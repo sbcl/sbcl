@@ -22,7 +22,8 @@
  "dirent.h" "signal.h"
  #-win32 "pwd.h"
  "unistd.h"
- #-win32 "termios.h")
+ #-win32 "termios.h"
+ #-win32 "syslog.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family" t)
@@ -472,4 +473,119 @@
  (:integer tcooff "TCOOFF" nil t)
  (:integer tcoon "TCOON" nil t)
 
- )
+ ;; syslog -- does this exist at all on Windows?
+
+ ;; SUSv3-standard openlog() facilities
+ #-win32
+ (:integer log-user "LOG_USER" "Default openlog() faclity." t)
+ #-win32
+ (:integer log-local0 "LOG_LOCAL0" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local1 "LOG_LOCAL1" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local2 "LOG_LOCAL2" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local3 "LOG_LOCAL3" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local4 "LOG_LOCAL4" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local5 "LOG_LOCAL5" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local6 "LOG_LOCAL6" "Locally-defined openlog() facility" t)
+ #-win32
+ (:integer log-local7 "LOG_LOCAL7" "Locally-defined openlog() facility" t)
+
+ ;; Additional, non-standard openlog() facilities (most of which
+ ;; probably won't be needed by Lisp programs, but here for
+ ;; completeness).
+ #-win32
+ (:integer
+  log-authpriv "LOG_AUTHPRIV" "openlog() facility for authorization messages" t)
+ #-win32
+ (:integer
+  log-cron "LOG_CRON" "openlog() facility for cron and at daemons" t)
+ #-win32
+ (:integer
+  log-daemon "LOG_DAEMON" "openlog() facility for arbitrary daemons" t)
+ #-win32
+ (:integer
+  log-ftp "LOG_FTP" "openlog() facility for FTP daemons" t)
+ #-win32
+ (:integer
+  log-kern "LOG_KERN" "openlog() facility for kernel messages" t)
+ #-win32
+ (:integer
+  log-lpr "LOG_LPR" "openlog() facility for the printer subsystem" t)
+ #-win32
+ (:integer
+  log-mail "LOG_MAIL" "openlog() facility for the mail subsystem" t)
+ #-win32
+ (:integer
+  log-news "LOG_NEWS" "openlog() facility for the usenet subsystem" t)
+ #-win32
+ (:integer
+  log-syslog "LOG_SYSLOG" "openlog() facility for the syslog subsystem" t)
+ #-win32
+ (:integer
+  log-uucp "LOG_UUCP" "openlog() facility for the UUCP subsystem" t)
+
+ ;; openlog() options
+ #-win32
+ (:integer
+  log-pid "LOG_PID"
+  "If supplied to openlog(), log the process ID with each message"
+  t)
+ #-win32
+ (:integer
+  log-cons "LOG_CONS"
+  "If supplied to openlog(), log to the system console as well as logfiles"
+  t)
+ #-win32
+ (:integer
+  log-ndelay "LOG_NDELAY"
+  "If supplied to openlog(), immediately open the syslog connection."
+  t)
+ #-win32
+ (:integer
+  log-odelay "LOG_ODELAY"
+  "If supplied to openlog(), delay opening the syslog connection to the first syslog() call."
+  t)
+ #-win32
+ (:integer
+  log-nowait "LOG_NOWAIT"
+  "If supplied to openlog(), do not wait for child processes created by calls to syslog()."
+  t)
+ ;; Not in SUSv3, but at least Glibc and BSD libc have this
+ #-win32
+ (:integer
+  log-perror "LOG_PERROR"
+  "If supplied to openlog(), write log messages to the process's standard error descriptor in addition to the logging facility."
+  t)
+
+ ;; syslog() severity levels
+ #-win32
+ (:integer
+  log-emerg "LOG_EMERG" "Log severity level denoting a panic." t)
+ #-win32
+ (:integer
+  log-alert "LOG_ALERT" "Log severity level denoting a condition that should be corrected immediately." t)
+ #-win32
+ (:integer
+  log-crit "LOG_CRIT" "Log severity level denoting critical conditions." t)
+ #-win32
+ (:integer
+  log-err "LOG_ERR" "Log severity level denoting an error." t)
+ #-win32
+ (:integer
+  log-warning "LOG_WARNING" "Log severity level denoting a warning." t)
+ #-win32
+ (:integer 
+  log-notice "LOG_NOTICE" "Log severity level denoting non-errors that may require special handling." t)
+ #-win32
+ (:integer
+  log-info "LOG_INFO" "Log severity level denoting informational messages." t)
+ #-win32
+ (:integer
+  log-debug "LOG_DEBUG" "Log severity level denoting debugging information ." t)
+ 
+)

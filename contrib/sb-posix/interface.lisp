@@ -552,3 +552,25 @@
     (unless (null-alien r)
       (cast r c-string))))
 (define-call "putenv" int minusp (string c-string))
+
+;;; syslog
+#-win32
+(progn
+  (export 'openlog :sb-posix)
+  (export 'syslog :sb-posix)
+  (export 'closelog :sb-posix)
+  (defun openlog (ident options &optional (facility log-user))
+    (alien-funcall (extern-alien
+                    "openlog" (function void c-string int int))
+                   ident options facility))
+  (defun syslog (priority format &rest args)
+    "Send a message to the syslog facility, with severity level
+PRIORITY.  The message will be formatted as by CL:FORMAT (rather
+than C's printf) with format string FORMAT and arguments ARGS."
+    (flet ((syslog1 (priority message)
+             (alien-funcall (extern-alien
+                             "syslog" (function void int c-string c-string))
+                            priority "%s" message)))
+      (syslog1 priority (apply #'format nil format args))))
+  (define-call "closelog" void never-fails))
+

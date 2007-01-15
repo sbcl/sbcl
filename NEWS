@@ -13,6 +13,8 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * new feature: new generic function SB-GRAY:STREAM-FILE-POSITION can 
     be used to provide an implementation for FILE-POSITION on Gray streams
     (thanks to Eric Marsden)
+  * new feature: add syslog, openlog and closelog support to SB-POSIX 
+    (thanks to Richard Kreuter)
   * optimization: the function call overhead in code compiled with 
     a high DEBUG optimization setting is significantly 
   * bug fix: an error is signaled for attempts to use READ-SEQUENCE
@@ -27,7 +29,7 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * bug fix: NIL can be used as a tagbody tag (thanks to Stephen Wilson)
   * bug fix: Win32 port can now handle foreign code unwinding Lisp
     stack frames from alien callbacks.
-  * bug fix: ATANH returned incorrect results on win32 (thanks to Pierre Mai)
+  * bug fix: ATANH returned incorrect results on win32 (thanks to Pierre Mai)  
 
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.
