@@ -65,6 +65,9 @@
 (defun %simple-fun-arglist (func)
   (%simple-fun-arglist func))
 
+(defun (setf %simple-fun-arglist) (new-value func)
+  (setf (%simple-fun-arglist func) new-value))
+
 ;;; Extract the name from the function header FUNC.
 (defun %simple-fun-name (func)
   (%simple-fun-name func))
