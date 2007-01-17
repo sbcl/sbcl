@@ -209,6 +209,14 @@
     (read-sequence sequence stream)
     (assert (equalp sequence #(255)))))
 
+  (let ((sequence (make-array 1)))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :external-format :latin-1
+                            :element-type 'character)
+      (read-sequence sequence stream)
+      (assert (equalp sequence #(#.(code-char 255))))))
+
   ;; Check the fast path works for (UNSIGNED-BYTE 8) and (SIGNED-BYTE
   ;; 8) vectors.
   (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
@@ -225,8 +233,8 @@
     (read-sequence sequence stream)
     (assert (equalp sequence #(-1)))))
 
-  ;; A bivalent stream can be read to a unsigned-byte vector or a
-  ;; string
+  ;; A bivalent stream can be read to a unsigned-byte vector, a
+  ;; string, or a generic vector
 
   (let ((sequence (make-array 1 :element-type '(unsigned-byte 8))))
     (with-open-file (stream pathname
@@ -236,6 +244,14 @@
       (assert (equalp sequence #(255)))))
 
   (let ((sequence (make-array 1 :element-type 'character)))
+    (with-open-file (stream pathname
+                            :direction :input
+                            :external-format :latin-1
+                            :element-type :default)
+      (read-sequence sequence stream)
+      (assert (equalp sequence #(#.(code-char 255))))))
+
+  (let ((sequence (make-array 1)))
     (with-open-file (stream pathname
                             :direction :input
                             :external-format :latin-1
@@ -280,7 +296,7 @@
                       (read-sequence sequence stream)
                       (error "READ-SEQUENCE didn't signal an error"))
         (type-error (condition)
-          (assert (= (type-error-datum condition) 255))
+          (assert (eql (type-error-datum condition) (code-char 255)))
           (assert (subtypep (type-error-expected-type condition)
                             '(signed-byte 8))))))))
 
@@ -296,6 +312,8 @@
 
 (let ((pathname "write-sequence.data")
       (generic-sequence (make-array 1 :initial-contents '(255)))
+      (generic-character-sequence (make-array 1 :initial-element #\a))
+      (generic-mixed-sequence (make-array 2 :initial-element #\a))
       (string (make-array 1 :element-type 'character
                           :initial-element (code-char 255)))
       (unsigned-sequence (make-array 1
@@ -304,12 +322,21 @@
       (signed-sequence (make-array 1
                                    :element-type '(signed-byte 8)
                                    :initial-contents '(-1))))
+
+  (setf (aref generic-mixed-sequence 1) 255)
+
   ;; Check the slow path for generic vectors.
   (with-open-file (stream pathname
                            :direction :output
                            :if-exists :supersede
                            :element-type '(unsigned-byte 8))
     (write-sequence generic-sequence stream))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :element-type 'character)
+    (write-sequence generic-character-sequence stream))
 
   ;; Check the fast path for unsigned and signed vectors.
   (with-open-file (stream pathname
@@ -324,7 +351,8 @@
                           :element-type '(signed-byte 8))
     (write-sequence signed-sequence stream))
 
-  ;; Bivalent streams on unsigned-byte and strings
+  ;; Bivalent streams on unsigned-byte vectors, strings, and a simple
+  ;; vector with mixed characters and bytes
 
   (with-open-file (stream pathname
                           :direction :output
@@ -338,6 +366,13 @@
                           :if-exists :supersede
                           :element-type :default)
     (write-sequence string stream))
+
+  (with-open-file (stream pathname
+                          :direction :output
+                          :external-format :latin-1
+                          :if-exists :supersede
+                          :element-type :default)
+    (write-sequence generic-mixed-sequence stream))
 
   ;; Check a TYPE-ERROR is signalled for unsigned and signed vectors
   ;; which are incompatible with the stream element type.

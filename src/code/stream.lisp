@@ -1821,8 +1821,17 @@
                    (+ start bytes-read)
                    end))
              (let ((read-function
-                    (if (subtypep (array-element-type data) 'character)
-                        #'ansi-stream-read-char
+                    (if (subtypep (stream-element-type stream) 'character)
+                        ;; If the stream-element-type is CHARACTER,
+                        ;; this might be a bivalent stream. If the
+                        ;; sequence is a specialized unsigned-byte
+                        ;; vector, try to read use binary IO. It'll
+                        ;; signal an error if stream is an pure
+                        ;; character stream.
+                        (if (subtypep (array-element-type data)
+                                      'unsigned-byte)
+                            #'ansi-stream-read-byte
+                            #'ansi-stream-read-char)
                         #'ansi-stream-read-byte)))
                (do ((i offset-start (1+ i)))
                    ((>= i offset-end) end)
@@ -1874,8 +1883,17 @@
          (labels
              ((output-seq-in-loop ()
                 (let ((write-function
-                       (if (subtypep (array-element-type data) 'character)
-                           (ansi-stream-out stream)
+                       (if (subtypep (stream-element-type stream) 'character)
+                           (lambda (stream object)
+                             ;; This might be a bivalent stream, so we need
+                             ;; to dispatch on a per-element basis, rather
+                             ;; than just based on the sequence or stream
+                             ;; element types.
+                             (if (characterp object)
+                                 (funcall (ansi-stream-out stream)
+                                          stream object)
+                                 (funcall (ansi-stream-bout stream)
+                                          stream object)))
                            (ansi-stream-bout stream))))
                   (do ((i offset-start (1+ i)))
                       ((>= i offset-end))
