@@ -123,9 +123,7 @@
                         ;; extra foreign frames below regular frames.
                         (let ((end (last backtrace #-win32 2 #+win32 4)))
                           (unless (equal (caar end)
-                                         (if *show-entry-point-details*
-                                             '(sb-c::tl-xep sb-impl::toplevel-init)
-                                             'sb-impl::toplevel-init))
+                                         'sb-impl::toplevel-init)
                             (print (list :backtrace-stunted (caar end)))
                             (setf result nil)))
                         (return-from outer-handler)))))

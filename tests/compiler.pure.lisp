@@ -1375,8 +1375,12 @@
 (handler-case (compile nil '(lambda (x)
                              (declare (optimize (speed 3) (safety 0)))
                              (the double-float (sqrt (the double-float x)))))
-  (sb-ext:compiler-note ()
-    (error "Compiler does not trust result type assertion.")))
+  (sb-ext:compiler-note (c)
+    ;; Ignore the note for the float -> pointer conversion of the
+    ;; return value.
+    (unless (string= (car (last (sb-c::simple-condition-format-arguments c)))
+                     "<return value>")
+      (error "Compiler does not trust result type assertion."))))
 
 (let ((f (compile nil '(lambda (x)
                         (declare (optimize speed (safety 0)))
@@ -1901,14 +1905,15 @@
     (compile nil '(lambda (x)
                    (declare (optimize (speed 3)))
                    (1+ x))))
-  ;; forced-to-do GENERIC-+, etc
-  (assert (> count0 0))
+  ;; forced-to-do GENERIC-+, etc, possible word -> bignum conversion note
+  (assert (> count0 1))
   (handler-bind ((sb-ext:compiler-note (lambda (c) (incf count1))))
     (compile nil '(lambda (x)
                    (declare (optimize (speed 3)))
                    (check-type x fixnum)
                    (1+ x))))
-  (assert (= count1 0)))
+  ;; Only the posssible word -> bignum conversion note
+  (assert (= count1 1)))
 
 ;;; Up to 0.9.8.22 x86-64 had broken return value handling in the
 ;;; %SET-SAP-REF-DOUBLE/SINGLE VOPs.

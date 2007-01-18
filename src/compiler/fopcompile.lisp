@@ -384,17 +384,11 @@
         (cond
           ;; Lambda forms are compiled with the real compiler
           ((lambda-form-p form)
-           ;; We wrap the real lambda inside another one to ensure
-           ;; that the compiler doesn't e.g. let convert it, thinking
-           ;; that there are no external references.
-           (let* ((handle (%compile `(lambda () ,form)
+           (let* ((handle (%compile form
                                     *compile-object*
                                     :path path)))
              (when for-value-p
-               (sb!fasl::dump-push handle *compile-object*)
-               ;; And then call the wrapper function when loading the FASL
-               (sb!fasl::dump-fop 'sb!fasl::fop-funcall *compile-object*)
-               (sb!fasl::dump-byte 0 *compile-object*))))
+               (sb!fasl::dump-push handle *compile-object*))))
           ;; While function names are translated to a call to FDEFINITION.
           ((legal-fun-name-p form)
            (dump-fdefinition form))

@@ -986,6 +986,7 @@
         (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun
             (functional-kind fun) :external
+            (functional-has-external-references-p locall-fun) t
             (functional-has-external-references-p fun) t)
       fun)))
 

@@ -579,7 +579,7 @@
  (:integer
   log-warning "LOG_WARNING" "Log severity level denoting a warning." t)
  #-win32
- (:integer 
+ (:integer
   log-notice "LOG_NOTICE" "Log severity level denoting non-errors that may require special handling." t)
  #-win32
  (:integer
@@ -587,5 +587,5 @@
  #-win32
  (:integer
   log-debug "LOG_DEBUG" "Log severity level denoting debugging information ." t)
- 
+
 )

@@ -1050,7 +1050,8 @@
 ;;; true if we converted.
 (defun maybe-let-convert (clambda)
   (declare (type clambda clambda))
-  (unless (declarations-suppress-let-conversion-p clambda)
+  (unless (or (declarations-suppress-let-conversion-p clambda)
+              (functional-has-external-references-p clambda))
     ;; We only convert to a LET when the function is a normal local
     ;; function, has no XEP, and is referenced in exactly one local
     ;; call. Conversion is also inhibited if the only reference is in
@@ -1166,7 +1167,8 @@
 (defun maybe-convert-to-assignment (clambda)
   (declare (type clambda clambda))
   (when (and (not (functional-kind clambda))
-             (not (functional-entry-fun clambda)))
+             (not (functional-entry-fun clambda))
+             (not (functional-has-external-references-p clambda)))
     (let ((outside-non-tail-call nil)
           (outside-call nil))
       (when (and (dolist (ref (leaf-refs clambda) t)
