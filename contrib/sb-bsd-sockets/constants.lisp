@@ -152,7 +152,7 @@
                       ((* t) control "void *" "msg_control")
                       (integer controllen "socklen_t" "msg_controllen")
                       (integer flags "int" "msg_flags")))
- (:function socket ("socket" int
+ (:function socket (#-netbsd "socket" #+netbsd "_socket" int
                     (domain int)
                     (type int)
                     (protocol int)))

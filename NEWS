@@ -32,6 +32,7 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * bug fix: ATANH returned incorrect results on win32 (thanks to Pierre Mai)  
   * bug fix: SBCL works on Linux/ppc systems with a kernel configured to use
     65k pages (thanks to David Woodhouse)
+  * bug fix: fix SB-POSIX dirent and socket on NetBSD (thanks to Richard Kreuter)
 
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.

@@ -52,7 +52,8 @@ os_vm_size_t os_vm_page_size;
 #include <sys/sysctl.h>
 #include <string.h>
 #include <sys/stat.h> /* For the stat-family wrappers. */
-
+#include <dirent.h>   /* For the opendir()/readdir() wrappers */
+#include <sys/socket.h> /* For the socket() wrapper */
 static void netbsd_init();
 #endif /* __NetBSD__ */
 
@@ -327,24 +328,44 @@ The system may fail to start.\n",
     }
 }
 
-/* The stat() routines in NetBSD's C library are compatibility
-   wrappers for some very old version of the stat buffer structure.
-   Programs must be processed by the C toolchain in order to get an
-   up-to-date definition of the stat() routine.  These wrappers are
-   used only in sb-posix, as of 2006-10-15. -- RMK */
-int _stat(const char *path, struct stat *sb) {
-  return (stat(path, sb));
+/* Various routines in NetBSD's C library are compatibility wrappers
+   for old versions. Programs must be processed by the C toolchain in
+   order to get up-to-date definitions of such routines. */
+/* The stat-family, opendir, and readdir are used only in sb-posix, as
+   of 2007-01-16. -- RMK */
+int
+_stat(const char *path, struct stat *sb)
+{
+    return stat(path, sb);
+}
+int
+_lstat(const char *path, struct stat *sb)
+{
+    return lstat(path, sb);
+}
+int
+_fstat(int fd, struct stat *sb)
+{
+    return fstat(fd, sb);
 }
 
-int _lstat(const char *path, struct stat *sb) {
-  return (lstat(path, sb));
+DIR *
+_opendir(const char *filename)
+{
+    return opendir(filename);
+}
+struct dirent *
+_readdir(DIR *dirp)
+{
+    return readdir(dirp);
 }
 
-int _fstat(int fd, struct stat *sb) {
-  return (fstat(fd, sb));
+/* Used in sb-bsd-sockets. */
+int
+_socket(int domain, int type, int protocol)
+{
+    return socket(domain, type, protocol);
 }
-
-
 #endif /* __NetBSD__ */
 
 #ifdef __FreeBSD__
