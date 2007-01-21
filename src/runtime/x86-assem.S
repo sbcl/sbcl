@@ -278,7 +278,7 @@ Ldone:
 	/* Establish an SEH frame. */
 #ifdef LISP_FEATURE_SB_THREAD
 	/* FIXME: need to save BSP here. */
-#error need to save BSP here, but don't know how yet.
+#error "need to save BSP here, but don't know how yet."
 #else
 	pushl	BINDING_STACK_POINTER + SYMBOL_VALUE_OFFSET
 #endif
