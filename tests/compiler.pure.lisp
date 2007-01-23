@@ -2043,6 +2043,30 @@
       (compiler-note () (throw :note nil)))
     (error "Unreachable code undetected.")))
 
+(with-test (:name (:compiler :constraint-propagation :var-eql-to-var-1))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x y)
+                        (when (typep y 'fixnum)
+                          (when (eql x y)
+                            (unless (typep x 'fixnum)
+                              (error "This is unreachable"))
+                            (setq y nil)))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
+
+(with-test (:name (:compiler :constraint-propagation :var-eql-to-var-2))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x y)
+                        (when (typep y 'fixnum)
+                          (when (eql y x)
+                            (unless (typep x 'fixnum)
+                              (error "This is unreachable"))
+                            (setq y nil)))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
+
 ;; Reported by John Wiseman, sbcl-devel
 ;; Subject: [Sbcl-devel] float type derivation bug?
 ;; Date: Tue, 4 Apr 2006 15:28:15 -0700

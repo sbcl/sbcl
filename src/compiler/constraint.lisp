@@ -447,7 +447,7 @@
       (do-eql-vars (var2 (var2 constraints))
         (inherit-constraints var1 var2 constraints target))
       (do-eql-vars (var1 (var1 constraints))
-        (inherit-constraints var1 var2 constraints target))
+        (inherit-constraints var2 var1 constraints target))
       t)))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR and LVAR's
