@@ -74,7 +74,7 @@ do
       else
           cat <<EOF
 
-WARNING! Some of the contrib modules did not build succesfully or pass
+WARNING! Some of the contrib modules did not build successfully or pass
 their self-tests. Failed contribs:"
 EOF
           HEADER_HAS_BEEN_PRINTED=true

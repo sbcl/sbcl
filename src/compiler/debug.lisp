@@ -415,7 +415,7 @@
     (typecase last
       (cif
        (unless (proper-list-of-length-p succ 1 2)
-         (barf "~S ends in an IF, but doesn't have one or two succesors."
+         (barf "~S ends in an IF, but doesn't have one or two successors."
                block))
        (unless (member (if-consequent last) succ)
          (barf "The CONSEQUENT for ~S isn't in SUCC for ~S." last block))

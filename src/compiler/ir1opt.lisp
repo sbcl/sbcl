@@ -451,7 +451,7 @@
 ;;; appropriate.)
 ;;;
 ;;; We call MAYBE-CONVERT-TAIL-LOCAL-CALL on each local non-MV
-;;; combination, which may change the succesor of the call to be the
+;;; combination, which may change the successor of the call to be the
 ;;; called function, and if so, checks if the call can become an
 ;;; assignment. If we convert to an assignment, we abort, since the
 ;;; RETURN has been deleted.
