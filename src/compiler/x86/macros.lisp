@@ -427,8 +427,6 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
-         (unless (zerop offset)
-           (format t "Attempting D-F-R-O, offset ~D~%" offset))
          (sc-case index
            (immediate
             (inst mov value (make-ea :dword :base object

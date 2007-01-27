@@ -60,7 +60,6 @@
                       (funcall func value (lvar-value offset))))
           (give-up-ir1-transform "constant is too large for inlining"))
         (splice-fun-args index func 2)
-        (format t "preparing to transform with ~A ~D~%" func value)
         `(lambda (thing index off1 off2 ,@(when setter-p
                                             '(value)))
            (,fun-name thing index (,func off2 off1) ,@(when setter-p
