@@ -393,7 +393,7 @@
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate)))
+              (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
@@ -404,9 +404,48 @@
                                      :disp (- (* (+ ,offset (tn-value index))
                                                  n-word-bytes)
                                               ,lowtag))))
+           (unsigned-reg
+            (inst mov value (make-ea :dword :base object :index index :scale 4
+                                     :disp (- (* ,offset n-word-bytes)
+                                              ,lowtag))))
            (t
             (inst mov value (make-ea :dword :base object :index index
                                      :disp (- (* ,offset n-word-bytes)
+                                              ,lowtag)))))))))
+
+(defmacro define-full-reffer+offset (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg immediate unsigned-reg)))
+       (:arg-types ,type tagged-num
+                   (:constant (constant-displacement ,lowtag sb!vm:n-word-bytes ,offset)))
+       (:info offset)
+       (:results (value :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 3                    ; pw was 5
+         (unless (zerop offset)
+           (format t "Attempting D-F-R-O, offset ~D~%" offset))
+         (sc-case index
+           (immediate
+            (inst mov value (make-ea :dword :base object
+                                     :disp (- (* (+ ,offset
+                                                    (tn-value index)
+                                                    offset)
+                                                 n-word-bytes)
+                                              ,lowtag))))
+           (unsigned-reg
+            (inst mov value (make-ea :dword :base object :index index :scale 4
+                                     :disp (- (* (+ ,offset offset)
+                                                 n-word-bytes)
+                                              ,lowtag))))
+           (t
+            (inst mov value (make-ea :dword :base object :index index
+                                     :disp (- (* (+ ,offset offset)
+                                                 n-word-bytes)
                                               ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
@@ -432,6 +471,35 @@
            (t
             (inst mov (make-ea :dword :base object :index index
                                :disp (- (* ,offset n-word-bytes) ,lowtag))
+                  value)))
+        (move result value)))))
+
+(defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg immediate))
+              (value :scs ,scs :target result))
+       (:info offset)
+       (:arg-types ,type tagged-num
+                   (:constant (constant-displacement ,lowtag sb!vm:n-word-bytes ,offset)) ,el-type)
+       (:results (result :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 4                    ; was 5
+         (sc-case index
+           (immediate
+            (inst mov (make-ea :dword :base object
+                               :disp (- (* (+ ,offset (tn-value index) offset)
+                                           n-word-bytes)
+                                        ,lowtag))
+                  value))
+           (t
+            (inst mov (make-ea :dword :base object :index index
+                               :disp (- (* (+ ,offset offset)
+                                           n-word-bytes) ,lowtag))
                   value)))
         (move result value)))))
 

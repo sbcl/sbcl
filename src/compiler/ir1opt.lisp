@@ -1830,6 +1830,17 @@
 
 ;;; TODO:
 ;;; - CAST chains;
+(defun delete-cast (cast)
+  (declare (type cast cast))
+  (let ((value (cast-value cast))
+        (lvar (node-lvar cast)))
+    (delete-filter cast lvar value)
+    (when lvar
+      (reoptimize-lvar lvar)
+      (when (lvar-single-value-p lvar)
+        (note-single-valuified-lvar lvar)))
+    (values)))
+
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
   (let ((value (cast-value cast))
@@ -1838,11 +1849,7 @@
       (let ((lvar (node-lvar cast)))
         (when (values-subtypep (lvar-derived-type value)
                                (cast-asserted-type cast))
-          (delete-filter cast lvar value)
-          (when lvar
-            (reoptimize-lvar lvar)
-            (when (lvar-single-value-p lvar)
-              (note-single-valuified-lvar lvar)))
+          (delete-cast cast)
           (return-from ir1-optimize-cast t))
 
         (when (and (listp (lvar-uses value))

@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.3 relative to sbcl-1.0.2:
+  * optimization: calls of the form (AREF FOO (+ INDEX <constant>)) now
+    produce more efficient code on the x86 if the compiler can determine
+    that (+ INDEX <constant>) does not require a bounds check and FOO
+    has an element type at least 8 bits wide.
+
 changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * improvement: experimental support for mach exception handling on
     x86/macos. requires building with :MACH-EXCEPTION-HANDLER feature

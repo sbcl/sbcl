@@ -1425,7 +1425,7 @@
 ;;; of arguments changes, the transform must be prepared to return a
 ;;; lambda with a new lambda-list with the correct number of
 ;;; arguments.
-(defun extract-fun-args (lvar fun num-args)
+(defun splice-fun-args (lvar fun num-args)
   #!+sb-doc
   "If LVAR is a call to FUN with NUM-ARGS args, change those arguments
    to feed directly to the LVAR-DEST of LVAR, which must be a
@@ -1461,6 +1461,22 @@
           (setf (node-derived-type inside) *wild-type*)
           (flush-dest lvar)
           (values))))))
+
+(defun extract-fun-args (lvar fun num-args)
+  (declare (type lvar lvar)
+           (type (or symbol list) fun)
+           (type index num-args))
+  (let ((fun (if (listp fun) fun (list fun))))
+    (let ((inside (lvar-uses lvar)))
+      (unless (combination-p inside)
+        (give-up-ir1-transform))
+      (let ((inside-fun (combination-fun inside)))
+        (unless (member (lvar-fun-name inside-fun) fun)
+          (give-up-ir1-transform))
+        (let ((inside-args (combination-args inside)))
+          (unless (= (length inside-args) num-args)
+            (give-up-ir1-transform))
+          (values (lvar-fun-name inside-fun) inside-args))))))
 
 (defun flush-combination (combination)
   (declare (type combination combination))

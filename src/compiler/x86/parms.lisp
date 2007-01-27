@@ -35,6 +35,12 @@
 ;;; addressable object
 (def!constant n-byte-bits 8)
 
+;;; The minimum immediate offset in a memory-referencing instruction.
+(def!constant minimum-immediate-offset (- (expt 2 31)))
+
+;;; The maximum immediate offset in a memory-referencing instruction.
+(def!constant maximum-immediate-offset (1- (expt 2 31)))
+
 (def!constant float-sign-shift 31)
 
 ;;; comment from CMU CL:

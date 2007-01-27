@@ -32,6 +32,48 @@
 (deftransform abs ((x) (rational))
   '(if (< x 0) (- x) x))
 
+;;; We don't want to clutter the bignum code.
+#!+x86
+(define-source-transform sb!bignum:%bignum-ref (bignum index)
+  ;; KLUDGE: We use TRULY-THE here because even though the bignum code
+  ;; is (currently) compiled with (SAFETY 0), the compiler insists on
+  ;; inserting CAST nodes to ensure that INDEX is of the correct type.
+  ;; These CAST nodes do not generate any type checks, but they do
+  ;; interfere with the operation of FOLD-INDEX-ADDRESSING, below.
+  ;; This scenario is a problem for the more user-visible case of
+  ;; folding as well.  --njf, 2006-12-01
+  `(sb!bignum:%bignum-ref-with-offset ,bignum
+                                      (truly-the bignum-index ,index) 0))
+
+#!+x86
+(defun fold-index-addressing (fun-name element-size lowtag data-offset
+                              index offset &optional setter-p)
+  (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
+    (destructuring-bind (x constant) index-args
+      (declare (ignorable x))
+      (unless (constant-lvar-p constant)
+        (give-up-ir1-transform))
+      (let ((value (lvar-value constant)))
+        (unless (and (integerp value)
+                     (sb!vm::foldable-constant-offset-p
+                      element-size lowtag data-offset
+                      (funcall func value (lvar-value offset))))
+          (give-up-ir1-transform "constant is too large for inlining"))
+        (splice-fun-args index func 2)
+        (format t "preparing to transform with ~A ~D~%" func value)
+        `(lambda (thing index off1 off2 ,@(when setter-p
+                                            '(value)))
+           (,fun-name thing index (,func off2 off1) ,@(when setter-p
+                                                        '(value))))))))
+
+#!+x86
+(deftransform sb!bignum:%bignum-ref-with-offset
+    ((bignum index offset) * * :node node)
+  (fold-index-addressing 'sb!bignum:%bignum-ref-with-offset
+                         sb!vm:n-word-bits sb!vm:other-pointer-lowtag
+                         sb!vm:bignum-digits-offset
+                         index offset))
+
 ;;; The layout is stored in slot 0.
 (define-source-transform %instance-layout (x)
   `(truly-the layout (%instance-ref ,x 0)))
@@ -57,10 +99,13 @@
         ;; the other transform will kick in, so that's OK
         (give-up-ir1-transform)
         `(etypecase string
-          ((simple-array character (*)) (data-vector-ref string index))
+          ((simple-array character (*))
+           (data-vector-ref string index))
           #!+sb-unicode
-          ((simple-array base-char (*)) (data-vector-ref string index))
-          ((simple-array nil (*)) (data-vector-ref string index))))))
+          ((simple-array base-char (*))
+           (data-vector-ref string index))
+          ((simple-array nil (*))
+           (data-vector-ref string index))))))
 
 (deftransform hairy-data-vector-ref ((array index) (array t) *)
   "avoid runtime dispatch on array element type"
@@ -74,7 +119,7 @@
     ;; WITH-ARRAY-DATA. Since WITH-ARRAY-DATA is implemented as a
     ;; macro, and macros aren't expanded in transform output, we have
     ;; to hand-expand it ourselves.)
-    (let ((element-type-specifier (type-specifier element-ctype)))
+    (let* ((element-type-specifier (type-specifier element-ctype)))
       `(multiple-value-bind (array index)
            (%data-vector-and-index array index)
          (declare (type (simple-array ,element-type-specifier 1) array))
@@ -86,8 +131,7 @@
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
-(deftransform data-vector-ref ((array index)
-                               (simple-array t))
+(deftransform data-vector-ref ((array index) (simple-array t))
   (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
@@ -102,6 +146,42 @@
                                                    (,total-size))
                                      (%array-data-vector array))
                           index)))))
+
+;;; Transform data vector access to a form that opens up optimization
+;;; opportunities.
+#!+x86
+(deftransform data-vector-ref ((array index) ((or simple-unboxed-array
+                                                  simple-vector)
+                                              t))
+  (let ((array-type (lvar-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
+           (saetp (find element-type
+                        sb!vm:*specialized-array-element-type-properties*
+                        :key #'sb!vm:saetp-specifier :test #'equal)))
+      (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
+        (give-up-ir1-transform))
+      `(data-vector-ref-with-offset array index 0))))
+
+#!+x86
+(deftransform data-vector-ref-with-offset ((array index offset)
+                                           ((or simple-unboxed-array
+                                                simple-vector)
+                                            t t))
+  (let ((array-type (lvar-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
+           (saetp (find element-type
+                        sb!vm:*specialized-array-element-type-properties*
+                        :key #'sb!vm:saetp-specifier :test #'equal)))
+      (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
+      (fold-index-addressing 'data-vector-ref-with-offset
+                             (sb!vm:saetp-n-bits saetp)
+                             sb!vm:other-pointer-lowtag
+                             sb!vm:vector-data-offset
+                             index offset))))
 
 (deftransform hairy-data-vector-set ((string index new-value)
                                      (simple-string t t))
@@ -140,6 +220,8 @@
                   (the ,(type-specifier declared-element-ctype)
                        new-value))))))))
 
+;;; Transform multi-dimensional array to one dimensional data vector
+;;; access.
 (deftransform data-vector-set ((array index new-value)
                                (simple-array t t))
   (let ((array-type (lvar-type array)))
@@ -157,6 +239,42 @@
                                      (%array-data-vector array))
                           index
                           new-value)))))
+
+;;; Transform data vector access to a form that opens up optimization
+;;; opportunities.
+#!+x86
+(deftransform data-vector-set ((array index new-value)
+                               ((or simple-unboxed-array simple-vector)
+                                t t))
+  (let ((array-type (lvar-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
+           (saetp (find element-type
+                        sb!vm:*specialized-array-element-type-properties*
+                        :key #'sb!vm:saetp-specifier :test #'equal)))
+      (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
+        (give-up-ir1-transform))
+      `(data-vector-set-with-offset array index 0 new-value))))
+
+#!+x86
+(deftransform data-vector-set-with-offset ((array index offset new-value)
+                                           ((or simple-unboxed-array
+                                                simple-vector)
+                                            t t t))
+  (let ((array-type (lvar-type array)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
+           (saetp (find element-type
+                        sb!vm:*specialized-array-element-type-properties*
+                        :key #'sb!vm:saetp-specifier :test #'equal)))
+      (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
+      (fold-index-addressing 'data-vector-set-with-offset
+                             (sb!vm:saetp-n-bits saetp)
+                             sb!vm:other-pointer-lowtag
+                             sb!vm:vector-data-offset
+                             index offset t))))
 
 (defoptimizer (%data-vector-and-index derive-type) ((array index))
   (let ((atype (lvar-type array)))

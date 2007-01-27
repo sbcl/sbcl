@@ -65,6 +65,30 @@
                           (* max-offset sb!vm:n-word-bytes))
                        scale)))
 
+#!+x86
+(defun displacement-bounds (lowtag element-size data-offset)
+  (let* ((adjustment (- (* data-offset sb!vm:n-word-bytes) lowtag))
+         (bytes-per-element (ceiling element-size sb!vm:n-byte-bits))
+         (min (truncate (+ sb!vm::minimum-immediate-offset adjustment)
+                        bytes-per-element))
+         (max (truncate (+ sb!vm::maximum-immediate-offset adjustment)
+                        bytes-per-element)))
+    (values min max)))
+
+#!+x86
+(def!type constant-displacement (lowtag element-size data-offset)
+  (flet ((integerify (x)
+           (etypecase x
+             (integer x)
+             (symbol (symbol-value x)))))
+    (let ((lowtag (integerify lowtag))
+          (element-size (integerify element-size))
+          (data-offset (integerify data-offset)))
+      (multiple-value-bind (min max) (displacement-bounds lowtag
+                                                          element-size
+                                                          data-offset)
+        `(integer ,min ,max)))))
+
 ;;; Similar to FUNCTION, but the result type is "exactly" specified:
 ;;; if it is an object type, then the function returns exactly one
 ;;; value, if it is a short form of VALUES, then this short form

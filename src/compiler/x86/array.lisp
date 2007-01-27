@@ -132,12 +132,12 @@
 ;;; out of 8, 16, or 32 bit elements.
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
              `(progn
-                (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type)
+                (define-full-reffer+offset ,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" type)
                   ,type vector-data-offset other-pointer-lowtag ,scs
-                  ,element-type data-vector-ref)
-                (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type)
+                  ,element-type data-vector-ref-with-offset)
+                (define-full-setter+offset ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
                   ,type vector-data-offset other-pointer-lowtag ,scs
-                  ,element-type data-vector-set))))
+                  ,element-type data-vector-set-with-offset))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
@@ -146,7 +146,10 @@
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
     signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num
-    unsigned-reg))
+    unsigned-reg)
+  #!+sb-unicode
+  (def-full-data-vector-frobs simple-character-string character character-reg))
+
 
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors
@@ -299,213 +302,114 @@
 
 ;;; And the float variants.
 
-(define-vop (data-vector-ref/simple-array-single-float)
+(defun make-ea-for-float-ref (object index offset element-size
+                              &key (scale 1) (complex-offset 0))
+  (sc-case index
+    (immediate
+     (make-ea :dword :base object
+              :disp (- (+ (* vector-data-offset n-word-bytes)
+                          (* element-size (+ offset complex-offset
+                                             (tn-value index)))
+                       other-pointer-lowtag))))
+    (t
+     (make-ea :dword :base object :index index :scale scale
+              :disp (- (+ (* vector-data-offset n-word-bytes)
+                          (* element-size offset)
+                          complex-offset)
+                       other-pointer-lowtag)))))
+
+(define-vop (data-vector-ref-with-offset/simple-array-single-float)
   (:note "inline array access")
-  (:translate data-vector-ref)
+  (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-single-float positive-fixnum)
+         (index :scs (any-reg immediate)))
+  (:info offset)
+  (:arg-types simple-array-single-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                4 vector-data-offset)))
   (:results (value :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
    (with-empty-tn@fp-top(value)
-     (inst fld (make-ea :dword :base object :index index :scale 1
-                        :disp (- (* vector-data-offset
-                                    n-word-bytes)
-                                 other-pointer-lowtag))))))
+     (inst fld (make-ea-for-float-ref object index offset 4)))))
 
-(define-vop (data-vector-ref-c/simple-array-single-float)
-  (:note "inline array access")
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-single-float (:constant (signed-byte 30)))
-  (:results (value :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 4
-   (with-empty-tn@fp-top(value)
-     (inst fld (make-ea :dword :base object
-                        :disp (- (+ (* vector-data-offset
-                                       n-word-bytes)
-                                    (* 4 index))
-                                 other-pointer-lowtag))))))
-
-(define-vop (data-vector-set/simple-array-single-float)
+(define-vop (data-vector-set-with-offset/simple-array-single-float)
   (:note "inline array store")
-  (:translate data-vector-set)
+  (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg immediate))
          (value :scs (single-reg) :target result))
-  (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 5
-    (cond ((zerop (tn-offset value))
-           ;; Value is in ST0.
-           (inst fst (make-ea :dword :base object :index index :scale 1
-                              :disp (- (* vector-data-offset
-                                          n-word-bytes)
-                                       other-pointer-lowtag)))
-           (unless (zerop (tn-offset result))
-                   ;; Value is in ST0 but not result.
-                   (inst fst result)))
-          (t
-           ;; Value is not in ST0.
-           (inst fxch value)
-           (inst fst (make-ea :dword :base object :index index :scale 1
-                              :disp (- (* vector-data-offset
-                                          n-word-bytes)
-                                       other-pointer-lowtag)))
-           (cond ((zerop (tn-offset result))
-                  ;; The result is in ST0.
-                  (inst fst value))
-                 (t
-                  ;; Neither value or result are in ST0
-                  (unless (location= value result)
-                          (inst fst result))
-                  (inst fxch value)))))))
-
-(define-vop (data-vector-set-c/simple-array-single-float)
-  (:note "inline array store")
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (single-reg) :target result))
-  (:info index)
-  (:arg-types simple-array-single-float (:constant (signed-byte 30))
+  (:info offset)
+  (:arg-types simple-array-single-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                4 vector-data-offset))
               single-float)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
-  (:generator 4
+  (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fst (make-ea :dword :base object
-                              :disp (- (+ (* vector-data-offset
-                                             n-word-bytes)
-                                          (* 4 index))
-                                       other-pointer-lowtag)))
+           (inst fst (make-ea-for-float-ref object index offset 4))
            (unless (zerop (tn-offset result))
-                   ;; Value is in ST0 but not result.
-                   (inst fst result)))
+             ;; Value is in ST0 but not result.
+             (inst fst result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fst (make-ea :dword :base object
-                              :disp (- (+ (* vector-data-offset
-                                             n-word-bytes)
-                                          (* 4 index))
-                                       other-pointer-lowtag)))
+           (inst fst (make-ea-for-float-ref object index offset 4))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fst value))
                  (t
                   ;; Neither value or result are in ST0
                   (unless (location= value result)
-                          (inst fst result))
+                    (inst fst result))
                   (inst fxch value)))))))
 
-(define-vop (data-vector-ref/simple-array-double-float)
+(define-vop (data-vector-ref-with-offset/simple-array-double-float)
   (:note "inline array access")
-  (:translate data-vector-ref)
+  (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-double-float positive-fixnum)
+         (index :scs (any-reg immediate)))
+  (:info offset)
+  (:arg-types simple-array-double-float
+              positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                8 vector-data-offset)))
   (:results (value :scs (double-reg)))
   (:result-types double-float)
   (:generator 7
    (with-empty-tn@fp-top(value)
-     (inst fldd (make-ea :dword :base object :index index :scale 2
-                         :disp (- (* vector-data-offset
-                                     n-word-bytes)
-                                  other-pointer-lowtag))))))
+     (inst fldd (make-ea-for-float-ref object index offset 8 :scale 2)))))
 
-(define-vop (data-vector-ref-c/simple-array-double-float)
-  (:note "inline array access")
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-double-float (:constant (signed-byte 30)))
-  (:results (value :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 6
-   (with-empty-tn@fp-top(value)
-     (inst fldd (make-ea :dword :base object
-                         :disp (- (+ (* vector-data-offset
-                                        n-word-bytes)
-                                     (* 8 index))
-                                  other-pointer-lowtag))))))
-
-(define-vop (data-vector-set/simple-array-double-float)
+(define-vop (data-vector-set-with-offset/simple-array-double-float)
   (:note "inline array store")
-  (:translate data-vector-set)
+  (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg immediate))
          (value :scs (double-reg) :target result))
-  (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 20
-    (cond ((zerop (tn-offset value))
-           ;; Value is in ST0.
-           (inst fstd (make-ea :dword :base object :index index :scale 2
-                               :disp (- (* vector-data-offset
-                                           n-word-bytes)
-                                        other-pointer-lowtag)))
-           (unless (zerop (tn-offset result))
-                   ;; Value is in ST0 but not result.
-                   (inst fstd result)))
-          (t
-           ;; Value is not in ST0.
-           (inst fxch value)
-           (inst fstd (make-ea :dword :base object :index index :scale 2
-                               :disp (- (* vector-data-offset
-                                           n-word-bytes)
-                                        other-pointer-lowtag)))
-           (cond ((zerop (tn-offset result))
-                  ;; The result is in ST0.
-                  (inst fstd value))
-                 (t
-                  ;; Neither value or result are in ST0
-                  (unless (location= value result)
-                          (inst fstd result))
-                  (inst fxch value)))))))
-
-(define-vop (data-vector-set-c/simple-array-double-float)
-  (:note "inline array store")
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (double-reg) :target result))
-  (:info index)
-  (:arg-types simple-array-double-float (:constant (signed-byte 30))
+  (:info offset)
+  (:arg-types simple-array-double-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                8 vector-data-offset))
               double-float)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
-  (:generator 19
+  (:generator 20
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fstd (make-ea :dword :base object
-                               :disp (- (+ (* vector-data-offset
-                                              n-word-bytes)
-                                           (* 8 index))
-                                        other-pointer-lowtag)))
+           (inst fstd (make-ea-for-float-ref object index offset 8 :scale 2))
            (unless (zerop (tn-offset result))
                    ;; Value is in ST0 but not result.
                    (inst fstd result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fstd (make-ea :dword :base object
-                               :disp (- (+ (* vector-data-offset
-                                              n-word-bytes)
-                                           (* 8 index))
-                                        other-pointer-lowtag)))
+           (inst fstd (make-ea-for-float-ref object index offset 8 :scale 2))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fstd value))
@@ -515,66 +419,41 @@
                           (inst fstd result))
                   (inst fxch value)))))))
 
-
-
 ;;; complex float variants
 
-(define-vop (data-vector-ref/simple-array-complex-single-float)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float)
   (:note "inline array access")
-  (:translate data-vector-ref)
+  (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-complex-single-float positive-fixnum)
-  (:results (value :scs (complex-single-reg)))
-  (:result-types complex-single-float)
-  (:generator 5
-    (let ((real-tn (complex-single-reg-real-tn value)))
-      (with-empty-tn@fp-top (real-tn)
-        (inst fld (make-ea :dword :base object :index index :scale 2
-                           :disp (- (* vector-data-offset
-                                       n-word-bytes)
-                                    other-pointer-lowtag)))))
-    (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (with-empty-tn@fp-top (imag-tn)
-        (inst fld (make-ea :dword :base object :index index :scale 2
-                           :disp (- (* (1+ vector-data-offset)
-                                       n-word-bytes)
-                                    other-pointer-lowtag)))))))
-
-(define-vop (data-vector-ref-c/simple-array-complex-single-float)
-  (:note "inline array access")
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-complex-single-float (:constant (signed-byte 30)))
-  (:results (value :scs (complex-single-reg)))
-  (:result-types complex-single-float)
-  (:generator 4
-    (let ((real-tn (complex-single-reg-real-tn value)))
-      (with-empty-tn@fp-top (real-tn)
-        (inst fld (make-ea :dword :base object
-                           :disp (- (+ (* vector-data-offset
-                                          n-word-bytes)
-                                       (* 8 index))
-                                    other-pointer-lowtag)))))
-    (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (with-empty-tn@fp-top (imag-tn)
-        (inst fld (make-ea :dword :base object
-                           :disp (- (+ (* vector-data-offset
-                                          n-word-bytes)
-                                       (* 8 index) 4)
-                                    other-pointer-lowtag)))))))
-
-(define-vop (data-vector-set/simple-array-complex-single-float)
-  (:note "inline array store")
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (complex-single-reg) :target result))
+         (index :scs (any-reg immediate)))
+  (:info offset)
   (:arg-types simple-array-complex-single-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                8 vector-data-offset)))
+  (:results (value :scs (complex-single-reg)))
+  (:result-types complex-single-float)
+  (:generator 5
+    (let ((real-tn (complex-single-reg-real-tn value)))
+      (with-empty-tn@fp-top (real-tn)
+        (inst fld (make-ea-for-float-ref object index offset 8 :scale 2))))
+    (let ((imag-tn (complex-single-reg-imag-tn value)))
+      (with-empty-tn@fp-top (imag-tn)
+        ;; FIXME
+        (inst fld (make-ea-for-float-ref object index offset 8
+                                         :scale 2 :complex-offset 4))))))
+
+(define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
+  (:note "inline array store")
+  (:translate data-vector-set-with-offset)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg immediate))
+         (value :scs (complex-single-reg) :target result))
+  (:info offset)
+  (:arg-types simple-array-complex-single-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                8 vector-data-offset))
               complex-single-float)
   (:results (result :scs (complex-single-reg)))
   (:result-types complex-single-float)
@@ -583,20 +462,14 @@
           (result-real (complex-single-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fst (make-ea :dword :base object :index index :scale 2
-                                :disp (- (* vector-data-offset
-                                            n-word-bytes)
-                                         other-pointer-lowtag)))
+             (inst fst (make-ea-for-float-ref object index offset 8 :scale 2))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
                (inst fst result-real)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fst (make-ea :dword :base object :index index :scale 2
-                                :disp (- (* vector-data-offset
-                                            n-word-bytes)
-                                         other-pointer-lowtag)))
+             (inst fst (make-ea-for-float-ref object index offset 8 :scale 2))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
                     (inst fst value-real))
@@ -608,125 +481,44 @@
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fst (make-ea :dword :base object :index index :scale 2
-                         :disp (- (+ (* vector-data-offset
-                                        n-word-bytes)
-                                     4)
-                                  other-pointer-lowtag)))
+      (inst fst (make-ea-for-float-ref object index offset 8
+                                       :scale 2 :complex-offset 4))
       (unless (location= value-imag result-imag)
         (inst fst result-imag))
       (inst fxch value-imag))))
 
-(define-vop (data-vector-set-c/simple-array-complex-single-float)
-  (:note "inline array store")
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (complex-single-reg) :target result))
-  (:info index)
-  (:arg-types simple-array-complex-single-float (:constant (signed-byte 30))
-              complex-single-float)
-  (:results (result :scs (complex-single-reg)))
-  (:result-types complex-single-float)
-  (:generator 4
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
-      (cond ((zerop (tn-offset value-real))
-             ;; Value is in ST0.
-             (inst fst (make-ea :dword :base object
-                                :disp (- (+ (* vector-data-offset
-                                               n-word-bytes)
-                                            (* 8 index))
-                                         other-pointer-lowtag)))
-             (unless (zerop (tn-offset result-real))
-               ;; Value is in ST0 but not result.
-               (inst fst result-real)))
-            (t
-             ;; Value is not in ST0.
-             (inst fxch value-real)
-             (inst fst (make-ea :dword :base object
-                                :disp (- (+ (* vector-data-offset
-                                               n-word-bytes)
-                                            (* 8 index))
-                                         other-pointer-lowtag)))
-             (cond ((zerop (tn-offset result-real))
-                    ;; The result is in ST0.
-                    (inst fst value-real))
-                   (t
-                    ;; Neither value or result are in ST0
-                    (unless (location= value-real result-real)
-                      (inst fst result-real))
-                    (inst fxch value-real))))))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
-      (inst fxch value-imag)
-      (inst fst (make-ea :dword :base object
-                         :disp (- (+ (* vector-data-offset
-                                        n-word-bytes)
-                                     (* 8 index) 4)
-                                  other-pointer-lowtag)))
-      (unless (location= value-imag result-imag)
-        (inst fst result-imag))
-      (inst fxch value-imag))))
-
-
-(define-vop (data-vector-ref/simple-array-complex-double-float)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
   (:note "inline array access")
-  (:translate data-vector-ref)
+  (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-complex-double-float positive-fixnum)
+         (index :scs (any-reg immediate)))
+  (:info offset)
+  (:arg-types simple-array-complex-double-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                16 vector-data-offset)))
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fldd (make-ea :dword :base object :index index :scale 4
-                            :disp (- (* vector-data-offset
-                                        n-word-bytes)
-                                     other-pointer-lowtag)))))
+        (inst fldd (make-ea-for-float-ref object index offset 16 :scale 4)))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-        (inst fldd (make-ea :dword :base object :index index :scale 4
-                            :disp (- (+ (* vector-data-offset
-                                           n-word-bytes)
-                                        8)
-                                     other-pointer-lowtag)))))))
+        (inst fldd (make-ea-for-float-ref object index offset 16
+                                          :scale 4 :complex-offset 8)))))))
 
-(define-vop (data-vector-ref-c/simple-array-complex-double-float)
-  (:note "inline array access")
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-complex-double-float (:constant (signed-byte 30)))
-  (:results (value :scs (complex-double-reg)))
-  (:result-types complex-double-float)
-  (:generator 6
-    (let ((real-tn (complex-double-reg-real-tn value)))
-      (with-empty-tn@fp-top (real-tn)
-        (inst fldd (make-ea :dword :base object
-                            :disp (- (+ (* vector-data-offset
-                                           n-word-bytes)
-                                        (* 16 index))
-                                     other-pointer-lowtag)))))
-    (let ((imag-tn (complex-double-reg-imag-tn value)))
-      (with-empty-tn@fp-top (imag-tn)
-        (inst fldd (make-ea :dword :base object
-                            :disp (- (+ (* vector-data-offset
-                                           n-word-bytes)
-                                        (* 16 index) 8)
-                                     other-pointer-lowtag)))))))
-
-(define-vop (data-vector-set/simple-array-complex-double-float)
+(define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
   (:note "inline array store")
-  (:translate data-vector-set)
+  (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
+         (index :scs (any-reg immediate))
          (value :scs (complex-double-reg) :target result))
+  (:info offset)
   (:arg-types simple-array-complex-double-float positive-fixnum
+              (:constant (constant-displacement other-pointer-lowtag
+                                                16 vector-data-offset))
               complex-double-float)
   (:results (result :scs (complex-double-reg)))
   (:result-types complex-double-float)
@@ -735,20 +527,16 @@
           (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fstd (make-ea :dword :base object :index index :scale 4
-                                 :disp (- (* vector-data-offset
-                                             n-word-bytes)
-                                          other-pointer-lowtag)))
+             (inst fstd (make-ea-for-float-ref object index offset 16
+                                               :scale 4))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
                (inst fstd result-real)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fstd (make-ea :dword :base object :index index :scale 4
-                                 :disp (- (* vector-data-offset
-                                             n-word-bytes)
-                                          other-pointer-lowtag)))
+             (inst fstd (make-ea-for-float-ref object index offset 16
+                                               :scale 4))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
                     (inst fstd value-real))
@@ -760,502 +548,151 @@
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fstd (make-ea :dword :base object :index index :scale 4
-                          :disp (- (+ (* vector-data-offset
-                                         n-word-bytes)
-                                      8)
-                                   other-pointer-lowtag)))
+      (inst fstd (make-ea-for-float-ref object index offset 16
+                                        :scale 4 :complex-offset 8))
       (unless (location= value-imag result-imag)
         (inst fstd result-imag))
       (inst fxch value-imag))))
-
-(define-vop (data-vector-set-c/simple-array-complex-double-float)
-  (:note "inline array store")
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (complex-double-reg) :target result))
-  (:info index)
-  (:arg-types simple-array-complex-double-float (:constant (signed-byte 30))
-              complex-double-float)
-  (:results (result :scs (complex-double-reg)))
-  (:result-types complex-double-float)
-  (:generator 19
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
-      (cond ((zerop (tn-offset value-real))
-             ;; Value is in ST0.
-             (inst fstd (make-ea :dword :base object
-                                 :disp (- (+ (* vector-data-offset
-                                                n-word-bytes)
-                                             (* 16 index))
-                                          other-pointer-lowtag)))
-             (unless (zerop (tn-offset result-real))
-               ;; Value is in ST0 but not result.
-               (inst fstd result-real)))
-            (t
-             ;; Value is not in ST0.
-             (inst fxch value-real)
-             (inst fstd (make-ea :dword :base object
-                                 :disp (- (+ (* vector-data-offset
-                                                n-word-bytes)
-                                             (* 16 index))
-                                          other-pointer-lowtag)))
-             (cond ((zerop (tn-offset result-real))
-                    ;; The result is in ST0.
-                    (inst fstd value-real))
-                   (t
-                    ;; Neither value or result are in ST0
-                    (unless (location= value-real result-real)
-                      (inst fstd result-real))
-                    (inst fxch value-real))))))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
-      (inst fxch value-imag)
-      (inst fstd (make-ea :dword :base object
-                          :disp (- (+ (* vector-data-offset
-                                         n-word-bytes)
-                                      (* 16 index) 8)
-                                   other-pointer-lowtag)))
-      (unless (location= value-imag result-imag)
-        (inst fstd result-imag))
-      (inst fxch value-imag))))
-
-
 
 
-;;; unsigned-byte-8
-(macrolet ((define-data-vector-frobs (ptype)
+;;; {un,}signed-byte-8, simple-base-string
+
+(macrolet ((define-data-vector-frobs (ptype element-type ref-inst &rest scs)
   `(progn
-    (define-vop (,(symbolicate "DATA-VECTOR-REF/" ptype))
-      (:translate data-vector-ref)
+    (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
+      (:translate data-vector-ref-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg))
-             (index :scs (unsigned-reg)))
-      (:arg-types ,ptype positive-fixnum)
-      (:results (value :scs (unsigned-reg signed-reg)))
-      (:result-types positive-fixnum)
+             (index :scs (unsigned-reg immediate)))
+      (:info offset)
+      (:arg-types ,ptype positive-fixnum
+                  (:constant (constant-displacement other-pointer-lowtag
+                                                    1 vector-data-offset)))
+      (:results (value :scs ,scs))
+      (:result-types ,element-type)
       (:generator 5
-        (inst movzx value
-              (make-ea :byte :base object :index index :scale 1
-                       :disp (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag)))))
-    (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" ptype))
-      (:translate data-vector-ref)
-      (:policy :fast-safe)
-      (:args (object :scs (descriptor-reg)))
-      (:info index)
-      (:arg-types ,ptype (:constant (signed-byte 30)))
-      (:results (value :scs (unsigned-reg signed-reg)))
-      (:result-types positive-fixnum)
-      (:generator 4
-        (inst movzx value
-              (make-ea :byte :base object
-                       :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                                other-pointer-lowtag)))))
-    (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
-      (:translate data-vector-set)
+        (sc-case index
+          (immediate
+           (inst ,ref-inst value
+                 (make-ea :byte :base object
+                          :disp (- (+ (* vector-data-offset n-word-bytes)
+                                      (tn-value index)
+                                      offset)
+                                   other-pointer-lowtag))))
+          (t
+           (inst ,ref-inst value
+                 (make-ea :byte :base object :index index :scale 1
+                          :disp (- (+ (* vector-data-offset n-word-bytes)
+                                      offset)
+                                   other-pointer-lowtag)))))))
+    (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
+      (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
-             (index :scs (unsigned-reg) :to (:eval 0))
-             (value :scs (unsigned-reg signed-reg) :target eax))
-      (:arg-types ,ptype positive-fixnum positive-fixnum)
+             (index :scs (unsigned-reg immediate) :to (:eval 0))
+             (value :scs ,scs :target eax))
+      (:info offset)
+      (:arg-types ,ptype positive-fixnum
+                  (:constant (constant-displacement other-pointer-lowtag
+                                                    1 vector-data-offset))
+                  ,element-type)
       (:temporary (:sc unsigned-reg :offset eax-offset :target result
                        :from (:argument 2) :to (:result 0))
                   eax)
-      (:results (result :scs (unsigned-reg signed-reg)))
-      (:result-types positive-fixnum)
+      (:results (result :scs ,scs))
+      (:result-types ,element-type)
       (:generator 5
         (move eax value)
-        (inst mov (make-ea :byte :base object :index index :scale 1
-                           :disp (- (* vector-data-offset n-word-bytes)
-                                    other-pointer-lowtag))
-              al-tn)
-        (move result eax)))
-    (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" ptype))
-      (:translate data-vector-set)
-      (:policy :fast-safe)
-      (:args (object :scs (descriptor-reg) :to (:eval 0))
-             (value :scs (unsigned-reg signed-reg) :target eax))
-      (:info index)
-      (:arg-types ,ptype (:constant (signed-byte 30))
-                  positive-fixnum)
-      (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                       :from (:argument 1) :to (:result 0))
-                  eax)
-      (:results (result :scs (unsigned-reg signed-reg)))
-      (:result-types positive-fixnum)
-      (:generator 4
-        (move eax value)
-        (inst mov (make-ea :byte :base object
-                           :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                                    other-pointer-lowtag))
-              al-tn)
+        (sc-case index
+          (immediate
+           (inst mov (make-ea :byte :base object
+                              :disp (- (+ (* vector-data-offset n-word-bytes)
+                                          (tn-value index)
+                                          offset)
+                                       other-pointer-lowtag))
+                 al-tn))
+          (t
+           (inst mov (make-ea :byte :base object :index index :scale 1
+                              :disp (- (+ (* vector-data-offset n-word-bytes)
+                                          offset)
+                                       other-pointer-lowtag))
+                 al-tn)))
         (move result eax))))))
-  (define-data-vector-frobs simple-array-unsigned-byte-7)
-  (define-data-vector-frobs simple-array-unsigned-byte-8))
+  (define-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
+    movzx unsigned-reg signed-reg)
+  (define-data-vector-frobs simple-array-unsigned-byte-8 positive-fixnum
+    movzx unsigned-reg signed-reg)
+  (define-data-vector-frobs simple-array-signed-byte-8 tagged-num
+    movsx signed-reg)
+  (define-data-vector-frobs simple-base-string character movzx character-reg))
 
-;;; unsigned-byte-16
-(macrolet ((define-data-vector-frobs (ptype)
+;;; {un,}signed-byte-16
+(macrolet ((define-data-vector-frobs (ptype element-type ref-inst &rest scs)
     `(progn
-      (define-vop (,(symbolicate "DATA-VECTOR-REF/" ptype))
-        (:translate data-vector-ref)
+      (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
+        (:translate data-vector-ref-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
-               (index :scs (unsigned-reg)))
-        (:arg-types ,ptype positive-fixnum)
-        (:results (value :scs (unsigned-reg signed-reg)))
-        (:result-types positive-fixnum)
+               (index :scs (unsigned-reg immediate)))
+        (:info offset)
+        (:arg-types ,ptype positive-fixnum
+                    (:constant (constant-displacement other-pointer-lowtag
+                                                      2 vector-data-offset)))
+        (:results (value :scs ,scs))
+        (:result-types ,element-type)
         (:generator 5
-          (inst movzx value
-                (make-ea :word :base object :index index :scale 2
-                         :disp (- (* vector-data-offset n-word-bytes)
-                                  other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" ptype))
-        (:translate data-vector-ref)
-        (:policy :fast-safe)
-        (:args (object :scs (descriptor-reg)))
-        (:info index)
-        (:arg-types ,ptype (:constant (signed-byte 30)))
-        (:results (value :scs (unsigned-reg signed-reg)))
-        (:result-types positive-fixnum)
-        (:generator 4
-          (inst movzx value
-                (make-ea :word :base object
-                         :disp (- (+ (* vector-data-offset n-word-bytes) (* 2 index))
-                                  other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
-        (:translate data-vector-set)
+          (sc-case index
+            (immediate
+             (inst ,ref-inst value
+                   (make-ea :word :base object
+                            :disp (- (+ (* vector-data-offset n-word-bytes)
+                                        (* 2 (+ offset (tn-value index)))
+                                     other-pointer-lowtag)))))
+            (t
+             (inst ,ref-inst value
+                   (make-ea :word :base object :index index :scale 2
+                            :disp (- (+ (* vector-data-offset n-word-bytes)
+                                        (* 2 offset))
+                                     other-pointer-lowtag)))))))
+      (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
+        (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
-               (index :scs (unsigned-reg) :to (:eval 0))
-               (value :scs (unsigned-reg signed-reg) :target eax))
-        (:arg-types ,ptype positive-fixnum positive-fixnum)
+               (index :scs (unsigned-reg immediate) :to (:eval 0))
+               (value :scs ,scs :target eax))
+        (:info offset)
+        (:arg-types ,ptype positive-fixnum
+                    (:constant (constant-displacement other-pointer-lowtag
+                                                      2 vector-data-offset))
+                    ,element-type)
         (:temporary (:sc unsigned-reg :offset eax-offset :target result
                          :from (:argument 2) :to (:result 0))
                     eax)
-        (:results (result :scs (unsigned-reg signed-reg)))
-        (:result-types positive-fixnum)
+        (:results (result :scs ,scs))
+        (:result-types ,element-type)
         (:generator 5
           (move eax value)
-          (inst mov (make-ea :word :base object :index index :scale 2
-                             :disp (- (* vector-data-offset n-word-bytes)
-                                      other-pointer-lowtag))
-                ax-tn)
-          (move result eax)))
-
-      (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" ptype))
-        (:translate data-vector-set)
-        (:policy :fast-safe)
-        (:args (object :scs (descriptor-reg) :to (:eval 0))
-               (value :scs (unsigned-reg signed-reg) :target eax))
-        (:info index)
-        (:arg-types ,ptype (:constant (signed-byte 30))
-                    positive-fixnum)
-        (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                         :from (:argument 1) :to (:result 0))
-                    eax)
-        (:results (result :scs (unsigned-reg signed-reg)))
-        (:result-types positive-fixnum)
-        (:generator 4
-          (move eax value)
-          (inst mov (make-ea :word :base object
-                             :disp (- (+ (* vector-data-offset n-word-bytes)
-                                         (* 2 index))
-                                      other-pointer-lowtag))
-                ax-tn)
+          (sc-case index
+            (immediate
+             (inst mov (make-ea :word :base object
+                                :disp (- (+ (* vector-data-offset n-word-bytes)
+                                            (* 2 (+ offset (tn-value index))))
+                                         other-pointer-lowtag))
+                   ax-tn))
+            (t
+             (inst mov (make-ea :word :base object :index index :scale 2
+                                :disp (- (+ (* vector-data-offset n-word-bytes)
+                                            (* 2 offset))
+                                         other-pointer-lowtag))
+                   ax-tn)))
           (move result eax))))))
-  (define-data-vector-frobs simple-array-unsigned-byte-15)
-  (define-data-vector-frobs simple-array-unsigned-byte-16))
+  (define-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum
+    movzx unsigned-reg signed-reg)
+  (define-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum
+    movzx unsigned-reg signed-reg)
+  (define-data-vector-frobs simple-array-signed-byte-16 tagged-num
+    movsx signed-reg))
 
-;;; simple-string
-
-#!+sb-unicode
-(progn
-(define-vop (data-vector-ref/simple-base-string)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:arg-types simple-base-string positive-fixnum)
-  (:results (value :scs (character-reg)))
-  (:result-types character)
-  (:generator 5
-    (inst movzx value
-          (make-ea :byte :base object :index index :scale 1
-                   :disp (- (* vector-data-offset n-word-bytes)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-ref-c/simple-base-string)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 30)))
-  (:results (value :scs (character-reg)))
-  (:result-types character)
-  (:generator 4
-    (inst movzx value
-          (make-ea :byte :base object
-                   :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-set/simple-base-string)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (index :scs (unsigned-reg) :to (:eval 0))
-         (value :scs (character-reg) :target eax))
-  (:arg-types simple-base-string positive-fixnum character)
-  (:temporary (:sc character-reg :offset eax-offset :target result
-                   :from (:argument 2) :to (:result 0))
-              eax)
-  (:results (result :scs (character-reg)))
-  (:result-types character)
-  (:generator 5
-    (move eax value)
-    (inst mov (make-ea :byte :base object :index index :scale 1
-                       :disp (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag))
-          al-tn)
-    (move result eax)))
-
-(define-vop (data-vector-set-c/simple-base-string)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (value :scs (character-reg)))
-  (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 30)) character)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                   :from (:argument 1) :to (:result 0))
-              eax)
-  (:results (result :scs (character-reg)))
-  (:result-types character)
-  (:generator 4
-    (move eax value)
-    (inst mov (make-ea :byte :base object
-                       :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                                other-pointer-lowtag))
-          al-tn)
-    (move result eax)))
-) ; PROGN
-
-#!-sb-unicode
-(progn
-(define-vop (data-vector-ref/simple-base-string)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:arg-types simple-base-string positive-fixnum)
-  (:results (value :scs (character-reg)))
-  (:result-types character)
-  (:generator 5
-    (inst mov value
-          (make-ea :byte :base object :index index :scale 1
-                   :disp (- (* vector-data-offset n-word-bytes)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-ref-c/simple-base-string)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 30)))
-  (:results (value :scs (character-reg)))
-  (:result-types character)
-  (:generator 4
-    (inst mov value
-          (make-ea :byte :base object
-                   :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-set/simple-base-string)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (index :scs (unsigned-reg) :to (:eval 0))
-         (value :scs (character-reg) :target result))
-  (:arg-types simple-base-string positive-fixnum character)
-  (:results (result :scs (character-reg)))
-  (:result-types character)
-  (:generator 5
-    (inst mov (make-ea :byte :base object :index index :scale 1
-                       :disp (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag))
-          value)
-    (move result value)))
-
-(define-vop (data-vector-set-c/simple-base-string)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (value :scs (character-reg)))
-  (:info index)
-  (:arg-types simple-base-string (:constant (signed-byte 30)) character)
-  (:results (result :scs (character-reg)))
-  (:result-types character)
-  (:generator 4
-   (inst mov (make-ea :byte :base object
-                      :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                               other-pointer-lowtag))
-         value)
-   (move result value)))
-) ; PROGN
-
-#!+sb-unicode
-(define-full-reffer data-vector-ref/simple-character-string
-    simple-character-string vector-data-offset other-pointer-lowtag
-    (character-reg) character data-vector-ref)
-#!+sb-unicode
-(define-full-setter data-vector-set/simple-character-string
-    simple-character-string vector-data-offset other-pointer-lowtag
-    (character-reg) character data-vector-set)
-
-;;; signed-byte-8
-
-(define-vop (data-vector-ref/simple-array-signed-byte-8)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:arg-types simple-array-signed-byte-8 positive-fixnum)
-  (:results (value :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 5
-    (inst movsx value
-          (make-ea :byte :base object :index index :scale 1
-                   :disp (- (* vector-data-offset n-word-bytes)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-ref-c/simple-array-signed-byte-8)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-signed-byte-8 (:constant (signed-byte 30)))
-  (:results (value :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 4
-    (inst movsx value
-          (make-ea :byte :base object
-                   :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-set/simple-array-signed-byte-8)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (index :scs (unsigned-reg) :to (:eval 0))
-         (value :scs (signed-reg) :target eax))
-  (:arg-types simple-array-signed-byte-8 positive-fixnum tagged-num)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                   :from (:argument 2) :to (:result 0))
-              eax)
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 5
-    (move eax value)
-    (inst mov (make-ea :byte :base object :index index :scale 1
-                       :disp (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag))
-          al-tn)
-    (move result eax)))
-
-(define-vop (data-vector-set-c/simple-array-signed-byte-8)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (value :scs (signed-reg) :target eax))
-  (:info index)
-  (:arg-types simple-array-signed-byte-8 (:constant (signed-byte 30))
-              tagged-num)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                   :from (:argument 1) :to (:result 0))
-              eax)
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 4
-    (move eax value)
-    (inst mov (make-ea :byte :base object
-                       :disp (- (+ (* vector-data-offset n-word-bytes) index)
-                                other-pointer-lowtag))
-          al-tn)
-    (move result eax)))
-
-;;; signed-byte-16
-
-(define-vop (data-vector-ref/simple-array-signed-byte-16)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:arg-types simple-array-signed-byte-16 positive-fixnum)
-  (:results (value :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 5
-    (inst movsx value
-          (make-ea :word :base object :index index :scale 2
-                   :disp (- (* vector-data-offset n-word-bytes)
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-ref-c/simple-array-signed-byte-16)
-  (:translate data-vector-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:info index)
-  (:arg-types simple-array-signed-byte-16 (:constant (signed-byte 30)))
-  (:results (value :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 4
-    (inst movsx value
-          (make-ea :word :base object
-                   :disp (- (+ (* vector-data-offset n-word-bytes)
-                               (* 2 index))
-                            other-pointer-lowtag)))))
-
-(define-vop (data-vector-set/simple-array-signed-byte-16)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (index :scs (unsigned-reg) :to (:eval 0))
-         (value :scs (signed-reg) :target eax))
-  (:arg-types simple-array-signed-byte-16 positive-fixnum tagged-num)
-  (:temporary (:sc signed-reg :offset eax-offset :target result
-                   :from (:argument 2) :to (:result 0))
-              eax)
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 5
-    (move eax value)
-    (inst mov (make-ea :word :base object :index index :scale 2
-                       :disp (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag))
-          ax-tn)
-    (move result eax)))
-
-(define-vop (data-vector-set-c/simple-array-signed-byte-16)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 0))
-         (value :scs (signed-reg) :target eax))
-  (:info index)
-  (:arg-types simple-array-signed-byte-16 (:constant (signed-byte 30)) tagged-num)
-  (:temporary (:sc signed-reg :offset eax-offset :target result
-                   :from (:argument 1) :to (:result 0))
-              eax)
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num)
-  (:generator 4
-    (move eax value)
-    (inst mov
-          (make-ea :word :base object
-                   :disp (- (+ (* vector-data-offset n-word-bytes)
-                               (* 2 index))
-                            other-pointer-lowtag))
-          ax-tn)
-    (move result eax)))
 
 ;;; These vops are useful for accessing the bits of a vector
 ;;; irrespective of what type of vector it is.

@@ -17,6 +17,16 @@
   (if (fixnump num)
       (ash num (1- n-lowtag-bits))
       (error "~W is too big for a fixnum." num)))
+
+;;; Determining whether a constant offset fits in an addressing mode.
+#!+x86
+(defun foldable-constant-offset-p (element-size lowtag data-offset offset)
+  (if (< element-size n-byte-bits)
+      nil
+      (multiple-value-bind (min max)
+          (sb!impl::displacement-bounds lowtag element-size data-offset)
+        (<= min offset max))))
+
 
 ;;;; routines for dealing with static symbols
 

@@ -469,7 +469,7 @@
   (let ((alien-node (lvar-uses alien)))
     (typecase alien-node
       (combination
-       (extract-fun-args alien '%sap-alien 2)
+       (splice-fun-args alien '%sap-alien 2)
        '(lambda (sap type)
           (declare (ignore type))
           sap))
@@ -590,7 +590,7 @@
             (unless (and (constant-lvar-p inside-amount)
                          (not (minusp (lvar-value inside-amount))))
               (give-up-ir1-transform)))
-          (extract-fun-args value inside-fun-name 2)
+          (splice-fun-args value inside-fun-name 2)
           (if width
               `(lambda (value amount1 amount2)
                  (logand (ash value (+ amount1 amount2))

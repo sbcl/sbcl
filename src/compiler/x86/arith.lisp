@@ -1476,7 +1476,9 @@
 
 (define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum:%bignum-ref)
-
+(define-full-reffer+offset bignum-ref-with-offset *
+  bignum-digits-offset other-pointer-lowtag
+  (unsigned-reg) unsigned-num sb!bignum:%bignum-ref-with-offset)
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum:%bignum-set)
 

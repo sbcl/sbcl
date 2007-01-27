@@ -284,10 +284,17 @@
 
 (defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
   (flushable))
+#!+x86
+(defknown %bignum-ref-with-offset (bignum-type bignum-index (signed-byte 24))
+  bignum-element-type (flushable always-translatable))
 
 (defknown %bignum-set (bignum-type bignum-index bignum-element-type)
   bignum-element-type
   (unsafe))
+#!+x86
+(defknown %bignum-set-with-offset
+  (bignum-type bignum-index (signed-byte 24) bignum-element-type)
+  bignum-element-type (unsafe always-translatable))
 
 (defknown %digit-0-or-plusp (bignum-element-type) boolean
   (foldable flushable movable))

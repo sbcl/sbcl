@@ -52,97 +52,39 @@
 (defknown int-sap ((unsigned-byte #.sb!vm::n-machine-word-bits))
   system-area-pointer (movable))
 
-(defknown sap-ref-8 (system-area-pointer fixnum) (unsigned-byte 8)
-  (flushable))
-(defknown %set-sap-ref-8 (system-area-pointer fixnum (unsigned-byte 8))
-  (unsigned-byte 8)
-  ())
+(macrolet ((defsapref (fun value-type)
+             (let (#!+x86
+                   (with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun)))
+                   (set-fun (intern (format nil "%SET-~A" fun)))
+                   #!+x86
+                   (set-with-offset-fun (intern (format nil "%SET-~A-WITH-OFFSET" fun))))
+               `(progn
+                  (defknown ,fun (system-area-pointer fixnum) ,value-type
+                    (flushable))
+                  #!+x86
+                  (defknown ,with-offset-fun (system-area-pointer fixnum fixnum) ,value-type
+                    (flushable always-translatable))
+                  (defknown ,set-fun (system-area-pointer fixnum ,value-type) ,value-type
+                    ())
+                  #!+x86
+                  (defknown ,set-with-offset-fun (system-area-pointer fixnum fixnum ,value-type) ,value-type
+                    (always-translatable))))))
+  (defsapref sap-ref-8 (unsigned-byte 8))
+  (defsapref sap-ref-16 (unsigned-byte 16))
+  (defsapref sap-ref-32 (unsigned-byte 32))
+  (defsapref sap-ref-64 (unsigned-byte 64))
+  (defsapref sap-ref-word (unsigned-byte #.sb!vm:n-word-bits))
+  (defsapref signed-sap-ref-8 (signed-byte 8))
+  (defsapref signed-sap-ref-16 (signed-byte 16))
+  (defsapref signed-sap-ref-32 (signed-byte 32))
+  (defsapref signed-sap-ref-64 (signed-byte 64))
+  (defsapref signed-sap-ref-word (signed-byte #.sb!vm:n-word-bits))
+  (defsapref sap-ref-sap system-area-pointer)
+  (defsapref sap-ref-single single-float)
+  (defsapref sap-ref-double double-float)
+  (defsapref sap-ref-long long-float)
+) ; MACROLET
 
-(defknown sap-ref-16 (system-area-pointer fixnum) (unsigned-byte 16)
-  (flushable))
-(defknown %set-sap-ref-16 (system-area-pointer fixnum (unsigned-byte 16))
-  (unsigned-byte 16)
-  ())
-
-(defknown sap-ref-32 (system-area-pointer fixnum) (unsigned-byte 32)
-  (flushable))
-(defknown %set-sap-ref-32 (system-area-pointer fixnum (unsigned-byte 32))
-  (unsigned-byte 32)
-  ())
-
-;; FIXME These are supported natively on alpha and using deftransforms
-;; in compiler/x86/sap.lisp, which in OAO$n$ style need copying to
-;; other 32 bit systems
-(defknown sap-ref-64 (system-area-pointer fixnum) (unsigned-byte 64)
-  (flushable))
-(defknown %set-sap-ref-64 (system-area-pointer fixnum (unsigned-byte 64))
-  (unsigned-byte 64)
-  ())
-
-(defknown sap-ref-word (system-area-pointer fixnum)
-  (unsigned-byte #.sb!vm::n-machine-word-bits)
-  (flushable))
-(defknown %set-sap-ref-word
-    (system-area-pointer fixnum (unsigned-byte #.sb!vm::n-machine-word-bits))
-  (unsigned-byte #.sb!vm::n-machine-word-bits)
-  ())
-
-(defknown signed-sap-ref-8 (system-area-pointer fixnum) (signed-byte 8)
-  (flushable))
-(defknown %set-signed-sap-ref-8 (system-area-pointer fixnum (signed-byte 8))
-  (signed-byte 8)
-  ())
-
-(defknown signed-sap-ref-16 (system-area-pointer fixnum) (signed-byte 16)
-  (flushable))
-(defknown %set-signed-sap-ref-16 (system-area-pointer fixnum (signed-byte 16))
-  (signed-byte 16)
-  ())
-
-(defknown signed-sap-ref-32 (system-area-pointer fixnum) (signed-byte 32)
-  (flushable))
-(defknown %set-signed-sap-ref-32 (system-area-pointer fixnum (signed-byte 32))
-  (signed-byte 32)
-  ())
-
-(defknown signed-sap-ref-64 (system-area-pointer fixnum) (signed-byte 64)
-  (flushable))
-(defknown %set-signed-sap-ref-64 (system-area-pointer fixnum (signed-byte 64))
-  (signed-byte 64)
-  ())
-
-(defknown signed-sap-ref-word (system-area-pointer fixnum)
-  (signed-byte #.sb!vm::n-machine-word-bits)
-  (flushable))
-(defknown %set-signed-sap-ref-word
-    (system-area-pointer fixnum (signed-byte #.sb!vm::n-machine-word-bits))
-  (signed-byte #.sb!vm::n-machine-word-bits)
-  ())
-
-(defknown sap-ref-sap (system-area-pointer fixnum) system-area-pointer
-  (flushable))
-(defknown %set-sap-ref-sap (system-area-pointer fixnum system-area-pointer)
-  system-area-pointer
-  ())
-
-(defknown sap-ref-single (system-area-pointer fixnum) single-float
-  (flushable))
-(defknown sap-ref-double (system-area-pointer fixnum) double-float
-  (flushable))
-#!+(or x86 long-float)
-(defknown sap-ref-long (system-area-pointer fixnum) long-float
-  (flushable))
-
-(defknown %set-sap-ref-single
-          (system-area-pointer fixnum single-float) single-float
-  ())
-(defknown %set-sap-ref-double
-          (system-area-pointer fixnum double-float) double-float
-  ())
-#!+long-float
-(defknown %set-sap-ref-long
-          (system-area-pointer fixnum long-float) long-float
-  ())
 
 ;;;; transforms for converting sap relation operators
 
@@ -162,43 +104,66 @@
               (eql (lvar-value offset) 0))
          'sap)
         (t
-         (extract-fun-args sap 'sap+ 2)
+         (splice-fun-args sap 'sap+ 2)
          '(lambda (sap offset1 offset2)
             (sap+ sap (+ offset1 offset2))))))
 
-(macrolet ((def (fun &optional setp)
-             `(deftransform ,fun ((sap offset ,@(when setp `(new-value))) * *)
-                (extract-fun-args sap 'sap+ 2)
-                 `(lambda (sap offset1 offset2 ,@',(when setp `(new-value)))
-                   (,',fun sap (+ offset1 offset2) ,@',(when setp `(new-value)))))))
-  (def sap-ref-8)
-  (def %set-sap-ref-8 t)
-  (def signed-sap-ref-8)
-  (def %set-signed-sap-ref-8 t)
-  (def sap-ref-16)
-  (def %set-sap-ref-16 t)
-  (def signed-sap-ref-16)
-  (def %set-signed-sap-ref-16 t)
-  (def sap-ref-32)
-  (def %set-sap-ref-32 t)
-  (def signed-sap-ref-32)
-  (def %set-signed-sap-ref-32 t)
-  (def sap-ref-64)
-  (def %set-sap-ref-64 t)
-  (def signed-sap-ref-64)
-  (def %set-signed-sap-ref-64 t)
-  (def sap-ref-sap)
-  (def %set-sap-ref-sap t)
-  (def sap-ref-single)
-  (def %set-sap-ref-single t)
-  (def sap-ref-double)
-  (def %set-sap-ref-double t)
-  ;; The original CMUCL code had #!+(and x86 long-float) for this first one,
-  ;; but only #!+long-float for the second.  This was redundant, since the
-  ;; LONG-FLOAT target feature only exists on X86.  So we removed the
-  ;; redundancy.  --njf 2002-01-08
-  #!+long-float (def sap-ref-long)
-  #!+long-float (def %set-sap-ref-long t))
+(macrolet ((def (fun element-size &optional setp value-type)
+             (declare (ignorable value-type))
+             `(progn
+                (deftransform ,fun ((sap offset ,@(when setp `(new-value))) * *)
+                  (splice-fun-args sap 'sap+ 2)
+                  `(lambda (sap offset1 offset2 ,@',(when setp `(new-value)))
+                     (,',fun sap (+ offset1 offset2) ,@',(when setp `(new-value)))))
+                ;; Avoid defining WITH-OFFSET transforms for accessors whose
+                ;; sizes are larger than the word size; they'd probably be
+                ;; pointless to optimize anyway and tricky to boot.
+                ,(unless (and (listp value-type)
+                              (or (eq (first value-type) 'unsigned-byte)
+                                  (eq (first value-type) 'signed-byte))
+                              (> (second value-type) sb!vm:n-word-bits))
+                   #!+x86
+                   (let ((with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun))))
+                     `(progn
+                        ,(cond
+                          (setp
+                           `(deftransform ,fun ((sap offset new-value)
+                                                (system-area-pointer fixnum ,value-type) *)
+                             `(,',with-offset-fun sap (truly-the fixnum offset) 0 new-value)))
+                          (t
+                           `(deftransform ,fun ((sap offset) (system-area-pointer fixnum) *)
+                              `(,',with-offset-fun sap (truly-the fixnum offset) 0))))
+                        (deftransform ,with-offset-fun ((sap offset disp
+                                                             ,@(when setp `(new-value))) * *)
+                          (fold-index-addressing ',with-offset-fun
+                                                 ,element-size
+                                                 0 ; lowtag
+                                                 0 ; data offset
+                                                 offset disp ,setp))))))))
+  (def sap-ref-8 8)
+  (def %set-sap-ref-8 8 t (unsigned-byte 8))
+  (def signed-sap-ref-8 8)
+  (def %set-signed-sap-ref-8 8 t (signed-byte 8))
+  (def sap-ref-16 16)
+  (def %set-sap-ref-16 16 t (unsigned-byte 16))
+  (def signed-sap-ref-16 16)
+  (def %set-signed-sap-ref-16 16 t (signed-byte 16))
+  (def sap-ref-32 32)
+  (def %set-sap-ref-32 32 t (unsigned-byte 32))
+  (def signed-sap-ref-32 32)
+  (def %set-signed-sap-ref-32 32 t (signed-byte 32))
+  (def sap-ref-64 64)
+  (def %set-sap-ref-64 64 t (unsigned-byte 64))
+  (def signed-sap-ref-64 64)
+  (def %set-signed-sap-ref-64 64 t (signed-byte 64))
+  (def sap-ref-sap sb!vm:n-word-bits)
+  (def %set-sap-ref-sap sb!vm:n-word-bits t system-area-pointer)
+  (def sap-ref-single 32)
+  (def %set-sap-ref-single 32 t single-float)
+  (def sap-ref-double 64)
+  (def %set-sap-ref-double 64 t double-float)
+  #!+long-float (def sap-ref-long 96)
+  #!+long-float (def %set-sap-ref-long 96 t 8))
 
 (macrolet ((def (fun args 32-bit 64-bit)
                `(deftransform ,fun (,args)

@@ -116,8 +116,14 @@
   (extract-upgraded-element-type array))
 (defoptimizer (data-vector-ref derive-type) ((array index))
   (extract-upgraded-element-type array))
+#!+x86
+(defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
+  (extract-upgraded-element-type array))
 
 (defoptimizer (data-vector-set derive-type) ((array index new-value))
+  (assert-new-value-type new-value array))
+#!+x86
+(defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
   (assert-new-value-type new-value array))
 (defoptimizer (hairy-data-vector-set derive-type) ((array index new-value))
   (assert-new-value-type new-value array))

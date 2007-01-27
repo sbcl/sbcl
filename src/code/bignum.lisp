@@ -2315,7 +2315,7 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 
 ;;;; %FLOOR for machines with a 32x32 divider.
 
-#!-sb-fluid
+#!+(and 32x16-divide (not sb-fluid))
 (declaim (inline 32x16-subtract-with-borrow 32x16-add-with-carry
                  32x16-divide 32x16-multiply 32x16-multiply-split))
 
