@@ -308,9 +308,9 @@
     (immediate
      (make-ea :dword :base object
               :disp (- (+ (* vector-data-offset n-word-bytes)
-                          (* element-size (+ offset complex-offset
-                                             (tn-value index)))
-                       other-pointer-lowtag))))
+                          (* element-size (+ offset (tn-value index)))
+                          complex-offset)
+                       other-pointer-lowtag)))
     (t
      (make-ea :dword :base object :index index :scale scale
               :disp (- (+ (* vector-data-offset n-word-bytes)
