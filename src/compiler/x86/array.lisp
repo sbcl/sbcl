@@ -634,7 +634,8 @@
     movzx nil unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-8 tagged-num
     movsx nil signed-reg)
-  (define-data-vector-frobs simple-base-string character mov
+  (define-data-vector-frobs simple-base-string character
+                            #!+sb-unicode movzx #!-sb-unicode mov
                             #!+sb-unicode nil #!-sb-unicode t character-reg))
 
 ;;; {un,}signed-byte-16
