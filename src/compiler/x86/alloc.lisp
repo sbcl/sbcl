@@ -75,27 +75,52 @@
 
 ;;; ALLOCATE-VECTOR
 (define-vop (allocate-vector-on-heap)
-  (:args (type :scs (unsigned-reg))
-         (length :scs (any-reg))
-         (words :scs (any-reg)))
+  (:args (type :scs (unsigned-reg immediate))
+         (length :scs (any-reg immediate))
+         (words :scs (any-reg immediate)))
   (:results (result :scs (descriptor-reg) :from :load))
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
   (:policy :fast-safe)
   (:generator 100
-    (inst lea result (make-ea :byte :base words :disp
-                              (+ (1- (ash 1 n-lowtag-bits))
-                                 (* vector-data-offset n-word-bytes))))
-    (inst and result (lognot lowtag-mask))
-    (pseudo-atomic
-      (allocation result result)
-      (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-      (storew type result 0 other-pointer-lowtag)
-      (storew length result vector-length-slot other-pointer-lowtag))))
+    (let ((size (sc-case words
+                  (immediate
+                   (logandc2 (+ (fixnumize (tn-value words))
+                                (+ (1- (ash 1 n-lowtag-bits))
+                                   (* vector-data-offset n-word-bytes)))
+                             lowtag-mask))
+                  (t
+                   (inst lea result (make-ea :byte :base words :disp
+                                             (+ (1- (ash 1 n-lowtag-bits))
+                                                (* vector-data-offset
+                                                   n-word-bytes))))
+                   (inst and result (lognot lowtag-mask))
+                   result))))
+      (pseudo-atomic
+       (allocation result size)
+       (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+       (sc-case type
+         (immediate
+          (aver (typep (tn-value type) '(unsigned-byte 8)))
+          (storeb (tn-value type) result 0 other-pointer-lowtag))
+         (t
+          (storew type result 0 other-pointer-lowtag)))
+       (sc-case length
+         (immediate
+          (let ((fixnum-length (fixnumize (tn-value length))))
+            (typecase fixnum-length
+              ((unsigned-byte 8)
+               (storeb fixnum-length result
+                       vector-length-slot other-pointer-lowtag))
+              (t
+               (storew fixnum-length result
+                       vector-length-slot other-pointer-lowtag)))))
+         (t
+          (storew length result vector-length-slot other-pointer-lowtag)))))))
 
 (define-vop (allocate-vector-on-stack)
-  (:args (type :scs (unsigned-reg))
+  (:args (type :scs (unsigned-reg immediate))
          (length :scs (any-reg))
          (words :scs (any-reg) :target ecx))
   (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
@@ -121,7 +146,12 @@
     (inst lea res
           (make-ea :byte :base result :disp (* vector-data-offset n-word-bytes)))
     (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-    (storew type result 0 other-pointer-lowtag)
+    (sc-case type
+      (immediate
+       (aver (typep (tn-value type) '(unsigned-byte 8)))
+       (storeb (tn-value type) result 0 other-pointer-lowtag))
+      (t
+       (storew type result 0 other-pointer-lowtag)))
     (storew length result vector-length-slot other-pointer-lowtag)
     (inst xor zero zero)
     (inst rep)

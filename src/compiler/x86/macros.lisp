@@ -46,8 +46,8 @@
     `(unless (location= ,n-dst ,n-src)
        (inst mov ,n-dst ,n-src))))
 
-(defmacro make-ea-for-object-slot (ptr slot lowtag)
-  `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+(defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :dword))
+  `(make-ea ,size :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
@@ -55,6 +55,11 @@
 (defmacro storew (value ptr &optional (slot 0) (lowtag 0))
   (once-only ((value value))
     `(inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))
+
+;;; A handy macro for storing widetags.
+(defmacro storeb (value ptr &optional (slot 0) (lowtag 0))
+  (once-only ((value value))
+    `(inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag :byte) ,value)))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
   `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
