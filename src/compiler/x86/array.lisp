@@ -557,7 +557,8 @@
 
 ;;; {un,}signed-byte-8, simple-base-string
 
-(macrolet ((define-data-vector-frobs (ptype element-type ref-inst &rest scs)
+(macrolet ((define-data-vector-frobs (ptype element-type ref-inst
+                                            8-bit-tns-p &rest scs)
   `(progn
     (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
       (:translate data-vector-ref-with-offset)
@@ -590,19 +591,22 @@
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
              (index :scs (unsigned-reg immediate) :to (:eval 0))
-             (value :scs ,scs :target eax))
+             (value :scs ,scs ,@(unless 8-bit-tns-p
+                                  '(:target eax))))
       (:info offset)
       (:arg-types ,ptype positive-fixnum
                   (:constant (constant-displacement other-pointer-lowtag
                                                     1 vector-data-offset))
                   ,element-type)
-      (:temporary (:sc unsigned-reg :offset eax-offset :target result
-                       :from (:argument 2) :to (:result 0))
-                  eax)
+      ,@(unless 8-bit-tns-p
+         '((:temporary (:sc unsigned-reg :offset eax-offset :target result
+                        :from (:argument 2) :to (:result 0))
+            eax)))
       (:results (result :scs ,scs))
       (:result-types ,element-type)
       (:generator 5
-        (move eax value)
+        ,@(unless 8-bit-tns-p
+           '((move eax value)))
         (sc-case index
           (immediate
            (inst mov (make-ea :byte :base object
@@ -610,21 +614,28 @@
                                           (tn-value index)
                                           offset)
                                        other-pointer-lowtag))
-                 al-tn))
+                 ,(if 8-bit-tns-p
+                      'value
+                      'al-tn)))
           (t
            (inst mov (make-ea :byte :base object :index index :scale 1
                               :disp (- (+ (* vector-data-offset n-word-bytes)
                                           offset)
                                        other-pointer-lowtag))
-                 al-tn)))
-        (move result eax))))))
+                 ,(if 8-bit-tns-p
+                      'value
+                      'al-tn))))
+        (move result ,(if 8-bit-tns-p
+                          'value
+                          'eax)))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
-    movzx unsigned-reg signed-reg)
+    movzx nil unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 positive-fixnum
-    movzx unsigned-reg signed-reg)
+    movzx nil unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-8 tagged-num
-    movsx signed-reg)
-  (define-data-vector-frobs simple-base-string character movzx character-reg))
+    movsx nil signed-reg)
+  (define-data-vector-frobs simple-base-string character mov
+                            #!+sb-unicode nil #!-sb-unicode t character-reg))
 
 ;;; {un,}signed-byte-16
 (macrolet ((define-data-vector-frobs (ptype element-type ref-inst &rest scs)
