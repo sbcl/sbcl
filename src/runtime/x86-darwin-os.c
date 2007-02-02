@@ -28,6 +28,7 @@
 #ifdef LISP_FEATURE_SB_THREAD
 
 pthread_mutex_t modify_ldt_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mach_exception_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void set_data_desc_size(data_desc_t* desc, unsigned long size)
 {
@@ -254,7 +255,6 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
 
     struct ucontext *context;
     struct mcontext *regs;
-    sigset_t sigmask;
 
     context = (struct ucontext*) os_validate(0, sizeof(struct ucontext));
     regs = (struct mcontext*) os_validate(0, sizeof(struct mcontext));
@@ -268,22 +268,20 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
        3) call the signal handler
        4) restore the sigmask */
 
-    pthread_sigmask(0, NULL, &sigmask);
-    block_blockable_signals();
-
     build_fake_signal_context(context, thread_state, float_state);
+
+    block_blockable_signals();
 
     handler(signal, siginfo, context);
 
     update_thread_state_from_context(thread_state, float_state, context);
 
-    pthread_sigmask(SIG_SETMASK, &sigmask, NULL);
-
     os_invalidate((os_vm_address_t)context, sizeof(struct ucontext));
     os_invalidate((os_vm_address_t)regs, sizeof(struct mcontext));
 
     /* Trap to restore the signal context. */
-    asm volatile ("movl %0, %%eax; .long 0xffff0b0f": : "r" (thread_state));
+    asm volatile ("movl %0, %%eax; movl %1, %%ebx; .long 0xffff0b0f"
+                  : : "r" (thread_state), "r" (float_state));
 }
 
 #if defined DUMP_CONTEXT
@@ -342,6 +340,8 @@ catch_exception_raise(mach_port_t exception_port,
     kern_return_t ret;
     int signal;
     siginfo_t* siginfo;
+
+    thread_mutex_lock(&mach_exception_lock);
 
     x86_thread_state32_t thread_state;
     mach_msg_type_number_t thread_state_count = x86_THREAD_STATE32_COUNT;
@@ -429,7 +429,6 @@ catch_exception_raise(mach_port_t exception_port,
              * exhaustion instead. */
             protect_control_stack_guard_page_thread(1, th);
             protect_control_stack_return_guard_page_thread(0, th);
-
         }
         else if (addr >= undefined_alien_address &&
                  addr < undefined_alien_address + os_vm_page_size) {
@@ -499,6 +498,7 @@ catch_exception_raise(mach_port_t exception_port,
                                x86_FLOAT_STATE32,
                                (thread_state_t)&float_state,
                                float_state_count);
+        thread_mutex_unlock(&mach_exception_lock);
         return KERN_SUCCESS;
 
     case EXC_BAD_INSTRUCTION:
@@ -527,6 +527,12 @@ catch_exception_raise(mach_port_t exception_port,
                                    (thread_state_t) thread_state.eax,
                                    /* &thread_state, */
                                    thread_state_count);
+
+            ret = thread_set_state(thread,
+                                   x86_FLOAT_STATE32,
+                                   (thread_state_t) thread_state.ebx,
+                                   /* &thread_state, */
+                                   float_state_count);
         } else {
 
             backup_thread_state = thread_state;
@@ -581,9 +587,11 @@ catch_exception_raise(mach_port_t exception_port,
                                    (thread_state_t)&float_state,
                                    float_state_count);
         }
+        thread_mutex_unlock(&mach_exception_lock);
         return KERN_SUCCESS;
 
     default:
+        thread_mutex_unlock(&mach_exception_lock);
         return KERN_INVALID_RIGHT;
     }
 }
