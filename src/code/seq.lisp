@@ -2521,8 +2521,9 @@
          ,@(loop for type in types
                  collect `(,type (,fun (the ,type ,var))))))))
 
-;;; originally in array.lisp; probably best to put it back there and
-;;; make DOSEQUENCE and SEQ-DISPATCH be in early-seq.lisp.
+;;; FIXME: this was originally in array.lisp; it might be better to
+;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in
+;;; a new early-seq.lisp file.
 (defun fill-data-vector (vector dimensions initial-contents)
   (let ((index 0))
     (labels ((frob (axis dims contents)

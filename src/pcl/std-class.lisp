@@ -1521,7 +1521,9 @@
       ;; layout-depthoid).  Is there any way we can provide a useful
       ;; error message?  -- CSR, 2005-05-03
       (eq s *the-class-file-stream*) (eq s *the-class-string-stream*)
-      ;; TODO
+      ;; This probably shouldn't be mixed in with certain other
+      ;; classes, too, but it seems to work both with STANDARD-OBJECT
+      ;; and FUNCALLABLE-STANDARD-OBJECT
       (eq s *the-class-sequence*)))
 
 ;;; Some necessary methods for FORWARD-REFERENCED-CLASS
