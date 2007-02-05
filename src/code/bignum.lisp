@@ -605,7 +605,7 @@
     (declare (type (unsigned-byte #.sb!vm:n-word-bits) ud vd umask imask m))
     (dotimes (i digit-size)
       (setf umask (logior umask imask))
-      (unless (zerop (logand ud umask))
+      (when (logtest ud umask)
         (setf ud (modularly (- ud vd)))
         (setf m (modularly (logior m imask))))
       (setf imask (modularly (ash imask 1)))
@@ -634,7 +634,7 @@
     (declare (type (unsigned-byte #.(integer-length #.sb!vm:n-word-bits)) d)
              (type (unsigned-byte #.sb!vm:n-word-bits) n))
     (gcd-assert (>= d 0))
-    (unless (zerop (logand (%bignum-ref u 0) n))
+    (when (logtest (%bignum-ref u 0) n)
       (let ((tmp1-len
              (multiply-bignum-buffer-and-smallnum-to-buffer v v-len
                                                             (logand n (bmod u
@@ -1277,7 +1277,7 @@
 
     (cond
      ;; Round down if round bit is 0.
-     ((zerop (logand round-bit low))
+     ((not (logtest round-bit low))
       (float-from-bits shifted len))
      ;; If only round bit is set, then round to even.
      ((and (= low round-bit)
@@ -1315,8 +1315,7 @@
         (floor index digit-size)
       (if (>= word-index len)
           (not (bignum-plus-p bignum))
-          (not (zerop (logand (%bignum-ref bignum word-index)
-                              (ash 1 bit-index))))))))
+          (logbitp bit-index (%bignum-ref bignum word-index))))))
 
 (defun bignum-logcount (bignum)
   (declare (type bignum-type bignum))
