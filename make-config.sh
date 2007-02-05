@@ -106,7 +106,7 @@ case `uname -m` in
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
-    ppc) guessed_sbcl_arch=ppc ;;
+    *ppc) guessed_sbcl_arch=ppc ;;
     ppc64) guessed_sbcl_arch=ppc ;;
     Power*Macintosh) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
@@ -313,6 +313,8 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
         echo "See the limit(1) or ulimit(1) commands and the README file."
         exit 1
     fi
+elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "netbsd" ]; then
+    printf ' :gencgc :stack-allocatable-closures :linkage-table' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate

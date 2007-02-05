@@ -27,12 +27,14 @@
 
      Caveat callers.  */
 
+#if defined (LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_LINUX)
 #ifndef PT_DAR
 #define PT_DAR          41
 #endif
 
 #ifndef PT_DSISR
 #define PT_DSISR        42
+#endif
 #endif
 
 void arch_init() {
@@ -44,7 +46,11 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
     unsigned long pc =  (unsigned long)(*os_context_pc_addr(context));
     os_vm_address_t addr;
 
+#if defined(LISP_FEATURE_NETBSD)
+    addr = (os_vm_address_t) (code->si_addr);
+#else
     addr = (os_vm_address_t) (*os_context_register_addr(context,PT_DAR));
+#endif
     return addr;
 }
 

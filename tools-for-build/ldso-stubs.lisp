@@ -85,7 +85,7 @@ ldso_stub__ ## fct: ;                           \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
-#!+(and linux ppc) "
+#!+(and (not darwin) ppc) "
 #define LDSO_STUBIFY(fct)                       \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\

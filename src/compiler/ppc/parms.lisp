@@ -110,6 +110,23 @@
   (def!constant linkage-table-space-end   #x0b000000)
   (def!constant linkage-table-entry-size 16))
 
+#!+netbsd
+(progn
+  #!+gencgc
+  (progn
+    (def!constant dynamic-space-start #x4f000000)
+    (def!constant dynamic-space-end   #x7efff000))
+  #!-gencgc
+  (progn
+    (def!constant dynamic-0-space-start #x4f000000)
+    (def!constant dynamic-0-space-end   #x66fff000)
+    (def!constant dynamic-1-space-start #x67000000)
+    (def!constant dynamic-1-space-end   #x7efff000))
+
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000)
+  (def!constant linkage-table-entry-size 16))
+
 #!+darwin
 (progn
   #!+gencgc
