@@ -271,8 +271,18 @@
                      (fopcompile `(symbol-value ',form) path for-value-p)
                      ;; Lexical
                      (when for-value-p
-                       (sb!fasl::dump-push (cdr (assoc form *fop-lexenv*))
-                                           *compile-object*)))))))
+                       (let ((handle (cdr (assoc form *fop-lexenv*))))
+                         (if handle
+                             (sb!fasl::dump-push handle
+                                                 *compile-object*)
+                             (progn
+                               ;; Undefined variable. Signal a warning, and
+                               ;; treat it as a special variable reference,
+                               ;; like the real compiler does.
+                               (note-undefined-reference form :variable)
+                               (fopcompile `(symbol-value ',form)
+                                           path
+                                           for-value-p))))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
              (macroexpand form)

@@ -78,3 +78,6 @@
     (let* ((a 13)
            (b a))
       (assert* (eql b 13)))))
+
+(setf (symbol-value 'fopcompile-test-foo) 1)
+(assert* (eql fopcompile-test-foo 1))
