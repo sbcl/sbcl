@@ -209,8 +209,7 @@
          ,@(mapcar (lambda (el)
                      (once-only ((n-val el))
                        `(locally (declare (optimize (safety 0)))
-                                 (setf (svref ,n-vec ,(incf n))
-                                       ,n-val))))
+                          (setf (svref ,n-vec ,(incf n)) ,n-val))))
                    elements)
          ,n-vec))))
 
@@ -748,10 +747,23 @@
   (deftransform aref ((array &rest indices))
     (with-row-major-index (array indices index)
       (hairy-data-vector-ref array index)))
+
   (deftransform %aset ((array &rest stuff))
     (let ((indices (butlast stuff)))
       (with-row-major-index (array indices index new-value)
         (hairy-data-vector-set array index new-value)))))
+
+(deftransform aref ((array index) ((or simple-vector
+                                       simple-unboxed-array)
+                                   index))
+  (let ((type (lvar-type array)))
+    (unless (array-type-p type)
+      ;; Not an exactly specified one-dimensional simple array -> punt
+      ;; to the complex version.
+      (give-up-ir1-transform)))
+  `(data-vector-ref array (%check-bound array
+                                        (array-dimension array 0)
+                                        index)))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
