@@ -126,7 +126,7 @@ extent of the block."
     (link-node-to-previous-ctran exit value-ctran)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
-        (push entry (lambda-calls-or-closes home-lambda))))
+        (sset-adjoin entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit exit-ctran (third found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
@@ -221,7 +221,7 @@ constrained to be used only within the dynamic extent of the TAGBODY."
     (link-node-to-previous-ctran exit start)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
-        (push entry (lambda-calls-or-closes home-lambda))))
+        (sset-adjoin entry (lambda-calls-or-closes home-lambda))))
     (use-ctran exit (second found))))
 
 ;;;; translators for compiler-magic special forms
@@ -869,7 +869,7 @@ other."
              (when (lambda-var-p leaf)
                (let ((home-lambda (ctran-home-lambda-or-null start)))
                  (when home-lambda
-                   (pushnew leaf (lambda-calls-or-closes home-lambda))))
+                   (sset-adjoin leaf (lambda-calls-or-closes home-lambda))))
                (when (lambda-var-ignorep leaf)
                  ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
                  ;; requires that this be a STYLE-WARNING, not a full warning.

@@ -131,7 +131,7 @@
     (dolist (arg (basic-combination-args call))
       (when arg
         (flush-lvar-externally-checkable-type arg))))
-  (pushnew fun (lambda-calls-or-closes (node-home-lambda call)))
+  (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
   (recognize-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
@@ -496,7 +496,7 @@
         (aver (= (optional-dispatch-min-args fun) 0))
         (aver (not (functional-entry-fun fun)))
         (setf (basic-combination-kind call) :local)
-        (pushnew ep (lambda-calls-or-closes (node-home-lambda call)))
+        (sset-adjoin ep (lambda-calls-or-closes (node-home-lambda call)))
         (merge-tail-sets call ep)
         (change-ref-leaf ref ep)
 
@@ -859,10 +859,9 @@
 
     ;; HOME no longer calls CLAMBDA, and owns all of CLAMBDA's old
     ;; DFO dependencies.
-    (setf (lambda-calls-or-closes home)
-          (delete clambda
-                  (nunion (lambda-calls-or-closes clambda)
-                          (lambda-calls-or-closes home))))
+    (sset-union (lambda-calls-or-closes home)
+                (lambda-calls-or-closes clambda))
+    (sset-delete clambda (lambda-calls-or-closes home))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which calls things or has DFO dependencies.
     (setf (lambda-calls-or-closes clambda) nil)
@@ -912,7 +911,7 @@
 ;;; the RETURN-RESULT, because the return might have been deleted (if
 ;;; all calls were TR.)
 (defun unconvert-tail-calls (fun call next-block)
-  (dolist (called (lambda-calls-or-closes fun))
+  (do-sset-elements (called (lambda-calls-or-closes fun))
     (when (lambda-p called)
       (dolist (ref (leaf-refs called))
         (let ((this-call (node-dest ref)))

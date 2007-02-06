@@ -129,6 +129,9 @@
 (defvar *big-compiler-lock*
   (sb!thread:make-mutex :name "big compiler lock"))
 
+(declaim (type fixnum *compiler-sset-counter*))
+(defvar *compiler-sset-counter* 0)
+
 ;;; unique ID for the next object created (to let us track object
 ;;; identity even across GC, useful for understanding weird compiler
 ;;; bugs where something is supposed to be unique but is instead

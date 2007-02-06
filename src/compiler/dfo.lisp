@@ -290,7 +290,7 @@
                    (declare (type entry entry))
                    (let ((entry-home (node-home-lambda entry)))
                      (scavenge-possibly-deleted-lambda entry-home))))
-          (dolist (cc (lambda-calls-or-closes clambda))
+          (do-sset-elements (cc (lambda-calls-or-closes clambda))
             (etypecase cc
               (clambda (scavenge-call cc))
               (lambda-var (scavenge-closure-var cc))

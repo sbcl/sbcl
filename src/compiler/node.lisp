@@ -86,6 +86,7 @@
     (format stream "~D" (cont-num x))))
 
 (def!struct (node (:constructor nil)
+                  (:include sset-element (number (incf *compiler-sset-counter*)))
                   (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
@@ -248,7 +249,10 @@
   ;; some kind of info used by the back end
   (info nil)
   ;; what macroexpansions happened "in" this block, used for xref
-  (macroexpands nil :type list))
+  (macroexpands nil :type list)
+  ;; Cache the physenv of a block during lifetime analysis. :NONE if
+  ;; no cached value has been stored yet.
+  (physenv-cache :none :type (or null physenv (member :none))))
 (def!method print-object ((cblock cblock) stream)
   (print-unreadable-object (cblock stream :type t :identity t)
     (format stream "~W :START c~W"
@@ -391,7 +395,9 @@
   ;; this is filled by physical environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.
-  (outer-loop (missing-arg) :type cloop))
+  (outer-loop (missing-arg) :type cloop)
+  ;; The current sset index
+  (sset-number 0 :type fixnum))
 (defprinter (component :identity t)
   name
   #!+sb-show id
@@ -585,6 +591,7 @@
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
 (def!struct (leaf (:make-load-form-fun ignore-it)
+                  (:include sset-element (number (incf *compiler-sset-counter*)))
                   (:constructor nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
@@ -932,7 +939,7 @@
   ;; objects (closed-over LAMBDA-VARs and XEPs) which this lambda
   ;; depends on in such a way that DFO shouldn't put them in separate
   ;; components.
-  (calls-or-closes nil :type list)
+  (calls-or-closes (make-sset) :type (or null sset))
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
   ;;
   ;; In CMU CL, and old SBCL, this was also NILed out when LET

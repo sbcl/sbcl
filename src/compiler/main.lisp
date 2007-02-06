@@ -1016,6 +1016,7 @@
                     :policy *policy*
                     :handled-conditions *handled-conditions*
                     :disabled-package-locks *disabled-package-locks*))
+         (*compiler-sset-counter* 0)
          (fun (make-functional-from-toplevel-lambda lambda-expression
                                                     :name name
                                                     :path path)))
@@ -1498,6 +1499,7 @@
         ;; and it's not obvious whether the rebinding to itself is
         ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
         (*info-environment* *info-environment*)
+        (*compiler-sset-counter* 0)
         (*gensym-counter* 0))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
