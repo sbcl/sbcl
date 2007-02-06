@@ -352,12 +352,11 @@
 ;;; accordingly.
 (defun constrain-ref-type (ref constraints in)
   (declare (type ref ref) (type sset constraints in))
-  (let ((var-cons (copy-sset constraints)))
-    (sset-intersection var-cons in)
-    (let ((res (single-value-type (node-derived-type ref)))
-          (not-res *empty-type*)
-          (leaf (ref-leaf ref)))
-      (do-sset-elements (con var-cons)
+  (let ((res (single-value-type (node-derived-type ref)))
+        (not-res *empty-type*)
+        (leaf (ref-leaf ref)))
+    (do-sset-elements (con constraints)
+      (when (sset-member con in)
         (let* ((x (constraint-x con))
                (y (constraint-y con))
                (not-p (constraint-not-p con))
@@ -398,18 +397,17 @@
                 (let ((greater (eq kind '>)))
                   (let ((greater (if not-p (not greater) greater)))
                     (setq res
-                          (constrain-float-type res y greater not-p))))))))))
-      (cond ((and (if-p (node-dest ref))
-                  (csubtypep (specifier-type 'null) not-res))
-             (setf (node-derived-type ref) *wild-type*)
-             (change-ref-leaf ref (find-constant t)))
-            (t
-             (derive-node-type ref
-                               (make-single-value-type
-                                (or (type-difference res not-res)
-                                    res)))
-             (maybe-terminate-block ref nil)))))
-
+                          (constrain-float-type res y greater not-p)))))))))))
+    (cond ((and (if-p (node-dest ref))
+                (csubtypep (specifier-type 'null) not-res))
+           (setf (node-derived-type ref) *wild-type*)
+           (change-ref-leaf ref (find-constant t)))
+          (t
+           (derive-node-type ref
+                             (make-single-value-type
+                              (or (type-difference res not-res)
+                                  res)))
+           (maybe-terminate-block ref nil))))
   (values))
 
 ;;;; Flow analysis
@@ -421,22 +419,23 @@
       (sset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
                    gen))))
 
-;;; Copy all CONSTRAINTS involving FROM-VAR to VAR except the (EQL VAR
-;;; LVAR) ones.
-(defun inherit-constraints (var from-var constraints target)
+;;; Copy all CONSTRAINTS involving FROM-VAR - except the (EQL VAR
+;;; LVAR) ones - to all of the variables in the VARS list.
+(defun inherit-constraints (vars from-var constraints target)
   (do-sset-elements (con constraints)
-    (let ((eq-x (eq from-var (constraint-x con)))
-          (eq-y (eq from-var (constraint-y con))))
-      ;; Constant substitution is controversial.
-      (unless (constant-p (constraint-y con))
-        (when (or (and eq-x (not (lvar-p (constraint-y con))))
-                  eq-y)
-          (sset-adjoin (find-or-create-constraint
-                        (constraint-kind con)
-                        (if eq-x var (constraint-x con))
-                        (if eq-y var (constraint-y con))
-                        (constraint-not-p con))
-                       target))))))
+    ;; Constant substitution is controversial.
+    (unless (constant-p (constraint-y con))
+      (dolist (var vars)
+        (let ((eq-x (eq from-var (constraint-x con)))
+              (eq-y (eq from-var (constraint-y con))))
+          (when (or (and eq-x (not (lvar-p (constraint-y con))))
+                    eq-y)
+            (sset-adjoin (find-or-create-constraint
+                          (constraint-kind con)
+                          (if eq-x var (constraint-x con))
+                          (if eq-y var (constraint-y con))
+                          (constraint-not-p con))
+                         target)))))))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
@@ -444,10 +443,13 @@
                                    &optional (target constraints))
   (let ((con (find-or-create-constraint 'eql var1 var2 nil)))
     (when (sset-adjoin con target)
-      (do-eql-vars (var2 (var2 constraints))
-        (inherit-constraints var1 var2 constraints target))
-      (do-eql-vars (var1 (var1 constraints))
-        (inherit-constraints var2 var1 constraints target))
+      (collect ((eql1) (eql2))
+        (do-eql-vars (var1 (var1 constraints))
+          (eql1 var1))
+        (do-eql-vars (var2 (var2 constraints))
+          (eql2 var2))
+        (inherit-constraints (eql1) var2 constraints target)
+        (inherit-constraints (eql2) var1 constraints target))
       t)))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR and LVAR's
@@ -469,9 +471,8 @@
                                 (:set-preprocessor (or null function)))
                           sset)
                 constraint-propagate-in-block))
-(defun constraint-propagate-in-block
-    (block gen &key ref-preprocessor set-preprocessor)
-
+(defun constraint-propagate-in-block (block gen &key
+                                            ref-preprocessor set-preprocessor)
   (do-nodes (node lvar block)
     (typecase node
       (bind
@@ -510,7 +511,6 @@
                 (con (find-or-create-constraint 'typep var type nil)))
            (sset-adjoin con gen))
          (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
-
   gen)
 
 (defun constraint-propagate-if (block gen)
