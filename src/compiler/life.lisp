@@ -58,6 +58,20 @@
 (defun reset-current-conflict (component)
   (do-packed-tns (tn component)
     (setf (tn-current-conflict tn) (tn-global-conflicts tn))))
+
+;;; Cache the results of BLOCK-PHYSENV during lifetime analysis.
+;;;
+;;; Fetching the home-lambda of a block (needed in block-physenv) can
+;;; be an expensive operation under some circumstances, and it needs
+;;; to be done a lot during lifetime analysis when compiling with high
+;;; DEBUG (e.g. 30% of the total compilation time for CL-PPCRE with
+;;; DEBUG 3 just for that).
+(defun cached-block-physenv (block)
+  (let ((physenv (block-physenv-cache block)))
+    (if (eq physenv :none)
+        (setf (block-physenv-cache block)
+              (block-physenv block))
+        physenv)))
 
 ;;;; pre-pass
 
@@ -415,7 +429,7 @@
     (convert-to-global tn))
   (setf (tn-current-conflict tn) (tn-global-conflicts tn))
   (do-blocks-backwards (block component)
-    (when (eq (block-physenv block) env)
+    (when (eq (cached-block-physenv block) env)
       (let* ((2block (block-info block))
              (last (do ((b (ir2-block-next 2block) (ir2-block-next b))
                         (prev 2block b))
@@ -614,7 +628,7 @@
                (num (global-conflicts-number conf)))
           (when (and num (zerop (sbit live-bits num))
                      (eq (tn-kind tn) :debug-environment)
-                     (eq (tn-physenv tn) (block-physenv 1block))
+                     (eq (tn-physenv tn) (cached-block-physenv 1block))
                      (saved-after-read tn block))
             (note-conflicts live-bits live-list tn num)
             (setf (sbit live-bits num) 1)
@@ -686,7 +700,7 @@
           (unless (eq (tn-kind tn) :environment)
             (convert-to-environment-tn
              tn
-             (block-physenv (ir2-block-block block))))))))
+             (cached-block-physenv (ir2-block-block block))))))))
   (values))
 
 ;;; FIXME: The next 3 macros aren't needed in the target runtime.
