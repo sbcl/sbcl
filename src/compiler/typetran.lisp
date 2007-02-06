@@ -415,8 +415,8 @@
                         class:~%  ~S"
                        class))
       (t
-        ;; Delay the type transform to give type propagation a chance.
-        (delay-ir1-transform node :constraint)
+       ;; Delay the type transform to give type propagation a chance.
+       (delay-ir1-transform node :constraint)
 
        ;; Otherwise transform the type test.
        (multiple-value-bind (pred get-layout)
@@ -456,8 +456,17 @@
                           (and (> (layout-depthoid ,n-layout)
                                   ,depthoid)
                                (locally (declare (optimize (safety 0)))
-                                 (eq (svref (layout-inherits ,n-layout)
-                                            ,depthoid)
+                                 ;; Use DATA-VECTOR-REF directly,
+                                 ;; since that's what SVREF in a
+                                 ;; SAFETY 0 lexenv will eventually be
+                                 ;; transformed to. This can give a
+                                 ;; large compilation speedup, since
+                                 ;; %INSTANCE-TYPEPs are frequently
+                                 ;; created during GENERATE-TYPE-CHECKS,
+                                 ;; and the normal aref transformation path
+                                 ;; is pretty heavy.
+                                 (eq (data-vector-ref (layout-inherits ,n-layout)
+                                                      ,depthoid)
                                      ',layout))))))))
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
@@ -475,7 +484,8 @@
                           (let ((,n-inherits (layout-inherits ,n-layout)))
                             (declare (optimize (safety 0)))
                             (and (> (length ,n-inherits) ,depthoid)
-                                 (eq (svref ,n-inherits ,depthoid)
+                                 ;; See above.
+                                 (eq (data-vector-ref ,n-inherits ,depthoid)
                                      ',layout))))))))
            (t
             (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
