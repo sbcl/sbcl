@@ -1,8 +1,12 @@
 ;;;; This file implements a sparse set abstraction, represented as a
-;;;; sorted linked list. We don't use bit-vectors to represent sets in
-;;;; flow analysis, since the universe may be quite large but the
-;;;; average number of elements is small. We keep the list sorted so
-;;;; that we can do union and intersection in linear time.
+;;;; custom lightweight hash-table. We don't use bit-vectors to
+;;;; represent sets in flow analysis, since the universe may be quite
+;;;; large but the average number of elements is small. We also don't
+;;;; use sorted lists like in the original CMUCL code, since it had
+;;;; bad worst-case performance (on some real-life programs the
+;;;; hash-based sset gives a 20% compilation speedup). A custom
+;;;; hash-table is used since the standard one is too heavy (locking,
+;;;; memory use) for this use.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,7 +15,7 @@
 ;;;; written at Carnegie Mellon University and released into the
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
-;;;; files for more information.
+;;;; files for more information. (This file no)
 
 (in-package "SB!C")
 
@@ -24,68 +28,168 @@
   (number nil :type (or index null)))
 
 (defstruct (sset (:copier nil))
-  ;; The element at the head of the list here seems always to be
-  ;; ignored. I think this idea is that the extra level of indirection
-  ;; it provides is handy to allow various destructive operations on
-  ;; SSETs to be expressed more easily. -- WHN
-  (elements (list nil) :type cons))
-(defprinter (sset)
-  (elements :prin1 (cdr elements)))
+  ;; Vector containing the set values. 0 is used for empty (since
+  ;; initializing a vector with 0 is cheaper than with NIL), +DELETED+
+  ;; is used to mark buckets that used to contain an element, but no
+  ;; longer do.
+  (vector #() :type simple-vector)
+  ;; How many buckets currently contain or used to contain an element.
+  (free 0 :type index)
+  ;; How many elements are currently members of the set.
+  (count 0 :type index))
+(defprinter (sset) vector)
 
 ;;; Iterate over the elements in SSET, binding VAR to each element in
 ;;; turn.
 (defmacro do-sset-elements ((var sset &optional result) &body body)
-  `(dolist (,var (cdr (sset-elements ,sset)) ,result) ,@body))
+  `(loop for ,var across (sset-vector ,sset)
+         do (unless (member ,var '(0 +deleted+))
+              ,@body)
+         finally (return ,result)))
+
+;;; Primary hash.
+(declaim (inline sset-hash1))
+(defun sset-hash1 (element)
+  #+sb-xc-host
+  (let ((result (sset-element-number element)))
+    ;; This is performance critical, and it's not certain that the host
+    ;; compiler does modular arithmetic optimization. Instad use
+    ;; something that most CL implementations will do efficiently.
+    (the fixnum (logxor (the fixnum result)
+                        (the fixnum (ash result -9))
+                        (the fixnum (ash result -5)))))
+  #-sb-xc-host
+  (let ((result (sset-element-number element)))
+    (declare (type sb!vm:word result))
+    ;; We only use the low-order bits.
+    (macrolet ((set-result (form)
+                 `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
+      (set-result (+ result (ash result -19)))
+      (set-result (logxor result (ash result -13)))
+      (set-result (+ result (ash result -9)))
+      (set-result (logxor result (ash result -5)))
+      (set-result (+ result (ash result -2)))
+      (logand sb!xc:most-positive-fixnum result))))
+
+;;; Secondary hash (for double hash probing). Needs to return an odd
+;;; number.
+(declaim (inline sset-hash2))
+(defun sset-hash2 (element)
+  (let ((number (sset-element-number element)))
+    (declare (fixnum number))
+    (logior 1 number)))
+
+;;; Double the size of the hash vector of SET.
+(defun sset-grow (set)
+  (let* ((vector (sset-vector set))
+         (new-vector (make-array (if (zerop (length vector))
+                                     2
+                                     (* (length vector) 2)))))
+    (setf (sset-vector set) new-vector
+          (sset-free set) (length new-vector)
+          (sset-count set) 0)
+    (loop for element across vector
+          do (unless (member element '(0 +deleted+))
+               (sset-adjoin element set)))))
+
+;;; Rehash the sset when the proportion of free cells in the set is
+;;; lower than this.
+(defconstant +sset-rehash-threshold+ 1/4)
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
-  (let ((number (sset-element-number element))
-        (elements (sset-elements set)))
-    (do ((prev elements current)
-         (current (cdr elements) (cdr current)))
-        ((null current)
-         (setf (cdr prev) (list element))
-         t)
-      (let ((el (car current)))
-        (when (>= (sset-element-number el) number)
-          (when (eq el element)
-            (return nil))
-          (setf (cdr prev) (cons element current))
-          (return t))))))
+  (declare (optimize (speed 2)))
+  (when (<= (sset-free set)
+            (max 1 (truncate (length (sset-vector set))
+                             #.(round (/ +sset-rehash-threshold+)))))
+    (sset-grow set))
+  (loop with vector = (sset-vector set)
+        with mask of-type fixnum = (1- (length vector))
+        with secondary-hash = (sset-hash2 element)
+        for hash of-type index = (logand mask (sset-hash1 element)) then
+          (logand mask (+ hash secondary-hash))
+        for current = (aref vector hash)
+        for deleted-index = nil
+        do (cond ((eql current 0)
+                  (incf (sset-count set))
+                  (cond (deleted-index
+                         (setf (aref vector deleted-index) element))
+                        (t
+                         (decf (sset-free set))
+                         (setf (aref vector hash) element)))
+                  (return t))
+                 ((and (eql current '+deleted+)
+                       (not deleted-index))
+                  (setf deleted-index hash))
+                 ((eq current element)
+                  (return nil)))))
 
 ;;; Destructively remove ELEMENT from SET. If element was in the set,
 ;;; then return true, otherwise return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
-  (let ((elements (sset-elements set)))
-    (do ((prev elements current)
-         (current (cdr elements) (cdr current)))
-        ((null current) nil)
-      (when (eq (car current) element)
-        (setf (cdr prev) (cdr current))
-        (return t)))))
+  (when (zerop (length (sset-vector set)))
+    (return-from sset-delete nil))
+  (loop with vector = (sset-vector set)
+        with mask fixnum = (1- (length vector))
+        with secondary-hash = (sset-hash2 element)
+        for hash of-type index = (logand mask (sset-hash1 element)) then
+          (logand mask (+ hash secondary-hash))
+        for current = (aref vector hash)
+        do (cond ((eql current 0)
+                  (return nil))
+                 ((eq current element)
+                  (decf (sset-count set))
+                  (setf (aref vector hash) '+deleted+)
+                  (return t)))))
 
 ;;; Return true if ELEMENT is in SET, false otherwise.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-member))
 (defun sset-member (element set)
-  (declare (inline member))
-  (not (null (member element (cdr (sset-elements set)) :test #'eq))))
+  (when (zerop (length (sset-vector set)))
+    (return-from sset-member nil))
+  (loop with vector = (sset-vector set)
+        with mask fixnum = (1- (length vector))
+        with secondary-hash = (sset-hash2 element)
+        for hash of-type index = (logand mask (sset-hash1 element)) then
+          (logand mask (+ hash secondary-hash))
+        for current = (aref vector hash)
+        do (cond ((eql current 0)
+                  (return nil))
+                 ((eq current element)
+                  (return t)))))
 
 (declaim (ftype (sfunction (sset sset) boolean) sset=))
 (defun sset= (set1 set2)
-  (equal (sset-elements set1) (sset-elements set2)))
+  (unless (eql (sset-count set1)
+               (sset-count set2))
+    (return-from sset= nil))
+  (do-sset-elements (element set1)
+    (unless (sset-member element set2)
+      (return-from sset= nil)))
+  t)
 
 ;;; Return true if SET contains no elements, false otherwise.
 (declaim (ftype (sfunction (sset) boolean) sset-empty))
 (defun sset-empty (set)
-  (null (cdr (sset-elements set))))
+  (zerop (sset-count set)))
 
 ;;; Return a new copy of SET.
 (declaim (ftype (sfunction (sset) sset) copy-sset))
 (defun copy-sset (set)
-  (make-sset :elements (copy-list (sset-elements set))))
+  (make-sset :vector (let* ((vector (sset-vector set))
+                            (new-vector (make-array (length vector))))
+                       (declare (type simple-vector vector new-vector)
+                                (optimize speed (safety 0)))
+                       ;; There's no REPLACE deftransform for simple-vectors.
+                       (dotimes (i (length vector))
+                         (setf (aref new-vector i)
+                               (aref vector i)))
+                       new-vector)
+             :count (sset-count set)
+             :free (sset-free set)))
 
 ;;; Perform the appropriate set operation on SET1 and SET2 by
 ;;; destructively modifying SET1. We return true if SET1 was modified,
@@ -93,127 +197,42 @@
 (declaim (ftype (sfunction (sset sset) boolean) sset-union sset-intersection
                 sset-difference))
 (defun sset-union (set1 set2)
-  (let* ((prev-el1 (sset-elements set1))
-         (el1 (cdr prev-el1))
-         (changed nil))
-    (do ((el2 (cdr (sset-elements set2)) (cdr el2)))
-        ((null el2) changed)
-      (let* ((e (car el2))
-             (num2 (sset-element-number e)))
-        (loop
-          (when (null el1)
-            (setf (cdr prev-el1) (copy-list el2))
-            (return-from sset-union t))
-          (let ((num1 (sset-element-number (car el1))))
-            (when (>= num1 num2)
-              (if (> num1 num2)
-                  (let ((new (cons e el1)))
-                    (setf (cdr prev-el1) new)
-                    (setq prev-el1 new
-                          changed t))
-                  (shiftf prev-el1 el1 (cdr el1)))
-              (return))
-            (shiftf prev-el1 el1 (cdr el1))))))))
+  (loop with modified = nil
+        for element across (sset-vector set2)
+        do (unless (member element '(0 +deleted+))
+             (when (sset-adjoin element set1)
+               (setf modified t)))
+        finally (return modified)))
 (defun sset-intersection (set1 set2)
-  (let* ((prev-el1 (sset-elements set1))
-         (el1 (cdr prev-el1))
-         (changed nil))
-    (do ((el2 (cdr (sset-elements set2)) (cdr el2)))
-        ((null el2)
-         (cond (el1
-                (setf (cdr prev-el1) nil)
-                t)
-               (t changed)))
-      (let ((num2 (sset-element-number (car el2))))
-        (loop
-          (when (null el1)
-            (return-from sset-intersection changed))
-          (let ((num1 (sset-element-number (car el1))))
-            (when (>= num1 num2)
-              (when (= num1 num2)
-                (shiftf prev-el1 el1 (cdr el1)))
-              (return))
-            (pop el1)
-            (setf (cdr prev-el1) el1)
-            (setq changed t)))))))
+  (loop with modified = nil
+        for element across (sset-vector set1)
+        for index of-type index from 0
+        do (unless (member element '(0 +deleted+))
+             (unless (sset-member element set2)
+               (decf (sset-count set1))
+               (setf (aref (sset-vector set1) index) '+deleted+
+                     modified t)))
+        finally (return modified)))
 (defun sset-difference (set1 set2)
-  (let* ((prev-el1 (sset-elements set1))
-         (el1 (cdr prev-el1))
-         (changed nil))
-    (do ((el2 (cdr (sset-elements set2)) (cdr el2)))
-        ((null el2) changed)
-      (let ((num2 (sset-element-number (car el2))))
-        (loop
-          (when (null el1)
-            (return-from sset-difference changed))
-          (let ((num1 (sset-element-number (car el1))))
-            (when (>= num1 num2)
-              (when (= num1 num2)
-                (pop el1)
-                (setf (cdr prev-el1) el1)
-                (setq changed t))
-              (return))
-            (shiftf prev-el1 el1 (cdr el1))))))))
+  (loop with modified = nil
+        for element across (sset-vector set1)
+        for index of-type index from 0
+        do (unless (member element '(0 +deleted+))
+             (when (sset-member element set2)
+               (decf (sset-count set1))
+               (setf (aref (sset-vector set1) index) '+deleted+
+                     modified t)))
+        finally (return modified)))
 
 ;;; Destructively modify SET1 to include its union with the difference
 ;;; of SET2 and SET3. We return true if SET1 was modified, false
 ;;; otherwise.
 (declaim (ftype (sfunction (sset sset sset) boolean) sset-union-of-difference))
 (defun sset-union-of-difference (set1 set2 set3)
-  (let* ((prev-el1 (sset-elements set1))
-         (el1 (cdr prev-el1))
-         (el3 (cdr (sset-elements set3)))
-         (changed nil))
-    (do ((el2 (cdr (sset-elements set2)) (cdr el2)))
-        ((null el2) changed)
-      (let* ((e (car el2))
-             (num2 (sset-element-number e)))
-        (loop
-          (when (null el3)
-            (loop
-              (when (null el1)
-                (setf (cdr prev-el1) (copy-list el2))
-                (return-from sset-union-of-difference t))
-              (let ((num1 (sset-element-number (car el1))))
-                (when (>= num1 num2)
-                  (if (> num1 num2)
-                      (let ((new (cons e el1)))
-                        (setf (cdr prev-el1) new)
-                        (setq prev-el1 new  changed t))
-                      (shiftf prev-el1 el1 (cdr el1)))
-                  (return))
-                (shiftf prev-el1 el1 (cdr el1))))
-            (return))
-          (let ((num3 (sset-element-number (car el3))))
-            (when (<= num2 num3)
-              (unless (= num2 num3)
-                (loop
-                  (when (null el1)
-                    (do ((el2 el2 (cdr el2)))
-                        ((null el2)
-                         (return-from sset-union-of-difference changed))
-                      (let* ((e (car el2))
-                             (num2 (sset-element-number e)))
-                        (loop
-                          (when (null el3)
-                            (setf (cdr prev-el1) (copy-list el2))
-                            (return-from sset-union-of-difference t))
-                          (setq num3 (sset-element-number (car el3)))
-                          (when (<= num2 num3)
-                            (unless (= num2 num3)
-                              (let ((new (cons e el1)))
-                                (setf (cdr prev-el1) new)
-                                (setq prev-el1 new  changed t)))
-                            (return))
-                          (pop el3)))))
-                  (let ((num1 (sset-element-number (car el1))))
-                    (when (>= num1 num2)
-                      (if (> num1 num2)
-                          (let ((new (cons e el1)))
-                            (setf (cdr prev-el1) new)
-                            (setq prev-el1 new  changed t))
-                          (shiftf prev-el1 el1 (cdr el1)))
-                      (return))
-                    (shiftf prev-el1 el1 (cdr el1)))))
-              (return)))
-          (pop el3))))))
+  (loop with modified = nil
+        for element across (sset-vector set2)
+        do (unless (member element '(0 +deleted+))
+             (unless (sset-member element set3)
+               (when (sset-adjoin element set1)
+                 (setf modified t))))
+        finally (return modified)))
