@@ -658,8 +658,8 @@
              (inst ,ref-inst value
                    (make-ea :word :base object
                             :disp (- (+ (* vector-data-offset n-word-bytes)
-                                        (* 2 (+ offset (tn-value index)))
-                                     other-pointer-lowtag)))))
+                                        (* 2 (+ offset (tn-value index))))
+                                     other-pointer-lowtag))))
             (t
              (inst ,ref-inst value
                    (make-ea :word :base object :index index :scale 2
