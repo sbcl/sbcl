@@ -593,7 +593,7 @@
   (:note "inline ASH")
   (:generator 2
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 2)))
+           (inst lea result (make-ea :qword :base number :index number)))
           ((and (= amount 2) (not (location= number result)))
            (inst lea result (make-ea :qword :index number :scale 4)))
           ((and (= amount 3) (not (location= number result)))
@@ -653,7 +653,7 @@
   (:note "inline ASH")
   (:generator 3
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 2)))
+           (inst lea result (make-ea :qword :base number :index number)))
           ((and (= amount 2) (not (location= number result)))
            (inst lea result (make-ea :qword :index number :scale 4)))
           ((and (= amount 3) (not (location= number result)))
@@ -680,7 +680,7 @@
   (:note "inline ASH")
   (:generator 3
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 2)))
+           (inst lea result (make-ea :qword :base number :index number)))
           ((and (= amount 2) (not (location= number result)))
            (inst lea result (make-ea :qword :index number :scale 4)))
           ((and (= amount 3) (not (location= number result)))
