@@ -246,7 +246,30 @@
   (define-call "setpgid" int minusp (pid pid-t) (pgid pid-t))
   (define-call "setpgrp" int minusp))
 
-;;(define-call "readlink" int minusp (path filename) (buf (* t)) (len int))
+#-win32
+(progn
+  (export 'readlink :sb-posix)
+  (defun readlink (pathspec)
+    (flet ((%readlink (path buf length)
+             (alien-funcall
+              (extern-alien "readlink" (function int c-string (* t) int))
+              path buf length)))
+      (loop for size = 128 then (* 2 size)
+            for buf = (make-alien c-string size)
+            do (unwind-protect
+                    (let ((count (%readlink (filename pathspec) buf size)))
+                      (cond ((minusp count)
+                             (syscall-error))
+                            ((< 0 count size)
+                             (setf (sb-sys:sap-ref-8 (sb-alien:alien-sap buf)
+                                                     count)
+                                   0)
+                             (return
+                               (sb-alien::c-string-to-string
+                                (sb-alien:alien-sap buf)
+                                (sb-impl::default-external-format)
+                                'character)))))
+                 (free-alien buf))))))
 
 #-win32
 (progn
@@ -581,4 +604,3 @@ than C's printf) with format string FORMAT and arguments ARGS."
                             priority "%s" message)))
       (syslog1 priority (apply #'format nil format args))))
   (define-call "closelog" void never-fails))
-

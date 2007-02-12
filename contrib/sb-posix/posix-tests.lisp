@@ -521,6 +521,122 @@
         (list (= (sb-posix:stat-atime stat) atime)
               (= (sb-posix:stat-mtime stat) mtime))))
   (t t))
+
+;; readlink tests.
+#-win32
+(progn
+  (deftest readlink.1
+      (let ((link-pathname (make-pathname :name "readlink.1"
+                                          :defaults *test-directory*)))
+        (sb-posix:symlink "/" link-pathname)
+        (unwind-protect
+             (sb-posix:readlink link-pathname)
+          (ignore-errors (sb-posix:unlink link-pathname))))
+    "/")
 
+  ;; Same thing, but with a very long link target (which doesn't have
+  ;; to exist).  This tests the array adjustment in the wrapper,
+  ;; provided that the target's length is long enough.
+  (deftest readlink.2
+      (let ((target-pathname (make-pathname
+                              :name (make-string 255 :initial-element #\a)
+                              :directory '(:absolute)))
+            (link-pathname (make-pathname :name "readlink.2"
+                                          :defaults *test-directory*)))
+        (sb-posix:symlink target-pathname link-pathname)
+        (unwind-protect
+             (sb-posix:readlink link-pathname)
+          (ignore-errors (sb-posix:unlink link-pathname))))
+    #.(concatenate 'string "/" (make-string 255 :initial-element #\a)))
 
-
+  ;; The error tests are in the order of exposition from SUSv3.
+  (deftest readlink.error.1
+      (let* ((subdir-pathname (merge-pathnames
+                               (make-pathname
+                                :directory '(:relative "readlink.error.1"))
+                               *test-directory*))
+             (link-pathname (make-pathname :name "readlink.error.1"
+                                           :defaults subdir-pathname)))
+        (sb-posix:mkdir subdir-pathname #o777)
+        (sb-posix:symlink "/" link-pathname)
+        (sb-posix:chmod subdir-pathname 0)
+        (unwind-protect
+             (handler-case (sb-posix:readlink link-pathname)
+               (sb-posix:syscall-error (c)
+                 (sb-posix:syscall-errno c)))
+          (ignore-errors
+            (sb-posix:chmod subdir-pathname #o777)
+            (sb-posix:unlink link-pathname)
+            (sb-posix:rmdir subdir-pathname))))
+    #.sb-posix:eacces)
+  (deftest readlink.error.2
+      (let* ((non-link-pathname (make-pathname :name "readlink.error.2"
+                                               :defaults *test-directory*))
+             (fd (sb-posix:open non-link-pathname sb-posix::o-creat)))
+        (unwind-protect
+             (handler-case (sb-posix:readlink non-link-pathname)
+               (sb-posix:syscall-error (c)
+                 (sb-posix:syscall-errno c)))
+          (ignore-errors
+            (sb-posix:close fd)
+            (sb-posix:unlink non-link-pathname))))
+    #.sb-posix:einval)
+  ;; Skipping EIO, ELOOP
+  (deftest readlink.error.3
+      (let* ((link-pathname (make-pathname :name "readlink.error.3"
+                                           :defaults *test-directory*))
+             (bogus-pathname (merge-pathnames
+                              (make-pathname
+                               :name "bogus"
+                               :directory '(:relative "readlink.error.3"))
+                               *test-directory*)))
+        (sb-posix:symlink link-pathname link-pathname)
+        (unwind-protect
+             (handler-case (sb-posix:readlink bogus-pathname)
+               (sb-posix:syscall-error (c)
+                 (sb-posix:syscall-errno c)))
+          (ignore-errors (sb-posix:unlink link-pathname))))
+    #.sb-posix:eloop)
+  ;; Note: PATH_MAX and NAME_MAX need not be defined, and may vary, so
+  ;; failure of this test is not too meaningful.
+  (deftest readlink.error.4
+      (let ((pathname
+             (make-pathname :name (make-string 257 ;NAME_MAX plus some, maybe
+                                               :initial-element #\a))))
+        (handler-case (sb-posix:readlink pathname)
+          (sb-posix:syscall-error (c)
+            (sb-posix:syscall-errno c))))
+    #.sb-posix:enametoolong)
+  (deftest readlink.error.5
+      (let ((string (format nil "~v{/A~}" 2049 ;PATH_MAX/2 plus some, maybe
+                                          '(x))))
+        (handler-case (sb-posix:readlink string)
+          (sb-posix:syscall-error (c)
+            (sb-posix:syscall-errno c))))
+    #.sb-posix:enametoolong)
+    (deftest readlink.error.6
+      (let ((no-such-pathname (make-pathname :name "readlink.error.6"
+                                             :defaults *test-directory*)))
+        (handler-case (sb-posix:readlink no-such-pathname)
+          (sb-posix:syscall-error (c)
+            (sb-posix:syscall-errno c))))
+    #.sb-posix:enoent)
+  (deftest readlink.error.7
+      (let* ((non-link-pathname (make-pathname :name "readlink.error.7"
+                                               :defaults *test-directory*))
+             (impossible-pathname (merge-pathnames
+                                   (make-pathname
+                                    :directory
+                                    '(:relative "readlink.error.7")
+                                    :name "readlink.error.7")
+                                   *test-directory*))
+             (fd (sb-posix:open non-link-pathname sb-posix::o-creat)))
+        (unwind-protect
+             (handler-case (sb-posix:readlink impossible-pathname)
+               (sb-posix:syscall-error (c)
+                 (sb-posix:syscall-errno c)))
+          (ignore-errors
+            (sb-posix:close fd)
+            (sb-posix:unlink non-link-pathname))))
+    #.sb-posix:enotdir)
+  )

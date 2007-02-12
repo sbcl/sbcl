@@ -12,6 +12,8 @@ changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * bug fix: use "gtar" as the asdf-install *TAR-PROGRAM* on NetBSD
     (thanks to Jon Buller)
   * improvement: faster compilation times for complex functions
+  * improvement: added readlink support to SB-POSIX (thanks to Richard
+    M Kreuter)
 
 changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * improvement: experimental support for mach exception handling on
