@@ -70,6 +70,15 @@
   (declare (ignore args))
   nil)
 
+;;; Some systems may need C-level wrappers, which can live in the
+;;; runtime (so that save-lisp-and-die can produce standalone
+;;; executables).  See REAL-C-NAME in macros.lisp for the use of this
+;;; variable.
+(eval-when (:compile-toplevel :load-toplevel)
+  (setf *c-functions-in-runtime*
+	'`(#+netbsd ,@("stat" "lstat" "fstat" "readdir" "opendir"))))
+
+
 ;;; filesystem access
 (defmacro define-call* (name &rest arguments)
   #-win32 `(define-call ,name ,@arguments)
@@ -356,15 +365,12 @@
               (syscall-error))
             (alien-to-stat a-stat stat)))))))
 
-;; Note: _stat, _lstat, and _fstat for NetBSD are provided in
-;; src/runtime/bsd-os.c.  See comments in that file
-;; for an explanation. -- RMK 2006-10-15
-(define-stat-call #-(or win32 netbsd) "stat" #+(or win32 netbsd) "_stat"
+(define-stat-call #-win32 "stat" #+win32 "_stat"
                   pathname filename
                   (function int c-string (* alien-stat)))
 
 #-win32
-(define-stat-call #-netbsd "lstat" #+netbsd "_lstat"
+(define-stat-call "lstat"
                   pathname filename
                   (function int c-string (* alien-stat)))
 ;;; No symbolic links on Windows, so use stat
@@ -374,7 +380,7 @@
   (export (defun lstat (filename &optional stat)
             (if stat (stat filename stat) (stat filename)))))
 
-(define-stat-call #-(or win32 netbsd) "fstat" #+(or win32 netbsd) "_fstat"
+(define-stat-call #-win32 "fstat" #+win32 "_fstat"
                   fd file-descriptor
                   (function int int (* alien-stat)))
 

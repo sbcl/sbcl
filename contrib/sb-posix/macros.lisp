@@ -25,20 +25,29 @@
      (let ((root (if (eql #\_ (char name 0)) (subseq name 1) name)))
        (intern (substitute #\- #\_ (string-upcase root)) :sb-posix)))))
 
+;; Note: this variable is set in interface.lisp.  defined here for
+;; clarity and so the real-c-name compile as desired.
+(defparameter *c-functions-in-runtime* nil)
+
 (defun real-c-name (name)
-  (etypecase name
-    (list
-     (destructuring-bind (name &key c-name options) name
-       (if c-name
-           c-name
-           (cond #+largefile
-                 ((or (eql options :largefile)
-                      (member :largefile options))
-                  (format nil "~a_largefile" name))
-                 (t
-                  name)))))
-    (string
-     name)))
+  (let  ((maybe-name
+          (etypecase name
+            (list
+             (destructuring-bind (name &key c-name options) name
+               (if c-name
+                   c-name
+                   (cond #+largefile
+                         ((or (eql options :largefile)
+                              (member :largefile options))
+                          (format nil "~a_largefile" name))
+                         (t
+                          name)))))
+            (string
+             name))))
+    (if (member maybe-name *c-functions-in-runtime*
+                :test #'string=)
+        (format nil "_~A" maybe-name)
+        maybe-name)))
 
 (defmacro define-call-internally (lisp-name c-name return-type error-predicate
                                   &rest arguments)
