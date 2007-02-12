@@ -5,6 +5,13 @@ changes in sbcl-1.0.3 relative to sbcl-1.0.2:
     produce more efficient code on the x86 if the compiler can determine
     that (+ INDEX <constant>) does not require a bounds check and FOO
     has an element type at least 8 bits wide.
+  * bug fix: references to undefined variables are handled the same way
+    in toplevel forms as in the normal compiler
+  * bug fix: the build scripts again work with non-bash /bin/sh (thanks
+    to Magnus Henoch)
+  * bug fix: use "gtar" as the asdf-install *TAR-PROGRAM* on NetBSD
+    (thanks to Jon Buller)
+  * improvement: faster compilation times for complex functions
 
 changes in sbcl-1.0.2 relative to sbcl-1.0.1:
   * improvement: experimental support for mach exception handling on

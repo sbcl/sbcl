@@ -256,9 +256,14 @@
       (elt *locations* (1- response)))))
 
 (defparameter *tar-program*
-  #+darwin "gnutar"
-  #+sunos "gtar"
-  #-(or darwin sunos) "tar")
+  ;; Please do not "clean this up" by using a bunch of #+'s and one
+  ;; #-. When the conditional is written this way, adding a new
+  ;; special case only involves one change. If #- is used, two changes
+  ;; are needed. -- JES, 2007-02-12
+  (progn
+    "tar"
+    #+darwin "gnutar"
+    #+(or sunos netbsd) "gtar"))
 
 (defun get-tar-directory (packagename)
   (let* ((tar (with-output-to-string (o)
