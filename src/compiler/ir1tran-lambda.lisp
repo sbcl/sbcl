@@ -1018,6 +1018,10 @@
                                      `(,(car x) .
                                        (macro . ,(coerce (cdr x) 'function))))
                                    macros)
+                     ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
+                     ;; rather than the definition-site lexenv, since it seems
+                     ;; like a much more common case.
+                     :handled-conditions (lexenv-handled-conditions *lexenv*)
                      :policy (lexenv-policy *lexenv*)))
           (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*)))
       (ir1-convert-lambda `(lambda ,@body)
