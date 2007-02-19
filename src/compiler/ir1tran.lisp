@@ -827,7 +827,8 @@
         (fun-lvar (make-lvar)))
     (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
     (let ((combination
-           (ir1-convert-combination-args fun-lvar ctran next result (cdr form))))
+           (ir1-convert-combination-args fun-lvar ctran next result
+                                         (cdr form))))
       (when (step-form-p form)
         ;; Store a string representation of the form in the
         ;; combination node. This will let the IR2 translator know

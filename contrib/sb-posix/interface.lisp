@@ -76,7 +76,7 @@
 ;;; variable.
 (eval-when (:compile-toplevel :load-toplevel)
   (setf *c-functions-in-runtime*
-	'`(#+netbsd ,@("stat" "lstat" "fstat" "readdir" "opendir"))))
+        '`(#+netbsd ,@("stat" "lstat" "fstat" "readdir" "opendir"))))
 
 
 ;;; filesystem access

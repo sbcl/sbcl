@@ -37,7 +37,6 @@
 (defvar *flame-on-necessarily-undefined-function* nil)
 
 (defvar *check-consistency* nil)
-(defvar *all-components*)
 
 ;;; Set to NIL to disable loop analysis for register allocation.
 (defvar *loop-analyze* t)
@@ -1031,14 +1030,10 @@
 
     (locall-analyze-clambdas-until-done (list fun))
 
-    (multiple-value-bind (components-from-dfo top-components hairy-top)
-        (find-initial-dfo (list fun))
-      (declare (ignore hairy-top))
-
-      (let ((*all-components* (append components-from-dfo top-components)))
-        (dolist (component-from-dfo components-from-dfo)
-          (compile-component component-from-dfo)
-          (replace-toplevel-xeps component-from-dfo)))
+    (let ((components-from-dfo (find-initial-dfo (list fun))))
+      (dolist (component-from-dfo components-from-dfo)
+        (compile-component component-from-dfo)
+        (replace-toplevel-xeps component-from-dfo))
 
       (let ((entry-table (etypecase *compile-object*
                            (fasl-output (fasl-output-entry-table
@@ -1390,10 +1385,10 @@
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)
       (find-initial-dfo lambdas)
-    (let ((*all-components* (append components top-components)))
+    (let ((all-components (append components top-components)))
       (when *check-consistency*
         (maybe-mumble "[check]~%")
-        (check-ir1-consistency *all-components*))
+        (check-ir1-consistency all-components))
 
       (dolist (component (append hairy-top top-components))
         (pre-physenv-analyze-toplevel component))
@@ -1404,7 +1399,7 @@
 
       (when *check-consistency*
         (maybe-mumble "[check]~%")
-        (check-ir1-consistency *all-components*))
+        (check-ir1-consistency all-components))
 
       (if load-time-value-p
           (compile-load-time-value-lambda lambdas)

@@ -355,8 +355,7 @@
   (loop
    (let ((did-something nil))
      (dolist (clambda clambdas)
-       (let* ((component (lambda-component clambda))
-              (*all-components* (list component)))
+       (let ((component (lambda-component clambda)))
          ;; The original CMU CL code seemed to implicitly assume that
          ;; COMPONENT is the only one here. Let's make that explicit.
          (aver (= 1 (length (functional-components clambda))))
