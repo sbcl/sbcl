@@ -1752,3 +1752,40 @@ WORKAROUND:
 		2: (SB-KERNEL:%SINGLE-FLOAT ...)
 		3: (SB-C::BOUND-FUNC ...)
 		4: (SB-C::%SINGLE-FLOAT-DERIVE-TYPE-AUX ...)
+
+408: SUBTYPEP confusion re. OR of SATISFIES of not-yet-defined predicate
+	As reported by Levente M\'{e}sz\'{a}ros sbcl-devel 2006-02-20,
+		(aver (equal (multiple-value-list
+	                      (subtypep '(or (satisfies x) string)
+        	                        '(or (satisfies x) integer)))
+	                     '(nil nil)))
+	fails. Also, beneath that failure lurks another failure,
+		(aver (equal (multiple-value-list
+                              (subtypep 'string
+	                                '(or (satisfies x) integer)))
+		             '(nil nil)))
+	Having looked at this for an hour or so in sbcl-1.0.2, and
+	specifically having looked at the output from
+	  laptop$ sbcl
+	  * (let ((x 'string)
+	          (y '(or (satisfies x) integer)))
+	      (trace sb-kernel::union-complex-subtypep-arg2
+	             sb-kernel::invoke-complex-subtypep-arg1-method
+	             sb-kernel::type-union
+	             sb-kernel::type-intersection
+	             sb-kernel::type=)
+	      (subtypep x y))
+	my (WHN) impression is that the problem is that the semantics of TYPE=
+	are wrong for what the UNION-COMPLEX-SUBTYPEP-ARG2 code is trying
+	to use it for. The comments on the definition of TYPE= probably
+	date back to CMU CL and seem to define it as a confusing thing:
+	its primary value is something like "certainly equal," and its
+	secondary value is something like "certain about that certainty."
+	I'm left uncertain how to fix UNION-COMPLEX-SUBTYPEP-ARG2 without
+	reducing its generality by removing the TYPE= cleverness. Possibly
+	the tempting TYPE/= relative defined next to it might be a
+	suitable replacement for the purpose. Probably, though, it would
+	be best to start by reverse engineering exactly what TYPE= and
+	TYPE/= do, and writing an explanation which is so clear that one
+	can see immediately what it's supposed to mean in odd cases like
+	(TYPE= '(SATISFIES X) 'INTEGER) when X isn't defined yet.
