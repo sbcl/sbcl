@@ -156,3 +156,22 @@
                      (+ x0 x2 x4 x6) (+ x1 x3 x5 x7)
                      (+ x0 x3 x4 x7) (+ x1 x2 x5 x6)
                      (+ x0 x1 x6 x7) (+ x2 x3 x4 x5)))))))
+
+(with-test (:name :nan-comparisons)
+  (macrolet ((test (form)
+               (let ((nform (subst (/ 0.0 0.0) 'nan form)))
+                 `(progn
+                    (assert (not (eval ',nform)))
+                    (assert (not (funcall (lambda () ,nform))))))))
+    ;; Source transforms for >= and <= used to be too eager about
+    ;; inverting the test, causing NaN issues.
+    (test (>= nan 1.0))
+    (test (>= 1.0 nan))
+    (test (>= 1.0 nan 0.0))
+    (test (>= 1.0 0.0 nan))
+    (test (>= nan 1.0 0.0))
+    (test (<= nan 1.0))
+    (test (<= 1.0 nan))
+    (test (<= 1.0 nan 2.0))
+    (test (<= 1.0 2.0 nan))
+    (test (<= nan 1.0 2.0))))

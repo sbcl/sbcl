@@ -291,6 +291,7 @@
   (let ((sequence (make-array 1 :element-type '(signed-byte 8))))
     (with-open-file (stream pathname
                             :direction :input
+                            :external-format :latin1
                             :element-type :default)
       (handler-case (progn
                       (read-sequence sequence stream)
@@ -299,7 +300,6 @@
           (assert (eql (type-error-datum condition) (code-char 255)))
           (assert (subtypep (type-error-expected-type condition)
                             '(signed-byte 8))))))))
-
 
 ;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
 ;;; write a sequence element.

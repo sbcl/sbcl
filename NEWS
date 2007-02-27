@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.4 relative to sbcl-1.0.3:
+  * bug fix: >= and <= gave wrong results when used with NaNs.
+
 changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * new platform: NetBSD/PPC.  (thanks to Aymeric Vincent)
   * optimization: calls of the form (AREF FOO (+ INDEX <constant>)) now

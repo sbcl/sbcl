@@ -511,15 +511,13 @@
 ;;; 1] and Y = [1, 2] to determine intersection.
 (defun interval-intersect-p (x y &optional closed-intervals-p)
   (declare (type interval x y))
-  (multiple-value-bind (intersect diff)
-      (interval-intersection/difference (if closed-intervals-p
-                                            (interval-closure x)
-                                            x)
-                                        (if closed-intervals-p
-                                            (interval-closure y)
-                                            y))
-    (declare (ignore diff))
-    intersect))
+  (and (interval-intersection/difference (if closed-intervals-p
+                                             (interval-closure x)
+                                             x)
+                                         (if closed-intervals-p
+                                             (interval-closure y)
+                                             y))
+       t))
 
 ;;; Are the two intervals adjacent?  That is, is there a number
 ;;; between the two intervals that is not an element of either
@@ -563,27 +561,44 @@
            (if (listp p)
                (first p)
                (list p)))
-         (test-number (p int)
+         (test-number (p int bound)
            ;; Test whether P is in the interval.
-           (when (interval-contains-p (type-bound-number p)
-                                      (interval-closure int))
-             (let ((lo (interval-low int))
-                   (hi (interval-high int)))
+           (let ((pn (type-bound-number p)))
+             (when (interval-contains-p pn (interval-closure int))
                ;; Check for endpoints.
-               (cond ((and lo (= (type-bound-number p) (type-bound-number lo)))
-                      (not (and (consp p) (numberp lo))))
-                     ((and hi (= (type-bound-number p) (type-bound-number hi)))
-                      (not (and (numberp p) (consp hi))))
-                     (t t)))))
+               (let* ((lo (interval-low int))
+                      (hi (interval-high int))
+                      (lon (type-bound-number lo))
+                      (hin (type-bound-number hi)))
+                 (cond
+                   ;; Interval may be a point.
+                   ((and lon hin (= lon hin pn))
+                    (and (numberp p) (numberp lo) (numberp hi)))
+                   ;; Point matches the low end.
+                   ;; [P] [P,?} => TRUE     [P] (P,?} => FALSE
+                   ;; (P  [P,?} => TRUE      P) [P,?} => FALSE
+                   ;; (P  (P,?} => TRUE      P) (P,?} => FALSE
+                   ((and lon (= pn lon))
+                    (or (and (numberp p) (numberp lo))
+                        (and (consp p) (eq :low bound))))
+                   ;; [P] {?,P] => TRUE     [P] {?,P) => FALSE
+                   ;;  P) {?,P] => TRUE     (P  {?,P] => FALSE
+                   ;;  P) {?,P) => TRUE     (P  {?,P) => FALSE
+                   ((and hin (= pn hin))
+                    (or (and (numberp p) (numberp hi))
+                        (and (consp p) (eq :high bound))))
+                   ;; Not an endpoint, all is well.
+                   (t
+                    t))))))
          (test-lower-bound (p int)
            ;; P is a lower bound of an interval.
            (if p
-               (test-number p int)
+               (test-number p int :low)
                (not (interval-bounded-p int 'below))))
          (test-upper-bound (p int)
            ;; P is an upper bound of an interval.
            (if p
-               (test-number p int)
+               (test-number p int :high)
                (not (interval-bounded-p int 'above)))))
       (let ((x-lo-in-y (test-lower-bound x-lo y))
             (x-hi-in-y (test-upper-bound x-hi y))
@@ -815,6 +830,24 @@
              (interval-bounded-p y 'above))
     (>= (type-bound-number (interval-low x))
         (type-bound-number (interval-high y)))))
+
+;;; Return T if X = Y.
+(defun interval-= (x y)
+  (declare (type interval x y))
+  (and (interval-bounded-p x 'both)
+       (interval-bounded-p y 'both)
+       (flet ((bound (v)
+                (if (numberp v)
+                    v
+                    ;; Open intervals cannot be =
+                    (return-from interval-= nil))))
+         ;; Both intervals refer to the same point
+         (= (bound (interval-high x)) (bound (interval-low x))
+            (bound (interval-high y)) (bound (interval-low y))))))
+
+;;; Return T if X /= Y
+(defun interval-/= (x y)
+  (not (interval-intersect-p x y)))
 
 ;;; Return an interval that is the absolute value of X. Thus, if
 ;;; X = [-1 10], the result is [0, 10].
@@ -3353,41 +3386,44 @@
 
 ;;; Convert to EQL if both args are rational and complexp is specified
 ;;; and the same for both.
-(deftransform = ((x y) * *)
+(deftransform = ((x y) (number number) *)
   "open code"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y)))
-    (if (and (csubtypep x-type (specifier-type 'number))
-             (csubtypep y-type (specifier-type 'number)))
-        (cond ((or (and (csubtypep x-type (specifier-type 'float))
-                        (csubtypep y-type (specifier-type 'float)))
-                   (and (csubtypep x-type (specifier-type '(complex float)))
-                        (csubtypep y-type (specifier-type '(complex float)))))
-               ;; They are both floats. Leave as = so that -0.0 is
-               ;; handled correctly.
-               (give-up-ir1-transform))
-              ((or (and (csubtypep x-type (specifier-type 'rational))
-                        (csubtypep y-type (specifier-type 'rational)))
-                   (and (csubtypep x-type
-                                   (specifier-type '(complex rational)))
-                        (csubtypep y-type
-                                   (specifier-type '(complex rational)))))
-               ;; They are both rationals and complexp is the same.
-               ;; Convert to EQL.
-               '(eql x y))
-              (t
-               (give-up-ir1-transform
-                "The operands might not be the same type.")))
-        (give-up-ir1-transform
-         "The operands might not be the same type."))))
+    (cond ((or (and (csubtypep x-type (specifier-type 'float))
+                    (csubtypep y-type (specifier-type 'float)))
+               (and (csubtypep x-type (specifier-type '(complex float)))
+                    (csubtypep y-type (specifier-type '(complex float)))))
+           ;; They are both floats. Leave as = so that -0.0 is
+           ;; handled correctly.
+           (give-up-ir1-transform))
+          ((or (and (csubtypep x-type (specifier-type 'rational))
+                    (csubtypep y-type (specifier-type 'rational)))
+               (and (csubtypep x-type
+                               (specifier-type '(complex rational)))
+                    (csubtypep y-type
+                               (specifier-type '(complex rational)))))
+           ;; They are both rationals and complexp is the same.
+           ;; Convert to EQL.
+           '(eql x y))
+          (t
+           (give-up-ir1-transform
+            "The operands might not be the same type.")))))
 
-;;; If LVAR's type is a numeric type, then return the type, otherwise
-;;; GIVE-UP-IR1-TRANSFORM.
-(defun numeric-type-or-lose (lvar)
-  (declare (type lvar lvar))
-  (let ((res (lvar-type lvar)))
-    (unless (numeric-type-p res) (give-up-ir1-transform))
-    res))
+(labels ((maybe-float-lvar-p (lvar)
+           (neq *empty-type* (type-intersection (specifier-type 'float)
+                                                (lvar-type lvar))))
+         (maybe-invert (op inverted x y)
+           ;; Don't invert if either argument can be a float (NaNs)
+           (if (or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
+               `(or (,op x y) (= x y))
+               `(if (,inverted x y) nil t))))
+  (deftransform >= ((x y) (number number) *)
+    "invert or open code"
+    (maybe-invert '> '< x y))
+  (deftransform <= ((x y) (number number) *)
+    "invert or open code"
+    (maybe-invert '< '> x y)))
 
 ;;; See whether we can statically determine (< X Y) using type
 ;;; information. If X's high bound is < Y's low, then X < Y.
@@ -3395,6 +3431,7 @@
 ;;; NIL). If not, at least make sure any constant arg is second.
 (macrolet ((def (name inverse reflexive-p surely-true surely-false)
              `(deftransform ,name ((x y))
+                "optimize using intervals"
                 (if (same-leaf-ref-p x y)
                     ,reflexive-p
                     (let ((ix (or (type-approximate-interval (lvar-type x))
@@ -3410,6 +3447,8 @@
                              `(,',inverse y x))
                             (t
                              (give-up-ir1-transform))))))))
+  (def = = t (interval-= ix iy) (interval-/= ix iy))
+  (def /= /= nil (interval-/= ix iy) (interval-= ix iy))
   (def < > nil (interval-< ix iy) (interval->= ix iy))
   (def > < nil (interval-< iy ix) (interval->= iy ix))
   (def <= >= t (interval->= iy ix) (interval-< iy ix))
@@ -3474,8 +3513,13 @@
 (define-source-transform = (&rest args) (multi-compare '= args nil 'number))
 (define-source-transform < (&rest args) (multi-compare '< args nil 'real))
 (define-source-transform > (&rest args) (multi-compare '> args nil 'real))
-(define-source-transform <= (&rest args) (multi-compare '> args t 'real))
-(define-source-transform >= (&rest args) (multi-compare '< args t 'real))
+;;; We cannot do the inversion for >= and <= here, since both
+;;;   (< NaN X) and (> NaN X)
+;;; are false, and we don't have type-inforation available yet. The
+;;; deftransforms for two-argument versions of >= and <= takes care of
+;;; the inversion to > and < when possible.
+(define-source-transform <= (&rest args) (multi-compare '<= args nil 'real))
+(define-source-transform >= (&rest args) (multi-compare '>= args nil 'real))
 
 (define-source-transform char= (&rest args) (multi-compare 'char= args nil
                                                            'character))
