@@ -58,6 +58,22 @@
     (read-from-string "#1=[#1#]")
   (assert (eq (value res) res))
   (assert (= pos 8)))
+;;; much, much, later (in Feb 2007), CSR noticed that the problem
+;;; still exists for funcallable instances.
+(defclass funcallable-box (box sb-mop:funcallable-standard-object) ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(defun read-funcallable-box (stream char)
+  (declare (ignore char))
+  (let ((objects (read-delimited-list #\} stream t)))
+    (unless (= 1 (length objects))
+      (error "Unknown box reader syntax"))
+    (make-instance 'funcallable-box :value (first objects))))
+(set-macro-character #\{ 'read-funcallable-box)
+(set-syntax-from-char #\} #\))
+(multiple-value-bind (res pos)
+    (read-from-string "#1={#1#}")
+  (assert (eq (value res) res))
+  (assert (= pos 8)))
 
 ;;; CSR managed to break the #S reader macro in the process of merging
 ;;; SB-PCL:CLASS and CL:CLASS -- make sure it works
