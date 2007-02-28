@@ -24,6 +24,22 @@
            (do ((data (%array-data-vector x) (%array-data-vector data)))
                ((not (array-header-p data)) (simple-vector-p data))))))
 
+;;; Is X an extended sequence?
+(defun extended-sequence-p (x)
+  (and (not (listp x))
+       (not (vectorp x))
+       (let* ((slayout #.(info :type :compiler-layout 'sequence))
+             (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
+             (layout (layout-of x)))
+        (when (layout-invalid layout)
+          (setq layout (update-object-layout-or-invalid x slayout)))
+        (if (eq layout slayout)
+            t
+            (let ((inherits (layout-inherits layout)))
+              (declare (optimize (safety 0)))
+              (and (> (length inherits) depthoid)
+                   (eq (svref inherits depthoid) slayout)))))))
+
 ;;; Is X a SEQUENCE?  Harder than just (OR VECTOR LIST)
 (defun sequencep (x)
   (or (listp x)

@@ -19,6 +19,7 @@
 (defvar *universal-fun-type*)
 (defvar *instance-type*)
 (defvar *funcallable-instance-type*)
+(defvar *extended-sequence-type*)
 
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes

@@ -1557,6 +1557,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%MAKE-SYMBOL"
                "%FUNCALLABLE-INSTANCE-FUNCTION" "SYMBOL-HASH"
 
+               "EXTENDED-SEQUENCE" "*EXTENDED-SEQUENCE-TYPE*"
+               "EXTENDED-SEQUENCE-P"
+
                "BUILT-IN-CLASSOID" "CONDITION-CLASSOID-P"
                "CONDITION-CLASSOID-SLOTS" "MAKE-UNDEFINED-CLASSOID"
                "FIND-CLASSOID" "CLASSOID" "CLASSOID-DIRECT-SUPERCLASSES"

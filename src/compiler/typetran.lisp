@@ -137,6 +137,7 @@
   (define-type-predicate rationalp rational)
   (define-type-predicate realp real)
   (define-type-predicate sequencep sequence)
+  (define-type-predicate extended-sequence-p extended-sequence)
   (define-type-predicate simple-bit-vector-p simple-bit-vector)
   (define-type-predicate simple-string-p simple-string)
   (define-type-predicate simple-vector-p simple-vector)

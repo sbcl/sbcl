@@ -25,7 +25,7 @@
            #!+sb-unicode character-string-p
            #!+sb-unicode simple-character-string-p
            array-header-p
-           sequencep
+           sequencep extended-sequence-p
            simple-array-p simple-array-nil-p vector-nil-p
            simple-array-unsigned-byte-2-p
            simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p

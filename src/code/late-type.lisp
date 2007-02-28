@@ -1051,7 +1051,11 @@
    ;; required to be a subclass of STANDARD-OBJECT.  -- CSR,
    ;; 2005-09-09
    (frob instance *instance-type*)
-   (frob funcallable-instance *funcallable-instance-type*))
+   (frob funcallable-instance *funcallable-instance-type*)
+   ;; new in sbcl-1.0.3.3: necessary to act as a join point for the
+   ;; extended sequence hierarchy.  (Might be removed later if we use
+   ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
+   (frob extended-sequence *extended-sequence-type*))
  (setf *universal-fun-type*
        (make-fun-type :wild-args t
                       :returns *wild-type*)))
@@ -1155,6 +1159,12 @@
          ;; member types can be subtypep INSTANCE and
          ;; FUNCALLABLE-INSTANCE in surprising ways.
          (invoke-complex-subtypep-arg1-method type1 type2))
+        ((and (eq type2 *extended-sequence-type*) (classoid-p type1))
+         (let* ((layout (classoid-layout type1))
+                (inherits (layout-inherits layout))
+                (sequencep (find (classoid-layout (find-classoid 'sequence))
+                                 inherits)))
+           (values (if sequencep t nil) t)))
         ((and (eq type2 *instance-type*) (classoid-p type1))
          (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
              (values nil t)
@@ -1192,6 +1202,21 @@
   ;; Perhaps when bug 85 is fixed it can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond
+    ((eq type2 *extended-sequence-type*)
+     (typecase type1
+       (structure-classoid *empty-type*)
+       (classoid
+        (if (member type1 *non-instance-classoid-types* :key #'find-classoid)
+            *empty-type*
+            (if (find (classoid-layout (find-classoid 'sequence))
+                      (layout-inherits (classoid-layout type1)))
+                type1
+                nil)))
+       (t
+        (if (or (type-might-contain-other-types-p type1)
+                (member-type-p type1))
+            nil
+            *empty-type*))))
     ((eq type2 *instance-type*)
      (typecase type1
        (structure-classoid type1)
@@ -1232,6 +1257,15 @@
   ;; Perhaps when bug 85 is fixed this can be reenabled.
   ;;(aver (not (eq type2 *wild-type*))) ; * isn't really a type.
   (cond
+    ((eq type2 *extended-sequence-type*)
+     (if (classoid-p type1)
+         (if (or (member type1 *non-instance-classoid-types*
+                         :key #'find-classoid)
+                 (not (find (classoid-layout (find-classoid 'sequence))
+                            (layout-inherits (classoid-layout type1)))))
+             nil
+             type2)
+         nil))
     ((eq type2 *instance-type*)
      (if (classoid-p type1)
          (if (or (member type1 *non-instance-classoid-types*
@@ -1260,7 +1294,8 @@
     ((eq x *universal-type*) *empty-type*)
     ((eq x *empty-type*) *universal-type*)
     ((or (eq x *instance-type*)
-         (eq x *funcallable-instance-type*))
+         (eq x *funcallable-instance-type*)
+         (eq x *extended-sequence-type*))
      (make-negation-type :type x))
     (t (bug "NAMED type unexpected: ~S" x))))
 

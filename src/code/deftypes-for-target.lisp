@@ -155,7 +155,7 @@
 
 ;;; a consed sequence result. If a vector, is a simple array.
 (sb!xc:deftype consed-sequence ()
-  '(or (simple-array * (*)) (and sequence (not vector))))
+  '(or (simple-array * (*)) list extended-sequence))
 
 ;;; the :END arg to a sequence
 (sb!xc:deftype sequence-end () '(or null index))

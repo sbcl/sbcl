@@ -39,6 +39,7 @@
        ((* t) t)
        ((instance) (%instancep object))
        ((funcallable-instance) (funcallable-instance-p object))
+       ((extended-sequence) (extended-sequence-p object))
        ((nil) nil)))
     (numeric-type
      (and (numberp object)

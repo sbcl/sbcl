@@ -356,6 +356,7 @@
            ((t *) (values *backend-t-primitive-type* t))
            ((instance) (exactly instance))
            ((funcallable-instance) (part-of function))
+           ((extended-sequence) (any))
            ((nil) (any))))
         (character-set-type
          (let ((pairs (character-set-type-pairs type)))

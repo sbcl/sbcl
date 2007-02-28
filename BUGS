@@ -1789,3 +1789,22 @@ WORKAROUND:
 	TYPE/= do, and writing an explanation which is so clear that one
 	can see immediately what it's supposed to mean in odd cases like
 	(TYPE= '(SATISFIES X) 'INTEGER) when X isn't defined yet.
+
+409: MORE TYPE SYSTEM PROBLEMS
+  Found while investigating an optimization failure for extended
+  sequences. The extended sequence type implementation was altered to
+  work around the problem, but the fundamental problem remains, to wit:
+    (sb-kernel:type= (sb-kernel:specifier-type '(or float ratio))
+                     (sb-kernel:specifier-type 'single-float))
+  returns NIL, NIL on sbcl-1.0.3.
+  (probably related to bug #408)
+
+410: read circularities and type declarations
+  Consider the definition
+    (defstruct foo (a 0 :type (not symbol)))
+  followed by
+    (setf *print-circle* t) ; just in case
+    (read-from-string "#1=#s(foo :a #1#)")
+  This gives a type error (#:G1 is not a (NOT SYMBOL)) because of the
+  implementation of read circularity, using a symbol as a marker for
+  the previously-referenced object.
