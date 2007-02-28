@@ -193,7 +193,9 @@
       (tagbody
        retry-compile-file
          (multiple-value-bind (output-truename warnings-p failure-p)
-             (compile-file fullname)
+             (if *compile-files-p*
+                 (compile-file fullname)
+                 (compile-file-pathname fullname))
            (declare (ignore warnings-p))
            (sb-int:/show "done compiling" fullname)
            (cond ((not output-truename)

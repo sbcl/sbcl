@@ -12,45 +12,6 @@
 (setq *print-circle* t)
 
 ;;; Do warm init.
-#+sb-show (print "/about to LOAD warm.lisp")
+(defvar *compile-files-p* t)
+#+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = T)")
 (load "src/cold/warm.lisp")
-
-;;; Unintern no-longer-needed stuff before the possible PURIFY in
-;;; SAVE-LISP-AND-DIE.
-#-sb-fluid (sb-impl::!unintern-init-only-stuff)
-
-;;; Now that the whole system is built, we don't need to hobble the
-;;; printer any more, so we can restore printer control variables to
-;;; their ANSI defaults.
-(setq *print-length* nil)
-(setq *print-level* nil)
-(setq *print-circle* nil)
-
-(sb-int:/show "done with warm.lisp, about to GC :FULL T")
-(gc :full t)
-
-;;; resetting compilation policy to neutral values in preparation for
-;;; SAVE-LISP-AND-DIE as final SBCL core (not in warm.lisp because
-;;; SB-C::*POLICY* has file scope)
-(sb-int:/show "setting compilation policy to neutral values")
-(proclaim
- '(optimize
-   (compilation-speed 1) (debug 1) (inhibit-warnings 1)
-   (safety 1) (space 1) (speed 1)))
-
-;;; Lock internal packages
-#+sb-package-locks
-(dolist (p (list-all-packages))
-  (unless (member p (mapcar #'find-package '(:keyword :cl-user)))
-    (lock-package p)))
-
-(sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
-;;; Even if /SHOW output was wanted during build, it's probably
-;;; not wanted by default after build is complete. (And if it's
-;;; wanted, it can easily be turned back on.)
-#+sb-show (setf sb-int:*/show* nil)
-;;; The system is complete now, all standard functions are
-;;; defined.
-(sb-kernel::ctype-of-cache-clear)
-(setq sb-c::*flame-on-necessarily-undefined-function* t)
-(sb-ext:save-lisp-and-die "output/sbcl.core")
