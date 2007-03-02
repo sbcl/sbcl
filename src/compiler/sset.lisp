@@ -84,7 +84,8 @@
   (let* ((vector (sset-vector set))
          (new-vector (make-array (if (zerop (length vector))
                                      2
-                                     (* (length vector) 2)))))
+                                     (* (length vector) 2))
+                                 :initial-element 0)))
     (setf (sset-vector set) new-vector
           (sset-free set) (length new-vector)
           (sset-count set) 0)
