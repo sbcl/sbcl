@@ -538,33 +538,38 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
 
 ;;;; NATURALIZE, DEPORT, EXTRACT-ALIEN-VALUE, DEPOSIT-ALIEN-VALUE
 
+(defun coerce-to-interpreted-function (lambda-form)
+  (let (#!+sb-eval
+        (*evaluator-mode* :interpret))
+    (coerce lambda-form 'function)))
+
 (defun naturalize (alien type)
   (declare (type alien-type type))
-  (funcall (coerce (compute-naturalize-lambda type) 'function)
+  (funcall (coerce-to-interpreted-function (compute-naturalize-lambda type))
            alien type))
 
 (defun deport (value type)
   (declare (type alien-type type))
-  (funcall (coerce (compute-deport-lambda type) 'function)
+  (funcall (coerce-to-interpreted-function (compute-deport-lambda type))
            value type))
 
 (defun deport-alloc (value type)
   (declare (type alien-type type))
-  (funcall (coerce (compute-deport-alloc-lambda type) 'function)
+  (funcall (coerce-to-interpreted-function (compute-deport-alloc-lambda type))
            value type))
 
 (defun extract-alien-value (sap offset type)
   (declare (type system-area-pointer sap)
            (type unsigned-byte offset)
            (type alien-type type))
-  (funcall (coerce (compute-extract-lambda type) 'function)
+  (funcall (coerce-to-interpreted-function (compute-extract-lambda type))
            sap offset type))
 
 (defun deposit-alien-value (sap offset type value)
   (declare (type system-area-pointer sap)
            (type unsigned-byte offset)
            (type alien-type type))
-  (funcall (coerce (compute-deposit-lambda type) 'function)
+  (funcall (coerce-to-interpreted-function (compute-deposit-lambda type))
            sap offset type value))
 
 ;;;; ALIEN-FUNCALL, DEFINE-ALIEN-ROUTINE
