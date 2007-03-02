@@ -732,3 +732,14 @@
                 result)
             adds
             shifts)))
+
+
+;;; Transform GET-LISP-OBJ-ADDRESS for constant immediates, since the normal
+;;; VOP can't handle them.
+
+(deftransform sb!vm::get-lisp-obj-address ((obj) ((constant-arg fixnum)))
+  (ash (lvar-value obj) sb!vm::n-fixnum-tag-bits))
+
+(deftransform sb!vm::get-lisp-obj-address ((obj) ((constant-arg character)))
+  (logior sb!vm::character-widetag
+          (ash (char-code (lvar-value obj)) sb!vm::n-widetag-bits)))

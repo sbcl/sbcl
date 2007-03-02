@@ -13,6 +13,8 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
     and 1.0.3).
   * bug fix: SHADOW accepts characters as string designators, as required
     by the spec (thanks to Eric Marsden)
+  * bug fix: fixed GC safety issues when foreign functions are called with
+    non-base strings as arguments
 
 changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * new platform: NetBSD/PPC.  (thanks to Aymeric Vincent)

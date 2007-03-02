@@ -43,6 +43,8 @@
   (deposit-gen nil :type (or null function))
   (naturalize-gen nil :type (or null function))
   (deport-gen nil :type (or null function))
+  (deport-alloc-gen nil :type (or null function))
+  (deport-pin-p nil :type (or null function))
   ;; Cast?
   (arg-tn nil :type (or null function))
   (result-tn nil :type (or null function))
@@ -73,6 +75,8 @@
     (:deposit-gen . alien-type-class-deposit-gen)
     (:naturalize-gen . alien-type-class-naturalize-gen)
     (:deport-gen . alien-type-class-deport-gen)
+    (:deport-alloc-gen . alien-type-class-deport-alloc-gen)
+    (:deport-pin-p . alien-type-class-deport-pin-p)
     ;; cast?
     (:arg-tn . alien-type-class-arg-tn)
     (:result-tn . alien-type-class-result-tn)))
@@ -445,6 +449,11 @@
                 (ignore ignore))
        ,form)))
 
+(defun compute-deport-alloc-lambda (type)
+  `(lambda (value ignore)
+     (declare (ignore ignore))
+     ,(invoke-alien-type-method :deport-alloc-gen type 'value)))
+
 (defun compute-extract-lambda (type)
   `(lambda (sap offset ignore)
      (declare (type system-area-pointer sap)
@@ -453,20 +462,38 @@
      (naturalize ,(invoke-alien-type-method :extract-gen type 'sap 'offset)
                  ',type)))
 
+(def!macro maybe-with-pinned-objects (variables types &body body)
+  (let ((pin-variables
+         ;; Only pin things on x86/x86-64, since on non-conservative
+         ;; gcs it'd imply disabling the GC. Which is something we
+         ;; don't want to do every time we're calling to C.
+         #+(or x86 x86-64)
+         (loop for variable in variables
+               for type in types
+               when (invoke-alien-type-method :deport-pin-p type)
+               collect variable)))
+    (if pin-variables
+        `(with-pinned-objects ,pin-variables
+           ,@body)
+        `(progn
+           ,@body))))
+
 (defun compute-deposit-lambda (type)
   (declare (type alien-type type))
   `(lambda (sap offset ignore value)
      (declare (type system-area-pointer sap)
               (type unsigned-byte offset)
               (ignore ignore))
-     (let ((value (deport value ',type)))
-       ,(invoke-alien-type-method :deposit-gen type 'sap 'offset 'value)
-       ;; Note: the reason we don't just return the pre-deported value
-       ;; is because that would inhibit any (deport (naturalize ...))
-       ;; optimizations that might have otherwise happen. Re-naturalizing
-       ;; the value might cause extra consing, but is flushable, so probably
-       ;; results in better code.
-       (naturalize value ',type))))
+     (let ((alloc-tmp (deport-alloc value ',type)))
+       (maybe-with-pinned-objects (alloc-tmp) (,type)
+         (let ((value (deport alloc-tmp  ',type)))
+           ,(invoke-alien-type-method :deposit-gen type 'sap 'offset 'value)
+           ;; Note: the reason we don't just return the pre-deported value
+           ;; is because that would inhibit any (deport (naturalize ...))
+           ;; optimizations that might have otherwise happen. Re-naturalizing
+           ;; the value might cause extra consing, but is flushable, so probably
+           ;; results in better code.
+           (naturalize value ',type))))))
 
 (defun compute-lisp-rep-type (type)
   (invoke-alien-type-method :lisp-rep type))
@@ -501,6 +528,16 @@
 (define-alien-type-method (root :deport-gen) (type object)
   (declare (ignore object))
   (error "cannot represent ~S typed aliens" type))
+
+(define-alien-type-method (root :deport-alloc-gen) (type object)
+  (declare (ignore type))
+  object)
+
+(define-alien-type-method (root :deport-pin-p) (type)
+  (declare (ignore type))
+  ;; Override this method to return T for classes which take a SAP to a
+  ;; GCable lisp object when deporting.
+  nil)
 
 (define-alien-type-method (root :extract-gen) (type sap offset)
   (declare (ignore sap offset))

@@ -61,6 +61,8 @@
   (flushable movable))
 (defknown deport (alien alien-type) t
   (flushable movable))
+(defknown deport-alloc (alien alien-type) t
+  (flushable movable))
 (defknown extract-alien-value (system-area-pointer unsigned-byte alien-type) t
   (flushable))
 (defknown deposit-alien-value (system-area-pointer unsigned-byte alien-type t) t
@@ -506,6 +508,8 @@
     (%computed-lambda #'compute-naturalize-lambda type))
   (deftransform deport ((alien type) * * :important t)
     (%computed-lambda #'compute-deport-lambda type))
+  (deftransform deport-alloc ((alien type) * * :important t)
+    (%computed-lambda #'compute-deport-alloc-lambda type))
   (deftransform extract-alien-value ((sap offset type) * * :important t)
     (%computed-lambda #'compute-extract-lambda type))
   (deftransform deposit-alien-value ((sap offset type value) * * :important t)
@@ -627,10 +631,31 @@
             (let ((param (gensym)))
               (params param)
               (deports `(deport ,param ',arg-type))))
+          ;; Build BODY from the inside out.
           (let ((return-type (alien-fun-type-result-type alien-type))
+                ;; Innermost, we DEPORT the parameters (e.g. by taking SAPs
+                ;; to them) and do the call.
                 (body `(%alien-funcall (deport function ',alien-type)
                                        ',alien-type
                                        ,@(deports))))
+            ;; Wrap that in a WITH-PINNED-OBJECTS to ensure the values
+            ;; the SAPs are taken for won't be moved by the GC. (If
+            ;; needed: some alien types won't need it).
+            (setf body `(maybe-with-pinned-objects ,(params) ,arg-types
+                          ,body))
+            ;; Around that handle any memory allocation that's needed.
+            ;; Mostly the DEPORT-ALLOC alien-type-methods are just an
+            ;; identity operation, but for example for deporting a
+            ;; Unicode string we need to convert the string into an
+            ;; octet array. This step needs to be done before the pinning
+            ;; to ensure we pin the right objects, so it can't be combined
+            ;; with the deporting.
+            ;; -- JES 2006-03-16
+            (loop for param in (params)
+                  for arg-type in arg-types
+                  do (setf body
+                           `(let ((,param (deport-alloc ,param ',arg-type)))
+                              ,body)))
             (if (alien-values-type-p return-type)
                 (collect ((temps) (results))
                   (dolist (type (alien-values-type-values return-type))

@@ -463,6 +463,8 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
 
 (define-setf-expander local-alien (&whole whole info alien)
   (let ((value (gensym))
+        (info-var (gensym))
+        (alloc-tmp (gensym))
         (info (if (and (consp info)
                        (eq (car info) 'quote))
                   (second info)
@@ -473,8 +475,10 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
             (list value)
             `(if (%local-alien-forced-to-memory-p ',info)
                  (%set-local-alien ',info ,alien ,value)
-                 (setf ,alien
-                       (deport ,value ',(local-alien-info-type info))))
+                   (let* ((,info-var ',(local-alien-info-type info))
+                          (,alloc-tmp (deport-alloc ,value ,info-var)))
+                     (maybe-with-pinned-objects (,alloc-tmp) (,(local-alien-info-type info))
+                       (setf ,alien (deport ,alloc-tmp ,info-var)))))
             whole)))
 
 (defun %local-alien-forced-to-memory-p (info)
@@ -542,6 +546,11 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
 (defun deport (value type)
   (declare (type alien-type type))
   (funcall (coerce (compute-deport-lambda type) 'function)
+           value type))
+
+(defun deport-alloc (value type)
+  (declare (type alien-type type))
+  (funcall (coerce (compute-deport-alloc-lambda type) 'function)
            value type))
 
 (defun extract-alien-value (sap offset type)
