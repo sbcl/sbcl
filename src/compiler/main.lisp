@@ -978,6 +978,13 @@
                                   definition
                                   :source-name name)))
            (debug-name (debug-name 'tl-xep name))
+           ;; Convert the XEP using the policy of the real
+           ;; function. Otherwise the wrong policy will be used for
+           ;; deciding whether to type-check the parameters of the
+           ;; real function (via CONVERT-CALL / PROPAGATE-TO-ARGS).
+           ;; -- JES, 2007-02-27
+           (*lexenv* (make-lexenv :policy (lexenv-policy
+                                           (functional-lexenv locall-fun))))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
                                     :source-name (or name '.anonymous.)
                                     :debug-name debug-name)))

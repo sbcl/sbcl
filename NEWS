@@ -8,6 +8,9 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * bug fix: >= and <= gave wrong results when used with NaNs.
   * bug fix: the #= and ## reader macros now interact reasonably with
     funcallable instances.
+  * bug fix: type-checks for function arguments were compiled using the
+    compiler policy settings of the wrong lexical environment (in 1.0.2
+    and 1.0.3).
 
 changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * new platform: NetBSD/PPC.  (thanks to Aymeric Vincent)

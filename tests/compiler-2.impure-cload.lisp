@@ -51,5 +51,17 @@
 (assert (equal (test) '(0 0 0)))
 (assert (equal (test) '(13 13 13))) ; sanity check
 
-(write-line "//compiler-2.impure.cload.lisp")
+;; Bug in 1.0.2 and 1.0.3, where the XEP was compiled with the wrong
+;; policy. (Test-case derived from code posted by alexander.ekart in
+;; comp.lang.lisp).
+
+(locally
+    (declare (optimize (safety 0)))
+  (defun bubblesort (x y)
+    (declare (type (simple-array fixnum (*)) x)
+             (type fixnum y)
+             (optimize (speed 3) (safety 3) (space 0) (debug 0)))
+    (aref x y)))
+
+(assert (raises-error? (bubblesort (make-array 10) 9)))
 
