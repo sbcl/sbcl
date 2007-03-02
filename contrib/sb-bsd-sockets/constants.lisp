@@ -33,25 +33,25 @@
 
  ;; some of these may be linux-specific
  (:integer so-debug "SO_DEBUG"
-   "Enable debugging in underlying protocol modules")
+           "Enable debugging in underlying protocol modules")
  (:integer so-reuseaddr "SO_REUSEADDR" "Enable local address reuse")
- (:integer so-type "SO_TYPE")                  ;get only
- (:integer so-error "SO_ERROR")                 ;get only (also clears)
+ (:integer so-type "SO_TYPE")                   ;get only
+ (:integer so-error "SO_ERROR")         ;get only (also clears)
  (:integer so-dontroute "SO_DONTROUTE"
            "Bypass routing facilities: instead send direct to appropriate network interface for the network portion of the destination address")
  (:integer so-broadcast "SO_BROADCAST" "Request permission to send broadcast datagrams")
  (:integer so-sndbuf "SO_SNDBUF")
-#+linux (:integer so-passcred "SO_PASSCRED")
+ #+linux (:integer so-passcred "SO_PASSCRED")
  (:integer so-rcvbuf "SO_RCVBUF")
  (:integer so-keepalive "SO_KEEPALIVE"
            "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
  (:integer so-no-check "SO_NO_CHECK")
-#+linux (:integer so-priority "SO_PRIORITY")
+ #+linux (:integer so-priority "SO_PRIORITY")
  (:integer so-linger "SO_LINGER"
            "For reliable streams, pause a while on closing when unsent messages are queued")
-#+linux (:integer so-bsdcompat "SO_BSDCOMPAT")
+ #+linux (:integer so-bsdcompat "SO_BSDCOMPAT")
  (:integer so-sndlowat "SO_SNDLOWAT")
  (:integer so-rcvlowat "SO_RCVLOWAT")
  (:integer so-sndtimeo "SO_SNDTIMEO")
@@ -84,6 +84,7 @@
  (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
  (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
  (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
+ (:function h-strerror ("hstrerror" c-string (errno int)))
 
  (:integer O-NONBLOCK "O_NONBLOCK")
  (:integer f-getfl "F_GETFL")
@@ -98,22 +99,22 @@
  (:integer msg-dontroute "MSG_DONTROUTE")
  (:integer msg-dontwait "MSG_DONTWAIT")
  (:integer msg-nosignal "MSG_NOSIGNAL")
-#+linux (:integer msg-confirm "MSG_CONFIRM")
-#+linux (:integer msg-more "MSG_MORE")
+ #+linux (:integer msg-confirm "MSG_CONFIRM")
+ #+linux (:integer msg-more "MSG_MORE")
 
  ;; for socket-receive
  (:type socklen-t "socklen_t")
  (:type size-t "size_t")
  (:type ssize-t "ssize_t")
 
- #|
+                                        #|
  ;;; stat is nothing to do with sockets, but I keep it around for testing
  ;;; the ffi glue
  (:structure stat ("struct stat"
-                   (t dev "dev_t" "st_dev")
-                   ((alien:integer 32) atime "time_t" "st_atime")))
+ (t dev "dev_t" "st_dev")
+ ((alien:integer 32) atime "time_t" "st_atime")))
  (:function stat ("stat" (integer 32)
-                  (file-name (* t))
+ (file-name (* t))
  (buf (* t))))
  |#
  (:structure protoent ("struct protoent"
@@ -213,7 +214,76 @@
                                            (addr (* t))
                                            (len int)
                                            (af int)))
-;;; should be using getaddrinfo instead?
+
+ ;; Re-entrant gethostbyname
+
+ #+linux
+ (:function gethostbyname-r ("gethostbyname_r"
+                             int
+                             (name c-string)
+                             (ret (* hostent))
+                             (buf (* char))
+                             (buflen long)
+                             (result (* (* hostent)))
+                             (h-errnop (* int))))
+ ;; getaddrinfo / getnameinfo
+
+ #+sb-bsd-sockets-addrinfo
+ (:structure addrinfo ("struct addrinfo"
+                       (integer flags "int" "ai_flags")
+                       (integer family "int" "ai_family")
+                       (integer socktype "int" "ai_socktype")
+                       (integer protocol "int" "ai_protocol")
+                       (integer addrlen "size_t""ai_addrlen")
+                       ((* sockaddr-in) addr "struct sockaddr*" "ai_addr")
+                       (c-string canonname "char *" "ai_canonname")
+                       ((* t) next "struct addrinfo*" "ai_next")))
+
+ #+sb-bsd-sockets-addrinfo
+ (:function getaddrinfo ("getaddrinfo"
+                         int
+                         (node c-string)
+                         (service c-string)
+                         (hints (* addrinfo))
+                         (res (* (* addrinfo)))))
+
+ #+sb-bsd-sockets-addrinfo
+ (:function freeaddrinfo ("freeaddrinfo"
+                          void
+                          (res (* addrinfo))))
+
+ #+sb-bsd-sockets-addrinfo
+ (:function gai-strerror ("gai_strerror"
+                         c-string
+                         (error-code int)))
+
+ #+sb-bsd-sockets-addrinfo
+ (:function getnameinfo ("getnameinfo"
+                         int
+                         (address (* sockaddr-in))
+                         (address-length size-t)
+                         (host (* char))
+                         (host-len size-t)
+                         (service (* char))
+                         (service-len size-t)
+                         (flags int)))
+
+ (:integer EAI-FAMILY "EAI_FAMILY")
+ (:integer EAI-SOCKTYPE "EAI_SOCKTYPE")
+ (:integer EAI-BADFLAGS "EAI_BADFLAGS")
+ (:integer EAI-NONAME "EAI_NONAME")
+ (:integer EAI-SERVICE "EAI_SERVICE")
+ (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
+ (:integer EAI-NODATA "EAI_NODATA")
+ (:integer EAI-MEMORY "EAI_MEMORY")
+ (:integer EAI-FAIL "EAI_FAIL")
+ (:integer EAI-AGAIN "EAI_AGAIN")
+ (:integer EAI-SYSTEM "EAI_SYSTEM")
+
+ (:integer NI-NAMEREQD "NI_NAMEREQD")
+
+ ;; Socket options
+
  (:function setsockopt ("setsockopt" int
                         (socket int)
                         (level int)

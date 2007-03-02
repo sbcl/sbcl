@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
+  * incompatible change: the thread-safe (on most platforms) getaddrinfo
+    and getnameinfo sockets functions are used instead of gethostbyaddr
+    and gethostbyname, on platforms where the newer functions are available.
+    As a result, the ALIASES field of HOST-ENT will always be NIL on these
+    platforms.
   * bug fix: >= and <= gave wrong results when used with NaNs.
   * bug fix: the #= and ## reader macros now interact reasonably with
     funcallable instances.

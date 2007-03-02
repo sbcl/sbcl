@@ -886,7 +886,7 @@ WORKAROUND:
   strongly suspected problems, as of 0.8.3.10: please update this
   bug instead of creating new ones
 
-    gethostbyname, gethostbyaddr in sb-bsd-sockets
+    gethostbyaddr in sb-bsd-sockets
 
 284: Thread safety: special variables
   There are lots of special variables in SBCL, and I feel sure that at

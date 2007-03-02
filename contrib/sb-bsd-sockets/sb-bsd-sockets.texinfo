@@ -151,14 +151,16 @@ across a network.
 @node Name Service
 @section Name Service
 
-Presently name service is implemented by calling whatever
-@code{gethostbyname(2)} uses. This may be any or all of
-@file{/etc/hosts}, NIS, DNS, or something completely different.
-Typically it's controlled by @file{/etc/nsswitch.conf}.
-                                                                                
-Direct links to the asynchronous @code{resolver(3)} routines would be
-nice to have eventually, so that we can do DNS lookups in parallel
-with other things
+Presently name service is implemented by calling out to the
+@code{getaddrinfo(3)} and @code{gethostinfo(3)}, or to
+@code{gethostbyname(3)} @code{gethostbyaddr(3)} on platforms where
+the preferred functions are not available. The exact details of
+the name resolving process (for example the choice of whether
+DNS or a hosts file is used for lookup) are platform dependent.
+                                                                                 
+@c Direct links to the asynchronous @code{resolver(3)} routines would be
+@c nice to have eventually, so that we can do DNS lookups in parallel
+@c with other things.
 
 @include class-sb-bsd-sockets-host-ent.texinfo
 
@@ -167,5 +169,3 @@ with other things
 @include fun-sb-bsd-sockets-get-host-by-address.texinfo
 
 @include fun-sb-bsd-sockets-host-ent-address.texinfo
-
-@include fun-sb-bsd-sockets-name-service-error.texinfo
