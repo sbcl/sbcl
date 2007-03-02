@@ -883,10 +883,8 @@ WORKAROUND:
 283: Thread safety: libc functions
   There are places that we call unsafe-for-threading libc functions
   that we should find alternatives for, or put locks around.  Known or
-  strongly suspected problems, as of 0.8.3.10: please update this
+  strongly suspected problems, as of 1.0.3.13: please update this
   bug instead of creating new ones
-
-    gethostbyaddr in sb-bsd-sockets
 
 284: Thread safety: special variables
   There are lots of special variables in SBCL, and I feel sure that at
