@@ -10,7 +10,7 @@
 # files for more information.
 
 CC = gcc
-CFLAGS += -DSVR4
+CFLAGS += -DSVR4 -D_REENTRANT
 ASFLAGS = -g -Wall -DSVR4
 LINKFLAGS += -v
 NM = nm -t x -p 
