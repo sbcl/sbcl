@@ -213,6 +213,7 @@ main(int argc, char *argv[])
 
     DEFTYPE("ino-t",  ino_t);
     DEFTYPE("time-t", time_t);
+    DEFTYPE("suseconds-t", suseconds_t);
     DEFTYPE("off-t",  off_t);
     DEFTYPE("size-t", size_t);
     DEFTYPE("mode-t", mode_t);
@@ -241,6 +242,7 @@ main(int argc, char *argv[])
     DEFTYPE("off-t",   off_t);
     DEFTYPE("size-t",  size_t);
     DEFTYPE("time-t",  time_t);
+    DEFTYPE("suseconds-t", suseconds_t);
     DEFTYPE("uid-t",   uid_t);
     printf("\n");
 

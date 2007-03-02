@@ -331,11 +331,11 @@ undefined_alien_handler(int signal, siginfo_t *siginfo, void *void_context) {
 
 kern_return_t
 catch_exception_raise(mach_port_t exception_port,
-                     mach_port_t thread,
-                     mach_port_t task,
-                     exception_type_t exception,
-                     exception_data_t code_vector,
-                     mach_msg_type_number_t code_count)
+                      mach_port_t thread,
+                      mach_port_t task,
+                      exception_type_t exception,
+                      exception_data_t code_vector,
+                      mach_msg_type_number_t code_count)
 {
     kern_return_t ret;
     int signal;
