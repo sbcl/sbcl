@@ -11,6 +11,8 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * bug fix: type-checks for function arguments were compiled using the
     compiler policy settings of the wrong lexical environment (in 1.0.2
     and 1.0.3).
+  * bug fix: SHADOW accepts characters as string designators, as required
+    by the spec (thanks to Eric Marsden)
 
 changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * new platform: NetBSD/PPC.  (thanks to Aymeric Vincent)

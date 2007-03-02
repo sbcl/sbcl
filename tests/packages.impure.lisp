@@ -22,3 +22,5 @@
   (package-error (c) (princ c))
   (:no-error (&rest args) (error "(EXPORT :FOO) returned ~S" args)))
 
+(make-package "FOO")
+(assert (shadow #\a :foo))

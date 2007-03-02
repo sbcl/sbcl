@@ -204,7 +204,7 @@
 (defknown unexport (symbols-designator &optional package-designator) (eql t))
 (defknown shadowing-import (symbols-designator &optional package-designator)
   (eql t))
-(defknown shadow ((or symbol string list) &optional package-designator)
+(defknown shadow ((or symbol character string list) &optional package-designator)
   (eql t))
 (defknown (use-package unuse-package)
   ((or list package-designator) &optional package-designator) (eql t))
