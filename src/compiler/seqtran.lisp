@@ -779,27 +779,60 @@
              finally (return `(progn ,@forms)))))
   (define-copy-seq-transforms))
 
-;;; FIXME: this would be a valid transform for certain excluded cases:
-;;;   * :TEST 'CHAR= or :TEST #'CHAR=
-;;;   * :TEST 'EQL   or :TEST #'EQL
-;;;   * :FROM-END NIL (or :FROM-END non-NIL, with a little ingenuity)
-(deftransform search ((pattern text &key (start1 0) (start2 0) end1 end2)
-                      (simple-string simple-string &rest t)
+;;; FIXME: it really should be possible to take advantage of the
+;;; macros used in code/seq.lisp here to avoid duplication of code,
+;;; and enable even funkier transformations.
+(deftransform search ((pattern text &key (start1 0) (start2 0) end1 end2
+                               (test #'eql)
+                               (key #'identity)
+                               from-end)
+                      (vector vector &rest t)
                       *
                       :policy (> speed (max space safety)))
-  `(block search
-    (let ((end1 (or end1 (length pattern)))
-          (end2 (or end2 (length text))))
-      (do ((index2 start2 (1+ index2)))
-          ((>= index2 end2) nil)
-        (when (do ((index1 start1 (1+ index1))
-                   (index2 index2 (1+ index2)))
-                  ((>= index1 end1) t)
-                (when (= index2 end2)
-                  (return-from search nil))
-                (when (char/= (char pattern index1) (char text index2))
-                  (return nil)))
-          (return index2))))))
+  "open code"
+  (let ((from-end (when (lvar-p from-end)
+                    (unless (constant-lvar-p from-end)
+                      (give-up-ir1-transform ":FROM-END is not constant."))
+                    (lvar-value from-end)))
+        (keyp (lvar-p key))
+        (testp (lvar-p test)))
+    `(block search
+       (let ((end1 (or end1 (length pattern)))
+             (end2 (or end2 (length text)))
+             ,@(when keyp
+                     '((key (coerce key 'function))))
+             ,@(when testp
+                     '((test (coerce test 'function)))))
+         (declare (type index start1 start2 end1 end2))
+         (do (,(if from-end
+                   '(index2 (- end2 (- end1 start1)) (1- index2))
+                   '(index2 start2 (1+ index2))))
+             (,(if from-end
+                   '(< index2 start2)
+                   '(>= index2 end2))
+              nil)
+           ;; INDEX2 is FIXNUM, not an INDEX, as right before the loop
+           ;; terminates is hits -1 when :FROM-END is true and :START2
+           ;; is 0.
+           (declare (type fixnum index2))
+           (when (do ((index1 start1 (1+ index1))
+                      (index2 index2 (1+ index2)))
+                     ((>= index1 end1) t)
+                   (declare (type index index1 index2))
+                   ,@(unless from-end
+                             '((when (= index2 end2)
+                                 (return-from search nil))))
+                   (unless (,@(if testp
+                                  '(funcall test)
+                                  '(eql))
+                              ,(if keyp
+                                   '(funcall key (aref pattern index1))
+                                   '(aref pattern index1))
+                              ,(if keyp
+                                   '(funcall key (aref text index2))
+                                   '(aref text index2)))
+                     (return nil)))
+             (return index2)))))))
 
 ;;; FIXME: It seems as though it should be possible to make a DEFUN
 ;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to

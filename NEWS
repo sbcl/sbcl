@@ -6,7 +6,8 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
     and gethostbyname, on platforms where the newer functions are available.
     As a result, the ALIASES field of HOST-ENT will always be NIL on these
     platforms.
-  * optimization: code using alien values with undeclared types is much faster
+  * optimization: code using alien values with undeclared types is much faster.
+  * optimization: the compiler is now able to open code SEARCH in more cases.
   * bug fix: >= and <= gave wrong results when used with NaNs.
   * bug fix: the #= and ## reader macros now interact reasonably with
     funcallable instances.
