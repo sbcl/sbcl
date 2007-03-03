@@ -657,7 +657,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     void  *constants_start_addr, *constants_end_addr;
     void  *code_start_addr, *code_end_addr;
     lispobj fixups = NIL;
-    unsigned  displacement = (unsigned)new_code - (unsigned)old_code;
+    unsigned long displacement = (unsigned long)new_code - (unsigned long)old_code;
     struct vector *fixups_vector;
 
     ncode_words = fixnum_value(new_code->code_size);
@@ -703,21 +703,21 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
         for (i=0; i<length; i++) {
             unsigned offset = fixups_vector->data[i];
             /* Now check the current value of offset. */
-            unsigned old_value =
-                *(unsigned *)((unsigned)code_start_addr + offset);
+            unsigned long old_value =
+                *(unsigned long *)((unsigned long)code_start_addr + offset);
 
             /* If it's within the old_code object then it must be an
              * absolute fixup (relative ones are not saved) */
-            if ((old_value>=(unsigned)old_code)
-                && (old_value<((unsigned)old_code + nwords * N_WORD_BYTES)))
+            if ((old_value>=(unsigned long)old_code)
+                && (old_value<((unsigned long)old_code + nwords * N_WORD_BYTES)))
                 /* So add the dispacement. */
-                *(unsigned *)((unsigned)code_start_addr + offset) = old_value
+                *(unsigned long *)((unsigned long)code_start_addr + offset) = old_value
                     + displacement;
             else
                 /* It is outside the old code object so it must be a relative
                  * fixup (absolute fixups are not saved). So subtract the
                  * displacement. */
-                *(unsigned *)((unsigned)code_start_addr + offset) = old_value
+                *(unsigned long *)((unsigned long)code_start_addr + offset) = old_value
                     - displacement;
         }
     }

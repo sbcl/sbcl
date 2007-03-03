@@ -747,7 +747,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
-   if ((arch_pseudo_atomic_atomic(context) ||
+    if ((arch_pseudo_atomic_atomic(context) ||
          SymbolValue(GC_INHIBIT,thread) != NIL)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         if (SymbolValue(GC_INHIBIT,thread) == NIL)
@@ -937,6 +937,7 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
 #elif defined(LISP_FEATURE_X86_64)
     u64 *sp=(u64 *)*os_context_register_addr(context,reg_RSP);
+
     /* return address for call_into_lisp: */
     *(sp-18) = (u64)post_signal_tramp;
 

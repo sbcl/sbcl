@@ -67,6 +67,8 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
     /* Put us in our own process group. */
 #if defined(hpux)
     setsid();
+#elif defined(LISP_FEATURE_DARWIN)
+    setpgid(0, getpid());
 #elif defined(SVR4) || defined(__linux__) || defined(__osf__)
     setpgrp();
 #else

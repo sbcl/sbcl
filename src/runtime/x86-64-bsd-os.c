@@ -8,6 +8,12 @@
 #include <machine/fpu.h>
 #endif
 
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+#include <mach/mach.h>
+
+kern_return_t mach_thread_init(mach_port_t thread_exception_port);
+#endif
+
 /* KLUDGE: There is strong family resemblance in the signal context
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
@@ -19,7 +25,7 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(LISP_FEATURE_FREEBSD)
+#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN)
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
@@ -85,6 +91,11 @@ int arch_os_thread_init(struct thread *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     pthread_setspecific(specials,thread);
 #endif
+
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+    mach_thread_init(THREAD_STRUCT_TO_EXCEPTION_PORT(thread));
+#endif
+
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us

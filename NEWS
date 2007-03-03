@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
+  * new platform: experimental support for x86-64/darwin (MacOS).
   * incompatible change: the thread-safe (on most platforms) getaddrinfo
     and getnameinfo sockets functions are used instead of gethostbyaddr
     and gethostbyname, on platforms where the newer functions are available.

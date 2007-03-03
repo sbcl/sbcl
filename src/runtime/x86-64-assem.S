@@ -14,6 +14,7 @@
  */
 
 #define LANGUAGE_ASSEMBLY
+#include "genesis/config.h"
 #include "validate.h"
 #include "sbcl.h"
 #include "genesis/closure.h"
@@ -43,9 +44,52 @@
 #define	align_16byte	4	
 #endif			
 
+/*
+ * The assembler used for win32 doesn't like .type or .size directives,
+ * so we want to conditionally kill them out. So let's wrap them in macros
+ * that are defined to be no-ops on win32. Hopefully this still works on
+ * other platforms.
+ */
+#if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_DARWIN)
+#define TYPE(name) .type name,@function
+#define SIZE(name) .size name,.-name
+#define DOLLAR(name) $(name)
+#else
+#define TYPE(name)
+#define SIZE(name)
+#endif
+
+/*
+ * x86/darwin (as of MacOS X 10.4.5) doesn't reliably fire signal
+ * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
+ * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
+ * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
+ * for this instruction in the SIGILL handler and if we see it, we
+ * advance the EIP by two bytes to skip over ud2 instruction and
+ * call sigtrap_handler. */
+#if defined(LISP_FEATURE_DARWIN)
+#define TRAP ud2
+#else
+#define TRAP int3
+#endif
+
+/*
+ * More Apple assembler hacks
+ */
+
+#if defined(LISP_FEATURE_DARWIN)
+/* global symbol x86-64 sym(%rip) hack:*/
+#define GSYM(name) name(%rip)
+#define END()
+#else
+#define GSYM(name) $name
+#define END() .end
+#endif
+
+        
 	.text
-	.global	GNAME(foreign_function_call_active)
-	.global	GNAME(all_threads)
+        .globl  GNAME(all_threads)
+        
 	
 
 /* From lower to higher-numbered addresses, the stack contains 
@@ -58,13 +102,12 @@
  */
 	.text
 	.align	align_16byte,0x90
-	.global GNAME(call_into_c)
-	.type	GNAME(call_into_c),@function
+	.globl  GNAME(call_into_c)
+	TYPE(GNAME(call_into_c))
 GNAME(call_into_c):
         /* ABI requires that the direction flag be clear on function
          * entry and exit. */
         cld
-        
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 
@@ -81,12 +124,12 @@ GNAME(call_into_c):
 	mov	%rbp,%rsp
 	pop	%rbp
 	ret
-	.size	GNAME(call_into_c), . - GNAME(call_into_c)
+	SIZE(GNAME(call_into_c))
 
 
 	.text	
-	.global GNAME(call_into_lisp_first_time)
-	.type  GNAME(call_into_lisp_first_time),@function
+	.globl  GNAME(call_into_lisp_first_time)
+	TYPE(GNAME(call_into_lisp_first_time))
 		
 /* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
  * the stack changes.  We don't worry too much about saving registers 
@@ -97,17 +140,17 @@ GNAME(call_into_c):
 GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
-	mov    %rsp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
-	mov    GNAME(all_threads),%rax
-	mov    THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
+	mov     %rsp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
+	movq    GSYM(GNAME(all_threads)),%rax
+	mov     THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
-	add 	$THREAD_CONTROL_STACK_SIZE-16,%rsp
+        add 	$(THREAD_CONTROL_STACK_SIZE)-16,%rsp
 	jmp     Lstack
 
 	.text	
-	.global GNAME(call_into_lisp)
-	.type  GNAME(call_into_lisp),@function
+	.globl  GNAME(call_into_lisp)
+	TYPE(GNAME(call_into_lisp))
 		
 /*
  * amd64 calling convention: C expects that
@@ -194,49 +237,49 @@ LsingleValue:
 	/* return value is already in rax where lisp expects it */
 	leave
 	ret
-	.size	GNAME(call_into_lisp), . - GNAME(call_into_lisp)
+	SIZE(GNAME(call_into_lisp))
 
 /* support for saving and restoring the NPX state from C */
 	.text
-	.global	GNAME(fpu_save)
-	.type	GNAME(fpu_save),@function
+	.globl 	GNAME(fpu_save)
+	TYPE(GNAME(fpu_save))
 	.align	2,0x90
 GNAME(fpu_save):
 	mov	4(%rsp),%rax
 	fnsave	(%rax)		# Save the NPX state. (resets NPX)
 	ret
-	.size	GNAME(fpu_save),.-GNAME(fpu_save)
+	SIZE(GNAME(fpu_save))
 
-	.global	GNAME(fpu_restore)
-	.type	GNAME(fpu_restore),@function
+	.globl 	GNAME(fpu_restore)
+	TYPE(GNAME(fpu_restore))
 	.align	2,0x90
 GNAME(fpu_restore):
 	mov	4(%rsp),%rax
 	frstor	(%rax)		# Restore the NPX state.
 	ret
-	.size	GNAME(fpu_restore),.-GNAME(fpu_restore)
+	SIZE(GNAME(fpu_restore))
 
 /*
  * the undefined-function trampoline
  */
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(undefined_tramp)
-	.type	GNAME(undefined_tramp),@function
+	.globl  GNAME(undefined_tramp)
+	TYPE(GNAME(undefined_tramp))
 GNAME(undefined_tramp):
-	int3
+	TRAP
 	.byte	trap_Error
         .byte   2
         .byte   UNDEFINED_FUN_ERROR
         .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
 	ret
-	.size	GNAME(undefined_tramp), .-GNAME(undefined_tramp)
+	SIZE(GNAME(undefined_tramp))
 
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(alloc_tramp)
-	.type	GNAME(alloc_tramp),@function
+	.globl  GNAME(alloc_tramp)
+	TYPE(GNAME(alloc_tramp))
 GNAME(alloc_tramp):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
@@ -250,7 +293,7 @@ GNAME(alloc_tramp):
 	push	%r10
 	push	%r11
 	mov	16(%rbp),%rdi	
-	call	alloc
+	call	GNAME(alloc)
 	mov	%rax,16(%rbp)
 	pop	%r11
 	pop	%r10
@@ -263,7 +306,7 @@ GNAME(alloc_tramp):
 	pop	%rax
 	pop	%rbp
 	ret
-	.size	GNAME(alloc_tramp),.-GNAME(alloc_tramp)
+	SIZE(GNAME(alloc_tramp))
 
 		
 /*
@@ -271,8 +314,8 @@ GNAME(alloc_tramp):
  */
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(closure_tramp)
-	.type	GNAME(closure_tramp),@function
+	.globl  GNAME(closure_tramp)
+	TYPE(GNAME(closure_tramp))
 GNAME(closure_tramp):
 	mov	FDEFN_FUN_OFFSET(%rax),%rax
 	/* FIXME: The '*' after "jmp" in the next line is from PVE's
@@ -282,24 +325,27 @@ GNAME(closure_tramp):
 	 * right. It would be good to find a way to force the flow of
 	 * control through here to test it. */
 	jmp	*CLOSURE_FUN_OFFSET(%rax)
-	.size	GNAME(closure_tramp), .-GNAME(closure_tramp)
+	SIZE(GNAME(closure_tramp))
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(funcallable_instance_tramp)
-	.type	GNAME(funcallable_instance_tramp),@function
-GNAME(funcallable_instance_tramp):
+	.globl  GNAME(funcallable_instance_tramp)
+#if !defined(LISP_FEATURE_DARWIN)
+        .type	GNAME(funcallable_instance_tramp),@function
+#endif
+        GNAME(funcallable_instance_tramp):
 	mov	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%rax),%rax
 	/* KLUDGE: on this platform, whatever kind of function is in %rax
 	 * now, the first word of it contains the address to jump to. */
 	jmp	*CLOSURE_FUN_OFFSET(%rax)
+#if !defined(LISP_FEATURE_DARWIN)
 	.size	GNAME(funcallable_instance_tramp), .-GNAME(funcallable_instance_tramp)
-	
+#endif
 /*
  * fun-end breakpoint magic
  */
 	.text
-	.global	GNAME(fun_end_breakpoint_guts)
+	.globl 	GNAME(fun_end_breakpoint_guts)
 	.align	align_8byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
@@ -310,32 +356,36 @@ GNAME(fun_end_breakpoint_guts):
 	mov	%rsp,%rbx	# Setup ebx - the ofp.
 	sub	$8,%rsp		# Allocate one stack slot for the return value
 	mov	$8,%rcx		# Setup ecx for one return value.
+#if defined(LISP_FEATURE_DARWIN)
+	mov	GSYM(NIL),%rdi	# default second value
+	mov	GSYM(NIL),%rsi	# default third value
+#else
 	mov	$NIL,%rdi	# default second value
 	mov	$NIL,%rsi	# default third value
-		
+#endif
 multiple_value_return:
 	
-	.global GNAME(fun_end_breakpoint_trap)
+	.globl  GNAME(fun_end_breakpoint_trap)
 GNAME(fun_end_breakpoint_trap):
-	int3
+	TRAP
 	.byte 	trap_FunEndBreakpoint
 	hlt			# We should never return here.
 
-	.global GNAME(fun_end_breakpoint_end)
+	.globl  GNAME(fun_end_breakpoint_end)
 GNAME(fun_end_breakpoint_end):
 
 
-	.global	GNAME(do_pending_interrupt)
-	.type	GNAME(do_pending_interrupt),@function
+	.globl 	GNAME(do_pending_interrupt)
+	TYPE(GNAME(do_pending_interrupt))
 	.align	align_8byte,0x90
 GNAME(do_pending_interrupt):
-	int3
+	TRAP
 	.byte 	trap_PendingInterrupt
 	ret
-	.size	GNAME(do_pending_interrupt),.-GNAME(do_pending_interrupt)
+	SIZE(GNAME(do_pending_interrupt))
 
 	.globl	GNAME(post_signal_tramp)
-	.type	GNAME(post_signal_tramp),@function
+	TYPE(GNAME(post_signal_tramp))
 	.align	align_8byte,0x90
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
@@ -359,12 +409,12 @@ GNAME(post_signal_tramp):
         popfq
 	leave
 	ret
-	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
+	SIZE(GNAME(post_signal_tramp))
 
 	.text
 	.align	align_8byte,0x90
-	.global GNAME(fast_bzero)
-	.type	GNAME(fast_bzero),@function
+	.globl  GNAME(fast_bzero)
+	TYPE(GNAME(fast_bzero))
         
 GNAME(fast_bzero):
         /* A fast routine for zero-filling blocks of memory that are
@@ -376,7 +426,7 @@ GNAME(fast_bzero):
         movups %xmm7, -16(%rsp)   /* Save XMM register */
         xorps  %xmm7, %xmm7       /* Zero the XMM register */
         jmp Lloop
-        .align 16                 
+        .align align_16byte                 
 Lloop:
 
         /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
@@ -399,6 +449,6 @@ Lloop:
                                  * since it's likely to be used immediately. */
 Lend:        
 	ret
-	.size	GNAME(fast_bzero), .-GNAME(fast_bzero)
+	SIZE(GNAME(fast_bzero))
 
-        .end
+        END()

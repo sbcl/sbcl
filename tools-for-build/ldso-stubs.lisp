@@ -57,7 +57,7 @@ ldso_stub__~A: ;                                \\
 #endif
         .text"
 
-#!+(or (and x86 (not darwin)) x86-64) "
+#!+(and (or x86 x86-64) (not darwin)) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 16 ;                             \\
 .globl ldso_stub__ ## fct ;                     \\
@@ -129,6 +129,15 @@ L ## fct ## $stub: ;                    \\
         hlt                       ;     \\
         hlt                       ;     \\
         .subsections_via_symbols  ;    "
+
+;;; darwin x86-64
+#!+(and darwin x86-64) "
+#define LDSO_STUBIFY(fct)                       \\
+        .align 4 ;                              \\
+.globl ldso_stub___ ## fct ;                    \\
+ldso_stub___ ## fct: ;                          \\
+        jmp _ ## fct ;                          \\
+.L ## fct ## e1: ;                            "
 
 ;;; KLUDGE: set up the vital fifth argument, passed on the
 ;;; stack.  Do this unconditionally, even if the stub is for a

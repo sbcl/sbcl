@@ -32,7 +32,7 @@
 static char dl_self; /* I'm going to abuse this */
 
 static int callback_count;
-static struct mach_header* last_header;
+static const struct mach_header* last_header;
 
 #define DLSYM_ERROR 1
 #define DLOPEN_ERROR 2
@@ -40,7 +40,7 @@ static struct mach_header* last_header;
 static int last_error = 0;
 
 void
-dlshim_image_callback(struct mach_header* ptr, unsigned long phooey)
+dlshim_image_callback(const struct mach_header* ptr, intptr_t phooey)
 {
     callback_count++;
     last_header = ptr;
@@ -159,7 +159,7 @@ dlopen(const char* filename, int flags)
                                       NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR);
             }
             if (NSIsSymbolNameDefinedInImage(img, "__init")) {
-                NSSymbol* initsymbol;
+                NSSymbol initsymbol;
                 void (*initfunc) (void);
                 initsymbol = NSLookupSymbolInImage(img, "__init", 0);
                 initfunc = NSAddressOfSymbol(initsymbol);
@@ -204,7 +204,7 @@ dlsym(void* handle, char* symbol)
 {
     if (handle == &dl_self) {
         if (NSIsSymbolNameDefined(symbol)) {
-            NSSymbol* retsym;
+            NSSymbol retsym;
             retsym = NSLookupAndBindSymbol(symbol);
             return NSAddressOfSymbol(retsym);
         } else {
@@ -213,7 +213,7 @@ dlsym(void* handle, char* symbol)
         }
     } else {
         if (NSIsSymbolNameDefinedInImage(handle, symbol)) {
-            NSSymbol* retsym;
+            NSSymbol retsym;
             retsym = NSLookupSymbolInImage(handle, symbol, 0);
             return NSAddressOfSymbol(retsym);
         } else {

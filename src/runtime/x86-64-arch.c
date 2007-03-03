@@ -62,6 +62,8 @@ context_eflags_addr(os_context_t *context)
     return &context->uc_mcontext.gregs[17];
 #elif defined __FreeBSD__
     return &context->uc_mcontext.mc_rflags;
+#elif defined LISP_FEATURE_DARWIN
+    return &context->uc_mcontext->ss.rflags;
 #elif defined __OpenBSD__
     return &context->sc_eflags;
 #else
@@ -270,8 +272,8 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 
     case trap_Error:
     case trap_Cerror:
-        FSHOW((stderr, "<trap error/cerror %d>\n", code));
-        interrupt_internal_error(signal, info, context, code==trap_Cerror);
+        FSHOW((stderr, "<trap error/cerror %d>\n", trap));
+        interrupt_internal_error(signal, info, context, trap==trap_Cerror);
         break;
 
     case trap_Breakpoint:
@@ -301,9 +303,20 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     }
 }
 
-static void
+void
 sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = (os_context_t*)void_context;
+
+    /* Triggering SIGTRAP using int3 is unreliable on OS X/x86, so
+     * we need to use illegal instructions for traps.
+     */
+#if defined(LISP_FEATURE_DARWIN) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+    if (*((unsigned short *)*os_context_pc_addr(context)) == 0x0b0f) {
+        *os_context_pc_addr(context) += 2;
+        return sigtrap_handler(signal, siginfo, void_context);
+    }
+#endif
+
     fake_foreign_function_call(context);
     lose("fake_foreign_function_call fell through");
 }
@@ -373,8 +386,11 @@ arch_install_interrupt_handlers()
      * OS I haven't tested on?) and we have to go back to the old CMU
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
+#if !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+#endif
+
 #ifdef X86_64_SIGFPE_FIXUP
     undoably_install_low_level_interrupt_handler(SIGFPE, sigfpe_handler);
 #endif

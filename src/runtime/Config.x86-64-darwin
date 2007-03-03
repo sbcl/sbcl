@@ -1,0 +1,31 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
+OS_SRC = bsd-os.c x86-64-bsd-os.c darwin-os.c x86-64-darwin-os.c darwin-dlshim.c darwin-langinfo.c
+OS_LIBS = -lSystem -lc -ldl
+
+ASSEM_SRC = x86-64-assem.S ldso-stubs.S
+ARCH_SRC = x86-64-arch.c
+
+LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000
+
+OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
+                      > /dev/null 2>&1; \
+                   then echo "-lpthread"; fi)
+
+CFLAGS += -arch x86_64 -fno-omit-frame-pointer -pagezero_size 0x100000
+
+GC_SRC = gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

@@ -281,6 +281,7 @@
               #+nil
               (:integer fields "int" "pw_fields")))
 
+ #-darwin
  (:structure alien-stat
              ("struct stat"
               (mode-t mode "mode_t" "st_mode")
@@ -297,6 +298,29 @@
               (time-t atime "time_t" "st_atime")
               (time-t mtime "time_t" "st_mtime")
               (time-t ctime "time_t" "st_ctime")))
+
+ #+darwin
+ (:structure alien-timespec
+             ("struct timespec"
+              (time-t tv-sec "time_t" "tv_sec")
+              (long tv-nsec "long" "tv_nsec")))
+ #+darwin
+ (:structure alien-stat
+             ("struct stat"
+              (mode-t mode "mode_t" "st_mode")
+              (ino-t ino "ino_t" "st_ino")
+              ;; Linux/MIPS uses unsigned long instead of dev_t here.
+              #-mips
+              (dev-t dev "dev_t" "st_dev")
+              #+mips
+              ((unsigned 32) dev "dev_t" "st_dev")
+              (nlink-t nlink "nlink_t" "st_nlink")
+              (uid-t uid "uid_t" "st_uid")
+              (gid-t gid "gid_t" "st_gid")
+              (off-t size "off_t" "st_size")
+              (alien-timespec atime "struct timespec" "st_atime")
+              (alien-timespec mtime "struct timespec" "st_mtime")
+              (alien-timespec ctime "struct timespec" "st_ctime")))
 
  ;; open()
  (:integer o-rdonly "O_RDONLY" nil t)
@@ -354,6 +378,9 @@
 
  ;; utime(), utimes()
  #-win32
+ (:type suseconds-t "suseconds_t")
+
+ #-win32
  (:structure alien-utimbuf
              ("struct utimbuf"
               (time-t actime "time_t" "actime")
@@ -361,8 +388,8 @@
  #-win32
  (:structure alien-timeval
              ("struct timeval"
-              (long sec "long" "tv_sec")
-              (long usec "long" "tv_usec")))
+              (time-t sec "time_t" "tv_sec")
+              (suseconds-t usec "suseconds_t" "tv_usec")))
 
  (:integer veof "VEOF" nil t)
  (:integer veol "VEOL" nil t)

@@ -1052,6 +1052,14 @@
                                      :default-printer '(:name :tab code))
  (op :field (byte 8 0))
  (code :field (byte 8 8)))
+
+;;; Two byte instruction with an immediate byte argument.
+;;;
+(sb!disassem:define-instruction-format (word-imm 24
+                                     :default-printer '(:name :tab code))
+  (op :field (byte 16 0))
+  (code :field (byte 8 16)))
+
 
 ;;;; primitive emitters
 
@@ -2695,7 +2703,8 @@
     ;; Lisp (with (DESCRIBE 'BYTE-IMM-CODE)) than to definitively deduce
     ;; from first principles whether it's defined in some way that genesis
     ;; can't grok.
-    (case (byte-imm-code chunk dstate)
+    (case #!-darwin (byte-imm-code chunk dstate)
+          #!+darwin (word-imm-code chunk dstate)
       (#.error-trap
        (nt "error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
@@ -2717,10 +2726,17 @@
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
-  (:printer byte-imm ((op #b11001100)) '(:name :tab code)
-            :control #'break-control)
+  #!-darwin (:printer byte-imm ((op #b11001100)) '(:name :tab code)
+                     :control #'break-control)
+  #!+darwin (:printer word-imm ((op #b0000101100001111)) '(:name :tab code)
+                     :control #'break-control)
   (:emitter
-   (emit-byte segment #b11001100)
+   #!-darwin (emit-byte segment #b11001100)
+   ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
+   ;; throw a sigill with 0x0b0f instead and check for this in the
+   ;; SIGILL handler and pass it on to the sigtrap handler if
+   ;; appropriate
+   #!+darwin (emit-word segment #b0000101100001111)
    (emit-byte segment code)))
 
 (define-instruction int (segment number)

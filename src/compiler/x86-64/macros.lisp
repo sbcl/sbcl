@@ -175,7 +175,7 @@
          #!-sb-thread
          (make-ea :qword
                   :scale 1 :disp
-                  (make-fixup (extern-alien-name "boxed_region") :foreign)))
+                  (make-fixup "boxed_region" :foreign)))
         ;; thread->alloc_region.end_addr
         (end-addr
          #!+sb-thread
@@ -185,7 +185,7 @@
          #!-sb-thread
          (make-ea :qword
                   :scale 1 :disp
-                  (make-fixup (extern-alien-name "boxed_region") :foreign 8))))
+                  (make-fixup "boxed_region" :foreign 8))))
     (cond (in-elsewhere
            (allocation-tramp alloc-tn size))
           (t
@@ -242,7 +242,16 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
-      `((inst int 3)                            ; i386 breakpoint instruction
+      `((progn
+          #!-darwin (inst int 3)                  ; i386 breakpoint instruction
+          ;; On Darwin, we need to use #x0b0f instead of int3 in order
+          ;; to generate a SIGILL instead of a SIGTRAP as darwin/x86
+          ;; doesn't seem to be reliably firing SIGTRAP
+          ;; handlers. Hopefully this will be fixed by Apple at a
+          ;; later date. Do the same on x86-64 as we do on x86 until this gets
+          ;; sorted out.
+          #!+darwin (inst word #x0b0f))
+
         ;; The return PC points here; note the location for the debugger.
         (let ((vop ,vop))
           (when vop
