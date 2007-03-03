@@ -463,15 +463,16 @@
                  ',type)))
 
 (def!macro maybe-with-pinned-objects (variables types &body body)
+  (declare (ignorable variables types))
   (let ((pin-variables
          ;; Only pin things on x86/x86-64, since on non-conservative
          ;; gcs it'd imply disabling the GC. Which is something we
          ;; don't want to do every time we're calling to C.
-         #+(or x86 x86-64)
+         #!+(or x86 x86-64)
          (loop for variable in variables
-               for type in types
-               when (invoke-alien-type-method :deport-pin-p type)
-               collect variable)))
+            for type in types
+            when (invoke-alien-type-method :deport-pin-p type)
+            collect variable)))
     (if pin-variables
         `(with-pinned-objects ,pin-variables
            ,@body)

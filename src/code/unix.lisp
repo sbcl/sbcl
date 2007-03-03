@@ -189,15 +189,15 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;; problematic on Darwin x86-64 (and wrong). Trying suseconds-t.
 #!-win32
 (define-alien-type nil
-    (struct timeval
-            (tv-sec time-t)             ; seconds
-            (tv-usec suseconds-t))) ; and microseconds
+  (struct timeval
+          (tv-sec time-t)           ; seconds
+          (tv-usec suseconds-t)))   ; and microseconds
 
 #!+win32
 (define-alien-type nil
-    (struct timeval
-            (tv-sec time-t)             ; seconds
-            (tv-usec long)))          ; and microseconds
+  (struct timeval
+          (tv-sec time-t)           ; seconds
+          (tv-usec long)))          ; and microseconds
 
 ;;;; resourcebits.h
 
