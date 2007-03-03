@@ -47,6 +47,7 @@
            "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
+ #-freebsd
  (:integer so-no-check "SO_NO_CHECK")
  #+linux (:integer so-priority "SO_PRIORITY")
  (:integer so-linger "SO_LINGER"
@@ -273,7 +274,9 @@
  (:integer EAI-BADFLAGS "EAI_BADFLAGS")
  (:integer EAI-NONAME "EAI_NONAME")
  (:integer EAI-SERVICE "EAI_SERVICE")
+ #-freebsd
  (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
+ #-freebsd
  (:integer EAI-NODATA "EAI_NODATA")
  (:integer EAI-MEMORY "EAI_MEMORY")
  (:integer EAI-FAIL "EAI_FAIL")

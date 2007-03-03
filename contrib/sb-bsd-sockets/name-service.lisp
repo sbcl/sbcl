@@ -222,7 +222,7 @@ GET-NAME-SERVICE-ERRNO")
     no-recovery-error)
 (define-name-service-condition
     sockint::NO-ADDRESS  ;; Also defined as NO-DATA, with the same value
-    sockint::EAI-NODATA
+    #-freebsd sockint::EAI-NODATA #+freebsd nil
     no-address-error)
 
 (defun condition-for-name-service-errno (err)
