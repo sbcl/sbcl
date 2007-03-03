@@ -97,7 +97,7 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-#!+linux
+#!+(or linux freebsd)
 (progn
   (def!constant read-only-space-start     #x20000000)
   (def!constant read-only-space-end       #x27ff0000)
