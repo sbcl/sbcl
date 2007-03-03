@@ -326,15 +326,18 @@
 ;;; destructuring mechanisms.
 (defmacro-mundanely dotimes ((var count &optional (result nil)) &body body)
   (cond ((numberp count)
-         `(do ((,var 0 (1+ ,var)))
-              ((>= ,var ,count) ,result)
-            (declare (type unsigned-byte ,var))
-            ,@body))
-        (t (let ((v1 (gensym)))
-             `(do ((,var 0 (1+ ,var)) (,v1 ,count))
-                  ((>= ,var ,v1) ,result)
-                (declare (type unsigned-byte ,var))
-                ,@body)))))
+        `(do ((,var 0 (1+ ,var)))
+             ((>= ,var ,count) ,result)
+           (declare (type unsigned-byte ,var))
+           ,@body))
+        (t
+         (let ((c (gensym "COUNT")))
+           `(do ((,var 0 (1+ ,var))
+                 (,c ,count))
+                ((>= ,var ,c) ,result)
+              (declare (type unsigned-byte ,var)
+                       (type integer ,c))
+              ,@body)))))
 
 (defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
   ;; We repeatedly bind the var instead of setting it so that we never
