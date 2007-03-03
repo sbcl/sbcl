@@ -141,7 +141,11 @@ GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 	mov     %rsp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
+#if defined(LISP_FEATURE_DARWIN)
 	movq    GSYM(GNAME(all_threads)),%rax
+#else
+        movq    GNAME(all_threads),%rax
+#endif
 	mov     THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
