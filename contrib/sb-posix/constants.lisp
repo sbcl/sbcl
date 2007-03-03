@@ -391,6 +391,12 @@
               (time-t sec "time_t" "tv_sec")
               (suseconds-t usec "suseconds_t" "tv_usec")))
 
+ #+win32
+ (:structure alien-timeval
+             ("struct timeval"
+              (time-t sec "time_t" "tv_sec")
+              (long usec "long" "tv_usec")))
+
  (:integer veof "VEOF" nil t)
  (:integer veol "VEOL" nil t)
  (:integer verase "VERASE" nil t)
