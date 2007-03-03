@@ -359,6 +359,7 @@
 (define-pw-call "getpwnam" login-name (function (* alien-passwd) c-string))
 (define-pw-call "getpwuid" uid (function (* alien-passwd) uid-t))
 
+#-win32
 (define-protocol-class timeval alien-timeval ()
   ((sec :initarg :tv-sec :accessor timeval-sec)
    (usec :initarg :tv-usec :accessor timeval-usec)))
