@@ -237,11 +237,13 @@
                    :offset ,(cdr arg)))
                 args))
         (return `(lambda (stream &optional ,@args &rest args)
+                   (declare (ignorable stream))
                    ,guts
                    args))))
     (let ((*orig-args-available* t)
           (*only-simple-args* nil))
       `(lambda (stream &rest orig-args)
+         (declare (ignorable stream))
          (let ((args orig-args))
            ,(expand-control-string control-string)
            args)))))
