@@ -196,6 +196,10 @@
     (host-ent-name (get-host-by-address #(198 41 0 4)))
   "a.root-servers.net")
 
+;;; These days lots of people seem to be using DNS servers that don't
+;;; report resolving failures for non-existing domains. This test
+;;; will fail there, so we've disabled it.
+#+nil
 (deftest get-host-by-name-wrong
   (handler-case
    (get-host-by-name "foo.tninkpad.telent.net.")
