@@ -1523,8 +1523,8 @@
       ;; the input file.
       (fatal-compiler-error (condition)
        (signal condition)
-       (when *compile-verbose*
-         (format *standard-output*
+       (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+         (format *error-output*
                  "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
                  condition))
        (values nil t t)))))
