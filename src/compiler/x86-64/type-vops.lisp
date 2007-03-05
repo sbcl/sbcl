@@ -19,18 +19,23 @@
                   :sc (sc-or-lose 'byte-reg)
                   :offset (tn-offset tn)))
 
+(defun make-dword-tn (tn)
+  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
+  (make-random-tn :kind :normal
+                  :sc (sc-or-lose 'dword-reg)
+                  :offset (tn-offset tn)))
+
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
-  (let ((offset (tn-offset value)))
-    ;; The x86 backend uses a pun from E[A-D]X -> [A-D]L for these
-    ;; tests. The Athlon 64 optimization guide says that this is a
-    ;; bad idea, so it's been removed.
-    (cond ((sc-is value control-stack)
-           (inst test (make-ea :byte :base rbp-tn
-                               :disp (- (* (1+ offset) n-word-bytes)))
-                 sb!vm::fixnum-tag-mask))
-          (t
-           (inst test value sb!vm::fixnum-tag-mask)))))
+  (inst test
+        (cond ((sc-is value any-reg descriptor-reg)
+               (make-byte-tn value))
+              ((sc-is value control-stack)
+               (make-ea :byte :base rbp-tn
+                        :disp (- (* (1+ (tn-offset value)) n-word-bytes))))
+              (t
+               value))
+        sb!vm::fixnum-tag-mask))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)
@@ -79,9 +84,12 @@
   (%test-headers value target not-p nil headers drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
-  (move rax-tn value)
-  (inst and rax-tn lowtag-mask)
-  (inst cmp rax-tn lowtag)
+  (if (and (sc-is value any-reg descriptor-reg)
+           (< (tn-offset value) r8-offset))
+      (move eax-tn (make-dword-tn value)) ; shorter encoding (no REX prefix)
+      (move rax-tn value))
+  (inst and al-tn lowtag-mask)
+  (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
