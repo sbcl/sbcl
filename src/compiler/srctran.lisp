@@ -3410,14 +3410,15 @@
            (give-up-ir1-transform
             "The operands might not be the same type.")))))
 
-(labels ((maybe-float-lvar-p (lvar)
-           (neq *empty-type* (type-intersection (specifier-type 'float)
-                                                (lvar-type lvar))))
-         (maybe-invert (op inverted x y)
-           ;; Don't invert if either argument can be a float (NaNs)
-           (if (or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
-               `(or (,op x y) (= x y))
-               `(if (,inverted x y) nil t))))
+(defun maybe-float-lvar-p (lvar)
+  (neq *empty-type* (type-intersection (specifier-type 'float)
+                                       (lvar-type lvar))))
+
+(flet ((maybe-invert (op inverted x y)
+         ;; Don't invert if either argument can be a float (NaNs)
+         (if (or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
+             `(or (,op x y) (= x y))
+             `(if (,inverted x y) nil t))))
   (deftransform >= ((x y) (number number) *)
     "invert or open code"
     (maybe-invert '> '< x y))
@@ -3432,7 +3433,13 @@
 (macrolet ((def (name inverse reflexive-p surely-true surely-false)
              `(deftransform ,name ((x y))
                 "optimize using intervals"
-                (if (same-leaf-ref-p x y)
+                (if (and (same-leaf-ref-p x y)
+                         ;; For non-reflexive functions we don't need
+                         ;; to worry about NaNs: (non-ref-op NaN NaN) => false,
+                         ;; but with reflexive ones we don't know...
+                         ,@(when reflexive-p
+                                 '((and (not (maybe-float-lvar-p x))
+                                        (not (maybe-float-lvar-p y))))))
                     ,reflexive-p
                     (let ((ix (or (type-approximate-interval (lvar-type x))
                                   (give-up-ir1-transform)))
