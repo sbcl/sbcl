@@ -68,6 +68,9 @@ arguments to fit Lisp style more closely.
 ;;; Unfortunately the manual page claims that these functions are not
 ;;; thread-safe on OS X, but they probably can't be any worse than
 ;;; gethostbyname and gethostbyaddr.
+;;;
+;;; CLH: getaddrinfo seems to be broken is broken on x86-64/darwin
+#-(and x86-64 darwin)
 (let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
   (when addr
     (pushnew :sb-bsd-sockets-addrinfo *features*)))

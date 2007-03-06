@@ -211,6 +211,10 @@
                                (msg (* msghdr))
                                (flags int)))
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
+ #+darwin
+ (:function gethostbyname2 ("gethostbyname2" (* hostent)
+                                             (name c-string)
+                                             (af int)))
  (:function gethostbyaddr ("gethostbyaddr" (* hostent)
                                            (addr (* t))
                                            (len int)
@@ -235,7 +239,14 @@
                        (integer family "int" "ai_family")
                        (integer socktype "int" "ai_socktype")
                        (integer protocol "int" "ai_protocol")
-                       (integer addrlen "size_t""ai_addrlen")
+                       ;; CLH 20070306 FIXME: ai_addrlen should really
+                       ;; be a socklen_t, but I'm not sure if this the
+                       ;; case on other platforms. I'm setting this to
+                       ;; socklen_t on darwin and hoping that other
+                       ;; platform maintainers will do the right thing
+                       ;; here.
+                       #+darwin (integer addrlen "socklen_t" "ai_addrlen")
+                       #-darwin (integer addrlen "size_t" "ai_addrlen")
                        ((* sockaddr-in) addr "struct sockaddr*" "ai_addr")
                        (c-string canonname "char *" "ai_canonname")
                        ((* t) next "struct addrinfo*" "ai_next")))

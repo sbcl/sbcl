@@ -34,8 +34,16 @@
                 until (sb-alien:null-alien ad)
                 collect (ecase (sockint::hostent-type h)
                           (#.sockint::af-inet
+                           ;; CLH: Work around x86-64 darwin bug here.
+                           ;; The length is reported as 8, when it should be 4.
+                           #+(and darwin x86-64)
+                           (progn
+                             (assert (or (= length 4) (= length 8)))
+                             (naturalize-unsigned-byte-8-array ad 4))
+                           #-(and darwin x86-64)
+                           (progn
                              (assert (= length 4))
-                             (naturalize-unsigned-byte-8-array ad length))
+                             (naturalize-unsigned-byte-8-array ad length)))
                           #-win32
                           (#.sockint::af-local
                            (sb-alien:cast ad sb-alien:c-string))))))
