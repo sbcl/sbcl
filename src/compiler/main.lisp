@@ -977,7 +977,9 @@
                          (funcall #'ir1-convert-lambdalike
                                   definition
                                   :source-name name)))
-           (debug-name (debug-name 'tl-xep name))
+           (debug-name (debug-name 'tl-xep
+                                   (or name
+                                       (functional-%source-name locall-fun))))
            ;; Convert the XEP using the policy of the real
            ;; function. Otherwise the wrong policy will be used for
            ;; deciding whether to type-check the parameters of the

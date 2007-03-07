@@ -8,7 +8,7 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
     platforms.
   * optimization: code using alien values with undeclared types is much faster.
   * optimization: the compiler is now able to open code SEARCH in more cases.
-  * optimization: more compact (thanks to Lutz Euler)
+  * optimization: more compact typechecks on x86-64 (thanks to Lutz Euler)
   * bug fix: >= and <= gave wrong results when used with NaNs.
   * bug fix: the #= and ## reader macros now interact reasonably with
     funcallable instances.
@@ -21,6 +21,8 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
     non-base strings as arguments
   * bug fix: more consistent error output for fatal-compiler-warnings, like
     reader errors
+  * bug fix: functions with proper names were showing up as NIL in
+    backtraces (reported by Edi Weitz, regression in 1.0.2)
 
 changes in sbcl-1.0.3 relative to sbcl-1.0.2:
   * new platform: NetBSD/PPC.  (thanks to Aymeric Vincent)
