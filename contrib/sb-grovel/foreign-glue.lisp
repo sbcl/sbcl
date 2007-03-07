@@ -280,11 +280,14 @@ deeply nested structures."
 (defun (setf c-string->lisp-string) (new-string alien &optional limit)
   (declare (string new-string))
   (let* ((upper-bound (or limit (1+ (length new-string))))
-         (last-elt (min (1- upper-bound) (length new-string))))
-    (loop for i upfrom 0 below last-elt
-          for char across new-string
-          do (setf (deref alien i) (char-code char)))
-    (setf (deref alien last-elt) 0)
+         (last-elt (min (1- upper-bound) (length new-string)))
+         (octets (sb-ext:string-to-octets new-string :end last-elt
+                                          :null-terminate t))
+         (alien-pointer (cast alien (* unsigned-char))))
+    (declare (cl:type (simple-array (unsigned-byte 8) (*)) octets))
+    (declare (cl:type sb-int:index last-elt))
+    (loop for i from 0 to last-elt
+          do (setf (deref alien-pointer i) (aref octets i)))
     (subseq new-string 0 last-elt)))
 
 (defgeneric accessors-for (struct-name element path))
