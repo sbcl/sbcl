@@ -2178,3 +2178,15 @@
 ;;;
 ;;; Bug reported by Kaersten Poeck on sbcl-devel 20061023.
 (compile nil '(lambda () (let* () (declare (values list)))))
+
+
+;;; test for some problems with too large immediates in x86-64 modular
+;;; arithmetic vops
+(compile nil '(lambda (x) (declare (fixnum x))
+               (logand most-positive-fixnum (logxor x most-positive-fixnum))))
+
+(compile nil '(lambda (x) (declare (fixnum x))
+               (logand most-positive-fixnum (+ x most-positive-fixnum))))
+
+(compile nil '(lambda (x) (declare (fixnum x))
+               (logand most-positive-fixnum (* x most-positive-fixnum))))

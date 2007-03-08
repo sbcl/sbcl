@@ -1238,7 +1238,7 @@
                                         (sc-is r signed-stack))
                                     (location= x r)))))
      (:info y)
-     (:arg-types untagged-num (:constant (or (unsigned-byte 64) (signed-byte 64))))
+     (:arg-types untagged-num (:constant (or (unsigned-byte 31) (signed-byte 32))))
      (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
                   :load-if (not (and (or (sc-is x unsigned-stack)
                                          (sc-is x signed-stack))
