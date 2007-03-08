@@ -124,7 +124,10 @@
         (string= (prog1 (write-line "Got it!" s) (finish-output s))
                  (read-line s)))
     ;; Fail gracefully if echo isn't activated on the system
-    (sb-bsd-sockets::connection-refused-error () t))
+    (sb-bsd-sockets::connection-refused-error () t)
+    ;; Timeout may occur on the restricted systems (e.g. FreeBSD
+    ;; with jail(8) or blackhole(4) is used).
+    (sb-bsd-sockets::operation-timeout-error () t))
   t)
 
 (deftest write-read-large-sc-1
@@ -197,7 +200,10 @@
        (string= (prog1 (write-line content s) (finish-output s))
                 (read-line s))))
     ;; Fail gracefully if echo isn't activated on the system
-   (sb-bsd-sockets::connection-refused-error () t))
+   (sb-bsd-sockets::connection-refused-error () t)
+   ;; Timeout may occur on the restricted systems (e.g. FreeBSD
+   ;; with jail(8) or blackhole(4) is used).
+   (sb-bsd-sockets::operation-timeout-error () t))
   t)
 
 
