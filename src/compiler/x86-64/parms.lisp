@@ -97,7 +97,6 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-#!+(or linux freebsd)
 (progn
   (def!constant read-only-space-start     #x20000000)
   (def!constant read-only-space-end       #x27ff0000)
@@ -112,26 +111,6 @@
   (def!constant linkage-table-space-end   #x63fff000)
 
   (def!constant linkage-table-entry-size 16))
-
-#!+darwin
-(progn
-  (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x27ff0000)
-
-  (def!constant static-space-start        #x40000000)
-  (def!constant static-space-end          #x47fff000)
-
-  #+nil  (def!constant dynamic-space-start   #x1000000000)
-  #+nil  (def!constant dynamic-space-end     #x11ffff0000)
-
-  (def!constant dynamic-space-start   #x50000000)
-  (def!constant dynamic-space-end     #x5fff0000)
-
-  (def!constant linkage-table-space-start #x60000000)
-  (def!constant linkage-table-space-end   #x63fff000)
-
-  (def!constant linkage-table-entry-size 16))
-
 
 
 ;;;; other miscellaneous constants

@@ -766,6 +766,21 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; doesn't work, it returns NIL and the errno.
 #!-sb-fluid (declaim (inline unix-gettimeofday))
 (defun unix-gettimeofday ()
+  #!+(and x86-64 darwin)
+  (with-alien ((tv (struct timeval)))
+    ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
+    ;; gettimeofday occasionally fails. passing in a null pointer for
+    ;; the timezone struct seems to work around the problem. I can't
+    ;; find any instances in the SBCL where we actually ues the
+    ;; timezone values, so we just punt for the moment.
+    (syscall* ("gettimeofday" (* (struct timeval))
+                              (* (struct timezone)))
+              (values t
+                      (slot tv 'tv-sec)
+                      (slot tv 'tv-usec))
+              (addr tv)
+              nil))
+  #!-(and x86-64 darwin)
   (with-alien ((tv (struct timeval))
                (tz (struct timezone)))
     (syscall* ("gettimeofday" (* (struct timeval))
