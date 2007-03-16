@@ -376,7 +376,7 @@ main(int argc, char *argv[], char *envp[])
         free(copied_core);
     }
 
-    if (!noinform) {
+    if (!noinform && embedded_core_offset == 0) {
         print_banner();
         fflush(stdout);
     }

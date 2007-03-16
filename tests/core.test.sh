@@ -14,7 +14,8 @@
 # more information.
 
 tmpcore="core-test-sh-$$.core"
-rm -f $tmpcore
+tmpoutput="core-test-sh-$$.output.txt"
+rm -f "$tmpcore" "$tmpoutput"
 
 # In sbcl-0.7.7 SAVE-LISP-AND-DIE didn't work at all because of
 # flakiness caused by consing/GC/purify twice-and-at-least-twice
@@ -61,6 +62,29 @@ else
     exit 1
 fi
 
-rm -f $tmpcore
+# test suppression of banner in executable cores
+$SBCL <<EOF
+  (save-lisp-and-die "$tmpcore" :executable t)
+EOF
+chmod u+x "$tmpcore"
+./"$tmpcore" >"$tmpoutput" --eval '(quit :unix-status 71)'
+if [ $? != 71 ]; then
+  echo "failure in banner suppression: $?"
+  exit 1
+elif [ -s "$tmpoutput" ]; then
+  echo "failure in banner suppression: nonempty output:"
+  echo ---
+  cat "$tmpoutput"
+  echo ---
+  exit 1
+elif [ -f "$tmpoutput" ]; then
+  echo "/Executable suppressed banner, good."
+else
+  echo "failure in banner suppression: $tmpoutput was not created or something funny happened."
+  exit 1
+fi
+
+rm -f "$tmpcore"
+rm -f "$tmpoutput"
 echo "/returning success from core.test.sh"
 exit 104
