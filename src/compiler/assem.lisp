@@ -1179,8 +1179,8 @@
                  ;; Must be done so that contribs and user code doing
                  ;; low-level stuff don't need to worry about this.
                  (disable-package-locks %%current-segment%% %%current-vop%%))
-        (macrolet ((%%current-segment%% () '**current-segment**)
-                   (%%current-vop%% () '**current-vop**))
+        (macrolet ((%%current-segment%% () ',seg-var)
+                   (%%current-vop%% () ',vop-var))
           ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
           ;; can't deal with this declaration, so disable it on host.
           ;; Ditto for later ENABLE-PACKAGE-LOCKS %%C-S%% declaration.
@@ -1227,8 +1227,8 @@
                           `(,name (gen-label)))
                         new-labels))
         (declare (ignorable ,vop-var ,seg-var))
-        (macrolet ((%%current-segment%% () '**current-segment**)
-                   (%%current-vop%% () '**current-vop**))
+        (macrolet ((%%current-segment%% () ',seg-var)
+                   (%%current-vop%% () ',vop-var))
           (symbol-macrolet (,@(when (or inherited-labels nested-labels)
                                     `((..inherited-labels.. ,nested-labels))))
               ,@(mapcar (lambda (form)
