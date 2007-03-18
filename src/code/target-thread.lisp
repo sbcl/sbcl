@@ -30,7 +30,9 @@ in future versions."
   %alive-p
   os-thread
   interruptions
-  (interruptions-lock (make-mutex :name "thread interruptions lock")))
+  (interruptions-lock (make-mutex :name "thread interruptions lock"))
+  result
+  (result-lock (make-mutex :name "thread result lock")))
 
 #!+sb-doc
 (setf (sb!kernel:fdocumentation 'thread-name 'function)
@@ -604,7 +606,8 @@ have the foreground next."
 (defun make-thread (function &key name)
   #!+sb-doc
   "Create a new thread of NAME that runs FUNCTION. When the function
-returns the thread exits."
+returns the thread exits. The return values of FUNCTION are kept
+around and can be retrieved by JOIN-THREAD."
   #!-sb-thread (declare (ignore function name))
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
@@ -638,30 +641,34 @@ returns the thread exits."
                   (sb!impl::*internal-symbol-output-fun* nil)
                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
               (setf (thread-os-thread thread) (current-thread-sap-id))
-              (with-all-threads-lock
-                (push thread *all-threads*))
-              (with-session-lock (*session*)
-                (push thread (session-threads *session*)))
-              (setf (thread-%alive-p thread) t)
-              (signal-semaphore setup-sem)
-              ;; can't use handling-end-of-the-world, because that flushes
-              ;; output streams, and we don't necessarily have any (or we
-              ;; could be sharing them)
-              (catch 'sb!impl::toplevel-catcher
-                (catch 'sb!impl::%end-of-the-world
-                  (with-simple-restart
-                      (terminate-thread
-                       (format nil
-                               "~~@<Terminate this thread (~A)~~@:>"
-                               *current-thread*))
-                    (unwind-protect
-                         (progn
-                           ;; now that most things have a chance to
-                           ;; work properly without messing up other
-                           ;; threads, it's time to enable signals
-                           (sb!unix::reset-signal-mask)
-                           (funcall real-function))
-                      (handle-thread-exit thread))))))
+              (with-mutex ((thread-result-lock thread))
+                (with-all-threads-lock
+                  (push thread *all-threads*))
+                (with-session-lock (*session*)
+                  (push thread (session-threads *session*)))
+                (setf (thread-%alive-p thread) t)
+                (signal-semaphore setup-sem)
+                ;; can't use handling-end-of-the-world, because that flushes
+                ;; output streams, and we don't necessarily have any (or we
+                ;; could be sharing them)
+                (catch 'sb!impl::toplevel-catcher
+                  (catch 'sb!impl::%end-of-the-world
+                    (with-simple-restart
+                        (terminate-thread
+                         (format nil
+                                 "~~@<Terminate this thread (~A)~~@:>"
+                                 *current-thread*))
+                      (unwind-protect
+                           (progn
+                             ;; now that most things have a chance to
+                             ;; work properly without messing up other
+                             ;; threads, it's time to enable signals
+                             (sb!unix::reset-signal-mask)
+                             (setf (thread-result thread)
+                                   (cons t
+                                         (multiple-value-list
+                                          (funcall real-function)))))
+                        (handle-thread-exit thread)))))))
             (values))))
     ;; Keep INITIAL-FUNCTION pinned until the child thread is
     ;; initialized properly.
@@ -673,6 +680,32 @@ returns the thread exits."
           (error "Can't create a new thread"))
         (wait-on-semaphore setup-sem)
         thread))))
+
+(define-condition join-thread-error (error)
+  ((thread :reader join-thread-error-thread :initarg :thread))
+  #!+sb-doc
+  (:documentation "Joining thread failed.")
+  (:report (lambda (c s)
+             (format s "Joining thread failed: thread ~A ~
+                        has not returned normally."
+                     (join-thread-error-thread c)))))
+
+#!+sb-doc
+(setf (sb!kernel:fdocumentation 'join-thread-error-thread 'function)
+      "The thread that we failed to join.")
+
+(defun join-thread (thread &key (errorp t) default)
+  #!+sb-doc
+  "Suspend current thread until THREAD exits. Returns the result
+values of the thread function. If the thread does not exit normally,
+return DEFAULT or signal JOIN-THREAD-ERROR depending on ERRORP."
+  (with-mutex ((thread-result-lock thread))
+    (cond ((car (thread-result thread))
+           (values-list (cdr (thread-result thread))))
+          (errorp
+           (error 'join-thread-error :thread thread))
+          (t
+           default))))
 
 (defun destroy-thread (thread)
   #!+sb-doc

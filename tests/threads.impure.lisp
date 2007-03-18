@@ -14,9 +14,11 @@
 (in-package "SB-THREAD") ; this is white-box testing, really
 
 (use-package :test-util)
+(use-package "ASSERTOID")
 
 (defun wait-for-threads (threads)
-  (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
+  (mapc #'sb-thread:join-thread threads)
+  (assert (not (some #'sb-thread:thread-alive-p threads))))
 
 (assert (eql 1 (length (list-all-threads))))
 
@@ -49,6 +51,20 @@
   (assert (= (1+ (length old-threads)) (length new-threads)))
   (sleep 3)
   (assert (not (thread-alive-p thread))))
+
+(with-test (:name '(:join-thread :nlx :default))
+  (let ((sym (gensym)))
+    (assert (eq sym (join-thread (make-thread (lambda () (sb-ext:quit)))
+                                 :default sym)))))
+
+(with-test (:name '(:join-thread :nlx :error))
+  (raises-error? (join-thread (make-thread (lambda () (sb-ext:quit)))
+                              :errorp t)))
+
+(with-test (:name '(:join-thread :multiple-values))
+  (assert (equal '(1 2 3)
+                 (multiple-value-list
+                  (join-thread (make-thread (lambda () (values 1 2 3))))))))
 
 ;;; We had appalling scaling properties for a while.  Make sure they
 ;;; don't reappear.
@@ -641,16 +657,15 @@
   (let* ((ok t)
          (threads (loop for i from 0 to 10
                         collect (sb-thread:make-thread
-                                 (let ((i i))
-                                   (lambda ()
-                                     (dotimes (j 100)
-                                       (write-char #\-)
-                                       (finish-output)
-                                       (let ((n (infodb-test)))
-                                         (unless (zerop n)
-                                           (setf ok nil)
-                                           (format t "N != 0 (~A)~%" n)
-                                           (quit))))))))))
+                                 (lambda ()
+                                   (dotimes (j 100)
+                                     (write-char #\-)
+                                     (finish-output)
+                                     (let ((n (infodb-test)))
+                                       (unless (zerop n)
+                                         (setf ok nil)
+                                         (format t "N != 0 (~A)~%" n)
+                                         (sb-ext:quit)))))))))
     (wait-for-threads threads)
     (assert ok)))
 

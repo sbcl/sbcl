@@ -9,6 +9,7 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * change: runtimes with embedded cores (i.e. saved with :EXECUTABLE T)
     don't print the startup banner, but behave as if --noinform was passed
     as a command line argument. (thanks to Kevin Reid)
+  * new feature: added JOIN-THREAD (by NIIMI Satoshi)
   * optimization: code using alien values with undeclared types is much faster.
   * optimization: the compiler is now able to open code SEARCH in more cases.
   * optimization: more compact typechecks on x86-64 (thanks to Lutz Euler)

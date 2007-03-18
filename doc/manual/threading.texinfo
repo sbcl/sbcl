@@ -33,6 +33,9 @@ threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 @include struct-sb-thread-thread.texinfo
 @include var-sb-thread-star-current-thread-star.texinfo
 @include fun-sb-thread-make-thread.texinfo
+@include fun-sb-thread-join-thread.texinfo
+@include condition-sb-thread-join-thread-error.texinfo
+@include fun-sb-thread-join-thread-error-thread.texinfo
 @include fun-sb-thread-thread-alive-p.texinfo
 @include fun-sb-thread-list-all-threads.texinfo
 @include condition-sb-thread-interrupt-thread-error.texinfo
