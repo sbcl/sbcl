@@ -206,7 +206,7 @@
          (:note "inline array store")
          (:translate data-vector-set)
          (:policy :fast-safe)
-         (:args (object :scs (descriptor-reg))
+         (:args (object :scs (descriptor-reg) :to (:argument 2))
                 (index :scs (unsigned-reg) :target ecx)
                 (value :scs (unsigned-reg immediate) :target result))
          (:arg-types ,type positive-fixnum positive-fixnum)
@@ -214,7 +214,7 @@
          (:result-types positive-fixnum)
          (:temporary (:sc unsigned-reg) word-index)
          (:temporary (:sc unsigned-reg) old)
-         (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
+         (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
          (:generator 25
            (move word-index index)
            (inst shr word-index ,bit-shift)
