@@ -87,7 +87,7 @@ info: $(INFOFILES)
 # directories containing the modules, and that these directories
 # are in $(CONTRIBDIR).
 CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIBDIR)|g") -name '*.fasl')
-docstrings: ../../output/sbcl.core $(CONTRIB_FASLS) tempfiles-stamp
+docstrings: $(CONTRIB_FASLS) tempfiles-stamp
 	for module in $(shell echo $(MODULES)); do test -e $(CONTRIBDIR)/$${module#:}/test-passed || { echo "The documented contrib $$module seems to have failed its tests." && exit 1; }; done
 	DOCSTRINGDIR=$(DOCSTRINGDIR) PACKAGES=$(PACKAGES) MODULES=$(MODULES) sh make-tempfiles.sh "$(SBCL_SYSTEM)" && touch $(DOCSTRINGDIR)
 
