@@ -484,4 +484,9 @@
             test:*special*))
          program-error))
 
+;;; Bogus package lock violations from LOOP
+
+(assert (equal (loop :for *print-base* :from 2 :to 3 :collect *print-base*)
+               '(2 3)))
+
 ;;; WOOT! Done.

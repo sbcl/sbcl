@@ -917,10 +917,22 @@ code to be loaded.
 
 (defun loop-typed-init (data-type &optional step-var-p)
   (when (and data-type (sb!xc:subtypep data-type 'number))
-    (if (or (sb!xc:subtypep data-type 'float)
-            (sb!xc:subtypep data-type '(complex float)))
-        (coerce (if step-var-p 1 0) data-type)
-        (if step-var-p 1 0))))
+    (let ((init (if step-var-p 1 0)))
+      (flet ((like (&rest types)
+               (coerce init (find-if (lambda (type)
+                                       (sb!xc:subtypep data-type type))
+                                     types))))
+        (cond ((sb!xc:subtypep data-type 'float)
+               (like 'single-float 'double-float
+                     'short-float 'long-float 'float))
+              ((sb!xc:subtypep data-type '(complex float))
+               (like '(complex single-float)
+                     '(complex double-float)
+                     '(complex short-float)
+                     '(complex long-float)
+                     '(complex float)))
+              (t
+               init))))))
 
 (defun loop-optional-type (&optional variable)
   ;; No variable specified implies that no destructuring is permissible.
@@ -1046,7 +1058,9 @@ code to be loaded.
 (defun loop-declare-var (name dtype &optional step-var-p)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
-         (unless (sb!xc:subtypep t dtype)
+         (unless (or (sb!xc:subtypep t dtype)
+                     (and (eq (find-package :cl) (symbol-package name))
+                          (eq :special (sb!int:info :variable :kind name))))
            (let ((dtype (let ((init (loop-typed-init dtype step-var-p)))
                           (if (sb!xc:typep init dtype)
                               dtype
@@ -1720,7 +1734,8 @@ code to be loaded.
                                  `(and ,indexv-type real)))))
            (:by
             (multiple-value-setq (form stepby-constantp stepby)
-              (loop-constant-fold-if-possible form `(and ,indexv-type (real (0)))))
+              (loop-constant-fold-if-possible form
+                                              `(and ,indexv-type (real (0)))))
             (unless stepby-constantp
               (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
                  form
@@ -1731,7 +1746,8 @@ code to be loaded.
               maybe invalid prepositions were specified in iteration path descriptor?"
                  prep)))
          (when (and odir dir (not (eq dir odir)))
-           (loop-error "conflicting stepping directions in LOOP sequencing path"))
+           (loop-error
+             "conflicting stepping directions in LOOP sequencing path"))
          (setq odir dir))
        (when (and sequence-variable (not sequencep))
          (loop-error "missing OF or IN phrase in sequence path"))
@@ -1749,8 +1765,9 @@ code to be loaded.
                                   :key #'type-declaration-of
                                   :from-end t)))
                  (sb!int:aver (eq decl %decl))
-                 (setf (cadr decl)
-                       `(and real ,(cadr decl))))))
+                 (when decl
+                   (setf (cadr decl)
+                         `(and real ,(cadr decl)))))))
            ;; default start
            ;; DUPLICATE KLUDGE: loop-make-var generates a temporary
            ;; symbol for indexv if it is NIL. See also the comment in

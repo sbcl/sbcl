@@ -12,7 +12,14 @@ changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * optimization: code using alien values with undeclared types is much faster.
   * optimization: the compiler is now able to open code SEARCH in more cases.
   * optimization: more compact typechecks on x86-64 (thanks to Lutz Euler)
-  * bug fix: >= and <= gave wrong results when used with NaNs.
+  * bug fix: using standardized COMMON-LISP special variables as loop
+    variables no longer signals bogus package lock violations. (reported
+    by Eric Marsden)
+  * bug fix: declaring local loop variables to be of a range-limited type
+    such as (SINGLE-FLOAT 1.0 2.0) no longer causes a compile-time error.
+    (reported by Andras Simon)
+  * bug fix: >= and <= gave wrong results when used with NaNs. (Some NaN
+    bugs remain on x86-64.)
   * bug fix: the #= and ## reader macros now interact reasonably with
     funcallable instances.
   * bug fix: type-checks for function arguments were compiled using the

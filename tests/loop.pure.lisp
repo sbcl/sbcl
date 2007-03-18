@@ -238,3 +238,7 @@
       (macroexpand '(LOOP WITH A = 0 FOR A DOWNFROM 10 TO 0 DO (PRINT A))))
   (declare (ignore _))
   (assert (typep condition 'program-error)))
+
+;;; Loop variable with a range excluding 0, reported by Andras Simon.
+;;; (Used to signal an error during macroexpansion.)
+(assert (not (loop with foo of-type (single-float 1.0 2.0) = 1.5 do (return))))
