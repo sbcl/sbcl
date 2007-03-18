@@ -26,11 +26,17 @@
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100
-    (inst push object)
+    (move rax object)
+    (inst push rbp-tn)
+    (inst mov rbp-tn rsp-tn)
+    (inst push rbp-tn)
+    (inst and rsp-tn -16)
+    (storew rax rsp-tn)
     (inst lea rax (make-fixup "debug_print" :foreign))
     (inst lea call-target
           (make-ea :qword
                    :disp (make-fixup "call_into_c" :foreign)))
     (inst call call-target)
-    (inst add rsp-tn n-word-bytes)
+    (inst mov rsp-tn rbp-tn)
+    (inst pop rbp-tn)
     (move result rax)))
