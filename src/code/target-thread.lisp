@@ -698,7 +698,9 @@ around and can be retrieved by JOIN-THREAD."
   #!+sb-doc
   "Suspend current thread until THREAD exits. Returns the result
 values of the thread function. If the thread does not exit normally,
-return DEFAULT or signal JOIN-THREAD-ERROR depending on ERRORP."
+return DEFAULT or signal JOIN-THREAD-ERROR depending on ERRORP. This
+function is experimental and it is likely to be changed in the
+future."
   (with-mutex ((thread-result-lock thread))
     (cond ((car (thread-result thread))
            (values-list (cdr (thread-result thread))))
