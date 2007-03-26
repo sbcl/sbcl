@@ -318,9 +318,14 @@
               (uid-t uid "uid_t" "st_uid")
               (gid-t gid "gid_t" "st_gid")
               (off-t size "off_t" "st_size")
-              (alien-timespec atime "struct timespec" "st_atime")
-              (alien-timespec mtime "struct timespec" "st_mtime")
-              (alien-timespec ctime "struct timespec" "st_ctime")))
+
+              (time-t atime "time_t" "st_atime")
+              (time-t mtime "time_t" "st_mtime")
+              (time-t ctime "time_t" "st_ctime")
+
+              #+foo (alien-timespec atime "struct timespec" "st_atime")
+              #+foo (alien-timespec mtime "struct timespec" "st_mtime")
+              #+foo (alien-timespec ctime "struct timespec" "st_ctime")))
 
  ;; open()
  (:integer o-rdonly "O_RDONLY" nil t)
