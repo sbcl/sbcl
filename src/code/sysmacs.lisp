@@ -32,14 +32,26 @@
 
 (defmacro without-gcing (&body body)
   #!+sb-doc
-  "Executes the forms in the body without doing a garbage
-collection. It inhibits both automatically and explicitly triggered
-gcs. Finally, upon leaving the BODY if gc is not inhibited it runs the
-pending gc. Similarly, if gc is triggered in another thread then it
-waits until gc is enabled in this thread."
+  "Executes the forms in the body without doing a garbage collection. It
+inhibits both automatically and explicitly triggered collections. Finally,
+upon leaving the BODY if gc is not inhibited it runs the pending gc.
+Similarly, if gc is triggered in another thread then it waits until gc is
+enabled in this thread.
+
+Implies SB-SYS:WITHOUT-INTERRUPTS for BODY, and causes any nested
+SB-SYS:WITH-INTERRUPTS to signal a warning during execution of the BODY.
+
+Should be used with great care, and not at all in multithreaded application
+code: Any locks that are ever acquired while GC is inhibited need to be always
+held with GC inhibited to prevent deadlocks: if T1 holds the lock and is
+stopped for GC while T2 is waiting for the lock inside WITHOUT-GCING the
+system will be deadlocked. Since SBCL does not currently document its internal
+locks, application code can never be certain that this invariant is
+maintained."
   `(unwind-protect
-        (let ((*gc-inhibit* t))
-          ,@body)
+        (without-interrupts
+          (let ((*gc-inhibit* t))
+            ,@body))
      ;; the test is racy, but it can err only on the overeager side
      (sb!kernel::maybe-handle-pending-gc)))
 

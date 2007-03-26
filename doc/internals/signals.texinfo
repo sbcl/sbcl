@@ -92,9 +92,36 @@ filling up the queue and then a gc hits and tries to send
 Signal handlers should automatically restore errno and fp
 state. Currently, this is not the case.
 
-Furthormore, while @code{arrange_return_to_lisp_function} exits, most
-signal handlers invoke unsafe functions without hesitation: gc and all
-lisp level handlers think nothing of it.
+@subsection POSIX -- Letter and Spirit
+
+POSIX restricts signal handlers to a use only a narrow subset of POSIX
+functions, and declares anything else to have undefined semantics.
+
+Apparently the real reason is that a signal handler is potentially
+interrupting a POSIX call: so the signal safety requirement is really
+a re-entrancy requirement. We can work around the letter of the
+standard by arranging to handle the interrupt when the signal handler
+returns (see: @code{arrange_return_to_lisp_function}.) This does,
+however, in no way protect us from the real issue of re-entrancy: even
+though we would no longer be in a signal handler, we might still be in
+the middle of an interrupted POSIX call.
+
+For some signals this appears to be a non-issue: @code{SIGSEGV} and
+other semi-synchronous signals are raised by our code for our code,
+and so we can be sure that we are not interrupting a POSIX call with
+any of them.
+
+For asynchronous signals like @code{SIGALARM} and @code{SIGINT} this
+is a real issue.
+
+The right thing to do in multithreaded builds would probably be to use
+POSIX semaphores (which are signal safe) to inform a separate handler
+thread about such asynchronous events. In single-threaded builds there
+does not seem to be any other option aside from generally blocking
+asynch signals and listening for them every once and a while at safe
+points. Neither of these is implemented as of SBCL 1.0.4.
+
+Currently all our handlers invoke unsafe functions without hesitation.
 
 @node Programming with signal handling in mind
 @section Programming with signal handling in mind

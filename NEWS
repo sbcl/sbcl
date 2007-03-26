@@ -1,4 +1,13 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.5 relative to sbcl-1.0.4:
+  * documentation: unwinding from asyncronous events has been
+    documented as unsafe.
+  * documentation: SB-SYS:WITHOUT-GCING has been documented as unsafe
+    in multithreaded application code.
+  * bug fix: GC deadlocks from asynchronous interrupts has been fixed
+    by disabling interrupts for the duration of any
+    SB-SYS:WITHOUT-GCING section.
+
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * new platform: experimental support for x86-64/darwin (MacOS).
   * incompatible change: the thread-safe (on most platforms) getaddrinfo

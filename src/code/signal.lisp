@@ -42,7 +42,11 @@
 
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc
-  "Execute BODY in a context impervious to interrupts."
+  "Execute BODY with all deferrable interrupts deferred. Deferrable interrupts
+include most blockable POSIX signals, and SB-THREAD:INTERRUPT-THREAD. Does not
+interfere with garbage collection, and unlike in many traditional Lisps using
+userspace threads, in SBCL WITHOUT-INTERRUPTS does not inhibit scheduling of
+other threads."
   (let ((name (gensym "WITHOUT-INTERRUPTS-BODY-")))
     `(flet ((,name () ,@body))
       (if *interrupts-enabled*
@@ -66,12 +70,16 @@
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc
   "Allow interrupts while executing BODY. As interrupts are normally allowed,
-  this is only useful inside a WITHOUT-INTERRUPTS."
+this is only useful inside a SB-SYS:WITHOUT-INTERRUPTS. Signals a runtime
+warning if used inside the dynamic countour of SB-SYS:WITHOUT-GCING."
   (let ((name (gensym)))
     `(flet ((,name () ,@body))
        (if *interrupts-enabled*
            (,name)
-           (let ((*interrupts-enabled* t))
-             (when *interrupt-pending*
-               (receive-pending-interrupt))
-             (,name))))))
+           (progn
+             (when sb!kernel:*gc-inhibit*
+               (warn "Re-enabling interrupts while GC is inhibited."))
+             (let ((*interrupts-enabled* t))
+               (when *interrupt-pending*
+                 (receive-pending-interrupt))
+               (,name)))))))
