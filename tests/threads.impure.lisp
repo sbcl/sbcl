@@ -17,7 +17,7 @@
 (use-package "ASSERTOID")
 
 (defun wait-for-threads (threads)
-  (mapc (lambda (thread) (sb-thread:join-thread thread :errorp nil)) threads)
+  (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
   (assert (not (some #'sb-thread:thread-alive-p threads))))
 
 (assert (eql 1 (length (list-all-threads))))
@@ -55,7 +55,6 @@
 (with-test (:name '(:join-thread :nlx :default))
   (let ((sym (gensym)))
     (assert (eq sym (join-thread (make-thread (lambda () (sb-ext:quit)))
-                                 :errorp nil
                                  :default sym)))))
 
 (with-test (:name '(:join-thread :nlx :error))

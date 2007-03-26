@@ -694,20 +694,18 @@ around and can be retrieved by JOIN-THREAD."
 (setf (sb!kernel:fdocumentation 'join-thread-error-thread 'function)
       "The thread that we failed to join.")
 
-(defun join-thread (thread &key (errorp t) default)
+(defun join-thread (thread &key (default nil defaultp))
   #!+sb-doc
   "Suspend current thread until THREAD exits. Returns the result
 values of the thread function. If the thread does not exit normally,
-return DEFAULT or signal JOIN-THREAD-ERROR depending on ERRORP. This
-function is experimental and it is likely to be changed in the
-future."
+return DEFAULT if given or else signal JOIN-THREAD-ERROR."
   (with-mutex ((thread-result-lock thread))
     (cond ((car (thread-result thread))
            (values-list (cdr (thread-result thread))))
-          (errorp
-           (error 'join-thread-error :thread thread))
+          (defaultp
+           default)
           (t
-           default))))
+           (error 'join-thread-error :thread thread)))))
 
 (defun destroy-thread (thread)
   #!+sb-doc

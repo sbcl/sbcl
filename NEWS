@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
+  * minor incompatible change: changed experimental JOIN-THREAD interface
   * documentation: unwinding from asyncronous events has been
     documented as unsafe.
   * documentation: SB-SYS:WITHOUT-GCING has been documented as unsafe
