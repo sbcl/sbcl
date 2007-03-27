@@ -9,21 +9,15 @@
 
 (in-package "SB!KERNEL")
 
-;;; the size of the chunks returned by RANDOM-CHUNK
-(def!constant random-chunk-length 32)
+;;; the size of the chunks returned from the fundamental random number
+;;; generator
+(def!constant n-random-chunk-bits 32)
+(def!constant most-positive-random-chunk
+  (1- (ash 1 n-random-chunk-bits)))
 
-;;; the amount that we overlap chunks by when building a large integer
-;;; to make up for the loss of randomness in the low bits
-(def!constant random-integer-overlap 3)
-
-;;; extra bits of randomness that we generate before taking the value MOD the
-;;; limit, to avoid loss of randomness near the limit
-(def!constant random-integer-extra-bits 10)
-
-;;; the largest fixnum we can compute from one chunk of bits
-(def!constant random-fixnum-max
-  (1- (ash 1 (- random-chunk-length random-integer-extra-bits))))
-
+;;; our implementation of the RANDOM-STATE type specified by ANSI CL
 (sb!xc:defstruct (random-state (:constructor %make-random-state)
-                               (:copier nil)) ; since shallow copy is wrong
+                               ;; Shallow copy would be wrong: we must
+                               ;; effectively COPY-SEQ the STATE slot.
+                               (:copier nil))
   (state (init-random-state) :type (simple-array (unsigned-byte 32) (627))))

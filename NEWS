@@ -6,13 +6,19 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * minor incompatible change: changed experimental JOIN-THREAD interface
   * documentation: the manual now lists reader and writer methods
     in class slot documentation sections. (thanks to Richard M Kreuter)
-  * documentation: unwinding from asyncronous events has been
+  * documentation: unwinding from asynchronous events has been
     documented as unsafe.
   * documentation: SB-SYS:WITHOUT-GCING has been documented as unsafe
     in multithreaded application code.
   * bug fix: GC deadlocks from asynchronous interrupts has been fixed
     by disabling interrupts for the duration of any
     SB-SYS:WITHOUT-GCING section.
+  * bug fix: RANDOM of large INTEGER is no longer slightly biased. (It 
+    used to be biased by as much as about 1/2000; many algorithms aren't 
+    sensitive to that, but Metropolis Monte Carlo algorithms are.) This 
+    involved a sizable rewrite, so if you think there's a new bug or 
+    performance problem in the code, you're probably right, please
+    report it.
 
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * new platform: experimental support for x86-64/darwin (MacOS).

@@ -514,6 +514,7 @@
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
  ("src/compiler/float-tran")
+ ("src/compiler/integer-tran")
  ("src/compiler/saptran")
  ("src/compiler/srctran")
  ("src/compiler/generic/vm-tran")
