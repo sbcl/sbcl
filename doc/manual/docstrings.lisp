@@ -711,10 +711,21 @@ followed another tabulation label or a tabulation body."
         (when slots
           (format *texinfo-output* "Slots:~%@itemize~%")
           (dolist (slot slots)
-            (format *texinfo-output* "@item ~(@code{~A} ~
-                                     ~@[--- initargs: @code{~{@w{~S}~^, ~}}~]~)~%~%"
+            (format *texinfo-output*
+                    "@item ~(@code{~A}~#[~:; --- ~]~
+                      ~:{~2*~@[~2:*~A~P: ~{@code{@w{~S}}~^, ~}~]~:^; ~}~)~%~%"
                     (slot-definition-name slot)
-                    (slot-definition-initargs slot))
+                    (remove
+                     nil
+                     (mapcar
+                      (lambda (name things)
+                        (if things
+                            (list name (length things) things)))
+                      '("initarg" "reader"  "writer")
+                      (list
+                       (slot-definition-initargs slot)
+                       (slot-definition-readers slot)
+                       (slot-definition-writers slot)))))
             ;; FIXME: Would be neater to handler as children
             (write-texinfo-string (docstring slot t)))
           (format *texinfo-output* "@end itemize~%~%"))))))

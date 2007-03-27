@@ -1,16 +1,15 @@
 (in-package :sb-bsd-sockets)
 
 (defclass host-ent ()
-  ;; Unfortunately the docstring generator can't currently create.
-  ((name :initarg :name :accessor host-ent-name
+  ((name :initarg :name :reader host-ent-name
          :documentation "The name of the host")
    ;; Deliberately not documented, since this isn't very useful,
    ;; and the data isn't available when using getaddrinfo(). Unfortunately
    ;; it is exported.
-   (aliases :initarg :aliases :accessor host-ent-aliases)
+   (aliases :initarg :aliases :reader host-ent-aliases)
    ;; presently always AF_INET. Not exported.
-   (address-type :initarg :type :accessor host-ent-address-type)
-   (addresses :initarg :addresses :accessor host-ent-addresses
+   (address-type :initarg :type :reader host-ent-address-type)
+   (addresses :initarg :addresses :reader host-ent-addresses
               :documentation "A list of addresses for this host."))
   (:documentation "This class represents the results of an address lookup."))
 
@@ -109,7 +108,7 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
                          ;; The same effective result can be multiple time
                          ;; in the list, with different socktypes. Only record
                          ;; each address once.
-                         (setf (host-ent-addresses host-ent)
+                         (setf (slot-value host-ent 'addresses)
                                (adjoin (naturalize-unsigned-byte-8-array address
                                                                          4)
                                        (host-ent-addresses host-ent)

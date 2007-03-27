@@ -1,6 +1,11 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
+  * incompatible change: removed writer methods for host-ent-name,
+    host-ent-addresses -- changing the values did not update the DNS
+    information anyway.
   * minor incompatible change: changed experimental JOIN-THREAD interface
+  * documentation: the manual now lists reader and writer methods
+    in class slot documentation sections. (thanks to Richard M Kreuter)
   * documentation: unwinding from asyncronous events has been
     documented as unsafe.
   * documentation: SB-SYS:WITHOUT-GCING has been documented as unsafe
