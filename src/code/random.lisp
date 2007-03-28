@@ -9,12 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-;;; the size of the chunks returned from the fundamental random number
-;;; generator
-(def!constant n-random-chunk-bits 32)
-(def!constant most-positive-random-chunk
-  (1- (ash 1 n-random-chunk-bits)))
-
 ;;; our implementation of the RANDOM-STATE type specified by ANSI CL
 (sb!xc:defstruct (random-state (:constructor %make-random-state)
                                ;; Shallow copy would be wrong: we must

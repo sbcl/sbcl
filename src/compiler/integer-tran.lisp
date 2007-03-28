@@ -15,8 +15,8 @@
 ;;;; RANDOM in various integer cases
 
 (deftransform random ((limit &optional state)
-                      ((integer 1 #.(expt 2 n-random-chunk-bits)) &optional *))
-  "optimize to single-RANDOM-CHUNK operations"
+                      ((integer 1 #.(ash 1 sb!vm:n-word-bits)) &optional *))
+  "transform to a sample no wider than CPU word"
   (let ((type (lvar-type limit)))
     (if (numeric-type-p type)
         (let ((limit-high (numeric-type-high (lvar-type limit))))
@@ -35,7 +35,7 @@
 (deftransform %inclusive-random-integer
     ((inclusive-limit state) (* *) * :policy (> speed space))
   ;; By the way, some natural special cases (notably when the user is
-  ;; asking for a full RANDOM-CHUNK) could be expanded to much simpler
+  ;; asking for a full %RANDOM-WORD) could be expanded to much simpler
   ;; code (with no test and loop) if someone finds it important.
   '(let ((n-bits (integer-length inclusive-limit)))
     (%inclusive-random-integer-accept-reject (%random-bits n-bits state)

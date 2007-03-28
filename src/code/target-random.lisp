@@ -102,7 +102,8 @@
 
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
-#!-sb-fluid (declaim (inline random-chunk))
+(defconstant n-random-mt19937-bits 32)
+(declaim (inline %random32))
 ;;; portable implementation
 (defconstant mt19937-n 624)
 (defconstant mt19937-m 397)
@@ -138,7 +139,7 @@
                   (ash y -1) (aref state (logand y 1)))))
   (values))
 #!-x86
-(defun random-chunk (state)
+(defun %random32 (state)
   (declare (type random-state state))
   (let* ((state (random-state-state state))
          (k (aref state 2)))
@@ -161,9 +162,29 @@
 ;;; My inclination is to get rid of the nonportable implementation
 ;;; unless the performance difference is just enormous.
 #!+x86
-(defun random-chunk (state)
+(defun %random32 (state)
   (declare (type random-state state))
   (sb!vm::random-mt19937 (random-state-state state)))
+
+(declaim (inline %random-word))
+(defun %random-word (state)
+  ;; KLUDGE: This #.(ECASE ...) is not the most flexible and elegant
+  ;; construct one could imagine. It is intended as a quick fix to stand
+  ;; in for The Right Thing which can't be coded so quickly.
+  ;;
+  ;; The Right Thing: The Mersenne Twister has been generalized to 64
+  ;; bits, and seems likely to be generalized to any future common CPU
+  ;; word width as well. Thus, it should be straightforward to
+  ;; implement this as "Return one sample from the MT variant
+  ;; corresponding to SB!VM:N-WORD-BITS."
+  ;;
+  ;; Meanwhile: Mock that up by pasting together as many samples from
+  ;; the 32-bit Mersenne Twister as necessary.
+  #.(ecase sb!vm:n-word-bits
+      (32 '(%random32 state))
+      (64 '(logior
+            (%random32 state)
+            (ash (%random32 state) 32)))))
 
 ;;; Handle the single or double float case of RANDOM. We generate a
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
@@ -176,10 +197,16 @@
 (defun %random-single-float (arg state)
   (declare (type (single-float (0f0)) arg)
            (type random-state state))
+  ;; KLUDGE: The hardwired-to-32 hackery here could be replaced by a
+  ;; call to %RANDOM-BITS if there were sufficiently smart
+  ;; DEFTRANSFORMs for it, but in sbcl-1.0.4.epsilon it looks as
+  ;; though it would be a performance disaster.
+  (aver (<= sb!vm:single-float-digits 32))
   (* arg
      (- (make-single-float
-         (dpb (ash (random-chunk state)
-                   (- sb!vm:single-float-digits n-random-chunk-bits))
+         (dpb (ash
+               (%random32 state)
+               (- sb!vm:single-float-digits 32))
               sb!vm:single-float-significand-byte
               (single-float-bits 1.0)))
         1.0)))
@@ -187,25 +214,21 @@
                           (double-float 0d0))
                 %random-double-float))
 
-;;; 32-bit version
-#!+nil
-(defun %random-double-float (arg state)
-  (declare (type (double-float (0d0)) arg)
-           (type random-state state))
-  (* (float (random-chunk state) 1d0) (/ 1d0 (expt 2 32))))
-
 ;;; 53-bit version
 #!-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
+  ;; KLUDGE: As in %RANDOM-SIMNGLE-FLOAT, as of sbcl-1.0.4.epsilon
+  ;; calling %RANDOM-BITS doesn't look reasonable, so we bang bits.
+  (aver (<= sb!vm:single-float-digits 32))
   (* arg
      (- (sb!impl::make-double-float
-         (dpb (ash (random-chunk state)
-                   (- sb!vm:double-float-digits n-random-chunk-bits 32))
+         (dpb (ash (%random32 state)
+                   (- sb!vm:double-float-digits 64))
               sb!vm:double-float-significand-byte
               (sb!impl::double-float-high-bits 1d0))
-         (random-chunk state))
+         (%random32 state))
         1d0)))
 
 ;;; using a faster inline VOP
@@ -217,13 +240,13 @@
     (* arg
        (- (sb!impl::make-double-float
            (dpb (ash (sb!vm::random-mt19937 state-vector)
-                     (- sb!vm:double-float-digits n-random-chunk-bits
+                     (- sb!vm:double-float-digits
+                        n-random-mt19937-bits
                         sb!vm:n-word-bits))
                 sb!vm:double-float-significand-byte
                 (sb!impl::double-float-high-bits 1d0))
            (sb!vm::random-mt19937 state-vector))
           1d0))))
-
 
 ;;;; random integers
 
@@ -276,9 +299,9 @@
     until (<= ,raw-mersenne-output ,inclusive-limit-once)
     finally (return ,raw-mersenne-output))))
 
-;;; an UNSIGNED-BYTE of N-CHUNKS chunks sampled from the Mersenne twister
-(declaim (inline %random-chunks))
-(defun %random-chunks (n-chunks state)
+;;; an UNSIGNED-BYTE of N-WORDS words sampled from the Mersenne twister
+(declaim (inline %random-words))
+(defun %random-words (n-words state)
   ;; KLUDGE: This algorithm will cons O(N^2) words when constructing
   ;; an N-word result. To do better should be fundamentally easy, we
   ;; just need to do some low-level hack preallocating the bignum and
@@ -295,23 +318,24 @@
   ;; the previous RNG author didn't have some subtle reason to need
   ;; RANDOM-INTEGER-OVERLAP that we know not of, we just concatenate
   ;; chunks.
-  (loop repeat n-chunks
-        for result = 0 then (logior (ash result n-random-chunk-bits)
-                                    (random-chunk state))
+  (loop repeat n-words
+        for result = 0 then (logior (ash result sb!vm:n-word-bits)
+                                    (%random-word state))
         finally (return result)))
 
 ;;; an UNSIGNED-BYTE of N-BITS bits sampled from the Mersenne twister
 (declaim (inline %random-bits))
 (defun %random-bits (n-bits state)
-  (multiple-value-bind (n-full-chunks n-extra-bits)
-      (floor n-bits n-random-chunk-bits)
-    (let ((full-chunks (%random-chunks n-full-chunks state)))
+  (multiple-value-bind (n-full-words n-extra-bits)
+      (floor n-bits sb!vm:n-word-bits)
+    (let ((full-chunks (%random-words n-full-words state)))
       (if (zerop n-extra-bits)
           full-chunks
           (logior full-chunks
-                  (ash (logand (random-chunk state)
+                  (ash (logand (%random-word state)
                                (1- (ash 1 n-extra-bits)))
-                       (* n-full-chunks n-random-chunk-bits)))))))
+                       (* n-full-words
+                          sb!vm:n-word-bits)))))))
 
 ;;; the guts of (RANDOM (1+ INCLUSIVE-LIMIT))
 (defun %inclusive-random-integer (inclusive-limit state)
@@ -328,12 +352,11 @@
 (declaim (maybe-inline %inclusive-random-fixnum))
 (defun %inclusive-random-fixnum (inclusive-limit state)
   (declare (type (and fixnum unsigned-byte) inclusive-limit))
-  (aver (<= inclusive-limit most-positive-random-chunk))
   (let (;; If this calculation needs to be optimized further, a good
         ;; start might be a DEFTRANSFORM which picks off the case of
         ;; constant LIMIT and precomputes the MASK at compile time.
         (mask (%inclusive-random-integer-mask inclusive-limit)))
-    (%inclusive-random-integer-accept-reject (logand (random-chunk state) mask)
+    (%inclusive-random-integer-accept-reject (logand (%random-word state) mask)
                                              inclusive-limit)))
 
 ;;;; outer, dynamically-typed interface
