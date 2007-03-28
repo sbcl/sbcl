@@ -69,7 +69,7 @@
 
 (defun make-random-state (&optional state)
   #!+sb-doc
-  "Make a RANDOM-STATE object. If STATE is not supplied, return a copy
+  "Make a random state object. If STATE is not supplied, return a copy
   of the default random state. If STATE is a random state, then return a
   copy of it. If STATE is T then return a random state generated from
   the universal time."
@@ -102,8 +102,7 @@
 
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
-(defconstant n-random-mt19937-bits 32)
-(declaim (inline %random32))
+#!-sb-fluid (declaim (inline random-chunk))
 ;;; portable implementation
 (defconstant mt19937-n 624)
 (defconstant mt19937-m 397)
@@ -139,7 +138,7 @@
                   (ash y -1) (aref state (logand y 1)))))
   (values))
 #!-x86
-(defun %random32 (state)
+(defun random-chunk (state)
   (declare (type random-state state))
   (let* ((state (random-state-state state))
          (k (aref state 2)))
@@ -162,29 +161,16 @@
 ;;; My inclination is to get rid of the nonportable implementation
 ;;; unless the performance difference is just enormous.
 #!+x86
-(defun %random32 (state)
+(defun random-chunk (state)
   (declare (type random-state state))
   (sb!vm::random-mt19937 (random-state-state state)))
 
-(declaim (inline %random-word))
-(defun %random-word (state)
-  ;; KLUDGE: This #.(ECASE ...) is not the most flexible and elegant
-  ;; construct one could imagine. It is intended as a quick fix to stand
-  ;; in for The Right Thing which can't be coded so quickly.
-  ;;
-  ;; The Right Thing: The Mersenne Twister has been generalized to 64
-  ;; bits, and seems likely to be generalized to any future common CPU
-  ;; word width as well. Thus, it should be straightforward to
-  ;; implement this as "Return one sample from the MT variant
-  ;; corresponding to SB!VM:N-WORD-BITS."
-  ;;
-  ;; Meanwhile: Mock that up by pasting together as many samples from
-  ;; the 32-bit Mersenne Twister as necessary.
-  #.(ecase sb!vm:n-word-bits
-      (32 '(%random32 state))
-      (64 '(logior
-            (%random32 state)
-            (ash (%random32 state) 32)))))
+#!-sb-fluid (declaim (inline big-random-chunk))
+(defun big-random-chunk (state)
+  (declare (type random-state state))
+  (logand (1- (expt 2 64))
+          (logior (ash (random-chunk state) 32)
+                  (random-chunk state))))
 
 ;;; Handle the single or double float case of RANDOM. We generate a
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
@@ -197,16 +183,10 @@
 (defun %random-single-float (arg state)
   (declare (type (single-float (0f0)) arg)
            (type random-state state))
-  ;; KLUDGE: The hardwired-to-32 hackery here could be replaced by a
-  ;; call to %RANDOM-BITS if there were sufficiently smart
-  ;; DEFTRANSFORMs for it, but in sbcl-1.0.4.epsilon it looks as
-  ;; though it would be a performance disaster.
-  (aver (<= sb!vm:single-float-digits 32))
   (* arg
      (- (make-single-float
-         (dpb (ash
-               (%random32 state)
-               (- sb!vm:single-float-digits 32))
+         (dpb (ash (random-chunk state)
+                   (- sb!vm:single-float-digits random-chunk-length))
               sb!vm:single-float-significand-byte
               (single-float-bits 1.0)))
         1.0)))
@@ -214,21 +194,25 @@
                           (double-float 0d0))
                 %random-double-float))
 
+;;; 32-bit version
+#!+nil
+(defun %random-double-float (arg state)
+  (declare (type (double-float (0d0)) arg)
+           (type random-state state))
+  (* (float (random-chunk state) 1d0) (/ 1d0 (expt 2 32))))
+
 ;;; 53-bit version
 #!-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
-  ;; KLUDGE: As in %RANDOM-SIMNGLE-FLOAT, as of sbcl-1.0.4.epsilon
-  ;; calling %RANDOM-BITS doesn't look reasonable, so we bang bits.
-  (aver (<= sb!vm:single-float-digits 32))
   (* arg
      (- (sb!impl::make-double-float
-         (dpb (ash (%random32 state)
-                   (- sb!vm:double-float-digits 64))
+         (dpb (ash (random-chunk state)
+                   (- sb!vm:double-float-digits random-chunk-length 32))
               sb!vm:double-float-significand-byte
               (sb!impl::double-float-high-bits 1d0))
-         (%random32 state))
+         (random-chunk state))
         1d0)))
 
 ;;; using a faster inline VOP
@@ -240,140 +224,34 @@
     (* arg
        (- (sb!impl::make-double-float
            (dpb (ash (sb!vm::random-mt19937 state-vector)
-                     (- sb!vm:double-float-digits
-                        n-random-mt19937-bits
+                     (- sb!vm:double-float-digits random-chunk-length
                         sb!vm:n-word-bits))
                 sb!vm:double-float-significand-byte
                 (sb!impl::double-float-high-bits 1d0))
            (sb!vm::random-mt19937 state-vector))
           1d0))))
+
 
 ;;;; random integers
 
-;;; a bitmask M wide enough that (= (LOGAND INCLUSIVE-LIMIT M) INCLUSIVE-LIMIT)
-(declaim (inline %inclusive-random-integer-mask))
-(defun %inclusive-random-integer-mask (inclusive-limit)
-  (1- (ash 1 (integer-length inclusive-limit))))
-
-;;; Transform a uniform sample from an at-least-as-large range into a
-;;; random sample in [0,INCLUSIVE-LIMIT] range by throwing away
-;;; too-big samples.
-;;;
-;;; Up through sbcl-1.0.4, the (RANDOM INTEGER) worked by taking (MOD
-;;; RAW-MERSENNE-OUTPUT INTEGER). That introduces enough bias that it
-;;; is unsuitable for some calculations (like the Metropolis Monte
-;;; Carlo simulations that I, WHN, worked on in grad school): in the
-;;; sbcl-1.0.4, the expectation value of a sample was (in the worst
-;;; part of the range) more than 1.0001 times the ideal expectation
-;;; value. Perhaps that was even ANSI-conformant, because ANSI says only
-;;;   An approximately uniform choice distribution is used. If
-;;;   LIMIT is an integer, each of the possible results occurs
-;;;   with (approximate) probability 1/LIMIT.
-;;; But I (WHN again) said "yuck," so these days we try to get a
-;;; truly uniform distribution by translating RAW-MERSENNE-OUTPUT to
-;;; our output using the second method recommended by
-;;; <http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/efaq.html>:
-;;;   In the rare case that the rounding-off error becomes a problem,
-;;;   obtain minimum integer n such that N<=2^n, generate integer
-;;;   random numbers, take the most significant n bits, and discard
-;;;   those more than or equal to N.
-;;; (The first method recommended there differs from the sbcl-1.0.4
-;;; method: the recommended method gives slightly different weights
-;;; to different integers, but distributes the overweighted integers
-;;; evenly across the range of outputs so that any skew would be
-;;; of order (/ MOST-POSITIVE-MACHINE-WORD), rather than the (/ 10000)
-;;; or so achieved by sbcl-1.0.4. That skew would probably be
-;;; acceptable --- it seems to be exactly the kind of deviation that
-;;; might have been anticipated in the ANSI CL standard. However, that
-;;; recommended calculation involves multiplication and division of
-;;; two-machine-word bignums, which is hard for us to do efficiently
-;;; here. Without special low-level hacking to support such short
-;;; bignums without consing, the accept-reject solution is not only
-;;; more exact, but also likely more efficient.)
-(defmacro %inclusive-random-integer-accept-reject (raw-mersenne-output-expr
-                                                   inclusive-limit)
-  (with-unique-names (raw-mersenne-output inclusive-limit-once)
-  `(loop
-    with ,inclusive-limit-once = ,inclusive-limit
-    for ,raw-mersenne-output = ,raw-mersenne-output-expr
-    until (<= ,raw-mersenne-output ,inclusive-limit-once)
-    finally (return ,raw-mersenne-output))))
-
-;;; an UNSIGNED-BYTE of N-WORDS words sampled from the Mersenne twister
-(declaim (inline %random-words))
-(defun %random-words (n-words state)
-  ;; KLUDGE: This algorithm will cons O(N^2) words when constructing
-  ;; an N-word result. To do better should be fundamentally easy, we
-  ;; just need to do some low-level hack preallocating the bignum and
-  ;; writing its words one by one.
-  ;;
-  ;; Note: The old sbcl-1.0.4 code did its analogous operation using a
-  ;; mysterious RANDOM-INTEGER-OVERLAP parameter, "the amount that we
-  ;; overlap chunks by when building a large integer to make up for
-  ;; the loss of randomness in the low bits." No such thing is called
-  ;; for on
-  ;;   <http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/efaq.html>:
-  ;; they say there that it's OK just to concatenate words of twister
-  ;; output with no overlap. Thus, crossing our fingers and hoping that
-  ;; the previous RNG author didn't have some subtle reason to need
-  ;; RANDOM-INTEGER-OVERLAP that we know not of, we just concatenate
-  ;; chunks.
-  (loop repeat n-words
-        for result = 0 then (logior (ash result sb!vm:n-word-bits)
-                                    (%random-word state))
-        finally (return result)))
-
-;;; an UNSIGNED-BYTE of N-BITS bits sampled from the Mersenne twister
-(declaim (inline %random-bits))
-(defun %random-bits (n-bits state)
-  (multiple-value-bind (n-full-words n-extra-bits)
-      (floor n-bits sb!vm:n-word-bits)
-    (let ((full-chunks (%random-words n-full-words state)))
-      (if (zerop n-extra-bits)
-          full-chunks
-          (logior full-chunks
-                  (ash (logand (%random-word state)
-                               (1- (ash 1 n-extra-bits)))
-                       (* n-full-words
-                          sb!vm:n-word-bits)))))))
-
-;;; the guts of (RANDOM (1+ INCLUSIVE-LIMIT))
-(defun %inclusive-random-integer (inclusive-limit state)
-  (declare (optimize speed (space 1))) ; to ensure DEFTRANSFORM is enabled
-  (%inclusive-random-integer inclusive-limit state))
-
-;;; the guts of RANDOM for the known-to-return-FIXNUM case
-;;;
-;;; We use INCLUSIVE-LIMIT instead of the (exclusive) LIMIT of RANDOM,
-;;; because we want it to be a FIXNUM even for the possibly-common
-;;; case of (RANDOM (1+ MOST-POSITIVE-FIXNUM)). (That case is what
-;;; one might use for generating random hash values, e.g.)
-;;; It also turns out to be just what's needed for INTEGER-LENGTH.
-(declaim (maybe-inline %inclusive-random-fixnum))
-(defun %inclusive-random-fixnum (inclusive-limit state)
-  (declare (type (and fixnum unsigned-byte) inclusive-limit))
-  (let (;; If this calculation needs to be optimized further, a good
-        ;; start might be a DEFTRANSFORM which picks off the case of
-        ;; constant LIMIT and precomputes the MASK at compile time.
-        (mask (%inclusive-random-integer-mask inclusive-limit)))
-    (%inclusive-random-integer-accept-reject (logand (%random-word state) mask)
-                                             inclusive-limit)))
-
-;;;; outer, dynamically-typed interface
+(defun %random-integer (arg state)
+  (declare (type (integer 1) arg) (type random-state state))
+  (let ((shift (- random-chunk-length random-integer-overlap)))
+    (do ((bits (random-chunk state)
+               (logxor (ash bits shift) (random-chunk state)))
+         (count (+ (integer-length arg)
+                   (- random-integer-extra-bits shift))
+                (- count shift)))
+        ((minusp count)
+         (rem bits arg))
+      (declare (fixnum count)))))
 
 (defun random (arg &optional (state *random-state*))
-  (declare (inline %random-single-float
-                   %random-double-float
+  (declare (inline %random-single-float %random-double-float
                    #!+long-float %random-long-float))
   (cond
-    ((and (fixnump arg) (plusp arg))
-     (locally
-         ;; The choice to inline this very common case of
-         ;; %INCLUSIVE-RANDOM-FIXNUM and not the less-common call
-         ;; below was just a guess (by WHN 2007-03-27), not based on
-         ;; benchmarking or anything.
-         (declare (inline %inclusive-random-fixnum))
-       (%inclusive-random-fixnum (1- arg) state)))
+    ((and (fixnump arg) (<= arg random-fixnum-max) (> arg 0))
+     (rem (random-chunk state) arg))
     ((and (typep arg 'single-float) (> arg 0.0f0))
      (%random-single-float arg state))
     ((and (typep arg 'double-float) (> arg 0.0d0))
@@ -381,10 +259,8 @@
     #!+long-float
     ((and (typep arg 'long-float) (> arg 0.0l0))
      (%random-long-float arg state))
-    ((and (integerp arg) (plusp arg))
-     (if (= arg (1+ most-positive-fixnum))
-         (%inclusive-random-fixnum most-positive-fixnum state)
-         (%inclusive-random-integer (1- arg) state)))
+    ((and (integerp arg) (> arg 0))
+     (%random-integer arg state))
     (t
      (error 'simple-type-error
             :expected-type '(or (integer 1) (float (0))) :datum arg
