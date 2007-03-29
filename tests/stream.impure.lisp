@@ -412,25 +412,28 @@
         (assert (subtypep (type-error-expected-type condition)
                           '(unsigned-byte 8)))))))
 
-;;; writing looong lines
-(defun write-n-chars (n stream)
-  (format t "~&/writing ~D chars on a single line~%" n)
-  (finish-output t)
-  (loop repeat n
-     do (write-char #\x stream))
-  (terpri stream)
-  n)
+;;; writing looong lines. takes way too long and way too much space
+;;; to test on 64 bit platforms
+#-#.(cl:if (cl:= sb-vm:n-word-bits 64) '(and) '(or))
+(progn
+  (defun write-n-chars (n stream)
+    (format t "~&/writing ~D chars on a single line~%" n)
+    (finish-output t)
+    (loop repeat n
+       do (write-char #\x stream))
+    (terpri stream)
+    n)
 
-(let ((test "long-lines-write-test.tmp"))
-  (unwind-protect
-       (with-open-file (f test
-                          :direction :output
-                          :external-format :ascii
-                          :element-type 'character
-                          :if-does-not-exist :create
-                          :if-exists :supersede)
+  (let ((test "long-lines-write-test.tmp"))
+    (unwind-protect
+         (with-open-file (f test
+                            :direction :output
+                            :external-format :ascii
+                            :element-type 'character
+                            :if-does-not-exist :create
+                            :if-exists :supersede)
          (write-n-chars (+ most-positive-fixnum 7) f))
-    (when (probe-file test)
-      (delete-file test))))
+      (when (probe-file test)
+        (delete-file test)))))
 
 ;;; success
