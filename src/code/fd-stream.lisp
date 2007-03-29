@@ -77,8 +77,9 @@
   ;; sources where input and output aren't related).  non-NIL means
   ;; don't clear input buffer.
   (dual-channel-p nil)
-  ;; character position (if known)
-  (char-pos nil :type (or index null))
+  ;; character position if known -- this may run into bignums, but
+  ;; we probably should flip it into null then for efficiency's sake...
+  (char-pos nil :type (or unsigned-byte null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
   (listen nil :type (member nil t :eof))
 
