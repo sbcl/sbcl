@@ -2190,3 +2190,14 @@
 
 (compile nil '(lambda (x) (declare (fixnum x))
                (logand most-positive-fixnum (* x most-positive-fixnum))))
+
+;;; bug 256.b
+(assert (let (warned-p)
+            (handler-bind ((warning (lambda (w) (setf warned-p t))))
+              (compile nil
+                         '(lambda (x)
+                           (list (let ((y (the real x)))
+                                   (unless (floatp y) (error ""))
+                                   y)
+                                 (integer-length x)))))
+            warned-p))

@@ -84,12 +84,6 @@ WORKAROUND:
 
   d: (fixed in 0.8.1.5)
 
-27:
-  Sometimes (SB-EXT:QUIT) fails with 
-	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
-	Process inferior-lisp exited abnormally with code 1
-  I haven't noticed a repeatable case of this yet.
-
 33:
   And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.
@@ -173,6 +167,9 @@ WORKAROUND:
   isn't allowed. So it's not clear this is a bug after all. (See the
   e-mail on cmucl-help@cons.org on 2001-01-16 and 2001-01-17 from WHN
   and Pierre Mai.)
+
+  (Actually this has changed changed since, and types as above are
+  now supported. This may be a bug.)
 
 83:
   RANDOM-INTEGER-EXTRA-BITS=10 may not be large enough for the RANDOM
@@ -732,11 +729,7 @@ WORKAROUND:
 
   a. (lambda () (svref (make-array 8 :adjustable t) 1))
 
-  b. (lambda (x)
-       (list (let ((y (the real x)))
-               (unless (floatp y) (error ""))
-               y)
-             (integer-length x)))
+  b. (fixed at some point before 1.0.4.10)
 
   c. (lambda (x)
        (declare (optimize (debug 0)))
@@ -1475,18 +1468,6 @@ WORKAROUND:
   the class redefinition will fail when SB-PCL::REMOVE-READER-METHOD
   tries to find and remove a method with an incompatible lambda list
   from the unrelated generic function.
-
-381: incautious calls to EQUAL in fasl dumping
-  Compiling 
-    (frob #(#1=(a #1#)))
-    (frob #(#1=(b #1#)))
-    (frob #(#1=(a #1#)))
-  in sbcl-0.9.0 causes CONTROL-STACK-EXHAUSTED. My (WHN) impression 
-  is that this follows from the use of (MAKE-HASH-TABLE :TEST 'EQUAL)
-  to detect sharing, in which case fixing it might require either 
-  getting less ambitious about detecting shared list structure, or 
-  implementing the moral equivalent of EQUAL hash tables in a 
-  cycle-tolerant way.
 
 382: externalization unexpectedly changes array simplicity
   COMPILE-FILE and LOAD
