@@ -87,18 +87,21 @@
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc
-  "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body)
-   provides a method of manually looping over the elements of a hash-table.
-   FUNCTION is bound to a generator-macro that, within the scope of the
-   invocation, returns one or three values. The first value tells whether
-   any objects remain in the hash table. When the first value is non-NIL,
-   the second and third values are the key and the value of the next object."
+  "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body) 
+
+Provides a method of manually looping over the elements of a hash-table.
+FUNCTION is bound to a generator-macro that, within the scope of the
+invocation, returns one or three values. The first value tells whether any
+objects remain in the hash table. When the first value is non-NIL, the second
+and third values are the key and the value of the next object."
+  ;; This essentially duplicates MAPHASH, so any changes here should
+  ;; be reflected there as well.
   (let ((n-function (gensym "WITH-HASH-TABLE-ITERATOR-")))
     `(let ((,n-function
             (let* ((table ,hash-table)
                    (length (length (hash-table-next-vector table)))
                    (index 1))
-              (declare (type (mod #.(floor most-positive-fixnum 2)) index))
+              (declare (type index/2 index))
               (labels
                   ((,function ()
                      ;; (We grab the table again on each iteration just in

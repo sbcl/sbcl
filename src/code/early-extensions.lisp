@@ -30,6 +30,10 @@
 ;;; bound because ANSI specifies it as an exclusive bound.)
 (def!type index () `(integer 0 (,sb!xc:array-dimension-limit)))
 
+;;; like INDEX, but only up to half the maximum. Used by hash-table
+;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
+(def!type index/2 () `(integer 0 (,(floor sb!xc:array-dimension-limit 2))))
+
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the

@@ -323,6 +323,7 @@
     ;; the chains are first to last.
     (do ((i (1- new-size) (1- i)))
         ((zerop i))
+      (declare (type index/2 i))
       (let ((key (aref new-kv-vector (* 2 i)))
             (value (aref new-kv-vector (1+ (* 2 i)))))
         (cond ((and (eq key +empty-ht-slot+)
@@ -395,6 +396,7 @@
       (setf (aref index-vector i) 0))
     (do ((i (1- size) (1- i)))
         ((zerop i))
+      (declare (type index/2 i))
       (let ((key (aref kv-vector (* 2 i)))
             (value (aref kv-vector (1+ (* 2 i)))))
         (cond ((and (eq key +empty-ht-slot+)
@@ -433,7 +435,7 @@
          (length (length index-vector)))
     (do ((next (hash-table-needing-rehash table)))
         ((zerop next))
-      (declare (type index next))
+      (declare (type index/2 next))
       (let* ((key (aref kv-vector (* 2 next)))
              (hashing (pointer-hash key))
              (index (rem hashing length))
@@ -495,13 +497,13 @@
            (if (or eq-based (not hash-vector))
                (do ((next next (aref next-vector next)))
                    ((zerop next) (values default nil))
-                 (declare (type index next))
+                 (declare (type index/2 next))
                  (when (eq key (aref table (* 2 next)))
                    (setf (hash-table-cache hash-table) (* 2 next))
                    (return (values (aref table (1+ (* 2 next))) t))))
              (do ((next next (aref next-vector next)))
                  ((zerop next) (values default nil))
-               (declare (type index next))
+               (declare (type index/2 next))
                (when (and (= hashing (aref hash-vector next))
                           (funcall test-fun key (aref table (* 2 next))))
                  ;; Found.
@@ -549,7 +551,7 @@
                 (next-vector (hash-table-next-vector hash-table))
                 (hash-vector (hash-table-hash-vector hash-table))
                 (test-fun (hash-table-test-fun hash-table)))
-           (declare (type index index))
+           (declare (type index index next))
            (when (hash-table-weakness hash-table)
              (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
            (cond ((or eq-based (not hash-vector))
@@ -560,7 +562,7 @@
                   ;; Search next-vector chain for a matching key.
                   (do ((next next (aref next-vector next)))
                       ((zerop next))
-                    (declare (type index next))
+                    (declare (type index/2 next))
                     (when (eq key (aref kv-vector (* 2 next)))
                       ;; Found, just replace the value.
                       (setf (hash-table-cache hash-table) (* 2 next))
@@ -570,7 +572,7 @@
                   ;; Search next-vector chain for a matching key.
                   (do ((next next (aref next-vector next)))
                       ((zerop next))
-                    (declare (type index next))
+                    (declare (type index/2 next))
                     (when (and (= hashing (aref hash-vector next))
                                (funcall test-fun key
                                         (aref kv-vector (* 2 next))))
@@ -581,6 +583,7 @@
 
            ;; Pop a KV slot off the free list
            (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
+             (declare (type index/2 free-kv-slot))
              ;; Double-check for overflow.
              (aver (not (zerop free-kv-slot)))
              (setf (hash-table-next-free-kv hash-table)
@@ -633,8 +636,10 @@
             (next-vector (hash-table-next-vector hash-table))
             (hash-vector (hash-table-hash-vector hash-table))
             (test-fun (hash-table-test-fun hash-table)))
-       (declare (type index index next))
+       (declare (type index index)
+                (type index/2 next))
        (flet ((clear-slot (chain-vector prior-slot-location slot-location)
+                (declare (type index/2 slot-location))
                 ;; Mark slot as empty.
                 (setf (aref table (* 2 slot-location)) +empty-ht-slot+
                       (aref table (1+ (* 2 slot-location))) +empty-ht-slot+)
@@ -671,7 +676,7 @@
                 (do ((prior next next)
                      (next (aref next-vector next) (aref next-vector next)))
                     ((zerop next) nil)
-                  (declare (type index next))
+                  (declare (type index/2 next))
                   (when (and (= hashing (aref hash-vector next))
                              (funcall test-fun key (aref table (* 2 next))))
                     (return-from remhash
@@ -721,14 +726,16 @@
 (declaim (inline maphash))
 (defun maphash (function-designator hash-table)
   #!+sb-doc
-  "For each entry in HASH-TABLE, call the designated two-argument function
-   on the key and value of the entry. Return NIL."
+  "For each entry in HASH-TABLE, call the designated two-argument function on
+the key and value of the entry. Return NIL."
+  ;; This essentially duplicates WITH-HASH-TABLE-ITERATOR, so
+  ;; any changes here should be reflected there as well.
   (let ((fun (%coerce-callable-to-fun function-designator))
         (size (length (hash-table-next-vector hash-table))))
     (declare (type function fun))
     (do ((i 1 (1+ i)))
         ((>= i size))
-      (declare (type index i))
+      (declare (type index/2 i))
       (let* ((kv-vector (hash-table-table hash-table))
              (key (aref kv-vector (* 2 i)))
              (value (aref kv-vector (1+ (* 2 i)))))
