@@ -25,7 +25,7 @@
 #define INSN_LEN sizeof(unsigned int)
 
 void
-arch_init()
+arch_init(void)
 {
     return;
 }
@@ -463,7 +463,7 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
 }
 
 void
-arch_install_interrupt_handlers()
+arch_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
     undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);
