@@ -351,7 +351,12 @@ static void brief_list(lispobj obj)
 
 static void print_unknown(lispobj obj)
 {
-    printf("unknown object: %p", obj);
+    printf("unknown object: %p", (void *)obj);
+}
+
+static void print_unknown(lispobj obj)
+{
+  printf("unknown object: %p", (void *)obj);
 }
 
 static void print_list(lispobj obj)

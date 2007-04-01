@@ -51,4 +51,13 @@ extern unsigned int * single_stepping;
 extern void restore_breakpoint_from_single_step(os_context_t * context);
 #endif
 
+extern void arch_handle_breakpoint(os_context_t* context);
+extern void arch_handle_fun_end_breakpoint(os_context_t *context);
+#ifdef trap_AfterBreakpoint
+extern void arch_handle_after_breakpoint(os_context_t *context);
+#endif
+#ifdef trap_SingleStepAround
+extern void arch_handle_single_step_trap(os_context_t *context, int trap);
+#endif
+
 #endif /* __ARCH_H__ */

@@ -124,7 +124,7 @@ static long compute_offset(os_context_t *context, lispobj code)
     }
 }
 
-void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
+void handle_breakpoint(os_context_t *context)
 {
     lispobj code, context_sap;
 
@@ -147,8 +147,7 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
     undo_fake_foreign_function_call(context);
 }
 
-void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
-                                os_context_t *context)
+void *handle_fun_end_breakpoint(os_context_t *context)
 {
     lispobj code, context_sap, lra;
     struct code *codeptr;

@@ -207,6 +207,30 @@ static int pseudo_atomic_trap_p(os_context_t *context)
     return result;
 }
 
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+    handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
+    *os_context_npc_addr(context) = *os_context_pc_addr(context) + 4;
+}
+
+void
+arch_handle_after_breakpoint(os_context_t *context)
+{
+    *skipped_break_addr = trap_Breakpoint;
+    os_flush_icache(skipped_break_addr, sizeof(unsigned int));
+    skipped_break_addr = NULL;
+    *(unsigned long *) os_context_pc_addr(context) = displaced_after_inst;
+    /* context->sigmask = orig_sigmask; */
+    os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
+}
+
 static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
@@ -226,44 +250,8 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 
         inst = *pc;
         trap = inst & 0x3fffff;
-
-        switch (trap) {
-        case trap_PendingInterrupt:
-            arch_skip_instruction(context);
-            interrupt_handle_pending(context);
-            break;
-
-        case trap_Halt:
-            fake_foreign_function_call(context);
-            lose("%%primitive halt called; the party is over.\n");
-
-        case trap_Error:
-        case trap_Cerror:
-            interrupt_internal_error(signal, siginfo, context, trap == trap_Cerror);
-            break;
-
-        case trap_Breakpoint:
-            handle_breakpoint(signal, siginfo, context);
-            break;
-
-        case trap_FunEndBreakpoint:
-            *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(signal, siginfo, context);
-            *os_context_npc_addr(context) = *os_context_pc_addr(context) + 4;
-            break;
-
-        case trap_AfterBreakpoint:
-            *skipped_break_addr = trap_Breakpoint;
-            os_flush_icache(skipped_break_addr, sizeof(unsigned int));
-            skipped_break_addr = NULL;
-            *(unsigned long *) os_context_pc_addr(context) = displaced_after_inst;
-            /* context->sigmask = orig_sigmask; */
-            os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
-            break;
-
-        default:
+        if (!maybe_handle_trap(context,trap))
             interrupt_handle_now(signal, siginfo, context);
-            break;
-        }
     }
     else if ((siginfo->si_code) == ILL_ILLTRP
 #ifdef LISP_FEATURE_LINUX
@@ -280,7 +268,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
             interrupt_handle_pending(context);
         }
         else {
-            interrupt_internal_error(signal, siginfo, context, 0);
+            interrupt_internal_error(context, 0);
         }
     }
     else {
@@ -333,7 +321,7 @@ static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
 
     if ((op1 & 3) != 0) {
         /* The first arg wan't a fixnum. */
-        interrupt_internal_error(signal, siginfo, context, 0);
+        interrupt_internal_error(context, 0);
         return;
     }
 
@@ -349,7 +337,7 @@ static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
 
     if ((op2 & 3) != 0) {
         /* The second arg wan't a fixnum. */
-        interrupt_internal_error(signal, siginfo, context, 0);
+        interrupt_internal_error(context, 0);
         return;
     }
 

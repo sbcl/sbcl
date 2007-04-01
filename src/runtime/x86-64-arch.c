@@ -203,6 +203,30 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 #endif
 }
 
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+    --*os_context_pc_addr(context);
+    handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    --*os_context_pc_addr(context);
+    *os_context_pc_addr(context) =
+        (unsigned long)handle_fun_end_breakpoint(context);
+}
+
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    arch_skip_instruction(context);
+    /* On x86-64 the fdefn / function is always in RAX, so we pass
+     * 0 as the register_offset. */
+    handle_single_step_trap(context, trap, 0);
+}
+
 
 void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
@@ -254,53 +278,9 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
     trap = *(unsigned char *)(*os_context_pc_addr(context));
-    switch (trap) {
 
-    case trap_PendingInterrupt:
-        FSHOW((stderr, "/<trap pending interrupt>\n"));
-        arch_skip_instruction(context);
-        interrupt_handle_pending(context);
-        break;
-
-    case trap_Halt:
-        /* Note: the old CMU CL code tried to save FPU state
-         * here, and restore it after we do our thing, but there
-         * seems to be no point in doing that, since we're just
-         * going to lose(..) anyway. */
-        fake_foreign_function_call(context);
-        lose("%%PRIMITIVE HALT called; the party is over.\n");
-
-    case trap_Error:
-    case trap_Cerror:
-        FSHOW((stderr, "<trap error/cerror %d>\n", trap));
-        interrupt_internal_error(signal, info, context, trap==trap_Cerror);
-        break;
-
-    case trap_Breakpoint:
-        --*os_context_pc_addr(context);
-        handle_breakpoint(signal, info, context);
-        break;
-
-    case trap_FunEndBreakpoint:
-        --*os_context_pc_addr(context);
-        *os_context_pc_addr(context) =
-            (unsigned long)handle_fun_end_breakpoint(signal, info, context);
-        break;
-
-    case trap_SingleStepAround:
-    case trap_SingleStepBefore:
-        arch_skip_instruction(context);
-        /* On x86-64 the fdefn / function is always in RAX, so we pass
-         * 0 as the register_offset. */
-        handle_single_step_trap(context, trap, 0);
-        break;
-
-    default:
-        FSHOW((stderr,"/[C--trap default %d %d %x]\n",
-               signal, code, context));
+    if (!maybe_handle_trap(context, trap))
         interrupt_handle_now(signal, info, context);
-        break;
-    }
 }
 
 void

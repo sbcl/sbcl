@@ -67,8 +67,6 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
-
-
 static void run_deferred_handler(struct interrupt_data *data, void *v_context);
 #ifndef LISP_FEATURE_WIN32
 static void store_signal_data_for_later (struct interrupt_data *data,
@@ -368,8 +366,7 @@ undo_fake_foreign_function_call(os_context_t *context)
 /* a handler for the signal caused by execution of a trap opcode
  * signalling an internal error */
 void
-interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
-                         boolean continuable)
+interrupt_internal_error(os_context_t *context, boolean continuable)
 {
     lispobj context_sap;
 
@@ -1432,3 +1429,50 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
 }
 #endif
+
+/* Common logic far trapping instructions. How we actually handle each
+ * case is highly architecture dependant, but the overall shape is
+ * this. */
+boolean
+maybe_handle_trap(os_context_t *context, int trap)
+{
+    switch(trap) {
+    case trap_PendingInterrupt:
+        FSHOW((stderr, "/<trap pending interrupt>\n"));
+        arch_skip_instruction(context);
+        interrupt_handle_pending(context);
+        break;
+    case trap_Error:
+    case trap_Cerror:
+        FSHOW((stderr, "/<trap error/cerror %d>\n", trap));
+        interrupt_internal_error(context, trap==trap_Cerror);
+        break;
+    case trap_Breakpoint:
+        arch_handle_breakpoint(context);
+        break;
+    case trap_FunEndBreakpoint:
+        arch_handle_fun_end_breakpoint(context);
+        break;
+#ifdef trap_AfterBreakpoint
+    case trap_AfterBreakpoint:
+        arch_handle_after_breakpoint(context);
+        break;
+#endif
+#ifdef trap_SingleStepAround
+    case trap_SingleStepAround:
+    case trap_SingleStepBefore:
+        arch_handle_single_step_trap(context, trap);
+        break;
+#endif
+    case trap_Halt:
+        fake_foreign_function_call(context);
+        lose("%%PRIMITIVE HALT called; the party is over.\n");
+    default:
+        FSHOW((stderr,"/[C--trap default %d %d %x]\n",
+               signal, trap, context));
+        /* Not our trap! */
+        return 0;
+    }
+    return 1;
+}
+

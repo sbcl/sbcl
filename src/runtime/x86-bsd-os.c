@@ -36,21 +36,21 @@ os_context_register_addr(os_context_t *context, int offset)
 {
     switch(offset) {
     case  0:
-        return CONTEXT_ADDR_FROM_STEM(eax);
+        return (int *)CONTEXT_ADDR_FROM_STEM(eax);
     case  2:
-        return CONTEXT_ADDR_FROM_STEM(ecx);
+        return (int *)CONTEXT_ADDR_FROM_STEM(ecx);
     case  4:
-        return CONTEXT_ADDR_FROM_STEM(edx);
+        return (int *)CONTEXT_ADDR_FROM_STEM(edx);
     case  6:
-        return CONTEXT_ADDR_FROM_STEM(ebx);
+        return (int *)CONTEXT_ADDR_FROM_STEM(ebx);
     case  8:
-        return CONTEXT_ADDR_FROM_STEM(esp);
+        return (int *)CONTEXT_ADDR_FROM_STEM(esp);
     case 10:
-        return CONTEXT_ADDR_FROM_STEM(ebp);
+        return (int *)CONTEXT_ADDR_FROM_STEM(ebp);
     case 12:
-        return CONTEXT_ADDR_FROM_STEM(esi);
+        return (int *)CONTEXT_ADDR_FROM_STEM(esi);
     case 14:
-        return CONTEXT_ADDR_FROM_STEM(edi);
+        return (int *)CONTEXT_ADDR_FROM_STEM(edi);
     default:
         return 0;
     }
@@ -59,7 +59,7 @@ os_context_register_addr(os_context_t *context, int offset)
 int *
 os_context_sp_addr(os_context_t *context)
 {
-    return CONTEXT_ADDR_FROM_STEM(esp);
+    return (int *)CONTEXT_ADDR_FROM_STEM(esp);
 }
 
 #endif /* __FreeBSD__ || __OpenBSD__ */
@@ -109,7 +109,7 @@ int *os_context_pc_addr(os_context_t *context)
 #elif defined __NetBSD__
     return CONTEXT_ADDR_FROM_STEM(EIP);
 #elif defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    return CONTEXT_ADDR_FROM_STEM(eip);
+    return (int *)CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined LISP_FEATURE_DARWIN
     return &context->uc_mcontext->ss.srr0;
 #else

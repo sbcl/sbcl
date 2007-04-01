@@ -363,54 +363,42 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     displaced_after_inst = arch_install_after_breakpoint(next_pc);
 }
 
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+    handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    *os_context_pc_addr(context)
+        = (os_context_register_t)(unsigned int)
+        handle_fun_end_breakpoint(context);
+}
+
+void
+arch_handle_after_breakpoint(os_context_t *context)
+{
+    arch_install_breakpoint(skipped_break_addr);
+    arch_remove_breakpoint((unsigned int *)os_context_pc(context),
+                           displaced_after_inst);
+    *os_context_sigmask_addr(context) = orig_sigmask;
+}
+
 static void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
-
-    switch (code) {
-    case trap_Halt:
-        fake_foreign_function_call(context);
-        lose("%%primitive halt called; the party is over.\n");
-
-    case trap_PendingInterrupt:
-        arch_skip_instruction(context);
-        interrupt_handle_pending(context);
-        break;
-
-    case trap_Error:
-    case trap_Cerror:
-        interrupt_internal_error(signal, info, context, code == trap_Cerror);
-        break;
-
-    case trap_Breakpoint:
-        handle_breakpoint(signal, info, context);
-        break;
-
-    case trap_FunEndBreakpoint:
-        *os_context_pc_addr(context)
-            = (os_context_register_t)(unsigned int)
-                handle_fun_end_breakpoint(signal, info, context);
-        break;
-
-    case trap_AfterBreakpoint:
-        arch_install_breakpoint(skipped_break_addr);
-        arch_remove_breakpoint((unsigned int *)os_context_pc(context),
-                               displaced_after_inst);
-        *os_context_sigmask_addr(context) = orig_sigmask;
-        break;
-
-    case 0x10:
+    /* FIXME: WTF is this magic number? Needs to become a #define
+     * and go into maybe_handle_trap. */
+    if (code==0x10) {
         arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
-        return;
-
-    default:
-        interrupt_handle_now(signal, info, context);
-        break;
-    }
+    } else if (!maybe_handle_trap(context,code))
+        interrupt_handle_now(signal, info, void_context);
 }
 
 #define FIXNUM_VALUE(lispobj) (((int)lispobj) >> N_FIXNUM_TAG_BITS)

@@ -1,3 +1,14 @@
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
 #include <stdio.h>
 
 #include "sbcl.h"
@@ -9,6 +20,7 @@
 #include "signal.h"
 #include "interrupt.h"
 #include "interr.h"
+#include "breakpoint.h"
 
 #if defined(LISP_FEATURE_GENCGC)
 #include "gencgc-alloc-region.h"
@@ -43,7 +55,6 @@ void arch_init() {
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-    unsigned long pc =  (unsigned long)(*os_context_pc_addr(context));
     os_vm_address_t addr;
 
 #if defined(LISP_FEATURE_NETBSD)
@@ -207,14 +218,11 @@ handle_allocation_trap(os_context_t * context)
 {
     unsigned int *pc;
     unsigned int inst;
-    unsigned int or_inst;
     unsigned int target, target_ptr, end_addr;
     unsigned int opcode;
     int size;
-    int immed;
     boolean were_in_lisp;
     char *memory;
-    sigset_t block;
 
     target = 0;
     size = 0;
@@ -366,6 +374,42 @@ handle_allocation_trap(os_context_t * context)
 }
 #endif
 
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+    handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    *os_context_pc_addr(context)
+        =(int)handle_fun_end_breakpoint(context);
+}
+
+/* FIXME: AFTER-BREAKPOINT-TRAP is defined for PPC, but never
+ * emitted as far as I can see. Should it be emitted, do removed
+ * entirely? */
+void
+arch_handle_after_breakpoint(os_context_t *context)
+{
+    *skipped_break_addr = trap_Breakpoint;
+    skipped_break_addr = NULL;
+    *(unsigned int *)*os_context_pc_addr(context)
+        = displaced_after_inst;
+    *os_context_sigmask_addr(context)= orig_sigmask;
+    os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
+                    sizeof(unsigned int));
+}
+
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    int register_offset = code >> 5 & 0x1f;
+    handle_single_step_trap(context, trap, register_offset);
+    arch_skip_instruction(context);
+}
 
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
@@ -401,64 +445,16 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0x1f;
 
-        switch (trap) {
-        case trap_Halt:
-            fake_foreign_function_call(context);
-            lose("%%primitive halt called; the party is over.\n");
+        if (!maybe_handle_trap(context,trap))
+            interrupt_handle_now(signal, siginfo, context);
 
-        case trap_Error:
-        case trap_Cerror:
-            interrupt_internal_error(signal, code, context, trap == trap_Cerror);
-            break;
-
-        case trap_PendingInterrupt:
-            /* This is supposed run after WITHOUT-INTERRUPTS if there
-             * were pending signals. */
-            arch_skip_instruction(context);
-            interrupt_handle_pending(context);
-            break;
-
-        case trap_Breakpoint:
-            handle_breakpoint(signal, code, context);
-            break;
-
-        case trap_FunEndBreakpoint:
-            *os_context_pc_addr(context)
-                =(int)handle_fun_end_breakpoint(signal, code, context);
-            break;
-
-        case trap_AfterBreakpoint:
-            *skipped_break_addr = trap_Breakpoint;
-            skipped_break_addr = NULL;
-            *(unsigned int *)*os_context_pc_addr(context)
-                = displaced_after_inst;
-            *os_context_sigmask_addr(context)= orig_sigmask;
-
-            os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
-                            sizeof(unsigned int));
-            break;
-
-        case trap_SingleStepAround:
-        case trap_SingleStepBefore:
-            {
-                int register_offset = code >> 5 & 0x1f;
-
-                handle_single_step_trap(context, trap, register_offset);
-
-                arch_skip_instruction(context);
-                break;
-            }
-        default:
-            interrupt_handle_now(signal, code, context);
-            break;
-        }
 #ifdef LISP_FEATURE_DARWIN
         DARWIN_FIX_CONTEXT(context);
 #endif
         return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
-        interrupt_internal_error(signal, code, context, 0);
+        interrupt_internal_error(context, 0);
 #ifdef LISP_FEATURE_DARWIN
         DARWIN_FIX_CONTEXT(context);
 #endif

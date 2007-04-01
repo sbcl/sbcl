@@ -277,6 +277,21 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
     os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned int));
 }
 
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+        *os_context_pc_addr(context) -=4;
+        handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    *os_context_pc_addr(context) -=4;
+    *os_context_pc_addr(context) =
+        (int)handle_fun_end_breakpoint(context);
+}
+
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
@@ -313,38 +328,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     } else
         /* a "system service" */
     code=*((u32 *)(*os_context_pc_addr(context)));
-
-    switch (code) {
-      case trap_PendingInterrupt:
-        arch_skip_instruction(context);
-        interrupt_handle_pending(context);
-        break;
-
-      case trap_Halt:
-        fake_foreign_function_call(context);
-        lose("%%primitive halt called; the party is over.\n");
-
-      case trap_Error:
-      case trap_Cerror:
-        interrupt_internal_error(signal, siginfo, context, code==trap_Cerror);
-        break;
-
-    case trap_Breakpoint:        /* call lisp-level handler */
-        *os_context_pc_addr(context) -=4;
-        handle_breakpoint(signal, siginfo, context);
-        break;
-
-      case trap_FunEndBreakpoint:
-        *os_context_pc_addr(context) -=4;
-        *os_context_pc_addr(context) =
-            (int)handle_fun_end_breakpoint(signal, siginfo, context);
-        break;
-
-      default:
-        fprintf(stderr, "unidentified breakpoint/trap %d\n",code);
+    if (!maybe_handle_trap(context, code))
         interrupt_handle_now(signal, siginfo, context);
-        break;
-    }
 }
 
 unsigned long

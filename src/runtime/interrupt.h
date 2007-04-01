@@ -66,8 +66,7 @@ extern void undo_fake_foreign_function_call(os_context_t* context);
 extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
 extern void interrupt_handle_now(int, siginfo_t*, void*);
 extern void interrupt_handle_pending(os_context_t*);
-extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
-                                     boolean continuable);
+extern void interrupt_internal_error(os_context_t*, boolean continuable);
 extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
 extern boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
@@ -106,5 +105,11 @@ extern void block_blockable_signals();
  * signal(..) handlers have another, and attempting to represent them
  * "cleanly" with union types is in fact a mess. */
 #define ARE_SAME_HANDLER(x, y) ((void*)(x) == (void*)(y))
+
+extern boolean maybe_handle_trap(os_context_t *context, int trap);
+
+#ifndef LISP_FEATURE_WIN32
+extern void lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr);
+#endif
 
 #endif

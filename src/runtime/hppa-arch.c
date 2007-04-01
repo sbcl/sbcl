@@ -181,7 +181,26 @@ static void restore_breakpoint(struct sigcontext *scp)
 }
 #endif
 
-static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
+void
+arch_handle_breakpoint(os_context_t *context)
+{
+    /*sigsetmask(scp->sc_mask); */
+    handle_breakpoint(context);
+}
+
+void
+arch_handle_fun_end_breakpoint(os_context_t *context)
+{
+    /*sigsetmask(scp->sc_mask); */
+    unsigned long pc;
+    pc = (unsigned long)
+        handle_fun_end_breakpoint(context);
+    *os_context_pc_addr(context) = pc;
+    *os_context_npc_addr(context) = pc + 4;
+}
+
+static void
+sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int bad_inst;
@@ -196,49 +215,8 @@ static void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
         interrupt_handle_now(signal, siginfo, context);
     else {
         int im5 = bad_inst & 0x1f;
-
-        switch (im5) {
-        case trap_Halt:
-            fake_foreign_function_call(context);
-            lose("%%primitive halt called; the party is over.\n");
-
-        case trap_PendingInterrupt:
-            arch_skip_instruction(context);
-            interrupt_handle_pending(context);
-            break;
-
-        case trap_Error:
-        case trap_Cerror:
-            interrupt_internal_error(signal, siginfo, context, im5==trap_Cerror);
-            break;
-
-        case trap_Breakpoint:
-            /*sigsetmask(scp->sc_mask); */
-            handle_breakpoint(signal, siginfo, context);
-            break;
-
-        case trap_FunEndBreakpoint:
-            /*sigsetmask(scp->sc_mask); */
-            {
-                unsigned long pc;
-                pc = (unsigned long)
-                    handle_fun_end_breakpoint(signal, siginfo, context);
-                *os_context_pc_addr(context) = pc;
-                *os_context_npc_addr(context) = pc + 4;
-            }
-            break;
-
-        case trap_SingleStepBreakpoint:
-            /* Uh, FIXME */
-#ifdef hpux
-            restore_breakpoint(context);
-#endif
-            break;
-
-        default:
-            interrupt_handle_now(signal, siginfo, context);
-            break;
-        }
+        if (!maybe_handle_trap(context, trap))
+            interrupt_handle_now(signal, sigingo, context);
     }
 }
 
