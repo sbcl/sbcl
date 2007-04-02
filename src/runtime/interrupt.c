@@ -406,14 +406,18 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 void
 interrupt_handle_pending(os_context_t *context)
 {
-    struct thread *thread;
-    struct interrupt_data *data;
+#ifdef LISP_FEATURE_WIN32
+    /* Actually this part looks almost good to go for
+     * Windows too, but currently we never save anything
+     * on Windows, so ending up here would be pretty bad. */
+    lose("Pending interrupts unimplemented on Windows.");
+#else
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
 
     FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
     check_blockables_blocked_or_lose();
-    thread=arch_os_get_current_thread();
-    data=thread->interrupt_data;
 
     /* If pseudo_atomic_interrupted is set then the interrupt is going
      * to be handled now, ergo it's safe to clear it. */
@@ -461,7 +465,6 @@ interrupt_handle_pending(os_context_t *context)
              * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
             SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
-#ifndef LISP_FEATURE_WIN32
             /* restore the saved signal mask from the original signal (the
              * one that interrupted us during the critical section) into the
              * os_context for the signal we're currently in the handler for.
@@ -470,12 +473,12 @@ interrupt_handle_pending(os_context_t *context)
             sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
 
             sigemptyset(&data->pending_mask);
-#endif
             /* This will break on sparc linux: the deferred handler really wants
              * to be called with a void_context */
             run_deferred_handler(data,(void *)context);
         }
     }
+#endif
 }
 
 /*
@@ -1315,11 +1318,24 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 }
 #endif
 
+void
+unhandled_trap_error(os_context_t *context)
+{
+    lispobj context_sap;
+    fake_foreign_function_call(context);
+    context_sap = alloc_sap(context);
+#ifndef LISP_FEATURE_WIN32
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+#endif
+    funcall1(SymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
+    lose("UNHANDLED-TRAP-ERROR fell through");
+}
+
 /* Common logic far trapping instructions. How we actually handle each
  * case is highly architecture dependant, but the overall shape is
  * this. */
-boolean
-maybe_handle_trap(os_context_t *context, int trap)
+void
+handle_trap(os_context_t *context, int trap)
 {
     switch(trap) {
     case trap_PendingInterrupt:
@@ -1353,11 +1369,7 @@ maybe_handle_trap(os_context_t *context, int trap)
         fake_foreign_function_call(context);
         lose("%%PRIMITIVE HALT called; the party is over.\n");
     default:
-        FSHOW((stderr,"/[C--trap default %d %d %x]\n",
-               signal, trap, context));
-        /* Not our trap! */
-        return 0;
+        unhandled_trap_error(context);
     }
-    return 1;
 }
 

@@ -250,8 +250,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 
         inst = *pc;
         trap = inst & 0x3fffff;
-        if (!maybe_handle_trap(context,trap))
-            interrupt_handle_now(signal, siginfo, context);
+        handle_trap(context,trap);
     }
     else if ((siginfo->si_code) == ILL_ILLTRP
 #ifdef LISP_FEATURE_LINUX

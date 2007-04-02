@@ -215,8 +215,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
         interrupt_handle_now(signal, siginfo, context);
     else {
         int im5 = bad_inst & 0x1f;
-        if (!maybe_handle_trap(context, trap))
-            interrupt_handle_now(signal, sigingo, context);
+        handle_trap(context, trap);
     }
 }
 

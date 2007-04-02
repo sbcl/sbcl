@@ -20,6 +20,7 @@
     sb!kernel::undefined-alien-variable-error
     sb!kernel::undefined-alien-function-error
     sb!kernel::memory-fault-error
+    sb!kernel::unhandled-trap-error
     sb!di::handle-breakpoint
     sb!di::handle-single-step-trap
     fdefinition-object

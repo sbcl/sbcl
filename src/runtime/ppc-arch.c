@@ -443,9 +443,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0x1f;
-
-        if (!maybe_handle_trap(context,trap))
-            interrupt_handle_now(signal, siginfo, context);
+        handle_trap(context,trap);
 
 #ifdef LISP_FEATURE_DARWIN
         DARWIN_FIX_CONTEXT(context);

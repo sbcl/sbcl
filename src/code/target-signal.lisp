@@ -118,7 +118,6 @@
 
 (define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
-(define-signal-handler sigtrap-handler "breakpoint/trap")
 #!-linux
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
@@ -147,7 +146,6 @@
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)
   (enable-interrupt sigill #'sigill-handler)
-  (enable-interrupt sigtrap #'sigtrap-handler)
   (enable-interrupt sigiot #'sigiot-handler)
   #!-linux
   (enable-interrupt sigemt #'sigemt-handler)

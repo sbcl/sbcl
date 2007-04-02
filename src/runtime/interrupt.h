@@ -104,7 +104,7 @@ extern void block_blockable_signals();
  * "cleanly" with union types is in fact a mess. */
 #define ARE_SAME_HANDLER(x, y) ((void*)(x) == (void*)(y))
 
-extern boolean maybe_handle_trap(os_context_t *context, int trap);
+extern void handle_trap(os_context_t *context, int trap);
 
 #ifndef LISP_FEATURE_WIN32
 extern void lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr);

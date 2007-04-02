@@ -392,13 +392,13 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
     /* FIXME: WTF is this magic number? Needs to become a #define
-     * and go into maybe_handle_trap. */
+     * and go into handle_trap. */
     if (code==0x10) {
         arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
-    } else if (!maybe_handle_trap(context,code))
-        interrupt_handle_now(signal, info, void_context);
+    } else
+        handle_trap(context,code);
 }
 
 #define FIXNUM_VALUE(lispobj) (((int)lispobj) >> N_FIXNUM_TAG_BITS)

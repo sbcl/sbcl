@@ -481,3 +481,13 @@
 (defun memory-fault-error ()
   (error 'memory-fault-error
          :address current-memory-fault-address))
+
+;;; This is SIGTRAP / EXCEPTION_BREAKPOINT that runtime could not deal
+;;; with. Prior to Windows we just had a Lisp side handler for
+;;; SIGTRAP, but now we need to deal this portably.
+(defun unhandled-trap-error (context-sap)
+  (declare (type system-area-pointer context-sap))
+  (infinite-error-protect
+   (let ((context (sap-alien context-sap (* os-context-t))))
+     (error "Unhandled breakpoint/trap at #x~X."
+            (sap-int (sb!vm:context-pc context))))))

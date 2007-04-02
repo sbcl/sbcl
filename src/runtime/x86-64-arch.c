@@ -279,8 +279,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
      * arguments to follow. */
     trap = *(unsigned char *)(*os_context_pc_addr(context));
 
-    if (!maybe_handle_trap(context, trap))
-        interrupt_handle_now(signal, info, context);
+    handle_trap(context, trap);
 }
 
 void
@@ -298,7 +297,7 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
 #endif
 
     fake_foreign_function_call(context);
-    lose("fake_foreign_function_call fell through");
+    lose("Unhandled SIGILL.");
 }
 
 #ifdef X86_64_SIGFPE_FIXUP

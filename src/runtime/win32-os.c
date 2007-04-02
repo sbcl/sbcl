@@ -305,10 +305,6 @@ is_valid_lisp_addr(os_vm_address_t addr)
     return 0;
 }
 
-/*
- * any OS-dependent special low-level handling for signals
- */
-
 /* A tiny bit of interrupt.c state we want our paws on. */
 extern boolean internal_errors_enabled;
 
@@ -345,17 +341,18 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     }
 
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
-        /* Pick off sigtrap case first. */
-
-        extern void sigtrap_handler(int signal, siginfo_t *info, void *context);
-        /*
-         * Unlike some other operating systems, Win32 leaves EIP
-         * pointing to the breakpoint instruction.
-         */
+        /* This is just for info in case the monitor wants to print an
+         * approximation. */
+        current_control_stack_pointer =
+            (lispobj *)*os_context_sp_addr(context);
+        /* Unlike some other operating systems, Win32 leaves EIP
+         * pointing to the breakpoint instruction. */
         context->Eip++;
-
-        sigtrap_handler(0, NULL, context);
-
+        /* Now EIP points just after the INT3 byte and aims at the
+         * 'kind' value (eg trap_Cerror). */
+        trap = *(unsigned char *)(*os_context_pc_addr(context));
+        handle_trap(context, trap);
+        /* Done, we're good to go! */
         return ExceptionContinueExecution;
     }
     else if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
@@ -457,7 +454,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     fflush(stderr);
 
     fake_foreign_function_call(context);
-    lose("fake_foreign_function_call fell through");
+    lose("Exception too early in cold init, cannot continue.");
 
     /* FIXME: WTF? How are we supposed to end up here? */
     return ExceptionContinueSearch;

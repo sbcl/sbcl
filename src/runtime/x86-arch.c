@@ -256,19 +256,17 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     handle_single_step_trap(context, trap, 0);
 }
 
+#ifndef LISP_FEATURE_WIN32
 void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
-#ifndef LISP_FEATURE_WIN32
-    /* On Windows this is done in the SE handler. */
     if (single_stepping && (signal==SIGTRAP)) {
         restore_breakpoint_from_single_step(context);
         return;
     }
-#endif
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
@@ -284,7 +282,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
-
 
 #ifdef LISP_FEATURE_SUNOS
     /* For some reason the breakpoints that :ENCAPSULATE NIL tracing sets up
@@ -302,8 +299,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
     trap = *(unsigned char *)(*os_context_pc_addr(context));
-    if (!maybe_handle_trap(context, trap))
-        interrupt_handle_now(signal, info, context);
+    handle_trap(context, trap);
 }
 
 void
@@ -319,10 +315,10 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
         return sigtrap_handler(signal, siginfo, void_context);
     }
 #endif
-
     fake_foreign_function_call(context);
-    lose("fake_foreign_call fell through");
+    lose("Unhandled SIGILL");
 }
+#endif /* not LISP_FEATURE_WIN32 */
 
 void
 arch_install_interrupt_handlers()
@@ -343,7 +339,6 @@ arch_install_interrupt_handlers()
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 #endif
-
     SHOW("returning from arch_install_interrupt_handlers()");
 }
 

@@ -328,8 +328,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     } else
         /* a "system service" */
     code=*((u32 *)(*os_context_pc_addr(context)));
-    if (!maybe_handle_trap(context, code))
-        interrupt_handle_now(signal, siginfo, context);
+    handle_trap(context, code);
 }
 
 unsigned long
