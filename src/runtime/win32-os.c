@@ -341,6 +341,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     }
 
     if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
+	unsigned char trap;
         /* This is just for info in case the monitor wants to print an
          * approximation. */
         current_control_stack_pointer =
