@@ -48,8 +48,6 @@ lispobj *new_space_free_pointer;
 
 static void scavenge_newspace(void);
 
-extern unsigned long bytes_consed_between_gcs;
-
 
 /* collecting garbage */
 
@@ -622,4 +620,43 @@ void clear_auto_gc_trigger(void)
 #endif
 
     current_auto_gc_trigger = NULL;
+}
+
+static boolean
+gc_trigger_hit(void *addr)
+{
+    if (current_auto_gc_trigger == NULL)
+        return 0;
+    else{
+        return (addr >= (void *)current_auto_gc_trigger &&
+                addr <((void *)current_dynamic_space + dynamic_space_size));
+    }
+}
+
+boolean
+cheneygc_handle_wp_violation(os_context_t *context, void *addr)
+{
+    if(!foreign_function_call_active && gc_trigger_hit(addr)){
+        struct thread *thread=arch_os_get_current_thread();
+        clear_auto_gc_trigger();
+        /* Don't flood the system with interrupts if the need to gc is
+         * already noted. This can happen for example when SUB-GC
+         * allocates or after a gc triggered in a WITHOUT-GCING. */
+        if (SymbolValue(GC_PENDING,thread) == NIL) {
+            if (SymbolValue(GC_INHIBIT,thread) == NIL) {
+                if (arch_pseudo_atomic_atomic(context)) {
+                    /* set things up so that GC happens when we finish
+                     * the PA section */
+                    SetSymbolValue(GC_PENDING,T,thread);
+                    arch_set_pseudo_atomic_interrupted(context);
+                } else {
+                    maybe_gc(context);
+                }
+            } else {
+                SetSymbolValue(GC_PENDING,T,thread);
+            }
+        }
+        return 1;
+    }
+    return 0;
 }

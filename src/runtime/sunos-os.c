@@ -217,11 +217,10 @@ static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    os_vm_address_t addr;
+    os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
-    addr = arch_get_bad_addr(signal, info, context);
-    if(!interrupt_maybe_gc(signal, info, context)) {
-        if(!handle_guard_page_triggered(context,addr))
+    if (!cheneygc_handle_wp_violation(context, addr)) {
+        if (!handle_guard_page_triggered(context,addr))
             interrupt_handle_now(signal, info, context);
     }
 }

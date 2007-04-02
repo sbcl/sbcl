@@ -87,7 +87,7 @@
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc
-  "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body) 
+  "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body)
 
 Provides a method of manually looping over the elements of a hash-table.
 FUNCTION is bound to a generator-macro that, within the scope of the

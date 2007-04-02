@@ -38,10 +38,12 @@ extern void gc_init_tables(void);
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
 
-extern int maybe_gc_pending;
-
 #include "fixnump.h"
 
 #include "pseudo-atomic.h"
+
+extern boolean maybe_gc(os_context_t *context);
+
+extern unsigned long bytes_consed_between_gcs;
 
 #endif /* _GC_H_ */

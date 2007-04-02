@@ -389,7 +389,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 #ifdef LISP_FEATURE_GENCGC
     if (!gencgc_handle_wp_violation(addr))
 #else
-    if (!interrupt_maybe_gc(signal, info, context))
+    if (!cheneygc_handle_wp_violation(context, addr))
 #endif
         if (!handle_guard_page_triggered(context, addr))
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

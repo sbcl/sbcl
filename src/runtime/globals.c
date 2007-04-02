@@ -22,7 +22,9 @@
 #include "globals.h"
 #include "validate.h"
 
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
 int foreign_function_call_active;
+#endif
 
 lispobj *current_control_stack_pointer;
 lispobj *current_control_frame_pointer;
@@ -65,9 +67,11 @@ void globals_init(void)
     current_auto_gc_trigger = NULL;
 #endif
 
-    /* Set foreign function call active. */
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     foreign_function_call_active = 1;
-#if defined(LISP_FEATURE_SB_THREAD)
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_key_create(&specials,0);
 #endif
 }

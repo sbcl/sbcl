@@ -207,7 +207,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             lisp_memory_fault_error(context, fault_addr);
 #else
-            if (!interrupt_maybe_gc_int(signal, siginfo, context)) {
+            if (!maybe_gc(context)) {
                 interrupt_handle_now(signal, siginfo, context);
             }
 #if defined(LISP_FEATURE_DARWIN)
@@ -269,9 +269,9 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
     os_vm_address_t addr;
 
-    addr = arch_get_bad_addr(signal,info,context);
-    if(!interrupt_maybe_gc(signal, info, context))
-        if(!handle_guard_page_triggered(context,addr))
+    addr = arch_get_bad_addr(signal, info, context);
+    if (!cheneygc_handle_wp_violation(context, addr))
+        if (!handle_guard_page_triggered(context, addr))
             interrupt_handle_now(signal, info, context);
     /* Work around G5 bug; fix courtesy gbyers */
     DARWIN_FIX_CONTEXT(context);

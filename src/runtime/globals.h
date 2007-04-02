@@ -20,8 +20,18 @@
 
 #include "sbcl.h"
 
+/* Currently threads live only on x86oid platforms, but this thing
+ * cannot ever work with threads, so... */
+#if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#define FOREIGN_FUNCTION_CALL_FLAG
+#endif
+
 #ifndef LANGUAGE_ASSEMBLY
+
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
 extern int foreign_function_call_active;
+#endif
+
 extern size_t dynamic_space_size;
 
 #ifdef LISP_FEATURE_WIN32
@@ -102,7 +112,9 @@ extern void globals_init(void);
 #  define POINTERSIZE 4
 # endif
 
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
 EXTERN(foreign_function_call_active, 4)
+#endif
 
 EXTERN(current_control_stack_pointer, POINTERSIZE)
 EXTERN(current_control_frame_pointer, POINTERSIZE)

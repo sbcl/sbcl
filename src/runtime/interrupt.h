@@ -68,8 +68,6 @@ extern void interrupt_handle_now(int, siginfo_t*, void*);
 extern void interrupt_handle_pending(os_context_t*);
 extern void interrupt_internal_error(os_context_t*, boolean continuable);
 extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);
-extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
-extern boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
 extern boolean maybe_defer_handler(void *handler, struct interrupt_data *data,
                                    int signal, siginfo_t *info,
                                    os_context_t *context);

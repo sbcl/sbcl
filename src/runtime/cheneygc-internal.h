@@ -48,3 +48,4 @@ new_space_p(lispobj object)
 
 #endif
 
+extern boolean cheneygc_handle_wp_violation(os_context_t*, void*);

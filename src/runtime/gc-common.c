@@ -2435,3 +2435,46 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
     }
     return (NULL);
 }
+
+boolean
+maybe_gc(os_context_t *context)
+{
+#ifndef LISP_FEATURE_WIN32
+    struct thread *thread = arch_os_get_current_thread();
+#endif
+
+    fake_foreign_function_call(context);
+    /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
+     * which case we will be running with no gc trigger barrier
+     * thing for a while.  But it shouldn't be long until the end
+     * of WITHOUT-GCING.
+     *
+     * FIXME: It would be good to protect the end of dynamic space for
+     * CheneyGC and signal a storage condition from there.
+     */
+
+    /* Restore the signal mask from the interrupted context before
+     * calling into Lisp if interrupts are enabled. Why not always?
+     *
+     * Suppose there is a WITHOUT-INTERRUPTS block far, far out. If an
+     * interrupt hits while in SUB-GC, it is deferred and the
+     * os_context_sigmask of that interrupt is set to block further
+     * deferrable interrupts (until the first one is
+     * handled). Unfortunately, that context refers to this place and
+     * when we return from here the signals will not be blocked.
+     *
+     * A kludgy alternative is to propagate the sigmask change to the
+     * outer context.
+     */
+#ifndef LISP_FEATURE_WIN32
+    if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL) {
+        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+        check_gc_signals_unblocked_or_lose();
+    }
+    else
+        unblock_gc_signals();
+#endif
+    funcall0(SymbolFunction(SUB_GC));
+    undo_fake_foreign_function_call(context);
+    return 1;
+}

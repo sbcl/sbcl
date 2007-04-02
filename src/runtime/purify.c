@@ -37,8 +37,6 @@
 
 #define PRINTNOISE
 
-extern unsigned long bytes_consed_between_gcs;
-
 static lispobj *dynamic_space_purify_pointer;
 
 

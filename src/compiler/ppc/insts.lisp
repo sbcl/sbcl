@@ -640,8 +640,7 @@
       (#.fun-end-breakpoint-trap
        (nt "Function end breakpoint trap"))
       (#.object-not-instance-trap
-       (nt "Object not instance trap"))
-    )))
+       (nt "Object not instance trap")))))
 
 (eval-when (:compile-toplevel :execute)
 

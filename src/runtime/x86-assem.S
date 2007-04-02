@@ -88,7 +88,6 @@
 #endif
 
 	.text
-	.globl	GNAME(foreign_function_call_active)
 	.globl	GNAME(all_threads)
 
 /*
@@ -107,8 +106,6 @@
 	.globl GNAME(call_into_c)
 	TYPE(GNAME(call_into_c))
 GNAME(call_into_c):
-	movl	$1,GNAME(foreign_function_call_active)
-
 /* Save the return Lisp address in ebx. */
 	popl	%ebx
 
@@ -154,7 +151,6 @@ GNAME(call_into_c):
 /* Restore the return value. */
 	movl	%ecx,%eax	# maybe return value
 
-	movl	$0,GNAME(foreign_function_call_active)
 /* Return. */
 	jmp	*%ebx
 
@@ -172,7 +168,6 @@ Lfp_rtn_value:
 
 /* We don't need to restore eax, because the result is in st(0). */
 
-	movl	$0,GNAME(foreign_function_call_active)
 /* Return. */	
 	jmp	*%ebx
 
@@ -252,8 +247,6 @@ Lstack:
 	xorl	%esi,%esi	# third arg
 
 /* no longer in function call */
-	movl	%eax, GNAME(foreign_function_call_active)
-
 	movl	%esp,%ebx	# remember current stack
 	pushl	%ebx		# Save entry stack on (maybe) new stack.
 

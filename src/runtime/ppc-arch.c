@@ -99,7 +99,7 @@ arch_clear_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) &= ~1;
 }
 
-unsigned int
+unsigned int 
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
@@ -137,9 +137,9 @@ static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
 void
-arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
+arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    /* not sure how we ensure that we get the breakpoint reinstalled
+    /* not sure how we ensure that we get the breakpoint reinstalled 
      * after doing this -dan */
     unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
 
@@ -149,6 +149,10 @@ arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
     *pc = orig_inst;
     os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     skipped_break_addr = pc;
+
+    /* FIXME: we should apparently be installing the after-breakpoint
+     * here, but would need to find the next instruction address for
+     * it first. alpha-arch.c shows how to do it. --NS 2007-04-02 */
 }
 
 #ifdef LISP_FEATURE_GENCGC
@@ -231,10 +235,8 @@ handle_allocation_trap(os_context_t * context)
     fprintf(stderr, "In handle_allocation_trap\n");
 #endif
 
-    /*
-     * I don't think it's possible for us NOT to be in lisp when we get
-     * here.  Remove this later?
-     */
+    /* I don't think it's possible for us NOT to be in lisp when we get
+     * here.  Remove this later? */
     were_in_lisp = !foreign_function_call_active;
 
     if (were_in_lisp) {
@@ -387,9 +389,6 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
         =(int)handle_fun_end_breakpoint(context);
 }
 
-/* FIXME: AFTER-BREAKPOINT-TRAP is defined for PPC, but never
- * emitted as far as I can see. Should it be emitted, do removed
- * entirely? */
 void
 arch_handle_after_breakpoint(os_context_t *context)
 {

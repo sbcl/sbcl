@@ -145,7 +145,6 @@ boolean gencgc_partial_pickup = 0;
 
 /* the total bytes allocated. These are seen by Lisp DYNAMIC-USAGE. */
 unsigned long bytes_allocated = 0;
-extern unsigned long bytes_consed_between_gcs; /* gc-common.c */
 unsigned long auto_gc_trigger = 0;
 
 /* the source and destination generations. These are set before a GC starts

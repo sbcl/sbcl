@@ -73,7 +73,6 @@ static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
                                          siginfo_t *info,
                                          os_context_t *context);
-boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
 void
 sigaddset_deferrable(sigset_t *s)
@@ -178,7 +177,7 @@ check_interrupts_enabled_or_lose(os_context_t *context)
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
         lose("interrupts not enabled\n");
     if (
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
         (!foreign_function_call_active) &&
 #endif
         arch_pseudo_atomic_atomic(context))
@@ -330,8 +329,9 @@ fake_foreign_function_call(os_context_t *context)
 
     thread->interrupt_contexts[context_index] = context;
 
-    /* no longer in Lisp now */
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     foreign_function_call_active = 1;
+#endif
 }
 
 /* blocks all blockable signals.  If you are calling from a signal handler,
@@ -344,8 +344,9 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* Block all blockable signals. */
     block_blockable_signals();
 
-    /* going back into Lisp */
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     foreign_function_call_active = 0;
+#endif
 
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
@@ -432,7 +433,7 @@ interrupt_handle_pending(os_context_t *context)
             /* GC_PENDING is cleared in SUB-GC, or if another thread
              * is doing a gc already we will get a SIG_STOP_FOR_GC and
              * that will clear it. */
-            interrupt_maybe_gc_int(0,NULL,context);
+            maybe_gc(context);
         }
         check_blockables_blocked_or_lose();
     }
@@ -441,7 +442,7 @@ interrupt_handle_pending(os_context_t *context)
      * enabled run the pending handler */
     if (!((SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) ||
           (
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
            (!foreign_function_call_active) &&
 #endif
            arch_pseudo_atomic_atomic(context)))) {
@@ -496,7 +497,7 @@ void
 interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifndef LISP_FEATURE_SB_THREAD
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
@@ -523,7 +524,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         return;
     }
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     were_in_lisp = !foreign_function_call_active;
     if (were_in_lisp)
 #endif
@@ -649,7 +650,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     if (
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
         /* FIXME: this foreign_function_call_active test is dubious at
          * best. If a foreign call is made in a pseudo atomic section
          * (?) or more likely a pseudo atomic section is in a foreign
@@ -844,18 +845,6 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  */
 
 #ifndef LISP_FEATURE_GENCGC
-/* since GENCGC has its own way to record trigger */
-static boolean
-gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
-{
-    if (current_auto_gc_trigger == NULL)
-        return 0;
-    else{
-        void *badaddr=arch_get_bad_addr(signal,info,context);
-        return (badaddr >= (void *)current_auto_gc_trigger &&
-                badaddr <((void *)current_dynamic_space + dynamic_space_size));
-    }
-}
 #endif
 
 /* manipulate the signal context and stack such that when the handler
@@ -1105,92 +1094,6 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else return 0;
 }
-
-#ifndef LISP_FEATURE_GENCGC
-/* This function gets called from the SIGSEGV (for e.g. Linux, NetBSD, &
- * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
- * whether the signal was due to treading on the mprotect()ed zone -
- * and if so, arrange for a GC to happen. */
-extern unsigned long bytes_consed_between_gcs; /* gc-common.c */
-
-boolean
-interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
-{
-    os_context_t *context=(os_context_t *) void_context;
-
-    if(!foreign_function_call_active && gc_trigger_hit(signal, info, context)){
-        struct thread *thread=arch_os_get_current_thread();
-        clear_auto_gc_trigger();
-        /* Don't flood the system with interrupts if the need to gc is
-         * already noted. This can happen for example when SUB-GC
-         * allocates or after a gc triggered in a WITHOUT-GCING. */
-        if (SymbolValue(GC_PENDING,thread) == NIL) {
-            if (SymbolValue(GC_INHIBIT,thread) == NIL) {
-                if (arch_pseudo_atomic_atomic(context)) {
-                    /* set things up so that GC happens when we finish
-                     * the PA section */
-                    SetSymbolValue(GC_PENDING,T,thread);
-                    arch_set_pseudo_atomic_interrupted(context);
-                } else {
-                    interrupt_maybe_gc_int(signal,info,void_context);
-                }
-            } else {
-                SetSymbolValue(GC_PENDING,T,thread);
-            }
-        }
-        return 1;
-    }
-    return 0;
-}
-
-#endif
-
-/* this is also used by gencgc, in alloc() */
-boolean
-interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
-{
-    os_context_t *context=(os_context_t *) void_context;
-#ifndef LISP_FEATURE_WIN32
-    struct thread *thread=arch_os_get_current_thread();
-#endif
-
-    fake_foreign_function_call(context);
-
-    /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
-     * which case we will be running with no gc trigger barrier
-     * thing for a while.  But it shouldn't be long until the end
-     * of WITHOUT-GCING.
-     *
-     * FIXME: It would be good to protect the end of dynamic space
-     * and signal a storage condition from there.
-     */
-
-    /* Restore the signal mask from the interrupted context before
-     * calling into Lisp if interrupts are enabled. Why not always?
-     *
-     * Suppose there is a WITHOUT-INTERRUPTS block far, far out. If an
-     * interrupt hits while in SUB-GC, it is deferred and the
-     * os_context_sigmask of that interrupt is set to block further
-     * deferrable interrupts (until the first one is
-     * handled). Unfortunately, that context refers to this place and
-     * when we return from here the signals will not be blocked.
-     *
-     * A kludgy alternative is to propagate the sigmask change to the
-     * outer context.
-     */
-#ifndef LISP_FEATURE_WIN32
-    if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL) {
-        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-        check_gc_signals_unblocked_or_lose();
-    }
-    else
-        unblock_gc_signals();
-#endif
-    funcall0(SymbolFunction(SUB_GC));
-    undo_fake_foreign_function_call(context);
-    return 1;
-}
-
 
 /*
  * noise to install handlers
