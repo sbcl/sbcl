@@ -99,7 +99,7 @@ arch_clear_pseudo_atomic_interrupted(os_context_t *context)
     *os_context_register_addr(context,reg_ALLOC) &= ~1;
 }
 
-unsigned int 
+unsigned int
 arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
@@ -139,7 +139,7 @@ static sigset_t orig_sigmask;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    /* not sure how we ensure that we get the breakpoint reinstalled 
+    /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
     unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
 

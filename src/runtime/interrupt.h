@@ -64,7 +64,7 @@ extern void interrupt_init();
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
 extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
-extern void interrupt_handle_now(int, siginfo_t*, void*);
+extern void interrupt_handle_now(int, siginfo_t*, os_context_t*);
 extern void interrupt_handle_pending(os_context_t*);
 extern void interrupt_internal_error(os_context_t*, boolean continuable);
 extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);

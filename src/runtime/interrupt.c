@@ -494,16 +494,14 @@ interrupt_handle_pending(os_context_t *context)
  */
 
 void
-interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
+interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = (os_context_t*)void_context;
-#ifndef LISP_FEATURE_SB_THREAD
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     boolean were_in_lisp;
 #endif
     union interrupt_handler handler;
 
     check_blockables_blocked_or_lose();
-
 
 #ifndef LISP_FEATURE_WIN32
     if (sigismember(&deferrable_sigset,signal))
@@ -516,7 +514,6 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
        delivered we appear to have a null FPU control word. */
     os_restore_fp_control(context);
 #endif
-
 
     handler = interrupt_handlers[signal];
 
@@ -589,11 +586,10 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
         /* Allow signals again. */
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
-
-        (*handler.c)(signal, info, void_context);
+        (*handler.c)(signal, info, context);
     }
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#ifdef FOREIGN_FUNCTION_CALL_FLAG
     if (were_in_lisp)
 #endif
     {
@@ -707,64 +703,47 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-
-    struct thread *thread;
-    struct interrupt_data *data;
-
-    thread=arch_os_get_current_thread();
-    data=thread->interrupt_data;
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
 
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
-    if(maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
-        return;
-    interrupt_handle_now(signal, info, context);
+    if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
+        interrupt_handle_now(signal, info, context);
+
 #ifdef LISP_FEATURE_DARWIN
-    /* Work around G5 bug */
     DARWIN_FIX_CONTEXT(context);
 #endif
 }
 
 static void
-low_level_interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
+low_level_interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = (os_context_t*)void_context;
-
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    os_restore_fp_control(context);
-#endif
-
+    /* No FP control fixage needed, caller has done that. */
     check_blockables_blocked_or_lose();
     check_interrupts_enabled_or_lose(context);
-    interrupt_low_level_handlers[signal](signal, info, void_context);
-#ifdef LISP_FEATURE_DARWIN
-    /* Work around G5 bug */
-    DARWIN_FIX_CONTEXT(context);
-#endif
+    interrupt_low_level_handlers[signal](signal, info, context);
+    /* No Darwin context fixage needed, caller does that. */
 }
 
 static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    struct thread *thread;
-    struct interrupt_data *data;
-
-    thread=arch_os_get_current_thread();
-    data=thread->interrupt_data;
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
 
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
 #endif
 
-    if(maybe_defer_handler(low_level_interrupt_handle_now,data,
-                           signal,info,context))
-        return;
-    low_level_interrupt_handle_now(signal, info, context);
+    if(!maybe_defer_handler(low_level_interrupt_handle_now,data,
+                            signal,info,context))
+        low_level_interrupt_handle_now(signal, info, context);
+
 #ifdef LISP_FEATURE_DARWIN
-    /* Work around G5 bug */
     DARWIN_FIX_CONTEXT(context);
 #endif
 }
@@ -834,6 +813,9 @@ void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
+    os_restore_fp_control(context);
+#endif
     interrupt_handle_now(signal, info, context);
 #ifdef LISP_FEATURE_DARWIN
     DARWIN_FIX_CONTEXT(context);
