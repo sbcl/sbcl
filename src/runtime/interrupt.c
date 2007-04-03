@@ -406,14 +406,19 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 void
 interrupt_handle_pending(os_context_t *context)
 {
-#ifdef LISP_FEATURE_WIN32
-    /* Actually this part looks almost good to go for
-     * Windows too, but currently we never save anything
-     * on Windows, so ending up here would be pretty bad. */
-    lose("Pending interrupts unimplemented on Windows.");
-#else
+    /* There are three ways we can get here.  First, if an interrupt
+     * occurs within pseudo-atomic, it will be deferred, and we'll
+     * trap to here at the end of the pseudo-atomic block.  Second, if
+     * the GC (in alloc()) decides that a GC is required, it will set
+     * *GC-PENDING* and pseudo-atomic-interrupted, and alloc() is
+     * always called from within pseudo-atomic, and thus we end up
+     * here again.  Third, when calling GC-ON or at the end of a
+     * WITHOUT-GCING, MAYBE-HANDLE-PENDING-GC will trap to here if
+     * there is a pending GC. */
+
+    /* Win32 only needs to handle the GC cases (for now?) */
+
     struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
 
     FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
@@ -442,6 +447,7 @@ interrupt_handle_pending(os_context_t *context)
         check_blockables_blocked_or_lose();
     }
 
+#ifndef LISP_FEATURE_WIN32
     /* we may be here only to do the gc stuff, if interrupts are
      * enabled run the pending handler */
     if (!((SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) ||
@@ -450,6 +456,7 @@ interrupt_handle_pending(os_context_t *context)
            (!foreign_function_call_active) &&
 #endif
            arch_pseudo_atomic_atomic(context)))) {
+        struct interrupt_data *data = thread->interrupt_data;
 
         /* There may be no pending handler, because it was only a gc
          * that had to be executed or because pseudo atomic triggered
