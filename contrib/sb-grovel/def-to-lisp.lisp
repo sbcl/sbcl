@@ -197,6 +197,8 @@ code:
                     '("-D_LARGEFILE_SOURCE"
                      "-D_LARGEFILE64_SOURCE"
                       "-D_FILE_OFFSET_BITS=64")
+                    #+(and x86-64 darwin)
+                    '("-arch" "x86_64")
                     (list "-o"
                          (namestring tmp-a-dot-out)
                          (namestring tmp-c-source)))
