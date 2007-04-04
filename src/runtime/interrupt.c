@@ -832,13 +832,6 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 #endif
 }
 
-/*
- * stuff to detect and handle hitting the GC trigger
- */
-
-#ifndef LISP_FEATURE_GENCGC
-#endif
-
 /* manipulate the signal context and stack such that when the handler
  * returns, it will call function instead of whatever it was doing
  * previously
