@@ -377,53 +377,6 @@ arch_install_interrupt_handlers()
     SHOW("returning from arch_install_interrupt_handlers()");
 }
 
-/* This is implemented in assembly language and called from C: */
-extern lispobj
-call_into_lisp(lispobj fun, lispobj *args, int nargs);
-
-/* These functions are an interface to the Lisp call-in facility.
- * Since this is C we can know nothing about the calling environment.
- * The control stack might be the C stack if called from the monitor
- * or the Lisp stack if called as a result of an interrupt or maybe
- * even a separate stack. The args are most likely on that stack but
- * could be in registers depending on what the compiler likes. So we
- * copy the args into a portable vector and let the assembly language
- * call-in function figure it out. */
-
-lispobj
-funcall0(lispobj function)
-{
-    lispobj *args = NULL;
-
-    FSHOW((stderr, "/entering funcall0(0x%lx)\n", (long)function));
-    return call_into_lisp(function, args, 0);
-}
-lispobj
-funcall1(lispobj function, lispobj arg0)
-{
-    lispobj args[1];
-    args[0] = arg0;
-    return call_into_lisp(function, args, 1);
-}
-lispobj
-funcall2(lispobj function, lispobj arg0, lispobj arg1)
-{
-    lispobj args[2];
-    args[0] = arg0;
-    args[1] = arg1;
-    return call_into_lisp(function, args, 2);
-}
-lispobj
-funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
-{
-    lispobj args[3];
-    args[0] = arg0;
-    args[1] = arg1;
-    args[2] = arg2;
-    return call_into_lisp(function, args, 3);
-}
-
-
 #ifdef LISP_FEATURE_LINKAGE_TABLE
 /* FIXME: It might be cleaner to generate these from the lisp side of
  * things.
