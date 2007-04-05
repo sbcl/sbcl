@@ -150,7 +150,7 @@
          (funcall fun)))
 
   (with-test (:name (:undefined-function :bug-346)
-              :fails-on '(or :alpha))   ; bug 346
+              :fails-on '(or :alpha (and :x86-64 :freebsd))) ; bug 346
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
@@ -206,7 +206,7 @@
 
 (with-test (:name (:throw :no-such-tag)
             :fails-on '(or
-                        (and :x86 (or :linux :freebsd sunos))
+                        (and :x86 (or :linux sunos))
                         :alpha
                         :mips))
   (progn
