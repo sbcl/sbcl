@@ -44,6 +44,7 @@
 
 (run "cc"
      #+(and (or linux freebsd) (or x86-64 ppc)) "-fPIC"
+     #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
      "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
 (defparameter *good-offset*
@@ -54,6 +55,7 @@
 
 (run "cc" "stack-alignment-offset.c"
      #+(and (or linux freebsd) (or x86-64 ppc)) "-fPIC"
+     #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
      #+darwin "-bundle" #-darwin "-shared"
      "-o" "stack-alignment-offset.so")
 

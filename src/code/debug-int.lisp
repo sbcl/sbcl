@@ -526,11 +526,11 @@
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
          (sap<= control-stack-start x)
-         (zerop (logand (sap-int x) #b11)))
+         (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask)))
     #!+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
          (sap> control-stack-end x)
-         (zerop (logand (sap-int x) #b11)))))
+         (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask)))))
 
 (declaim (inline component-ptr-from-pc))
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
@@ -658,8 +658,23 @@
 ;;; this function.
 (defun top-frame ()
   (/noshow0 "entering TOP-FRAME")
-  (multiple-value-bind (fp pc) (%caller-frame-and-pc)
-    (compute-calling-frame (descriptor-sap fp) pc nil)))
+  ;; if we have a stored context in *internal-error-context*, use it
+  ;; to compute the fp and pc (and rebind this variable to nil in case
+  ;; we signal another error), otherwise use the (%caller-frame-and-pc
+  ;; vop).
+
+  (if sb!kernel::*internal-error-context*
+      (let* ((context sb!kernel::*internal-error-context*)
+             (sb!kernel::*internal-error-context* nil)
+             (alien-context (locally
+                                (declare (optimize (inhibit-warnings 3)))
+                              (sb!alien:sap-alien context (* os-context-t)))))
+        (compute-calling-frame
+         (int-sap (sb!vm:context-register alien-context
+                                          sb!vm::cfp-offset))
+         (context-pc alien-context) nil))
+      (multiple-value-bind (fp pc) (%caller-frame-and-pc)
+        (compute-calling-frame (descriptor-sap fp) pc nil))))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
 ;;; below FRAME.
