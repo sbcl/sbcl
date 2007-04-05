@@ -641,8 +641,11 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (st-rdev #!-(or mips largefile) unsigned-int
              #!+mips unsigned-long
              #!+largefile dev-t)
-    (st-size #!-(or mips largefile) unsigned-int
-             #!+(or mips largefile) off-t)
+    (st-size #!-(or darwin mips largefile) unsigned-int
+             #!+(or darwin mips largefile) off-t)
+    #!+(and darwin)
+    (st-blksize unsigned-int)
+    #!-(and darwin)
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)

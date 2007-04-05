@@ -173,9 +173,18 @@ typedef off_t ffi_off_t;
 #elif defined(LISP_FEATURE_MIPS)
 typedef unsigned long ffi_dev_t; /* Linux/MIPS struct stat doesn't use dev_t */
 typedef off_t ffi_off_t;
+#elif defined(LISP_FEATURE_DARWIN)
+typedef dev_t ffi_dev_t;
+typedef off_t ffi_off_t;
 #else
 typedef u32 ffi_dev_t; /* since Linux dev_t can be 64 bits */
 typedef u32 ffi_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
+#endif
+
+#if defined(LISP_FEATURE_DARWIN)
+typedef blksize_t ffi_blksize_t;
+#else
+typedef unsigned long ffi_blksize_t;
 #endif
 
 /* a representation of stat(2) results which doesn't depend on CPU or OS */
@@ -204,7 +213,7 @@ struct stat_wrapper {
 #endif
     ffi_dev_t     wrapped_st_rdev;        /* device type (if inode device) */
     ffi_off_t     wrapped_st_size;        /* total size, in bytes */
-    unsigned long wrapped_st_blksize;     /* blocksize for filesystem I/O */
+    ffi_blksize_t wrapped_st_blksize;     /* blocksize for filesystem I/O */
     unsigned long wrapped_st_blocks;      /* number of blocks allocated */
     time_t        wrapped_st_atime;       /* time_t of last access */
     time_t        wrapped_st_mtime;       /* time_t of last modification */
