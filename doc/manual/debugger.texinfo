@@ -26,7 +26,7 @@ the debugger, single-stepper and @code{trace}, and the effect of
 
 @menu
 * Debugger Banner::             
-* Debugger Invokation::         
+* Debugger Invocation::         
 @end menu
 
 @node Debugger Banner
@@ -63,9 +63,9 @@ by entering the corresponding number or name.
 The current frame appears right underneath the restarts, immediately
 followed by the debugger prompt.
 
-@node Debugger Invokation
+@node Debugger Invocation
 @comment  node-name,  next,  previous,  up
-@subsection Debugger Invokation
+@subsection Debugger Invocation
 
 The debugger is invoked when:
 
