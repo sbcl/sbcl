@@ -267,7 +267,7 @@ GNAME(fpu_restore):
  * the undefined-function trampoline
  */
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl  GNAME(undefined_tramp)
 	TYPE(GNAME(undefined_tramp))
 GNAME(undefined_tramp):
@@ -281,7 +281,7 @@ GNAME(undefined_tramp):
 
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl  GNAME(alloc_tramp)
 	TYPE(GNAME(alloc_tramp))
 GNAME(alloc_tramp):
@@ -317,7 +317,7 @@ GNAME(alloc_tramp):
  * the closure trampoline
  */
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl  GNAME(closure_tramp)
 	TYPE(GNAME(closure_tramp))
 GNAME(closure_tramp):
@@ -332,7 +332,7 @@ GNAME(closure_tramp):
 	SIZE(GNAME(closure_tramp))
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl  GNAME(funcallable_instance_tramp)
 #if !defined(LISP_FEATURE_DARWIN)
         .type	GNAME(funcallable_instance_tramp),@function
@@ -350,7 +350,7 @@ GNAME(closure_tramp):
  */
 	.text
 	.globl 	GNAME(fun_end_breakpoint_guts)
-	.align	align_8byte
+	.align	align_16byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
 	jc	multiple_value_return
@@ -381,7 +381,7 @@ GNAME(fun_end_breakpoint_end):
 
 	.globl 	GNAME(do_pending_interrupt)
 	TYPE(GNAME(do_pending_interrupt))
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 GNAME(do_pending_interrupt):
 	TRAP
 	.byte 	trap_PendingInterrupt
@@ -390,7 +390,7 @@ GNAME(do_pending_interrupt):
 
 	.globl	GNAME(post_signal_tramp)
 	TYPE(GNAME(post_signal_tramp))
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
  	 * doesn't exist.  This is where call_into_lisp returns when called 
@@ -416,7 +416,7 @@ GNAME(post_signal_tramp):
 	SIZE(GNAME(post_signal_tramp))
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl  GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
         
