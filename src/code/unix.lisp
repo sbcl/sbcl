@@ -966,15 +966,53 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (defconstant micro-seconds-per-internal-time-unit
     (/ 1000000 sb!xc:internal-time-units-per-second))
 
-  (declaim (inline system-internal-real-time system-internal-run-time))
-  (defun system-internal-real-time ()
+  (declaim (inline system-internal-run-time
+                   internal-real-time-values))
+
+  (defun internal-real-time-values ()
     (multiple-value-bind (ignore seconds useconds) (unix-gettimeofday)
       (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
-      (let ((uint (truncate useconds
-                            micro-seconds-per-internal-time-unit)))
-        (declare (type (unsigned-byte 32) uint))
-        (+ (* seconds sb!xc:internal-time-units-per-second)
-           uint))))
+      (values seconds (truncate useconds micro-seconds-per-internal-time-unit))))
+
+  ;; There are two optimizations here that actually matter (on 32-bit
+  ;; systems): substract the epoch from seconds and milliseconds
+  ;; separately, as those should remain fixnums for the first 17 years
+  ;; or so of runtime. Also, avoid doing consing a new bignum if the
+  ;; result would be = to the last result given.
+  ;;
+  ;; Note: the next trick would be to spin a separate thread to update
+  ;; a global value once per internal tick, so each individual call to
+  ;; get-internal-real-time would be just a memory read... but that is
+  ;; probably best left for user-level code. ;)
+  ;;
+  ;; Thanks to James Anderson for the optimization hint.
+  ;;
+  ;; Yes, it is possible to a computation to be GET-INTERNAL-REAL-TIME
+  ;; bound.
+  ;;
+  ;; --NS 2007-04-05
+  (let ((e-sec 0)
+        (e-msec 0)
+        (c-sec 0)
+        (c-msec 0)
+        (now 0))
+    (declare (type (unsigned-byte 32) e-sec c-sec)
+             (type fixnum e-msec c-msec)
+             (type unsigned-byte now))
+    (defun reinit-internal-real-time ()
+      (setf (values e-sec e-msec) (internal-real-time-values)
+            c-sec 0
+            c-msec 0))
+    ;; If two threads call this at the same time, we're still safe, I believe,
+    ;; as long as NOW is updated before either of C-MSEC or C-SEC. --NS
+    (defun get-internal-real-time ()
+      (multiple-value-bind (sec msec) (internal-real-time-values)
+        (unless (and (= msec c-msec) (= sec c-sec))
+          (setf now (+ (* (- sec e-sec) sb!xc:internal-time-units-per-second)
+                       (- msec e-msec))
+                c-msec msec
+                c-sec sec))
+        now)))
 
   (defun system-internal-run-time ()
     (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)

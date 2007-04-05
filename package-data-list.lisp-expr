@@ -1992,7 +1992,7 @@ SB-KERNEL) have been undone, but probably more remain."
                ;; FIXME: STRUCTURE!OBJECT stuff probably belongs in SB!KERNEL.
                "STRUCTURE!OBJECT" "STRUCTURE!OBJECT-MAKE-LOAD-FORM"
                "SYSTEM-AREA-POINTER" "SYSTEM-AREA-POINTER-P"
-               "SYSTEM-INTERNAL-REAL-TIME"
+               "REINIT-INTERNAL-REAL-TIME"
                "SYSTEM-INTERNAL-RUN-TIME"
                "UNDEFINED-FOREIGN-SYMBOLS-P"
                "UPDATE-LINKAGE-TABLE" "VECTOR-SAP"

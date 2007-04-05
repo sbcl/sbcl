@@ -512,11 +512,19 @@
                (addr ,user-time))))
 
 (declaim (inline system-internal-real-time system-internal-run-time))
-(defun system-internal-real-time ()
-  (with-alien ((system-time filetime))
-    (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
-             (values (floor system-time 100ns-per-internal-time-unit))
-             (addr system-time))))
+
+(let ((epoch 0))
+  (declare (unsigned-byte epoch))
+  ;; FIXME: For optimization ideas see the unix implementation.
+  (defun reinit-internal-real-time ()
+    (setf epoch 0
+          epoch (system-internal-real-time)))
+  (defun get-internal-real-time ()
+    (- (with-alien ((system-time filetime))
+         (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
+                  (values (floor system-time 100ns-per-internal-time-unit))
+                  (addr system-time)))
+       epoch)))
 
 (defun system-internal-run-time ()
   (with-process-times (creation-time exit-time kernel-time user-time)

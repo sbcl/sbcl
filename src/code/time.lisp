@@ -11,18 +11,14 @@
 
 (in-package "SB!IMPL")
 
-;;; Internal epoch, used as base for real-time.
-(declaim (unsigned-byte *internal-epoch*))
-(defvar *internal-epoch* 0)
-
 (defun time-reinit ()
-  (setf *internal-epoch* (system-internal-real-time)))
+  (reinit-internal-real-time))
 
-(defun get-internal-real-time ()
-  #!+sb-doc
-  "Return the real time (\"wallclock time\") since startup in the internal
-time format. (See INTERNAL-TIME-UNITS-PER-SECOND.)"
-  (- (system-internal-real-time) *internal-epoch*))
+;;; Implemented in unix.lisp and win32.lisp.
+#!+sb-doc
+(setf (fdocumentation 'get-internal-real-time 'function)
+      "Return the real time (\"wallclock time\") since startup in the internal
+time format. (See INTERNAL-TIME-UNITS-PER-SECOND.)")
 
 (defun get-internal-run-time ()
   #!+sb-doc

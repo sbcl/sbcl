@@ -10,6 +10,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     documented as unsafe.
   * documentation: SB-SYS:WITHOUT-GCING has been documented as unsafe
     in multithreaded application code.
+  * optimization: GET-INTERNAL-REAL-TIME has been optimized on POSIX
+    platforms. (thanks to James Anderson for the optimization hint)
   * bug fix: number of characters that can be written onto a single
     line in a file is unlimited.
   * bug fix: GC deadlocks from asynchronous interrupts has been fixed
