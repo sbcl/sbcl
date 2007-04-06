@@ -96,8 +96,8 @@
         *gc-inhibit* t
         *gc-pending* nil
         #!+sb-thread *stop-for-gc-pending* #!+sb-thread nil
-        sb!unix::*interrupts-enabled* t
-        sb!unix::*interrupt-pending* nil
+        *interrupts-enabled* t
+        *interrupt-pending* nil
         *break-on-signals* nil
         *maximum-error-depth* 10
         *current-error-depth* 0

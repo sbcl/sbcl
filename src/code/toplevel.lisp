@@ -26,8 +26,8 @@
 
 ;;; FIXME: These could be converted to DEFVARs.
 (declaim (special #!+(or x86 x86-64) *pseudo-atomic-bits*
-                  sb!unix::*interrupts-enabled*
-                  sb!unix::*interrupt-pending*
+                  *interrupts-enabled*
+                  *interrupt-pending*
                   *type-system-initialized*))
 
 (defvar *cold-init-complete-p*)

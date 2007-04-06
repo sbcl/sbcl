@@ -49,23 +49,23 @@ userspace threads, in SBCL WITHOUT-INTERRUPTS does not inhibit scheduling of
 other threads."
   (let ((name (gensym "WITHOUT-INTERRUPTS-BODY-")))
     `(flet ((,name () ,@body))
-      (if *interrupts-enabled*
-          (unwind-protect
-               (let ((*interrupts-enabled* nil))
-                 (,name))
-            ;; If we were interrupted in the protected section, then
-            ;; the interrupts are still blocked and it remains so
-            ;; until the pending interrupt is handled.
-            ;;
-            ;; If we were not interrupted in the protected section,
-            ;; but here, then even if the interrupt handler enters
-            ;; another WITHOUT-INTERRUPTS, the pending interrupt will
-            ;; be handled immediately upon exit from said
-            ;; WITHOUT-INTERRUPTS, so it is as if nothing has
-            ;; happened.
-            (when *interrupt-pending*
-              (receive-pending-interrupt)))
-          (,name)))))
+       (if *interrupts-enabled*
+           (unwind-protect
+                (let ((*interrupts-enabled* nil))
+                  (,name))
+             ;; If we were interrupted in the protected section, then
+             ;; the interrupts are still blocked and it remains so
+             ;; until the pending interrupt is handled.
+             ;;
+             ;; If we were not interrupted in the protected section,
+             ;; but here, then even if the interrupt handler enters
+             ;; another WITHOUT-INTERRUPTS, the pending interrupt will
+             ;; be handled immediately upon exit from said
+             ;; WITHOUT-INTERRUPTS, so it is as if nothing has
+             ;; happened.
+             (when *interrupt-pending*
+               (receive-pending-interrupt)))
+           (,name)))))
 
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc

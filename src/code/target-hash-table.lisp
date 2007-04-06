@@ -21,8 +21,10 @@
 (defmacro with-spinlock-and-without-gcing ((spinlock) &body body)
   #!-sb-thread
   (declare (ignore spinlock))
-  (with-unique-names (old-gc-inhibit)
+  (with-unique-names (old-gc-inhibit old-interrupts-enabled)
     `(let ((,old-gc-inhibit *gc-inhibit*)
+           (,old-interrupts-enabled *interrupts-enabled*)
+           (*interrupts-enabled* nil)
            (*gc-inhibit* t))
        (unwind-protect
             (progn
@@ -31,8 +33,10 @@
               ,@body)
          #!+sb-thread
          (sb!thread::release-spinlock ,spinlock)
-         (let ((*gc-inhibit* ,old-gc-inhibit))
-           ;; the test is racy, but it can err only on the overeager side
+         (let ((*interrupts-enabled* ,old-interrupts-enabled)
+               (*gc-inhibit* ,old-gc-inhibit))
+           ;; the test is racy, but it can err only on the overeager
+           ;; side
            (sb!kernel::maybe-handle-pending-gc))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

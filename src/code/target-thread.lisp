@@ -208,12 +208,15 @@ in future versions."
   (sb!vm::%instance-set spinlock 2 0))
 
 (defmacro with-spinlock ((spinlock) &body body)
-  (sb!int:with-unique-names (lock)
-    `(let ((,lock ,spinlock))
-      (get-spinlock ,lock)
+  (sb!int:with-unique-names (lock got-it)
+    `(let ((,lock ,spinlock)
+           (,got-it nil))
       (unwind-protect
-           (progn ,@body)
-        (release-spinlock ,lock)))))
+           (progn
+             (setf ,got-it (get-spinlock ,lock))
+             (locally ,@body))
+        (when ,got-it
+          (release-spinlock ,lock))))))
 
 ;;;; mutexes
 

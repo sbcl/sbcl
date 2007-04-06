@@ -14,9 +14,9 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     platforms. (thanks to James Anderson for the optimization hint)
   * bug fix: number of characters that can be written onto a single
     line in a file is unlimited.
-  * bug fix: GC deadlocks from asynchronous interrupts has been fixed
-    by disabling interrupts for the duration of any
-    SB-SYS:WITHOUT-GCING section.
+  * bug fix: some GC deadlocks caused by asynchronous interrupts have
+    been fixed by inhibiting interrupts for when GC is disbled.
+  * bug fix: GETHASH, PUTHASH, CLRHASH and REMHASH are now interrupt safe.
 
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * new platform: experimental support for x86-64/darwin (MacOS).
