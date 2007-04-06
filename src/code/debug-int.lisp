@@ -669,7 +669,8 @@
   ;; nth-interrupt-context, otherwise use the (%caller-frame-and-pc
   ;; vop).
   (let ((context (nth-interrupt-context 0)))
-    (if context
+    (if (and context
+             (not (sb!alien:null-alien context)))
         (compute-calling-frame
          (int-sap (sb!vm:context-register context
                                           sb!vm::cfp-offset))
