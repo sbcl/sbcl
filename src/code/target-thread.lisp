@@ -195,7 +195,8 @@ in future versions."
   ;; store any value
   #!+sb-thread
   (loop until
-        (eql (sb!vm::%instance-set-conditional spinlock 2 0 1) 0)))
+        (eql (sb!vm::%instance-set-conditional spinlock 2 0 1) 0))
+  t)
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
