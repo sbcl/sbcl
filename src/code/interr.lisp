@@ -391,70 +391,62 @@
                   nil)))))
 
 
-;;; Special variable to store away the signal context passed to
-;;; internal error. internal-error stores the context for use by
-;;; sb-di:top-frame to figure out what the frame pointer and pc were
-;;; when the error was signalled. This is done since on some platforms
-;;; we have problems tracing through signal handler frames.
-(defparameter *internal-error-context* nil)
-
 ;;;; INTERNAL-ERROR signal handler
 
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
-  (let ((*internal-error-context* context))
-    (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
-    (/hexstr context)
-    (infinite-error-protect
-     (/show0 "about to bind ALIEN-CONTEXT")
-     (let ((alien-context (locally
-                              (declare (optimize (inhibit-warnings 3)))
-                            (sb!alien:sap-alien context (* os-context-t)))))
-       (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
-       (multiple-value-bind (error-number arguments)
-           (sb!vm:internal-error-args alien-context)
+  (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
+  (/hexstr context)
+  (infinite-error-protect
+   (/show0 "about to bind ALIEN-CONTEXT")
+   (let ((alien-context (locally
+                            (declare (optimize (inhibit-warnings 3)))
+                          (sb!alien:sap-alien context (* os-context-t)))))
+     (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
+     (multiple-value-bind (error-number arguments)
+         (sb!vm:internal-error-args alien-context)
 
-         ;; There's a limit to how much error reporting we can usefully
-         ;; do before initialization is complete, but try to be a little
-         ;; bit helpful before we die.
-         (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
-         (/hexstr error-number)
-         (/show0 "cold/low ARGUMENTS=..")
-         (/hexstr arguments)
-         (unless *cold-init-complete-p*
-           (%primitive print "can't recover from error in cold init, halting")
-           (%primitive sb!c:halt))
+       ;; There's a limit to how much error reporting we can usefully
+       ;; do before initialization is complete, but try to be a little
+       ;; bit helpful before we die.
+       (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
+       (/hexstr error-number)
+       (/show0 "cold/low ARGUMENTS=..")
+       (/hexstr arguments)
+       (unless *cold-init-complete-p*
+         (%primitive print "can't recover from error in cold init, halting")
+         (%primitive sb!c:halt))
 
-         (multiple-value-bind (name sb!debug:*stack-top-hint*)
-             (find-interrupted-name-and-frame)
-           (/show0 "back from FIND-INTERRUPTED-NAME")
-           (let ((fp (int-sap (sb!vm:context-register alien-context
-                                                      sb!vm::cfp-offset)))
-                 (handler (and (< -1 error-number (length *internal-errors*))
-                               (svref *internal-errors* error-number))))
-             (cond ((null handler)
-                    (error 'simple-error
-                           :format-control
-                           "unknown internal error, ~D, args=~S"
-                           :format-arguments
-                           (list error-number
-                                 (mapcar (lambda (sc-offset)
-                                           (sb!di::sub-access-debug-var-slot
-                                            fp sc-offset alien-context))
-                                         arguments))))
-                   ((not (functionp handler))
-                    (error 'simple-error
-                           :format-control "internal error ~D: ~A; args=~S"
-                           :format-arguments
-                           (list error-number
-                                 handler
-                                 (mapcar (lambda (sc-offset)
-                                           (sb!di::sub-access-debug-var-slot
-                                            fp sc-offset alien-context))
-                                         arguments))))
-                   (t
-                    (funcall handler name fp alien-context arguments))))))))))
+       (multiple-value-bind (name sb!debug:*stack-top-hint*)
+           (find-interrupted-name-and-frame)
+         (/show0 "back from FIND-INTERRUPTED-NAME")
+         (let ((fp (int-sap (sb!vm:context-register alien-context
+                                                    sb!vm::cfp-offset)))
+               (handler (and (< -1 error-number (length *internal-errors*))
+                             (svref *internal-errors* error-number))))
+           (cond ((null handler)
+                  (error 'simple-error
+                         :format-control
+                         "unknown internal error, ~D, args=~S"
+                         :format-arguments
+                         (list error-number
+                               (mapcar (lambda (sc-offset)
+                                         (sb!di::sub-access-debug-var-slot
+                                          fp sc-offset alien-context))
+                                       arguments))))
+                 ((not (functionp handler))
+                  (error 'simple-error
+                         :format-control "internal error ~D: ~A; args=~S"
+                         :format-arguments
+                         (list error-number
+                               handler
+                               (mapcar (lambda (sc-offset)
+                                         (sb!di::sub-access-debug-var-slot
+                                          fp sc-offset alien-context))
+                                       arguments))))
+                 (t
+                  (funcall handler name fp alien-context arguments)))))))))
 
 (defun control-stack-exhausted-error ()
   (let ((sb!debug:*stack-top-hint* nil))

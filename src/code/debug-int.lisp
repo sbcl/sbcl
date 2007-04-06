@@ -654,27 +654,28 @@
 (defun descriptor-sap (x)
   (int-sap (get-lisp-obj-address x)))
 
+(defun nth-interrupt-context (n)
+  (declare (type (unsigned-byte 32) n)
+           (optimize (speed 3) (safety 0)))
+  (sb!alien:sap-alien (sb!vm::current-thread-offset-sap
+                       (+ sb!vm::thread-interrupt-contexts-offset n))
+                      (* os-context-t)))
+
 ;;; Return the top frame of the control stack as it was before calling
 ;;; this function.
 (defun top-frame ()
   (/noshow0 "entering TOP-FRAME")
-  ;; if we have a stored context in *internal-error-context*, use it
-  ;; to compute the fp and pc (and rebind this variable to nil in case
-  ;; we signal another error), otherwise use the (%caller-frame-and-pc
+  ;; check to see if we can get the context by calling
+  ;; nth-interrupt-context, otherwise use the (%caller-frame-and-pc
   ;; vop).
-
-  (if sb!kernel::*internal-error-context*
-      (let* ((context sb!kernel::*internal-error-context*)
-             (sb!kernel::*internal-error-context* nil)
-             (alien-context (locally
-                                (declare (optimize (inhibit-warnings 3)))
-                              (sb!alien:sap-alien context (* os-context-t)))))
+  (let ((context (nth-interrupt-context 0)))
+    (if context
         (compute-calling-frame
-         (int-sap (sb!vm:context-register alien-context
+         (int-sap (sb!vm:context-register context
                                           sb!vm::cfp-offset))
-         (context-pc alien-context) nil))
-      (multiple-value-bind (fp pc) (%caller-frame-and-pc)
-        (compute-calling-frame (descriptor-sap fp) pc nil))))
+         (context-pc context) nil)
+        (multiple-value-bind (fp pc) (%caller-frame-and-pc)
+          (compute-calling-frame (descriptor-sap fp) pc nil)))))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
 ;;; below FRAME.
@@ -875,13 +876,6 @@
                                                     escaped)
                              (if up-frame (1+ (frame-number up-frame)) 0)
                              escaped)))))
-
-(defun nth-interrupt-context (n)
-  (declare (type (unsigned-byte 32) n)
-           (optimize (speed 3) (safety 0)))
-  (sb!alien:sap-alien (sb!vm::current-thread-offset-sap
-                       (+ sb!vm::thread-interrupt-contexts-offset n))
-                      (* os-context-t)))
 
 #!+(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
