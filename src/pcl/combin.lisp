@@ -248,7 +248,7 @@
                              `(list* ,@required
                                      (sb-c::%listify-rest-args
                                       .dfun-more-context.
-                                      (the (and (unsigned-byte fixnum))
+                                      (the (and unsigned-byte fixnum)
                                         .dfun-more-count.)))
                              `(list ,@required))))
            `(lambda ,ll

@@ -17,6 +17,7 @@
 
 #include "sbcl.h"
 #include "runtime.h"
+#include "globals.h"
 
 /* This is implemented in assembly language and called from C: */
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);

@@ -231,7 +231,7 @@
 (defknown * (&rest number) number
   (movable foldable flushable explicit-check))
 (defknown / (number &rest number) number
-  (movable foldable flushable explicit-check))
+  (movable foldable unsafely-flushable explicit-check))
 (defknown (1+ 1-) (number) number
   (movable foldable flushable explicit-check))
 

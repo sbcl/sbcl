@@ -1792,3 +1792,12 @@ WORKAROUND:
   Test :NAN-COMPARISONS in float.pure.lisp fails on x86-64, and has been
   disabled on those platforms. Since x86 does not exhibit any problems
   the problem is probably with the new FP implementation.
+
+412: deletion of global variable references in safe code
+  The following returns 1 instead of signalling an error.
+   (funcall (compile nil
+                     '(lambda ()
+                        (declare (optimize (safety 3)))
+                        #:unbound
+                        42)))
+  Reported by Marco Monteiro on sbcl-devel.

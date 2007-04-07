@@ -2201,3 +2201,17 @@
                                    y)
                                  (integer-length x)))))
             warned-p))
+
+;; Dead / in safe code
+(with-test (:name :safe-dead-/)
+  (assert (eq :error
+              (handler-case
+                  (funcall (compile nil
+                                    '(lambda (x y)
+                                      (declare (optimize (safety 3)))
+                                      (/ x y)
+                                      (+ x y)))
+                           1
+                           0)
+                (division-by-zero ()
+                  :error)))))
