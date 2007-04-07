@@ -42,9 +42,9 @@
 (macrolet ((ea-for-xf-stack (tn kind)
              `(make-ea
                :dword :base ebp-tn
-               :disp (- (* (+ (tn-offset ,tn)
-                              (ecase ,kind (:single 1) (:double 2) (:long 3)))
-                         n-word-bytes)))))
+               :disp (frame-byte-offset
+                      (+ (tn-offset ,tn)
+                       (ecase ,kind (:single 0) (:double 1) (:long 2)))))))
   (defun ea-for-sf-stack (tn)
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
@@ -79,13 +79,14 @@
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)
              `(make-ea
                :dword :base ,base
-               :disp (- (* (+ (tn-offset ,tn)
-                              (* (ecase ,kind
-                                   (:single 1)
-                                   (:double 2)
-                                   (:long 3))
-                                 (ecase ,slot (:real 1) (:imag 2))))
-                         n-word-bytes)))))
+               :disp (frame-byte-offset
+                      (+ (tn-offset ,tn)
+                       -1
+                       (* (ecase ,kind
+                            (:single 1)
+                            (:double 2)
+                            (:long 3))
+                          (ecase ,slot (:real 1) (:imag 2))))))))
   (defun ea-for-csf-real-stack (tn &optional (base ebp-tn))
     (ea-for-cxf-stack tn :single :real base))
   (defun ea-for-csf-imag-stack (tn &optional (base ebp-tn))
@@ -613,6 +614,7 @@
                                  (inst fxch x)))))
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
+                           ;; C-call
                            (let* ((offset (* (tn-offset y) n-word-bytes))
                                   (ea (make-ea :dword :base fp :disp offset)))
                              (with-tn@fp-top(x)
@@ -621,14 +623,15 @@
                                          (:double '((inst fstd ea)))
                                          #!+long-float
                                          (:long '((store-long-float ea))))))
+                           ;; Lisp stack
                            (let ((ea (make-ea
                                       :dword :base fp
-                                      :disp (- (* (+ (tn-offset y)
-                                                     ,(case format
-                                                            (:single 1)
-                                                            (:double 2)
-                                                            (:long 3)))
-                                                  n-word-bytes)))))
+                                      :disp (frame-byte-offset
+                                             (+ (tn-offset y)
+                                                ,(case format
+                                                       (:single 0)
+                                                       (:double 1)
+                                                       (:long 2)))))))
                              (with-tn@fp-top(x)
                                ,@(ecase format
                                     (:single '((inst fst  ea)))
@@ -1830,12 +1833,12 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 2
-    (let ((offset (1+ (tn-offset temp))))
-      (storew hi-bits ebp-tn (- offset))
-      (storew lo-bits ebp-tn (- (1+ offset)))
+    (let ((offset (tn-offset temp)))
+      (storew hi-bits ebp-tn (frame-word-offset offset))
+      (storew lo-bits ebp-tn (frame-word-offset (1+ offset)))
       (with-empty-tn@fp-top(res)
         (inst fldd (make-ea :dword :base ebp-tn
-                            :disp (- (* (1+ offset) n-word-bytes))))))))
+                            :disp (frame-byte-offset (1+ offset))))))))
 
 #!+long-float
 (define-vop (make-long-float)
@@ -1850,13 +1853,13 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (let ((offset (1+ (tn-offset temp))))
-      (storew exp-bits ebp-tn (- offset))
-      (storew hi-bits ebp-tn (- (1+ offset)))
-      (storew lo-bits ebp-tn (- (+ offset 2)))
+    (let ((offset (tn-offset temp)))
+      (storew exp-bits ebp-tn (frame-word-offset offset))
+      (storew hi-bits ebp-tn (frame-word-offset (1+ offset)))
+      (storew lo-bits ebp-tn (frame-word-offset (+ offset 2)))
       (with-empty-tn@fp-top(res)
         (inst fldl (make-ea :dword :base ebp-tn
-                            :disp (- (* (+ offset 2) n-word-bytes))))))))
+                            :disp (frame-byte-offset (+ offset 2))))))))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
@@ -1903,12 +1906,11 @@
        (double-reg
         (with-tn@fp-top(float)
           (let ((where (make-ea :dword :base ebp-tn
-                                :disp (- (* (+ 2 (tn-offset temp))
-                                            n-word-bytes)))))
+                                :disp (frame-byte-offset (1+ (tn-offset temp))))))
             (inst fstd where)))
-        (loadw hi-bits ebp-tn (- (1+ (tn-offset temp)))))
+        (loadw hi-bits ebp-tn (frame-word-offset (tn-offset temp))))
        (double-stack
-        (loadw hi-bits ebp-tn (- (1+ (tn-offset float)))))
+        (loadw hi-bits ebp-tn (frame-word-offset (tn-offset float))))
        (descriptor-reg
         (loadw hi-bits float (1+ double-float-value-slot)
                other-pointer-lowtag)))))
@@ -1928,12 +1930,11 @@
        (double-reg
         (with-tn@fp-top(float)
           (let ((where (make-ea :dword :base ebp-tn
-                                :disp (- (* (+ 2 (tn-offset temp))
-                                            n-word-bytes)))))
+                                :disp (frame-byte-offset (1+ (tn-offset temp))))))
             (inst fstd where)))
-        (loadw lo-bits ebp-tn (- (+ 2 (tn-offset temp)))))
+        (loadw lo-bits ebp-tn (frame-word-offset (1+ (tn-offset temp)))))
        (double-stack
-        (loadw lo-bits ebp-tn (- (+ 2 (tn-offset float)))))
+        (loadw lo-bits ebp-tn (frame-word-offset (1+ (tn-offset float)))))
        (descriptor-reg
         (loadw lo-bits float double-float-value-slot
                other-pointer-lowtag)))))
@@ -1954,16 +1955,15 @@
        (long-reg
         (with-tn@fp-top(float)
           (let ((where (make-ea :dword :base ebp-tn
-                                :disp (- (* (+ 3 (tn-offset temp))
-                                            n-word-bytes)))))
+                                :disp (frame-byte-offset (+ 2 (tn-offset temp))))))
             (store-long-float where)))
         (inst movsx exp-bits
               (make-ea :word :base ebp-tn
-                       :disp (* (- (1+ (tn-offset temp))) n-word-bytes))))
+                       :disp (frame-byte-offset (tn-offset temp)))))
        (long-stack
         (inst movsx exp-bits
               (make-ea :word :base ebp-tn
-                       :disp (* (- (1+ (tn-offset float))) n-word-bytes))))
+                       :disp (frame-byte-offset (tn-offset temp)))))
        (descriptor-reg
         (inst movsx exp-bits
               (make-ea :word :base float
@@ -1987,12 +1987,11 @@
        (long-reg
         (with-tn@fp-top(float)
           (let ((where (make-ea :dword :base ebp-tn
-                                :disp (- (* (+ 3 (tn-offset temp))
-                                            n-word-bytes)))))
+                                :disp (frame-byte-offset (+ 2 (tn-offset temp))))))
             (store-long-float where)))
-        (loadw hi-bits ebp-tn (- (+ (tn-offset temp) 2))))
+        (loadw hi-bits ebp-tn (frame-word-offset (1+ (tn-offset temp)))))
        (long-stack
-        (loadw hi-bits ebp-tn (- (+ (tn-offset float) 2))))
+        (loadw hi-bits ebp-tn (frame-word-offset (1+ (tn-offset temp)))))
        (descriptor-reg
         (loadw hi-bits float (1+ long-float-value-slot)
                other-pointer-lowtag)))))
@@ -2013,12 +2012,11 @@
        (long-reg
         (with-tn@fp-top(float)
           (let ((where (make-ea :dword :base ebp-tn
-                                :disp (- (* (+ 3 (tn-offset temp))
-                                            n-word-bytes)))))
+                                :disp (frame-byte-offset (+ 2 (tn-offset temp))))))
             (store-long-float where)))
-        (loadw lo-bits ebp-tn (- (+ (tn-offset temp) 3))))
+        (loadw lo-bits ebp-tn (frame-word-offset (+ (tn-offset temp) 2))))
        (long-stack
-        (loadw lo-bits ebp-tn (- (+ (tn-offset float) 3))))
+        (loadw lo-bits ebp-tn (frame-word-offset (+ (tn-offset float) 2))))
        (descriptor-reg
         (loadw lo-bits float long-float-value-slot
                other-pointer-lowtag)))))

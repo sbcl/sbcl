@@ -133,7 +133,7 @@
 
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (popw ebp-tn (- (1+ return-pc-save-offset)))
+    (popw ebp-tn (frame-word-offset return-pc-save-offset))
 
     ;; If copy-more-arg follows it will allocate the correct stack
     ;; size. The stack is not allocated first here as this may expose
@@ -267,7 +267,7 @@
 
             (inst cmp ecx-tn (fixnumize i))
             (inst jmp :be default-lab)
-            (loadw edx-tn ebx-tn (- (1+ i)))
+            (loadw edx-tn ebx-tn (frame-word-offset i))
             (inst mov tn edx-tn)))
 
         (emit-label defaulting-done)
@@ -306,7 +306,7 @@
       (emit-label no-stack-args)
       (inst lea edi-tn
             (make-ea :dword :base ebp-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Load EAX with NIL so we can quickly store it, and set up
       ;; stuff for the loop.
       (inst mov eax-tn nil-value)
@@ -321,7 +321,7 @@
       ;; and then default the remaining stack arguments.
       (emit-label regs-defaulted)
       ;; Save EDI.
-      (storew edi-tn ebx-tn (- (1+ 1)))
+      (storew edi-tn ebx-tn (frame-word-offset 1))
       ;; Compute the number of stack arguments, and if it's zero or
       ;; less, don't copy any stack arguments.
       (inst sub ecx-tn (fixnumize register-arg-count))
@@ -337,12 +337,12 @@
       ;; Compute a pointer to where the stack args go.
       (inst lea edi-tn
             (make-ea :dword :base ebp-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Save ESI, and compute a pointer to where the args come from.
-      (storew esi-tn ebx-tn (- (1+ 2)))
+      (storew esi-tn ebx-tn (frame-word-offset 2))
       (inst lea esi-tn
             (make-ea :dword :base ebx-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Do the copy.
       (inst shr ecx-tn word-shift)              ; make word count
       (inst std)
@@ -351,7 +351,7 @@
       ;; solaris requires DF being zero.
       #!+sunos (inst cld)
       ;; Restore ESI.
-      (loadw esi-tn ebx-tn (- (1+ 2)))
+      (loadw esi-tn ebx-tn (frame-word-offset 2))
       ;; Now we have to default the remaining args. Find out how many.
       (inst sub eax-tn (fixnumize (- nvals register-arg-count)))
       (inst neg eax-tn)
@@ -369,7 +369,7 @@
       #!+sunos (inst cld)
       ;; Restore EDI, and reset the stack.
       (emit-label restore-edi)
-      (loadw edi-tn ebx-tn (- (1+ 1)))
+      (loadw edi-tn ebx-tn (frame-word-offset 1))
       (inst mov esp-tn ebx-tn))))
   (values))
 
@@ -479,7 +479,7 @@
          #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
                        (tn-offset ret-tn))
          (storew (make-fixup nil :code-object return)
-                 ebp-tn (- (1+ (tn-offset ret-tn)))))
+                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
         ((sap-reg)
          (inst lea ret-tn (make-fixup nil :code-object return)))))
 
@@ -518,7 +518,7 @@
                        (tn-offset ret-tn))
          ;; Stack
          (storew (make-fixup nil :code-object return)
-                 ebp-tn (- (1+ (tn-offset ret-tn)))))
+                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
         ((sap-reg)
          ;; Register
          (inst lea ret-tn (make-fixup nil :code-object return)))))
@@ -566,7 +566,7 @@
                        (tn-offset ret-tn))
          ;; Stack
          (storew (make-fixup nil :code-object return)
-                 ebp-tn (- (1+ (tn-offset ret-tn)))))
+                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
         ((sap-reg)
          ;; Register
          (inst lea ret-tn (make-fixup nil :code-object return)))))
@@ -651,8 +651,7 @@
           (cond ((zerop (tn-offset old-fp))
                  ;; Zot all of the stack except for the old-fp.
                  (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                           :disp (- (* (1+ ocfp-save-offset)
-                                                       n-word-bytes))))
+                                           :disp (frame-byte-offset ocfp-save-offset)))
                  ;; Restore the old fp from its save location on the stack,
                  ;; and zot the stack.
                  (inst pop ebp-tn))
@@ -680,7 +679,7 @@
        ;; Zot all of the stack except for the old-fp and return-pc.
        (inst lea esp-tn
              (make-ea :dword :base ebp-tn
-                      :disp (- (* (1+ (tn-offset return-pc)) n-word-bytes))))
+                      :disp (frame-byte-offset (tn-offset return-pc))))
        ;; Restore the old fp. old-fp may be either on the stack in its
        ;; save location or in a register, in either case this restores it.
        (move ebp-tn old-fp)
@@ -858,12 +857,12 @@
                                       (move old-fp-tmp old-fp)
                                       (storew old-fp-tmp
                                               ebp-tn
-                                              (- (1+ ocfp-save-offset)))))
+                                              (frame-word-offset ocfp-save-offset))))
                                    ((any-reg descriptor-reg)
                                     (format t "** tail-call old-fp in reg not S0~%")
                                     (storew old-fp
                                             ebp-tn
-                                            (- (1+ ocfp-save-offset)))))
+                                            (frame-word-offset ocfp-save-offset))))
 
                           ;; For tail call, we have to push the
                           ;; return-pc so that it looks like we CALLed
@@ -889,7 +888,7 @@
                                '(inst sub esp-tn (fixnumize 3)))
 
                           ;; Save the fp
-                          (storew ebp-tn new-fp (- (1+ ocfp-save-offset)))
+                          (storew ebp-tn new-fp (frame-word-offset ocfp-save-offset))
 
                           (move ebp-tn new-fp) ; NB - now on new stack frame.
                           )))
@@ -992,8 +991,7 @@
           ;; Drop the stack above it and pop it off.
           (cond ((zerop (tn-offset old-fp))
                  (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                           :disp (- (* (1+ ocfp-save-offset)
-                                                       n-word-bytes))))
+                                           :disp (frame-byte-offset ocfp-save-offset)))
                  (inst pop ebp-tn))
                 (t
                  ;; Should this ever happen, we do the same as above, but
@@ -1024,8 +1022,7 @@
        ;; into a temp reg while we fix the stack.
        ;; Drop stack above return-pc
        (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                 :disp (- (* (1+ (tn-offset return-pc))
-                                             n-word-bytes))))
+                                 :disp (frame-byte-offset (tn-offset return-pc))))
        ;; Set single-value return flag
        (inst clc)
        ;; Restore the old frame pointer
@@ -1096,8 +1093,7 @@
            (inst ret))
           (t
            (inst jmp (make-ea :dword :base ebx
-                              :disp (- (* (1+ (tn-offset return-pc))
-                                          n-word-bytes))))))
+                              :disp (frame-byte-offset (tn-offset return-pc))))))
 
     (trace-table-entry trace-table-normal)))
 

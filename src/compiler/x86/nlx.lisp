@@ -24,7 +24,7 @@
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
   (make-ea :dword :base ebp-tn
-           :disp (- (* (+ (tn-offset tn) catch-block-size) n-word-bytes))))
+           :disp (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size))))
 
 
 ;;;; Save and restore dynamic environment.
@@ -189,9 +189,9 @@
                  (inst jmp :le default-lab)
                  (sc-case tn
                    ((descriptor-reg any-reg)
-                    (loadw tn start (- (1+ i))))
+                    (loadw tn start (frame-word-offset i)))
                    ((control-stack)
-                    (loadw move-temp start (- (1+ i)))
+                    (loadw move-temp start (frame-word-offset i))
                     (inst mov tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)

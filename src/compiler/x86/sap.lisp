@@ -65,7 +65,7 @@
       (sap-stack
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
-           (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 

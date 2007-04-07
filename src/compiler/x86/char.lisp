@@ -103,12 +103,14 @@
       (character-stack
        #!-sb-unicode
        (inst mov
-             (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
+             ;; XXX: If the sb-unicode case needs to handle c-call,
+             ;; why does the non-unicode case not need to?
+             (make-ea :byte :base fp :disp (frame-byte-offset (tn-offset y)))
              x)
        #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
-           (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 

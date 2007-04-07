@@ -408,7 +408,14 @@
 ;;; offsets of special stack frame locations
 (def!constant ocfp-save-offset 0)
 (def!constant return-pc-save-offset 1)
-(def!constant code-save-offset 2)
+
+(declaim (inline frame-word-offset))
+(defun frame-word-offset (index)
+  (- (1+ index)))
+
+(declaim (inline frame-byte-offset))
+(defun frame-byte-offset (index)
+  (* (frame-word-offset index) n-word-bytes))
 
 ;;; FIXME: This is a bad comment (changed since when?) and there are others
 ;;; like it in this file. It'd be nice to clarify them. Failing that deleting

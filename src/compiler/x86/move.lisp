@@ -127,36 +127,24 @@
                                    character-widetag)))))
          (move y x)))
       ((control-stack)
-       (if (sc-is x immediate)
-           (let ((val (tn-value x)))
-             (if (= (tn-offset fp) esp-offset)
-                 ;; C-call
-                 (etypecase val
-                   (integer
-                    (storew (fixnumize val) fp (tn-offset y)))
-                   (symbol
-                    (storew (+ nil-value (static-symbol-offset val))
-                            fp (tn-offset y)))
-                   (character
-                    (storew (logior (ash (char-code val) n-widetag-bits)
-                                    character-widetag)
-                            fp (tn-offset y))))
-               ;; Lisp stack
+       (let ((frame-offset (if (= (tn-offset fp) esp-offset)
+                               ;; C-call
+                               (tn-offset y)
+                               ;; Lisp stack
+                               (frame-word-offset (tn-offset y)))))
+         (if (sc-is x immediate)
+             (let ((val (tn-value x)))
                (etypecase val
                  (integer
-                  (storew (fixnumize val) fp (- (1+ (tn-offset y)))))
+                  (storew (fixnumize val) fp frame-offset))
                  (symbol
                   (storew (+ nil-value (static-symbol-offset val))
-                          fp (- (1+ (tn-offset y)))))
+                          fp frame-offset))
                  (character
                   (storew (logior (ash (char-code val) n-widetag-bits)
                                   character-widetag)
-                          fp (- (1+ (tn-offset y))))))))
-         (if (= (tn-offset fp) esp-offset)
-             ;; C-call
-             (storew x fp (tn-offset y))
-           ;; Lisp stack
-           (storew x fp (- (1+ (tn-offset y))))))))))
+                          fp frame-offset))))
+             (storew x fp frame-offset)))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -415,7 +403,7 @@
       ((signed-stack unsigned-stack)
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
-           (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

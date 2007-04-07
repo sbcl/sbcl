@@ -55,7 +55,7 @@
   (:result-types *)
   (:generator 5
     (inst mov result (make-ea :dword :base sap
-                              :disp (- (* (1+ index) n-word-bytes))))))
+                              :disp (frame-byte-offset index)))))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -85,7 +85,7 @@
   (:result-types *)
   (:generator 5
     (inst mov (make-ea :dword :base sap
-                       :disp (- (* (1+ index) n-word-bytes)))
+                       :disp (frame-byte-offset index))
           value)
     (move result value)))
 
