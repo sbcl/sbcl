@@ -67,7 +67,8 @@ $SBCL <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" >"$tmpoutput" --eval '(quit :unix-status 71)'
+./"$tmpcore" >"$tmpoutput" \
+  --no-userinit --no-sysinit --eval '(quit :unix-status 71)'
 if [ $? != 71 ]; then
   echo "failure in banner suppression: $?"
   exit 1
