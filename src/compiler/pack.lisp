@@ -607,20 +607,6 @@
                        save tn before))
   (values))
 
-(eval-when (:compile-toplevel :execute)
-
-;;; Do stuff to note a read of TN, for OPTIMIZED-EMIT-SAVES-BLOCK.
-(defmacro save-note-read (tn)
-  `(let* ((tn ,tn)
-          (num (tn-number tn)))
-     (when (and (sc-save-p (tn-sc tn))
-                (zerop (sbit restores num))
-                (not (eq (tn-kind tn) :component)))
-       (setf (sbit restores num) 1)
-       (push tn restores-list))))
-
-) ; EVAL-WHEN
-
 ;;; Start scanning backward at the end of BLOCK, looking which TNs are
 ;;; live and looking for places where we have to save. We manipulate
 ;;; two sets: SAVES and RESTORES.
@@ -700,9 +686,7 @@
                   (setq saves-list
                         (delete tn saves-list :test #'eq))))))
 
-          (macrolet (;; Do stuff to note a read of TN, for
-                     ;; OPTIMIZED-EMIT-SAVES-BLOCK.
-                     (save-note-read (tn)
+          (macrolet ((save-note-read (tn)
                        `(let* ((tn ,tn)
                                (num (tn-number tn)))
                           (when (and (sc-save-p (tn-sc tn))
