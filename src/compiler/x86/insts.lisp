@@ -1089,8 +1089,14 @@
 
 
 (define-instruction fs-segment-prefix (segment)
+  (:printer byte ((op #b01100100)))
   (:emitter
    (emit-byte segment #x64)))
+
+(define-instruction gs-segment-prefix (segment)
+  (:printer byte ((op #b01100101)))
+  (:emitter
+   (emit-byte segment #x65)))
 
 ;;;; flag control instructions
 
