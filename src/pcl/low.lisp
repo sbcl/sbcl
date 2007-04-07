@@ -305,11 +305,8 @@
 
 ;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
 
-(defun get-structure-dd (type)
-  (layout-info (classoid-layout (find-classoid type))))
-
 (defun structure-type-included-type-name (type)
-  (let ((include (dd-include (get-structure-dd type))))
+  (let ((include (dd-include (find-defstruct-description type))))
     (if (consp include)
         (car include)
         include)))
@@ -317,8 +314,8 @@
 (defun structure-type-slot-description-list (type)
   (nthcdr (length (let ((include (structure-type-included-type-name type)))
                     (and include
-                         (dd-slots (get-structure-dd include)))))
-          (dd-slots (get-structure-dd type))))
+                         (dd-slots (find-defstruct-description include)))))
+          (dd-slots (find-defstruct-description type))))
 
 (defun structure-slotd-name (slotd)
   (dsd-name slotd))
@@ -331,7 +328,7 @@
 
 (defun structure-slotd-writer-function (type slotd)
   (if (dsd-read-only slotd)
-      (let ((dd (get-structure-dd type)))
+      (let ((dd (find-defstruct-description type)))
         (coerce (slot-setter-lambda-form dd slotd) 'function))
       (fdefinition `(setf ,(dsd-accessor-name slotd)))))
 

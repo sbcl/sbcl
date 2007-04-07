@@ -170,7 +170,9 @@
                 (let ((value (slot-value-using-class class object slot)))
                   (if (typep object 'structure-object)
                       ;; low-level but less noisy initializer form
-                      (let* ((dd (get-structure-dd (class-name class)))
+                      ;; FIXME: why not go class->layout->info == dd?
+                      (let* ((dd (find-defstruct-description
+                                  (class-name class)))
                              (dsd (find slot-name (dd-slots dd)
                                         :key #'dsd-name)))
                         (inits `(,(slot-setter-lambda-form dd dsd)

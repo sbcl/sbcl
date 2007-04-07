@@ -19,7 +19,7 @@
 ;;; set the doc here because in early-thread FDOCUMENTATION is not
 ;;; available, yet
 #!+sb-doc
-(setf (sb!kernel:fdocumentation '*current-thread* 'variable)
+(setf (fdocumentation '*current-thread* 'variable)
       "Bound in each thread to the thread itself.")
 
 (defstruct (thread (:constructor %make-thread))
@@ -35,7 +35,7 @@ in future versions."
   (result-lock (make-mutex :name "thread result lock")))
 
 #!+sb-doc
-(setf (sb!kernel:fdocumentation 'thread-name 'function)
+(setf (fdocumentation 'thread-name 'function)
       "The name of the thread. Setfable.")
 
 (def!method print-object ((thread thread) stream)
@@ -143,7 +143,7 @@ in future versions."
     (defmacro with-lutex-address ((name lutex) &body body)
       `(let ((,name ,lutex))
          (with-pinned-objects (,name)
-           (let ((,name (sb!kernel:get-lisp-obj-address ,name)))
+           (let ((,name (get-lisp-obj-address ,name)))
              ,@body))))
 
     (defun make-lutex ()
@@ -182,31 +182,33 @@ in future versions."
   (sb!vm::current-thread-offset-sap n))
 
 ;;;; spinlocks
+#!+sb-thread
+(define-structure-slot-compare-and-exchange
+    compare-and-exchange-spinlock-value
+    :structure spinlock
+    :slot value)
 
 (declaim (inline get-spinlock release-spinlock))
 
-;;; The bare 2 here and below are offsets of the slots in the struct.
-;;; There ought to be some better way to get these numbers
 (defun get-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
            #!-sb-thread
-           (ignore spinlock new-value))
+           (ignore spinlock))
   ;; %instance-set-conditional can test for 0 (which is a fixnum) and
   ;; store any value
   #!+sb-thread
-  (loop until
-        (eql (sb!vm::%instance-set-conditional spinlock 2 0 1) 0))
+  (compare-and-exchange-spinlock-value spinlock 0 1)
   t)
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
            #!-sb-thread (ignore spinlock))
   ;; %instance-set-conditional cannot compare arbitrary objects
-  ;; meaningfully, so
-  ;; (sb!vm::%instance-set-conditional spinlock 2 our-value 0)
+  ;; meaningfully, so (compare-and-exchange-spinlock-value our-value 0)
   ;; does not work for bignum thread ids.
   #!+sb-thread
-  (sb!vm::%instance-set spinlock 2 0))
+  (setf (spinlock-value spinlock) 0)
+  nil)
 
 (defmacro with-spinlock ((spinlock) &body body)
   (sb!int:with-unique-names (lock got-it)
@@ -222,28 +224,28 @@ in future versions."
 ;;;; mutexes
 
 #!+sb-doc
-(setf (sb!kernel:fdocumentation 'make-mutex 'function)
+(setf (fdocumentation 'make-mutex 'function)
       "Create a mutex."
-      (sb!kernel:fdocumentation 'mutex-name 'function)
+      (fdocumentation 'mutex-name 'function)
       "The name of the mutex. Setfable."
-      (sb!kernel:fdocumentation 'mutex-value 'function)
+      (fdocumentation 'mutex-value 'function)
       "The value of the mutex. NIL if the mutex is free. Setfable.")
 
 #!+(and sb-thread (not sb-lutex))
 (progn
-  (declaim (inline mutex-value-address))
-  (defun mutex-value-address (mutex)
-    (declare (optimize (speed 3)))
-    (sb!ext:truly-the
-     sb!vm:word
-     (+ (sb!kernel:get-lisp-obj-address mutex)
-        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
+  (define-structure-slot-addressor mutex-value-address
+      :structure mutex
+      :slot value)
+  (define-structure-slot-compare-and-exchange
+      compare-and-exchange-mutex-value
+      :structure mutex
+      :slot value))
 
 (defun get-mutex (mutex &optional (new-value *current-thread*) (wait-p t))
   #!+sb-doc
   "Acquire MUTEX, setting it to NEW-VALUE or some suitable default
-value if NIL.  If WAIT-P is non-NIL and the mutex is in use, sleep
-until it is available"
+value if NIL. If WAIT-P is non-NIL and the mutex is in use, sleep
+until it is available."
   (declare (type mutex mutex) (optimize (speed 3)))
   (/show0 "Entering GET-MUTEX")
   (unless new-value
@@ -273,13 +275,13 @@ until it is available"
     (let (old)
       (loop
          (unless
-             (setf old (sb!vm::%instance-set-conditional mutex 2 nil
-                                                         new-value))
+             (setf old
+                   (compare-and-exchange-mutex-value mutex nil new-value))
            (return t))
          (unless wait-p (return nil))
          (with-pinned-objects (mutex old)
            (futex-wait (mutex-value-address mutex)
-                       (sb!kernel:get-lisp-obj-address old)))))))
+                       (get-lisp-obj-address old)))))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
@@ -313,18 +315,13 @@ this mutex."
   (%make-waitqueue :name name))
 
 #!+sb-doc
-(setf (sb!kernel:fdocumentation 'waitqueue-name 'function)
+(setf (fdocumentation 'waitqueue-name 'function)
       "The name of the waitqueue. Setfable.")
 
 #!+(and sb-thread (not sb-lutex))
-(progn
-  (declaim (inline waitqueue-data-address))
-  (defun waitqueue-data-address (waitqueue)
-    (declare (optimize (speed 3)))
-    (sb!ext:truly-the
-     sb!vm:word
-     (+ (sb!kernel:get-lisp-obj-address waitqueue)
-        (- (* 3 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag)))))
+(define-structure-slot-addressor waitqueue-data-address
+    :structure waitqueue
+    :slot data)
 
 (defun condition-wait (queue mutex)
   #!+sb-doc
@@ -358,7 +355,7 @@ time we reacquire MUTEX and return to the caller."
            ;; Ergo, no lost wakeup
            (with-pinned-objects (queue me)
              (futex-wait (waitqueue-data-address queue)
-                         (sb!kernel:get-lisp-obj-address me))))
+                         (get-lisp-obj-address me))))
       ;; If we are interrupted while waiting, we should do these things
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is
@@ -414,7 +411,7 @@ time we reacquire MUTEX and return to the caller."
   "Create a semaphore with the supplied COUNT."
   (%make-semaphore :name name :count count))
 
-(setf (sb!kernel:fdocumentation 'semaphore-name 'function)
+(setf (fdocumentation 'semaphore-name 'function)
       "The name of the semaphore. Setfable.")
 
 (defun wait-on-semaphore (sem)
@@ -633,9 +630,9 @@ around and can be retrieved by JOIN-THREAD."
             ;; least accessible to users to secure their own libraries.
             ;;   --njf, 2006-07-15
             (let ((*current-thread* thread)
-                  (sb!kernel::*restart-clusters* nil)
-                  (sb!kernel::*handler-clusters* nil)
-                  (sb!kernel::*condition-restarts* nil)
+                  (*restart-clusters* nil)
+                  (*handler-clusters* nil)
+                  (*condition-restarts* nil)
                   (sb!impl::*step-out* nil)
                   ;; internal printer variables
                   (sb!impl::*previous-case* nil)
@@ -679,7 +676,7 @@ around and can be retrieved by JOIN-THREAD."
     (with-pinned-objects (initial-function)
       (let ((os-thread
              (%create-thread
-              (sb!kernel:get-lisp-obj-address initial-function))))
+              (get-lisp-obj-address initial-function))))
         (when (zerop os-thread)
           (error "Can't create a new thread"))
         (wait-on-semaphore setup-sem)
@@ -695,7 +692,7 @@ around and can be retrieved by JOIN-THREAD."
                      (join-thread-error-thread c)))))
 
 #!+sb-doc
-(setf (sb!kernel:fdocumentation 'join-thread-error-thread 'function)
+(setf (fdocumentation 'join-thread-error-thread 'function)
       "The thread that we failed to join.")
 
 (defun join-thread (thread &key (default nil defaultp))
@@ -725,7 +722,7 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
                      (interrupt-thread-error-thread c)))))
 
 #!+sb-doc
-(setf (sb!kernel:fdocumentation 'interrupt-thread-error-thread 'function)
+(setf (fdocumentation 'interrupt-thread-error-thread 'function)
       "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
@@ -805,7 +802,7 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
                                (* sb!vm:n-word-bytes index))))
     (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
         (sb!vm::symbol-global-value symbol)
-        (sb!kernel:make-lisp-obj tl-val))))
+        (make-lisp-obj tl-val))))
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
   (sb!vm::locked-symbol-global-value-add symbol-name delta))
@@ -813,11 +810,11 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;; Stepping
 
 (defun thread-stepping ()
-  (sb!kernel:make-lisp-obj
+  (make-lisp-obj
    (sap-ref-word (current-thread-sap)
                  (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))))
 
 (defun (setf thread-stepping) (value)
   (setf (sap-ref-word (current-thread-sap)
                       (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))
-        (sb!kernel:get-lisp-obj-address value)))
+        (get-lisp-obj-address value)))

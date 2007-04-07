@@ -601,5 +601,6 @@
            :datum x
            :expected-type (classoid-name (layout-classoid layout))))
   (values))
+
 
 (/show0 "target-defstruct.lisp end of file")

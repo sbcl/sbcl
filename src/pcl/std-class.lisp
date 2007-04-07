@@ -617,7 +617,8 @@
     (values defstruct-form constructor reader-names writer-names)))
 
 (defun make-defstruct-allocation-function (class)
-  (let ((dd (get-structure-dd (class-name class))))
+  ;; FIXME: Why don't we go class->layout->info == dd
+  (let ((dd (find-defstruct-description (class-name class))))
     (lambda ()
       (sb-kernel::%make-instance-with-layout
        (sb-kernel::compiler-layout-or-lose (dd-name dd))))))

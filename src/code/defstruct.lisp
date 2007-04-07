@@ -1725,4 +1725,57 @@
          (inherits (inherits-for-structure dd)))
     (%compiler-defstruct dd inherits)))
 
+;;; finding these beasts
+(defun find-defstruct-description (name &optional (errorp t))
+  (let ((info (layout-info (classoid-layout (find-classoid name errorp)))))
+    (if (defstruct-description-p info)
+        info
+        (when errorp
+          (error "No DEFSTRUCT-DESCRIPTION for ~S." name)))))
+
+(defun structure-slot-index (type slot-name &optional (errorp t))
+  (let ((slotd (find slot-name
+                     (dd-slots (find-defstruct-description type))
+                     :key #'dsd-name)))
+    (if slotd
+        (dsd-index slotd)
+        (when errorp
+          (error "No slot named ~S in ~S." slot-name type)))))
+
+;;; Used internally, but it would be nice to provide something
+;;; like this for users as well.
+#!+sb-thread
+(defmacro define-structure-slot-compare-and-exchange
+    (name &key structure slot)
+  (let* ((dd (find-defstruct-description structure t))
+         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
+         (type (when slotd (dsd-type slotd)))
+         (index (when slotd (dsd-index slotd))))
+    (unless index
+      (error "Slot ~S not found in ~S." slot structure))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (instance old new)
+         (declare (type ,structure instance)
+                  (type ,type new))
+         (sb!vm::%instance-set-conditional instance ,index old new)))))
+
+;;; Ditto
+#!+sb-thread
+(defmacro define-structure-slot-addressor (name &key structure slot)
+  (let* ((dd (find-defstruct-description structure t))
+         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
+         (index (when slotd (dsd-index slotd))))
+    (unless index
+      (error "Slot ~S not found in ~S." slot structure))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (instance)
+         (declare (type ,structure instance) (optimize speed))
+         (sb!ext:truly-the
+          sb!vm:word
+          (+ (sb!kernel:get-lisp-obj-address instance)
+             (- (* ,(+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
+                sb!vm:instance-pointer-lowtag)))))))
+
 (/show0 "code/defstruct.lisp end of file")
