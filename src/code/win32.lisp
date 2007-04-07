@@ -511,14 +511,14 @@
                (addr ,kernel-time)
                (addr ,user-time))))
 
-(declaim (inline system-internal-real-time system-internal-run-time))
+(declaim (inline system-internal-real-time))
 
 (let ((epoch 0))
   (declare (unsigned-byte epoch))
   ;; FIXME: For optimization ideas see the unix implementation.
   (defun reinit-internal-real-time ()
     (setf epoch 0
-          epoch (system-internal-real-time)))
+          epoch (get-internal-real-time)))
   (defun get-internal-real-time ()
     (- (with-alien ((system-time filetime))
          (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
