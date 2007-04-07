@@ -27,10 +27,16 @@
                                         'simple-condition
                                         'signal))
         (*handler-clusters* *handler-clusters*)
-        (old-bos *break-on-signals*))
+        (old-bos *break-on-signals*)
+        (bos-actually-breaking nil))
     (restart-case
-        (when (typep condition *break-on-signals*)
-          (let ((*break-on-signals* nil))
+        (let ((break-on-signals *break-on-signals*)
+              (*break-on-signals* nil))
+          ;; The rebinding encloses the TYPEP so that a bogus
+          ;; type specifier will not lead to infinite recursion when
+          ;; TYPEP fails.
+          (when (typep condition break-on-signals)
+            (setf bos-actually-breaking t)
             (break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* ~
                     (now rebound to NIL)."
                    condition)))
@@ -45,7 +51,13 @@
       ;; unless we provide this restart.)
       (reassign (new-value)
         :report
-        "Return from BREAK and assign a new value to *BREAK-ON-SIGNALS*."
+        (lambda (stream)
+          (format stream
+                  (if bos-actually-breaking
+                    "Return from BREAK and assign a new value to ~
+                     *BREAK-ON-SIGNALS*."
+                    "Assign a new value to *BREAK-ON-SIGNALS* and ~
+                     continue with signal handling.")))
         :interactive
         (lambda ()
           (let (new-value)
