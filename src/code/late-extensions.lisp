@@ -45,3 +45,40 @@
                                (write-string (unprintable-object-string x) s))))
             (:copier nil))
   string)
+
+;;; Used internally, but it would be nice to provide something
+;;; like this for users as well.
+#!+sb-thread
+(defmacro define-structure-slot-compare-and-exchange
+    (name &key structure slot)
+  (let* ((dd (find-defstruct-description structure t))
+         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
+         (type (when slotd (dsd-type slotd)))
+         (index (when slotd (dsd-index slotd))))
+    (unless index
+      (error "Slot ~S not found in ~S." slot structure))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (instance old new)
+         (declare (type ,structure instance)
+                  (type ,type new))
+         (sb!vm::%instance-set-conditional instance ,index old new)))))
+
+;;; Ditto
+#!+sb-thread
+(defmacro define-structure-slot-addressor (name &key structure slot)
+  (let* ((dd (find-defstruct-description structure t))
+         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
+         (index (when slotd (dsd-index slotd))))
+    (unless index
+      (error "Slot ~S not found in ~S." slot structure))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (instance)
+         (declare (type ,structure instance) (optimize speed))
+         (sb!ext:truly-the
+          sb!vm:word
+          (+ (sb!kernel:get-lisp-obj-address instance)
+             (- (* ,(+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
+                sb!vm:instance-pointer-lowtag)))))))
+
