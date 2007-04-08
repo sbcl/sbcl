@@ -88,8 +88,10 @@
       (make-room-info :name 'closure
                       :kind :closure))
 
+;; FIXME: This looks rather brittle. Can we get more of these numbers
+;; from somewhere sensible?
 (dolist (stuff '((simple-bit-vector-widetag . -3)
-                 (simple-vector-widetag . 2)
+                 (simple-vector-widetag . #.sb!vm:word-shift)
                  (simple-array-unsigned-byte-2-widetag . -2)
                  (simple-array-unsigned-byte-4-widetag . -1)
                  (simple-array-unsigned-byte-7-widetag . 0)
@@ -179,7 +181,9 @@
   (multiple-value-bind (start end) (space-bounds space)
     (- (sap-int end) (sap-int start))))
 
-;;; Round SIZE (in bytes) up to the next dualword (eight byte) boundary.
+;;; Round SIZE (in bytes) up to the next dualword boundary. A dualword
+;;; is eight bytes on platforms with 32-bit word size and 16 bytes on
+;;; platforms with 64-bit word size.
 #!-sb-fluid (declaim (inline round-to-dualword))
 (defun round-to-dualword (size)
   (declare (fixnum size))
