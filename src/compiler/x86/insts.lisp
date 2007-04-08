@@ -896,6 +896,23 @@
      (emit-word segment value))
     (:dword
      (emit-dword segment value))))
+
+(defun toggle-word-width (chunk inst stream dstate)
+  (declare (ignore chunk inst stream))
+  (let ((word-width (or (sb!disassem:dstate-get-prop dstate 'word-width)
+                        +default-operand-size+)))
+    (setf (sb!disassem:dstate-get-prop dstate 'word-width)
+          (ecase word-width
+            (:word :dword)
+            (:dword :word)))))
+
+;;; This is a "prefix" instruction, which means that it modifies the
+;;; following instruction in some way without having an actual
+;;; mnemonic of its own.
+(define-instruction operand-size-prefix (segment)
+  (:printer byte ((op +operand-size-prefix-byte+))
+            nil                         ; don't actually print it
+            :control #'toggle-word-width))
 
 ;;;; general data transfer
 

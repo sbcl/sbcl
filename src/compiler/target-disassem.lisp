@@ -492,7 +492,8 @@
            (type (or null stream) stream))
 
   (let ((ispace (get-inst-space))
-        (prefix-p nil)) ; just processed a prefix inst
+        (prefix-p nil) ; just processed a prefix inst
+        (prefix-len 0)) ; length of any prefix instruction(s)
 
     (rewind-current-segment dstate segment)
 
@@ -535,19 +536,22 @@
                             (when prefilter
                               (funcall prefilter chunk dstate))
 
+                            (setf prefix-p (null (inst-printer inst)))
+
                             ;; print any instruction bytes recognized by the prefilter which calls read-suffix
                             ;; and updates next-offs
                             (when stream
                               (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
                                 (when (plusp suffix-len)
                                   (print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
-                              (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len))))
-                                (write-char #\space stream)))
-                              (write-char #\space stream))
+                                (unless prefix-p
+                                  (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len prefix-len))))
+                                    (write-char #\space stream))
+                                  (write-char #\space stream))
+
+                                (setf prefix-len (+ (inst-length inst) suffix-len))))
 
                             (funcall function chunk inst)
-
-                            (setf prefix-p (null (inst-printer inst)))
 
                             (when control
                               (funcall control chunk inst stream dstate))
@@ -557,6 +561,7 @@
 
       (unless (null stream)
         (unless prefix-p
+          (setf prefix-len 0)
           (print-notes-and-newline stream dstate))
         (setf (dstate-output-state dstate) nil)))))
 
