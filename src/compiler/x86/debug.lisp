@@ -43,7 +43,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-          (make-ea :dword :base sap :disp (- n-word-bytes) :index temp))))
+          (make-ea :dword :base sap :disp (frame-byte-offset 0) :index temp))))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -71,7 +71,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-          (make-ea :dword :base sap :disp (- n-word-bytes) :index temp) value)
+          (make-ea :dword :base sap :disp (frame-byte-offset 0) :index temp) value)
     (move result value)))
 
 (define-vop (write-control-stack-c)
