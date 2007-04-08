@@ -181,7 +181,7 @@ typedef u32 ffi_dev_t; /* since Linux dev_t can be 64 bits */
 typedef u32 ffi_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 #endif
 
-#if defined(LISP_FEATURE_DARWIN)
+#ifdef LISP_FEATURE_OS_PROVIDES_BLKSIZE_T
 typedef blksize_t ffi_blksize_t;
 #else
 typedef unsigned long ffi_blksize_t;
