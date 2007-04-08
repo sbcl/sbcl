@@ -933,9 +933,14 @@
 
 ;;; Return a LAMBDA form which can be used to set a slot.
 (defun slot-setter-lambda-form (dd dsd)
-  `(lambda (new-value instance)
-     ,(funcall (nth-value 1 (slot-accessor-transforms dd dsd))
-               '(dummy new-value instance))))
+  ;; KLUDGE: Evaluating the results of SLOT-ACCESSOR-TRANSFORMS needs
+  ;; a lexenv.
+  (let ((sb!c:*lexenv* (if (boundp 'sb!c:*lexenv*)
+                           sb!c:*lexenv*
+                           (sb!c::make-null-lexenv))))
+    `(lambda (new-value instance)
+       ,(funcall (nth-value 1 (slot-accessor-transforms dd dsd))
+                 '(dummy new-value instance)))))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities

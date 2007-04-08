@@ -2215,3 +2215,14 @@
                            0)
                 (division-by-zero ()
                   :error)))))
+
+;;; Dead unbound variable (bug 412)
+(with-test (:name :dead-unbound)
+  (assert (eq :error
+              (handler-case
+                  (funcall (compile nil
+                                    '(lambda ()
+                                      #:unbound
+                                      42)))
+                (unbound-variable ()
+                  :error)))))

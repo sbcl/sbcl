@@ -589,28 +589,33 @@
 (defun ir1-convert-var (start next result name)
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
-    (etypecase var
-      (leaf
-       (when (lambda-var-p var)
-         (let ((home (ctran-home-lambda-or-null start)))
-           (when home
-             (sset-adjoin var (lambda-calls-or-closes home))))
-         (when (lambda-var-ignorep var)
-           ;; (ANSI's specification for the IGNORE declaration requires
-           ;; that this be a STYLE-WARNING, not a full WARNING.)
-           #-sb-xc-host
-           (compiler-style-warn "reading an ignored variable: ~S" name)
-           ;; there's no need for us to accept ANSI's lameness when
-           ;; processing our own code, though.
-           #+sb-xc-host
-           (warn "reading an ignored variable: ~S" name)))
-       (reference-leaf start next result var))
-      (cons
-       (aver (eq (car var) 'macro))
-       ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
-       (ir1-convert start next result (cdr var)))
-      (heap-alien-info
-       (ir1-convert start next result `(%heap-alien ',var)))))
+    (if (and (global-var-p var) (not result))
+        ;; KLUDGE: If the reference is dead, convert using SYMBOL-VALUE
+        ;; which is not flushable, so that unbound dead variables signal
+        ;; an error (bug 412).
+        (ir1-convert start next result `(symbol-value ',name))
+        (etypecase var
+          (leaf
+           (when (lambda-var-p var)
+             (let ((home (ctran-home-lambda-or-null start)))
+               (when home
+                 (sset-adjoin var (lambda-calls-or-closes home))))
+             (when (lambda-var-ignorep var)
+               ;; (ANSI's specification for the IGNORE declaration requires
+               ;; that this be a STYLE-WARNING, not a full WARNING.)
+               #-sb-xc-host
+               (compiler-style-warn "reading an ignored variable: ~S" name)
+               ;; there's no need for us to accept ANSI's lameness when
+               ;; processing our own code, though.
+               #+sb-xc-host
+               (warn "reading an ignored variable: ~S" name)))
+           (reference-leaf start next result var))
+          (cons
+           (aver (eq (car var) 'macro))
+           ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
+           (ir1-convert start next result (cdr var)))
+          (heap-alien-info
+           (ir1-convert start next result `(%heap-alien ',var))))))
   (values))
 
 ;;; Find a compiler-macro for a form, taking FUNCALL into account.

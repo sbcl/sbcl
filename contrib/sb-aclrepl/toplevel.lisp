@@ -1,7 +1,7 @@
 (cl:defpackage :sb-aclrepl
   (:use "COMMON-LISP" "SB-EXT")
   (:shadowing-import-from "SB-IMPL" "SCRUB-CONTROL-STACK")
-  (:shadowing-import-from "SB-INT" "*REPL-PROMPT-FUN*" "*REPL-READ-FORM-FUN*" "*STEP*" "*STEPPING*")
+  (:shadowing-import-from "SB-INT" "*REPL-PROMPT-FUN*" "*REPL-READ-FORM-FUN*")
   (:export
    ;; user-level customization of UI
    "*PROMPT*" "*EXIT-ON-EOF*" "*MAX-HISTORY*"
@@ -40,9 +40,9 @@
            (loop
             (unwind-protect
                  (rep-one)
-              ;; reset toplevel step-condition handler
-              (setf *step* nil
-                    *stepping* nil))))
+              ;; if we started stepping in the debugger, now is the
+              ;; time to stop
+              (sb-impl::disable-stepping))))
        (declare (ignore reason-param))
        (cond
          ((and (eq reason :inspect)

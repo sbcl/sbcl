@@ -26,7 +26,8 @@
                ;; Note that this code can get executed several times
                ;; for the same block, if the functional is referenced
                ;; from multiple XEPs.
-               (loop for node = (ctran-next this-cont) then (ctran-next (node-next node))
+               (loop for node = (ctran-next this-cont)
+                     then (ctran-next (node-next node))
                      until (eq node last)
                      do (record-node-xrefs node functional))
                ;; Properly record the deferred macroexpansion information
@@ -80,7 +81,14 @@
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry combination mv-combination cast))
+    ((or creturn cif entry mv-combination cast))
+    (combination
+     ;; Record references to globals made using SYMBOL-VALUE.
+     (let ((fun (principal-lvar-use (combination-fun node)))
+           (arg (car (combination-args node))))
+       (when (and (ref-p fun) (eq 'symbol-value (leaf-%source-name (ref-leaf fun)))
+                  (constant-lvar-p arg) (symbolp (lvar-value arg)))
+         (record-xref :references (lvar-value arg) context node nil))))
     (ref
      (let ((leaf (ref-leaf node)))
        (typecase leaf
