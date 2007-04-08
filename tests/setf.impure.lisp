@@ -51,4 +51,34 @@
   (setf (macro-function 'nothing-at-all nil) fun)
   (assert (eq fun (macro-function 'nothing-at-all nil))))
 
+
+;;; DEFSETF accepts &ENVIRONMENT but not &AUX
+(defsetf test-defsetf-env-1  (&environment env) (new)
+  (declare (ignore new))
+  (if (macro-function 'defsetf-env-trick env)
+      :local
+      :global))
+
+(defsetf test-defsetf-env-2  (local global &environment env) (new)
+  (declare (ignore new))
+  (if (macro-function 'defsetf-env-trick env)
+      local
+      global))
+
+(aver (eq :local (macrolet ((defsetf-env-trick ()))
+                   (setf (test-defsetf-env-1) 13))))
+
+(aver (eq :global (setf (test-defsetf-env-1) 13)))
+
+(aver (eq :local (macrolet ((defsetf-env-trick ()))
+                   (setf (test-defsetf-env-2 :local :oops) 13))))
+
+(aver (eq :global (setf (test-defsetf-env-2 :oops :global) 13)))
+
+(aver (eq :error
+          (handler-case
+              (eval '(defsetf test-defsetf-aux (&aux aux) (new) nil))
+            (error ()
+              :error))))
+
 ;;; success

@@ -140,7 +140,10 @@
                   (defmacro-error (format nil "required argument after ~A"
                                           restp)
                       context name))
-                (process-sublist var "REQUIRED-" `(car ,path))
+                (when (process-sublist var "REQUIRED-" `(car ,path))
+                  ;; Note &ENVIRONMENT from DEFSETF sublist
+                  (aver (eq context 'defsetf))
+                  (setf env-arg-used t))
                 (setq path `(cdr ,path)
                       minimum (1+ minimum)
                       maximum (1+ maximum)))
@@ -195,7 +198,9 @@
                (&environment
                 (cond (env-illegal
                        (error "&ENVIRONMENT is not valid with ~S." context))
-                      (sublist
+                      ;; DEFSETF explicitly allows &ENVIRONMENT, and we get
+                      ;; it here in a sublist.
+                      ((and sublist (neq context 'defsetf))
                        (error "&ENVIRONMENT is only valid at top level of ~
                              lambda-list."))
                       (env-arg-used
@@ -246,6 +251,8 @@
                   (error "Multiple ~A in ~A lambda-list." var context))
                 (setq allow-other-keys-p t))
                (&aux
+                (when (eq context 'defsetf)
+                  (error "~A not allowed in a ~A lambda-list." var context))
                 (when aux-seen
                   (error "Multiple ~A in ~A lambda-list." '&aux context))
                 (setq now-processing :auxs

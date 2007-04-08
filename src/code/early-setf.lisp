@@ -399,12 +399,12 @@ GET-SETF-EXPANSION directly."
              (multiple-value-bind (body local-decs doc)
                  (parse-defmacro `(,lambda-list ,@store-variables)
                                  whole-var body access-fn 'defsetf
+                                 :environment env-var
                                  :anonymousp t)
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (assign-setf-macro
                    ',access-fn
                    (lambda (,access-form-var ,env-var)
-                     (declare (ignore ,env-var))
                      (%defsetf ,access-form-var ,(length store-variables)
                                (lambda (,whole-var)
                                  ,@local-decs
