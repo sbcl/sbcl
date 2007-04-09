@@ -197,7 +197,8 @@ in future versions."
   ;; %instance-set-conditional can test for 0 (which is a fixnum) and
   ;; store any value
   #!+sb-thread
-  (compare-and-exchange-spinlock-value spinlock 0 1)
+  (loop until
+       (eql 0 (compare-and-exchange-spinlock-value spinlock 0 1)))
   t)
 
 (defun release-spinlock (spinlock)
