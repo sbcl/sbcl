@@ -1,4 +1,4 @@
-;;;; type testing and checking VOPs for the x86 VM
+;;;; type testing and checking VOPs for the x86-64 VM
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -12,18 +12,6 @@
 (in-package "SB!VM")
 
 ;;;; test generation utilities
-
-(defun make-byte-tn (tn)
-  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'byte-reg)
-                  :offset (tn-offset tn)))
-
-(defun make-dword-tn (tn)
-  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'dword-reg)
-                  :offset (tn-offset tn)))
 
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"

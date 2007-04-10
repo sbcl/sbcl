@@ -1,4 +1,4 @@
-;;;; x86 definition of character operations
+;;;; x86-64 definition of character operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,6 +11,11 @@
 
 (in-package "SB!VM")
 
+;;; Space optimization: As the upper 32 bits of (tagged or untagged)
+;;; characters are always zero many operations can be done on 32-bit
+;;; registers. This often leads to smaller encodings as the REX prefix
+;;; is then only needed if registers R8 - R15 are used.
+
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
@@ -22,8 +27,9 @@
                :load-if (not (location= x y))))
   (:note "character untagging")
   (:generator 1
-    (move y x)
-    (inst shr y n-widetag-bits)))
+    (let ((y-dword (make-dword-tn y)))
+      (move y-dword (make-dword-tn x))
+      (inst shr y-dword n-widetag-bits))))
 #!-sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack)))
@@ -44,12 +50,15 @@
 ;;; Move an untagged char to a tagged representation.
 #!+sb-unicode
 (define-vop (move-from-character)
-  (:args (x :scs (character-reg)))
+  (:args (x :scs (character-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (inst imul y x (ash 1 n-widetag-bits))
-    (inst or y character-widetag)))
+    (let ((y-dword (make-dword-tn y)))
+      (unless (location= x y)
+        (inst mov y-dword (make-dword-tn x)))
+      (inst shl y-dword n-widetag-bits)
+      (inst or y-dword character-widetag))))
 #!-sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg character-stack)))
@@ -117,7 +126,8 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args (ch :scs (character-reg character-stack)))
+  (:args #!-sb-unicode (ch :scs (character-reg character-stack))
+         #!+sb-unicode (ch :scs (character-reg character-stack) :target res))
   (:arg-types character)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -125,18 +135,18 @@
     #!-sb-unicode
     (inst movzx res ch)
     #!+sb-unicode
-    (inst mov res ch)))
+    (move res ch)))
 
 #!+sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg unsigned-stack)))
+  (:args (code :scs (unsigned-reg unsigned-stack) :target res))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (inst mov res code)))
+    (move res code)))
 #!-sb-unicode
 (define-vop (code-char)
   (:translate code-char)

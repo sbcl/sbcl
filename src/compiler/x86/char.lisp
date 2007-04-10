@@ -44,16 +44,12 @@
 ;;; Move an untagged char to a tagged representation.
 #!+sb-unicode
 (define-vop (move-from-character)
-  (:args (x :scs (character-reg)))
+  (:args (x :scs (character-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    ;; FIXME: is this inefficient?  Is there a better way of writing
-    ;; it?  (fixnum tagging is done with LEA).  We can't use SHL
-    ;; because we either scribble over the source register or briefly
-    ;; have a non-descriptor in a descriptor register, unless we
-    ;; introduce a temporary.
-    (inst imul y x (ash 1 n-widetag-bits))
+    (move y x)
+    (inst shl y n-widetag-bits)
     (inst or y character-widetag)))
 #!-sb-unicode
 (define-vop (move-from-character)
@@ -124,7 +120,8 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args (ch :scs (character-reg character-stack)))
+  (:args #!-sb-unicode (ch :scs (character-reg character-stack))
+         #!+sb-unicode (ch :scs (character-reg character-stack) :target res))
   (:arg-types character)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
@@ -132,18 +129,18 @@
     #!-sb-unicode
     (inst movzx res ch)
     #!+sb-unicode
-    (inst mov res ch)))
+    (move res ch)))
 
 #!+sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg unsigned-stack)))
+  (:args (code :scs (unsigned-reg unsigned-stack) :target res))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (inst mov res code)))
+    (move res code)))
 #!-sb-unicode
 (define-vop (code-char)
   (:translate code-char)

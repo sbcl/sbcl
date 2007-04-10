@@ -229,8 +229,8 @@
 
   ;; the non-descriptor stacks
   ;; XXX alpha backend has :element-size 2 :alignment 2 in these entries
-  (signed-stack stack)                  ; (signed-byte 32)
-  (unsigned-stack stack)                ; (unsigned-byte 32)
+  (signed-stack stack)                  ; (signed-byte 64)
+  (unsigned-stack stack)                ; (unsigned-byte 64)
   (character-stack stack)               ; non-descriptor characters.
   (sap-stack stack)                     ; System area pointers.
   (single-stack stack)                  ; single-floats
@@ -276,6 +276,8 @@
   (character-reg registers
                  :locations #!-sb-unicode #.*byte-regs*
                             #!+sb-unicode #.*qword-regs*
+                 #!+sb-unicode #!+sb-unicode
+                 :element-size 2
                  #!-sb-unicode #!-sb-unicode
                  :reserve-locations (#.al-offset)
                  :constant-scs (immediate)

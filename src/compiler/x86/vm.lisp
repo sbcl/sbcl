@@ -232,6 +232,8 @@
   (character-reg registers
                  :locations #!-sb-unicode #.*byte-regs*
                             #!+sb-unicode #.*dword-regs*
+                 #!+sb-unicode #!+sb-unicode
+                 :element-size 2
                  #!-sb-unicode #!-sb-unicode
                  :reserve-locations (#.ah-offset #.al-offset)
                  :constant-scs (immediate)
