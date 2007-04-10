@@ -107,8 +107,8 @@
     (sb!sys:without-gcing
      (let* ((sap (truly-the system-area-pointer
                             (sb!kernel:code-instructions code)))
-            (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
-                                    #xfffffffffffffff8))
+            (obj-start-addr (logandc2 (sb!kernel:get-lisp-obj-address code)
+                                      sb!vm:lowtag-mask))
             (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
                                               code)))
             (ncode-words (sb!kernel:code-header-ref code 1))
@@ -175,8 +175,7 @@
     (let* ((sap (truly-the system-area-pointer
                            (sb!kernel:code-instructions code)))
            (obj-start-addr
-            ;; FIXME: looks like (LOGANDC2 foo typebits)
-            (logand (sb!kernel:get-lisp-obj-address code) #xfffffffffffffff8))
+            (logandc2 (sb!kernel:get-lisp-obj-address code) sb!vm:lowtag-mask))
            (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
                                              code)))
            (ncode-words (sb!kernel:code-header-ref code 1))
