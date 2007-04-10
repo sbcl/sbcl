@@ -1011,12 +1011,68 @@
 ;; Too slow for the interpreter
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
 (loop for i = 1 then (* i 2) do
-     ;; the bare '32' here is fairly arbitrary; '8' provides a good
-     ;; range of lengths over which to fill and copy, which should tease
-     ;; out most errors in the code (if any exist).  (It also makes this
-     ;; part of the test suite finish reasonably quickly.)
-     (assert (test-fill-bashing i 32 8))
-     (assert (test-copy-bashing i 32 8))
+     ;; the bare '13' here is fairly arbitrary, except that it's been
+     ;; reduced from '32', which made the tests take aeons; '8' provides
+     ;; a good range of lengths over which to fill and copy, which
+     ;; should tease out most errors in the code (if any exist).  (It
+     ;; also makes this part of the test suite finish reasonably
+     ;; quickly.)
+     (assert (time (test-fill-bashing i 13 8)))
+     (assert (time (test-copy-bashing i 13 8)))
      until (= i sb-vm:n-word-bits))
+
+(defun test-inlined-bashing (bitsize)
+  ;; We have to compile things separately for each bitsize so the
+  ;; compiler will work out the array type and trigger the REPLACE
+  ;; transform.
+  (let ((lambda-form
+         `(lambda ()
+            (let* ((n-elements-per-word ,(truncate sb-vm:n-word-bits bitsize))
+                   (size (* 3 n-elements-per-word))
+                   (standard-dst (make-array size :element-type '(unsigned-byte ,bitsize)))
+                   (bashed-dst (make-array size :element-type '(unsigned-byte ,bitsize)))
+                   (source (make-array size :element-type '(unsigned-byte ,bitsize))))
+              (declare (type (simple-array (unsigned-byte ,bitsize) (*))
+                             source standard-dst bashed-dst))
+              (do ((i 0 (1+ i))
+                   (offset n-elements-per-word (1+ offset)))
+                  ((>= offset (* 2 n-elements-per-word)) t)
+                (dolist (c (fill-bytes-for-testing ,bitsize))
+                  (fill-with-known-value (mod (lognot c) (ash 1 ,bitsize)) size
+                                         source standard-dst bashed-dst)
+                  ;; fill with test-data
+                  (fill source c :start offset :end (+ offset n-elements-per-word))
+                  ;; copy filled data to test vectors
+                  ;;
+                  ;; a) the slow way (which is actually fast, since this
+                  ;; should be transformed into UB*-BASH-COPY)
+                  (replace standard-dst source
+                           :start1 (- offset n-elements-per-word i)
+                           :start2 (- offset n-elements-per-word i)
+                           :end1 offset :end2 offset)
+                  ;; b) the fast way--we fold the
+                  ;; :START{1,2} arguments above ourselves
+                  ;; to trigger the REPLACE transform
+                  (replace bashed-dst source
+                           :start1 0 :start2 0 :end1 offset :end2 offset)
+                  ;; check for errors
+                  (when (or (mismatch standard-dst bashed-dst)
+                            ;; trigger COPY-SEQ transform
+                            (mismatch (copy-seq standard-dst) bashed-dst)
+                            ;; trigger SUBSEQ transform
+                            (mismatch (subseq standard-dst (- offset n-elements-per-word i))
+                                      bashed-dst))
+                    (format t "Test with target-offset ~A, source-offset ~A, fill ~A, and length ~A failed.~%"
+                            0 0 c offset)
+                    (format t "Mismatch:~% correct ~A~% actual  ~A~%"
+                            standard-dst
+                            bashed-dst)
+                    (return-from nil nil))))))))
+    (funcall (compile nil lambda-form))))
+
+#+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
+(loop for i = 1 then (* i 2) do
+      (assert (test-inlined-bashing i))
+      until (= i sb-vm:n-word-bits))
 
 ;;; success

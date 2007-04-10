@@ -73,6 +73,31 @@
                          sb!vm:bignum-digits-offset
                          index offset))
 
+#!+x86
+(progn
+(define-source-transform sb!kernel:%vector-raw-bits (thing index)
+  `(sb!kernel:%raw-bits-with-offset ,thing ,index 2))
+
+(define-source-transform sb!kernel:%raw-bits (thing index)
+  `(sb!kernel:%raw-bits-with-offset ,thing ,index 0))
+
+(define-source-transform sb!kernel:%set-vector-raw-bits (thing index value)
+  `(sb!kernel:%set-raw-bits-with-offset ,thing ,index 2 ,value))
+
+(define-source-transform sb!kernel:%set-raw-bits (thing index value)
+  `(sb!kernel:%set-raw-bits-with-offset ,thing ,index 0 ,value))
+
+(deftransform sb!kernel:%raw-bits-with-offset ((thing index offset) * * :node node)
+  (fold-index-addressing 'sb!kernel:%raw-bits-with-offset
+                         sb!vm:n-word-bits sb!vm:other-pointer-lowtag
+                         0 index offset))
+
+(deftransform sb!kernel:%set-raw-bits-with-offset ((thing index offset value) * *)
+  (fold-index-addressing 'sb!kernel:%set-raw-bits-with-offset
+                         sb!vm:n-word-bits sb!vm:other-pointer-lowtag
+                         0 index offset t))
+) ; PROGN
+
 ;;; The layout is stored in slot 0.
 (define-source-transform %instance-layout (x)
   `(truly-the layout (%instance-ref ,x 0)))
@@ -149,32 +174,28 @@
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
 #!+x86
-(deftransform data-vector-ref ((array index) ((or simple-unboxed-array
+(deftransform data-vector-ref ((array index) ((or (simple-unboxed-array (*))
                                                   simple-vector)
                                               t))
   (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find element-type
-                        sb!vm:*specialized-array-element-type-properties*
-                        :key #'sb!vm:saetp-specifier :test #'equal)))
+           (saetp (find-saetp element-type)))
       (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
         (give-up-ir1-transform))
       `(data-vector-ref-with-offset array index 0))))
 
 #!+x86
 (deftransform data-vector-ref-with-offset ((array index offset)
-                                           ((or simple-unboxed-array
+                                           ((or (simple-unboxed-array (*))
                                                 simple-vector)
                                             t t))
   (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find element-type
-                        sb!vm:*specialized-array-element-type-properties*
-                        :key #'sb!vm:saetp-specifier :test #'equal)))
+           (saetp (find-saetp element-type)))
       (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
       (fold-index-addressing 'data-vector-ref-with-offset
                              (sb!vm:saetp-n-bits saetp)
@@ -243,31 +264,27 @@
 ;;; opportunities.
 #!+x86
 (deftransform data-vector-set ((array index new-value)
-                               ((or simple-unboxed-array simple-vector)
+                               ((or (simple-unboxed-array (*)) simple-vector)
                                 t t))
   (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find element-type
-                        sb!vm:*specialized-array-element-type-properties*
-                        :key #'sb!vm:saetp-specifier :test #'equal)))
+           (saetp (find-saetp element-type)))
       (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
         (give-up-ir1-transform))
       `(data-vector-set-with-offset array index 0 new-value))))
 
 #!+x86
 (deftransform data-vector-set-with-offset ((array index offset new-value)
-                                           ((or simple-unboxed-array
+                                           ((or (simple-unboxed-array (*))
                                                 simple-vector)
                                             t t t))
   (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find element-type
-                        sb!vm:*specialized-array-element-type-properties*
-                        :key #'sb!vm:saetp-specifier :test #'equal)))
+           (saetp (find-saetp element-type)))
       (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
       (fold-index-addressing 'data-vector-set-with-offset
                              (sb!vm:saetp-n-bits saetp)

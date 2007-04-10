@@ -708,14 +708,11 @@
 
 ;;; These vops are useful for accessing the bits of a vector
 ;;; irrespective of what type of vector it is.
-(define-full-reffer raw-bits * 0 other-pointer-lowtag (unsigned-reg)
-  unsigned-num %raw-bits)
-(define-full-setter set-raw-bits * 0 other-pointer-lowtag (unsigned-reg)
-  unsigned-num %set-raw-bits)
-(define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num %vector-raw-bits)
-(define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num %set-vector-raw-bits)
+(define-full-reffer+offset raw-bits-with-offset * 0 other-pointer-lowtag (unsigned-reg)
+  unsigned-num %raw-bits-with-offset)
+(define-full-setter+offset set-raw-bits-with-offset * 0 other-pointer-lowtag (unsigned-reg)
+  unsigned-num %set-raw-bits-with-offset)
+
 
 ;;;; miscellaneous array VOPs
 

@@ -179,3 +179,9 @@
   #!+sb-doc
   "An alist for mapping simple array element types to their
 corresponding primitive types.")
+
+(in-package "SB!C")
+
+(defun find-saetp (element-type)
+  (find element-type sb!vm:*specialized-array-element-type-properties*
+        :key #'sb!vm:saetp-specifier :test #'equal))

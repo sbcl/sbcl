@@ -12,6 +12,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     in multithreaded application code.
   * optimization: GET-INTERNAL-REAL-TIME has been optimized on POSIX
     platforms. (thanks to James Anderson for the optimization hint)
+  * optimization: REPLACE, SUBSEQ, and COPY-SEQ are now optimized in
+    more cases.
   * enhancement: XREF information is now collected to references made
     to global variables using SYMBOL-VALUE with a constant argument.
   * bug fix: dead unbound variable references now signal an error.

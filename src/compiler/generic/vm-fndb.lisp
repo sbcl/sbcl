@@ -200,11 +200,17 @@
 
 (defknown %raw-bits (t fixnum) sb!vm:word
   (foldable flushable))
+#!+x86
+(defknown %raw-bits-with-offset (t fixnum fixnum) sb!vm:word
+  (flushable always-translatable))
 (defknown (%set-raw-bits) (t fixnum sb!vm:word) sb!vm:word
   (unsafe))
-;; These two are mostly used for bit-bashing operations.
+#!+x86
+(defknown (%set-raw-bits-with-offset) (t fixnum fixnum sb!vm:word) sb!vm:word
+  (unsafe always-translatable))
+;;; These two are mostly used for bit-bashing operations.
 (defknown %vector-raw-bits (t fixnum) sb!vm:word
-  (foldable flushable))
+  (flushable))
 (defknown (%set-vector-raw-bits) (t fixnum sb!vm:word) sb!vm:word
   (unsafe))
 

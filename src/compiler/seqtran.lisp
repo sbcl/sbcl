@@ -663,21 +663,10 @@
   (def string/=* identity))
 
 
-;;;; string-only transforms for sequence functions
-;;;;
-;;;; Note: CMU CL had more of these, including transforms for
-;;;; functions which cons. In SBCL, we've gotten rid of most of the
-;;;; transforms for functions which cons, since our GC overhead is
-;;;; sufficiently large that it doesn't seem worth it to try to
-;;;; economize on function call overhead or on the overhead of runtime
-;;;; type dispatch in AREF. The exception is CONCATENATE, since
-;;;; a full call to CONCATENATE would have to look up the sequence
-;;;; type, which can be really slow.
+;;;; transforms for sequence functions
 
-;;; Moved here from generic/vm-tran.lisp to satisfy clisp
-;;;
-;;; FIXME: Add a comment telling whether this holds for all vectors
-;;; or only for vectors based on simple arrays (non-adjustable, etc.).
+;;; Moved here from generic/vm-tran.lisp to satisfy clisp.  Only applies
+;;; to vectors based on simple arrays.
 (def!constant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
@@ -695,89 +684,245 @@
        (<= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)))
 ) ; EVAL-WHEN
 
-;; FIXME: It turns out that this transform (for SIMPLE-BASE-STRINGS)
-;; is critical for the performance of string streams.  Make this
-;; more explicit.
+;;; FIXME: In the copy loops below, we code the loops in a strange
+;;; fashion:
+;;;
+;;; (do ((i (+ src-offset length) (1- i)))
+;;;     ((<= i 0) ...)
+;;;   (... (aref foo (1- i)) ...))
+;;;
+;;; rather than the more natural (and seemingly more efficient):
+;;;
+;;; (do ((i (1- (+ src-offset length)) (1- i)))
+;;;     ((< i 0) ...)
+;;;   (... (aref foo i) ...))
+;;;
+;;; (more efficient because we don't have to do the index adjusting on
+;;; every iteration of the loop)
+;;;
+;;; We do this to avoid a suboptimality in SBCL's backend.  In the
+;;; latter case, the backend thinks I is a FIXNUM (which it is), but
+;;; when used as an array index, the backend thinks I is a
+;;; POSITIVE-FIXNUM (which it is).  However, since the backend thinks of
+;;; these as distinct storage classes, it cannot coerce a move from a
+;;; FIXNUM TN to a POSITIVE-FIXNUM TN.  The practical effect of this
+;;; deficiency is that we have two extra moves and increased register
+;;; pressure, which can lead to some spectacularly bad register
+;;; allocation.  (sub-FIXME: the register allocation even with the
+;;; strangely written loops is not always excellent, either...).  Doing
+;;; it the first way, above, means that I is always thought of as a
+;;; POSITIVE-FIXNUM and there are no issues.
+;;;
+;;; Besides, the *-WITH-OFFSET machinery will fold those index
+;;; adjustments in the first version into the array addressing at no
+;;; performance penalty!
+
+;;; This transform is critical to the performance of string streams.  If
+;;; you tweak it, make sure that you compare the disassembly, if not the
+;;; performance of, the functions implementing string streams
+;;; (e.g. SB!IMPL::STRING-OUCH).
 (macrolet
     ((define-replace-transforms ()
        (loop for saetp across sb!vm:*specialized-array-element-type-properties*
-             when (valid-bit-bash-saetp-p saetp)
+             for sequence-type = `(simple-array ,(sb!vm:saetp-specifier saetp) (*))
+             unless (= (sb!vm:saetp-typecode saetp) sb!vm::simple-array-nil-widetag)
              collect
-             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
-                    (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
-                                            (find-package "SB!KERNEL"))))
-               `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                                       (,sequence-type ,sequence-type &rest t)
-                                       ,sequence-type
-                                       :node node)
-                 `(let* ((len1 (length seq1))
-                         (len2 (length seq2))
-                         (end1 (or end1 len1))
-                         (end2 (or end2 len2))
-                         (replace-len1 (- end1 start1))
-                         (replace-len2 (- end2 start2)))
-                   ,(unless (policy node (= safety 0))
-                     `(progn
-                       (unless (<= 0 start1 end1 len1)
-                         (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
-                       (unless (<= 0 start2 end2 len2)
-                         (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
-                   (funcall (function ,',bash-function)
-                    seq2 start2
-                    seq1 start1
-                    (min replace-len1 replace-len2))
-                   seq1)))
+            `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                                    (,sequence-type ,sequence-type &rest t)
+                                    ,sequence-type
+                                    :node node)
+               ,(cond
+                 ((valid-bit-bash-saetp-p saetp) nil)
+                 ;; If we're not bit-bashing, only allow cases where we
+                 ;; can determine the order of copying up front.  (There
+                 ;; are actually more cases we can handle if we know the
+                 ;; amount that we're copying, but this handles the
+                 ;; common cases.)
+                 (t '(unless (= (constant-value-or-lose start1 0)
+                              (constant-value-or-lose start2 0))
+                      (give-up-ir1-transform))))
+               `(let* ((len1 (length seq1))
+                       (len2 (length seq2))
+                       (end1 (or end1 len1))
+                       (end2 (or end2 len2))
+                       (replace-len1 (- end1 start1))
+                       (replace-len2 (- end2 start2)))
+                  ,(unless (policy node (= safety 0))
+                           `(progn
+                              (unless (<= 0 start1 end1 len1)
+                                (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
+                              (unless (<= 0 start2 end2 len2)
+                                (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
+                  ,',(cond
+                      ((valid-bit-bash-saetp-p saetp)
+                       (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
+                              (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
+                                                     (find-package "SB!KERNEL"))))
+                         `(funcall (function ,bash-function) seq2 start2
+                                   seq1 start1 (min replace-len1 replace-len2))))
+                      (t
+                       ;; We can expand the loop inline here because we
+                       ;; would have given up the transform (see above)
+                       ;; if we didn't have constant matching start
+                       ;; indices.
+                       '(do ((i start1 (1+ i))
+                             (end (+ start1
+                                     (min replace-len1 replace-len2))))
+                         ((>= i end))
+                         (declare (optimize (insert-array-bounds-checks 0)))
+                         (setf (aref seq1 i) (aref seq2 i)))))
+                  seq1))
              into forms
              finally (return `(progn ,@forms)))))
   (define-replace-transforms))
 
-(macrolet
-    ((define-subseq-transforms ()
-       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
-             when (valid-bit-bash-saetp-p saetp)
-             collect
-             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
-                    (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
-                                           (find-package "SB!KERNEL"))))
-               `(deftransform subseq ((seq start &optional end)
-                                      (,sequence-type t &optional t)
-                                      ,sequence-type :node node)
-                 `(let* ((length (length seq))
-                         (end (if end (min end length) length)))
-                   ,(unless (policy node (= safety 0))
-                     `(progn
-                       (unless (<= 0 start end length)
-                         (sb!impl::signal-bounding-indices-bad-error seq start end))))
-                   (let* ((size (- end start))
-                          (result (make-array size :element-type ',',(sb!vm:saetp-specifier saetp))))
-                     (funcall (function ,',bash-function)
-                              seq start result 0 size)
-                     result))))
-             into forms
-             finally (return `(progn ,@forms)))))
-  (define-subseq-transforms))
+;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
+;;; defined as those cases where we are doing word-aligned copies from
+;;; both the source and the destination and we are copying from the same
+;;; offset from both the source and the destination.  (The last
+;;; condition is there so we can determine the direction to copy at
+;;; compile time rather than runtime.  Remember that UB<SIZE>-BASH-COPY
+;;; acts like memmove, not memcpy.)  These conditions may seem rather
+;;; restrictive, but they do catch common cases, like allocating a (* 2
+;;; N)-size buffer and blitting in the old N-size buffer in.
 
-(macrolet
-    ((define-copy-seq-transforms ()
-       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
-             when (valid-bit-bash-saetp-p saetp)
-             collect
-             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
-                    (n-element-bits (sb!vm:saetp-n-bits saetp))
-                    (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
-                                           (find-package "SB!KERNEL"))))
-               `(deftransform copy-seq ((seq) (,sequence-type)
-                                        ,sequence-type)
-                 `(let* ((length (length seq))
-                         (result (make-array length :element-type ',',(sb!vm:saetp-specifier saetp))))
-                   (funcall (function ,',bash-function)
-                    seq 0 result 0 length)
-                   result)))
-             into forms
-             finally (return `(progn ,@forms)))))
-  (define-copy-seq-transforms))
+(defun frob-bash-transform (src src-offset
+                            dst dst-offset
+                            length n-elems-per-word)
+  (declare (ignore src dst length))
+  (let ((n-bits-per-elem (truncate sb!vm:n-word-bits n-elems-per-word)))
+    (multiple-value-bind (src-word src-elt)
+        (truncate (lvar-value src-offset) n-elems-per-word)
+      (multiple-value-bind (dst-word dst-elt)
+          (truncate (lvar-value dst-offset) n-elems-per-word)
+        ;; Avoid non-word aligned copies.
+        (unless (and (zerop src-elt) (zerop dst-elt))
+          (give-up-ir1-transform))
+        ;; Avoid copies where we would have to insert code for
+        ;; determining the direction of copying.
+        (unless (= src-word dst-word)
+          (give-up-ir1-transform))
+        ;; FIXME: The cross-compiler doesn't optimize TRUNCATE properly,
+        ;; so we have to do its work here.
+        `(let ((end (+ ,src-word ,(if (= n-elems-per-word 1)
+                                      'length
+                                      `(truncate (the index length) ,n-elems-per-word)))))
+           (declare (type index end))
+           ;; Handle any bits at the end.
+           (when (logtest length (1- ,n-elems-per-word))
+             (let* ((extra (mod length ,n-elems-per-word))
+                    ;; FIXME: The shift amount on this ASH is
+                    ;; *always* negative, but the backend doesn't
+                    ;; have a NEGATIVE-FIXNUM primitive type, so we
+                    ;; wind up with a pile of code that tests the
+                    ;; sign of the shift count prior to shifting when
+                    ;; all we need is a simple negate and shift
+                    ;; right.  Yuck.
+                    (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
+                               (* (- extra ,n-elems-per-word)
+                                  ,n-bits-per-elem))))
+               (setf (sb!kernel:%vector-raw-bits dst end)
+                     (logior
+                      (logandc2 (sb!kernel:%vector-raw-bits dst end)
+                                (ash mask
+                                     ,(ecase sb!c:*backend-byte-order*
+                                             (:little-endian 0)
+                                             (:big-endian `(* (- ,n-elems-per-word extra)
+                                                              ,n-bits-per-elem)))))
+                      (logand (sb!kernel:%vector-raw-bits src end)
+                              (ash mask
+                                   ,(ecase sb!c:*backend-byte-order*
+                                           (:little-endian 0)
+                                           (:big-endian `(* (- ,n-elems-per-word extra)
+                                                            ,n-bits-per-elem)))))))))
+           ;; Copy from the end to save a register.
+           (do ((i end (1- i)))
+               ((<= i ,src-word))
+             (setf (sb!kernel:%vector-raw-bits dst (1- i))
+                   (sb!kernel:%vector-raw-bits src (1- i)))))))))
+
+#.(loop for i = 1 then (* i 2)
+        collect `(deftransform ,(intern (format nil "UB~D-BASH-COPY" i)
+                                        "SB!KERNEL")
+                                                        ((src src-offset
+                                                          dst dst-offset
+                                                          length)
+                                                        ((simple-unboxed-array (*))
+                                                         (constant-arg index)
+                                                         (simple-unboxed-array (*))
+                                                         (constant-arg index)
+                                                         index)
+                                                        *)
+                  (frob-bash-transform src src-offset
+                                       dst dst-offset length
+                                       ,(truncate sb!vm:n-word-bits i))) into forms
+        until (= i sb!vm:n-word-bits)
+        finally (return `(progn ,@forms)))
+
+;;; We expand copy loops inline in SUBSEQ and COPY-SEQ if we're copying
+;;; arrays with elements of size >= the word size.  We do this because
+;;; we know the arrays cannot alias (one was just consed), therefore we
+;;; can determine at compile time the direction to copy, and for
+;;; word-sized elements, UB<WORD-SIZE>-BASH-COPY will do a bit of
+;;; needless checking to figure out what's going on.  The same
+;;; considerations apply if we are copying elements larger than the word
+;;; size, with the additional twist that doing it inline is likely to
+;;; cons far less than calling REPLACE and letting generic code do the
+;;; work.
+;;;
+;;; However, we do not do this for elements whose size is < than the
+;;; word size because we don't want to deal with any alignment issues
+;;; inline.  The UB*-BASH-COPY transforms might fix things up later
+;;; anyway.
+
+(defun maybe-expand-copy-loop-inline (src src-offset dst dst-offset length
+                                      element-type)
+  (let ((saetp (find-saetp element-type)))
+    (aver saetp)
+    (if (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)
+        (expand-aref-copy-loop src src-offset dst dst-offset length)
+        `(locally (declare (optimize (safety 0)))
+           (replace ,dst ,src :start1 ,dst-offset :start2 ,src-offset :end1 ,length)))))
+
+(defun expand-aref-copy-loop (src src-offset dst dst-offset length)
+  (if (eql src-offset dst-offset)
+      `(do ((i (+ ,src-offset ,length) (1- i)))
+           ((<= i ,src-offset))
+         (declare (optimize (insert-array-bounds-checks 0)))
+         (setf (aref ,dst (1- i)) (aref ,src (1- i))))
+      `(do ((i (+ ,src-offset ,length) (1- i))
+            (j (+ ,dst-offset ,length) (1- j)))
+           ((<= i ,src-offset))
+         (declare (optimize (insert-array-bounds-checks 0)))
+         (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
+
+(deftransform subseq ((seq start &optional end)
+                      ((or (simple-unboxed-array (*)) simple-vector) t &optional t)
+                      * :node node)
+  (let ((array-type (lvar-type seq)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((element-type (type-specifier (array-type-specialized-element-type array-type))))
+      `(let* ((length (length seq))
+              (end (or end length)))
+         ,(unless (policy node (= safety 0))
+                  '(progn
+                    (unless (<= 0 start end length)
+                      (sb!impl::signal-bounding-indices-bad-error seq start end))))
+         (let* ((size (- end start))
+                (result (make-array size :element-type ',element-type)))
+           ,(maybe-expand-copy-loop-inline 'seq 'start 'result 0 'size element-type)
+           result)))))
+
+(deftransform copy-seq ((seq) ((or (simple-unboxed-array (*)) simple-vector)) *)
+  (let ((array-type (lvar-type seq)))
+    (unless (array-type-p array-type)
+      (give-up-ir1-transform))
+    (let ((element-type (type-specifier (array-type-specialized-element-type array-type))))
+      `(let* ((length (length seq))
+              (result (make-array length :element-type ',element-type)))
+         ,(maybe-expand-copy-loop-inline 'seq 0 'result 0 'length element-type)
+         result))))
 
 ;;; FIXME: it really should be possible to take advantage of the
 ;;; macros used in code/seq.lisp here to avoid duplication of code,
