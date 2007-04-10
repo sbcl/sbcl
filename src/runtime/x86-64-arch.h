@@ -26,11 +26,19 @@ get_spinlock(volatile lispobj *word,long value)
     if(*word==value)
         lose("recursive get_spinlock: 0x%x,%ld\n",word,value);
     do {
+#if defined(LISP_FEATURE_DARWIN)
+        asm ("xor %0,%0\n\
+              lock/cmpxchg %1,%2"
+             : "=a" (rax)
+             : "r" (value), "m" (*word)
+             : "memory", "cc");
+#else
         asm ("xor %0,%0\n\
               lock cmpxchg %1,%2"
              : "=a" (rax)
              : "r" (value), "m" (*word)
              : "memory", "cc");
+#endif
     } while(rax!=0);
 #else
     *word=value;

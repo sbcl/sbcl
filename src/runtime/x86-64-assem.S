@@ -182,8 +182,12 @@ Lstack:
 	push	%rsi	#
 	push	%rdx	#
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(specials)),%rdi
+#else
 	mov	specials,%rdi
-	call    pthread_getspecific
+#endif
+	call    GNAME(pthread_getspecific)
 	mov	%rax,%r12
 #endif
 	pop	%rcx	# num args

@@ -99,7 +99,8 @@
  #-sunos "cc" #+sunos "gcc"
  (or #+(or linux freebsd sunos) '(#+x86-64 "-fPIC"
                                   "-shared" "-o" "threads-foreign.so" "threads-foreign.c")
-     #+darwin '("-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
+     #+darwin '(#+x86-64 "-arch" #+x86-64 "x86_64"
+                "-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
 (sb-alien:load-shared-object "threads-foreign.so")

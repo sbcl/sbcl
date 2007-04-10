@@ -3822,6 +3822,22 @@ preserve_context_registers (os_context_t *c)
     preserve_pointer((void*)*os_context_register_addr(c,reg_ESI));
     preserve_pointer((void*)*os_context_register_addr(c,reg_EDI));
     preserve_pointer((void*)*os_context_pc_addr(c));
+#elif defined LISP_FEATURE_X86_64
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RAX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RCX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RDX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RBX));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RSI));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_RDI));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R8));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R9));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R10));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R11));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R12));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R13));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R14));
+    preserve_pointer((void*)*os_context_register_addr(c,reg_R15));
+    preserve_pointer((void*)*os_context_pc_addr(c));
 #else
     #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
 #endif
