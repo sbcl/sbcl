@@ -437,15 +437,20 @@
           (ucd-value-1 ,ch)
           (char-code ,ch)))))
 
+(defun two-arg-char-equal (c1 c2)
+  (= (equal-char-code c1) (equal-char-code c2)))
+
 (defun char-equal (character &rest more-characters)
   #!+sb-doc
   "Return T if all of the arguments are the same character.
   Font, bits, and case are ignored."
   (do ((clist more-characters (cdr clist)))
       ((null clist) t)
-    (unless (= (equal-char-code (car clist))
-               (equal-char-code character))
+    (unless (two-arg-char-equal (car clist) character)
       (return nil))))
+
+(defun two-arg-char-not-equal (c1 c2)
+  (/= (equal-char-code c1) (equal-char-code c2)))
 
 (defun char-not-equal (character &rest more-characters)
   #!+sb-doc
@@ -456,10 +461,12 @@
        ((null list) t)
     (unless (do* ((l list (cdr l)))
                  ((null l) t)
-              (if (= (equal-char-code head)
-                     (equal-char-code (car l)))
+              (if (two-arg-char-equal head (car l))
                   (return nil)))
       (return nil))))
+
+(defun two-arg-char-lessp (c1 c2)
+  (< (equal-char-code c1) (equal-char-code c2)))
 
 (defun char-lessp (character &rest more-characters)
   #!+sb-doc
@@ -468,9 +475,11 @@
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
-    (unless (< (equal-char-code c)
-               (equal-char-code (car list)))
+    (unless (two-arg-char-lessp c (car list))
       (return nil))))
+
+(defun two-arg-char-greaterp (c1 c2)
+  (> (equal-char-code c1) (equal-char-code c2)))
 
 (defun char-greaterp (character &rest more-characters)
   #!+sb-doc
@@ -479,9 +488,11 @@
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
-    (unless (> (equal-char-code c)
-               (equal-char-code (car list)))
+    (unless (two-arg-char-greaterp c (car list))
       (return nil))))
+
+(defun two-arg-char-not-greaterp (c1 c2)
+  (<= (equal-char-code c1) (equal-char-code c2)))
 
 (defun char-not-greaterp (character &rest more-characters)
   #!+sb-doc
@@ -490,9 +501,11 @@
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
-    (unless (<= (equal-char-code c)
-                (equal-char-code (car list)))
+    (unless (two-arg-char-not-greaterp c (car list))
       (return nil))))
+
+(defun two-arg-char-not-lessp (c1 c2)
+  (>= (equal-char-code c1) (equal-char-code c2)))
 
 (defun char-not-lessp (character &rest more-characters)
   #!+sb-doc
@@ -501,8 +514,7 @@
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
-    (unless (>= (equal-char-code c)
-                (equal-char-code (car list)))
+    (unless (two-arg-char-not-lessp c (car list))
       (return nil))))
 
 ;;;; miscellaneous functions

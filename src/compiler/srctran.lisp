@@ -3497,15 +3497,16 @@
 ;;; negated test as appropriate. If it is a degenerate one-arg call,
 ;;; then we transform to code that returns true. Otherwise, we bind
 ;;; all the arguments and expand into a bunch of IFs.
-(declaim (ftype (function (symbol list boolean t) *) multi-compare))
-(defun multi-compare (predicate args not-p type)
+(defun multi-compare (predicate args not-p type &optional force-two-arg-p)
   (let ((nargs (length args)))
     (cond ((< nargs 1) (values nil t))
           ((= nargs 1) `(progn (the ,type ,@args) t))
           ((= nargs 2)
            (if not-p
                `(if (,predicate ,(first args) ,(second args)) nil t)
-               (values nil t)))
+               (if force-two-arg-p
+                   `(,predicate ,(first args) ,(second args))
+                   (values nil t))))
           (t
            (do* ((i (1- nargs) (1- i))
                  (last nil current)
@@ -3543,15 +3544,15 @@
                                                             'character))
 
 (define-source-transform char-equal (&rest args)
-  (multi-compare 'char-equal args nil 'character))
+  (multi-compare 'sb!impl::two-arg-char-equal args nil 'character t))
 (define-source-transform char-lessp (&rest args)
-  (multi-compare 'char-lessp args nil 'character))
+  (multi-compare 'sb!impl::two-arg-char-lessp args nil 'character t))
 (define-source-transform char-greaterp (&rest args)
-  (multi-compare 'char-greaterp args nil 'character))
+  (multi-compare 'sb!impl::two-arg-char-greaterp args nil 'character t))
 (define-source-transform char-not-greaterp (&rest args)
-  (multi-compare 'char-greaterp args t 'character))
+  (multi-compare 'sb!impl::two-arg-char-greaterp args t 'character t))
 (define-source-transform char-not-lessp (&rest args)
-  (multi-compare 'char-lessp args t 'character))
+  (multi-compare 'sb!impl::two-arg-char-lessp args t 'character t))
 
 ;;; This function does source transformation of N-arg inequality
 ;;; functions such as /=. This is similar to MULTI-COMPARE in the <3
