@@ -8,52 +8,7 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
-#|
-;;;; object set stuff
 
-;;; a hashtable from ports to objects. Each entry is a cons (object . set).
-;(defvar *port-table* (make-hash-table :test 'eql))
-
-(defstruct (object-set
-            (:constructor make-object-set
-                          (name &optional
-                                (default-handler #'default-default-handler)))
-            (:print-object
-             (lambda (s stream)
-               (format stream "#<Object Set ~S>" (object-set-name s))))
-            (:copier nil))
-  name                                  ; Name, for descriptive purposes.
-  (table (make-hash-table :test 'eq))   ; Message-ID or
-                                        ;   xevent-type --> handler fun.
-  default-handler)
-
-#!+sb-doc
-(setf (fdocumentation 'make-object-set 'function)
-      "Make an object set for use by a RPC/xevent server. Name is for
-      descriptive purposes only.")
-
-;;; If no such operation defined, signal an error.
-(defun default-default-handler (object)
-  (error "You lose, object: ~S" object))
-
-;;; Look up the handler function for a given message ID.
-(defun object-set-operation (object-set message-id)
-  #!+sb-doc
-  "Return the handler function in Object-Set for the operation specified by
-   Message-ID, if none, NIL is returned."
-  (enforce-type object-set object-set)
-  (enforce-type message-id fixnum)
-  (values (gethash message-id (object-set-table object-set))))
-
-;;; The setf inverse for Object-Set-Operation.
-(defun %set-object-set-operation (object-set message-id new-value)
-  (enforce-type object-set object-set)
-  (enforce-type message-id fixnum)
-  (setf (gethash message-id (object-set-table object-set)) new-value))
-
-|#
-
 ;;;; file descriptor I/O noise
 
 (defstruct (handler
@@ -63,10 +18,17 @@
   (direction nil :type (member :input :output))
   ;; File descriptor this handler is tied to.
   (descriptor 0 :type (mod #.sb!unix:fd-setsize))
+  ;; T iff this handler is running.
+  ;;
+  ;; FIXME: unused. At some point this used to be set to T
+  ;; around the call to the handler-function, but that was commented
+  ;; out with the verbose explantion "Doesn't work -- ACK".
+  active
+  ;; Function to call.
+  (function nil :type function)
+  ;; T if this descriptor is bogus.
+  bogus)
 
-  active                      ; T iff this handler is running.
-  (function nil :type function) ; Function to call.
-  bogus)                      ; T if this descriptor is bogus.
 (def!method print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
     (format stream
@@ -80,6 +42,33 @@
   #!+sb-doc
   "List of all the currently active handlers for file descriptors")
 
+(defvar *descriptor-handler-lock*
+  (sb!thread::make-spinlock :name "descriptor handle lock"))
+
+(sb!xc:defmacro with-descriptor-handlers (&body forms)
+  ;; FD-STREAM functionality can add and remove descriptors on it's
+  ;; own, and two threads adding add the same time could lose one.
+  ;;
+  ;; This is never held for long, so a spinlock is fine.
+  `(without-interrupts
+     (sb!thread::with-spinlock (*descriptor-handler-lock*)
+       ,@forms)))
+
+(defun list-all-descriptor-handlers ()
+  (with-descriptor-handlers
+    (copy-list *descriptor-handlers*)))
+
+(defun select-descriptor-handlers (function)
+  (declare (function function))
+  (with-descriptor-handlers
+    (remove-if-not function *descriptor-handlers*)))
+
+(defun map-descriptor-handlers (function)
+  (declare (function function))
+  (with-descriptor-handlers
+    (dolist (handler *descriptor-handlers*)
+      (funcall function handler))))
+
 ;;; Add a new handler to *descriptor-handlers*.
 (defun add-fd-handler (fd direction function)
   #!+sb-doc
@@ -90,25 +79,27 @@
     ;; FIXME: should be TYPE-ERROR?
     (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
   (let ((handler (make-handler direction fd function)))
-    (push handler *descriptor-handlers*)
+    (with-descriptor-handlers
+      (push handler *descriptor-handlers*))
     handler))
 
 ;;; Remove an old handler from *descriptor-handlers*.
 (defun remove-fd-handler (handler)
   #!+sb-doc
   "Removes HANDLER from the list of active handlers."
-  (setf *descriptor-handlers*
-        (delete handler *descriptor-handlers*
-                :test #'eq)))
+  (with-descriptor-handlers
+    (setf *descriptor-handlers*
+          (delete handler *descriptor-handlers*))))
 
 ;;; Search *descriptor-handlers* for any reference to fd, and nuke 'em.
 (defun invalidate-descriptor (fd)
   #!+sb-doc
   "Remove any handers refering to fd. This should only be used when attempting
   to recover from a detected inconsistancy."
-  (setf *descriptor-handlers*
-        (delete fd *descriptor-handlers*
-                :key #'handler-descriptor)))
+  (with-descriptor-handlers
+    (setf *descriptor-handlers*
+          (delete fd *descriptor-handlers*
+                  :key #'handler-descriptor))))
 
 ;;; Add the handler to *descriptor-handlers* for the duration of BODY.
 (defmacro with-fd-handler ((fd direction function) &rest body)
@@ -129,20 +120,24 @@
 ;;; offering a few restarts.
 (defun handler-descriptors-error ()
   (let ((bogus-handlers nil))
-    (dolist (handler *descriptor-handlers*)
+    (dolist (handler (list-all-descriptor-handlers))
       (unless (or (handler-bogus handler)
                   (sb!unix:unix-fstat (handler-descriptor handler)))
         (setf (handler-bogus handler) t)
         (push handler bogus-handlers)))
     (restart-case (error "~S ~[have~;has a~:;have~] bad file descriptor~:P."
                          bogus-handlers (length bogus-handlers))
-      (remove-them () :report "Remove bogus handlers."
-       (setf *descriptor-handlers*
-             (delete-if #'handler-bogus *descriptor-handlers*)))
-      (retry-them () :report "Retry bogus handlers."
+      (remove-them ()
+        :report "Remove bogus handlers."
+        (with-descriptor-handlers
+          (setf *descriptor-handlers*
+                (delete-if #'handler-bogus *descriptor-handlers*))))
+      (retry-them ()
+        :report "Retry bogus handlers."
        (dolist (handler bogus-handlers)
          (setf (handler-bogus handler) nil)))
-      (continue () :report "Go on, leaving handlers marked as bogus."))))
+      (continue ()
+        :report "Go on, leaving handlers marked as bogus."))))
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
 
@@ -230,53 +225,6 @@
   (multiple-value-bind (to-sec to-usec) (decode-timeout timeout)
     (sub-serve-event to-sec to-usec)))
 
-;;; These macros are chunks of code from SUB-SERVE-EVENT. They randomly
-;;; reference the READ-FDS and WRITE-FDS Alien variables (which wold be consed
-;;; if passed as function arguments.)
-(eval-when (:compile-toplevel :execute)
-
-;;; Initialize the fd-sets for UNIX-SELECT and return the active descriptor
-;;; count.
-(sb!xc:defmacro calc-masks ()
-  '(progn
-     (sb!unix:fd-zero read-fds)
-     (sb!unix:fd-zero write-fds)
-     (let ((count 0))
-       (declare (type index count))
-       (dolist (handler *descriptor-handlers*)
-         (unless (or (handler-active handler)
-                     (handler-bogus handler))
-           (let ((fd (handler-descriptor handler)))
-             (ecase (handler-direction handler)
-               (:input (sb!unix:fd-set fd read-fds))
-               (:output (sb!unix:fd-set fd write-fds)))
-             (when (> fd count)
-               (setf count fd)))))
-       (1+ count))))
-
-;;; Call file descriptor handlers according to the readable and writable masks
-;;; returned by select.
-(sb!xc:defmacro call-fd-handler ()
-  '(let ((result nil))
-     (dolist (handler *descriptor-handlers*)
-       (let ((desc (handler-descriptor handler)))
-         (when (ecase (handler-direction handler)
-                 (:input (sb!unix:fd-isset desc read-fds))
-                 (:output (sb!unix:fd-isset desc write-fds)))
-           (unwind-protect
-               (progn
-                 ;; Doesn't work -- ACK
-                 ;(setf (handler-active handler) t)
-                 (funcall (handler-function handler) desc))
-             (setf (handler-active handler) nil))
-           (ecase (handler-direction handler)
-             (:input (sb!unix:fd-clr desc read-fds))
-             (:output (sb!unix:fd-clr desc write-fds)))
-           (setf result t)))
-       result)))
-
-) ; EVAL-WHEN
-
 ;;; When a *periodic-polling-function* is defined the server will not
 ;;; block for more than the maximum event timeout and will call the
 ;;; polling function if it does time out.
@@ -304,26 +252,56 @@
     ;; Next, wait for something to happen.
     (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
                           (write-fds (sb!alien:struct sb!unix:fd-set)))
-      (let ((count (calc-masks)))
+      (sb!unix:fd-zero read-fds)
+      (sb!unix:fd-zero write-fds)
+      (let ((count 0))
+        (declare (type index count))
+
+        ;; Initialize the fd-sets for UNIX-SELECT and return the active
+        ;; descriptor count.
+        (map-descriptor-handlers
+         (lambda (handler)
+           ;; FIXME: If HANDLER-ACTIVE ever is reinstanted, it needs
+           ;; to be checked here in addition to HANDLER-BOGUS
+           (unless (handler-bogus handler)
+             (let ((fd (handler-descriptor handler)))
+               (ecase (handler-direction handler)
+                 (:input (sb!unix:fd-set fd read-fds))
+                 (:output (sb!unix:fd-set fd write-fds)))
+               (when (> fd count)
+                 (setf count fd))))))
+        (incf count)
+
         (multiple-value-bind (value err)
             (sb!unix:unix-fast-select count
                                       (sb!alien:addr read-fds)
                                       (sb!alien:addr write-fds)
                                       nil to-sec to-usec)
           #!+win32 (declare (ignorable err))
-          ;; Now see what it was (if anything)
-          (cond (value
-                 (cond ((zerop value)
-                        ;; Timed out.
-                        (when call-polling-fn
-                          (funcall *periodic-polling-function*)))
-                       (t
-                        (call-fd-handler))))
-                #!-win32
+          (cond ((eql 0 value)
+                 ;; Timed out.
+                 (when call-polling-fn
+                   (funcall *periodic-polling-function*)))
+                (value
+                 ;; Call file descriptor handlers according to the
+                 ;; readable and writable masks returned by select.
+                 (dolist (handler
+                           (select-descriptor-handlers
+                            (lambda (handler)
+                              (let ((fd (handler-descriptor handler)))
+                                (ecase (handler-direction handler)
+                                  (:input (sb!unix:fd-isset fd read-fds))
+                                  (:output (sb!unix:fd-isset fd write-fds)))))))
+                   (funcall (handler-function handler)
+                            (handler-descriptor handler)))
+                 t)
                 ((eql err sb!unix:eintr)
                  ;; We did an interrupt.
+                 ;;
+                 ;; FIXME: Why T here?
                  t)
                 (t
                  ;; One of the file descriptors is bad.
                  (handler-descriptors-error)
                  nil)))))))
+

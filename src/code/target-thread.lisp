@@ -211,17 +211,6 @@ in future versions."
   (setf (spinlock-value spinlock) 0)
   nil)
 
-(defmacro with-spinlock ((spinlock) &body body)
-  (sb!int:with-unique-names (lock got-it)
-    `(let ((,lock ,spinlock)
-           (,got-it nil))
-      (unwind-protect
-           (progn
-             (setf ,got-it (get-spinlock ,lock))
-             (locally ,@body))
-        (when ,got-it
-          (release-spinlock ,lock))))))
-
 ;;;; mutexes
 
 #!+sb-doc

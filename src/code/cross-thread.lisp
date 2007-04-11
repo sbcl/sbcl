@@ -29,7 +29,7 @@
 
 (defun get-spinlock (spinlock)
   (declare (ignore spinlock))
-  nil)
+  t)
 
 (defun release-spinlock (spinlock)
   (declare (ignore spinlock))
