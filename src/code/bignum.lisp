@@ -499,14 +499,21 @@
                (declare (fixnum ,i1 ,i2))
                (%bignum-set ,n-dest ,i1
                             (%bignum-ref ,n-src ,i2))))
-          `(let ((,n-end1 ,end1)
-                 (,n-end2 ,end2))
-             (do ((,i1 ,start1 (1+ ,i1))
-                  (,i2 ,start2 (1+ ,i2)))
-                 ((or (>= ,i1 ,n-end1) (>= ,i2 ,n-end2)))
-               (declare (type bignum-index ,i1 ,i2))
-               (%bignum-set ,n-dest ,i1
-                            (%bignum-ref ,n-src ,i2))))))))
+          (if (eql start1 start2)
+              `(let ((,n-end1 (min ,end1 ,end2)))
+                 (do ((,i1 ,start1 (1+ ,i1)))
+                     ((>= ,i1 ,n-end1))
+                   (declare (type bignum-index ,i1))
+                   (%bignum-set ,n-dest ,i1
+                                (%bignum-ref ,n-src ,i1))))
+              `(let ((,n-end1 ,end1)
+                     (,n-end2 ,end2))
+                 (do ((,i1 ,start1 (1+ ,i1))
+                      (,i2 ,start2 (1+ ,i2)))
+                     ((or (>= ,i1 ,n-end1) (>= ,i2 ,n-end2)))
+                   (declare (type bignum-index ,i1 ,i2))
+                   (%bignum-set ,n-dest ,i1
+                                (%bignum-ref ,n-src ,i2)))))))))
 
 (sb!xc:defmacro with-bignum-buffers (specs &body body)
   #!+sb-doc
