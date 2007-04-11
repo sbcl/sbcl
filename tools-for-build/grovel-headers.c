@@ -336,6 +336,9 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; signals\n");
+    defconstant("sig-dfl", SIG_DFL);
+    defconstant("sig-ign", SIG_IGN);
+
     defsignal("sigalrm", SIGALRM);
     defsignal("sigbus", SIGBUS);
     defsignal("sigchld", SIGCHLD);
@@ -354,11 +357,11 @@ main(int argc, char *argv[])
     defsignal("sigprof", SIGPROF);
     defsignal("sigquit", SIGQUIT);
     defsignal("sigsegv", SIGSEGV);
-#if ((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))
+#ifdef SIGSTKFLT
     defsignal("sigstkflt", SIGSTKFLT);
 #endif
     defsignal("sigstop", SIGSTOP);
-#if (!((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86)))
+#ifdef SIGSYS
     defsignal("sigsys", SIGSYS);
 #endif
     defsignal("sigterm", SIGTERM);
@@ -370,12 +373,14 @@ main(int argc, char *argv[])
     defsignal("sigusr1", SIGUSR1);
     defsignal("sigusr2", SIGUSR2);
     defsignal("sigvtalrm", SIGVTALRM);
-#ifdef LISP_FEATURE_SUNOS
+#ifdef SIGWAITING
     defsignal("sigwaiting", SIGWAITING);
 #endif
     defsignal("sigwinch", SIGWINCH);
-#ifndef LISP_FEATURE_HPUX
+#ifndef SIGXCPU
     defsignal("sigxcpu", SIGXCPU);
+#endif
+#ifdef SIGXFSZ
     defsignal("sigxfsz", SIGXFSZ);
 #endif
 

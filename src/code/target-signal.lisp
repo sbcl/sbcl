@@ -13,17 +13,28 @@
 
 (defun invoke-interruption (function)
   (without-interrupts
-    (sb!unix::reset-signal-mask)
+    ;; FIXME: This is wrong. Imagine the following sequence:
+    ;;
+    ;; 1. an asynch interrupt arrives after entry to
+    ;;    WITHOUT-INTERRUPTS but before RESET-SIGNAL-MASK: pending
+    ;;    machinery blocks all signals and marks the signal as
+    ;;    pending.
+    ;;
+    ;; 2. RESET-SIGNAL-MASK is called, and all signals are unblocked.
+    ;;
+    ;; 3. Another signal arrives while we already have one pending.
+    ;;    Oops -- we lose().
+    ;;
+    ;; Not sure what the right thing is, but definitely not
+    ;; RESET-SIGNAL-MASK. Removing it breaks signals.impure.lisp
+    ;; right now, though, and this is a rare race, so...
+    (reset-signal-mask)
     (funcall function)))
 
 (defmacro in-interruption ((&rest args) &body body)
   #!+sb-doc
   "Convenience macro on top of INVOKE-INTERRUPTION."
   `(invoke-interruption (lambda () ,@body) ,@args))
-
-;;; These should probably be somewhere, but I don't know where.
-(defconstant sig_dfl 0)
-(defconstant sig_ign 1)
 
 ;;;; system calls that deal with signals
 
@@ -73,13 +84,13 @@
     (without-gcing
       (let ((result (install-handler signal
                                      (case handler
-                                       (:default sig_dfl)
-                                       (:ignore sig_ign)
+                                       (:default sig-dfl)
+                                       (:ignore sig-ign)
                                        (t
                                         (sb!kernel:get-lisp-obj-address
                                          #'run-handler))))))
-        (cond ((= result sig_dfl) :default)
-              ((= result sig_ign) :ignore)
+        (cond ((= result sig-dfl) :default)
+              ((= result sig-ign) :ignore)
               (t (the (or function fixnum)
                    (sb!kernel:make-lisp-obj result))))))))
 
@@ -97,15 +108,8 @@
 ;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
 ;;; SIGINT in --disable-debugger mode will cleanly terminate the system
 ;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
-(defun sigint-%break (format-string &rest format-arguments)
-  (flet ((break-it ()
-           (apply #'%break 'sigint format-string format-arguments)))
-    (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
-
 (eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro define-signal-handler (name
-                                         what
-                                         &optional (function 'error))
+  (sb!xc:defmacro define-signal-handler (name what &optional (function 'error))
     `(defun ,name (signal info context)
        (declare (ignore signal info))
        (declare (type system-area-pointer context))
@@ -116,7 +120,6 @@
                     (with-alien ((context (* os-context-t) context))
                       (sap-int (sb!vm:context-pc context))))))))
 
-(define-signal-handler sigint-handler "interrupted" sigint-%break)
 (define-signal-handler sigill-handler "illegal instruction")
 #!-linux
 (define-signal-handler sigemt-handler "SIGEMT")
@@ -124,6 +127,18 @@
 (define-signal-handler sigsegv-handler "segmentation violation")
 #!-linux
 (define-signal-handler sigsys-handler "bad argument to a system call")
+
+(defun sigint-handler (signal info context)
+  (declare (ignore signal info))
+  (declare (type system-area-pointer context))
+  (/show "in Lisp-level SIGINT handler" (sap-int context))
+  (flet ((interrupt-it ()
+           (with-alien ((context (* os-context-t) context))
+             (%break 'sigint 'interactive-interrupt
+                     :context context
+                     :address (sap-int (sb!vm:context-pc context))))))
+    (sb!thread:interrupt-thread (sb!thread::foreground-thread)
+                                #'interrupt-it)))
 
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))

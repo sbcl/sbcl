@@ -19,7 +19,15 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * optimization: Direct calls to CHAR-{EQUAL,LESSP,GREATERP} and
     their NOT- variants no longer cons.
   * enhancement: XREF information is now collected to references made
-    to global variables using SYMBOL-VALUE with a constant argument.
+    to global variables using SYMBOL-VALUE and a constant argument.
+  * enhancement: SIGINT now causes a specific condition
+    SB-SYS:INTERACTIVE-INTERRUPT to be signalled.
+  * bug fix: bad type declaration in the CLOS implementation has
+    been fixed. (reported by James Anderson)
+  * bug fix: incorrect ROOM reporting on x86-64 has been fixed.
+    (thanks to Lutz Euler)
+  * bug fix: DEFSETF now allows &ENVIRONMENT and disallows &AUX as
+    required by the CLHS. (reported by Samium Gromoff)
   * bug fix: dead unbound variable references now signal an error.
     (reported by Marco Monteiro)
   * bug fix: / with an unused value was being deleted in safe code.
@@ -28,7 +36,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     line in a file is unlimited.
   * bug fix: some GC deadlocks caused by asynchronous interrupts have
     been fixed by inhibiting interrupts for when GC is disbled.
-  * bug fix: GETHASH, PUTHASH, CLRHASH and REMHASH are now interrupt safe.
+  * bug fix: GETHASH, (SETF GETHASH), CLRHASH and REMHASH are now
+    interrupt safe.
   * bug fix: binding *BREAK-ON-SIGNALS* to a value that is not a type
     specifier no longer causes infinite recursion.
   * improvement: the x86-64/darwin port now passes all tests and

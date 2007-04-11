@@ -165,8 +165,24 @@
                  *heap-exhausted-error-requested-bytes*)
          (print-unreadable-object (condition stream))))))
 
-(define-condition memory-fault-error (error)
-  ((address :initarg :address :reader memory-fault-error-address))
+(define-condition system-condition (condition)
+  ((address :initarg :address :reader system-condition-address :initform nil)
+   (context :initarg :context :reader system-condition-context :initform nil)))
+
+(define-condition memory-fault-error (system-condition error) ()
   (:report
    (lambda (condition stream)
-     (format stream "Memory fault in address #x~X" (memory-fault-error-address condition)))))
+     (format stream "Unhandled memory fault at #x~X."
+             (system-condition-address condition)))))
+
+(define-condition breakpoint-error (system-condition error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "Uhandled breakpoint/trap at #x~X."
+             (system-condition-address condition)))))
+
+(define-condition interactive-interrupt (system-condition serious-condition) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "Interactive interrupt at #x~X."
+             (system-condition-address condition)))))

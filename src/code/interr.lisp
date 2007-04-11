@@ -490,5 +490,6 @@
   (declare (type system-area-pointer context-sap))
   (infinite-error-protect
    (let ((context (sap-alien context-sap (* os-context-t))))
-     (error "Unhandled breakpoint/trap at #x~X."
-            (sap-int (sb!vm:context-pc context))))))
+     (error 'breakpoint-error
+            :context context
+            :address (sap-int (sb!vm:context-pc context))))))

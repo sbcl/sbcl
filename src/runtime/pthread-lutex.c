@@ -138,7 +138,11 @@ lutex_lock (tagged_lutex_t tagged_lutex)
     struct lutex *lutex = (struct lutex*) native_pointer(tagged_lutex);
 
     ret = thread_mutex_lock(lutex->mutex);
-    /* The mutex is locked by the same thread. */
+    /* The mutex is locked by the same thread.
+     *
+     * FIXME: Usually when POSIX says that "an error value is returned"
+     * it actually refers to errno...
+     */
     if (ret == EDEADLK)
         return ret;
     lutex_assert(ret == 0);

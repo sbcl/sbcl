@@ -499,7 +499,7 @@ this semaphore, then N of them is woken up."
     (when *session*
       (%delete-thread-from-session thread *session*)))
   #!+sb-lutex
-  (when (thread-interruptions-lock thread)
+  (without-gcing
     (/show0 "FREEING MUTEX LUTEX")
     (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
       (%lutex-destroy lutex))))
