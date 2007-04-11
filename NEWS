@@ -18,6 +18,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     variants no longer cons.
   * optimization: Direct calls to CHAR-{EQUAL,LESSP,GREATERP} and
     their NOT- variants no longer cons.
+  * optimization: Stack allocation of arrays containing unboxed
+    elements is slightly more efficient on x86 and x86-64.
   * enhancement: XREF information is now collected to references made
     to global variables using SYMBOL-VALUE and a constant argument.
   * enhancement: SIGINT now causes a specific condition

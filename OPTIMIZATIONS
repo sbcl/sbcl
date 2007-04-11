@@ -220,10 +220,13 @@ SBCL cannot derive upper bound for I and uses generic arithmetic here:
 should know the connection between an NLE and its CLEANUP.)
 --------------------------------------------------------------------------------
 #27
-Initialization of stack-allocated arrays is inefficient: we always
-fill the vector with zeroes, even when it is not needed (as for
-platforms with conservative GC or for arrays of unboxed objectes) and
-is performed later explicitely.
+(We always zeroize stack-allocated arrays of boxed elements.  The
+previous note here suggested that we could avoid that step on
+platforms with conservative GC; it's not clear to me (NJF) that
+doing so is a wise idea.)
+
+x86 and x86-64 do not zeroize stack-allocated arrays of unboxed
+elements; other platforms could copy what they do.
 --------------------------------------------------------------------------------
 #28
 a. Accessing raw slots in structure instances is more inefficient than
