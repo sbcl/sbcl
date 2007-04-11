@@ -96,7 +96,7 @@
       (storew length result vector-length-slot other-pointer-lowtag))))
 
 (define-vop (allocate-vector-on-stack)
-  (:args (type :scs (unsigned-reg immediate))
+  (:args (type :scs (unsigned-reg))
          (length :scs (any-reg))
          (words :scs (any-reg) :target ecx))
   (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
@@ -110,30 +110,23 @@
   (:policy :fast-safe)
   (:node-var node)
   (:generator 100
-    (when (sc-is type immediate)
-      (aver (typep (tn-value type) '(unsigned-byte 8))))
-    (let ((unboxed-elements-p (and (sc-is type immediate)
-                                   (/= (tn-value type)
-                                       simple-vector-widetag))))
-      (inst lea result (make-ea :byte :base words :disp
-                                (+ (1- (ash 1 n-lowtag-bits))
-                                   (* vector-data-offset n-word-bytes))))
-      (inst and result (lognot lowtag-mask))
-      ;; FIXME: It would be good to check for stack overflow here.
-      (move ecx words)
-      (inst shr ecx n-fixnum-tag-bits)
-      (allocation result result node t)
-      (unless unboxed-elements-p
-        (inst cld))
-      (inst lea res
-            (make-ea :byte :base result :disp (* vector-data-offset n-word-bytes)))
-      (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-      (storew type result 0 other-pointer-lowtag)
-      (storew length result vector-length-slot other-pointer-lowtag)
-      (unless unboxed-elements-p
-        (zeroize zero)
-        (inst rep)
-        (inst stos zero)))))
+    (inst lea result (make-ea :byte :base words :disp
+                              (+ (1- (ash 1 n-lowtag-bits))
+                                 (* vector-data-offset n-word-bytes))))
+    (inst and result (lognot lowtag-mask))
+    ;; FIXME: It would be good to check for stack overflow here.
+    (move ecx words)
+    (inst shr ecx n-fixnum-tag-bits)
+    (allocation result result node t)
+    (inst cld)
+    (inst lea res
+          (make-ea :byte :base result :disp (* vector-data-offset n-word-bytes)))
+    (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+    (storew type result 0 other-pointer-lowtag)
+    (storew length result vector-length-slot other-pointer-lowtag)
+    (zeroize zero)
+    (inst rep)
+    (inst stos zero)))
 
 (in-package "SB!C")
 

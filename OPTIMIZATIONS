@@ -220,13 +220,16 @@ SBCL cannot derive upper bound for I and uses generic arithmetic here:
 should know the connection between an NLE and its CLEANUP.)
 --------------------------------------------------------------------------------
 #27
-(We always zeroize stack-allocated arrays of boxed elements.  The
-previous note here suggested that we could avoid that step on
-platforms with conservative GC; it's not clear to me (NJF) that
-doing so is a wise idea.)
+Initialization of stack-allocated arrays is inefficient: we always
+fill the vector with zeroes, even when it is not needed (as for
+platforms with conservative GC or for arrays of unboxed objectes) and
+is performed later explicitely.
 
-x86 and x86-64 do not zeroize stack-allocated arrays of unboxed
-elements; other platforms could copy what they do.
+(This is harder than it might look at first glance, as MAKE-ARRAY is smart
+enough to eliminate something like ':initial-element 0'.  Such an optimization
+is valid if the vector is being allocated in the heap, but not if it is being
+allocated on the stack.  You could remove this optimization, but that makes
+the heap-allocated case somewhat slower...)
 --------------------------------------------------------------------------------
 #28
 a. Accessing raw slots in structure instances is more inefficient than
