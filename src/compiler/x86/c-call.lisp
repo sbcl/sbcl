@@ -214,6 +214,7 @@
                    :from :eval :to :result) ecx)
   (:temporary (:sc unsigned-reg :offset edx-offset
                    :from :eval :to :result) edx)
+  #!+darwin
   (:temporary (:sc unsigned-reg :offset esi-offset) prev-esp)
   (:node-var node)
   (:vop-var vop)
