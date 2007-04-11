@@ -214,6 +214,7 @@
                    :from :eval :to :result) ecx)
   (:temporary (:sc unsigned-reg :offset edx-offset
                    :from :eval :to :result) edx)
+  (:temporary (:sc unsigned-reg :offset esi-offset) prev-esp)
   (:node-var node)
   (:vop-var vop)
   (:save-p t)
@@ -236,11 +237,17 @@
 
            #!+darwin
            ;; Align stack for C.
-           (inst and esp-tn #xfffffff0)
+           (progn
+             (move prev-esp esp-tn)
+             (inst and esp-tn -16))
 
            (inst call function)
            ;; To give the debugger a clue. XX not really internal-error?
            (note-this-location vop :internal-error)
+
+           #!+darwin
+           ;; Restore
+           (move esp-tn prev-esp)
 
            ;; Restore the NPX for lisp; ensure no regs are empty
            (dotimes (i 7)

@@ -111,7 +111,7 @@ build_so $testfilestem-c
 
 ## Foreign definitions & load
 
-cat > $testfilestem.def.lisp <<EOF
+cat > $testfilestem.base.lisp <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
   (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -154,12 +154,11 @@ cat > $testfilestem.def.lisp <<EOF
   ;; that the location will be the same.
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
-
   (enable-debugger)
   ;; automagic restarts
   (setf *debugger-hook*
         (lambda (condition hook)
-          (print (list :debugger-hook condition))
+          (princ condition)
           (let ((cont (find-restart 'continue condition)))
             (when cont
               (invoke-restart cont)))
@@ -167,9 +166,15 @@ cat > $testfilestem.def.lisp <<EOF
           (invoke-debugger condition)))
 EOF
 
+echo "(declaim (optimize speed))" > $testfilestem.fast.lisp
+cat $testfilestem.base.lisp >> $testfilestem.fast.lisp
+
+echo "(declaim (optimize space))" > $testfilestem.small.lisp
+cat $testfilestem.base.lisp >> $testfilestem.small.lisp
+
 # Test code
 cat > $testfilestem.test.lisp <<EOF
-  (assert (= (summish 10 20) 31))
+  (assert (= 31 (summish 10 20)))
   (assert (= 42 numberish))
   (setf numberish 13)
   (assert (= 13 numberish))
@@ -222,53 +227,71 @@ cat > $testfilestem.test.lisp <<EOF
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
 
-${SBCL:-sbcl} --eval "(progn (load (compile-file #p\"$testfilestem.def.lisp\")) (sb-ext:quit :unix-status 52))"
-if [ $? = 52 ]; then
-    true # nop
-else
-    # we can't compile the test file. something's wrong.
-    # rm $testfilestem.*
-    echo test failed: $?
-    exit 1
-fi
+test_compile() {
+    ${SBCL:-sbcl} --eval "(progn (load (compile-file #p\"$testfilestem.$1.lisp\")) (sb-ext:quit :unix-status 52))"
+    if [ $? = 52 ]; then
+        echo test compile $1 ok
+    else
+        # we can't compile the test file. something's wrong.
+        # rm $testfilestem.*
+        echo test compile $1 failed: $?
+	exit 1
+    fi
+}
 
-echo compile ok
+test_compile fast
+test_compile small
 
-${SBCL:-sbcl} --load $testfilestem.def.fasl --load $testfilestem.test.lisp
-RET=$?
-if [ $RET = 22 ]; then
-    rm $testfilestem.*
-    exit $PUNT # success -- load-shared-object not supported
-elif [ $RET != 52 ]; then
-    rm $testfilestem.*
-    echo test failed: $?
-    exit 1
-fi
+test_use() {
+    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --load $testfilestem.test.lisp
+    RET=$?
+    if [ $RET = 22 ]; then
+	rm $testfilestem.*
+	exit $PUNT # success -- load-shared-object not supported
+    elif [ $RET != 52 ]; then
+	rm $testfilestem.*
+	echo test use $1 failed: $?
+	exit 1
+    else
+	echo test use $1 ok
+    fi
+}
 
-echo load ok
+test_use small
+test_use fast
 
-${SBCL:-sbcl} --load $testfilestem.def.fasl --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.core\"))" <<EOF
+test_save() {
+    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.$1.core\"))" <<EOF
   (sb-ext:quit :unix-status 22) ; catch this
 EOF
-if [ $? = 22 ]; then
-    rm $testfilestem.*
-    exit $PUNT # success -- linkage-table not available
-fi
+    if [ $? = 22 ]; then
+	rm $testfilestem.*
+	exit $PUNT # success -- linkage-table not available
+    else
+	echo save $1 ok
+    fi
+}
 
-echo table ok
+test_save small
+test_save fast
 
-${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
-if [ $? != 52 ]; then
-    rm $testfilestem.*
-    echo test failed: $?
-    exit 1 # Failure
-fi
+test_start() {
+    ${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.$1.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
+    if [ $? != 52 ]; then
+	rm $testfilestem.*
+	echo test failed: $?
+	exit 1 # Failure
+    else
+	echo test start $1 ok
+    fi
+}
 
-echo start ok
+test_start fast
+test_start small
 
 # missing object file
 rm $testfilestem-b.so $testfilestem-b2.so
-${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.core --sysinit /dev/null --userinit /dev/null <<EOF
+${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.fast.core --sysinit /dev/null --userinit /dev/null <<EOF
   (assert (= 22 (summish 10 11)))
   (multiple-value-bind (val err) (ignore-errors (eval 'foo))
     (assert (not val))
@@ -284,7 +307,7 @@ if [ $? != 52 ]; then
     exit 1 # Failure
 fi
 
-echo missing ok
+echo missing .so ok
 
 rm -f $testfilestem.* $testfilestem-*
 
