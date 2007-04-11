@@ -70,7 +70,7 @@
 ;;; for that). For an explanation of what it really does, look
 ;;; elsewhere.
 (export '*shebang-backend-subfeatures*)
-(declaim (type list *shebang-features*))
+(declaim (type list *shebang-backend-subfeatures*))
 (defvar *shebang-backend-subfeatures*)
 
 ;;;; string checker, for catching non-portability early

@@ -95,7 +95,8 @@
 
 ;;; Rehash the sset when the proportion of free cells in the set is
 ;;; lower than this.
-(defconstant +sset-rehash-threshold+ 1/4)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +sset-rehash-threshold+ 1/4))
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.

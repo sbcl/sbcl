@@ -811,6 +811,7 @@
     %method-lambda-list
     optimize
     ftype
+    muffle-conditions
     inline
     notinline))
 

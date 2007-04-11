@@ -43,6 +43,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     interrupt safe.
   * bug fix: binding *BREAK-ON-SIGNALS* to a value that is not a type
     specifier no longer causes infinite recursion.
+  * bug fix: SB-EXT:MUFFLE-CONDITIONS declarations no longer trigger a 
+    bogus warning in DEFMETHOD bodies (reported by Kevin Reid)
   * improvement: the x86-64/darwin port now passes all tests and
     should be considered non-experimental.
 
