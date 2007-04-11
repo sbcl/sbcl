@@ -100,6 +100,9 @@
  * floats.
  *
  * This should work for Lisp calls C calls Lisp calls C..
+ *
+ * FIXME & OAOOM: This duplicates call-out in src/compiler/x86/c-call.lisp,
+ * so if you tweak this, change that too!
  */
 	.text
 	.align	align_16byte,0x90

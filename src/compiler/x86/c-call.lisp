@@ -219,6 +219,9 @@
   (:save-p t)
   (:ignore args ecx edx)
   (:generator 0
+    ;; FIXME & OAOOM: This is brittle and error-prone to maintain two
+    ;; instances of the same logic, on in arch-assem.S, and one in
+    ;; c-call.lisp. If you modify this, modify that one too...
     (cond ((policy node (> space speed))
            (move eax function)
            (inst call (make-fixup "call_into_c" :foreign)))
@@ -228,7 +231,12 @@
            (dotimes (i 8)
              (inst fstp fr0-tn))
 
-           #!+win32 (inst cld)
+           #!+win32
+           (inst cld)
+
+           #!+darwin
+           ;; Align stack for C.
+           (inst and esp-tn #xfffffff0)
 
            (inst call function)
            ;; To give the debugger a clue. XX not really internal-error?
