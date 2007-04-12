@@ -316,11 +316,7 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst mov temp
-              (make-ea :dword
-                       :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack*)
-                                (ash symbol-tls-index-slot word-shift)
-                                (- other-pointer-lowtag))))
+              (make-ea-for-symbol-tls-index *alien-stack*))
         (inst fs-segment-prefix)
         (inst sub (make-ea :dword :base temp) delta)))
     (load-tl-symbol-value result *alien-stack*))
@@ -329,11 +325,7 @@
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst sub (make-ea :dword
-                           :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack*)
-                                    (ash symbol-value-slot word-shift)
-                                    (- other-pointer-lowtag)))
+        (inst sub (make-ea-for-symbol-value *alien-stack*)
               delta)))
     (load-symbol-value result *alien-stack*)))
 
@@ -345,22 +337,14 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst mov temp
-              (make-ea :dword
-                       :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack*)
-                                (ash symbol-tls-index-slot word-shift)
-                                (- other-pointer-lowtag))))
+              (make-ea-for-symbol-tls-index *alien-stack*))
         (inst fs-segment-prefix)
         (inst add (make-ea :dword :base temp) delta))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst add (make-ea :dword
-                           :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack*)
-                                    (ash symbol-value-slot word-shift)
-                                    (- other-pointer-lowtag)))
+        (inst add (make-ea-for-symbol-value *alien-stack*)
               delta)))))
 
 ;;; these are not strictly part of the c-call convention, but are

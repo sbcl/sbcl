@@ -12,10 +12,7 @@
 (in-package "SB!VM")
 
 (macrolet ((ea-for-xf-desc (tn slot)
-             `(make-ea
-               :dword :base ,tn
-               :disp (- (* ,slot n-word-bytes)
-                        other-pointer-lowtag))))
+             `(make-ea-for-object-slot ,tn ,slot other-pointer-lowtag)))
   (defun ea-for-sf-desc (tn)
     (ea-for-xf-desc tn single-float-value-slot))
   (defun ea-for-df-desc (tn)
@@ -1966,10 +1963,8 @@
                        :disp (frame-byte-offset (tn-offset temp)))))
        (descriptor-reg
         (inst movsx exp-bits
-              (make-ea :word :base float
-                       :disp (- (* (+ 2 long-float-value-slot)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))))))
+              (make-ea-for-object-slot float (+ 2 long-float-value-slot)
+                                       other-pointer-lowtag :word))))))
 
 #!+long-float
 (define-vop (long-float-high-bits)

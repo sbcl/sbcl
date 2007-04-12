@@ -263,11 +263,7 @@
          (:temporary (:sc unsigned-reg :to (:result 0)) old)
          (:generator 20
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
-             (inst mov old
-                   (make-ea :dword :base object
-                            :disp (- (* (+ word vector-data-offset)
-                                        n-word-bytes)
-                                     other-pointer-lowtag)))
+             (loadw old object (+ word vector-data-offset) other-pointer-lowtag)
              (sc-case value
                (immediate
                 (let* ((value (tn-value value))
@@ -286,11 +282,7 @@
                   (inst or old value)
                   (unless (zerop shift)
                     (inst rol old shift)))))
-             (inst mov (make-ea :dword :base object
-                                :disp (- (* (+ word vector-data-offset)
-                                            n-word-bytes)
-                                         other-pointer-lowtag))
-                   old)
+             (storew old object (+ word vector-data-offset) other-pointer-lowtag)
              (sc-case value
                (immediate
                 (inst mov result (tn-value value)))

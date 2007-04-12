@@ -1738,10 +1738,7 @@
   (:results (y :scs (unsigned-reg) :from (:eval 0)))
   (:result-types unsigned-num)
   (:generator 50
-    (inst mov k (make-ea :dword :base state
-                         :disp (- (* (+ 2 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+    (loadw k state (+ 2 vector-data-offset) other-pointer-lowtag)
     (inst cmp k 624)
     (inst jmp :ne no-update)
     (inst mov tmp state)        ; The state is passed in EAX.
@@ -1764,11 +1761,7 @@
     (inst mov tmp y)
     (inst inc k)
     (inst shl tmp 7)
-    (inst mov (make-ea :dword :base state
-                       :disp (- (* (+ 2 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag))
-          k)
+    (storew k state (+ 2 vector-data-offset) other-pointer-lowtag)
     (inst and tmp #x9d2c5680)
     (inst xor y tmp)
     ;; y ^= (y << 15) & #xefc60000

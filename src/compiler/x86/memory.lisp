@@ -78,8 +78,7 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst xadd (make-ea :dword :base object
-                        :disp (- (* offset n-word-bytes) lowtag))
+    (inst xadd (make-ea-for-object-slot object offset lowtag)
           value)))
 
 ;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
@@ -102,21 +101,15 @@
          (let ((val (tn-value value)))
            (etypecase val
              (integer
-              (inst mov
-                    (make-ea :dword :base object
-                             :disp (- (* (+ base offset) n-word-bytes) lowtag))
-                    (fixnumize val)))
+              (storew (fixnumize val)
+                      object (+ base offset) lowtag))
              (symbol
-              (inst mov
-                    (make-ea :dword :base object
-                             :disp (- (* (+ base offset) n-word-bytes) lowtag))
-                    (+ nil-value (static-symbol-offset val))))
+              (storew (+ nil-value (static-symbol-offset val))
+                      object (+ base offset) lowtag))
              (character
-              (inst mov
-                    (make-ea :dword :base object
-                             :disp (- (* (+ base offset) n-word-bytes) lowtag))
-                    (logior (ash (char-code val) n-widetag-bits)
-                            character-widetag)))))
+              (storew (logior (ash (char-code val) n-widetag-bits)
+                              character-widetag)
+                      object (+ base offset) lowtag))))
          ;; Else, value not immediate.
          (storew value object (+ base offset) lowtag))))
 
@@ -133,8 +126,7 @@
   (:generator 4
     (move eax old-value)
     (move temp new-value)
-    (inst cmpxchg (make-ea :dword :base object
-                           :disp (- (* (+ base offset) n-word-bytes) lowtag))
+    (inst cmpxchg (make-ea-for-object-slot object (+ base offset) lowtag)
           temp)
     (move result eax)))
 
@@ -148,6 +140,5 @@
   (:info offset)
   (:generator 4
     (move result value)
-    (inst xadd (make-ea :dword :base object
-                        :disp (- (* (+ base offset) n-word-bytes) lowtag))
+    (inst xadd (make-ea-for-object-slot object (+ base offset) lowtag)
           value)))

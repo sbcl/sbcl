@@ -902,13 +902,11 @@
                (note-this-location vop :call-site)
 
                (inst ,(if (eq return :tail) 'jmp 'call)
-                     (make-ea :dword :base eax
-                              :disp ,(if named
-                                         '(- (* fdefn-raw-addr-slot
-                                                n-word-bytes)
-                                             other-pointer-lowtag)
-                                       '(- (* closure-fun-slot n-word-bytes)
-                                           fun-pointer-lowtag))))
+                     ,(if named
+                          '(make-ea-for-object-slot eax fdefn-raw-addr-slot
+                                                    other-pointer-lowtag)
+                          '(make-ea-for-object-slot eax closure-fun-slot
+                                                    fun-pointer-lowtag)))
                ,@(ecase return
                    (:fixed
                     '((default-unknown-values vop values nvals)))
@@ -1478,11 +1476,7 @@
                        :disp (* thread-stepping-slot n-word-bytes))
           nil-value))
   #!-sb-thread
-  (inst cmp (make-ea :dword
-                     :disp (+ nil-value (static-symbol-offset
-                                         'sb!impl::*stepping*)
-                              (* symbol-value-slot n-word-bytes)
-                              (- other-pointer-lowtag)))
+  (inst cmp (make-ea-for-symbol-value sb!impl::*stepping*)
         nil-value))
 
 (define-vop (step-instrument-before-vop)

@@ -164,9 +164,8 @@
   (:generator 4
     (move result value)
     (inst lock)
-    (inst add (make-ea :dword :base object
-                       :disp (- (* symbol-value-slot n-word-bytes)
-                                other-pointer-lowtag))
+    (inst add (make-ea-for-object-slot object symbol-value-slot
+                                       other-pointer-lowtag)
           value)))
 
 #!+sb-thread
@@ -244,9 +243,8 @@
   (:generator 38
     (load-type type function (- fun-pointer-lowtag))
     (inst lea raw
-          (make-ea :byte :base function
-                   :disp (- (* simple-fun-code-offset n-word-bytes)
-                            fun-pointer-lowtag)))
+          (make-ea-for-object-slot function simple-fun-code-offset
+                                   fun-pointer-lowtag))
     (inst cmp type simple-fun-header-widetag)
     (inst jmp :e normal-fn)
     (inst lea raw (make-fixup "closure_tramp" :foreign))
