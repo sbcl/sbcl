@@ -81,3 +81,16 @@
 
 (setf (symbol-value 'fopcompile-test-foo) 1)
 (assert* (eql fopcompile-test-foo 1))
+
+;;; Ensure that we're passing sensible environments to macros during
+;;; fopcompilation. Reported by Samium Gromoff.
+
+(defmacro bar (vars &environment env)
+  (assert (equal vars
+                 (mapcar #'car (sb-c::lexenv-vars env)))))
+
+(symbol-macrolet ((foo 1))
+  (let* ((x (bar (foo)))
+         (y (bar (x foo))))
+    (bar (y x foo)))))
+

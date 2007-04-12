@@ -1107,7 +1107,10 @@
   ;; propagation. This is left null by the lambda pre-pass if it
   ;; determine that this is a set closure variable, and is thus not a
   ;; good subject for flow analysis.
-  (constraints nil :type (or sset null)))
+  (constraints nil :type (or sset null))
+  ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
+  ;; in the fopcompiler.
+  (fop-value nil))
 (defprinter (lambda-var :identity t)
   %source-name
   #!+sb-show id

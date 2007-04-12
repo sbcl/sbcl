@@ -11,11 +11,6 @@
 
 (in-package "SB!C")
 
-;;; True if the current contour of FOPCOMPILABLE-P has a LET or LET*
-;;; with a non-nil bindings list, false otherwise. The effect of this
-;;; variable is to
-(defvar *fop-complex-lexenv-p* nil)
-
 ;;; SBCL has no proper byte compiler (having ditched the rather
 ;;; ambitious and slightly flaky byte compiler inherited from CMU CL)
 ;;; but its FOPs are a sort of byte code which is expressive enough
@@ -47,7 +42,7 @@
            (constant-fopcompilable-p form))
       (and (symbolp form)
            (multiple-value-bind (macroexpansion macroexpanded-p)
-               (macroexpand form)
+               (macroexpand form *lexenv*)
              (if macroexpanded-p
                  (fopcompilable-p macroexpansion)
                  ;; Punt on :ALIEN variables
@@ -60,7 +55,7 @@
       (and (listp form)
            (ignore-errors (list-length form))
            (multiple-value-bind (macroexpansion macroexpanded-p)
-               (macroexpand form)
+               (macroexpand form *lexenv*)
              (if macroexpanded-p
                  (fopcompilable-p macroexpansion)
                  (destructuring-bind (operator &rest args) form
@@ -86,7 +81,9 @@
                                     ;; analysis would be useful are the PCL
                                     ;; slot-definition type-check-functions
                                     ;;   -- JES, 2007-01-13
-                                    (not *fop-complex-lexenv-p*))
+                                    (notany (lambda (binding)
+                                              (lambda-var-p (cdr binding)))
+                                            (lexenv-vars *lexenv*)))
                                ;; #'FOO, #'(SETF FOO), etc
                                (legal-fun-name-p (car args)))))
                      ((if)
@@ -120,30 +117,7 @@
                      ;; (And whether there are declarations in the body,
                      ;; see below)
                      ((let let*)
-                      (and (>= (length args) 1)
-                           (loop for binding in (car args)
-                                 for complexp = *fop-complex-lexenv-p* then
-                                   (if (eq operator 'let)
-                                       complexp
-                                       t)
-                                 for name = (if (consp binding)
-                                                (first binding)
-                                                binding)
-                                 for value = (if (consp binding)
-                                                 (second binding)
-                                                 nil)
-                                 ;; Only allow binding lexicals,
-                                 ;; since special bindings can't be
-                                 ;; easily expressed with fops.
-                                 always (and (eq (info :variable :kind name)
-                                                 :global)
-                                             (let ((*fop-complex-lexenv-p*
-                                                    complexp))
-                                               (fopcompilable-p value))))
-                           (let ((*fop-complex-lexenv-p*
-                                  (or *fop-complex-lexenv-p*
-                                      (not (null (car args))))))
-                             (every #'fopcompilable-p (cdr args)))))
+                      (let-fopcompilable-p operator args))
                      ((locally)
                       (every #'fopcompilable-p args))
                      (otherwise
@@ -165,6 +139,40 @@
                            ;; trouble than it's worth).
                            (<= (length args) 255)
                            (every #'fopcompilable-p args))))))))))
+
+(defun let-fopcompilable-p (operator args)
+  (when (>= (length args) 1)
+    (multiple-value-bind (body decls)
+        (parse-body (cdr args) :doc-string-allowed nil)
+      (declare (ignore body))
+      (let* ((orig-lexenv *lexenv*)
+             (*lexenv* (make-lexenv)))
+        ;; We need to check for declarations
+        ;; first. Otherwise the fake lexenv we're
+        ;; constructing might be invalid.
+        (and (null decls)
+             (loop for binding in (car args)
+                   for name = (if (consp binding)
+                                  (first binding)
+                                  binding)
+                   for value = (if (consp binding)
+                                   (second binding)
+                                   nil)
+                   ;; Only allow binding lexicals,
+                   ;; since special bindings can't be
+                   ;; easily expressed with fops.
+                   always (and (eq (info :variable :kind name)
+                                   :global)
+                               (let ((*lexenv* (ecase operator
+                                                 (let orig-lexenv)
+                                                 (let* *lexenv*))))
+                                 (fopcompilable-p value)))
+                   do (progn
+                        (setf *lexenv* (make-lexenv))
+                        (push (cons name
+                                    (make-lambda-var :%source-name name))
+                              (lexenv-vars *lexenv*))))
+             (every #'fopcompilable-p (cdr args)))))))
 
 (defun lambda-form-p (form)
   (and (consp form)
@@ -250,9 +258,6 @@
       (grovel constant))
     t))
 
-;;; An alist mapping lexical varible names to FOP table handles.
-(defvar *fop-lexenv* nil)
-
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
 ;;; FOP stack), or NIL if any value will be discarded. FOPCOMPILABLE-P
 ;;; has already ensured that the form can be fopcompiled.
@@ -261,7 +266,7 @@
          (fopcompile-constant form for-value-p))
         ((symbolp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (macroexpand form)
+             (macroexpand form *lexenv*)
            (if macroexpanded-p
                ;; Symbol macro
                (fopcompile macroexpansion path for-value-p)
@@ -271,7 +276,9 @@
                      (fopcompile `(symbol-value ',form) path for-value-p)
                      ;; Lexical
                      (when for-value-p
-                       (let ((handle (cdr (assoc form *fop-lexenv*))))
+                       (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
+                              (handle (when lambda-var
+                                        (lambda-var-fop-value lambda-var))))
                          (if handle
                              (sb!fasl::dump-push handle
                                                  *compile-object*)
@@ -285,7 +292,7 @@
                                            for-value-p))))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (macroexpand form)
+             (macroexpand form *lexenv*)
            (if macroexpanded-p
                (fopcompile macroexpansion path for-value-p)
                (destructuring-bind (operator &rest args) form
@@ -315,11 +322,11 @@
                    ((if)
                     (fopcompile-if args path for-value-p))
                    ((progn)
-                     (loop for (arg . next) on args
-                           do (fopcompile arg
-                                          path (if next
-                                                   nil
-                                                   for-value-p))))
+                    (loop for (arg . next) on args
+                          do (fopcompile arg
+                                         path (if next
+                                                  nil
+                                                  for-value-p))))
                    ((setq)
                     (loop for (name value . next) on args by #'cddr
                           do (fopcompile `(set ',name ,value) path
@@ -333,8 +340,8 @@
                           (fopcompile (cons 'progn body) path for-value-p)
                           (fopcompile nil path for-value-p))))
                    ((let let*)
-                    (let ((orig-lexenv *fop-lexenv*)
-                          (*fop-lexenv* *fop-lexenv*))
+                    (let ((orig-lexenv *lexenv*)
+                          (*lexenv* (make-lexenv :default *lexenv*)))
                       (loop for binding in (car args)
                             for name = (if (consp binding)
                                            (first binding)
@@ -342,15 +349,17 @@
                             for value = (if (consp binding)
                                             (second binding)
                                             nil)
-                            do (let ((*fop-lexenv*
-                                      (if (eql operator 'let)
-                                          orig-lexenv
-                                          *fop-lexenv*)))
+                            do (let ((*lexenv* (if (eql operator 'let)
+                                                   orig-lexenv
+                                                   *lexenv*)))
                                  (fopcompile value path t))
-                            do (push (cons name
-                                           (sb!fasl::dump-pop
-                                            *compile-object*))
-                                     *fop-lexenv*))
+                            do (let ((obj (sb!fasl::dump-pop *compile-object*)))
+                                 (setf *lexenv*
+                                       (make-lexenv
+                                        :vars (list (cons name
+                                                          (make-lambda-var
+                                                           :%source-name name
+                                                           :fop-value obj)))))))
                       (fopcompile (cons 'progn (cdr args)) path for-value-p)))
                    ;; Otherwise it must be an ordinary funcall.
                    (otherwise
