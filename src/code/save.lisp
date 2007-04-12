@@ -108,6 +108,7 @@ This implementation is not as polished and painless as you might like:
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
+  (tune-hashtable-sizes-of-all-packages)
   (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this
   ;; function, and just do a GC :FULL T here? (Then if the user wanted

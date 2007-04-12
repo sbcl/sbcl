@@ -1278,6 +1278,8 @@ core and return a descriptor to it."
              (symbols (cdr cold-package-symbols-entry))
              (shadows (package-shadowing-symbols cold-package))
              (documentation (base-string-to-core (documentation cold-package t)))
+             (internal-count 0)
+             (external-count 0)
              (internal *nil-descriptor*)
              (external *nil-descriptor*)
              (imported-internal *nil-descriptor*)
@@ -1319,10 +1321,14 @@ core and return a descriptor to it."
               (case where
                 (:internal (if imported-p
                                (cold-push handle imported-internal)
-                               (cold-push handle internal)))
+                               (progn
+                                 (cold-push handle internal)
+                                 (incf internal-count))))
                 (:external (if imported-p
                                (cold-push handle imported-external)
-                               (cold-push handle external)))))))
+                               (progn
+                                 (cold-push handle external)
+                                 (incf external-count))))))))
         (let ((r *nil-descriptor*))
           (cold-push documentation r)
           (cold-push shadowing r)
@@ -1330,7 +1336,10 @@ core and return a descriptor to it."
           (cold-push imported-internal r)
           (cold-push external r)
           (cold-push internal r)
-          (cold-push (make-make-package-args cold-package) r)
+          (cold-push (make-make-package-args cold-package
+                                             internal-count
+                                             external-count)
+                     r)
           ;; FIXME: It would be more space-efficient to use vectors
           ;; instead of lists here, and space-efficiency here would be
           ;; nice, since it would reduce the peak memory usage in
@@ -1349,9 +1358,9 @@ core and return a descriptor to it."
     (cold-set 'sb!vm::*fp-constant-0f0* (number-to-core 0f0))
     (cold-set 'sb!vm::*fp-constant-1f0* (number-to-core 1f0))))
 
-;;; Make a cold list that can be used as the arg list to MAKE-PACKAGE in order
-;;; to make a package that is similar to PKG.
-(defun make-make-package-args (pkg)
+;;; Make a cold list that can be used as the arg list to MAKE-PACKAGE in
+;;; order to make a package that is similar to PKG.
+(defun make-make-package-args (pkg internal-count external-count)
   (let* ((use *nil-descriptor*)
          (cold-nicknames *nil-descriptor*)
          (res *nil-descriptor*))
@@ -1380,13 +1389,14 @@ core and return a descriptor to it."
       (dolist (warm-nickname warm-nicknames)
         (cold-push (base-string-to-core warm-nickname) cold-nicknames)))
 
-    (cold-push (number-to-core (truncate (package-internal-symbol-count pkg)
-                                         0.8))
-               res)
+    ;; INTERNAL-COUNT and EXTERNAL-COUNT are the number of symbols that
+    ;; the package contains in the core. We arrange for the package
+    ;; symbol tables to be created somewhat larger so that they don't
+    ;; need to be rehashed so easily when additional symbols are
+    ;; interned during the warm build.
+    (cold-push (number-to-core (truncate internal-count 0.8)) res)
     (cold-push (cold-intern :internal-symbols) res)
-    (cold-push (number-to-core (truncate (package-external-symbol-count pkg)
-                                         0.8))
-               res)
+    (cold-push (number-to-core (truncate external-count 0.8)) res)
     (cold-push (cold-intern :external-symbols) res)
 
     (cold-push cold-nicknames res)

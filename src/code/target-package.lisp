@@ -39,24 +39,31 @@
             (package-hashtable-free table)
             (package-hashtable-deleted table))))
 
-;;; the maximum density we allow in a package hashtable
-(defconstant package-rehash-threshold 0.75)
+;;; the maximum load factor we allow in a package hashtable
+(defconstant +package-rehash-threshold+ 0.75)
+
+;;; the load factor desired for a package hashtable when writing a
+;;; core image
+(defconstant +package-hashtable-image-load-factor+ 0.5)
 
 ;;; Make a package hashtable having a prime number of entries at least
-;;; as great as (/ SIZE PACKAGE-REHASH-THRESHOLD). If RES is supplied,
+;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+). If RES is supplied,
 ;;; then it is destructively modified to produce the result. This is
 ;;; useful when changing the size, since there are many pointers to
 ;;; the hashtable.
+;;; Actually, the smallest table built here has three entries. This
+;;; is necessary because the double hashing step size is calculated
+;;; using a division by the table size minus two.
 (defun make-or-remake-package-hashtable (size
                                          &optional
                                          res)
   (flet ((actual-package-hashtable-size (size)
            (loop for n of-type fixnum
-              from (logior (truncate size package-rehash-threshold) 1)
+              from (logior (ceiling size +package-rehash-threshold+) 1)
               by 2
               when (positive-primep n) return n)))
     (let* ((n (actual-package-hashtable-size size))
-           (size (truncate (* n package-rehash-threshold)))
+           (size (truncate (* n +package-rehash-threshold+)))
            (table (make-array n))
            (hash (make-array n
                              :element-type '(unsigned-byte 8)
@@ -69,6 +76,17 @@
                 (package-hashtable-deleted res) 0)
           (setf res (%make-package-hashtable table hash size)))
       res)))
+
+;;; Destructively resize TABLE to have room for at least SIZE entries
+;;; and rehash its existing entries. 
+(defun resize-package-hashtable (table size)
+  (let* ((vec (package-hashtable-table table))
+         (hash (package-hashtable-hash table))
+         (len (length vec)))
+    (make-or-remake-package-hashtable size table)
+    (dotimes (i len)
+      (when (> (aref hash i) 1)
+        (add-symbol table (svref vec i))))))
 
 ;;;; package locking operations, built conditionally on :sb-package-locks
 
@@ -386,33 +404,47 @@ error if any of PACKAGES is not a valid package designator."
 ;;; Add a symbol to a package hashtable. The symbol is assumed
 ;;; not to be present.
 (defun add-symbol (table symbol)
+  (when (zerop (package-hashtable-free table))
+    ;; The hashtable is full. Resize it to be able to hold twice the
+    ;; amount of symbols than it currently contains. The actual new size
+    ;; can be smaller than twice the current size if the table contained
+    ;; deleted entries.
+    (resize-package-hashtable table
+                              (* (- (package-hashtable-size table)
+                                    (package-hashtable-deleted table))
+                                 2)))
   (let* ((vec (package-hashtable-table table))
          (hash (package-hashtable-hash table))
          (len (length vec))
          (sxhash (%sxhash-simple-string (symbol-name symbol)))
-         (h2 (the fixnum (1+ (the fixnum (rem sxhash
-                                              (the fixnum (- len 2))))))))
-    (declare (fixnum len sxhash h2))
-    (cond ((zerop (the fixnum (package-hashtable-free table)))
-           (make-or-remake-package-hashtable (* (package-hashtable-size table)
-                                                2)
-                                             table)
-           (add-symbol table symbol)
-           (dotimes (i len)
-             (declare (fixnum i))
-             (when (> (the fixnum (aref hash i)) 1)
-               (add-symbol table (svref vec i)))))
-          (t
-           (do ((i (rem sxhash len) (rem (+ i h2) len)))
-               ((< (the fixnum (aref hash i)) 2)
-                (if (zerop (the fixnum (aref hash i)))
-                    (decf (package-hashtable-free table))
-                    (decf (package-hashtable-deleted table)))
-                (setf (svref vec i) symbol)
-                (setf (aref hash i)
-                      (entry-hash (length (symbol-name symbol))
-                                  sxhash)))
-             (declare (fixnum i)))))))
+         (h2 (1+ (rem sxhash (- len 2)))))
+    (declare (fixnum sxhash h2))
+    (do ((i (rem sxhash len) (rem (+ i h2) len)))
+        ((< (the fixnum (aref hash i)) 2)
+         (if (zerop (the fixnum (aref hash i)))
+             (decf (package-hashtable-free table))
+             (decf (package-hashtable-deleted table)))
+         (setf (svref vec i) symbol)
+         (setf (aref hash i)
+               (entry-hash (length (symbol-name symbol))
+                           sxhash)))
+      (declare (fixnum i)))))
+
+;;; Resize the package hashtables of all packages so that their load
+;;; factor is +PACKAGE-HASHTABLE-IMAGE-LOAD-FACTOR+. Called from
+;;; SAVE-LISP-AND-DIE to optimize space usage in the image.
+(defun tune-hashtable-sizes-of-all-packages ()
+  (flet ((tune-table-size (table)
+           (resize-package-hashtable
+            table
+            (round (* (/ +package-rehash-threshold+
+                         +package-hashtable-image-load-factor+)
+                      (- (package-hashtable-size table)
+                         (package-hashtable-free table)
+                         (package-hashtable-deleted table)))))))
+    (dolist (package (list-all-packages))
+      (tune-table-size (package-internal-symbols package))
+      (tune-table-size (package-external-symbols package)))))
 
 ;;; Find where the symbol named STRING is stored in TABLE. INDEX-VAR
 ;;; is bound to the index, or NIL if it is not present. SYMBOL-VAR
@@ -464,7 +496,17 @@ error if any of PACKAGES is not a valid package designator."
     (with-symbol (index symbol table string length hash ehash)
       (setf (aref (package-hashtable-hash table) index) 1)
       (setf (aref (package-hashtable-table table) index) nil)
-      (incf (package-hashtable-deleted table)))))
+      (incf (package-hashtable-deleted table))))
+  ;; If the table is less than one quarter full, halve its size and
+  ;; rehash the entries.
+  (let* ((size (package-hashtable-size table))
+         (deleted (package-hashtable-deleted table))
+         (used (- size
+                  (package-hashtable-free table)
+                  deleted)))
+    (declare (type fixnum size deleted used))
+    (when (< used (truncate size 4))
+      (resize-package-hashtable table (* used 2)))))
 
 ;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*.
 ;;; If there is a conflict then give the user a chance to do
