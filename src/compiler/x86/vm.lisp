@@ -404,6 +404,20 @@
                (eql value (log 2l0 10l0))
                (eql value (log 2l0 2.718281828459045235360287471352662L0)))
        (sc-number-or-lose 'fp-constant)))))
+
+;; For an immediate TN, return its value encoded for use as a literal.
+;; For any other TN, return the TN.  Only works for FIXNUMs,
+;; STATIC-SYMBOLs, and CHARACTERS (FLOATs and SAPs are handled
+;; elsewhere).
+(defun encode-value-if-immediate (tn)
+  (if (sc-is tn immediate)
+      (let ((val (tn-value tn)))
+        (etypecase val
+          (integer (fixnumize val))
+          (symbol (+ nil-value (static-symbol-offset val)))
+          (character (logior (ash (char-code val) n-widetag-bits)
+                             character-widetag))))
+      tn))
 
 ;;;; miscellaneous function call parameters
 

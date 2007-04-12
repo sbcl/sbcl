@@ -38,33 +38,16 @@
   (:policy :fast-safe)
   (:translate eq)
   (:generator 3
-    (cond
-     ((sc-is y immediate)
-      (let ((val (tn-value y)))
-        (etypecase val
-          (integer
-           (if (and (zerop val) (sc-is x any-reg descriptor-reg))
-               (inst test x x) ; smaller
-             (inst cmp x (fixnumize val))))
-          (symbol
-           (inst cmp x (+ nil-value (static-symbol-offset val))))
-          (character
-           (inst cmp x (logior (ash (char-code val) n-widetag-bits)
-                               character-widetag))))))
-     ((sc-is x immediate) ; and y not immediate
-      ;; Swap the order to fit the compare instruction.
-      (let ((val (tn-value x)))
-        (etypecase val
-          (integer
-           (if (and (zerop val) (sc-is y any-reg descriptor-reg))
-               (inst test y y) ; smaller
-             (inst cmp y (fixnumize val))))
-          (symbol
-           (inst cmp y (+ nil-value (static-symbol-offset val))))
-          (character
-           (inst cmp y (logior (ash (char-code val) n-widetag-bits)
-                               character-widetag))))))
-      (t
-       (inst cmp x y)))
+    (let ((x-val (encode-value-if-immediate x))
+          (y-val (encode-value-if-immediate y)))
+      (cond
+        ;; Shorter instruction sequences for these two cases.
+        ((eql 0 y-val) (inst test x x))
+        ((eql 0 x-val) (inst test y y))
+
+        ;; An encoded value (literal integer) has to be the second argument.
+        ((sc-is x immediate) (inst cmp y x-val))
+
+        (t (inst cmp x y-val))))
 
     (inst jmp (if not-p :ne :e) target)))

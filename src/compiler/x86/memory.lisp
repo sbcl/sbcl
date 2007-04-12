@@ -97,21 +97,7 @@
   (:variant-vars base lowtag)
   (:info offset)
   (:generator 4
-     (if (sc-is value immediate)
-         (let ((val (tn-value value)))
-           (etypecase val
-             (integer
-              (storew (fixnumize val)
-                      object (+ base offset) lowtag))
-             (symbol
-              (storew (+ nil-value (static-symbol-offset val))
-                      object (+ base offset) lowtag))
-             (character
-              (storew (logior (ash (char-code val) n-widetag-bits)
-                              character-widetag)
-                      object (+ base offset) lowtag))))
-         ;; Else, value not immediate.
-         (storew value object (+ base offset) lowtag))))
+     (storew (encode-value-if-immediate value) object (+ base offset) lowtag)))
 
 (define-vop (slot-set-conditional)
   (:args (object :scs (descriptor-reg) :to :eval)

@@ -28,21 +28,7 @@
   (:ignore name)
   (:results)
   (:generator 1
-     (if (sc-is value immediate)
-        (let ((val (tn-value value)))
-           (etypecase val
-             (integer
-              (storew (fixnumize val)
-                      object offset lowtag))
-             (symbol
-              (storew (+ nil-value (static-symbol-offset val))
-                      object offset lowtag))
-             (character
-              (storew (logior (ash (char-code val) n-widetag-bits)
-                              character-widetag)
-                      object offset lowtag))))
-       ;; Else, value not immediate.
-       (storew value object offset lowtag))))
+     (storew (encode-value-if-immediate value) object offset lowtag)))
 
 
 
