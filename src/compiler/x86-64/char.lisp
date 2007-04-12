@@ -27,9 +27,14 @@
                :load-if (not (location= x y))))
   (:note "character untagging")
   (:generator 1
-    (let ((y-dword (make-dword-tn y)))
-      (move y-dword (make-dword-tn x))
-      (inst shr y-dword n-widetag-bits))))
+    (cond ((and (sc-is y character-reg) (sc-is x any-reg descriptor-reg))
+           (let ((y-dword (make-dword-tn y)))
+             (unless (location= x y)
+               (inst mov y-dword (make-dword-tn x)))
+             (inst shr y-dword n-widetag-bits)))
+          (t
+           (move y x)
+           (inst shr y n-widetag-bits)))))
 #!-sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack)))
