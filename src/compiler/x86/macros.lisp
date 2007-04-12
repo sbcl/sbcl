@@ -73,6 +73,7 @@
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
 (defmacro make-ea-for-symbol-value (symbol)
+  (declare (type symbol symbol))
   `(make-ea :dword
     :disp (+ nil-value
            (static-symbol-offset ',symbol)
@@ -87,6 +88,7 @@
 
 #!+sb-thread
 (defmacro make-ea-for-symbol-tls-index (symbol)
+  (declare (type symbol symbol))
   `(make-ea :dword
     :disp (+ nil-value
            (static-symbol-offset ',symbol)
