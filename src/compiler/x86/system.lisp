@@ -85,9 +85,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (move eax type)
-    (inst mov
-          (make-ea :byte :base function :disp (- fun-pointer-lowtag))
-          al-tn)
+    (storeb al-tn function 0 fun-pointer-lowtag)
     (move result eax)))
 
 (define-vop (get-header-data)
@@ -240,10 +238,8 @@
   (:temporary (:sc any-reg :from (:argument 0) :to :result) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (inst lea temp
-          (make-ea :byte :base new-self
-                   :disp (- (ash simple-fun-code-offset word-shift)
-                            fun-pointer-lowtag)))
+    (inst lea temp (make-ea-for-object-slot new-self simple-fun-code-offset
+                                            fun-pointer-lowtag))
     (storew temp function simple-fun-self-slot fun-pointer-lowtag)
     (move result new-self)))
 

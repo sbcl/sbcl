@@ -31,22 +31,16 @@
      (if (sc-is value immediate)
         (let ((val (tn-value value)))
            (etypecase val
-              (integer
-               (inst mov
-                     (make-ea :dword :base object
-                              :disp (- (* offset n-word-bytes) lowtag))
-                     (fixnumize val)))
-              (symbol
-               (inst mov
-                     (make-ea :dword :base object
-                              :disp (- (* offset n-word-bytes) lowtag))
-                     (+ nil-value (static-symbol-offset val))))
-              (character
-               (inst mov
-                     (make-ea :dword :base object
-                              :disp (- (* offset n-word-bytes) lowtag))
-                     (logior (ash (char-code val) n-widetag-bits)
-                             character-widetag)))))
+             (integer
+              (storew (fixnumize val)
+                      object offset lowtag))
+             (symbol
+              (storew (+ nil-value (static-symbol-offset val))
+                      object offset lowtag))
+             (character
+              (storew (logior (ash (char-code val) n-widetag-bits)
+                              character-widetag)
+                      object offset lowtag))))
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 
