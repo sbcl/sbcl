@@ -50,6 +50,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     (reported by Samium Gromoff)
   * improvement: the x86-64/darwin port now passes all tests and
     should be considered non-experimental.
+  * improvement: a style-warning is signaled for CASE (etc) clauses with
+    duplicate keys (thanks to Kevin Reid)
 
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * new platform: experimental support for x86-64/darwin (MacOS).
