@@ -295,6 +295,7 @@
                    (funcall (handler-function handler)
                             (handler-descriptor handler)))
                  t)
+                #!-win32
                 ((eql err sb!unix:eintr)
                  ;; We did an interrupt.
                  ;;
