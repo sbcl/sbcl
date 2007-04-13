@@ -1747,16 +1747,10 @@
     (inst xor k k)
     NO-UPDATE
     ;; y = ptgfsr[k++];
-    (inst mov y (make-ea :dword :base state :index k :scale 4
-                         :disp (- (* (+ 3 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+    (inst mov y (make-ea-for-vector-data state :index k :offset 3))
     ;; y ^= (y >> 11);
     (inst shr y 11)
-    (inst xor y (make-ea :dword :base state :index k :scale 4
-                         :disp (- (* (+ 3 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+    (inst xor y (make-ea-for-vector-data state :index k :offset 3))
     ;; y ^= (y << 7) & #x9d2c5680
     (inst mov tmp y)
     (inst inc k)

@@ -171,10 +171,7 @@
          (:generator 20
            (move ecx index)
            (inst shr ecx ,bit-shift)
-           (inst mov result
-                 (make-ea :dword :base object :index ecx :scale 4
-                          :disp (- (* vector-data-offset n-word-bytes)
-                                   other-pointer-lowtag)))
+           (inst mov result (make-ea-for-vector-data object :index ecx))
            (move ecx index)
            ;; We used to mask ECX for all values of ELEMENT-PER-WORD,
            ;; but since Intel's documentation says that the chip will
@@ -218,10 +215,7 @@
          (:generator 25
            (move word-index index)
            (inst shr word-index ,bit-shift)
-           (inst mov old
-                 (make-ea :dword :base object :index word-index :scale 4
-                          :disp (- (* vector-data-offset n-word-bytes)
-                                   other-pointer-lowtag)))
+           (inst mov old (make-ea-for-vector-data object :index word-index))
            (move ecx index)
            ;; We used to mask ECX for all values of ELEMENT-PER-WORD,
            ;; but since Intel's documentation says that the chip will
@@ -242,9 +236,7 @@
              (unsigned-reg
               (inst or old value)))
            (inst rol old :cl)
-           (inst mov (make-ea :dword :base object :index word-index :scale 4
-                              :disp (- (* vector-data-offset n-word-bytes)
-                                       other-pointer-lowtag))
+           (inst mov (make-ea-for-vector-data object :index word-index)
                  old)
            (sc-case value
              (immediate
@@ -566,18 +558,13 @@
       (:generator 5
         (sc-case index
           (immediate
-           (inst ,ref-inst value
-                 (make-ea :byte :base object
-                          :disp (- (+ (* vector-data-offset n-word-bytes)
-                                      (tn-value index)
-                                      offset)
-                                   other-pointer-lowtag))))
+           (inst ,ref-inst value (make-ea-for-vector-data
+                                  object :size :byte
+                                  :offset (+ (tn-value index) offset))))
           (t
            (inst ,ref-inst value
-                 (make-ea :byte :base object :index index :scale 1
-                          :disp (- (+ (* vector-data-offset n-word-bytes)
-                                      offset)
-                                   other-pointer-lowtag)))))))
+                 (make-ea-for-vector-data object :size :byte
+                                          :index index :offset offset))))))
     (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
       (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
@@ -601,19 +588,14 @@
            '((move eax value)))
         (sc-case index
           (immediate
-           (inst mov (make-ea :byte :base object
-                              :disp (- (+ (* vector-data-offset n-word-bytes)
-                                          (tn-value index)
-                                          offset)
-                                       other-pointer-lowtag))
+           (inst mov (make-ea-for-vector-data
+                      object :size :byte :offset (+ (tn-value index) offset))
                  ,(if 8-bit-tns-p
                       'value
                       'al-tn)))
           (t
-           (inst mov (make-ea :byte :base object :index index :scale 1
-                              :disp (- (+ (* vector-data-offset n-word-bytes)
-                                          offset)
-                                       other-pointer-lowtag))
+           (inst mov (make-ea-for-vector-data object :size :byte
+                                              :index index :offset offset)
                  ,(if 8-bit-tns-p
                       'value
                       'al-tn))))
@@ -648,16 +630,12 @@
           (sc-case index
             (immediate
              (inst ,ref-inst value
-                   (make-ea :word :base object
-                            :disp (- (+ (* vector-data-offset n-word-bytes)
-                                        (* 2 (+ offset (tn-value index))))
-                                     other-pointer-lowtag))))
+                   (make-ea-for-vector-data object :size :word
+                                            :offset (+ (tn-value index) offset))))
             (t
              (inst ,ref-inst value
-                   (make-ea :word :base object :index index :scale 2
-                            :disp (- (+ (* vector-data-offset n-word-bytes)
-                                        (* 2 offset))
-                                     other-pointer-lowtag)))))))
+                   (make-ea-for-vector-data object :size :word
+                                            :index index :offset offset))))))
       (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
@@ -678,16 +656,12 @@
           (move eax value)
           (sc-case index
             (immediate
-             (inst mov (make-ea :word :base object
-                                :disp (- (+ (* vector-data-offset n-word-bytes)
-                                            (* 2 (+ offset (tn-value index))))
-                                         other-pointer-lowtag))
+             (inst mov (make-ea-for-vector-data
+                        object :size :word :offset (+ (tn-value index) offset))
                    ax-tn))
             (t
-             (inst mov (make-ea :word :base object :index index :scale 2
-                                :disp (- (+ (* vector-data-offset n-word-bytes)
-                                            (* 2 offset))
-                                         other-pointer-lowtag))
+             (inst mov (make-ea-for-vector-data object :size :word
+                                                :index index :offset offset)
                    ax-tn)))
           (move result eax))))))
   (define-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum

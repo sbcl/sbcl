@@ -289,6 +289,4 @@
   (:args (count-vector :scs (descriptor-reg)))
   (:info index)
   (:generator 0
-    (inst inc (make-ea-for-object-slot count-vector
-                                       (+ vector-data-offset index)
-                                       other-pointer-lowtag))))
+    (inst inc (make-ea-for-vector-data count-vector :offset index))))

@@ -66,6 +66,13 @@
 
 (defmacro popw (ptr &optional (slot 0) (lowtag 0))
   `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+
+(defmacro make-ea-for-vector-data (object &key (size :dword) (offset 0)
+                                   index (scale (ash (width-bits size) -3)))
+  `(make-ea ,size :base ,object :index ,index :scale ,scale
+            :disp (- (+ (* vector-data-offset n-word-bytes)
+                        (* ,offset ,scale))
+                     other-pointer-lowtag)))
 
 ;;;; macros to generate useful values
 
