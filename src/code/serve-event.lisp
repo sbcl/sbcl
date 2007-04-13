@@ -42,17 +42,11 @@
   #!+sb-doc
   "List of all the currently active handlers for file descriptors")
 
-(defvar *descriptor-handler-lock*
-  (sb!thread::make-spinlock :name "descriptor handle lock"))
-
 (sb!xc:defmacro with-descriptor-handlers (&body forms)
   ;; FD-STREAM functionality can add and remove descriptors on it's
-  ;; own, and two threads adding add the same time could lose one.
-  ;;
-  ;; This is never held for long, so a spinlock is fine.
-  `(without-interrupts
-     (sb!thread::with-spinlock (*descriptor-handler-lock*)
-       ,@forms)))
+  ;; own, so getting an interrupt while modifying this and the
+  ;; starting to recursively modify it could lose...
+  `(without-interrupts ,@forms))
 
 (defun list-all-descriptor-handlers ()
   (with-descriptor-handlers

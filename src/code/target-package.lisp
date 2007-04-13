@@ -78,7 +78,7 @@
       res)))
 
 ;;; Destructively resize TABLE to have room for at least SIZE entries
-;;; and rehash its existing entries. 
+;;; and rehash its existing entries.
 (defun resize-package-hashtable (table size)
   (let* ((vec (package-hashtable-table table))
          (hash (package-hashtable-hash table))
