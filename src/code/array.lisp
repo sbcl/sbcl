@@ -966,44 +966,62 @@ of specialized arrays is supported."
 ;;;
 ;;; DX is probably a bad idea, because a with a big array it would
 ;;; be fairly easy to blow the stack.
-;;;
-;;; Rebound per thread.
-(defvar *zap-array-data-temp* (make-array 1000 :initial-element t))
+(defvar *zap-array-data-temp* (vector))
+(declaim (simple-vector *zap-array-data-temp*))
 
-(defun zap-array-data-temp (length element-type initial-element
-                            initial-element-p)
+(defun zap-array-data-temp (length initial-element initial-element-p)
   (declare (fixnum length))
-  (when (> length (the fixnum (length *zap-array-data-temp*)))
-    (setf *zap-array-data-temp*
-          (make-array length :initial-element t)))
-  (when initial-element-p
-    (unless (typep initial-element element-type)
-      (error "~S can't be used to initialize an array of type ~S."
-             initial-element element-type))
-    (fill (the simple-vector *zap-array-data-temp*) initial-element
-          :end length))
-  *zap-array-data-temp*)
+  (let ((tmp *zap-array-data-temp*))
+    (declare (simple-vector tmp))
+    (cond ((> length (length tmp))
+           (setf *zap-array-data-temp*
+                 (if initial-element-p
+                     (make-array length :initial-element initial-element)
+                     (make-array length))))
+          (initial-element-p
+           (fill tmp initial-element :end length))
+          (t
+           tmp))))
 
 ;;; This does the grinding work for ADJUST-ARRAY. It zaps the data
 ;;; from the OLD-DATA in an arrangement specified by the OLD-DIMS to
 ;;; the NEW-DATA in an arrangement specified by the NEW-DIMS. OFFSET
 ;;; is a displaced offset to be added to computed indices of OLD-DATA.
-;;; NEW-LENGTH, ELEMENT-TYPE, INITIAL-ELEMENT, and INITIAL-ELEMENT-P
-;;; are used when OLD-DATA and NEW-DATA are EQ; in this case, a
-;;; temporary must be used and filled appropriately. When OLD-DATA and
-;;; NEW-DATA are not EQ, NEW-DATA has already been filled with any
-;;; specified initial-element.
 (defun zap-array-data (old-data old-dims offset new-data new-dims new-length
                        element-type initial-element initial-element-p)
   (declare (list old-dims new-dims))
-  (setq old-dims (nreverse old-dims))
-  (setq new-dims (reverse new-dims))
-  (if (eq old-data new-data)
-      (let ((temp (zap-array-data-temp new-length element-type
-                                       initial-element initial-element-p)))
-        (zap-array-data-aux old-data old-dims offset temp new-dims)
-        (dotimes (i new-length) (setf (aref new-data i) (aref temp i))))
-      (zap-array-data-aux old-data old-dims offset new-data new-dims)))
+  ;; OLD-DIMS comes from array-dimensions, which returns a fresh list
+  ;; at least in SBCL.
+  ;; NEW-DIMS comes from the user.
+  (setf old-dims (nreverse old-dims)
+        new-dims (reverse new-dims))
+  (cond ((eq old-data new-data)
+         ;; NEW-LENGTH, ELEMENT-TYPE, INITIAL-ELEMENT, and
+         ;; INITIAL-ELEMENT-P are used when OLD-DATA and NEW-DATA are
+         ;; EQ; in this case, a temporary must be used and filled
+         ;; appropriately. specified initial-element.
+         (when initial-element-p
+           ;; FIXME: transforming this TYPEP to someting a bit faster
+           ;; would be a win...
+           (unless (typep initial-element element-type)
+             (error "~S can't be used to initialize an array of type ~S."
+                    initial-element element-type)))
+         (without-interrupts
+           ;; Need to disable interrupts while using the temp-vector.
+           ;; An interrupt handler that also happened to call
+           ;; ADJUST-ARRAY could otherwise stomp on our data here.
+           (let ((temp (zap-array-data-temp new-length
+                                            initial-element initial-element-p)))
+             (declare (simple-vector temp))
+             (zap-array-data-aux old-data old-dims offset temp new-dims)
+             (dotimes (i new-length)
+               (setf (aref new-data i) (aref temp i)
+                     ;; zero out any garbage right away
+                     (aref temp i) 0)))))
+        (t
+         ;; When OLD-DATA and NEW-DATA are not EQ, NEW-DATA has
+         ;; already been filled with any
+         (zap-array-data-aux old-data old-dims offset new-data new-dims))))
 
 (defun zap-array-data-aux (old-data old-dims offset new-data new-dims)
   (declare (fixnum offset))

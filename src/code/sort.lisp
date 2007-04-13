@@ -237,12 +237,14 @@
             (,start-1 0))  ; one n-len subsequence to be merged with the next
        (declare (fixnum ,vector-len ,n ,temp-len ,unsorted ,start-1)
                 (simple-vector ,temp))
-       (if (> ,vector-len ,temp-len)
-           (setf ,temp (make-array (max ,vector-len
-                                        (min most-positive-fixnum
-                                             (+ ,temp-len ,temp-len))))
-                 *merge-sort-temp-vector* ,temp))
-       ;; rebind, in case PRED or KEY calls STABLE-SORT
+       (when (> ,vector-len ,temp-len)
+         (setf ,temp (make-array (max ,vector-len
+                                      (min most-positive-fixnum
+                                           (+ ,temp-len ,temp-len))))
+               *merge-sort-temp-vector* ,temp))
+       ;; Rebind, in case PRED or KEY calls STABLE-SORT. This is also
+       ;; interrupt safe: we bind before we put any data of our own in
+       ;; the temp vector.
        (let ((*merge-sort-temp-vector* (vector)))
          (loop
             ;; for each n, we start taking n-runs from the start of the vector
@@ -295,8 +297,7 @@
 ) ; EVAL-when
 
 ;;; temporary vector for stable sorting vectors, allocated for each new thread
-(defvar *merge-sort-temp-vector* (make-array 50))
-
+(defvar *merge-sort-temp-vector* (vector))
 (declaim (simple-vector *merge-sort-temp-vector*))
 
 (defun stable-sort-simple-vector (vector pred key)
