@@ -79,9 +79,9 @@
 (defmacro load-symbol (reg symbol)
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
-(defmacro make-ea-for-symbol-value (symbol)
+(defmacro make-ea-for-symbol-value (symbol &optional (width :dword))
   (declare (type symbol symbol))
-  `(make-ea :dword
+  `(make-ea ,width
     :disp (+ nil-value
            (static-symbol-offset ',symbol)
            (ash symbol-value-slot word-shift)
@@ -376,21 +376,10 @@
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-       ;; FIXME: The MAKE-EA noise should become a MACROLET macro
-       ;; or something. (perhaps SVLB, for static variable low
-       ;; byte)
-       (inst or (make-ea :byte :disp (+ nil-value
-                                        (static-symbol-offset
-                                         '*pseudo-atomic-bits*)
-                                        (ash symbol-value-slot word-shift)
-                                        (- other-pointer-lowtag)))
+       (inst or (make-ea-for-symbol-value *pseudo-atomic-bits* :byte)
              (fixnumize 1))
        ,@forms
-       (inst xor (make-ea :byte :disp (+ nil-value
-                                         (static-symbol-offset
-                                          '*pseudo-atomic-bits*)
-                                         (ash symbol-value-slot word-shift)
-                                         (- other-pointer-lowtag)))
+       (inst xor (make-ea-for-symbol-value *pseudo-atomic-bits* :byte)
              (fixnumize 1))
        (inst jmp :z ,label)
        ;; if PAI was set, interrupts were disabled at the same
