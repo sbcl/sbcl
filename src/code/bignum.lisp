@@ -1929,6 +1929,6 @@
       (let ((xi (%bignum-ref x i)))
         (mixf result
               (logand most-positive-fixnum
-                      xi
-                      (ash xi -7)))))
+                      (logxor xi
+                              (ash xi -7))))))
     result))

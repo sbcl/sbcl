@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 72)
+(def!constant +fasl-file-version+ 73)
 ;;; (description of versions before 0.9.0.1 deleted in 0.9.17)
 ;;; 56: (2005-05-22) Something between 0.9.0.1 and 0.9.0.14. My money is
 ;;;     on 0.9.0.6 (MORE CASE CONSISTENCY).
@@ -102,6 +102,7 @@
 ;;; 70: (2006-09-13) changes to *PSEUDO-ATOMIC* on x86 and x86-64
 ;;; 71: (2006-11-19) CLOS calling convention changes
 ;;; 72: (2006-12-05) Added slot to the primitive function type
+;;; 73: (2007-04-13) Changed a hash function
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

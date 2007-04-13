@@ -49,6 +49,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * bug fix: an &environment argument with the correct variable information
     is passed to macros that are expanded during byte compilation
     (reported by Samium Gromoff)
+  * bug fix: a logical error was causing the hash function for bignums to
+    have excessive amounts of collisions (reported by Faré Rideau)
   * improvement: the x86-64/darwin port now passes all tests and
     should be considered non-experimental.
   * improvement: a style-warning is signaled for CASE (etc) clauses with
