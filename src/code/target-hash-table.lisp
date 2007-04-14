@@ -64,7 +64,16 @@
 #!-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values hash (member t nil)))
-  (values (sxhash key) nil))
+  (typecase key
+    ;; For some types the definition of EQUAL implies a special hash
+    ((or string cons number bit-vector pathname)
+     (values (sxhash key) nil))
+    ;; Otherwise use an EQ hash, rather than SXHASH, since the values
+    ;; of SXHASH will be extremely badly distributed due to the
+    ;; requirements of the spec fitting badly with our implementation
+    ;; strategy.
+    (t
+     (eq-hash key))))
 
 #!-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)

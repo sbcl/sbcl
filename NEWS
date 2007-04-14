@@ -49,8 +49,14 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * bug fix: an &environment argument with the correct variable information
     is passed to macros that are expanded during byte compilation
     (reported by Samium Gromoff)
-  * bug fix: a logical error was causing the hash function for bignums to
+  * bug fix: a logic error was causing the hash function for bignums to
     have excessive amounts of collisions (reported by Faré Rideau)
+  * bug fix: modifying the contents of an array could change the return
+    value of SXHASH on that array, which is only allowed for strings 
+    and bit vectors (bug introduced in 0.9.16)
+  * optimization: EQUAL hash tables no longer use SXHASH for objects
+    of all data types, but instead use an EQL hash for types for which
+    EQUAL is the same as EQL
   * improvement: the x86-64/darwin port now passes all tests and
     should be considered non-experimental.
   * improvement: a style-warning is signaled for CASE (etc) clauses with
