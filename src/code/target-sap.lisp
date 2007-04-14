@@ -41,7 +41,7 @@
 ;;; Return a new SAP, OFFSET bytes from SAP.
 (defun sap+ (sap offset)
   (declare (type system-area-pointer sap)
-           (fixnum offset))
+           (type (signed-byte #.sb!vm:n-word-bits) offset))
   (sap+ sap offset))
 
 ;;; Return the byte offset between SAP1 and SAP2.
