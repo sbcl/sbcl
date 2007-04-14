@@ -22,6 +22,10 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
+
+;;;; The whole of this file is dead code as long as *optimize-cache-functions-p*
+;;;; is true, which it currently _always_ is.
+
 
 (defun emit-reader/writer-function (reader/writer 1-or-2-class class-slot-p)
   (values

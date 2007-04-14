@@ -118,6 +118,16 @@
 
 (defmacro modify-cache (cache-vector &body body)
   `(with-pcl-lock
+     ;; This locking scheme is less the sufficient, and not what the
+     ;; PCL implementors had planned: apparently we should increment
+     ;; the lock count atomically, and all cache users should check
+     ;; the count before and after they touch cache: if the counts
+     ;; match the cache was not altered, if they don't match the
+     ;; work needs to be redone.
+     ;;
+     ;; We probably want to re-engineer things so that the whole
+     ;; cache vector gets replaced atomically when we do things
+     ;; to it that could affect others.
      (multiple-value-prog1
        (progn ,@body)
        (let ((old-count (cache-vector-lock-count ,cache-vector)))
@@ -288,21 +298,6 @@
   (and (< field-number #.(1- wrapper-cache-number-vector-length))
        (1+ field-number)))
 
-;;; FIXME: Why are there two layers here, with one operator trivially
-;;; defined in terms of the other? It'd be nice either to have a
-;;; comment explaining why the separation is valuable, or to collapse
-;;; it into a single layer.
-;;;
-;;; Second FIXME deleted from here. Setting the "hash" values is OK:
-;;; that's part of the magic we need to do to obsolete things. The
-;;; hash values are used as indexes to the cache vectors. Nikodemus
-;;; thinks both "layers" should go away, and we should just use the
-;;; LAYOUT-CLOS-HASH directly.
-(defmacro cache-number-vector-ref (cnv n)
-  `(wrapper-cache-number-vector-ref ,cnv ,n))
-(defmacro wrapper-cache-number-vector-ref (wrapper n)
-  `(layout-clos-hash ,wrapper ,n))
-
 (declaim (inline wrapper-class*))
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
@@ -326,9 +321,10 @@
 (defun invalid-wrapper-p (wrapper)
   (not (null (layout-invalid wrapper))))
 
-;;; FIXME: This needs a lock
+;;; We only use this inside INVALIDATE-WRAPPER.
 (defvar *previous-nwrappers* (make-hash-table))
 
+;;; We always call this inside WITH-PCL-LOCK.
 (defun invalidate-wrapper (owrapper state nwrapper)
   (aver (member state '(:flush :obsolete) :test #'eq))
   (let ((new-previous ()))
@@ -346,8 +342,13 @@
       (setf (cadr previous) nwrapper)
       (push previous new-previous))
 
+    ;; FIXME: We are here inside PCL lock, but might someone be
+    ;; accessing the wrapper at the same time from outside the lock?
+    ;; Can it matter that they get 0 from one slot and a valid value
+    ;; from another?
     (dotimes (i layout-clos-hash-length)
-      (setf (cache-number-vector-ref owrapper i) 0))
+      (setf (layout-clos-hash owrapper i) 0))
+
     ;; FIXME: We could save a whopping cons by using (STATE . WRAPPER)
     ;; instead
     (push (setf (layout-invalid owrapper) (list state nwrapper))
@@ -492,15 +493,13 @@
 (defun compute-primary-cache-location (field mask wrappers)
   (declare (type field-type field) (fixnum mask))
   (if (not (listp wrappers))
-      (logand mask
-              (the fixnum (wrapper-cache-number-vector-ref wrappers field)))
+      (logand mask (layout-clos-hash wrappers field))
       (let ((location 0)
             (i 0))
         (declare (fixnum location i))
         (dolist (wrapper wrappers)
           ;; First add the cache number of this wrapper to location.
-          (let ((wrapper-cache-number (wrapper-cache-number-vector-ref wrapper
-                                                                       field)))
+          (let ((wrapper-cache-number (layout-clos-hash wrapper field)))
             (declare (fixnum wrapper-cache-number))
             (if (zerop wrapper-cache-number)
                 (return-from compute-primary-cache-location 0)
@@ -535,8 +534,10 @@
     (declare (type field-type field) (fixnum result mask nkeys)
              (simple-vector cache-vector))
     (dotimes-fixnum (i nkeys)
+      ;; FIXME: Sometimes we get NIL here as wrapper, apparently because
+      ;; another thread has stomped on the cache-vector.
       (let* ((wrapper (cache-vector-ref cache-vector (+ i from-location)))
-             (wcn (wrapper-cache-number-vector-ref wrapper field)))
+             (wcn (layout-clos-hash wrapper field)))
         (declare (fixnum wcn))
         (incf result wcn))
       (when (and (not (zerop i))

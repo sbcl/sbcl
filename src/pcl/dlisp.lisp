@@ -173,7 +173,7 @@
                                (fsc-instance-wrapper ,instance)))))
         (block access
           (when (and wrapper
-                     (/= (wrapper-cache-number-vector-ref wrapper ,field) 0)
+                     (/= (layout-clos-hash wrapper ,field) 0)
                      ,@(if (eql 1 1-or-2-class)
                            `((eq wrapper wrapper-0))
                            `((or (eq wrapper wrapper-0)
@@ -420,7 +420,7 @@
              (go ,miss-label)))))))
 
 (defun emit-1-wrapper-compute-primary-cache-location (wrapper miss-label)
-  `(let ((wrapper-cache-no (wrapper-cache-number-vector-ref ,wrapper field)))
+  `(let ((wrapper-cache-no (layout-clos-hash ,wrapper field)))
      (declare (fixnum wrapper-cache-no))
      (when (zerop wrapper-cache-no) (go ,miss-label))
      ,(let ((form `(logand mask wrapper-cache-no)))
@@ -433,8 +433,7 @@
      ,@(let ((adds 0) (len (length wrappers)))
          (declare (fixnum adds len))
          (mapcar (lambda (wrapper)
-                   `(let ((wrapper-cache-no (wrapper-cache-number-vector-ref
-                                             ,wrapper field)))
+                   `(let ((wrapper-cache-no (layout-clos-hash ,wrapper field)))
                       (declare (fixnum wrapper-cache-no))
                       (when (zerop wrapper-cache-no) (go ,miss-label))
                       (setq primary (the fixnum (+ primary wrapper-cache-no)))

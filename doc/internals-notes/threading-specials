@@ -132,6 +132,9 @@ bound & safe:
    SB-PCL::*PRECOMPILING-LAP* 
    SB-PCL::*CACHE-MISS-VALUES-STACK* 
 
+protected by PCL-LOCK:
+   SB-PCL::*PREVIOUS-NWRAPPERS* 
+
 believed protected by the compiler-lock:
    SB-PCL::*ALL-CTORS* 
    SB-PCL::*FGENS* 
@@ -148,7 +151,6 @@ potentially unsafe:
    SB-PCL::*PVS* 
    SB-PCL::*SLOT-NAME-LISTS-INNER* 
    SB-PCL::*SLOT-NAME-LISTS-OUTER* 
-   SB-PCL::*PREVIOUS-NWRAPPERS* 
 
 debugging / profiling -- low relevance:
    SB-PCL::*DFUN-COUNT* 
