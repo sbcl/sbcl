@@ -15,6 +15,13 @@
 
 echo //entering room.test.sh
 
+${SBCL:-sbcl} --eval "(progn (defvar *a* (make-array (expt 2 27))) (room) (sb-ext:quit :unix-status 52))"
+if [ $? = 52 ]; then
+    true # nop
+else
+    exit 1
+fi
+
 ${SBCL:-sbcl} --eval "(progn (dotimes (i 10) (dotimes (j 10) (room)) (gc)) (sb-ext:quit :unix-status 52))"
 if [ $? = 52 ]; then
     true # nop

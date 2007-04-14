@@ -186,14 +186,16 @@
 ;;; platforms with 64-bit word size.
 #!-sb-fluid (declaim (inline round-to-dualword))
 (defun round-to-dualword (size)
-  (declare (fixnum size))
-  (logand (the fixnum (+ size lowtag-mask)) (lognot lowtag-mask)))
+  (declare (unsigned-byte size))
+  (ldb (byte n-word-bits 0)
+       (logand (+ size lowtag-mask) (lognot lowtag-mask))))
 
 ;;; Return the total size of a vector in bytes, including any pad.
 #!-sb-fluid (declaim (inline vector-total-size))
 (defun vector-total-size (obj info)
+  (declare (type (simple-array * (*)) obj))
   (let ((shift (room-info-length info))
-        (len (+ (length (the (simple-array * (*)) obj))
+        (len (+ (length obj)
                 (ecase (room-info-kind info)
                   (:vector 0)
                   (:string 1)))))
@@ -278,8 +280,7 @@
                                 ;; Don't bother testing again until we
                                 ;; get past that allocation offset
                                 (setf skip-tests-until-addr
-                                      (+ (logandc2 addr page-mask)
-                                         (the fixnum bytes-used)))
+                                      (+ (logandc2 addr page-mask) bytes-used))
                                 ;; And then continue with the scheduled
                                 ;; mapping
                                 (return-from maybe-skip-page))
@@ -308,8 +309,7 @@
                 (let* ((obj (make-lisp-obj (logior (sap-int current)
                                                    fun-pointer-lowtag)))
                        (size (round-to-dualword
-                              (* (the fixnum (1+ (get-closure-length obj)))
-                                 n-word-bytes))))
+                              (* (1+ (get-closure-length obj)) n-word-bytes))))
                   (funcall fun obj header-widetag size)
                   (setq current (sap+ current size))))
                ((eq (room-info-kind info) :instance)
@@ -338,12 +338,9 @@
                                 (round-to-dualword
                                  (* (1+ (get-header-data obj)) n-word-bytes)))
                                (:code
-                                (+ (the fixnum
-                                     (* (get-header-data obj) n-word-bytes))
+                                (+ (* (get-header-data obj) n-word-bytes)
                                    (round-to-dualword
-                                    (* (the fixnum (%code-code-size obj))
-                                       n-word-bytes)))))))
-                  (declare (fixnum size))
+                                    (* (%code-code-size obj) n-word-bytes)))))))
                   (funcall fun obj header-widetag size)
                   (aver (zerop (logand size lowtag-mask)))
                   (setq current (sap+ current size))))))))))))
@@ -354,11 +351,11 @@
 ;;; Return a list of 3-lists (bytes object type-name) for the objects
 ;;; allocated in Space.
 (defun type-breakdown (space)
-  (let ((sizes (make-array 256 :initial-element 0 :element-type 'fixnum))
+  (let ((sizes (make-array 256 :initial-element 0))
         (counts (make-array 256 :initial-element 0 :element-type 'fixnum)))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (speed 3)) (ignore obj))
+       (declare (index type) (optimize (speed 3)) (ignore obj))
        (incf (aref sizes type) size)
        (incf (aref counts type)))
      space)
@@ -398,7 +395,6 @@
       (maphash (lambda (k v)
                  (declare (ignore k))
                  (let ((sum 0))
-                   (declare (fixnum sum))
                    (dolist (space-total v)
                      (incf sum (first (cdr space-total))))
                    (summary-totals (cons sum v))))
@@ -407,13 +403,13 @@
       (format t "~2&Summary of spaces: ~(~{~A ~}~)~%" spaces)
       (let ((summary-total-bytes 0)
             (summary-total-objects 0))
-        (declare (fixnum summary-total-bytes summary-total-objects))
+        (declare (fixnum summary-total-objects))
         (dolist (space-totals
                  (mapcar #'cdr (sort (summary-totals) #'> :key #'car)))
           (let ((total-objects 0)
                 (total-bytes 0)
                 name)
-            (declare (fixnum total-objects total-bytes))
+            (declare (fixnum total-objects))
             (collect ((spaces))
               (dolist (space-total space-totals)
                 (let ((total (cdr space-total)))
@@ -445,8 +441,7 @@
                            0))
          (reported-bytes 0)
          (reported-objects 0))
-    (declare (fixnum total-objects total-bytes cutoff-point reported-objects
-                     reported-bytes))
+    (declare (fixnum total-objects cutoff-point reported-objects))
     (loop for (bytes objects name) in types do
       (when (<= bytes cutoff-point)
         (format t "  ~10:D bytes for ~9:D other object~2:*~P.~%"
@@ -500,9 +495,8 @@
        (declare (fixnum size))
        (when (eql type code-header-widetag)
          (incf total-bytes size)
-         (let ((words (truly-the fixnum (%code-code-size obj)))
-               (sap (truly-the system-area-pointer
-                               (%primitive code-instructions obj))))
+         (let ((words (%code-code-size obj))
+               (sap (code-instructions obj)))
            (incf code-words words)
            (dotimes (i words)
              (when (zerop (sap-ref-word sap (* i n-word-bytes)))
@@ -529,7 +523,7 @@
          (declare (fixnum size))
          (case type
            (#.code-header-widetag
-            (let ((inst-words (truly-the fixnum (%code-code-size obj))))
+            (let ((inst-words (%code-code-size obj)))
               (declare (type fixnum inst-words))
               (incf non-descriptor-bytes (* inst-words n-word-bytes))
               (incf descriptor-words
@@ -593,7 +587,7 @@
   (let ((totals (make-hash-table :test 'eq))
         (total-objects 0)
         (total-bytes 0))
-    (declare (fixnum total-objects total-bytes))
+    (declare (fixnum total-objects))
     (map-allocated-objects
      (lambda (obj type size)
        (declare (fixnum size) (optimize (speed 3)))
@@ -603,8 +597,8 @@
          (let* ((classoid (layout-classoid (%instance-ref obj 0)))
                 (found (gethash classoid totals)))
            (cond (found
-                  (incf (the fixnum (car found)))
-                  (incf (the fixnum (cdr found)) size))
+                  (incf (car found))
+                  (incf (cdr found) size))
                  (t
                   (setf (gethash classoid totals) (cons 1 size)))))))
      space)
@@ -618,7 +612,7 @@
       (let ((sorted (sort (totals-list) #'> :key #'cddr))
             (printed-bytes 0)
             (printed-objects 0))
-        (declare (fixnum printed-bytes printed-objects))
+        (declare (fixnum printed-objects))
         (dolist (what (if top-n
                           (subseq sorted 0 (min (length sorted) top-n))
                           sorted))
@@ -675,9 +669,7 @@
                  (return-from print-allocated-objects (values)))
 
                (unless count
-                 (let ((this-page (* (the (values (unsigned-byte 32) t)
-                                       (truncate addr pagesize))
-                                     pagesize)))
+                 (let ((this-page (* (truncate addr pagesize) pagesize)))
                    (declare (type (unsigned-byte 32) this-page))
                    (when (/= this-page last-page)
                      (when (< pages-so-far pages)

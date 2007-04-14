@@ -22,6 +22,8 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     to global variables using SYMBOL-VALUE and a constant argument.
   * enhancement: SIGINT now causes a specific condition
     SB-SYS:INTERACTIVE-INTERRUPT to be signalled.
+  * bug fix: ROOM sometimes failed with a type-error due to byte-counts
+    not fitting into a fixnum. (reported by Faré Rideau)
   * bug fix: ADJUST-ARRAY is now interrupt-safe.
   * bug fix: adding and removing fd-handlers is now interrupt-safe.
   * bug fix: inlined calls to C now ensure 16byte stack alignment on
