@@ -129,3 +129,9 @@
                   (%set-symbol-hash x sxhash)
                   sxhash)
                 result)))))
+
+(deftransform psxhash ((x &optional depthoid) (character &optional t))
+  `(char-code (char-upcase x)))
+
+(deftransform psxhash ((x &optional depthoid) (integer &optional t))
+  `(sxhash x))

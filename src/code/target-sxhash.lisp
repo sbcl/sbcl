@@ -40,6 +40,7 @@
                             (and fixnum unsigned-byte))
                            (and fixnum unsigned-byte))
                 mix))
+(declaim (inline mix))
 (defun mix (x y)
   ;; FIXME: We wouldn't need the nasty (SAFETY 0) here if the compiler
   ;; were smarter about optimizing ASH. (Without the THE FIXNUM below,
@@ -234,7 +235,7 @@
     (structure-object (structure-object-psxhash key depthoid))
     (cons (list-psxhash key depthoid))
     (number (number-psxhash key))
-    (character (sxhash (char-upcase key)))
+    (character (char-code (char-upcase key)))
     (t (sxhash key))))
 
 (defun array-psxhash (key depthoid)
@@ -249,31 +250,31 @@
                   '(let ((result 572539))
                      (declare (type fixnum result))
                      (mixf result (length key))
-                     (dotimes (i (min depthoid (length key)))
+                     (dotimes (i (length key))
                        (declare (type fixnum i))
                        (mixf result
                              (psxhash (aref key i)
                                       (- depthoid 1 i))))
-                     result)))
-       ;; CMU can compile SIMPLE-ARRAY operations so much more efficiently
-       ;; than the general case that it's probably worth picking off the
-       ;; common special cases.
-       (typecase key
-         (simple-string
-          ;;(format t "~&SIMPLE-STRING special case~%")
-          (frob))
-         (simple-vector
-          ;;(format t "~&SIMPLE-VECTOR special case~%")
-          (frob))
-         (t (frob)))))
+                     result))
+                (make-dispatch (types)
+                  `(typecase key
+                     ,@(loop for type in types
+                             collect `(,type
+                                       (frob))))))
+       (make-dispatch (simple-base-string
+                       (simple-array character (*))
+                       simple-vector
+                       (simple-array (unsigned-byte 8) (*))
+                       (simple-array fixnum (*))
+                       t))))
     ;; Any other array can be hashed by working with its underlying
     ;; one-dimensional physical representation.
     (t
      (let ((result 60828))
        (declare (type fixnum result))
-       (dotimes (i (min depthoid (array-rank key)))
+       (dotimes (i (array-rank key))
          (mixf result (array-dimension key i)))
-       (dotimes (i (min depthoid (array-total-size key)))
+       (dotimes (i (array-total-size key))
          (mixf result
                (psxhash (row-major-aref key i)
                         (- depthoid 1 i))))

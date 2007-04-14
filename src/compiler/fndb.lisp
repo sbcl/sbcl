@@ -809,6 +809,8 @@
 (defknown hash-table-test (hash-table) symbol (foldable flushable))
 (defknown sxhash (t) (integer 0 #.sb!xc:most-positive-fixnum)
   (#-sb-xc-host foldable flushable))
+(defknown psxhash (t &optional t) (integer 0 #.sb!xc:most-positive-fixnum)
+  (#-sb-xc-host foldable flushable))
 
 ;;;; from the "Arrays" chapter
 

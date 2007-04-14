@@ -84,7 +84,13 @@
 
 (defun equalp-hash (key)
   (declare (values hash (member t nil)))
-  (values (psxhash key) nil))
+  (typecase key
+    ;; Types requiring special treatment. Note that PATHNAME and
+    ;; HASH-TABLE are caught by the STRUCTURE-OBJECT test.
+    ((or array cons number character structure-object)
+     (values (psxhash key) nil))
+    (t
+     (eq-hash key))))
 
 (defun almost-primify (num)
   (declare (type index num))
