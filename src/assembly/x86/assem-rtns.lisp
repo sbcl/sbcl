@@ -175,10 +175,7 @@
   (inst push ebx)
 
   ;; And jump into the function.
-    (inst jmp
-          (make-ea :byte :base eax
-                   :disp (- (* closure-fun-slot n-word-bytes)
-                            fun-pointer-lowtag)))
+  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS
@@ -194,9 +191,7 @@
   (pushw ebp-tn -2)
 
   ;; And away we go.
-  (inst jmp (make-ea :byte :base eax
-                     :disp (- (* closure-fun-slot n-word-bytes)
-                              fun-pointer-lowtag))))
+  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (throw
                           (:return-style :none))
@@ -270,8 +265,7 @@
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
   ;; count in ecx-tn.
 
-  (inst jmp (make-ea :byte :base block
-                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
 
 
 ;;;; Win32 non-local exit noise
@@ -345,8 +339,7 @@
 
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
-  (inst jmp (make-ea :byte :base block
-                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
 
 
 ;;;; Win32 UWP block SEH interface.
@@ -430,8 +423,7 @@
   (inst xor ecx-tn ecx-tn)
   (inst mov ebx-tn ebp-tn)
   (loadw ebp-tn block unwind-block-current-cont-slot)
-  (inst jmp (make-ea :byte :base block
-                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
 
 #!+win32
 (define-assembly-routine (continue-unwind

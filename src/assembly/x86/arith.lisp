@@ -319,14 +319,8 @@
   ;; Generate a new set of results.
   (inst xor k k)
   LOOP1
-  (inst mov y (make-ea :dword :base state :index k :scale 4
-                       :disp (- (* (+ 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov tmp (make-ea :dword :base state :index k :scale 4
-                         :disp (- (* (+ 1 3 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+  (inst mov y (make-ea-for-vector-data state :index k :offset 3))
+  (inst mov tmp (make-ea-for-vector-data state :index k :offset (+ 1 3)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -334,27 +328,14 @@
   (inst jmp :nc skip1)
   (inst xor y #x9908b0df)
   SKIP1
-  (inst xor y (make-ea :dword :base state :index k :scale 4
-                       :disp (- (* (+ 397 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov (make-ea :dword :base state :index k :scale 4
-                     :disp (- (* (+ 3 vector-data-offset)
-                                 n-word-bytes)
-                              other-pointer-lowtag))
-        y)
+  (inst xor y (make-ea-for-vector-data state :index k :offset (+ 397 3)))
+  (inst mov (make-ea-for-vector-data state :index k :offset 3) y)
   (inst inc k)
   (inst cmp k (- 624 397))
   (inst jmp :b loop1)
   LOOP2
-  (inst mov y (make-ea :dword :base state :index k :scale 4
-                       :disp (- (* (+ 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov tmp (make-ea :dword :base state :index k :scale 4
-                         :disp (- (* (+ 1 3 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+  (inst mov y (make-ea-for-vector-data state :index k :offset 3))
+  (inst mov tmp (make-ea-for-vector-data state :index k :offset (+ 1 3)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -362,27 +343,14 @@
   (inst jmp :nc skip2)
   (inst xor y #x9908b0df)
   SKIP2
-  (inst xor y (make-ea :dword :base state :index k :scale 4
-                       :disp (- (* (+ (- 397 624) 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov (make-ea :dword :base state :index k :scale 4
-                     :disp (- (* (+ 3 vector-data-offset)
-                                 n-word-bytes)
-                              other-pointer-lowtag))
-        y)
+  (inst xor y (make-ea-for-vector-data state :index k :offset (+ (- 397 624) 3)))
+  (inst mov (make-ea-for-vector-data state :index k :offset 3) y)
   (inst inc k)
   (inst cmp k (- 624 1))
   (inst jmp :b loop2)
 
-  (inst mov y (make-ea :dword :base state
-                       :disp (- (* (+ (- 624 1) 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov tmp (make-ea :dword :base state
-                         :disp (- (* (+ 0 3 vector-data-offset)
-                                     n-word-bytes)
-                                  other-pointer-lowtag)))
+  (inst mov y (make-ea-for-vector-data state :offset (+ (- 624 1) 3)))
+  (inst mov tmp (make-ea-for-vector-data state :offset (+ 0 3)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -390,15 +358,8 @@
   (inst jmp :nc skip3)
   (inst xor y #x9908b0df)
   SKIP3
-  (inst xor y (make-ea :dword :base state
-                       :disp (- (* (+ (- 397 1) 3 vector-data-offset)
-                                   n-word-bytes)
-                                other-pointer-lowtag)))
-  (inst mov (make-ea :dword :base state
-                     :disp (- (* (+ (- 624 1) 3 vector-data-offset)
-                                 n-word-bytes)
-                              other-pointer-lowtag))
-        y)
+  (inst xor y (make-ea-for-vector-data state :offset (+ (- 397 1) 3)))
+  (inst mov (make-ea-for-vector-data state :offset (+ (- 624 1) 3)) y)
 
   ;; Restore the temporary registers and return.
   (inst pop tmp)
