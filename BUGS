@@ -1793,5 +1793,17 @@ WORKAROUND:
   disabled on those platforms. Since x86 does not exhibit any problems
   the problem is probably with the new FP implementation.
 
-412: deletion of global variable references in safe code
-  fixed in 1.0.4.45.
+413: type-errors in ROOM
+
+  (defvar *a* (make-array (expt 2 27)))
+  (room)
+
+  Causes a type-error on 32bit SBCL, as various byte-counts in ROOM
+  implementation overrun fixnums. 
+
+  This was fixed in 1.0.4.89, but the patch was reverted as it caused
+  ROOM to cons sufficiently to make running it in a loop deadly on
+  GENCGC: newly allocated objects survived to generation 1, where next
+  call to ROOM would see them, and allocate even more...
+
+  Reported by Faré Rideau on sbcl-devel.
