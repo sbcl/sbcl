@@ -42,8 +42,8 @@
           (y-val (encode-value-if-immediate y)))
       (cond
         ;; Shorter instruction sequences for these two cases.
-        ((eql 0 y-val) (inst test x x))
-        ((eql 0 x-val) (inst test y y))
+        ((and (eql 0 y-val) (sc-is x any-reg descriptor-reg)) (inst test x x))
+        ((and (eql 0 x-val) (sc-is y any-reg descriptor-reg)) (inst test y y))
 
         ;; An encoded value (literal integer) has to be the second argument.
         ((sc-is x immediate) (inst cmp y x-val))
