@@ -783,7 +783,11 @@
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array
                   ;; not being simple).
-                  (when (eql element-type *wild-type*)
+                  (when (and (eql element-type *wild-type*)
+                             ;; This type logic corresponds to the special
+                             ;; case for strings in HAIRY-DATA-VECTOR-REF
+                             ;; (generic/vm-tran.lisp)
+                             (not (csubtypep type (specifier-type 'simple-string))))
                     (when (or (not (array-type-p type))
                               ;; If it's a simple array, we might be able
                               ;; to inline the access completely.
