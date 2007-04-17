@@ -14,6 +14,8 @@ set -e
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+echo //entering make-target-contrib.sh
+
 LANG=C
 LC_ALL=C
 export LANG LC_ALL
