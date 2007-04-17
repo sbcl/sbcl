@@ -284,15 +284,26 @@ backtrace(int nframes)
 #else
 
 static int
+altstack_pointer_p (void *p) {
+    char* stack_start = ((char *) arch_os_get_current_thread())
+        + dynamic_values_bytes;
+    char* stack_end = stack_start + 32*SIGSTKSZ;
+
+    return (p > stack_start && p <= stack_end);
+}
+
+static int
 stack_pointer_p (void *p)
 {
   /* we are using sizeof(long) here, because that is the right value on both
    * x86 and x86-64.  (But note that false positives would not cause much harm
    * given the heuristical nature of x86_call_context.) */
   unsigned long stack_alignment = sizeof(long);
-  return (p < (void *) arch_os_get_current_thread()->control_stack_end
-          && p > (void *) &p
-          && (((unsigned long) p) & (stack_alignment-1)) == 0);
+
+  return (altstack_pointer_p(p)
+          || (p < (void *) arch_os_get_current_thread()->control_stack_end
+              && (p > (void *) &p || altstack_pointer_p(&p))
+              && (((unsigned long) p) & (stack_alignment-1)) == 0));
 }
 
 static int
@@ -511,19 +522,14 @@ print_entry_points (struct code *code)
   }
 }
 
+/* This function has been split from backtrace() to enable Lisp
+ * backtraces from gdb with call backtrace_from_fp(...). Useful for
+ * example when debugging threading deadlocks.
+ */
 void
-backtrace(int nframes)
+backtrace_from_fp(void *fp, int nframes)
 {
-  void *fp;
   int i;
-
-#if defined(LISP_FEATURE_X86)
-  asm("movl %%ebp,%0" : "=g" (fp));
-#elif defined (LISP_FEATURE_X86_64)
-  asm("movq %%rbp,%0" : "=g" (fp));
-#else
-#error "How did we get here?"
-#endif
 
   for (i = 0; i < nframes; ++i) {
     lispobj *p;
@@ -561,6 +567,23 @@ backtrace(int nframes)
     putchar('\n');
     fp = next_fp;
   }
+}
+
+void
+backtrace(int nframes)
+{
+  void *fp;
+  int i;
+
+#if defined(LISP_FEATURE_X86)
+  asm("movl %%ebp,%0" : "=g" (fp));
+#elif defined (LISP_FEATURE_X86_64)
+  asm("movq %%rbp,%0" : "=g" (fp));
+#else
+#error "How did we get here?"
+#endif
+
+  backtrace_from_fp(fp, nframes);
 }
 
 #endif
