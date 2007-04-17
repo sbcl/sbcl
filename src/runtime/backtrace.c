@@ -285,11 +285,16 @@ backtrace(int nframes)
 
 static int
 altstack_pointer_p (void *p) {
+#ifndef LISP_FEATURE_WIN32
     char* stack_start = ((char *) arch_os_get_current_thread())
         + dynamic_values_bytes;
     char* stack_end = stack_start + 32*SIGSTKSZ;
 
     return (p > stack_start && p <= stack_end);
+#else
+    /* Win32 doesn't do altstack */
+    return 0;
+#endif
 }
 
 static int
