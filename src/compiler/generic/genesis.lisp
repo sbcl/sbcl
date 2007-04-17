@@ -2611,23 +2611,28 @@ core and return a descriptor to it."
     (format t " *~@[ ~A~]~%" line))
   (format t " */~%"))
 
+(defun c-name (string &optional strip)
+  (delete #\+
+          (nsubstitute-if #\_ (lambda (c) (member c '(#\- #\/ #\%)))
+                          (remove-if (lambda (c) (position c strip))
+                                     string))))
+
+(defun c-symbol-name (symbol &optional strip)
+  (c-name (symbol-name symbol) strip))
+
 (defun write-makefile-features ()
   ;; propagating *SHEBANG-FEATURES* into the Makefiles
-  (dolist (shebang-feature-name (sort (mapcar #'symbol-name
+  (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
                                               sb-cold:*shebang-features*)
                                       #'string<))
-    (format t
-            "LISP_FEATURE_~A=1~%"
-            (substitute #\_ #\- shebang-feature-name))))
+    (format t "LISP_FEATURE_~A=1~%" shebang-feature-name)))
 
 (defun write-config-h ()
   ;; propagating *SHEBANG-FEATURES* into C-level #define's
-  (dolist (shebang-feature-name (sort (mapcar #'symbol-name
+  (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
                                               sb-cold:*shebang-features*)
                                       #'string<))
-    (format t
-            "#define LISP_FEATURE_~A~%"
-            (substitute #\_ #\- shebang-feature-name)))
+    (format t "#define LISP_FEATURE_~A~%" shebang-feature-name))
   (terpri)
   ;; and miscellaneous constants
   (format t "#define SBCL_CORE_VERSION_INTEGER ~D~%" sbcl-core-version-integer)
@@ -2645,7 +2650,7 @@ core and return a descriptor to it."
 (defun write-constants-h ()
   ;; writing entire families of named constants
   (let ((constants nil))
-    (dolist (package-name '(;; Even in CMU CL, constants from VM
+    (dolist (package-name '( ;; Even in CMU CL, constants from VM
                             ;; were automatically propagated
                             ;; into the runtime.
                             "SB!VM"
@@ -2656,7 +2661,7 @@ core and return a descriptor to it."
       (do-external-symbols (symbol (find-package package-name))
         (when (constantp symbol)
           (let ((name (symbol-name symbol)))
-            (labels (;; shared machinery
+            (labels ( ;; shared machinery
                      (record (string priority)
                        (push (list string
                                    priority
@@ -2682,8 +2687,7 @@ core and return a descriptor to it."
                                                   priority)))
                      ;; machinery for new-style SBCL Lisp-to-C naming
                      (record-with-translated-name (priority)
-                       (record (substitute #\_ #\- name)
-                               priority))
+                       (record (c-name name) priority))
                      (maybe-record-with-translated-name (suffixes priority)
                        (when (some (lambda (suffix)
                                      (tailwise-equal name suffix))
@@ -2709,20 +2713,18 @@ core and return a descriptor to it."
                  sb!vm:n-lowtag-bits sb!vm:lowtag-mask
                  sb!vm:n-widetag-bits sb!vm:widetag-mask
                  sb!vm:n-fixnum-tag-bits sb!vm:fixnum-tag-mask))
-      (push (list (substitute #\_ #\- (symbol-name c))
+      (push (list (c-symbol-name c)
                   -1                    ; invent a new priority
                   (symbol-value c)
                   nil)
             constants))
     ;; One more symbol that doesn't fit into the code above.
-    (flet ((translate (name)
-             (delete #\+ (substitute #\_ #\- name))))
-      (let ((c 'sb!impl::+magic-hash-vector-value+))
-        (push (list (translate (symbol-name c))
-                    9
-                    (symbol-value c)
-                    nil)
-              constants)))
+    (let ((c 'sb!impl::+magic-hash-vector-value+))
+      (push (list (c-symbol-name c)
+                  9
+                  (symbol-value c)
+                  nil)
+            constants))
 
     (setf constants
           (sort constants
@@ -2749,7 +2751,7 @@ core and return a descriptor to it."
                   ;; literal-U syntax, since the assembler doesn't
                   ;; support that syntax and some of the small
                   ;; constants can be used in assembler files.
-                  (let (;; cutoff for treatment as a small code
+                  (let ( ;; cutoff for treatment as a small code
                         (cutoff (expt 2 16)))
                     (cond ((minusp value)
                            (error "stub: negative values unsupported"))
@@ -2769,7 +2771,7 @@ core and return a descriptor to it."
         ;; interr.lisp) -- APD, 2002-03-05
         (unless (eq nil (car current-error))
           (format t "#define ~A ~D~%"
-                  (substitute #\_ #\- (symbol-name (car current-error)))
+                  (c-symbol-name (car current-error))
                   i)))))
   (terpri)
 
@@ -2800,10 +2802,10 @@ core and return a descriptor to it."
                     sb!vm::float-sticky-bits
                     sb!vm::float-rounding-mode))
     (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
-            (substitute #\_ #\- (symbol-name symbol))
+            (c-symbol-name symbol)
             (sb!xc:byte-position (symbol-value symbol)))
     (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
-            (substitute #\_ #\- (symbol-name symbol))
+            (c-symbol-name symbol)
             (sb!xc:mask-field (symbol-value symbol) -1))))
 
 
@@ -2813,15 +2815,13 @@ core and return a descriptor to it."
   (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
   (format t
           "struct ~A {~%"
-          (substitute #\_ #\-
-                      (string-downcase (string (sb!vm:primitive-object-name obj)))))
+          (c-name (string-downcase (string (sb!vm:primitive-object-name obj)))))
   (when (sb!vm:primitive-object-widetag obj)
     (format t "    lispobj header;~%"))
   (dolist (slot (sb!vm:primitive-object-slots obj))
     (format t "    ~A ~A~@[[1]~];~%"
             (getf (sb!vm:slot-options slot) :c-type "lispobj")
-            (substitute #\_ #\-
-                        (string-downcase (string (sb!vm:slot-name slot))))
+            (c-name (string-downcase (string (sb!vm:slot-name slot))))
             (sb!vm:slot-rest-p slot)))
   (format t "};~2%")
   (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
@@ -2832,17 +2832,15 @@ core and return a descriptor to it."
     (when lowtag
       (dolist (slot (sb!vm:primitive-object-slots obj))
         (format t "#define ~A_~A_OFFSET ~D~%"
-                (substitute #\_ #\- (string name))
-                (substitute #\_ #\- (string (sb!vm:slot-name slot)))
+                (c-symbol-name name)
+                (c-symbol-name (sb!vm:slot-name slot))
                 (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
       (terpri)))
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
 (defun write-structure-object (dd)
   (flet ((cstring (designator)
-           (substitute
-            #\_ #\%
-            (substitute #\_ #\- (string-downcase (string designator))))))
+           (c-name (string-downcase (string designator)))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header;~%")
@@ -2862,10 +2860,9 @@ core and return a descriptor to it."
     ;; FIXME: It would be nice to use longer names than NIL and
     ;; (particularly) T in #define statements.
     (format t "#define ~A LISPOBJ(0x~X)~%"
-            (substitute #\_ #\-
-                        (remove-if (lambda (char)
-                                     (member char '(#\% #\* #\. #\!)))
-                                   (symbol-name symbol)))
+            ;; FIXME: It would be nice not to need to strip anything
+            ;; that doesn't get stripped always by C-SYMBOL-NAME.
+            (c-symbol-name symbol "%*.!")
             (if *static*                ; if we ran GENESIS
               ;; We actually ran GENESIS, use the real value.
               (descriptor-bits (cold-intern symbol))
@@ -3280,7 +3277,7 @@ initially undefined function references:~2%")
                      (with-open-file (*standard-output* fn
                                       :if-exists :supersede :direction :output)
                        (write-boilerplate)
-                       (let ((n (substitute #\_ #\- (string-upcase ,name))))
+                       (let ((n (c-name (string-upcase ,name))))
                          (format
                           t
                           "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~A 1~%"
