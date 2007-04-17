@@ -29,6 +29,10 @@
   (instance-pointer-lowtag)
   :mask lowtag-mask)
 
+(!define-type-vops %other-pointer-p nil nil nil
+  (other-pointer-lowtag)
+  :mask lowtag-mask)
+
 (!define-type-vops bignump check-bignum bignum object-not-bignum-error
   (bignum-widetag))
 

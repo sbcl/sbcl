@@ -18,6 +18,11 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     variants no longer cons.
   * optimization: Direct calls to CHAR-{EQUAL,LESSP,GREATERP} and
     their NOT- variants no longer cons.
+  * optimization: EQUAL hash tables no longer use SXHASH for objects
+    of all data types, but instead use an EQL hash for types for which
+    EQUAL is the same as EQL
+  * optimization: the non-inlined generic versions of AREF and (SETF AREF)
+    are significantly faster
   * enhancement: XREF information is now collected to references made
     to global variables using SYMBOL-VALUE and a constant argument.
   * enhancement: SIGINT now causes a specific condition
@@ -54,9 +59,6 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * bug fix: modifying the contents of an array could change the return
     value of SXHASH on that array, which is only allowed for strings 
     and bit vectors (bug introduced in 0.9.16)
-  * optimization: EQUAL hash tables no longer use SXHASH for objects
-    of all data types, but instead use an EQL hash for types for which
-    EQUAL is the same as EQL
   * improvement: the x86-64/darwin port now passes all tests and
     should be considered non-experimental.
   * improvement: a style-warning is signaled for CASE (etc) clauses with

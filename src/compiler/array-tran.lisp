@@ -112,20 +112,26 @@
   (assert-array-rank array (1- (length stuff)))
   (assert-new-value-type (car (last stuff)) array))
 
-(defoptimizer (hairy-data-vector-ref derive-type) ((array index))
-  (extract-upgraded-element-type array))
-(defoptimizer (data-vector-ref derive-type) ((array index))
-  (extract-upgraded-element-type array))
+(macrolet ((define (name)
+             `(defoptimizer (,name derive-type) ((array index))
+                (extract-upgraded-element-type array))))
+  (define hairy-data-vector-ref)
+  (define hairy-data-vector-ref/check-bounds)
+  (define data-vector-ref))
+
 #!+x86
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
   (extract-upgraded-element-type array))
 
-(defoptimizer (data-vector-set derive-type) ((array index new-value))
-  (assert-new-value-type new-value array))
+(macrolet ((define (name)
+             `(defoptimizer (,name derive-type) ((array index new-value))
+                (assert-new-value-type new-value array))))
+  (define hairy-data-vector-set)
+  (define hairy-data-vector-set/check-bounds)
+  (define data-vector-set))
+
 #!+x86
 (defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
-  (assert-new-value-type new-value array))
-(defoptimizer (hairy-data-vector-set derive-type) ((array index new-value))
   (assert-new-value-type new-value array))
 
 ;;; Figure out the type of the data vector if we know the argument
@@ -753,8 +759,49 @@
       (with-row-major-index (array indices index new-value)
         (hairy-data-vector-set array index new-value)))))
 
+;; For AREF of vectors we do the bounds checking in the callee. This
+;; lets us do a significantly more efficient check for simple-arrays
+;; without bloating the code.
+(deftransform aref ((array index) (t t) * :node node)
+  (if (policy node (zerop insert-array-bounds-checks))
+      `(hairy-data-vector-ref array index)
+      `(hairy-data-vector-ref/check-bounds array index)))
+
+(deftransform %aset ((array index new-value) (t t t) * :node node)
+  (if (policy node (zerop insert-array-bounds-checks))
+      `(hairy-data-vector-set array index new-value)
+      `(hairy-data-vector-set/check-bounds array index new-value)))
+
+;;; But if we find out later that there's some useful type information
+;;; available, switch back to the normal one to give other transforms
+;;; a stab at it.
+(macrolet ((define (name transform-to extra extra-type)
+             `(deftransform ,name ((array index ,@extra))
+                (let ((type (lvar-type array))
+                      (element-type (extract-upgraded-element-type array)))
+                  ;; If an element type has been declared, we want to
+                  ;; use that information it for type checking (even
+                  ;; if the access can't be optimized due to the array
+                  ;; not being simple).
+                  (when (eql element-type *wild-type*)
+                    (when (or (not (array-type-p type))
+                              ;; If it's a simple array, we might be able
+                              ;; to inline the access completely.
+                              (not (null (array-type-complexp type))))
+                      (give-up-ir1-transform
+                       "Upgraded element type of array is not known at compile time."))))
+                `(,',transform-to array
+                                  (%check-bound array
+                                                (array-dimension array 0)
+                                                index)
+                                  ,@',extra))))
+  (define hairy-data-vector-ref/check-bounds
+      hairy-data-vector-ref nil nil)
+  (define hairy-data-vector-set/check-bounds
+      hairy-data-vector-set (new-value) (*)))
+
 (deftransform aref ((array index) ((or simple-vector
-                                       simple-unboxed-array)
+                                       (simple-unboxed-array 1))
                                    index))
   (let ((type (lvar-type array)))
     (unless (array-type-p type)

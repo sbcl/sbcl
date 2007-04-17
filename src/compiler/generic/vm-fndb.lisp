@@ -20,7 +20,7 @@
            complex-rational-p complex-float-p complex-single-float-p
            complex-double-float-p #!+long-float complex-long-float-p
            complex-vector-p
-           base-char-p %standard-char-p %instancep
+           base-char-p %standard-char-p %instancep %other-pointer-p
            base-string-p simple-base-string-p
            #!+sb-unicode character-string-p
            #!+sb-unicode simple-character-string-p
