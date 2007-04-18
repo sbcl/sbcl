@@ -1188,7 +1188,22 @@
        end))))
 
 ;;;; STRING-OUTPUT-STREAM stuff
+;;;;
+;;;; FIXME: This, like almost none of the stream code is particularly
+;;;; interrupt or thread-safe. While it should not be possible to
+;;;; corrupt the heap here, it certainly is possible to end up with
+;;;; a string-output-stream whose internal state is messed up.
+;;;;
+;;;; FIXME: It would be nice to support space-efficient
+;;;; string-output-streams with element-type base-char. This would
+;;;; mean either a separate subclass, or typecases in functions.
 
+(defparameter *string-output-stream-buffer-initial-size* 64)
+
+#!-sb-fluid
+(declaim (inline string-output-string-stream-buffer
+                 string-output-string-stream-pointer
+                 string-output-string-stream-index))
 (defstruct (string-output-stream
             (:include ansi-stream
                       (out #'string-ouch)
@@ -1196,136 +1211,276 @@
                       (misc #'string-out-misc))
             (:constructor make-string-output-stream
                           (&key (element-type 'character)
-                           &aux (string (make-string 40))))
+                           &aux (buffer
+                                 (make-string
+                                  *string-output-stream-buffer-initial-size*))))
             (:copier nil))
   ;; The string we throw stuff in.
-  (string (missing-arg) :type (simple-array character (*)))
-  ;; Index of the next location to use.
-  (index 0 :type fixnum)
-  ;; Index cache for string-output-stream-last-index
-  (index-cache 0 :type fixnum)
+  (buffer (missing-arg) :type (simple-array character (*)))
+  ;; Chains of buffers to use
+  (prev nil)
+  (next nil)
+  ;; Index of the next location to use in the current string.
+  (pointer 0 :type index)
+  ;; Global location in the stream
+  (index 0 :type index)
+  ;; Index cache: when we move backwards we save the greater of this
+  ;; and index here, so the the greater of index and this is always
+  ;; the end of the stream.
+  (index-cache 0 :type index)
   ;; Requested element type
   (element-type 'character))
 
 #!+sb-doc
 (setf (fdocumentation 'make-string-output-stream 'function)
-  "Return an output stream which will accumulate all output given it for
-   the benefit of the function GET-OUTPUT-STREAM-STRING.")
+  "Return an output stream which will accumulate all output given it for the
+benefit of the function GET-OUTPUT-STREAM-STRING.")
 
-(defun string-output-stream-last-index (stream)
-  (max (string-output-stream-index stream)
-       (string-output-stream-index-cache stream)))
+;;; Pushes the current segment onto the prev-list, and either pops
+;;; or allocates a new one.
+(defun string-output-stream-new-buffer (stream size)
+  (declare (index size))
+  (/show0 "/string-output-stream-new-buffer")
+  (push (string-output-stream-buffer stream)
+        (string-output-stream-prev stream))
+  (setf (string-output-stream-buffer stream)
+        (or (pop (string-output-stream-next stream))
+            ;; FIXME: This would be the correct place to detect that
+            ;; more then FIXNUM characters are being written to the
+            ;; stream, and do something about it.
+            (make-string size))))
+
+;;; Moves to the end of the next segment or the current one if there are
+;;; no more segments. Returns true as long as there are next segments.
+(defun string-output-stream-next-buffer (stream)
+  (/show0 "/string-output-stream-next-buffer")
+  (let* ((old (string-output-stream-buffer stream))
+         (new (pop (string-output-stream-next stream)))
+         (old-size (length old))
+         (skipped (- old-size (string-output-stream-pointer stream))))
+    (cond (new
+           (let ((new-size (length new)))
+             (push old (string-output-stream-prev stream))
+             (setf (string-output-stream-buffer stream) new
+                   (string-output-stream-pointer stream) new-size)
+             (incf (string-output-stream-index stream) (+ skipped new-size)))
+           t)
+          (t
+           (setf (string-output-stream-pointer stream) old-size)
+           (incf (string-output-stream-index stream) skipped)
+           nil))))
+
+;;; Moves to the start of the previous segment or the current one if there
+;;; are no more segments. Returns true as long as there are prev segments.
+(defun string-output-stream-prev-buffer (stream)
+  (/show0 "/string-output-stream-prev-buffer")
+  (let ((old (string-output-stream-buffer stream))
+        (new (pop (string-output-stream-prev stream)))
+        (skipped (string-output-stream-pointer stream)))
+    (cond (new
+           (push old (string-output-stream-next stream))
+           (setf (string-output-stream-buffer stream) new
+                 (string-output-stream-pointer stream) 0)
+           (decf (string-output-stream-index stream) (+ skipped (length new)))
+           t)
+          (t
+           (setf (string-output-stream-pointer stream) 0)
+           (decf (string-output-stream-index stream) skipped)
+           nil))))
 
 (defun string-ouch (stream character)
-  (let ((current (string-output-stream-index stream))
-        (workspace (string-output-stream-string stream)))
-    (declare (type (simple-array character (*)) workspace)
-             (type fixnum current))
-    (if (= current (the fixnum (length workspace)))
-        (let ((new-workspace (make-string (* current 2))))
-          (replace new-workspace workspace)
-          (setf (aref new-workspace current) character
-                (string-output-stream-string stream) new-workspace))
-        (setf (aref workspace current) character))
-    (setf (string-output-stream-index stream) (1+ current))))
+  (/show0 "/string-ouch")
+  (let ((pointer (string-output-stream-pointer stream))
+        (buffer (string-output-stream-buffer stream))
+        (index (string-output-stream-index stream)))
+    (cond ((= pointer (length buffer))
+           (setf buffer (string-output-stream-new-buffer stream index)
+                 (aref buffer 0) character
+                 (string-output-stream-pointer stream) 1))
+          (t
+           (setf (aref buffer pointer) character
+                 (string-output-stream-pointer stream) (1+ pointer))))
+    (setf (string-output-stream-index stream) (1+ index))))
 
 (defun string-sout (stream string start end)
   (declare (type simple-string string)
-           (type fixnum start end))
-  (let* ((string (if (typep string '(simple-array character (*)))
-                     string
-                     (coerce string '(simple-array character (*)))))
-         (current (string-output-stream-index stream))
-         (length (- end start))
-         (dst-end (+ length current))
-         (workspace (string-output-stream-string stream)))
-    (declare (type (simple-array character (*)) workspace string)
-             (type fixnum current length dst-end))
-    (if (> dst-end (the fixnum (length workspace)))
-        (let ((new-workspace (make-string (+ (* current 2) length))))
-          (replace new-workspace workspace :end2 current)
-          (replace new-workspace string
-                   :start1 current :end1 dst-end
-                   :start2 start :end2 end)
-          (setf (string-output-stream-string stream) new-workspace))
-        (replace workspace string
-                 :start1 current :end1 dst-end
-                 :start2 start :end2 end))
-    (setf (string-output-stream-index stream) dst-end)))
+           (type index start end))
+  (let* ((full-length (- end start))
+         (length full-length)
+         (buffer (string-output-stream-buffer stream))
+         (pointer (string-output-stream-pointer stream))
+         (space (- (length buffer) pointer))
+         (here (min space length))
+         (stop (+ start here))
+         (overflow (- length space)))
+    (declare (index length space here stop full-length)
+             (fixnum overflow)
+             (type (simple-array character (*)) buffer))
+    (tagbody
+     :more
+       (when (plusp here)
+         (etypecase string
+           ((simple-array character (*))
+            (replace buffer string :start1 pointer :start2 start :end2 stop))
+           (simple-base-string
+            (replace buffer string :start1 pointer :start2 start :end2 stop))
+           ((simple-array nil (*))
+            (replace buffer string :start1 pointer :start2 start :end2 stop)))
+         (setf (string-output-stream-pointer stream) (+ here pointer)))
+       (when (plusp overflow)
+         (setf start stop
+               length (- end start)
+               buffer (string-output-stream-new-buffer
+                       stream (max overflow (string-output-stream-index stream)))
+               pointer 0
+               space (length buffer)
+               here (min space length)
+               stop (+ start here)
+               ;; there may be more overflow if we used a buffer
+               ;; already allocated to the stream
+               overflow (- length space))
+         (go :more)))
+    (incf (string-output-stream-index stream) full-length)))
+
+;;; Factored out of the -misc method due to size.
+(defun set-string-output-stream-file-position (stream pos)
+  (let* ((index (string-output-stream-index stream))
+         (end (max index (string-output-stream-index-cache stream))))
+    (declare (index index end))
+    (setf (string-output-stream-index-cache stream) end)
+    (cond ((eq :start pos)
+           (loop while (string-output-stream-prev-buffer stream)))
+          ((eq :end pos)
+           (loop while (string-output-stream-next-buffer stream))
+           (let ((over (- (string-output-stream-index stream) end)))
+             (decf (string-output-stream-pointer stream) over))
+           (setf (string-output-stream-index stream) end))
+          ((< pos index)
+           (loop while (< pos index)
+                 do (string-output-stream-prev-buffer stream)
+                 (setf index (string-output-stream-index stream)))
+           (let ((step (- pos index)))
+             (incf (string-output-stream-pointer stream) step)
+             (setf (string-output-stream-index stream) pos)))
+          ((> pos index)
+           ;; We allow moving beyond the end of stream, implicitly
+           ;; extending the output stream.
+           (let ((next (string-output-stream-next-buffer stream)))
+             ;; Update after -next-buffer, INDEX is kept pointing at
+             ;; the end of the current buffer.
+             (setf index (string-output-stream-index stream))
+             (loop while (and next (> pos index))
+                   do (setf next (string-output-stream-next-buffer stream)
+                            index (string-output-stream-index stream))))
+           ;; Allocate new buffer if needed, or step back to
+           ;; the desired index and set pointer and index
+           ;; correctly.
+           (let ((diff (- pos index)))
+             (if (plusp diff)
+                 (let* ((new (string-output-stream-new-buffer stream diff))
+                        (size (length new)))
+                   (aver (= pos (+ index size)))
+                   (setf (string-output-stream-pointer stream) size
+                         (string-output-stream-index stream) pos))
+                 (let ((size (length (string-output-stream-buffer stream))))
+                   (setf (string-output-stream-pointer stream) (+ size diff)
+                         (string-output-stream-index stream) pos))))))))
 
 (defun string-out-misc (stream operation &optional arg1 arg2)
   (declare (ignore arg2))
   (case operation
-    (:file-position
-     (if arg1
-         (let ((end (string-output-stream-last-index stream)))
-           (setf (string-output-stream-index-cache stream) end
-                 (string-output-stream-index stream)
-                 (case arg1
-                   (:start 0)
-                   (:end end)
-                   (t
-                    ;; We allow moving beyond the end of stream,
-                    ;; implicitly extending the output stream.
-                    (let ((buffer (string-output-stream-string stream)))
-                      (when (> arg1 (length buffer))
-                        (setf (string-output-stream-string stream)
-                              (make-string
-                               arg1 :element-type (array-element-type buffer))
-                              (subseq (string-output-stream-string stream)
-                                      0 end)
-                              (subseq buffer 0 end))))
-                      arg1))))
-         (string-output-stream-index stream)))
-    (:close (set-closed-flame stream))
     (:charpos
-     (do ((index (1- (the fixnum (string-output-stream-index stream)))
-                 (1- index))
-          (count 0 (1+ count))
-          (string (string-output-stream-string stream)))
-         ((< index 0) count)
-       (declare (type (simple-array character (*)) string)
-                (type fixnum index count))
-       (if (char= (schar string index) #\newline)
-           (return count))))
-    (:element-type (array-element-type (string-output-stream-string stream)))))
+     ;; Keeping this first is a silly micro-optimization: FRESH-LINE
+     ;; makes this the most common one.
+     (/show0 "/string-out-misc charpos")
+     (prog ((pointer (string-output-stream-pointer stream))
+            (buffer (string-output-stream-buffer stream))
+            (prev (string-output-stream-prev stream))
+            (base 0))
+      :next
+      (let ((pos (position #\newline buffer :from-end t :end pointer)))
+        (when (or pos (not buffer))
+          ;; If newline is at index I, and pointer at index I+N, charpos
+          ;; is N-1. If there is no newline, and pointer is at index N,
+          ;; charpos is N.
+          (return (+ base (if pos (- pointer pos 1) pointer))))
+        (setf base (+ base pointer)
+              buffer (pop prev)
+              pointer (length buffer))
+        (/show0 "/string-out-misc charpos next")
+        (go :next))))
+    (:file-position
+     (/show0 "/string-out-misc file-position")
+     (when arg1
+       (set-string-output-stream-file-position stream arg1))
+     (string-output-stream-index stream))
+    (:close
+     (/show0 "/string-out-misc close")
+     (set-closed-flame stream))
+    (:element-type (string-output-stream-element-type stream))))
 
 ;;; Return a string of all the characters sent to a stream made by
 ;;; MAKE-STRING-OUTPUT-STREAM since the last call to this function.
 (defun get-output-stream-string (stream)
   (declare (type string-output-stream stream))
-  (let* ((length (string-output-stream-last-index stream))
+  (let* ((length (max (string-output-stream-index stream)
+                      (string-output-stream-index-cache stream)))
          (element-type (string-output-stream-element-type stream))
+         (prev (string-output-stream-prev stream))
+         (this (string-output-stream-buffer stream))
+         (next (string-output-stream-next stream))
          (result
           (case element-type
             ;; overwhelmingly common case: can be inlined
+            ;;
+            ;; FIXME: If we were willing to use %SHRINK-VECTOR here,
+            ;; and allocate new strings the size of 2 * index in
+            ;; STRING-SOUT, we would not need to allocate one here in
+            ;; the common case, but could just use the last one
+            ;; allocated, and chop it down to size..
+            ;;
             ((character) (make-string length))
             ;; slightly less common cases: inline it anyway
             ((base-char standard-char)
              (make-string length :element-type 'base-char))
-            (t (make-string length :element-type element-type)))))
-    ;; For the benefit of the REPLACE transform, let's do this, so
-    ;; that the common case isn't ludicrously expensive.
-    (etypecase result
-      ((simple-array character (*))
-       (replace result (string-output-stream-string stream)))
-      (simple-base-string
-       (replace result (string-output-stream-string stream)))
-      ((simple-array nil (*))
-       (replace result (string-output-stream-string stream))))
-    (setf (string-output-stream-index stream) 0
-          (string-output-stream-index-cache stream) 0)
-    result))
+            (t
+             (make-string length :element-type element-type)))))
 
-;;; Dump the characters buffer up in IN-STREAM to OUT-STREAM as
-;;; GET-OUTPUT-STREAM-STRING would return them.
-(defun dump-output-stream-string (in-stream out-stream)
-  (%write-string (string-output-stream-string in-stream)
-                 out-stream
-                 0
-                 (string-output-stream-last-index in-stream))
-  (setf (string-output-stream-index in-stream) 0
-        (string-output-stream-index-cache in-stream) 0))
+    (setf (string-output-stream-index stream) 0
+          (string-output-stream-index-cache stream) 0
+          (string-output-stream-pointer stream) 0
+          ;; throw them away for simplicity's sake: this way the rest of the
+          ;; implementation can assume that the greater of INDEX and INDEX-CACHE
+          ;; is always within the last buffer.
+          (string-output-stream-prev stream) nil
+          (string-output-stream-next stream) nil)
+
+    (flet ((replace-all (fun)
+             (let ((start 0))
+               (declare (index start))
+               (dolist (buffer (nreverse prev))
+                 (funcall fun buffer start)
+                 (incf start (length buffer)))
+               (funcall fun this start)
+               (incf start (length this))
+               (dolist (buffer next)
+                 (funcall fun buffer start)
+                 (incf start (length buffer))))))
+      (macrolet ((frob (type)
+                   `(replace-all (lambda (buffer from)
+                                   (declare (type ,type result)
+                                            (type (simple-array character (*))
+                                                  buffer))
+                                   (replace result buffer :start1 from)))))
+        (etypecase result
+          ((simple-array character (*))
+           (frob (simple-array character (*))))
+          (simple-base-string
+           (frob simple-base-string))
+          ((simple-array nil (*))
+           (frob (simple-array nil (*)))))))
+
+    result))
 
 ;;;; fill-pointer streams
 

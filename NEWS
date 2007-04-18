@@ -23,7 +23,9 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     EQUAL is the same as EQL
   * optimization: the non-inlined generic versions of AREF and (SETF AREF)
     are significantly faster
-  * enhancement: XREF information is now collected to references made
+  * optimization: new STRING-OUTPUT-STREAM implementation is much
+    faster for large outputs and conses 30% less on average.
+  * enhancement: XREF information is now collected for references made
     to global variables using SYMBOL-VALUE and a constant argument.
   * enhancement: SIGINT now causes a specific condition
     SB-SYS:INTERACTIVE-INTERRUPT to be signalled.
