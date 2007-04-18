@@ -47,13 +47,14 @@ character input streams must implement @codew{stream-read-char} and
 @end group
 
 @group
-(defclass wrapped-character-input-stream (wrapped-stream)
+(defclass wrapped-character-input-stream
+    (wrapped-stream fundamental-character-output-stream)
   ())
 @end group
 
 @group
 (defmethod stream-read-char ((stream wrapped-character-input-stream))
-  (read-char (stream-of stream)))
+  (read-char (stream-of stream) nil :eof))
 @end group
 
 @group
