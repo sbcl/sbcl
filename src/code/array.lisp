@@ -341,22 +341,31 @@ of specialized arrays is supported."
                                      ;; is done implicitly via the widetag
                                      ;; dispatch.
                                      (safety 0)))
-                  #1=(funcall (the function
-                                (let ((tag 0))
-                                  ;; WIDETAG-OF needs extra code to
-                                  ;; handle LIST and FUNCTION
-                                  ;; lowtags. We're only dispatching
-                                  ;; on other pointers, so let's do
-                                  ;; the lowtag extraction manually.
-                                  (when (sb!vm::%other-pointer-p array)
-                                    (setf tag (sb!sys:sap-ref-8
-                                               (int-sap (get-lisp-obj-address array))
-                                               (- sb!vm:other-pointer-lowtag))))
-                                  ;; SYMBOL-GLOBAL-VALUE is a performance hack
-                                  ;; for threaded builds.
-                                  (svref (sb!vm::symbol-global-value ',table-name)
-                                         tag)))
-                                array index ,@extra-params))
+                  #1=(funcall
+                      (the function
+                        (let ((tag 0)
+                              (offset
+                               #.(ecase sb!c:*backend-byte-order*
+                                   (:little-endian
+                                    (- sb!vm:other-pointer-lowtag))
+                                   (:big-endian
+                                    ;; I'm not completely sure of what this
+                                    ;; 3 represents symbolically. It's
+                                    ;; just what all the LOAD-TYPE vops
+                                    ;; are doing.
+                                    (- 3 sb!vm:other-pointer-lowtag)))))
+                          ;; WIDETAG-OF needs extra code to handle
+                          ;; LIST and FUNCTION lowtags. We're only
+                          ;; dispatching on other pointers, so let's
+                          ;; do the lowtag extraction manually.
+                          (when (sb!vm::%other-pointer-p array)
+                            (setf tag
+                                  (sb!sys:sap-ref-8 (int-sap (get-lisp-obj-address array))
+                                                    offset)))
+                          ;; SYMBOL-GLOBAL-VALUE is a performance hack
+                          ;; for threaded builds.
+                          (svref (sb!vm::symbol-global-value ',table-name) tag)))
+                      array index ,@extra-params))
                 (defun ,slow-accessor-name (array index ,@extra-params)
                   (declare (optimize speed (safety 0)))
                   (if (not (%array-displaced-p array))
