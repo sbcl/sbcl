@@ -1134,7 +1134,7 @@
             (truly-the index (+ index copy)))
       ;; FIXME: why are we VECTOR-SAP'ing things here?  what's the point?
       ;; and are there SB-UNICODE issues here as well?  --njf, 2005-03-24
-      (sb!sys:without-gcing
+      (without-gcing
        (system-area-ub8-copy (vector-sap string)
                              index
                              (if (typep buffer 'system-area-pointer)

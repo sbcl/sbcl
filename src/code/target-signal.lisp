@@ -184,31 +184,3 @@
 ;;;   Magically converted by the compiler into a break instruction.
 (defun receive-pending-interrupt ()
   (receive-pending-interrupt))
-
-;;; stale code which I'm insufficiently motivated to test -- WHN 19990714
-#|
-;;;; WITH-ENABLED-INTERRUPTS
-
-(defmacro with-enabled-interrupts (interrupt-list &body body)
-  #!+sb-doc
-  "With-enabled-interrupts ({(interrupt function)}*) {form}*
-   Establish function as a handler for the Unix signal interrupt which
-   should be a number between 1 and 31 inclusive."
-  (let ((il (gensym))
-        (it (gensym)))
-    `(let ((,il NIL))
-       (unwind-protect
-           (progn
-             ,@(do* ((item interrupt-list (cdr item))
-                     (intr (caar item) (caar item))
-                     (ifcn (cadar item) (cadar item))
-                     (forms NIL))
-                    ((null item) (nreverse forms))
-                 (when (symbolp intr)
-                   (setq intr (symbol-value intr)))
-                 (push `(push `(,,intr ,(enable-interrupt ,intr ,ifcn)) ,il)
-                       forms))
-             ,@body)
-         (dolist (,it (nreverse ,il))
-           (enable-interrupt (car ,it) (cadr ,it)))))))
-|#

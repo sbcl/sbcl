@@ -1109,16 +1109,6 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                         '(:ansi-cl :section (15 1 2 1))
                         '(:ansi-cl :section (15 1 2 2)))))
 
-(define-condition io-timeout (stream-error)
-  ((direction :reader io-timeout-direction :initarg :direction))
-  (:report
-   (lambda (condition stream)
-     (declare (type stream stream))
-     (format stream
-             "I/O timeout ~(~A~)ing ~S"
-             (io-timeout-direction condition)
-             (stream-error-stream condition)))))
-
 (define-condition namestring-parse-error (parse-error)
   ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
    (args :reader namestring-parse-error-args :initarg :args :initform nil)
@@ -1158,6 +1148,16 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                (reader-impossible-number-error-error condition))))))
 
 (define-condition timeout (serious-condition) ())
+
+(define-condition io-timeout (stream-error timeout)
+  ((direction :reader io-timeout-direction :initarg :direction))
+  (:report
+   (lambda (condition stream)
+     (declare (type stream stream))
+     (format stream
+             "I/O timeout ~(~A~)ing ~S"
+             (io-timeout-direction condition)
+             (stream-error-stream condition)))))
 
 (define-condition declaration-type-conflict-error (reference-condition
                                                    simple-error)

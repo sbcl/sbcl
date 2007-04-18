@@ -221,7 +221,7 @@
                          end)
                    (fd-stream-output-later stream))))))
   (unless (fd-stream-output-later stream)
-    (sb!sys:remove-fd-handler (fd-stream-handler stream))
+    (remove-fd-handler (fd-stream-handler stream))
     (setf (fd-stream-handler stream) nil)))
 
 ;;; Arange to output the string when we can write on the file descriptor.
@@ -230,7 +230,7 @@
          (setf (fd-stream-output-later stream)
                (list (list base start end reuse-sap)))
          (setf (fd-stream-handler stream)
-               (sb!sys:add-fd-handler (fd-stream-fd stream)
+               (add-fd-handler (fd-stream-fd stream)
                                       :output
                                       (lambda (fd)
                                         (declare (ignore fd))
@@ -739,17 +739,17 @@
     ;;(not (sb!win32:fd-listen fd)), as was originally here.  See
     ;;comment in `sysread-may-block-p'.
     (when (sysread-may-block-p stream)
-      (unless (sb!sys:wait-until-fd-usable
+      (unless (wait-until-fd-usable
                fd :input (fd-stream-timeout stream))
         (error 'io-timeout :stream stream :direction :read)))
     (multiple-value-bind (count errno)
         (sb!unix:unix-read fd
-                           (sb!sys:int-sap (+ (sb!sys:sap-int ibuf-sap) tail))
+                           (int-sap (+ (sap-int ibuf-sap) tail))
                            (- buflen tail))
       (cond ((null count)
              (if #!-win32 (eql errno sb!unix:ewouldblock) #!+win32 t #!-win32
                  (progn
-                   (unless (sb!sys:wait-until-fd-usable
+                   (unless (wait-until-fd-usable
                             fd :input (fd-stream-timeout stream))
                      (error 'io-timeout :stream stream :direction :read))
                    (refill-buffer/fd stream))
@@ -1211,7 +1211,7 @@
               (declare (optimize (speed 3) (safety 0)))
             (let* ((length (length string))
                    (buffer (make-array (* (1+ length) ,size) :element-type '(unsigned-byte 8)))
-                   (sap (sb!sys:vector-sap buffer))
+                   (sap (vector-sap buffer))
                    (tail 0)
                    (stream ,name))
               (declare (type index length tail)
@@ -1454,7 +1454,7 @@
                              (the index ,out-size-expr)))))
                  (tail 0)
                  (buffer (make-array buffer-length :element-type '(unsigned-byte 8)))
-                 (sap (sb!sys:vector-sap buffer))
+                 (sap (vector-sap buffer))
                  stream)
             (declare (type index length buffer-length tail)
                      (type system-area-pointer sap)
@@ -1815,7 +1815,7 @@
     (:close
      (cond (arg1                    ; We got us an abort on our hands.
             (when (fd-stream-handler fd-stream)
-              (sb!sys:remove-fd-handler (fd-stream-handler fd-stream))
+              (remove-fd-handler (fd-stream-handler fd-stream))
               (setf (fd-stream-handler fd-stream) nil))
             ;; We can't do anything unless we know what file were
             ;; dealing with, and we don't want to do anything
@@ -1904,9 +1904,7 @@
      (flush-output-buffer fd-stream))
     (:finish-output
      (flush-output-buffer fd-stream)
-     (do ()
-         ((null (fd-stream-output-later fd-stream)))
-       (sb!sys:serve-all-events)))
+     (finish-fd-stream-output fd-stream))
     (:element-type
      (fd-stream-element-type fd-stream))
     (:external-format
@@ -1946,11 +1944,16 @@
     (:file-position
      (fd-stream-file-position fd-stream arg1))))
 
+(defun finish-fd-stream-output (stream)
+  (do ()
+      ((null (fd-stream-output-later stream)))
+    (serve-all-events)))
+
 (defun fd-stream-file-position (stream &optional newpos)
   (declare (type fd-stream stream)
            (type (or (alien sb!unix:off-t) (member nil :start :end)) newpos))
   (if (null newpos)
-      (sb!sys:without-interrupts
+      (without-interrupts
         ;; First, find the position of the UNIX file descriptor in the file.
         (multiple-value-bind (posn errno)
             (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)
@@ -1979,7 +1982,7 @@
                 ((eq errno sb!unix:espipe)
                  nil)
                 (t
-                 (sb!sys:with-interrupts
+                 (with-interrupts
                    (simple-stream-perror "failure in Unix lseek() on ~S"
                                          stream
                                          errno))))))
@@ -1989,9 +1992,7 @@
         ;; move the file pointer before writing this stuff, it will be
         ;; written in the wrong location.
         (flush-output-buffer stream)
-        (do ()
-            ((null (fd-stream-output-later stream)))
-          (sb!sys:serve-all-events))
+        (finish-fd-stream-output stream)
         ;; Clear out any pending input to force the next read to go to
         ;; the disk.
         (setf (fd-stream-unread stream) nil)
