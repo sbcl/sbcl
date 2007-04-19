@@ -286,7 +286,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) len))
-
   (int-syscall ("read" int (* char) int) fd buf len))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
@@ -300,6 +299,10 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                fd
                (with-alien ((ptr (* char) (etypecase buf
                                             ((simple-array * (*))
+                                             ;; This SAP-taking is
+                                             ;; safe as BUF remains
+                                             ;; either in a register
+                                             ;; or on stack.
                                              (vector-sap buf))
                                             (system-area-pointer
                                              buf))))
@@ -1004,7 +1007,8 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
             c-sec 0
             c-msec 0))
     ;; If two threads call this at the same time, we're still safe, I believe,
-    ;; as long as NOW is updated before either of C-MSEC or C-SEC. --NS
+    ;; as long as NOW is updated before either of C-MSEC or C-SEC. Same applies
+    ;; to interrupts. --NS
     (defun get-internal-real-time ()
       (multiple-value-bind (sec msec) (internal-real-time-values)
         (unless (and (= msec c-msec) (= sec c-sec))

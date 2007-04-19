@@ -346,8 +346,8 @@
                     (element-type 'character)
                     ((:initial-element fill-char)))
   #!+sb-doc
-  "Given a character count and an optional fill character, makes and returns
-   a new string COUNT long filled with the fill character."
+  "Given a character count and an optional fill character, makes and returns a
+new string COUNT long filled with the fill character."
   (declare (fixnum count))
   (if fill-char
       (make-string count :element-type element-type :initial-element fill-char)

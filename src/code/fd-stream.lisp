@@ -182,13 +182,13 @@
 
 (defun external-format-encoding-error (stream code)
   (if (streamp stream)
-    (stream-encoding-error-and-handle stream code)
-    (c-string-encoding-error stream code)))
+      (stream-encoding-error-and-handle stream code)
+      (c-string-encoding-error stream code)))
 
 (defun external-format-decoding-error (stream octet-count)
   (if (streamp stream)
-    (stream-decoding-error stream octet-count)
-    (c-string-decoding-error stream octet-count)))
+      (stream-decoding-error stream octet-count)
+      (c-string-decoding-error stream octet-count)))
 
 ;;; This is called by the server when we can write to the given file
 ;;; descriptor. Attempt to write the data again. If it worked, remove
@@ -208,7 +208,10 @@
                             start
                             length)
       (cond ((not count)
-             (if #!-win32 (= errno sb!unix:ewouldblock) #!+win32 t #!-win32
+             #!+win32
+             (simple-stream-perror "couldn't write to ~S" stream errno)
+             #!-win32
+             (if (= errno sb!unix:ewouldblock)
                  (error "Write would have blocked, but SERVER told us to go.")
                  (simple-stream-perror "couldn't write to ~S" stream errno)))
             ((eql count length) ; Hot damn, it worked.
@@ -251,19 +254,19 @@
            (type (or system-area-pointer (simple-array * (*))) base)
            (type index start end))
   (if (not (null (fd-stream-output-later stream))) ; something buffered.
-      (progn
-        (output-later stream base start end reuse-sap)
-        ;; ### check to see whether any of this noise can be output
-        )
+      (output-later stream base start end reuse-sap)
+      ;; ### check to see whether any of this noise can be output
       (let ((length (- end start)))
         (multiple-value-bind (count errno)
             (sb!unix:unix-write (fd-stream-fd stream) base start length)
           (cond ((not count)
-                 (if #!-win32 (= errno sb!unix:ewouldblock) #!+win32 t #!-win32
+                 #!+win32
+                 (simple-stream-perror "Couldn't write to ~S" stream errno)
+                 #!-win32
+                 (if (= errno sb!unix:ewouldblock)
                      (output-later stream base start end reuse-sap)
-                     (simple-stream-perror "couldn't write to ~S"
-                                           stream
-                                           errno)))
+                     (simple-stream-perror "Couldn't write to ~S"
+                                           stream errno)))
                 ((not (eql count length))
                  (output-later stream base (the index (+ start count))
                                end reuse-sap)))))))
@@ -274,6 +277,10 @@
     (unless (= length 0)
       (frob-output stream (fd-stream-obuf-sap stream) 0 length t)
       (setf (fd-stream-obuf-tail stream) 0))))
+
+(defun fd-stream-output-finished-p (stream)
+  (and (zerop (fd-stream-obuf-tail stream))
+       (not (fd-stream-output-later stream))))
 
 (defmacro output-wrapper/variable-width ((stream size buffering restart)
                                          &body body)
@@ -1078,7 +1085,8 @@
          (in-char-function (symbolicate "INPUT-CHAR/" name))
          (size-function (symbolicate "BYTES-FOR-CHAR/" name))
          (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
-         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name)))
+         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name))
+         (n-buffer (gensym "BUFFER")))
     `(progn
       (defun ,size-function (byte)
         (declare (ignore byte))
@@ -1142,9 +1150,11 @@
           ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
                            &aux (index start) (end (+ start requested)))
-        (declare (type fd-stream stream))
-        (declare (type index start requested index end))
-        (declare (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
+        (declare (type fd-stream stream)
+                 (type index start requested index end)
+                 (type
+                  (simple-array character (#.+ansi-stream-in-buffer-length+))
+                  buffer))
         (let ((unread (fd-stream-unread stream)))
           (when unread
             (setf (aref buffer index) unread)
@@ -1188,16 +1198,18 @@
         (locally
             (declare (optimize (speed 3) (safety 0)))
           (let* ((stream ,name)
-                 (length (loop for head of-type index upfrom 0 by ,size
-                            for count of-type index upto (1- ARRAY-DIMENSION-LIMIT)
-                            for byte = (sap-ref-8 sap head)
-                            for char of-type character = ,in-expr
-                            until (zerop (char-code char))
-                            finally (return count)))
+                 (length
+                  (loop for head of-type index upfrom 0 by ,size
+                        for count of-type index upto (1- array-dimension-limit)
+                        for byte = (sap-ref-8 sap head)
+                        for char of-type character = ,in-expr
+                        until (zerop (char-code char))
+                        finally (return count)))
+                 ;; Inline the common cases
                  (string (make-string length :element-type element-type)))
             (declare (ignorable stream)
                      (type index length)
-                     (type string string))
+                     (type simple-string string))
             (/show0 before-copy-loop)
             (loop for head of-type index upfrom 0 by ,size
                for index of-type index below length
@@ -1210,8 +1222,14 @@
           (locally
               (declare (optimize (speed 3) (safety 0)))
             (let* ((length (length string))
-                   (buffer (make-array (* (1+ length) ,size) :element-type '(unsigned-byte 8)))
-                   (sap (vector-sap buffer))
+                   (,n-buffer (make-array (* (1+ length) ,size)
+                                          :element-type '(unsigned-byte 8)))
+                   ;; This SAP-taking may seem unsafe without pinning,
+                   ;; but since the variable name is a gensym OUT-EXPR
+                   ;; cannot close over it even if it tried, so the buffer
+                   ;; will always be either in a register or on stack.
+                   ;; FIXME: But ...this is true on x86oids only!
+                   (sap (vector-sap ,n-buffer))
                    (tail 0)
                    (stream ,name))
               (declare (type index length tail)
@@ -1226,7 +1244,7 @@
                      (byte (code-char bits)))
                 (declare (ignorable bits byte))
                 ,out-expr)
-              buffer)))
+              ,n-buffer)))
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
                ,@(mapcar #'(lambda (buffering)
@@ -1247,7 +1265,8 @@
          (resync-function (symbolicate "RESYNC/" name))
          (size-function (symbolicate "BYTES-FOR-CHAR/" name))
          (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
-         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name)))
+         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name))
+         (n-buffer (gensym "BUFFER")))
     `(progn
       (defun ,size-function (byte)
         (declare (ignorable byte))
@@ -1313,9 +1332,11 @@
           ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
                            &aux (total-copied 0))
-        (declare (type fd-stream stream))
-        (declare (type index start requested total-copied))
-        (declare (type (simple-array character (#.+ansi-stream-in-buffer-length+)) buffer))
+        (declare (type fd-stream stream)
+                 (type index start requested total-copied)
+                 (type
+                  (simple-array character (#.+ansi-stream-in-buffer-length+))
+                  buffer))
         (let ((unread (fd-stream-unread stream)))
           (when unread
             (setf (aref buffer start) unread)
@@ -1453,26 +1474,32 @@
                        (setf (aref char-length length)
                              (the index ,out-size-expr)))))
                  (tail 0)
-                 (buffer (make-array buffer-length :element-type '(unsigned-byte 8)))
-                 (sap (vector-sap buffer))
+                 (,n-buffer (make-array buffer-length
+                                        :element-type '(unsigned-byte 8)))
+                 ;; This SAP-taking may seem unsafe without pinning,
+                 ;; but since the variable name is a gensym OUT-EXPR
+                 ;; cannot close over it even if it tried, so the buffer
+                 ;; will always be either in a register or on stack.
+                 ;; FIXME: But ...this is true on x86oids only!
+                 (sap (vector-sap ,n-buffer))
                  stream)
             (declare (type index length buffer-length tail)
                      (type system-area-pointer sap)
                      (type null stream)
                      (ignorable stream))
             (loop for i of-type index below length
-               for byte of-type character = (aref string i)
-               for bits = (char-code byte)
-               for size of-type index = (aref char-length i)
-               do (prog1
-                      ,out-expr
-                    (incf tail size)))
+                  for byte of-type character = (aref string i)
+                  for bits = (char-code byte)
+                  for size of-type index = (aref char-length i)
+                  do (prog1
+                         ,out-expr
+                       (incf tail size)))
             (let* ((bits 0)
                    (byte (code-char bits))
                    (size (aref char-length length)))
               (declare (ignorable bits byte size))
               ,out-expr)
-            buffer)))
+            ,n-buffer)))
 
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
@@ -1903,7 +1930,6 @@
     (:force-output
      (flush-output-buffer fd-stream))
     (:finish-output
-     (flush-output-buffer fd-stream)
      (finish-fd-stream-output fd-stream))
     (:element-type
      (fd-stream-element-type fd-stream))
@@ -1942,84 +1968,96 @@
        (character (fd-stream-character-size fd-stream arg1))
        (string (fd-stream-string-size fd-stream arg1))))
     (:file-position
-     (fd-stream-file-position fd-stream arg1))))
+     (if arg1
+         (fd-stream-set-file-position fd-stream arg1)
+         (fd-stream-get-file-position fd-stream)))))
 
 (defun finish-fd-stream-output (stream)
+  (flush-output-buffer stream)
   (do ()
       ((null (fd-stream-output-later stream)))
     (serve-all-events)))
 
-(defun fd-stream-file-position (stream &optional newpos)
-  (declare (type fd-stream stream)
-           (type (or (alien sb!unix:off-t) (member nil :start :end)) newpos))
-  (if (null newpos)
-      (without-interrupts
-        ;; First, find the position of the UNIX file descriptor in the file.
-        (multiple-value-bind (posn errno)
-            (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)
-          (declare (type (or (alien sb!unix:off-t) null) posn))
-          (cond ((integerp posn)
-                 ;; Adjust for buffered output: If there is any output
-                 ;; buffered, the *real* file position will be larger
-                 ;; than reported by lseek() because lseek() obviously
-                 ;; cannot take into account output we have not sent
-                 ;; yet.
-                 (dolist (later (fd-stream-output-later stream))
-                   (incf posn (- (caddr later)
-                                 (cadr later))))
-                 (incf posn (fd-stream-obuf-tail stream))
-                 ;; Adjust for unread input: If there is any input
-                 ;; read from UNIX but not supplied to the user of the
-                 ;; stream, the *real* file position will smaller than
-                 ;; reported, because we want to look like the unread
-                 ;; stuff is still available.
-                 (decf posn (- (fd-stream-ibuf-tail stream)
-                               (fd-stream-ibuf-head stream)))
-                 (when (fd-stream-unread stream)
-                   (decf posn))
-                 ;; Divide bytes by element size.
-                 (truncate posn (fd-stream-element-size stream)))
-                ((eq errno sb!unix:espipe)
-                 nil)
-                (t
-                 (with-interrupts
-                   (simple-stream-perror "failure in Unix lseek() on ~S"
-                                         stream
-                                         errno))))))
-      (let ((offset 0) origin)
-        (declare (type (alien sb!unix:off-t) offset))
-        ;; Make sure we don't have any output pending, because if we
-        ;; move the file pointer before writing this stuff, it will be
-        ;; written in the wrong location.
-        (flush-output-buffer stream)
-        (finish-fd-stream-output stream)
-        ;; Clear out any pending input to force the next read to go to
-        ;; the disk.
-        (setf (fd-stream-unread stream) nil)
-        (setf (fd-stream-ibuf-head stream) 0)
-        (setf (fd-stream-ibuf-tail stream) 0)
-        ;; Trash cached value for listen, so that we check next time.
-        (setf (fd-stream-listen stream) nil)
-        ;; Now move it.
-        (cond ((eq newpos :start)
-               (setf offset 0 origin sb!unix:l_set))
-              ((eq newpos :end)
-               (setf offset 0 origin sb!unix:l_xtnd))
-              ((typep newpos '(alien sb!unix:off-t))
-               (setf offset (* newpos (fd-stream-element-size stream))
-                     origin sb!unix:l_set))
-              (t
-               (error "invalid position given to FILE-POSITION: ~S" newpos)))
-        (multiple-value-bind (posn errno)
-            (sb!unix:unix-lseek (fd-stream-fd stream) offset origin)
-          (cond ((typep posn '(alien sb!unix:off-t))
-                 t)
-                ((eq errno sb!unix:espipe)
-                 nil)
-                (t
-                 (simple-stream-perror "error in Unix lseek() on ~S"
-                                       stream
-                                       errno)))))))
+(defun fd-stream-get-file-position (stream)
+  (declare (fd-stream stream))
+  (without-interrupts
+    (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)))
+      (declare (type (or (alien sb!unix:off-t) null) posn))
+      ;; We used to return NIL for errno==ESPIPE, and signal an error
+      ;; in other failure cases. However, CLHS says to return NIL if
+      ;; the position cannot be determined -- so that's what we do.
+      (when (integerp posn)
+        ;; Adjust for buffered output: If there is any output
+        ;; buffered, the *real* file position will be larger
+        ;; than reported by lseek() because lseek() obviously
+        ;; cannot take into account output we have not sent
+        ;; yet.
+        (dolist (later (fd-stream-output-later stream))
+          (incf posn (- (caddr later) (cadr later))))
+        (incf posn (fd-stream-obuf-tail stream))
+        ;; Adjust for unread input: If there is any input
+        ;; read from UNIX but not supplied to the user of the
+        ;; stream, the *real* file position will smaller than
+        ;; reported, because we want to look like the unread
+        ;; stuff is still available.
+        (decf posn (- (fd-stream-ibuf-tail stream)
+                      (fd-stream-ibuf-head stream)))
+        (when (fd-stream-unread stream)
+          (decf posn))
+        ;; Divide bytes by element size.
+        (truncate posn (fd-stream-element-size stream))))))
+
+(defun fd-stream-set-file-position (stream position-spec)
+  (declare (fd-stream stream))
+  (check-type position-spec
+              (or (alien sb!unix:off-t) (member nil :start :end))
+              "valid file position designator")
+  (tagbody
+   :again
+     ;; Make sure we don't have any output pending, because if we
+     ;; move the file pointer before writing this stuff, it will be
+     ;; written in the wrong location.
+     (finish-fd-stream-output stream)
+     ;; Disable interrupts so that interrupt handlers doing output
+     ;; won't screw us.
+     (without-interrupts
+       (unless (fd-stream-output-finished-p stream)
+         ;; We got interrupted and more output came our way during
+         ;; the interrupt. Wrapping the FINISH-FD-STREAM-OUTPUT in
+         ;; WITHOUT-INTERRUPTS gets nasty as it can signal errors,
+         ;; so we prefer to do things like this...
+         (go :again))
+       ;; Clear out any pending input to force the next read to go to
+       ;; the disk.
+       (setf (fd-stream-unread stream) nil
+             (fd-stream-ibuf-head stream) 0
+             (fd-stream-ibuf-tail stream) 0)
+       ;; Trash cached value for listen, so that we check next time.
+       (setf (fd-stream-listen stream) nil)
+         ;; Now move it.
+         (multiple-value-bind (offset origin)
+             (case position-spec
+           (:start
+            (values 0 sb!unix:l_set))
+           (:end
+            (values 0 sb!unix:l_xtnd))
+           (t
+            (values (* position-spec (fd-stream-element-size stream))
+                    sb!unix:l_set)))
+           (declare (type (alien sb!unix:off-t) offset))
+           (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream)
+                                           offset origin)))
+             ;; CLHS says to return true if the file-position was set
+             ;; succesfully, and NIL otherwise. We are to signal an error
+             ;; only if the given position was out of bounds, and that is
+             ;; dealt with above. In times past we used to return NIL for
+             ;; errno==ESPIPE, and signal an error in other cases.
+             ;;
+             ;; FIXME: We are still liable to signal an error if flushing
+             ;; output fails.
+             (return-from fd-stream-set-file-position
+               (typep posn '(alien sb!unix:off-t))))))))
+
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
 

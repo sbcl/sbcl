@@ -150,6 +150,8 @@
   (declare (type stream stream))
   (declare (type (or index (alien sb!unix:off-t) (member nil :start :end))
                  position))
+  ;; FIXME: It woud be good to comment on the stuff that is done here...
+  ;; FIXME: This doesn't look interrupt safe.
   (cond
     (position
      (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)

@@ -82,6 +82,8 @@
 
 (define-alien-type-method (c-string :deport-gen) (type value)
   (declare (ignore type))
+  ;; This SAP taking is safe as DEPORT callers pin the VALUE when
+  ;; necessary.
   `(etypecase ,value
      (null (int-sap 0))
      ((alien (* char)) (alien-sap ,value))
