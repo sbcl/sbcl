@@ -43,7 +43,7 @@
                      ;; function, and report spurious warnings about
                      ;; redefinition a macro as a function, and then
                      ;; vice versa.
-                     #-sb-xc-host #-sb-xc-host named-lambda (defmacro ,name)
+                     #-sb-xc-host named-lambda #-sb-xc-host (defmacro ,name)
                      (,whole ,environment)
                       ,@local-decs
                       ,new-body))

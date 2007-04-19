@@ -176,7 +176,7 @@ invoked. In that case it will store into PLACE and start over."
    (case-kind :initarg :case-kind
               :reader case-warning-case-kind)
    (occurrences :initarg :occurrences
-                :type (cons (integer 0) (cons t null))
+                :type list
                 :reader duplicate-case-key-warning-occurrences))
   (:report
     (lambda (condition stream)
