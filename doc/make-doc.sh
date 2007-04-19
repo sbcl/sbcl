@@ -1,3 +1,6 @@
 #!/bin/sh
 
-(cd ./manual ; make html)
+. ../find-gnumake.sh
+find_gnumake
+
+(cd ./manual ; $GNUMAKE html)
