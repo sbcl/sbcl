@@ -226,7 +226,6 @@ INSTALLING SBCL
     SBCL
     CMUCL
     OpenMCL
-    CLISP (recent versions only)
     ABCL (recent versions only)
 
     Note that every release isn't tested with every possible host
