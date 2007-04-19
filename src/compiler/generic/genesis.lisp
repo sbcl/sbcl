@@ -2613,9 +2613,9 @@ core and return a descriptor to it."
 
 (defun c-name (string &optional strip)
   (delete #\+
-          (nsubstitute-if #\_ (lambda (c) (member c '(#\- #\/ #\%)))
-                          (remove-if (lambda (c) (position c strip))
-                                     string))))
+          (substitute-if #\_ (lambda (c) (member c '(#\- #\/ #\%)))
+                         (remove-if (lambda (c) (position c strip))
+                                    string))))
 
 (defun c-symbol-name (symbol &optional strip)
   (c-name (symbol-name symbol) strip))
