@@ -219,10 +219,10 @@ case "$sbcl_os" in
         printf ' :bsd' >> $ltf
         printf ' :darwin' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
-            printf ' :sb-lutex :restore-fs-segment-register-from-tls' >> $ltf
+            printf ' :mach-exception-handler :sb-lutex :restore-fs-segment-register-from-tls' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :sb-lutex' >> $ltf
+            printf ' :mach-exception-handler :sb-lutex' >> $ltf
         fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h

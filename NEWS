@@ -63,10 +63,14 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * bug fix: modifying the contents of an array could change the return
     value of SXHASH on that array, which is only allowed for strings 
     and bit vectors (bug introduced in 0.9.16)
-  * improvement: the x86-64/darwin port now passes all tests and
-    should be considered non-experimental.
+  * improvement: the x86-64/darwin port now passes all tests (except
+    for the debugger tests) but should still be considered
+    experimental until this is fixed.
   * improvement: a style-warning is signaled for CASE (etc) clauses with
     duplicate keys (thanks to Kevin Reid)
+  * improvement: macos/x86 and macos/x86-64 now use mach exception
+    handlers for dealing with illegal instructions (for trapping and
+    error handling) and memory protection violations (for GC).
 
 changes in sbcl-1.0.4 relative to sbcl-1.0.3:
   * new platform: experimental support for x86-64/darwin (MacOS).
