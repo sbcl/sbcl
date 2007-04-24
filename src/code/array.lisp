@@ -444,7 +444,7 @@ of specialized arrays is supported."
                 ,@(loop for widetag in '(sb!vm:complex-vector-widetag
                                          sb!vm:complex-vector-nil-widetag
                                          sb!vm:complex-bit-vector-widetag
-                                         sb!vm:complex-character-string-widetag
+                                         #!+sb-unicode sb!vm:complex-character-string-widetag
                                          sb!vm:complex-base-string-widetag
                                          sb!vm:simple-array-widetag
                                          sb!vm:complex-array-widetag)
