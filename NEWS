@@ -20,9 +20,9 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     their NOT- variants no longer cons.
   * optimization: EQUAL hash tables no longer use SXHASH for objects
     of all data types, but instead use an EQL hash for types for which
-    EQUAL is the same as EQL
+    EQUAL is the same as EQL.
   * optimization: the non-inlined generic versions of AREF and (SETF AREF)
-    are significantly faster
+    are significantly faster.
   * optimization: new STRING-OUTPUT-STREAM implementation is much
     faster for large outputs and conses 30% less on average.
   * enhancement: XREF information is now collected for references made
@@ -49,25 +49,25 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
     line in a file is unlimited.
   * bug fix: some GC deadlocks caused by asynchronous interrupts have
     been fixed by inhibiting interrupts for when GC is disbled.
-  * bug fix: GETHASH, (SETF GETHASH), CLRHASH and REMHASH are now
-    interrupt safe.
+  * bug fix: some interrupt safety issues with GETHASH, (SETF
+    GETHASH), CLRHASH and REMHASH have been fixed.
   * bug fix: binding *BREAK-ON-SIGNALS* to a value that is not a type
     specifier no longer causes infinite recursion.
   * bug fix: SB-EXT:MUFFLE-CONDITIONS declarations no longer trigger a 
-    bogus warning in DEFMETHOD bodies (reported by Kevin Reid)
+    bogus warning in DEFMETHOD bodies. (reported by Kevin Reid)
   * bug fix: an &environment argument with the correct variable information
-    is passed to macros that are expanded during byte compilation
+    is passed to macros that are expanded during byte compilation.
     (reported by Samium Gromoff)
   * bug fix: a logic error was causing the hash function for bignums to
-    have excessive amounts of collisions (reported by Faré Rideau)
+    have excessive amounts of collisions. (reported by Faré Rideau)
   * bug fix: modifying the contents of an array could change the return
     value of SXHASH on that array, which is only allowed for strings 
-    and bit vectors (bug introduced in 0.9.16)
+    and bit vectors. (bug introduced in 0.9.16)
   * improvement: the x86-64/darwin port now passes all tests (except
     for the debugger tests) but should still be considered
     experimental until this is fixed.
   * improvement: a style-warning is signaled for CASE (etc) clauses with
-    duplicate keys (thanks to Kevin Reid)
+    duplicate keys. (thanks to Kevin Reid)
   * improvement: macos/x86 and macos/x86-64 now use mach exception
     handlers for dealing with illegal instructions (for trapping and
     error handling) and memory protection violations (for GC).
