@@ -5,6 +5,10 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * bug fix: GC race condition occasionally resulting in crashes with
     the error message "SIG_STOP_FOR_GC blocked at a bad place" has been
     fixed.
+  * bug fix: &ENVIRONMENT variables in macro lambda lists can now be
+    declared ignored.
+  * bug fix: DEFSETF lambda lists without &ENVIRONMENT no longer cause
+    a STYLE-WARNING to be signalled (regression from 1.0.4.)
 
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * incompatible change: removed writer methods for host-ent-name,

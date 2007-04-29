@@ -1416,4 +1416,14 @@
               (program-error ()
                 :ok))))
 
+;;; ignore &environment
+(handler-bind ((style-warning #'error))
+  (compile nil '(lambda ()
+                 (defmacro macro-ignore-env (&environment env)
+                   (declare (ignore env))
+                   :foo)))
+  (compile nil '(lambda ()
+                 (defmacro macro-no-env ()
+                   :foo))))
+
 ;;; success

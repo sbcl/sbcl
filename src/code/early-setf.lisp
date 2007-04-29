@@ -405,10 +405,9 @@ GET-SETF-EXPANSION directly."
                   (assign-setf-macro
                    ',access-fn
                    (lambda (,access-form-var ,env-var)
-                     (declare (ignorable ,env-var))
+                     ,@local-decs
                      (%defsetf ,access-form-var ,(length store-variables)
                                (lambda (,whole-var)
-                                 ,@local-decs
                                  ,body)))
                    nil
                    ',doc))))))

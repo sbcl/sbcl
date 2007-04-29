@@ -81,4 +81,13 @@
               (error ()
                 :error))))
 
+(handler-bind ((style-warning #'error))
+  (compile nil '(lambda ()
+                 (defsetf test-defsetf-no-env (foo) (new)
+                   `(set-foo ,foo ,new))))
+  (compile nil '(lambda ()
+                 (defsetf test-defsetf-ignore-env (foo &environment env) (new)
+                   (declare (ignore env))
+                   `(set-foo ,foo ,new)))))
+
 ;;; success

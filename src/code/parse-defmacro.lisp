@@ -50,13 +50,13 @@
           (parse-defmacro-lambda-list lambda-list whole-var name context
                                       :error-fun error-fun
                                       :anonymousp anonymousp)
-        (values `(let* (,@(when env-arg-used
-                            `((,*env-var* ,env-arg-name)))
-                        ,@(nreverse *system-lets*))
+        (values `(let* (,@(nreverse *system-lets*))
                    ,@(when *ignorable-vars*
                        `((declare (ignorable ,@*ignorable-vars*))))
                    ,@*arg-tests*
-                   (let* ,(nreverse *user-lets*)
+                   (let* (,@(when env-arg-used
+                            `((,*env-var* ,env-arg-name)))
+                          ,@(nreverse *user-lets*))
                      ,@declarations
                      ,@(if wrap-block
                            `((block ,(fun-name-block-name name)
