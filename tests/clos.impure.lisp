@@ -1527,5 +1527,25 @@
       (a b *count* (setf *count* 0))
       ())
 
+;;;; long-form method combination with &rest in :arguments
+;;;; (this had a bug what with fixed in 1.0.4.something)
+(define-method-combination long-form-with-&rest ()
+  ((methods *))
+  (:arguments x &rest others)
+  `(progn
+     ,@(mapcar (lambda (method)
+                 `(call-method ,method))
+               methods)
+     (list ,x (length ,others))))
+
+(defgeneric test-long-form-with-&rest (x &rest others)
+  (:method-combination long-form-with-&rest))
+
+(defmethod test-long-form-with-&rest (x &rest others)
+  nil)
+
+(assert (equal '(:foo 13)
+               (apply #'test-long-form-with-&rest :foo (make-list 13))))
+
 
 ;;;; success
