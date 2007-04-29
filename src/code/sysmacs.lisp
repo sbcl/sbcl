@@ -49,11 +49,13 @@ system will be deadlocked. Since SBCL does not currently document its internal
 locks, application code can never be certain that this invariant is
 maintained."
   `(unwind-protect
-        (without-interrupts
-          (let ((*gc-inhibit* t))
-            ,@body))
-     ;; the test is racy, but it can err only on the overeager side
-     (sb!kernel::maybe-handle-pending-gc)))
+        (let* ((*interrupts-enabled* nil)
+               (*gc-inhibit* t))
+          ,@body)
+     (when (or (and *interrupts-enabled* *interrupt-pending*)
+               (and (not *gc-inhibit*)
+                    (or *gc-pending* #!+sb-thread *stop-for-gc-pending*)))
+       (sb!unix::receive-pending-interrupt))))
 
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

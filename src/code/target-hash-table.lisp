@@ -14,30 +14,22 @@
 
 ;;;; utilities
 
-;; This stuff is performance critical and unwind-protect is too
-;; slow. And without the locking the next vector can get cyclic
-;; causing looping in a WITHOUT-GCING form, SHRINK-VECTOR can corrupt
-;; memory and who knows what else.
+;;; Without the locking the next vector can get cyclic causing
+;;; looping in a WITHOUT-GCING form, SHRINK-VECTOR can corrupt memory
+;;; and who knows what else.
+;;;
+;;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
 (defmacro with-spinlock-and-without-gcing ((spinlock) &body body)
   #!-sb-thread
   (declare (ignore spinlock))
-  (with-unique-names (old-gc-inhibit old-interrupts-enabled)
-    `(let ((,old-gc-inhibit *gc-inhibit*)
-           (,old-interrupts-enabled *interrupts-enabled*)
-           (*interrupts-enabled* nil)
-           (*gc-inhibit* t))
+  `(without-gcing
        (unwind-protect
             (progn
               #!+sb-thread
               (sb!thread::get-spinlock ,spinlock)
               ,@body)
          #!+sb-thread
-         (sb!thread::release-spinlock ,spinlock)
-         (let ((*interrupts-enabled* ,old-interrupts-enabled)
-               (*gc-inhibit* ,old-gc-inhibit))
-           ;; the test is racy, but it can err only on the overeager
-           ;; side
-           (sb!kernel::maybe-handle-pending-gc))))))
+         (sb!thread::release-spinlock ,spinlock))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))

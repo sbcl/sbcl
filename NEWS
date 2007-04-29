@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.6 relative to sbcl-1.0.5:
+  * bug fix: GETHASH, (SETF GETHASH), CLRHASH and REMHASH are now
+    interrupt safe.
+
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * incompatible change: removed writer methods for host-ent-name,
     host-ent-addresses -- changing the values did not update the DNS
