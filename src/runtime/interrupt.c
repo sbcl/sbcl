@@ -136,27 +136,6 @@ check_blockables_blocked_or_lose(void)
 }
 
 void
-check_gc_signals_unblocked_or_lose(void)
-{
-#ifdef LISP_FEATURE_SB_THREAD
-# if !defined(LISP_FEATURE_WIN32)
-    /* Get the current sigmask, by blocking the empty set. */
-    sigset_t empty,current;
-    sigemptyset(&empty);
-    thread_sigmask(SIG_BLOCK, &empty, &current);
-    if (sigismember(&current, SIG_STOP_FOR_GC))
-        lose("SIG_STOP_FOR_GC blocked in thread %p at a bad place\n",
-             arch_os_get_current_thread());
-#  if defined(SIG_RESUME_FROM_GC)
-    if (sigismember(&current, SIG_RESUME_FROM_GC))
-        lose("SIG_RESUME_FROM_GC blocked in thread %p at a bad place\n",
-             arch_os_get_current_thread());
-#  endif
-# endif
-#endif
-}
-
-void
 unblock_gc_signals(void)
 {
 #ifdef LISP_FEATURE_SB_THREAD

@@ -2468,8 +2468,17 @@ maybe_gc(os_context_t *context)
      */
 #ifndef LISP_FEATURE_WIN32
     if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL) {
-        thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-        check_gc_signals_unblocked_or_lose();
+        sigset_t *context_sigmask = os_context_sigmask_addr(context);
+        /* What if the context we'd like to restore has GC signals
+         * blocked? Just skip the GC: we can't set GC_PENDING, because
+         * that would block the next attempt, and we don't know when
+         * we'd next check for it -- and it's hard to be sure that
+         * unblocking would be safe. */
+        if (sigismember(context_sigmask,SIG_STOP_FOR_GC)) {
+            undo_fake_foreign_function_call(context);
+            return 1;
+        }
+        thread_sigmask(SIG_SETMASK, context_sigmask, 0);
     }
     else
         unblock_gc_signals();
