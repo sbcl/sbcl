@@ -786,6 +786,17 @@ error if any of PACKAGES is not a valid package designator."
                         string length hash ehash)
       (values symbol found))))
 
+(defun print-symbol-with-prefix (stream symbol colon at)
+  #!+sb-doc
+  "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
+  the current package."
+  (declare (ignore colon at))
+  ;; Only keywords should be accessible from the keyword package, and
+  ;; keywords are always printed with colons, so this guarantees that the
+  ;; symbol will not be printed without a prefix.
+  (let ((*package* *keyword-package*))
+    (write symbol :stream stream :escape t)))
+
 (define-condition name-conflict (reference-condition package-error)
   ((function :initarg :function :reader name-conflict-function)
    (datum :initarg :datum :reader name-conflict-datum)
@@ -794,7 +805,8 @@ error if any of PACKAGES is not a valid package designator."
   (:report
    (lambda (c s)
      (format s "~@<~S ~S causes name-conflicts in ~S between the ~
-                following symbols:~2I~@:_~{~S~^, ~}~:@>"
+                following symbols:~2I~@:_~
+                ~{~/sb-impl::print-symbol-with-prefix/~^, ~}~:@>"
              (name-conflict-function c)
              (name-conflict-datum c)
              (package-error-package c)
@@ -812,7 +824,9 @@ error if any of PACKAGES is not a valid package designator."
                (nlen (length (write-to-string len :base 10)))
                (*print-pretty* t))
           (format *query-io* "~&~@<Select a symbol to be made accessible in ~
-                              package ~A:~2I~@:_~{~{~V,' D. ~S~}~@:_~}~@:>"
+                              package ~A:~2I~@:_~{~{~V,' D. ~
+                              ~/sb-impl::print-symbol-with-prefix/~}~@:_~}~
+                              ~@:>"
                 (package-name package)
                 (loop for s in symbols
                       for i upfrom 1
