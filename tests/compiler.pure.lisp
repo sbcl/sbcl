@@ -2226,3 +2226,25 @@
                                       42)))
                 (unbound-variable ()
                   :error)))))
+
+;;; No compiler notes from compiling SUBSEQ SIMPLE-VECTOR.
+(handler-bind ((sb-ext:compiler-note 'error))
+  (assert
+   (equalp #(2 3)
+           (funcall (compile nil `(lambda (s p e)
+                                    (declare (optimize speed)
+                                             (simple-vector s))
+                                    (subseq s p e)))
+                    (vector 1 2 3 4)
+                    1
+                    3))))
+
+;;; No compiler notes from compiling COPY-SEQ SIMPLE-VECTOR.
+(handler-bind ((sb-ext:compiler-note 'error))
+  (assert
+   (equalp #(1 2 3 4)
+           (funcall (compile nil `(lambda (s)
+                                    (declare (optimize speed)
+                                             (simple-vector s))
+                                    (copy-seq s)))
+                    (vector 1 2 3 4)))))

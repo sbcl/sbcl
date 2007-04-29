@@ -890,10 +890,15 @@
            ((<= i ,src-offset))
          (declare (optimize (insert-array-bounds-checks 0)))
          (setf (aref ,dst (1- i)) (aref ,src (1- i))))
-      `(do ((i (+ ,src-offset ,length) (1- i))
+      ;; KLUDGE: The compiler is not able to derive that (+ offset
+      ;; length) must be a fixnum, but arrives at (unsigned-byte 29).
+      ;; We, however, know it must be so, as by this point the bounds
+      ;; have already been checked.
+      `(do ((i (truly-the fixnum (+ ,src-offset ,length)) (1- i))
             (j (+ ,dst-offset ,length) (1- j)))
            ((<= i ,src-offset))
-         (declare (optimize (insert-array-bounds-checks 0)))
+         (declare (optimize (insert-array-bounds-checks 0))
+                  (type (integer 0 #.sb!xc:array-dimension-limit) j i))
          (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
 
 (deftransform subseq ((seq start &optional end)
