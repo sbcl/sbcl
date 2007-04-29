@@ -98,8 +98,8 @@
   ;; output flushed, but not written due to non-blocking io?
   (output-later nil)
   (handler nil)
-  ;; timeout specified for this stream, or NIL if none
-  (timeout nil :type (or index null))
+  ;; timeout specified for this stream as seconds or NIL if none
+  (timeout nil :type (or single-float null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null))
   (external-format :default)
@@ -748,7 +748,8 @@
     (when (sysread-may-block-p stream)
       (unless (wait-until-fd-usable
                fd :input (fd-stream-timeout stream))
-        (error 'io-timeout :stream stream :direction :read)))
+        (signal-timeout 'io-timeout :stream stream :direction :read
+                        :seconds (fd-stream-timeout stream))))
     (multiple-value-bind (count errno)
         (sb!unix:unix-read fd
                            (int-sap (+ (sap-int ibuf-sap) tail))
@@ -758,7 +759,9 @@
                  (progn
                    (unless (wait-until-fd-usable
                             fd :input (fd-stream-timeout stream))
-                     (error 'io-timeout :stream stream :direction :read))
+                     (signal-timeout 'io-timeout
+                                     :stream stream :direction :read
+                                     :seconds (fd-stream-timeout stream)))
                    (refill-buffer/fd stream))
                  (simple-stream-perror "couldn't read from ~S" stream errno)))
             ((zerop count)
@@ -1972,6 +1975,19 @@
          (fd-stream-set-file-position fd-stream arg1)
          (fd-stream-get-file-position fd-stream)))))
 
+;; FIXME: Think about this.
+;;
+;; (defun finish-fd-stream-output (fd-stream)
+;;   (let ((timeout (fd-stream-timeout fd-stream)))
+;;     (loop while (fd-stream-output-later fd-stream)
+;;        ;; FIXME: SIGINT while waiting for a timeout will
+;;        ;; cause a timeout here.
+;;        do (when (and (not (serve-event timeout)) timeout)
+;;             (signal-timeout 'io-timeout
+;;                             :stream fd-stream
+;;                             :direction :write
+;;                             :seconds timeout)))))
+
 (defun finish-fd-stream-output (stream)
   (flush-output-buffer stream)
   (do ()
@@ -2096,7 +2112,7 @@
                                  (format nil "file ~A" file)
                                  (format nil "descriptor ~W" fd)))
                        auto-close)
-  (declare (type index fd) (type (or index null) timeout)
+  (declare (type index fd) (type (or real null) timeout)
            (type (member :none :line :full) buffering))
   (cond ((not (or input-p output-p))
          (setf input t))
@@ -2111,7 +2127,10 @@
                                  :buffering buffering
                                  :dual-channel-p dual-channel-p
                                  :external-format external-format
-                                 :timeout timeout)))
+                                 :timeout
+                                 (if timeout
+                                     (coerce timeout 'single-float)
+                                     nil))))
     (set-fd-stream-routines stream element-type external-format
                             input output input-buffer-p)
     (when (and auto-close (fboundp 'finalize))

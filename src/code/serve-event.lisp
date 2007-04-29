@@ -131,22 +131,11 @@
        (dolist (handler bogus-handlers)
          (setf (handler-bogus handler) nil)))
       (continue ()
-        :report "Go on, leaving handlers marked as bogus."))))
+        :report "Go on, leaving handlers marked as bogus.")))
+  nil)
+
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
-
-;;; Break a real timeout into seconds and microseconds.
-(defun decode-timeout (timeout)
-  (declare (values (or index null) index))
-  (typecase timeout
-    (integer (values timeout 0))
-    (null (values nil 0))
-    (real
-     (multiple-value-bind (q r) (truncate (coerce timeout 'single-float))
-       (declare (type index q) (single-float r))
-       (values q (the (values index t) (truncate (* r 1f6))))))
-    (t
-     (error "Timeout is not a real number or NIL: ~S" timeout))))
 
 ;;; Wait until FD is usable for DIRECTION. The timeout given to serve-event is
 ;;; recalculated each time through the loop so that WAIT-UNTIL-FD-USABLE will
@@ -155,97 +144,65 @@
 (defun wait-until-fd-usable (fd direction &optional timeout)
   #!+sb-doc
   "Wait until FD is usable for DIRECTION. DIRECTION should be either :INPUT or
-  :OUTPUT. TIMEOUT, if supplied, is the number of seconds to wait before giving
-  up."
-  (declare (type (or real null) timeout))
+:OUTPUT. TIMEOUT, if supplied, is the number of seconds to wait before giving
+up."
   (let (usable)
-    (multiple-value-bind (to-sec to-usec) (decode-timeout timeout)
-      (declare (type (or index null) to-sec to-usec))
-      (multiple-value-bind (stop-sec stop-usec)
-          (if to-sec
-              (multiple-value-bind (okay start-sec start-usec)
-                  (sb!unix:unix-gettimeofday)
-                (declare (ignore okay))
-                (let ((usec (+ to-usec start-usec))
-                      (sec (+ to-sec start-sec)))
-                  (declare (type (unsigned-byte 31) usec sec))
-                  (if (>= usec 1000000)
-                      (values (1+ sec) (- usec 1000000))
-                      (values sec usec))))
-              (values 0 0))
-        (declare (type (unsigned-byte 31) stop-sec stop-usec))
-        (with-fd-handler (fd direction (lambda (fd)
-                                         (declare (ignore fd))
-                                         (setf usable t)))
-          (loop
-            (sub-serve-event to-sec to-usec)
-
-            (when usable
-              (return t))
-
-            (when timeout
-              (multiple-value-bind (okay sec usec) (sb!unix:unix-gettimeofday)
-                (declare (ignore okay))
-                (when (or (> sec stop-sec)
-                          (and (= sec stop-sec) (>= usec stop-usec)))
-                  (return nil))
-                (setq to-sec (- stop-sec sec))
-                (cond ((> usec stop-usec)
-                       (decf to-sec)
-                       (setq to-usec (- (+ stop-usec 1000000) usec)))
-                      (t
-                       (setq to-usec (- stop-usec usec))))))))))))
+    (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
+        (decode-timeout timeout)
+      (declare (type (or integer null) to-sec to-usec))
+      (with-fd-handler (fd direction (lambda (fd)
+                                       (declare (ignore fd))
+                                       (setf usable t)))
+        (loop
+           (sub-serve-event to-sec to-usec signalp)
+           (when usable
+             (return t))
+           (when to-sec
+             (multiple-value-bind (sec usec)
+                 (decode-internal-time (get-internal-real-time))
+               (setf to-sec (- stop-sec sec))
+               (cond ((> usec stop-usec)
+                      (decf to-sec)
+                      (setf to-usec (- (+ stop-usec 1000000) usec)))
+                     (t
+                      (setf to-usec (- stop-usec usec)))))
+             (when (or (minusp to-sec) (minusp to-usec))
+               (if signalp
+                   (signal-deadline)
+                   (return nil)))))))))
 
 ;;; Wait for up to timeout seconds for an event to happen. Make sure all
 ;;; pending events are processed before returning.
 (defun serve-all-events (&optional timeout)
   #!+sb-doc
   "SERVE-ALL-EVENTS calls SERVE-EVENT with the specified timeout. If
-  SERVE-EVENT does something (returns T) it loops over SERVE-EVENT with timeout
-  0 until all events have been served. SERVE-ALL-EVENTS returns T if
-  SERVE-EVENT did something and NIL if not."
+SERVE-EVENT does something (returns T) it loops over SERVE-EVENT with a
+timeout of 0 until there are no more events to serve. SERVE-ALL-EVENTS returns
+T if SERVE-EVENT did something and NIL if not."
   (do ((res nil)
        (sval (serve-event timeout) (serve-event 0)))
       ((null sval) res)
     (setq res t)))
 
-;;; Serve a single event.
+;;; Serve a single set of events.
 (defun serve-event (&optional timeout)
   #!+sb-doc
-  "Receive on all ports and Xevents and dispatch to the appropriate handler
-  function. If timeout is specified, server will wait the specified time (in
-  seconds) and then return, otherwise it will wait until something happens.
-  Server returns T if something happened and NIL otherwise."
-  (multiple-value-bind (to-sec to-usec) (decode-timeout timeout)
-    (sub-serve-event to-sec to-usec)))
-
-;;; When a *periodic-polling-function* is defined the server will not
-;;; block for more than the maximum event timeout and will call the
-;;; polling function if it does time out.
-(declaim (type (or null function) *periodic-polling-function*))
-(defvar *periodic-polling-function* nil)
-(declaim (type (unsigned-byte 29) *max-event-to-sec* *max-event-to-usec*))
-(defvar *max-event-to-sec* 1)
-(defvar *max-event-to-usec* 0)
+  "Receive pending events on all FD-STREAMS and dispatch to the appropriate
+handler functions. If timeout is specified, server will wait the specified
+time (in seconds) and then return, otherwise it will wait until something
+happens. Server returns T if something happened and NIL otherwise. Timeout
+0 means polling without waiting."
+  (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
+      (decode-timeout timeout)
+    (declare (ignore stop-sec stop-usec))
+    (sub-serve-event to-sec to-usec signalp)))
 
 ;;; Takes timeout broken into seconds and microseconds.
-(defun sub-serve-event (to-sec to-usec)
-  (declare (type (or null (unsigned-byte 29)) to-sec to-usec))
+(defun sub-serve-event (to-sec to-usec deadlinep)
+  ;; Next, wait for something to happen.
+  (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
+                        (write-fds (sb!alien:struct sb!unix:fd-set)))
 
-  (let ((call-polling-fn nil))
-    (when (and *periodic-polling-function*
-               ;; Enforce a maximum timeout.
-               (or (null to-sec)
-                   (> to-sec *max-event-to-sec*)
-                   (and (= to-sec *max-event-to-sec*)
-                        (> to-usec *max-event-to-usec*))))
-      (setf to-sec *max-event-to-sec*)
-      (setf to-usec *max-event-to-usec*)
-      (setf call-polling-fn t))
-
-    ;; Next, wait for something to happen.
-    (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
-                          (write-fds (sb!alien:struct sb!unix:fd-set)))
       (sb!unix:fd-zero read-fds)
       (sb!unix:fd-zero write-fds)
       (let ((count 0))
@@ -266,37 +223,40 @@
                  (setf count fd))))))
         (incf count)
 
-        (multiple-value-bind (value err)
-            (sb!unix:unix-fast-select count
-                                      (sb!alien:addr read-fds)
-                                      (sb!alien:addr write-fds)
-                                      nil to-sec to-usec)
-          #!+win32 (declare (ignorable err))
-          (cond ((eql 0 value)
-                 ;; Timed out.
-                 (when call-polling-fn
-                   (funcall *periodic-polling-function*)))
-                (value
-                 ;; Call file descriptor handlers according to the
-                 ;; readable and writable masks returned by select.
-                 (dolist (handler
-                           (select-descriptor-handlers
-                            (lambda (handler)
-                              (let ((fd (handler-descriptor handler)))
-                                (ecase (handler-direction handler)
-                                  (:input (sb!unix:fd-isset fd read-fds))
-                                  (:output (sb!unix:fd-isset fd write-fds)))))))
-                   (funcall (handler-function handler)
-                            (handler-descriptor handler)))
-                 t)
-                #!-win32
-                ((eql err sb!unix:eintr)
-                 ;; We did an interrupt.
-                 ;;
-                 ;; FIXME: Why T here?
-                 t)
-                (t
-                 ;; One of the file descriptors is bad.
-                 (handler-descriptors-error)
-                 nil)))))))
-
+      ;; Next, wait for something to happen.
+      (multiple-value-bind (value err)
+          (sb!unix:unix-fast-select count
+                                    (sb!alien:addr read-fds)
+                                    (sb!alien:addr write-fds)
+                                    nil to-sec to-usec)
+        #!+win32
+        (declare (ignore err))
+        ;; Now see what it was (if anything)
+        (cond ((not value)
+               ;; Interrupted or one of the file descriptors is bad.
+               ;; FIXME: Check for other errnos. Why do we return true
+               ;; when interrupted?
+               #!-win32
+               (if (eql err sb!unix:eintr)
+                   t
+                 (handler-descriptors-error))
+               #!+win32
+               (handler-descriptors-error))
+              ((plusp value)
+               ;; Got something. Call file descriptor handlers
+               ;; according to the readable and writable masks
+               ;; returned by select.
+               (dolist (handler
+                        (select-descriptor-handlers
+                         (lambda (handler)
+                           (let ((fd (handler-descriptor handler)))
+                             (ecase (handler-direction handler)
+                               (:input (sb!unix:fd-isset fd read-fds))
+                               (:output (sb!unix:fd-isset fd write-fds)))))))
+                 (funcall (handler-function handler)
+                          (handler-descriptor handler)))
+               t)
+              ((zerop value)
+               (when deadlinep
+                 (signal-deadline))
+               nil))))))

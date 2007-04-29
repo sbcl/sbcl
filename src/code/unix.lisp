@@ -533,29 +533,52 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 ;;;; sys/select.h
 
+(defvar *on-dangerous-select* :warn)
+
+;;; Calling select in a bad place can hang in a nasty manner, so it's better
+;;; to have some way to detect these.
+(defun note-dangerous-select ()
+  (let ((action *on-dangerous-select*)
+        (*on-dangerous-select* nil))
+    (case action
+      (:warn
+       (warn "Starting a select without a timeout while interrupts are ~
+             disabled."))
+      (:error
+       (error "Starting a select without a timeout while interrupts are ~
+              disabled."))
+      (:backtrace
+       (write-line
+        "=== Starting a select without a timeout while interrupts are disabled. ==="
+        *debug-io*)
+       (sb!debug:backtrace)))
+    nil))
+
 ;;;; FIXME: Why have both UNIX-SELECT and UNIX-FAST-SELECT?
 
 ;;; Perform the UNIX select(2) system call.
-(declaim (inline unix-fast-select)) ; (used to be a macro in CMU CL)
+(declaim (inline unix-fast-select))
 (defun unix-fast-select (num-descriptors
                          read-fds write-fds exception-fds
-                         timeout-secs &optional (timeout-usecs 0))
+                         timeout-secs timeout-usecs)
   (declare (type (integer 0 #.fd-setsize) num-descriptors)
            (type (or (alien (* (struct fd-set))) null)
                  read-fds write-fds exception-fds)
-           (type (or null (unsigned-byte 31)) timeout-secs)
-           (type (unsigned-byte 31) timeout-usecs))
-  ;; FIXME: CMU CL had
-  ;;   (declare (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
-  ;; here. Is that important for SBCL? If so, why? Profiling might tell us..
-  (with-alien ((tv (struct timeval)))
-    (when timeout-secs
-      (setf (slot tv 'tv-sec) timeout-secs)
-      (setf (slot tv 'tv-usec) timeout-usecs))
-    (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-                  (* (struct fd-set)) (* (struct timeval)))
-                 num-descriptors read-fds write-fds exception-fds
-                 (if timeout-secs (alien-sap (addr tv)) (int-sap 0)))))
+           (type (or null (unsigned-byte 31)) timeout-secs timeout-usecs))
+  (flet ((select (tv-sap)
+           (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+                                  (* (struct fd-set)) (* (struct timeval)))
+                        num-descriptors read-fds write-fds exception-fds
+                        tv-sap)))
+    (cond ((or timeout-secs timeout-usecs)
+           (with-alien ((tv (struct timeval)))
+             (setf (slot tv 'tv-sec) (or timeout-secs 0))
+             (setf (slot tv 'tv-usec) (or timeout-usecs 0))
+             (select (alien-sap (addr tv)))))
+          (t
+           (unless *interrupts-enabled*
+             (note-dangerous-select))
+           (select (int-sap 0))))))
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
@@ -595,9 +618,11 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                (rdf (struct fd-set))
                (wrf (struct fd-set))
                (xpf (struct fd-set)))
-    (when to-secs
-      (setf (slot tv 'tv-sec) to-secs)
-     (setf (slot tv 'tv-usec) to-usecs))
+    (cond (to-secs
+           (setf (slot tv 'tv-sec) to-secs
+                 (slot tv 'tv-usec) to-usecs))
+          ((not *interrupts-enabled*)
+           (note-dangerous-select)))
     (num-to-fd-set rdf rdfds)
     (num-to-fd-set wrf wrfds)
     (num-to-fd-set xpf xpfds)
@@ -606,7 +631,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                       (int-sap 0)
                       (alien-sap (addr ,alienvar)))))
       (syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-                (* (struct fd-set)) (* (struct timeval)))
+                         (* (struct fd-set)) (* (struct timeval)))
                (values result
                        (fd-set-to-num nfds rdf)
                        (fd-set-to-num nfds wrf)
@@ -970,12 +995,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (/ 1000000 sb!xc:internal-time-units-per-second))
 
   (declaim (inline system-internal-run-time
-                   internal-real-time-values))
+                   system-real-time-values))
 
-  (defun internal-real-time-values ()
-    (multiple-value-bind (ignore seconds useconds) (unix-gettimeofday)
-      (declare (ignore ignore) (type (unsigned-byte 32) seconds useconds))
-      (values seconds (truncate useconds micro-seconds-per-internal-time-unit))))
+  (defun system-real-time-values ()
+    (multiple-value-bind (_ sec usec) (unix-gettimeofday)
+      (declare (ignore _) (type (unsigned-byte 32) sec usec))
+      (values sec (truncate usec micro-seconds-per-internal-time-unit))))
 
   ;; There are two optimizations here that actually matter (on 32-bit
   ;; systems): substract the epoch from seconds and milliseconds
@@ -1003,16 +1028,17 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
              (type fixnum e-msec c-msec)
              (type unsigned-byte now))
     (defun reinit-internal-real-time ()
-      (setf (values e-sec e-msec) (internal-real-time-values)
+      (setf (values e-sec e-msec) (system-real-time-values)
             c-sec 0
             c-msec 0))
     ;; If two threads call this at the same time, we're still safe, I believe,
     ;; as long as NOW is updated before either of C-MSEC or C-SEC. Same applies
     ;; to interrupts. --NS
     (defun get-internal-real-time ()
-      (multiple-value-bind (sec msec) (internal-real-time-values)
+      (multiple-value-bind (sec msec) (system-real-time-values)
         (unless (and (= msec c-msec) (= sec c-sec))
-          (setf now (+ (* (- sec e-sec) sb!xc:internal-time-units-per-second)
+          (setf now (+ (* (- sec e-sec)
+                          sb!xc:internal-time-units-per-second)
                        (- msec e-msec))
                 c-msec msec
                 c-sec sec))

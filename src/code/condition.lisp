@@ -1147,7 +1147,11 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                (reader-error-format-arguments condition)
                (reader-impossible-number-error-error condition))))))
 
-(define-condition timeout (serious-condition) ())
+(define-condition timeout (serious-condition)
+  ((seconds :initarg :seconds :initform nil :reader timeout-seconds))
+  (:report (lambda (condition stream)
+             (format stream "Timeout occurred~@[ after ~A seconds~]."
+                     (timeout-seconds condition)))))
 
 (define-condition io-timeout (stream-error timeout)
   ((direction :reader io-timeout-direction :initarg :direction))
@@ -1155,9 +1159,14 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (declare (type stream stream))
      (format stream
-             "I/O timeout ~(~A~)ing ~S"
+             "I/O timeout ~(~A~)ing ~S."
              (io-timeout-direction condition)
              (stream-error-stream condition)))))
+
+(define-condition deadline-timeout (timeout) ()
+  (:report (lambda (condition stream)
+             (format stream "A deadline was reached after ~A seconds."
+                     (timeout-seconds condition)))))
 
 (define-condition declaration-type-conflict-error (reference-condition
                                                    simple-error)

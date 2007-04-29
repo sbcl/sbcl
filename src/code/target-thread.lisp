@@ -163,7 +163,8 @@ in future versions."
     (declaim (inline futex-wait futex-wake))
 
     (sb!alien:define-alien-routine "futex_wait"
-        int (word unsigned-long) (old-value unsigned-long))
+        int (word unsigned-long) (old-value unsigned-long)
+        (to-sec long) (to-usec unsigned-long))
 
     (sb!alien:define-alien-routine "futex_wake"
         int (word unsigned-long) (n unsigned-long))))
@@ -231,47 +232,53 @@ in future versions."
       :structure mutex
       :slot value))
 
-(defun get-mutex (mutex &optional (new-value *current-thread*) (wait-p t))
+(defun get-mutex (mutex &optional (new-value *current-thread*) (waitp t))
   #!+sb-doc
   "Acquire MUTEX, setting it to NEW-VALUE or some suitable default
-value if NIL. If WAIT-P is non-NIL and the mutex is in use, sleep
+value if NIL. If WAITP is non-NIL and the mutex is in use, sleep
 until it is available."
   (declare (type mutex mutex) (optimize (speed 3)))
   (/show0 "Entering GET-MUTEX")
   (unless new-value
     (setq new-value *current-thread*))
   #!-sb-thread
-  (let ((old-value (mutex-value mutex)))
-    (when (and old-value wait-p)
-      (error "In unithread mode, mutex ~S was requested with WAIT-P ~S and ~
+  (let ((old (mutex-value mutex)))
+    (when (and old waitp)
+      (error "In unithread mode, mutex ~S was requested with WAITP ~S and ~
               new-value ~S, but has already been acquired (with value ~S)."
-             mutex wait-p new-value old-value))
+             mutex waitp new-value old))
     (setf (mutex-value mutex) new-value)
     t)
   #!+sb-thread
-  (progn
-    (when (eql new-value (mutex-value mutex))
-      (warn "recursive lock attempt ~S~%" mutex)
-      (format *debug-io* "Thread: ~A~%" *current-thread*)
-      (sb!debug:backtrace most-positive-fixnum *debug-io*)
-      (force-output *debug-io*))
-    #!+sb-lutex
-    (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
-                   (if wait-p
-                       (%lutex-lock lutex)
-                       (%lutex-trylock lutex))))
-      (setf (mutex-value mutex) new-value))
-    #!-sb-lutex
-    (let (old)
-      (loop
-         (unless
-             (setf old
-                   (compare-and-swap-mutex-value mutex nil new-value))
-           (return t))
-         (unless wait-p (return nil))
-         (with-pinned-objects (mutex old)
-           (futex-wait (mutex-value-address mutex)
-                       (get-lisp-obj-address old)))))))
+  (when (eql new-value (mutex-value mutex))
+    (warn "recursive lock attempt ~S~%" mutex)
+    (format *debug-io* "Thread: ~A~%" *current-thread*)
+    (sb!debug:backtrace most-positive-fixnum *debug-io*)
+    (force-output *debug-io*))
+  ;; FIXME: Lutexes do not currently support deadlines, as at least
+  ;; on Darwin pthread_foo_timedbar functions are not supported:
+  ;; this means that we probably need to use the Carbon multiprocessing
+  ;; functions on Darwin.
+  #!+sb-lutex
+  (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
+                 (if waitp
+                     (%lutex-lock lutex)
+                     (%lutex-trylock lutex))))
+    (setf (mutex-value mutex) new-value))
+  #!-sb-lutex
+  (let (old)
+    (when (and (setf old (compare-and-exchange-mutex-value mutex nil new-value))
+               waitp)
+      (loop while old
+            do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+                 (when (= 1 (with-pinned-objects (mutex old)
+                              (futex-wait (mutex-value-address mutex)
+                                          (get-lisp-obj-address old)
+                                          (or to-sec -1)
+                                          (or to-usec 0))))
+                   (signal-deadline)))
+            (setf old (compare-and-exchange-mutex-value mutex nil new-value))))
+    (not old)))
 
 (defun release-mutex (mutex)
   #!+sb-doc
@@ -342,10 +349,15 @@ time we reacquire MUTEX and return to the caller."
            ;; manages to grab MUTEX and call CONDITION-NOTIFY during
            ;; this comment, it will change queue->data, and so
            ;; futex-wait returns immediately instead of sleeping.
-           ;; Ergo, no lost wakeup
-           (with-pinned-objects (queue me)
-             (futex-wait (waitqueue-data-address queue)
-                         (get-lisp-obj-address me))))
+           ;; Ergo, no lost wakeup. We may get spurious wakeups,
+           ;; but that's ok.
+           (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+             (when (= 1 (with-pinned-objects (queue me)
+                          (futex-wait (waitqueue-data-address queue)
+                                      (get-lisp-obj-address me)
+                                      (or to-sec -1) ;; our way if saying "no timeout"
+                                      (or to-usec 0))))
+               (signal-deadline))))
       ;; If we are interrupted while waiting, we should do these things
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is

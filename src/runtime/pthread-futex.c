@@ -206,7 +206,7 @@ futex_relative_to_abs(struct timespec *tp, int relative)
 }
 
 int
-futex_wait(int *lock_word, int oldval)
+futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
     int ret, result;
     struct futex *futex;

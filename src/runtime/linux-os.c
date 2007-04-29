@@ -82,21 +82,30 @@ static inline int sys_futex (void *futex, int op, int val, struct timespec *rel)
 }
 
 int
-futex_wait(int *lock_word, int oldval)
+futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
-    int t;
-  again:
+  struct timespec timeout;
+  int t;
+
+ again:
+  if (sec<0) {
     t = sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
-
-    /* Interrupted FUTEX_WAIT calls may return early.
-     *
-     * If someone manages to wake the futex while we're spinning
-     * around it, we will just return with -1 and errno EWOULDBLOCK,
-     * because the value has changed, so that's ok. */
-    if (t != 0 && errno == EINTR)
-        goto again;
-
-    return t;
+  }
+  else {
+    timeout.tv_sec = sec;
+    timeout.tv_nsec = usec * 1000;
+    t = sys_futex(lock_word,FUTEX_WAIT,oldval, &timeout);
+  }
+  if (t==0)
+      return 0;
+  else if (errno==ETIMEDOUT)
+      return 1;
+  else if (errno==EINTR)
+      /* spurious wakeup from interrupt */
+      goto again;
+  else
+      /* EWOULDBLOCK and others, need to check the lock */
+      return -1;
 }
 
 int
@@ -172,7 +181,7 @@ os_init(char *argv[], char *envp[])
     }
 #ifdef LISP_FEATURE_SB_THREAD
 #if !defined(LISP_FEATURE_SB_LUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
-    futex_wait(futex,-1);
+    futex_wait(futex,-1,-1,0);
     if(errno==ENOSYS) {
        lose("This version of SBCL is compiled with threading support, but your kernel\n"
             "is too old to support this. Please use a more recent kernel or\n"

@@ -456,7 +456,7 @@
 ;;; keywords specify the initial values for various optimizers that
 ;;; the function might have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
-                    &rest keys)
+                    &body keys)
   (when (and (intersection attributes '(any call unwind))
              (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))

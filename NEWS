@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
+  * enhancement: a new, experimental synchronous timeout facility is
+    provided. Refer to SB-SYS:WITH-DEADLINE for details.
   * enhancement: when a symbol name conflict error arises, the
     conflicting symbols are always printed with a package prefix.
     (thanks to Kevin Reid)

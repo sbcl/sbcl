@@ -16,9 +16,9 @@
 ;;;; information for known functions:
 
 (defknown coerce (t type-specifier) t
-  ;; Note:
-  ;; This is not FLUSHABLE because it's defined to signal errors.
-  (movable)
+    ;; Note:
+    ;; This is not FLUSHABLE because it's defined to signal errors.
+    (movable)
   ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
   ;; returns REAL/INTEGER, not COMPLEX.
   )
@@ -29,8 +29,8 @@
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (sb!xc:upgraded-complex-part-type sb!xc:upgraded-array-element-type)
-          (type-specifier &optional lexenv-designator) type-specifier
-  (unsafely-flushable))
+    (type-specifier &optional lexenv-designator) type-specifier
+    (unsafely-flushable))
 
 ;;;; from the "Predicates" chapter:
 
