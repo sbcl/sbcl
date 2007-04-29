@@ -183,8 +183,8 @@ in future versions."
 
 ;;;; spinlocks
 #!+sb-thread
-(define-structure-slot-compare-and-exchange
-    compare-and-exchange-spinlock-value
+(define-structure-slot-compare-and-swap
+    compare-and-swap-spinlock-value
     :structure spinlock
     :slot value)
 
@@ -198,14 +198,14 @@ in future versions."
   ;; store any value
   #!+sb-thread
   (loop until
-       (eql 0 (compare-and-exchange-spinlock-value spinlock 0 1)))
+       (eql 0 (compare-and-swap-spinlock-value spinlock 0 1)))
   t)
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0))
            #!-sb-thread (ignore spinlock))
   ;; %instance-set-conditional cannot compare arbitrary objects
-  ;; meaningfully, so (compare-and-exchange-spinlock-value our-value 0)
+  ;; meaningfully, so (compare-and-swap-spinlock-value our-value 0)
   ;; does not work for bignum thread ids.
   #!+sb-thread
   (setf (spinlock-value spinlock) 0)
@@ -226,8 +226,8 @@ in future versions."
   (define-structure-slot-addressor mutex-value-address
       :structure mutex
       :slot value)
-  (define-structure-slot-compare-and-exchange
-      compare-and-exchange-mutex-value
+  (define-structure-slot-compare-and-swap
+      compare-and-swap-mutex-value
       :structure mutex
       :slot value))
 
@@ -266,7 +266,7 @@ until it is available."
       (loop
          (unless
              (setf old
-                   (compare-and-exchange-mutex-value mutex nil new-value))
+                   (compare-and-swap-mutex-value mutex nil new-value))
            (return t))
          (unless wait-p (return nil))
          (with-pinned-objects (mutex old)

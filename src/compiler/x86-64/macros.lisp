@@ -354,6 +354,30 @@
 
 ;;;; indexed references
 
+(defmacro define-full-compare-and-swap
+    (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+         ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg) :to :eval)
+              (index :scs (any-reg) :to :result)
+              (old-value :scs ,scs :target rax)
+              (new-value :scs ,scs))
+       (:arg-types ,type tagged-num ,el-type ,el-type)
+       (:temporary (:sc descriptor-reg :offset rax-offset
+                        :from (:argument 2) :to :result :target value)  rax)
+       (:results (value :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 5
+         (move rax old-value)
+         #!+sb-thread
+         (inst lock)
+         (inst cmpxchg (make-ea :qword :base object :index index
+                                :disp (- (* ,offset n-word-bytes) ,lowtag))
+               new-value)
+         (move value rax)))))
+
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)

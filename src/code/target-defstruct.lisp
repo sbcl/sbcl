@@ -31,6 +31,15 @@
 (defun %instance-set (instance index new-value)
   (setf (%instance-ref instance index) new-value))
 
+(defun %instance-compare-and-swap (instance index old new)
+  #!+(or x86 x86-64)
+  (%instance-compare-and-swap instance index old new)
+  #!-(or x86 x86-64)
+  (let ((n-old (%instance-ref instance index)))
+    (when (eq old n-old)
+      (%instance-set instance index new))
+    n-old))
+
 #!-hppa
 (progn
   (defun %raw-instance-ref/word (instance index)

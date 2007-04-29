@@ -49,7 +49,7 @@
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
 #!+sb-thread
-(defmacro define-structure-slot-compare-and-exchange
+(defmacro define-structure-slot-compare-and-swap
     (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
          (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
@@ -57,12 +57,16 @@
          (index (when slotd (dsd-index slotd))))
     (unless index
       (error "Slot ~S not found in ~S." slot structure))
+    (unless (eq t (dsd-raw-type slotd))
+      (error "Cannot define compare-and-swap on a raw slot."))
+    (when (dsd-read-only slotd)
+      (error "Cannot define compare-and-swap on a read-only slot."))
     `(progn
        (declaim (inline ,name))
        (defun ,name (instance old new)
          (declare (type ,structure instance)
-                  (type ,type new))
-         (sb!vm::%instance-set-conditional instance ,index old new)))))
+                  (type ,type old new))
+         (%instance-compare-and-swap instance ,index old new)))))
 
 ;;; Ditto
 #!+sb-thread

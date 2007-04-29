@@ -154,6 +154,11 @@
       signed-num signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
     unsigned-reg))
+
+(define-full-compare-and-swap simple-vector-compare-and-swap
+    simple-vector vector-data-offset other-pointer-lowtag
+    (descriptor-reg any-reg) *
+    %simple-vector-compare-and-swap)
 
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors

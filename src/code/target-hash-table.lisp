@@ -23,13 +23,13 @@
   #!-sb-thread
   (declare (ignore spinlock))
   `(without-gcing
-       (unwind-protect
-            (progn
-              #!+sb-thread
-              (sb!thread::get-spinlock ,spinlock)
-              ,@body)
-         #!+sb-thread
-         (sb!thread::release-spinlock ,spinlock))))
+     (unwind-protect
+          (progn
+            #!+sb-thread
+            (sb!thread::get-spinlock ,spinlock)
+            ,@body)
+       #!+sb-thread
+       (sb!thread::release-spinlock ,spinlock))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))
