@@ -185,52 +185,57 @@ run in any thread.")
               (sb!thread::mutex-value *already-in-gc*))
     ;; With gencgc, unless *GC-PENDING* every allocation in this
     ;; function triggers another gc, potentially exceeding maximum
-    ;; interrupt nesting.
-    (setq *gc-pending* t)
-    (unless *gc-inhibit*
-      (sb!thread:with-mutex (*already-in-gc*)
-        (let ((old-usage (dynamic-usage))
-              (new-usage 0))
-          (unsafe-clear-roots)
-          ;; We need to disable interrupts for GC, but we also want
-          ;; to run as little as possible without them.
-          (without-interrupts
-            (gc-stop-the-world)
-            (let ((start-time (get-internal-run-time)))
-              (collect-garbage gen)
-              (incf *gc-run-time*
-                    (- (get-internal-run-time) start-time)))
-            (setf *gc-pending* nil
-                  new-usage (dynamic-usage))
-            (gc-start-the-world))
-          ;; Interrupts re-enabled, but still inside the mutex.
-          ;; In a multithreaded environment the other threads will
-          ;; see *n-b-f-o-p* change a little late, but that's OK.
-          (let ((freed (- old-usage new-usage)))
-            ;; GENCGC occasionally reports negative here, but the
-            ;; current belief is that it is part of the normal order
-            ;; of things and not a bug.
-            (when (plusp freed)
-              (incf *n-bytes-freed-or-purified* freed)))))
-      ;; Outside the mutex, these may cause another GC. FIXME: it can
-      ;; potentially exceed maximum interrupt nesting by triggering
-      ;; GCs.
-      ;;
-      ;; Can that be avoided by having the finalizers and hooks run only
-      ;; from the outermost SUB-GC?
-      ;;
-      ;; KLUDGE: Don't run the hooks in GC's triggered by dying threads,
-      ;; so that user-code never runs with
-      ;;   (thread-alive-p *current-thread*) => nil
-      ;; The long-term solution will be to keep a separate thread for
-      ;; finalizers and after-gc hooks.
-      (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
-        (run-pending-finalizers)
-        (dolist (hook *after-gc-hooks*)
-          (handler-case
-              (funcall hook)
-            (error (c)
-              (warn "Error calling after-GC hook ~S:~% ~A" hook c))))))))
+    ;; interrupt nesting. If *GC-INHIBIT* is not true, however,
+    ;; there is no guarantee that we would ever check for pending
+    ;; GC -- so in that case we must first disable interrupts, which
+    ;; needs to be done for GC anyways...
+    (cond (*gc-inhibit*
+           (setf *gc-pending* t))
+          (t
+           (without-interrupts
+             (setf *gc-pending* t)
+             (sb!thread:with-mutex (*already-in-gc*)
+               (let ((old-usage (dynamic-usage))
+                     (new-usage 0))
+                 (unsafe-clear-roots)
+
+                 (gc-stop-the-world)
+                 (let ((start-time (get-internal-run-time)))
+                   (collect-garbage gen)
+                   (incf *gc-run-time*
+                         (- (get-internal-run-time) start-time)))
+                 (setf *gc-pending* nil
+                       new-usage (dynamic-usage))
+                 (gc-start-the-world)
+
+                 ;; In a multithreaded environment the other threads will
+                 ;; see *n-b-f-o-p* change a little late, but that's OK.
+                 (let ((freed (- old-usage new-usage)))
+                   ;; GENCGC occasionally reports negative here, but the
+                   ;; current belief is that it is part of the normal order
+                   ;; of things and not a bug.
+                   (when (plusp freed)
+                     (incf *n-bytes-freed-or-purified* freed))))))
+
+           ;; Outside the mutex, interrupts enabled: these may cause
+           ;; another GC. FIXME: it can potentially exceed maximum
+           ;; interrupt nesting by triggering GCs.
+           ;;
+           ;; Can that be avoided by having the finalizers and hooks
+           ;; run only from the outermost SUB-GC?
+           ;;
+           ;; KLUDGE: Don't run the hooks in GC's triggered by dying
+           ;; threads, so that user-code never runs with
+           ;;   (thread-alive-p *current-thread*) => nil
+           ;; The long-term solution will be to keep a separate thread
+           ;; for finalizers and after-gc hooks.
+           (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
+             (run-pending-finalizers)
+             (dolist (hook *after-gc-hooks*)
+               (handler-case
+                   (funcall hook)
+                 (serious-condition (c)
+                   (warn "Error calling after-GC hook ~S:~% ~A" hook c)))))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)

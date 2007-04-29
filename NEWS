@@ -14,6 +14,8 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
     declared ignored.
   * bug fix: DEFSETF lambda lists without &ENVIRONMENT no longer cause
     a STYLE-WARNING to be signalled (regression from 1.0.4.)
+  * bug fix: an asynchronous interrupt could previously leave the
+    system running with GC inhibited.
 
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * incompatible change: removed writer methods for host-ent-name,
