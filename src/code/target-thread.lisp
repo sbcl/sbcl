@@ -250,35 +250,36 @@ until it is available."
     (setf (mutex-value mutex) new-value)
     t)
   #!+sb-thread
-  (when (eql new-value (mutex-value mutex))
-    (warn "recursive lock attempt ~S~%" mutex)
-    (format *debug-io* "Thread: ~A~%" *current-thread*)
-    (sb!debug:backtrace most-positive-fixnum *debug-io*)
-    (force-output *debug-io*))
-  ;; FIXME: Lutexes do not currently support deadlines, as at least
-  ;; on Darwin pthread_foo_timedbar functions are not supported:
-  ;; this means that we probably need to use the Carbon multiprocessing
-  ;; functions on Darwin.
-  #!+sb-lutex
-  (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
-                 (if waitp
-                     (%lutex-lock lutex)
-                     (%lutex-trylock lutex))))
-    (setf (mutex-value mutex) new-value))
-  #!-sb-lutex
-  (let (old)
-    (when (and (setf old (compare-and-exchange-mutex-value mutex nil new-value))
-               waitp)
-      (loop while old
-            do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
-                 (when (= 1 (with-pinned-objects (mutex old)
-                              (futex-wait (mutex-value-address mutex)
-                                          (get-lisp-obj-address old)
-                                          (or to-sec -1)
-                                          (or to-usec 0))))
-                   (signal-deadline)))
-            (setf old (compare-and-exchange-mutex-value mutex nil new-value))))
-    (not old)))
+  (progn
+    (when (eql new-value (mutex-value mutex))
+      (warn "recursive lock attempt ~S~%" mutex)
+      (format *debug-io* "Thread: ~A~%" *current-thread*)
+      (sb!debug:backtrace most-positive-fixnum *debug-io*)
+      (force-output *debug-io*))
+    ;; FIXME: Lutexes do not currently support deadlines, as at least
+    ;; on Darwin pthread_foo_timedbar functions are not supported:
+    ;; this means that we probably need to use the Carbon multiprocessing
+    ;; functions on Darwin.
+    #!+sb-lutex
+    (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
+                   (if waitp
+                       (%lutex-lock lutex)
+                       (%lutex-trylock lutex))))
+      (setf (mutex-value mutex) new-value))
+    #!-sb-lutex
+    (let (old)
+      (when (and (setf old (compare-and-exchange-mutex-value mutex nil new-value))
+                 waitp)
+        (loop while old
+              do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+                   (when (= 1 (with-pinned-objects (mutex old)
+                                (futex-wait (mutex-value-address mutex)
+                                            (get-lisp-obj-address old)
+                                            (or to-sec -1)
+                                            (or to-usec 0))))
+                     (signal-deadline)))
+              (setf old (compare-and-exchange-mutex-value mutex nil new-value))))
+      (not old))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
