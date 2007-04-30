@@ -4,6 +4,7 @@
 @settitle SBCL User Manual
 @c %**end of header
 
+@include texinfo-macros.texinfo
 @include variables.texinfo
 @set EDITION 0.1
 @settitle SBCL @value{VERSION} User Manual 

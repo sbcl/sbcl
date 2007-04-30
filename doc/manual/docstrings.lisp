@@ -702,7 +702,7 @@ followed another tabulation label or a tabulation body."
   (when (member (get-kind doc) '(class structure condition))
     (let ((name (get-name doc)))
       ;; class precedence list
-      (format *texinfo-output* "Class precedence list: @code{~(~{@w{~A}~^, ~}~)}~%~%"
+      (format *texinfo-output* "Class precedence list: @code{~(~{@lw{~A}~^, ~}~)}~%~%"
               (remove-if (lambda (class)  (hide-superclass-p name class))
                          (mapcar #'class-name (ensure-class-precedence-list (find-class name)))))
       ;; slots

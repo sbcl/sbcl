@@ -48,7 +48,7 @@ character input streams must implement @codew{stream-read-char} and
 
 @group
 (defclass wrapped-character-input-stream
-    (wrapped-stream fundamental-character-output-stream)
+    (wrapped-stream fundamental-character-input-stream)
   ())
 @end group
 
