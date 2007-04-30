@@ -32,8 +32,7 @@
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
-                                         (purify #!+gencgc nil
-                                                 #!-gencgc t)
+                                         (purify t)
                                          (root-structures ())
                                          (environment-name "auxiliary")
                                          (executable nil))
@@ -61,9 +60,8 @@ The following &KEY arguments are defined:
      somewhat longer than the normal GC which is otherwise done, but
      it's only done once, and subsequent GC's will be done less often
      and will take less time in the resulting core file. See the PURIFY
-     function. For platforms that use the generational garbage collector
-     (x86 and x86-64) purification generally results in a loss of
-     performance.
+     function. This parameter has no effect on platforms using the
+     generational garbage collector.
 
   :ROOT-STRUCTURES
      This should be a list of the main entry points in any newly loaded
@@ -108,6 +106,8 @@ This implementation is not as polished and painless as you might like:
 This isn't because we like it this way, but just because there don't
 seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
+  #!+gencgc
+  (declare (ignore purify root-structures environment-name))
   (tune-hashtable-sizes-of-all-packages)
   (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this
@@ -135,7 +135,8 @@ sufficiently motivated to do lengthy fixes."
     ;; access to it even after the GC has moved it.
     #!+gencgc
     (setf sb!vm::*restart-lisp-function* #'restart-lisp)
-    (cond (purify
+    (cond #!-gencgc
+          (purify
            (purify :root-structures root-structures
                    :environment-name environment-name)
            (save-core nil))

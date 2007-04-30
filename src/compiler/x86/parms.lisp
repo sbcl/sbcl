@@ -157,104 +157,103 @@
 (progn
 
   (def!constant read-only-space-start #x02000000)
-  (def!constant read-only-space-end   #x047ff000)
+  (def!constant read-only-space-end   #x020ff000)
 
-  (def!constant static-space-start    #x05000000)
-  (def!constant static-space-end      #x07fff000)
+  (def!constant static-space-start    #x02100000)
+  (def!constant static-space-end      #x021ff000)
 
   (def!constant dynamic-space-start   #x09000000)
   (def!constant dynamic-space-end     #x29000000)
 
-  (def!constant linkage-table-space-start #x30000000)
-  (def!constant linkage-table-space-end   #x40000000))
+  (def!constant linkage-table-space-start #x02200000)
+  (def!constant linkage-table-space-end   #x022ff000))
 
 #!+linux
 (progn
   (def!constant read-only-space-start     #x01000000)
-  (def!constant read-only-space-end       #x037ff000)
+  (def!constant read-only-space-end       #x010ff000)
 
-  (def!constant static-space-start        #x05000000)
-  (def!constant static-space-end          #x07fff000)
+  (def!constant static-space-start        #x01100000)
+  (def!constant static-space-end          #x011ff000)
 
   (def!constant dynamic-space-start       #x09000000)
   (def!constant dynamic-space-end         #x29000000)
 
-  (def!constant linkage-table-space-start #x70000000)
-  (def!constant linkage-table-space-end   #x7ffff000))
+  (def!constant linkage-table-space-start #x01200000)
+  (def!constant linkage-table-space-end   #x012ff000))
 
 #!+sunos
 (progn
   (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x2ffff000)
+  (def!constant read-only-space-end       #x200ff000)
 
-  (def!constant static-space-start        #x40000000)
-  (def!constant static-space-end          #x42fff000)
+  (def!constant static-space-start        #x20100000)
+  (def!constant static-space-end          #x201ff000)
 
   (def!constant dynamic-space-start       #x48000000)
   (def!constant dynamic-space-end         #xA0000000)
 
-  (def!constant linkage-table-space-start #xA2000000)
-  (def!constant linkage-table-space-end   #xA3000000))
+  (def!constant linkage-table-space-start #x20200000)
+  (def!constant linkage-table-space-end   #x202ff000))
 
 #!+freebsd
 (progn
   (def!constant read-only-space-start     #x10000000)
-  (def!constant read-only-space-end       #x1ffff000)
+  (def!constant read-only-space-end       #x100ff000)
 
-  (def!constant static-space-start        #x30000000)
-  (def!constant static-space-end          #x37fff000)
+  (def!constant static-space-start        #x10100000)
+  (def!constant static-space-end          #x101ff000)
 
   (def!constant dynamic-space-start       #x48000000)
   (def!constant dynamic-space-end         #x88000000)
 
-  ;; In CMUCL:  0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #x90000000)
-  (def!constant linkage-table-space-end   #x91000000))
+  (def!constant linkage-table-space-start #x10200000)
+  (def!constant linkage-table-space-end   #x102ff000))
 
 #!+openbsd
 (progn
-  (def!constant read-only-space-start     #x40000000)
-  (def!constant read-only-space-end       #x47fff000)
+  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-end       #x100ff000)
 
-  (def!constant static-space-start        #x50000000)
-  (def!constant static-space-end          #x5ffff000)
+  (def!constant static-space-start        #x10100000)
+  (def!constant static-space-end          #x101ff000)
 
   (def!constant dynamic-space-start       #x80000000)
   (def!constant dynamic-space-end         #xA0000000)
 
   ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #xA0000000)
-  (def!constant linkage-table-space-end   #xA1000000))
+  (def!constant linkage-table-space-start #x10200000)
+  (def!constant linkage-table-space-end   #x102ff000))
 
 #!+netbsd
 (progn
   (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x2ffff000)
+  (def!constant read-only-space-end       #x200ff000)
 
-  (def!constant static-space-start        #x30000000)
-  (def!constant static-space-end          #x37fff000)
+  (def!constant static-space-start        #x20100000)
+  (def!constant static-space-end          #x201ff000)
 
   (def!constant dynamic-space-start       #x60000000)
   (def!constant dynamic-space-end         #x98000000)
 
   ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #xA0000000)
-  (def!constant linkage-table-space-end   #xA1000000))
+  (def!constant linkage-table-space-start #x20200000)
+  (def!constant linkage-table-space-end   #x202ff000))
 
 
 #!+darwin
 (progn
   (def!constant read-only-space-start #x04000000)
-  (def!constant read-only-space-end   #x07ff8000)
+  (def!constant read-only-space-end   #x040ff000)
 
-  (def!constant static-space-start    #x08000000)
-  (def!constant static-space-end      #x097fff00)
+  (def!constant static-space-start    #x04100000)
+  (def!constant static-space-end      #x041ff000)
 
   (def!constant dynamic-space-start #x10000000)
   (def!constant dynamic-space-end   #x6ffff000)
 
-  (def!constant linkage-table-space-start #x0a000000)
-  (def!constant linkage-table-space-end   #x0b000000))
+  (def!constant linkage-table-space-start #x04200000)
+  (def!constant linkage-table-space-end   #x042ff000))
 
 ;;; Size of one linkage-table entry in bytes.
 (def!constant linkage-table-entry-size 8)

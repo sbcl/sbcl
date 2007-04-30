@@ -99,16 +99,16 @@
 
 (progn
   (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x27ff0000)
+  (def!constant read-only-space-end       #x200ff000)
 
-  (def!constant static-space-start        #x40000000)
-  (def!constant static-space-end          #x47fff000)
+  (def!constant static-space-start        #x20100000)
+  (def!constant static-space-end          #x201ff000)
 
   (def!constant dynamic-space-start   #x1000000000)
   (def!constant dynamic-space-end     #x11ffff0000)
 
-  (def!constant linkage-table-space-start #x60000000)
-  (def!constant linkage-table-space-end   #x63fff000)
+  (def!constant linkage-table-space-start #x20200000)
+  (def!constant linkage-table-space-end   #x202ff000)
 
   (def!constant linkage-table-entry-size 16))
 

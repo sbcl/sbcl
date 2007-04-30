@@ -85,13 +85,31 @@
 (def!constant float-fast-bit 2)         ; Non-IEEE mode
 
 
-;;; Where to put the different spaces.
+;;;; Where to put the different spaces.
 
-(def!constant read-only-space-start #x04000000)
-(def!constant read-only-space-end   #x07ff8000)
+;;; On non-gencgc we need large dynamic and static spaces for PURIFY
+#!-gencgc
+(progn
+  (def!constant read-only-space-start #x04000000)
+  (def!constant read-only-space-end   #x07ff8000)
+  (def!constant static-space-start    #x08000000)
+  (def!constant static-space-end      #x097fff00)
 
-(def!constant static-space-start    #x08000000)
-(def!constant static-space-end      #x097fff00)
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000))
+
+;;; While on gencgc we don't.
+#!+gencgc
+(progn
+  (def!constant read-only-space-start #x04000000)
+  (def!constant read-only-space-end   #x040ff000)
+  (def!constant static-space-start    #x04100000)
+  (def!constant static-space-end      #x041ff000)
+
+  (def!constant linkage-table-space-start #x04200000)
+  (def!constant linkage-table-space-end   #x042ff000))
+
+(def!constant linkage-table-entry-size 16)
 
 #!+linux
 (progn
@@ -104,11 +122,7 @@
     (def!constant dynamic-0-space-start #x4f000000)
     (def!constant dynamic-0-space-end   #x66fff000)
     (def!constant dynamic-1-space-start #x67000000)
-    (def!constant dynamic-1-space-end   #x7efff000))
-
-  (def!constant linkage-table-space-start #x0a000000)
-  (def!constant linkage-table-space-end   #x0b000000)
-  (def!constant linkage-table-entry-size 16))
+    (def!constant dynamic-1-space-end   #x7efff000)))
 
 #!+netbsd
 (progn
@@ -121,11 +135,7 @@
     (def!constant dynamic-0-space-start #x4f000000)
     (def!constant dynamic-0-space-end   #x66fff000)
     (def!constant dynamic-1-space-start #x67000000)
-    (def!constant dynamic-1-space-end   #x7efff000))
-
-  (def!constant linkage-table-space-start #x0a000000)
-  (def!constant linkage-table-space-end   #x0b000000)
-  (def!constant linkage-table-entry-size 16))
+    (def!constant dynamic-1-space-end   #x7efff000)))
 
 #!+darwin
 (progn
@@ -139,12 +149,7 @@
     (def!constant dynamic-0-space-end   #x3ffff000)
 
     (def!constant dynamic-1-space-start #x40000000)
-    (def!constant dynamic-1-space-end   #x6ffff000))
-
-
-  (def!constant linkage-table-space-start #x0a000000)
-  (def!constant linkage-table-space-end   #x0b000000)
-  (def!constant linkage-table-entry-size 16))
+    (def!constant dynamic-1-space-end   #x6ffff000)))
 
 ;;;; Other miscellaneous constants.
 

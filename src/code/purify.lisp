@@ -42,8 +42,15 @@
 
    ENVIRONMENT-NAME is gratuitous documentation for compacted version of the
    current global environment (as seen in SB!C::*INFO-ENVIRONMENT*.) If NIL is
-   supplied, then environment compaction is inhibited."
+   supplied, then environment compaction is inhibited.
 
-  (when environment-name (compact-environment-aux environment-name 200))
-  (%purify (get-lisp-obj-address root-structures)
-           (get-lisp-obj-address nil)))
+   This function is a no-op on platforms using the generational garbage
+   collector (x86, x86-64, ppc)."
+  #!+gencgc
+  (declare (ignore root-structures environment-name))
+  #!-gencgc
+  (progn
+    (when environment-name
+      (compact-environment-aux environment-name 200))
+    (%purify (get-lisp-obj-address root-structures)
+             (get-lisp-obj-address nil))))

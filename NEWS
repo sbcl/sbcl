@@ -5,6 +5,9 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * enhancement: when a symbol name conflict error arises, the
     conflicting symbols are always printed with a package prefix.
     (thanks to Kevin Reid)
+  * incompatible change: PURIFY no longer copies the data from the 
+    dynamic space into the static and read-only spaces on platforms
+    that use the generational garbage collector
   * bug fix: GETHASH, (SETF GETHASH), CLRHASH and REMHASH are now
     interrupt safe.
   * bug fix: GC race condition occasionally resulting in crashes with
