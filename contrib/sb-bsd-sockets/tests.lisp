@@ -162,9 +162,13 @@
       ;; something, so don't fail this test just because the file is
       ;; unavailable, or if it's a symlink to some weird character
       ;; device.
-      (when (and (probe-file "/dev/log")
-                 (sb-posix:s-issock
-                  (sb-posix::stat-mode (sb-posix:stat "/dev/log"))))
+      (when (block nil
+              (handler-bind ((sb-posix:syscall-error
+                              (lambda (e)
+                                (declare (ignore e))
+                                (return nil))))
+                (sb-posix:s-issock
+                 (sb-posix::stat-mode (sb-posix:stat "/dev/log")))))
         (let ((s (make-instance 'local-socket :type :datagram)))
           (format t "Connecting ~A... " s)
           (finish-output)
