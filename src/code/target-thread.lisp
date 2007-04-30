@@ -268,7 +268,7 @@ until it is available."
       (setf (mutex-value mutex) new-value))
     #!-sb-lutex
     (let (old)
-      (when (and (setf old (compare-and-exchange-mutex-value mutex nil new-value))
+      (when (and (setf old (compare-and-swap-mutex-value mutex nil new-value))
                  waitp)
         (loop while old
               do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
@@ -278,7 +278,7 @@ until it is available."
                                             (or to-sec -1)
                                             (or to-usec 0))))
                      (signal-deadline)))
-              (setf old (compare-and-exchange-mutex-value mutex nil new-value))))
+              (setf old (compare-and-swap-mutex-value mutex nil new-value))))
       (not old))))
 
 (defun release-mutex (mutex)
