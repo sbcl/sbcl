@@ -205,17 +205,46 @@ futex_relative_to_abs(struct timespec *tp, int relative)
     return 0;
 }
 
+static int
+futex_istimeout(struct timeval *timeout)
+{
+    int ret;
+    struct timeval tv;
+
+    if (timeout == NULL)
+        return 0;
+
+    ret = gettimeofday(&tv, NULL);
+    if (ret != 0)
+        return ret;
+
+    return (tv.tv_sec > timeout->tv_sec) ||
+        ((tv.tv_sec == timeout->tv_sec) && tv.tv_usec > timeout->tv_usec);
+}
+
 int
 futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
     int ret, result;
     struct futex *futex;
     sigset_t oldset, newset;
+    struct timeval tv, *timeout;
 
     sigemptyset(&newset);
     sigaddset_deferrable(&newset);
 
 again:
+    if (sec < 0)
+        timeout = NULL;
+    else {
+        ret = gettimeofday(&tv, NULL);
+        if (ret != 0)
+            return ret;
+        tv.tv_sec = tv.tv_sec + sec + (tv.tv_usec + usec) / 1000000;
+        tv.tv_usec = (tv.tv_usec + usec) % 1000000;
+        timeout = &tv;
+    }
+
     pthread_sigmask(SIG_BLOCK, &newset, &oldset);
 
     futex = futex_get(lock_word);
@@ -245,7 +274,7 @@ again:
                                         &abstime);
         futex_assert(result == 0 || result == ETIMEDOUT);
 
-        if (result != ETIMEDOUT)
+        if (result != ETIMEDOUT || futex_istimeout(timeout))
             break;
 
         /* futex system call of Linux returns with EINTR errno when
@@ -270,6 +299,9 @@ done:
         sched_yield();
         goto again;
     }
+
+    if (result == ETIMEDOUT)
+        return 1;
 
     return result;
 }
