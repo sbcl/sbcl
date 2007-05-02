@@ -3351,8 +3351,8 @@ register."
 ;;; or replace the function that's about to be called with a wrapper
 ;;; which will signal the condition.
 
-(defun handle-single-step-trap (context-sap kind callee-register-offset)
-  (let ((context (sb!alien:sap-alien context-sap (* os-context-t))))
+(defun handle-single-step-trap (kind callee-register-offset)
+  (let ((context (nth-interrupt-context (1- *free-interrupt-context-index*))))
     ;; The following calls must get tail-call eliminated for
     ;; *STEP-FRAME* to get set correctly on non-x86.
     (if (= kind single-step-before-trap)

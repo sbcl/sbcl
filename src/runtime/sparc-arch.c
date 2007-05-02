@@ -231,6 +231,15 @@ arch_handle_after_breakpoint(os_context_t *context)
     os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
 }
 
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    int register_offset = code >> 5 & 0x1f;
+    handle_single_step_trap(context, trap, register_offset);
+    arch_skip_instruction(context);
+}
+
 static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
@@ -249,7 +258,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
 
         inst = *pc;
-        trap = inst & 0x3fffff;
+        trap = inst & 0x1f;
         handle_trap(context,trap);
     }
     else if ((siginfo->si_code) == ILL_ILLTRP

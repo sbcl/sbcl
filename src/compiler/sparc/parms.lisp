@@ -139,9 +139,6 @@
   breakpoint
   fun-end-breakpoint
   after-breakpoint
-  ;; Stepper actually not implemented on Sparc, but these constants
-  ;; are still needed to avoid undefined variable warnings during sbcl
-  ;; build.
   single-step-around
   single-step-before)
 

@@ -178,7 +178,7 @@
 (define-condition breakpoint-error (system-condition error) ()
   (:report
    (lambda (condition stream)
-     (format stream "Uhandled breakpoint/trap at #x~X."
+     (format stream "Unhandled breakpoint/trap at #x~X."
              (system-condition-address condition)))))
 
 (define-condition interactive-interrupt (system-condition serious-condition) ()
