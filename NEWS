@@ -19,6 +19,8 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
     a STYLE-WARNING to be signalled (regression from 1.0.4.)
   * bug fix: an asynchronous interrupt could previously leave the
     system running with GC inhibited.
+  * bug fix: a DECLARE form evaluated at top-level now causes an error
+    rather than silently (or verbosely) returning NIL.
 
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * incompatible change: removed writer methods for host-ent-name,

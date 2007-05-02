@@ -220,4 +220,10 @@
       (tagbody (go NIL) NIL) t)
     (assert (tagbody-nil-is-valid-tag))))
 
+;;; top-level DECLARE is formally undefined, but we want it to raise
+;;; an error rather than silently return NIL.
+(defvar *scratch*)
+(with-test (:name :toplevel-declare)
+  (assert (raises-error? (eval '(declare (type pathname *scratch*))))))
+
 ;;; success
