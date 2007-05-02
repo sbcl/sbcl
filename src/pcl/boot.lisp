@@ -619,7 +619,7 @@ bootstrapping.
                     (typecase specializer-nameoid
                       (symbol (find-class specializer-nameoid nil))
                       (class specializer-nameoid)
-                      (class-eq-specializer 
+                      (class-eq-specializer
                        (specializer-class specializer-nameoid))
                       (t nil))))
              (ecase kind
