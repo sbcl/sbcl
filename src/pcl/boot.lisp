@@ -606,31 +606,35 @@ bootstrapping.
          ;; We still need to deal with the class case too, but at
          ;; least #.(find-class 'integer) and integer as equivalent
          ;; specializers with this.
-         (let* ((specializer (if (and (typep specializer 'class)
-                                      (let ((name (class-name specializer)))
-                                        (and name (symbolp name)
-                                             (eq specializer (find-class name nil)))))
-                                 (class-name specializer)
-                                 specializer))
-                (kind (info :type :kind specializer)))
+         (let* ((specializer-nameoid
+                 (if (and (typep specializer 'class)
+                          (let ((name (class-name specializer)))
+                            (and name (symbolp name)
+                                 (eq specializer (find-class name nil)))))
+                     (class-name specializer)
+                     specializer))
+                (kind (info :type :kind specializer-nameoid)))
 
-           (flet ((specializer-class ()
-                    (if (typep specializer 'class)
-                        specializer
-                        (find-class specializer nil))))
+           (flet ((specializer-nameoid-class ()
+                    (typecase specializer-nameoid
+                      (symbol (find-class specializer-nameoid nil))
+                      (class specializer-nameoid)
+                      (class-eq-specializer 
+                       (specializer-class specializer-nameoid))
+                      (t nil))))
              (ecase kind
-               ((:primitive) `(type ,specializer ,parameter))
+               ((:primitive) `(type ,specializer-nameoid ,parameter))
                ((:defined)
-                (let ((class (specializer-class)))
-                  ;; CLASS can be null here if the user has erroneously
-                 ;; tried to use a defined type as a specializer; it
-                 ;; can be a non-BUILT-IN-CLASS if the user defines a
-                 ;; type and calls (SETF FIND-CLASS) in a consistent
-                 ;; way.
+                (let ((class (specializer-nameoid-class)))
+                  ;; CLASS can be null here if the user has
+                  ;; erroneously tried to use a defined type as a
+                  ;; specializer; it can be a non-BUILT-IN-CLASS if
+                  ;; the user defines a type and calls (SETF
+                  ;; FIND-CLASS) in a consistent way.
                  (when (and class (typep class 'built-in-class))
-                   `(type ,specializer ,parameter))))
+                   `(type ,specializer-nameoid ,parameter))))
               ((:instance nil)
-               (let ((class (specializer-class)))
+               (let ((class (specializer-nameoid-class)))
                  (cond
                    (class
                     (if (typep class '(or built-in-class structure-class))
@@ -645,8 +649,8 @@ bootstrapping.
                     ;; ...)).  Best to let the user know we haven't
                     ;; been able to extract enough information:
                     (style-warn
-                     "~@<can't find type for presumed class ~S in ~S.~@:>"
-                     specializer
+                     "~@<can't find type for specializer ~S in ~S.~@:>"
+                     specializer-nameoid
                      'parameter-specializer-declaration-in-defmethod)
                     '(ignorable)))))
               ((:forthcoming-defclass-type)
