@@ -349,10 +349,12 @@ static void brief_list(lispobj obj)
     }
 }
 
+#ifdef LISP_FEATURE_X86_64
 static void print_unknown(lispobj obj)
 {
   printf("unknown object: %p", (void *)obj);
 }
+#endif
 
 static void print_list(lispobj obj)
 {
