@@ -266,7 +266,7 @@
          (fopcompile-constant form for-value-p))
         ((symbolp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (macroexpand form *lexenv*)
+             (sb!xc:macroexpand form *lexenv*)
            (if macroexpanded-p
                ;; Symbol macro
                (fopcompile macroexpansion path for-value-p)
@@ -292,7 +292,7 @@
                                            for-value-p))))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (macroexpand form *lexenv*)
+             (sb!xc:macroexpand form *lexenv*)
            (if macroexpanded-p
                (fopcompile macroexpansion path for-value-p)
                (destructuring-bind (operator &rest args) form
