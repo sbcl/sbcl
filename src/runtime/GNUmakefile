@@ -71,12 +71,6 @@ TAGS tags: $(SRCS)
 
 clean:
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
-	# the depend file is obsolete
-	-rm -f depend
-
-# depend target for backward compatibility
-.PHONY: depend
-depend:
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
