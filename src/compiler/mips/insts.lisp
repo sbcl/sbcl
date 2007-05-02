@@ -1085,7 +1085,11 @@
         (#.object-not-list-trap
          (nt "Object not list trap"))
         (#.object-not-instance-trap
-         (nt "Object not instance trap"))))))
+         (nt "Object not instance trap"))
+        (#.single-step-around-trap
+         (nt "Single step around trap"))
+        (#.single-step-before-trap
+         (nt "Single step before trap"))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))

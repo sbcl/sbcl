@@ -386,19 +386,30 @@ arch_handle_after_breakpoint(os_context_t *context)
     *os_context_sigmask_addr(context) = orig_sigmask;
 }
 
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    int register_offset = code >> 11 & 0x1f;
+    handle_single_step_trap(context, trap, register_offset);
+    arch_skip_instruction(context);
+}
+
 static void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
-    /* FIXME: WTF is this magic number? Needs to become a #define
-     * and go into handle_trap. */
+    /* FIXME: This magic number is pseudo-atomic-trap from parms.lisp.
+     * Genesis should provide the proper #define, but it specialcases
+     * pseudo-atomic-trap to work around some oddity on SPARC.
+     * Eventually this should go into handle_trap. */
     if (code==0x10) {
         arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
     } else
-        handle_trap(context,code);
+        handle_trap(context,code & 0x1f);
 }
 
 #define FIXNUM_VALUE(lispobj) (((int)lispobj) >> N_FIXNUM_TAG_BITS)

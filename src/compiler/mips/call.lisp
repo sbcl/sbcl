@@ -656,10 +656,7 @@ default-value-8
             step-instrumenting)
 
      (:ignore ,@(unless (or variable (eq return :tail)) '(arg-locs))
-              ,@(unless variable '(args))
-              ;; Step instrumentation for full calls not implemented yet.
-              ;; See the PPC backend for an example.
-              step-instrumenting)
+              ,@(unless variable '(args)))
 
      (:temporary (:sc descriptor-reg
                   :offset ocfp-offset
@@ -700,6 +697,8 @@ default-value-8
      ,@(when (eq return :fixed)
          '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
 
+     (:temporary (:scs (descriptor-reg) :to :eval) stepping)
+
      ,@(unless (eq return :tail)
          '((:temporary (:scs (non-descriptor-reg)) temp)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
@@ -714,6 +713,7 @@ default-value-8
        (let* ((cur-nfp (current-nfp-tn vop))
               ,@(unless (eq return :tail)
                   '((lra-label (gen-label))))
+              (step-done-label (gen-label))
               (filler
                (remove nil
                        (list :load-nargs
@@ -779,7 +779,29 @@ default-value-8
                                          (move cfp-tn csp-tn)))
                                (trace-table-entry trace-table-call-site))))
                       ((nil)
-                       (inst nop))))))
+                       (inst nop)))))
+                (insert-step-instrumenting (callable-tn)
+                  ;; Conditionally insert a conditional trap:
+                  (when step-instrumenting
+                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                    (inst lw stepping null-tn
+                          (- (+ symbol-value-slot
+                                (truncate (static-symbol-offset 'sb!impl::*stepping*)
+                                          n-word-bytes))
+                             other-pointer-lowtag))
+                    ;; If it's not null, trap.
+                    (inst beq stepping step-done-label)
+                    (inst nop)
+                    ;; CONTEXT-PC will be pointing here when the
+                    ;; interrupt is handled, not after the BREAK.
+                    (note-this-location vop :step-before-vop)
+                    ;; Construct a trap code with the low bits from
+                    ;; SINGLE-STEP-AROUND-TRAP and the high bits from
+                    ;; the register number of CALLABLE-TN.
+                    (inst break (logior single-step-around-trap
+                                        (ash (reg-tn-encoding callable-tn)
+                                             5)))
+                    (emit-label step-done-label))))
 
            ,@(if named
                  `((sc-case name
@@ -793,6 +815,10 @@ default-value-8
                             (- (ash (tn-offset name) word-shift)
                                other-pointer-lowtag))
                       (do-next-filler)))
+                   ;; The step instrumenting must be done after
+                   ;; FUNCTION is loaded, but before ENTRY-POINT is
+                   ;; calculated.
+                   (insert-step-instrumenting name-pass)
                    (inst lw entry-point name-pass
                          (- (ash fdefn-raw-addr-slot word-shift)
                             other-pointer-lowtag))
@@ -812,6 +838,10 @@ default-value-8
                          (- (ash closure-fun-slot word-shift)
                             fun-pointer-lowtag))
                    (do-next-filler)
+                   ;; The step instrumenting must be done before
+                   ;; after FUNCTION is loaded, but before ENTRY-POINT
+                   ;; is calculated.
+                   (insert-step-instrumenting function)
                    (inst addu entry-point function
                          (- (ash simple-fun-code-offset word-shift)
                             fun-pointer-lowtag))))
@@ -1257,8 +1287,23 @@ default-value-8
 ;;; Single-stepping
 
 (define-vop (step-instrument-before-vop)
+  (:temporary (:scs (descriptor-reg)) stepping)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    ;; Stub! See the PPC backend for an example.
-    (note-this-location vop :step-before-vop)))
+    ;; Get the symbol-value of SB!IMPL::*STEPPING*
+    (inst lw stepping null-tn
+          (- (+ symbol-value-slot
+                (truncate (static-symbol-offset 'sb!impl::*stepping*)
+                          n-word-bytes))
+             other-pointer-lowtag))
+    ;; If it's not null, trap.
+    (inst beq stepping DONE)
+    (inst nop)
+    ;; CONTEXT-PC will be pointing here when the interrupt is handled,
+    ;; not after the BREAK.
+    (note-this-location vop :step-before-vop)
+    ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
+    ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
+    (inst break single-step-before-trap)
+    DONE))

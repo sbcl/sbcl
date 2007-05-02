@@ -14,7 +14,7 @@
 (in-package :cl-user)
 
 ;; No stepper support on some platforms.
-#-(or x86 x86-64 ppc sparc)
+#-(or x86 x86-64 ppc sparc mips)
 (sb-ext:quit :unix-status 104)
 
 (defun fib (x)
