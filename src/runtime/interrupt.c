@@ -1311,7 +1311,7 @@ unhandled_trap_error(os_context_t *context)
 }
 
 /* Common logic far trapping instructions. How we actually handle each
- * case is highly architecture dependant, but the overall shape is
+ * case is highly architecture dependent, but the overall shape is
  * this. */
 void
 handle_trap(os_context_t *context, int trap)
