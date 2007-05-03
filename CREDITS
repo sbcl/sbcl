@@ -566,6 +566,10 @@ Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
   (which?) platforms.
 
+Helmut Eller:
+  A lot of the code in the SB-INTROSPECT and SB-COVER contrib modules
+  was originally written by him for Slime/Swank.
+
 Lutz Euler:
   He made a large number of improvements to the x86-64 disassembler.
 
@@ -600,10 +604,11 @@ Daisuke Homma:
   He added support for SunOS on x86 processors.
 
 ITA Software:
-  They hired Juho Snellman as a consultant to work on improvements to 
+  They hired Juho Snellman as a consultant to work on improvements to
   SBCL, to be released into the public domain. The work they've funded
-  includes faster compilation speeds, the interpreter-based evaluator
-  and the IR2-based single-stepper.
+  includes faster compilation, various improvements to the statistical
+  profiler, the SB-COVER code coverage tool, the interpreter-based
+  evaluator and the IR2-based single-stepper.
 
 Espen S Johnsen:
   He provided an ANSI-compliant version of CHANGE-CLASS for PCL.

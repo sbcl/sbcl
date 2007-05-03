@@ -116,6 +116,18 @@
 (declaim (type object *compile-object*))
 
 (defvar *fopcompile-label-counter*)
+
+;; Used during compilation to map code paths to the matching
+;; instrumentation conses.
+(defvar *code-coverage-records* nil)
+;; Used during compilation to keep track of with source paths have been
+;; instrumented in which blocks.
+(defvar *code-coverage-blocks* nil)
+;; Stores the code coverage instrumentation results. Keys are namestrings,
+;; the value is a list of (CONS PATH STATE), where STATE is NIL for
+;; a path that has not been visited, and T for one that has.
+(defvar *code-coverage-info* (make-hash-table :test 'equal))
+
 
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
@@ -1315,7 +1327,7 @@
 (defun compile-load-time-stuff (form for-value)
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
-          (lambda (ir1-toplevel form *current-path* for-value)))
+          (lambda (ir1-toplevel form *current-path* for-value nil)))
      (compile-toplevel (list lambda) t)
      lambda)))
 
@@ -1478,6 +1490,8 @@
         (sb!xc:*compile-file-pathname* nil) ; really bound in
         (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
         (*policy* *policy*)
+        (*code-coverage-records* (make-hash-table :test 'equal))
+        (*code-coverage-blocks* (make-hash-table :test 'equal))
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
@@ -1512,6 +1526,19 @@
                 (clear-stuff)
 
                 (sub-sub-compile-file info)
+
+                (unless (zerop (hash-table-count *code-coverage-records*))
+                  ;; Dump the code coverage records into the fasl.
+                  (fopcompile `(record-code-coverage
+                                ',(namestring *compile-file-pathname*)
+                                ',(let (list)
+                                       (maphash (lambda (k v)
+                                                  (declare (ignore k))
+                                                  (push v list))
+                                                *code-coverage-records*)
+                                       list))
+                              nil
+                              nil))
 
                 (finish-block-compilation)
                 (let ((object *compile-object*))

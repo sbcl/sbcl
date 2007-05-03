@@ -49,6 +49,8 @@
              (*toplevel-lambdas* ())
              (*block-compile* nil)
              (*allow-instrumenting* nil)
+             (*code-coverage-records* nil)
+             (*code-coverage-blocks* nil)
              (*compiler-error-bailout*
               (lambda (&optional error)
                 (declare (ignore error))

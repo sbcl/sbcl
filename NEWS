@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
+  * new contrib: sb-cover, an experimental code coverage tool, is included
+    as a contrib module.
   * enhancement: a new, experimental synchronous timeout facility is
     provided. Refer to SB-SYS:WITH-DEADLINE for details.
   * enhancement: when a symbol name conflict error arises, the

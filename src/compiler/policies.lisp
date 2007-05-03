@@ -97,3 +97,7 @@
         0
         3)
   ("no" "yes" "yes" "yes"))
+
+(define-optimization-quality store-coverage-data
+    0
+  ("no" "no" "yes" "yes"))

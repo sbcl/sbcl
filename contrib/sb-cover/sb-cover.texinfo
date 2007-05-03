@@ -1,0 +1,47 @@
+@node sb-cover
+@section sb-cover
+@cindex Code Coverage
+
+The @code{sb-cover} module provides a code coverage tool for SBCL. The
+tool has support for expression coverage, and for some branch coverage.
+Coverage reports are only generated for code compiled using
+@code{compile-file} with the value of the
+@code{sb-cover:store-coverage-data} optimization quality set to 3.
+
+As of SBCL 1.0.6 @code{sb-cover} is still experimental, and the
+interfaces documented here might change in later versions.
+
+@subsection Example Usage
+
+@lisp
+;;; Load SB-COVER
+(require :sb-cover)
+
+;;; Turn on generation of code coverage instrumentation in the compiler
+(declaim (optimize sb-cover:store-coverage-data))
+
+;;; Load some code, ensuring that it's recompiled with the new optimization
+;;; policy.
+(asdf:oos 'asdf:load-op :cl-ppcre-test :force t)
+
+;;; Run the test suite.
+(cl-ppcre-test:test)
+
+;;; Produce a coverage report
+(sb-cover:report "/tmp/report/")
+
+;;; Turn off instrumentation
+(declaim (optimize (sb-cover:store-coverage-data 0)))
+@end lisp
+
+@c @subsection Output
+@c Write some documentation about how to interpret the results
+
+@subsection Functions
+
+@include fun-sb-cover-report.texinfo
+
+@include fun-sb-cover-reset-coverage.texinfo
+
+@include fun-sb-cover-clear-coverage.texinfo
+

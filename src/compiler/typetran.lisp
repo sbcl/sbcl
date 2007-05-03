@@ -552,7 +552,10 @@
   ;; lvar, transforms it into a quoted form, and gives this
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
-  (if (and (consp spec) (eq (car spec) 'quote))
+  (if (and (consp spec)
+           (eq (car spec) 'quote)
+           (or (not *allow-instrumenting*)
+               (policy *lexenv* (= store-coverage-data 0))))
       (source-transform-typep object (cadr spec))
       (values nil t)))
 

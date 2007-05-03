@@ -20,25 +20,26 @@
    as if it were a constant. If READ-ONLY-P is non-NIL, then the resultant
    object is guaranteed to never be modified, so it can be put in read-only
    storage."
-  (if (producing-fasl-file)
-      (multiple-value-bind (handle type)
-          (compile-load-time-value (if read-only-p
-                                       form
-                                       `(make-value-cell ,form)))
-        (declare (ignore type))
-        (ir1-convert start next result
-                     (if read-only-p
-                         `(%load-time-value ',handle)
-                         `(value-cell-ref (%load-time-value ',handle)))))
-      (let ((value
-             (handler-case (eval form)
-               (error (condition)
-                 (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
-                                 condition)))))
-        (ir1-convert start next result
-                     (if read-only-p
-                         `',value
-                         `(value-cell-ref ',(make-value-cell value)))))))
+  (let ((*allow-instrumenting* nil))
+    (if (producing-fasl-file)
+        (multiple-value-bind (handle type)
+            (compile-load-time-value (if read-only-p
+                                         form
+                                         `(make-value-cell ,form)))
+          (declare (ignore type))
+          (ir1-convert start next result
+                       (if read-only-p
+                           `(%load-time-value ',handle)
+                           `(value-cell-ref (%load-time-value ',handle)))))
+        (let ((value
+               (handler-case (eval form)
+                 (error (condition)
+                   (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
+                                   condition)))))
+          (ir1-convert start next result
+                       (if read-only-p
+                           `',value
+                           `(value-cell-ref ',(make-value-cell value))))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
   (aver (constant-lvar-p handle))

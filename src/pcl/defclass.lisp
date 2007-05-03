@@ -233,7 +233,8 @@
                 (if (eq type t)
                     nil
                     `('type-check-function (lambda (value)
-                                             (declare (type ,type value))
+                                             (declare (type ,type value)
+                                                      (optimize (sb-c:store-coverage-data 0)))
                                              value))))
                (canon `(:name ',name :readers ',readers :writers ',writers
                               :initargs ',initargs
@@ -281,7 +282,10 @@
            (unless entry
              (setq entry (list initform
                                (gensym)
-                               `(function (lambda () ,initform))))
+                               `(function (lambda ()
+                                  (declare (optimize
+                                            (sb-c:store-coverage-data 0)))
+                                  ,initform))))
              (push entry *initfunctions-for-this-defclass*))
            (cadr entry)))))
 

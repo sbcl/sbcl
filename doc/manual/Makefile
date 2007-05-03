@@ -14,9 +14,9 @@ DOCSTRINGDIR="docstrings/"
 CONTRIBDIR="../../contrib/"
 I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIBDIR)
 # List of contrib modules that docstring docs will be created for.
-MODULES=':sb-md5 :sb-rotate-byte :sb-grovel :sb-sprof :sb-bsd-sockets'
+MODULES=':sb-md5 :sb-rotate-byte :sb-grovel :sb-sprof :sb-bsd-sockets :sb-cover'
 # List of package names that docstring docs will be created for.
-PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD :SB-MD5 :SB-ROTATE-BYTE :SB-SPROF :SB-BSD-SOCKETS"
+PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD :SB-MD5 :SB-ROTATE-BYTE :SB-SPROF :SB-BSD-SOCKETS :SB-COVER"
 
 # SBCL_SYSTEM is an optional argument to this make program. If this
 # variable is set, its contents are used as the command line for

@@ -34,6 +34,8 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
          (then-block (ctran-starts-block then-ctran))
          (else-ctran (make-ctran))
          (else-block (ctran-starts-block else-ctran))
+         (maybe-instrument *instrument-if-for-code-coverage*)
+         (*instrument-if-for-code-coverage* t)
          (node (make-if :test pred-lvar
                         :consequent then-block
                         :alternative else-block)))
@@ -50,8 +52,32 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
       (link-blocks start-block then-block)
       (link-blocks start-block else-block))
 
-    (ir1-convert then-ctran next result then)
-    (ir1-convert else-ctran next result else)))
+    (let ((path (best-sub-source-path test)))
+      (ir1-convert (if (and path maybe-instrument)
+                       (let ((*current-path* path))
+                         (instrument-coverage then-ctran :then test))
+                       then-ctran)
+                   next result then)
+      (ir1-convert (if (and path maybe-instrument)
+                       (let ((*current-path* path))
+                         (instrument-coverage else-ctran :else test))
+                       else-ctran)
+                   next result else))))
+
+;;; To get even remotely sensible results for branch coverage
+;;; tracking, we need good source paths. If the macroexpansions
+;;; interfere enough the TEST of the conditional doesn't actually have
+;;; an original source location (e.g. (UNLESS FOO ...) -> (IF (NOT
+;;; FOO) ...). Look through the form, and try to find some subform
+;;; that has one.
+(defun best-sub-source-path (form)
+  (if (policy *lexenv* (= store-coverage-data 0))
+      nil
+      (labels ((sub (form)
+                 (or (gethash form *source-paths*)
+                     (and (consp form)
+                          (some #'sub form)))))
+        (or (sub form)))))
 
 ;;;; BLOCK and TAGBODY
 

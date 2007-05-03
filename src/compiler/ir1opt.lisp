@@ -693,7 +693,10 @@
            (setf (lvar-reoptimize arg) nil)))
        (check-important-result node info)
        (let ((fun (fun-info-destroyed-constant-args info)))
-         (when fun
+         (when (and fun
+                    ;; If somebody is really sure that they want to modify
+                    ;; constants, let them.
+                    (policy node (> safety 0)))
            (let ((destroyed-constant-args (funcall fun args)))
              (when destroyed-constant-args
                (let ((*compiler-error-context* node))

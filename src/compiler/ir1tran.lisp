@@ -393,12 +393,12 @@
 ;;; The hashtables used to hold global namespace info must be
 ;;; reallocated elsewhere. Note also that *LEXENV* is not bound, so
 ;;; that local macro definitions can be introduced by enclosing code.
-(defun ir1-toplevel (form path for-value)
+(defun ir1-toplevel (form path for-value &optional (allow-instrumenting t))
   (declare (list path))
   (let* ((*current-path* path)
          (component (make-empty-component))
          (*current-component* component)
-         (*allow-instrumenting* t))
+         (*allow-instrumenting* allow-instrumenting))
     (setf (component-name component) 'initial-component)
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
@@ -442,8 +442,16 @@
                    '(progn
                       (when (atom subform) (return))
                       (let ((fm (car subform)))
-                        (when (consp fm)
-                          (sub-find-source-paths fm (cons pos path)))
+                        (if (consp fm)
+                            ;; If it's a cons, recurse
+                            (sub-find-source-paths fm (cons pos path))
+                            ;; Otherwise store the containing form. It's
+                            ;; not perfect, but better than nothing.
+                            (setf (gethash subform *source-paths*)
+                                  (list* 'original-source-start
+                                         *current-form-number*
+                                         pos
+                                         path)))
                         (incf pos))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
@@ -485,8 +493,9 @@
   ;; namespace.
   (defun ir1-convert (start next result form)
     (ir1-error-bailout (start next result form)
-      (let ((*current-path* (or (gethash form *source-paths*)
-                                (cons form *current-path*))))
+      (let* ((*current-path* (or (gethash form *source-paths*)
+                                 (cons form *current-path*)))
+             (start (instrument-coverage start nil form)))
         (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))
                       (ir1-convert-var start next result form))
@@ -795,6 +804,8 @@
             (forms body))
         (loop
           (let ((form (car forms)))
+            (setf this-start
+                  (maybe-instrument-progn-like this-start forms form))
             (when (endp (cdr forms))
               (ir1-convert this-start next result form)
               (return))
@@ -803,6 +814,81 @@
               (setq this-start this-ctran
                     forms (cdr forms)))))))
   (values))
+
+
+;;;; code coverage
+
+;;; Check the policy for whether we should generate code coverage
+;;; instrumentation. If not, just return the original START
+;;; ctran. Otherwise ninsert code coverage instrumentation after
+;;; START, and return the new ctran.
+(defun instrument-coverage (start mode form)
+  ;; We don't actually use FORM for anything, it's just convenient to
+  ;; have around when debugging the instrumentation.
+  (declare (ignore form))
+  (if (and (policy *lexenv* (> store-coverage-data 0))
+           *code-coverage-records*
+           *allow-instrumenting*)
+      (let ((path (source-path-original-source *current-path*)))
+        (when mode
+          (push mode path))
+        (if (member (ctran-block start)
+                    (gethash path *code-coverage-blocks*))
+            ;; If this source path has already been instrumented in
+            ;; this block, don't instrument it again.
+            start
+            (let ((store
+                   ;; Get an interned record cons for the path. A cons
+                   ;; with the same object identity must be used for
+                   ;; each instrument for the same block.
+                   (or (gethash path *code-coverage-records*)
+                       (setf (gethash path *code-coverage-records*)
+                             (cons path nil))))
+                  (next (make-ctran))
+                  (*allow-instrumenting* nil))
+              (push (ctran-block start)
+                    (gethash path *code-coverage-blocks*))
+              (let ((*allow-instrumenting* nil))
+                (ir1-convert start next nil
+                             `(locally
+                                  (declare (optimize speed
+                                                     (safety 0)
+                                                     (debug 0)))
+                                ;; We're being naughty here, and
+                                ;; modifying constant data. That's ok,
+                                ;; we know what we're doing.
+                                (%rplacd ',store t))))
+              next)))
+      start))
+
+;;; In contexts where we don't have a source location for FORM
+;;; e.g. due to it not being a cons, but where we have a source
+;;; location for the enclosing cons, use the latter source location if
+;;; available. This works pretty well in practice, since many PROGNish
+;;; macroexpansions will just directly splice a block of forms into
+;;; some enclosing form with `(progn ,@body), thus retaining the
+;;; EQness of the conses.
+(defun maybe-instrument-progn-like (start forms form)
+  (or (when (and *allow-instrumenting*
+                 (not (gethash form *source-paths*)))
+        (let ((*current-path* (gethash forms *source-paths*)))
+          (when *current-path*
+            (instrument-coverage start :progn form))))
+      start))
+
+(defun record-code-coverage (info cc)
+  (setf (gethash info *code-coverage-info*) cc))
+
+(defun clear-code-coverage ()
+  (clrhash *code-coverage-info*))
+
+(defun reset-code-coverage ()
+  (maphash (lambda (info cc)
+             (declare (ignore info))
+             (dolist (cc-entry cc)
+               (setf (cdr cc-entry) nil)))
+           *code-coverage-info*))
+
 
 ;;;; converting combinations
 
@@ -858,8 +944,12 @@
   (let ((node (make-combination fun-lvar)))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
-      (let ((this-start start))
+      (let ((this-start start)
+            (forms args))
         (dolist (arg args)
+          (setf this-start
+                (maybe-instrument-progn-like this-start forms arg))
+          (setf forms (cdr forms))
           (let ((this-ctran (make-ctran))
                 (this-lvar (make-lvar node)))
             (ir1-convert this-start this-ctran this-lvar arg)
@@ -892,6 +982,10 @@
                     (ir1-convert start next result transformed)))
               (ir1-convert-maybe-predicate start next result form var))))))
 
+;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE
+;;; attribute, don't generate any branch coverage instrumentation for it.
+(defvar *instrument-if-for-code-coverage* t)
+
 ;;; If the function has the PREDICATE attribute, and the RESULT's DEST
 ;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
 ;;; predicate always appears in a conditional context.
@@ -907,7 +1001,8 @@
     (if (and info
              (ir1-attributep (fun-info-attributes info) predicate)
              (not (if-p (and result (lvar-dest result)))))
-        (ir1-convert start next result `(if ,form t nil))
+        (let ((*instrument-if-for-code-coverage* nil))
+          (ir1-convert start next result `(if ,form t nil)))
         (ir1-convert-combination-checking-type start next result form var))))
 
 ;;; Actually really convert a global function call that we are allowed

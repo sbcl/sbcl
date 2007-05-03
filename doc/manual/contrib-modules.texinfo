@@ -13,6 +13,7 @@ modules.
 * sb-grovel::
 * sb-md5::
 * sb-rotate-byte::
+* sb-cover::
 @end menu
 
 @page
@@ -27,3 +28,5 @@ modules.
 @page
 @include sb-rotate-byte/sb-rotate-byte.texinfo
 
+@page
+@include sb-cover/sb-cover.texinfo
