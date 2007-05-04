@@ -411,8 +411,7 @@ not found"
         #+sb-eval
         ((typep function 'sb-eval:interpreted-function)
          (sb-eval:interpreted-function-lambda-list function))
-        (t (sb-impl::%simple-fun-arglist
-            (sb-impl::%closure-fun function)))))
+        (t (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
 
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))

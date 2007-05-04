@@ -12,6 +12,9 @@
 (assert (equal (function-arglist 'the)
                '(type sb-c::value)))
 
+(assert (equal (function-arglist #'(sb-pcl::slow-method cl-user::j (t)))
+               '(sb-pcl::method-args sb-pcl::next-methods)))
+
 (let ((source (find-definition-source #'cl-user::one)))
   (assert (= (definition-source-file-write-date source)
              (file-write-date (merge-pathnames "test.lisp" *load-pathname*))))
