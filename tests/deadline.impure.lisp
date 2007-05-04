@@ -15,8 +15,13 @@
 #+(and sb-thread (not sb-lutex))
 (progn
   (assert-timeout
-   (let ((lock (sb-thread:make-mutex)))
-     (sb-thread:make-thread (lambda () (sb-thread:get-mutex lock) (sleep 5)))
+   (let ((lock (sb-thread:make-mutex))
+         (waitp t))
+     (sb-thread:make-thread (lambda ()
+                              (sb-thread:get-mutex lock)
+                              (setf waitp nil)
+                              (sleep 5)))
+     (loop while waitp do (sleep 0.01))
      (sb-impl::with-deadline (:seconds 1)
        (sb-thread:get-mutex lock))))
 
