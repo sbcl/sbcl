@@ -125,6 +125,7 @@
                 "SRC;PCL;DEFCLASS"
                 "SRC;PCL;DEFS"
                 "SRC;PCL;FNGEN"
+                "SRC;PCL;WRAPPER"
                 "SRC;PCL;CACHE"
                 "SRC;PCL;DLISP"
                 "SRC;PCL;DLISP2"

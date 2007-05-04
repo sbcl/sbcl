@@ -22,12 +22,91 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
-;;; This file is (almost) functionally equivalent to dlap.lisp, but
-;;; easier to read.
 
-;;; Might generate faster code, too, depending on the compiler and
-;;; whether an implementation-specific lap assembler was used.
+;;;; some support stuff for getting a hold of symbols that we need when
+;;;; building the discriminator codes. It's OK for these to be interned
+;;;; symbols because we don't capture any user code in the scope in which
+;;;; these symbols are bound.
+
+(declaim (list *dfun-arg-symbols*))
+(defvar *dfun-arg-symbols* '(.ARG0. .ARG1. .ARG2. .ARG3.))
+
+(defun dfun-arg-symbol (arg-number)
+  (or (nth arg-number *dfun-arg-symbols*)
+      (format-symbol *pcl-package* ".ARG~A." arg-number)))
+
+(declaim (list *slot-vector-symbols*))
+(defvar *slot-vector-symbols* '(.SLOTS0. .SLOTS1. .SLOTS2. .SLOTS3.))
+
+(defun slot-vector-symbol (arg-number)
+  (or (nth arg-number *slot-vector-symbols*)
+      (format-symbol *pcl-package* ".SLOTS~A." arg-number)))
+
+(declaim (inline make-dfun-required-args))
+(defun make-dfun-required-args (metatypes)
+  ;; Micro-optimizations 'R Us
+  (labels ((rec (types i)
+             (declare (fixnum i))
+             (when types
+               (cons (dfun-arg-symbol i)
+                     (rec (cdr types) (1+ i))))))
+    (rec metatypes 0)))
+
+(defun make-dfun-lambda-list (metatypes applyp)
+  (let ((required (make-dfun-required-args metatypes)))
+    (if applyp
+        (nconc required
+               ;; Use &MORE arguments to avoid consing up an &REST list
+               ;; that we might not need at all. See MAKE-EMF-CALL and
+               ;; INVOKE-EFFECTIVE-METHOD-FUNCTION for the other
+               ;; pieces.
+               '(&more .dfun-more-context. .dfun-more-count.))
+      required)))
+
+(defun make-dlap-lambda-list (metatypes applyp)
+  (let* ((required (make-dfun-required-args metatypes))
+         (lambda-list (if applyp
+                          (append required '(&more .more-context. .more-count.))
+                          required)))
+    ;; Return the full lambda list, the required arguments, a form
+    ;; that will generate a rest-list, and a list of the &MORE
+    ;; parameters used.
+    (values lambda-list
+            required
+            (when applyp
+              '((sb-c::%listify-rest-args
+                 .more-context.
+                 (the (and unsigned-byte fixnum)
+                   .more-count.))))
+            (when applyp
+              '(.more-context. .more-count.)))))
+
+(defun make-emf-call (metatypes applyp fn-variable &optional emf-type)
+  (let ((required (make-dfun-required-args metatypes)))
+    `(,(if (eq emf-type 'fast-method-call)
+           'invoke-effective-method-function-fast
+           'invoke-effective-method-function)
+       ,fn-variable
+       ,applyp
+       :required-args ,required
+       ;; INVOKE-EFFECTIVE-METHOD-FUNCTION will decide whether to use
+       ;; the :REST-ARG version or the :MORE-ARG version depending on
+       ;; the type of the EMF.
+       :rest-arg ,(if applyp
+                      ;; Creates a list from the &MORE arguments.
+                      '((sb-c::%listify-rest-args
+                         .dfun-more-context.
+                         (the (and unsigned-byte fixnum)
+                           .dfun-more-count.)))
+                      nil)
+       :more-arg ,(when applyp
+                    '(.dfun-more-context. .dfun-more-count.)))))
+
+(defun make-fast-method-call-lambda-list (metatypes applyp)
+  (list* '.pv-cell. '.next-method-call.
+         (make-dfun-lambda-list metatypes applyp)))
+
+;;; Emitting various accessors.
 
 (defun emit-one-class-reader (class-slot-p)
   (emit-reader/writer :reader 1 class-slot-p))
@@ -472,4 +551,3 @@
      (when slot (error "can't do a slot reg for this metatype"))
      `(built-in-or-structure-wrapper
        ,argument))))
-
