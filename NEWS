@@ -26,6 +26,9 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
     system running with GC inhibited.
   * bug fix: a DECLARE form evaluated at top-level now causes an error
     rather than silently (or verbosely) returning NIL.
+  * bug fix: trying to dissassemble functions compiled at high DEBUG could
+    result in a error being signalled due to source form lookup errors.
+    (reported by Peter Graves)
 
 changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * incompatible change: removed writer methods for host-ent-name,

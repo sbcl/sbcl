@@ -1426,4 +1426,9 @@
                  (defmacro macro-no-env ()
                    :foo))))
 
+(dolist (*evaluator-mode* '(:interpret :compile))
+  (disassemble (eval '(defun disassemble-source-form-bug (x y z)
+                       (declare (optimize debug))
+                       (list x y z)))))
+
 ;;; success

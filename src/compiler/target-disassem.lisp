@@ -1016,7 +1016,7 @@
             (sfcache-form-number-mapping-table cache) mapping-table))
     (cond ((null toplevel-form)
            nil)
-          ((> form-number (length mapping-table))
+          ((>= form-number (length mapping-table))
            (warn "bogus form-number in form!  The source file has probably ~@
                   been changed too much to cope with.")
            (when cache

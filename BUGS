@@ -1807,3 +1807,16 @@ WORKAROUND:
   call to ROOM would see them, and allocate even more...
 
   Reported by Faré Rideau on sbcl-devel.
+
+414: strange DISASSEMBLE warning
+
+  Compiling and disassembling 
+
+   (defun disassemble-source-form-bug (x y z)
+     (declare (optimize debug))
+     (list x y z))
+
+  Gives
+
+   WARNING: bogus form-number in form!  The source file has probably 
+   been changed too much to cope with.
