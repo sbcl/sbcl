@@ -432,25 +432,23 @@ GNAME(do_pending_interrupt):
  * So only eax, ecx, and edx need special care here.
  *
  * ALLOC factors out the logic of calling alloc(): stack alignment, etc.
- * The TMP argument must be a preserved register different from the the
- * SIZE argument (if it is a register.)
  *
  * DEFINE_ALLOC_TO_FOO defines an alloction routine.
  */
 
 #ifdef LISP_FEATURE_DARWIN
-#define ALLOC(size,tmp)                                         \
-        pushl   tmp;               /* Save TMP               */ \
-        movl    %esp,tmp;          /* Save ESP to TMP        */ \
+#define ALLOC(size)                                             \
+        pushl   %ebp;              /* Save EBP               */ \
+        movl    %esp,%ebp;         /* Save ESP to EBP        */ \
         andl    $0xfffffff0,%esp;  /* Align stack            */ \
         pushl   $0;                /* Padding                */ \
         pushl   size;              /* Argument to alloc      */ \
         cld;                       /* Clear DF               */ \
         call    GNAME(alloc);                                   \
-        movl    tmp,%esp;          /* Restore ESP from TMP   */ \
-        popl    tmp;               /* Restore TMP            */
+        movl    %ebp,%esp;         /* Restore ESP from EBP   */ \
+        popl    %ebp;              /* Restore EBP            */
 #else
-#define ALLOC(size,tmp)                                         \
+#define ALLOC(size)                                             \
         pushl   size;              /* Argument to alloc      */ \
         cld;                       /* Clear DF               */ \
         call    GNAME(alloc);                                   \
@@ -464,7 +462,7 @@ GNAME(do_pending_interrupt):
 GNAME(name):                                                    \
         pushl   %ecx;              /* Save ECX and EDX       */ \
         pushl   %edx;                                           \
-        ALLOC(size,%esi)                                        \
+        ALLOC(size)                                             \
         popl    %edx;              /* Restore ECX and EDX    */ \
         popl    %ecx;                                           \
         ret;                                                    \
@@ -477,7 +475,7 @@ GNAME(name):                                                    \
 GNAME(name):                                                    \
         pushl   %eax;              /* Save EAX and EDX       */ \
         pushl   %edx;                                           \
-        ALLOC(size,%esi)                                        \
+        ALLOC(size)                                             \
         movl    %eax,%ecx;         /* Result to destination  */ \
         popl    %edx;                                           \
         popl    %eax;                                           \
@@ -491,14 +489,14 @@ GNAME(name):                                                    \
 GNAME(name):                                                    \
         pushl   %eax;               /* Save EAX and ECX      */ \
         pushl   %ecx;                                           \
-        ALLOC(size,%edi)                                        \
+        ALLOC(size)                                             \
         movl    %eax,%edx;          /* Restore EAX and ECX   */ \
         popl    %ecx;                                           \
         popl    %eax;                                           \
         ret;                                                    \
         SIZE(GNAME(name))
 
-#define DEFINE_ALLOC_TO_REG(name,reg,size,tmp)                  \
+#define DEFINE_ALLOC_TO_REG(name,reg,size)                      \
         .globl  GNAME(name);                                    \
         TYPE(GNAME(name));                                      \
         .align  align_4byte,0x90;                               \
@@ -506,7 +504,7 @@ GNAME(name):                                                    \
         pushl   %eax;              /* Save EAX, ECX, and EDX */ \
         pushl   %ecx;                                           \
         pushl   %edx;                                           \
-        ALLOC(size,tmp)                                         \
+        ALLOC(size)                                             \
         movl    %eax,reg;          /* Restore them           */ \
         popl    %edx;                                           \
         popl    %ecx;                                           \
@@ -526,17 +524,17 @@ DEFINE_ALLOC_TO_EDX(alloc_to_edx,%edx)
 DEFINE_ALLOC_TO_EDX(alloc_8_to_edx,$8)
 DEFINE_ALLOC_TO_EDX(alloc_16_to_edx,$16)
 
-DEFINE_ALLOC_TO_REG(alloc_to_ebx,%ebx,%ebx,%edi)
-DEFINE_ALLOC_TO_REG(alloc_8_to_ebx,%ebx,$8,%edi)
-DEFINE_ALLOC_TO_REG(alloc_16_to_ebx,%ebx,$16,%esi)
+DEFINE_ALLOC_TO_REG(alloc_to_ebx,%ebx,%ebx)
+DEFINE_ALLOC_TO_REG(alloc_8_to_ebx,%ebx,$8)
+DEFINE_ALLOC_TO_REG(alloc_16_to_ebx,%ebx,$16)
 
-DEFINE_ALLOC_TO_REG(alloc_to_esi,%esi,%esi,%edi)
-DEFINE_ALLOC_TO_REG(alloc_8_to_esi,%esi,$8,%edi)
-DEFINE_ALLOC_TO_REG(alloc_16_to_esi,%esi,$16,%edi)
+DEFINE_ALLOC_TO_REG(alloc_to_esi,%esi,%esi)
+DEFINE_ALLOC_TO_REG(alloc_8_to_esi,%esi,$8)
+DEFINE_ALLOC_TO_REG(alloc_16_to_esi,%esi,$16)
 
-DEFINE_ALLOC_TO_REG(alloc_to_edi,%edi,%edi,%esi)
-DEFINE_ALLOC_TO_REG(alloc_8_to_edi,%edi,$8,%esi)
-DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16,%esi)
+DEFINE_ALLOC_TO_REG(alloc_to_edi,%edi,%edi)
+DEFINE_ALLOC_TO_REG(alloc_8_to_edi,%edi,$8)
+DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16)
 
 /* Called from lisp when an inline allocation overflows.
  * Every register except the result needs to be preserved.
@@ -549,10 +547,10 @@ DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16,%esi)
 #define START_REGION GNAME(boxed_region)
 #endif
 
-#define ALLOC_OVERFLOW(size,tmp)                                \
+#define ALLOC_OVERFLOW(size)                                    \
         /* Calculate the size for the allocation. */            \
         subl    START_REGION,size;                              \
-        ALLOC(size,tmp)
+        ALLOC(size)
 
 /* This routine handles an overflow with eax=crfp+size. So the
    size=eax-crfp. */
@@ -562,7 +560,7 @@ DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16,%esi)
 GNAME(alloc_overflow_eax):
         pushl   %ecx            # Save ecx
         pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%eax,%esi)
+	ALLOC_OVERFLOW(%eax)
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
         ret
@@ -574,7 +572,7 @@ GNAME(alloc_overflow_eax):
 GNAME(alloc_overflow_ecx):
         pushl   %eax            # Save eax
         pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%ecx,%esi)
+	ALLOC_OVERFLOW(%ecx)
         movl    %eax,%ecx       # setup the destination.
         popl    %edx    # Restore edx.
         popl    %eax    # Restore eax.
@@ -587,7 +585,7 @@ GNAME(alloc_overflow_ecx):
 GNAME(alloc_overflow_edx):
         pushl   %eax            # Save eax
         pushl   %ecx            # Save ecx
-	ALLOC_OVERFLOW(%edx,%esi)
+	ALLOC_OVERFLOW(%edx)
         movl    %eax,%edx       # setup the destination.
         popl    %ecx    # Restore ecx.
         popl    %eax    # Restore eax.
@@ -603,7 +601,7 @@ GNAME(alloc_overflow_ebx):
         pushl   %eax            # Save eax
         pushl   %ecx            # Save ecx
         pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%ebx,%edi)
+	ALLOC_OVERFLOW(%ebx)
         movl    %eax,%ebx       # setup the destination.
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
@@ -620,7 +618,7 @@ GNAME(alloc_overflow_esi):
         pushl   %eax            # Save eax
         pushl   %ecx            # Save ecx
         pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%esi,%edi)
+	ALLOC_OVERFLOW(%esi)
         movl    %eax,%esi       # setup the destination.
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
@@ -635,7 +633,7 @@ GNAME(alloc_overflow_edi):
         pushl   %eax            # Save eax
         pushl   %ecx            # Save ecx
         pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%edi,%esi)
+	ALLOC_OVERFLOW(%edi)
         movl    %eax,%edi       # setup the destination.
         popl    %edx    # Restore edx.
         popl    %ecx    # Restore ecx.
