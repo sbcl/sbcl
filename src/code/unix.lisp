@@ -987,13 +987,14 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
             (return pathname)
             (push pathname previous-pathnames))))
 
+
+(defconstant micro-seconds-per-internal-time-unit
+  (/ 1000000 sb!xc:internal-time-units-per-second))
+
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
 #!-win32
 (progn
-  (defconstant micro-seconds-per-internal-time-unit
-    (/ 1000000 sb!xc:internal-time-units-per-second))
-
   (declaim (inline system-internal-run-time
                    system-real-time-values))
 
