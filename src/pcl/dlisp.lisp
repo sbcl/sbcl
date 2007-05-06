@@ -314,7 +314,7 @@
      arglist
      `(let (,@(unless class-slot-p '(slots))
             ,@(when cached-index-p '(index)))
-        ,(emit-dlap arglist metatypes
+        ,(emit-dlap 'cache arglist metatypes
                     (emit-slot-access reader/writer class-slot-p
                                       'slots 'index 'miss-fn arglist)
                     `(funcall miss-fn ,@arglist)
@@ -350,8 +350,7 @@
      `(cache ,@(unless cached-emf-p '(emf)) miss-fn)
      lambda-list
      `(let (,@(when cached-emf-p '(emf)))
-        ,(emit-dlap args
-                    metatypes
+        ,(emit-dlap 'cache args metatypes
                     (if return-value-p
                         (if cached-emf-p 'emf t)
                         `(invoke-effective-method-function
@@ -371,8 +370,10 @@
     (values
      (emit-checking-or-caching cached-emf-p return-value-p metatypes applyp))))
 
-(defun emit-dlap (args metatypes hit miss value-reg &optional slot-regs)
+(defun emit-dlap (cache-var args metatypes hit-form miss-form value-var
+                  &optional slot-vars)
   (let* ((index -1)
+         (miss-tag (gensym "MISSED"))
          (wrapper-bindings (mapcan (lambda (arg mt)
                                      (unless (eq mt t)
                                        (incf index)
@@ -380,29 +381,33 @@
                                                           "WRAPPER-~D"
                                                           index)
                                           ,(emit-fetch-wrapper
-                                            mt arg 'miss (pop slot-regs))))))
+                                            mt arg miss-tag (pop slot-vars))))))
                                    args metatypes))
-         (wrappers (mapcar #'car wrapper-bindings)))
+         (wrapper-vars (mapcar #'car wrapper-bindings)))
     (declare (fixnum index))
-    (unless wrappers (error "Every metatype is T."))
-    `(block dfun
-       (tagbody
-          (let ((field (cache-field cache))
-                (cache-vector (cache-vector cache))
-                (mask (cache-mask cache))
-                (size (cache-size cache))
-                (overflow (cache-overflow cache))
+    (unless wrapper-vars
+      (error "Every metatype is T."))
+    `(prog ()
+        (return
+          (let ((field (cache-field ,cache-var))
+                (cache-vector (cache-vector ,cache-var))
+                (mask (cache-mask ,cache-var))
+                (size (cache-size ,cache-var))
+                (overflow (cache-overflow ,cache-var))
                 ,@wrapper-bindings)
             (declare (fixnum size field mask))
-            ,(cond ((cdr wrappers)
-                    (emit-greater-than-1-dlap wrappers 'miss value-reg))
-                   (value-reg
-                    (emit-1-t-dlap (car wrappers) 'miss value-reg))
-                   (t
-                    (emit-1-nil-dlap (car wrappers) 'miss)))
-            (return-from dfun ,hit))
-        miss
-          (return-from dfun ,miss)))))
+            ,(emit-cache-lookup wrapper-vars miss-tag value-var)
+            ,hit-form))
+      ,miss-tag
+        (return ,miss-form))))
+
+(defun emit-cache-lookup (wrapper-vars miss-tag value-reg)
+  (cond ((cdr wrapper-vars)
+         (emit-greater-than-1-dlap wrapper-vars miss-tag value-reg))
+        (value-reg
+         (emit-1-t-dlap (car wrapper-vars) miss-tag value-reg))
+        (t
+         (emit-1-nil-dlap (car wrapper-vars) miss-tag))))
 
 (defun emit-1-nil-dlap (wrapper miss-label)
   `(let* ((primary ,(emit-1-wrapper-compute-primary-cache-location wrapper
