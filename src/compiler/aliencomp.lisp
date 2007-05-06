@@ -348,14 +348,16 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
-      #!+(or x86 x86-64) `(truly-the system-area-pointer
-                         (%primitive alloc-alien-stack-space
-                                     ,(ceiling (alien-type-bits alien-type)
-                                               sb!vm:n-byte-bits)))
-      #!-(or x86 x86-64) `(truly-the system-area-pointer
-                         (%primitive alloc-number-stack-space
-                                     ,(ceiling (alien-type-bits alien-type)
-                                               sb!vm:n-byte-bits)))
+      #!+(or x86 x86-64)
+      `(truly-the system-area-pointer
+                  (%primitive alloc-alien-stack-space
+                              ,(ceiling (alien-type-bits alien-type)
+                                        sb!vm:n-byte-bits)))
+      #!-(or x86 x86-64)
+      `(truly-the system-area-pointer
+                  (%primitive alloc-number-stack-space
+                              ,(ceiling (alien-type-bits alien-type)
+                                        sb!vm:n-byte-bits)))
       (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
              (alien-rep-type (specifier-type alien-rep-type-spec)))
         (cond ((csubtypep (specifier-type 'system-area-pointer)
@@ -700,11 +702,14 @@
                   (error "Something is broken.")))
         (lvar (node-lvar call))
         (args args)
-        #!+(or (and x86 darwin) win32) (stack-pointer (make-stack-pointer-tn)))
+        #!+x86
+        (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
         (make-call-out-tns type)
-      #!+x86 (vop set-fpu-word-for-c call block)
-      #!+(or (and x86 darwin) win32) (vop current-stack-pointer call block stack-pointer)
+      #!+x86
+      (progn
+        (vop set-fpu-word-for-c call block)
+        (vop current-stack-pointer call block stack-pointer))
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       (dolist (tn arg-tns)
         ;; On PPC, TN might be a list. This is used to indicate
@@ -722,22 +727,22 @@
           (unless (= (length move-arg-vops) 1)
             (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
           #!+(or x86 x86-64) (emit-move-arg-template call
-                                         block
-                                         (first move-arg-vops)
-                                         (lvar-tn call block arg)
-                                         nsp
-                                         first-tn)
+                                                     block
+                                                     (first move-arg-vops)
+                                                     (lvar-tn call block arg)
+                                                     nsp
+                                                     first-tn)
           #!-(or x86 x86-64) (progn
-                   (emit-move call
-                              block
-                              (lvar-tn call block arg)
-                              temp-tn)
-                   (emit-move-arg-template call
-                                           block
-                                           (first move-arg-vops)
-                                           temp-tn
-                                           nsp
-                                           first-tn))
+                               (emit-move call
+                                          block
+                                          (lvar-tn call block arg)
+                                          temp-tn)
+                               (emit-move-arg-template call
+                                                       block
+                                                       (first move-arg-vops)
+                                                       temp-tn
+                                                       nsp
+                                                       first-tn))
           #!+(and ppc darwin)
           (when (listp tn)
             ;; This means that we have a float arg that we need to
@@ -759,7 +764,10 @@
               ((lvar-tn call block function)
                (reference-tn-list arg-tns nil))
               ((reference-tn-list result-tns t))))
-      #!-(or (and darwin x86) win32) (vop dealloc-number-stack-space call block stack-frame-size)
-      #!+(or (and darwin x86) win32) (vop reset-stack-pointer call block stack-pointer)
-      #!+x86 (vop set-fpu-word-for-lisp call block)
+      #!-x86
+      (vop dealloc-number-stack-space call block stack-frame-size)
+      #!+x86
+      (progn
+        (vop reset-stack-pointer call block stack-pointer)
+        (vop set-fpu-word-for-lisp call block))
       (move-lvar-result call block result-tns lvar))))

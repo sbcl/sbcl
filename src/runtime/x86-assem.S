@@ -122,16 +122,11 @@ GNAME(call_into_c):
 	fstp	%st(0)
 	fstp	%st(0)
 
-#ifdef LISP_FEATURE_WIN32
-	cld
-#endif
-
-#ifdef LISP_FEATURE_DARWIN
-        andl	$0xfffffff0,%esp        # align stack to 16-byte boundary before calling C
-#endif
-	call	*%eax		# normal callout using Lisp stack
-
-	movl	%eax,%ecx	# remember integer return value
+	cld                       # clear out DF: Darwin, Solaris and Win32 at
+	                          # least need this, and it should not hurt others
+	
+	call	*%eax		  # normal callout using Lisp stack
+	movl	%eax,%ecx	  # remember integer return value
 
 /* Check for a return FP value. */
 	fxam

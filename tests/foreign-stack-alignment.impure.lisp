@@ -35,7 +35,8 @@
   #+(and ppc linux) 8
   #+x86-64 16
   #+mips 8
-  #+x86 4
+  #+(and x86 (not darwin)) 4
+  #+(and x86 darwin) 16
   #-(or x86 x86-64 mips (and ppc (or darwin linux))) (error "Unknown platform"))
 
 ;;;; Build the offset-tool as regular excutable, and run it with

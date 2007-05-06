@@ -214,8 +214,6 @@
                    :from :eval :to :result) ecx)
   (:temporary (:sc unsigned-reg :offset edx-offset
                    :from :eval :to :result) edx)
-  #!+darwin
-  (:temporary (:sc unsigned-reg :offset esi-offset) prev-esp)
   (:node-var node)
   (:vop-var vop)
   (:save-p t)
@@ -233,22 +231,13 @@
            (dotimes (i 8)
              (inst fstp fr0-tn))
 
-           #!+win32
+           ;; Clear out DF: Darwin, Windows, and Solaris at least require
+           ;; this, and it should not hurt others either.
            (inst cld)
 
-           #!+darwin
-           ;; Align stack for C.
-           (progn
-             (move prev-esp esp-tn)
-             (inst and esp-tn -16))
-
            (inst call function)
-           ;; To give the debugger a clue. XX not really internal-error?
+           ;; To give the debugger a clue. FIXME: not really internal-error?
            (note-this-location vop :internal-error)
-
-           #!+darwin
-           ;; Restore
-           (move esp-tn prev-esp)
 
            ;; Restore the NPX for lisp; ensure no regs are empty
            (dotimes (i 7)
@@ -257,8 +246,8 @@
            (if (and results
                     (location= (tn-ref-tn results) fr0-tn))
                ;; The return result is in fr0.
-               (inst fxch fr7-tn) ; move the result back to fr0
-               (inst fldz)) ; insure no regs are empty
+               (inst fxch fr7-tn)       ; move the result back to fr0
+               (inst fldz))             ; insure no regs are empty
            ))))
 
 ;;; While SBCL uses the FPU in 53-bit mode, most C libraries assume that
@@ -295,16 +284,8 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst sub esp-tn delta)))
-    ;; C stack should probably be 16 byte aligned on Darwin
-    #!+darwin (inst and esp-tn -16)
+    (align-stack-pointer esp-tn)
     (move result esp-tn)))
-
-(define-vop (dealloc-number-stack-space)
-  (:info amount)
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst add esp-tn delta)))))
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)

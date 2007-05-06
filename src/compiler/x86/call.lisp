@@ -312,8 +312,6 @@
       (inst mov eax-tn nil-value)
       (inst std)
       (inst mov ecx-tn (- nvals register-arg-count))
-      ;; solaris requires DF being zero.
-      #!+sunos (inst cld)
       ;; Jump into the default loop.
       (inst jmp default-stack-vals)
 
@@ -348,8 +346,6 @@
       (inst std)
       (inst rep)
       (inst movs :dword)
-      ;; solaris requires DF being zero.
-      #!+sunos (inst cld)
       ;; Restore ESI.
       (loadw esi-tn ebx-tn (frame-word-offset 2))
       ;; Now we have to default the remaining args. Find out how many.
@@ -365,8 +361,6 @@
       (emit-label default-stack-vals)
       (inst rep)
       (inst stos eax-tn)
-      ;; solaris requires DF being zero.
-      #!+sunos (inst cld)
       ;; Restore EDI, and reset the stack.
       (emit-label restore-edi)
       (loadw edi-tn ebx-tn (frame-word-offset 1))
@@ -1383,9 +1377,7 @@
        (inst jmp :nz loop)
        ;; NIL out the last cons.
        (storew nil-value dst 1 list-pointer-lowtag))
-      (emit-label done)
-      ;; solaris requires DF being zero.
-      #!+sunos (inst cld))))
+      (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
 ;;; COPY-MORE-ARG. SUPPLIED is the total number of arguments supplied
