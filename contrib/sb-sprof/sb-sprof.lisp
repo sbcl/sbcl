@@ -102,6 +102,7 @@
   (:export #:*sample-interval* #:*max-samples* #:*alloc-interval*
            #:start-sampling #:stop-sampling #:with-sampling
            #:with-profiling #:start-profiling #:stop-profiling
+           #:profile-call-counts #:unprofile-call-counts
            #:reset #:report))
 
 (in-package #:sb-sprof)
@@ -250,9 +251,9 @@
   ;; the sampling-mode that was used for the profiling run
   (sampling-mode (sb-impl::missing-arg) :type (member :cpu :alloc))
   ;; number of samples taken
-  (nsamples (sb-impl::missing-arg) :type sb-impl::index)
+  (nsamples (sb-impl::missing-arg) :type sb-int:index)
   ;; sample count for samples not in any function
-  (elsewhere-count (sb-impl::missing-arg) :type sb-impl::index)
+  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index)
   ;; a flat list of NODEs, sorted by sample count
   (flat-nodes () :type list))
 
@@ -280,7 +281,10 @@
   ;; the debug-info that this node was created from
   (debug-info nil :type t)
   ;; list of NODEs for functions calling this one
-  (callers () :type list))
+  (callers () :type list)
+  ;; the call count for the function that corresponds to this node (or NIL
+  ;; if call counting wasn't enabled for this function)
+  (call-count nil :type (or null integer)))
 
 ;;; A cycle in a call graph.  The functions forming the cycle are
 ;;; found in the SCC-VERTICES slot of the VERTEX structure.
@@ -291,7 +295,7 @@
 (defstruct (call (:include edge)
                  (:constructor make-call (vertex)))
   ;; number of times the call was sampled
-  (count 1 :type sb-impl::index))
+  (count 1 :type sb-int:index))
 
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples)
@@ -306,13 +310,13 @@
                          ;; Each sample takes two cells in the vector
                          2))
           :type simple-vector)
-  (trace-count 0 :type sb-impl::index)
-  (index 0 :type sb-impl::index)
+  (trace-count 0 :type sb-int:index)
+  (index 0 :type sb-int:index)
   (mode nil :type (member :cpu :alloc))
   (sample-interval *sample-interval* :type number)
   (alloc-interval *alloc-interval* :type number)
   (max-depth most-positive-fixnum :type number)
-  (max-samples *max-samples* :type sb-impl::index))
+  (max-samples *max-samples* :type sb-int:index))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -356,7 +360,7 @@ profiling")
   "Default number of traces taken. This variable is somewhat misnamed:
 each trace may actually consist of an arbitrary number of samples, depending
 on the depth of the call stack.")
-(declaim (type sb-impl::index *max-samples*))
+(declaim (type sb-int:index *max-samples*))
 
 (defvar *samples* nil)
 (declaim (type (or null samples) *samples*))
@@ -368,6 +372,9 @@ on the depth of the call stack.")
 (defvar *show-progress* nil)
 
 (defvar *old-sampling* nil)
+
+;; Call count encapsulation information
+(defvar *encapsulations* (make-hash-table :test 'equal))
 
 (defun turn-off-sampling ()
   (setq *old-sampling* *sampling*)
@@ -688,6 +695,7 @@ e
             *samples* (make-samples :max-depth max-depth
                                     :max-samples max-samples
                                     :mode mode))
+      (enable-call-counting)
       (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
       (if (eq mode :alloc)
           (setf sb-vm:*alloc-signal* (1- alloc-interval))
@@ -701,6 +709,7 @@ e
   "Stop profiling if profiling."
   (when *profiling*
     (unix-setitimer :profile 0 0 0 0)
+    (disable-call-counting)
     ;; Even with the timer shut down we cannot be sure that there is
     ;; no undelivered sigprof. Besides, leaving the signal handler
     ;; installed won't hurt.
@@ -780,6 +789,8 @@ e
   (when info
     (multiple-value-bind (new key)
         (make-node info)
+      (when (eql (node-name new) 'call-counter)
+        (return-from lookup-node (values nil nil)))
       (let* ((key (cons (node-name new) key))
              (found (gethash key *name->node*)))
         (cond (found
@@ -791,6 +802,11 @@ e
                           (node-end-pc-or-offset new)))
                found)
               (t
+               (let ((call-count-info (gethash (node-name new)
+                                               *encapsulations*)))
+                 (when call-count-info
+                   (setf (node-call-count new)
+                         (car call-count-info))))
                (setf (gethash key *name->node*) new)
                new))))))
 
@@ -943,7 +959,7 @@ e
     (when print-header
       (print-call-graph-header call-graph))
     (format t "~&           Self        Total        Cumul~%")
-    (format t "~&  Nr  Count     %  Count     %  Count     % Function~%")
+    (format t "~&  Nr  Count     %  Count     %  Count     %    Calls  Function~%")
     (print-separator)
     (let ((elsewhere-count (call-graph-elsewhere-count call-graph))
           (i 0))
@@ -957,7 +973,7 @@ e
                (accrued-percent (samples-percent call-graph accrued-count)))
           (incf total-count count)
           (incf total-percent percent)
-          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~s~%"
+          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  ~s~%"
                   (node-index node)
                   count
                   percent
@@ -965,12 +981,14 @@ e
                   accrued-percent
                   total-count
                   total-percent
+                  (or (node-call-count node) "-")
                   (node-name node))
           (finish-output)))
       (print-separator)
-      (format t "~&    ~6d ~5,1f              elsewhere~%"
+      (format t "~&     ~6d ~5,1f~36a elsewhere~%"
               elsewhere-count
-              (samples-percent call-graph elsewhere-count)))))
+              (samples-percent call-graph elsewhere-count)
+              ""))))
 
 (defun print-cycles (call-graph)
   (when (some #'cycle-p (graph-vertices call-graph))
@@ -1113,6 +1131,87 @@ e
 
 (pushnew 'add-disassembly-profile-note sb-disassem::*default-dstate-hooks*)
 
+
+;;;; Call counting
+
+;;; The following functions tell sb-sprof to do call count profiling
+;;; for the named functions in addition to normal statistical
+;;; profiling.  The benefit of this over using SB-PROFILE is that this
+;;; encapsulation is a lot more lightweight, due to not needing to
+;;; track cpu usage / consing. (For example, compiling asdf 20 times
+;;; took 13s normally, 15s with call counting for all functions in
+;;; SB-C, and 94s with SB-PROFILE profiling SB-C).
+
+(defun profile-call-counts (&rest names)
+  "Mark the functions named by NAMES as being subject to call counting
+during statistical profiling. If a string is used as a name, it will
+be interpreted as a package name. In this case call counting will be
+done for all functions with names like X or (SETF X), where X is a symbol
+with the package as its home package."
+  (dolist (name names)
+    (if (stringp name)
+        (let ((package (find-package name)))
+          (do-symbols (symbol package)
+            (when (eql (symbol-package symbol) package)
+              (dolist (function-name (list symbol (list 'setf symbol)))
+                (profile-call-counts-for-function function-name)))))
+        (profile-call-counts-for-function name))))
+
+(defun profile-call-counts-for-function (function-name)
+  (unless (gethash function-name *encapsulations*)
+    (setf (gethash function-name *encapsulations*) nil)))
+
+(defun unprofile-call-counts ()
+  "Clear all call counting information. Call counting will be done for no
+functions during statistical profiling."
+  (clrhash *encapsulations*))
+
+;;; Called when profiling is started to enable the call counting
+;;; encapsulation. Wrap all the call counted functions
+(defun enable-call-counting ()
+  (maphash (lambda (k v)
+             (declare (ignore v))
+             (enable-call-counting-for-function k))
+           *encapsulations*))
+
+;;; Called when profiling is stopped to disable the encapsulation. Restore
+;;; the original functions.
+(defun disable-call-counting ()
+  (maphash (lambda (k v)
+             (when v
+               (assert (cdr v))
+               (without-package-locks
+                 (setf (fdefinition k) (cdr v)))
+               (setf (cdr v) nil)))
+           *encapsulations*))
+
+(defun enable-call-counting-for-function (function-name)
+  (let ((info (gethash function-name *encapsulations*)))
+    ;; We should never try to encapsulate an fdefn multiple times.
+    (assert (or (null info)
+                (null (cdr info))))
+    (when (and (fboundp function-name)
+               (or (not (symbolp function-name))
+                   (and (not (special-operator-p function-name))
+                        (not (macro-function function-name)))))
+      (let* ((original-fun (fdefinition function-name))
+             (info (cons 0 original-fun)))
+        (setf (gethash function-name *encapsulations*) info)
+        (without-package-locks
+          (setf (fdefinition function-name)
+                (sb-int:named-lambda call-counter (sb-int:&more more-context more-count)
+                  (declare (optimize speed (safety 0)))
+                  ;; 2^59 calls should be enough for anybody, and it
+                  ;; allows using fixnum arithmetic on x86-64. 2^32
+                  ;; isn't enough, so we can't do that on 32 bit platforms.
+                  (incf (the (unsigned-byte 59)
+                          (car info)))
+                  (multiple-value-call original-fun
+                    (sb-c:%more-arg-values more-context
+                                           0
+                                           more-count)))))))))
+
+
 ;;; silly examples
 
 (defun test-0 (n &optional (depth 0))

@@ -12,6 +12,8 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * enhancement: stepping is now once again supported on the SPARC.  (It is
     also now more likely to work on CheneyGC builds on the PPC.)
   * enhancement: Stepping support on MIPS.
+  * enhancement: sb-sprof can now also track and report accurate call
+    counts.
   * incompatible change: PURIFY no longer copies the data from the 
     dynamic space into the static and read-only spaces on platforms
     that use the generational garbage collector

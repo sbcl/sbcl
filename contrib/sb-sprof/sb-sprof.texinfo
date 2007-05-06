@@ -11,19 +11,28 @@ functions like @code{sb-profile:profile} does. You might find
 functions in the @code{common-lisp}-package, SBCL internals, or code
 where the instrumenting overhead is excessive.
 
+Additionally @code{sb-sprof} includes a limited deterministic profiler
+which can be used for reporting the amounts of calls to some functions
+during
+
 @subsection Example Usage
 
 @lisp
+(in-package :cl-user)
+
 (require :sb-sprof)
 
 (declaim (optimize speed))
 
+(defun cpu-test-inner (a i)
+  (logxor a
+          (* i 5)
+          (+ a i)))
+
 (defun cpu-test (n)
   (let ((a 0))
     (dotimes (i (expt 2 n) a)
-      (setf a (logxor a
-                      (* i 5)
-                      (+ a i))))))
+      (setf a (cpu-test-inner a i)))))
 
 ;;;; CPU profiling
 
@@ -34,6 +43,10 @@ where the instrumenting overhead is excessive.
                           :report :flat
                           :loop nil)
   (cpu-test 26))
+
+;;; Record call counts for functions defined on symbols in the CL-USER
+;;; package.
+(sb-sprof:profile-call-counts "CL-USER")
 
 ;;; Take 1000 samples of running (CPU-TEST 24), and give a flat
 ;;; table report at the end. The body will be re-evaluated in a loop
@@ -68,11 +81,12 @@ number of samples taken while executing that function.
 
 @lisp
            Self        Total        Cumul
-  Nr  Count     %  Count     %  Count     % Function
+  Nr  Count     %  Count     %  Count     %    Calls  Function
 ------------------------------------------------------------------------
-   1    165  38.3    165  38.3    165  38.3 SB-KERNEL:TWO-ARG-XOR
-   2    141  32.7    141  32.7    306  71.0 SB-VM::GENERIC-+
-   3     67  15.5    145  33.6    373  86.5 CPU-TEST-2
+   1     69  24.4     97  34.3     69  24.4 67108864  CPU-TEST-INNER
+   2     64  22.6     64  22.6    133  47.0        -  SB-VM::GENERIC-+
+   3     39  13.8    256  90.5    172  60.8        1  CPU-TEST
+   4     31  11.0     31  11.0    203  71.7        -  SB-KERNEL:TWO-ARG-XOR
 @end lisp
 
 For each function, the table will show three absolute and relative
@@ -81,6 +95,11 @@ executing that function. The Total column shows samples taken while
 executing that function or functions called from it (sampled to a 
 platform-specific depth). The Cumul column shows the sum of all
 Self columns up to and including that line in the table.
+
+Additionally the Calls column will record the amount of calls that were
+made to the function during the profiling run. This value will only
+be reported for functions that have been explicitly marked for call counting
+with @code{profile-call-counts}.
 
 The profiler also hooks into the disassembler such that instructions which
 have been sampled are annotated with their relative frequency of
@@ -123,6 +142,10 @@ depth of more than two levels is only supported on x86 and x86-64.
 @include fun-sb-sprof-start-profiling.texinfo
 
 @include fun-sb-sprof-stop-profiling.texinfo
+
+@include fun-sb-sprof-profile-call-counts.texinfo
+
+@include fun-sb-sprof-unprofile-call-counts.texinfo
 
 @subsection Variables
 
