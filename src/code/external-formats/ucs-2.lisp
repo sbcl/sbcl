@@ -209,10 +209,8 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(pushnew '((:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2)
-           ucs-2le->string-aref string->ucs-2le)
-         *external-format-functions*)
+(add-external-format-funs '(:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2)
+                          '(ucs-2le->string-aref string->ucs-2le))
 
-(pushnew '((:ucs-2be :ucs2be)
-           ucs-2be->string-aref string->ucs-2be)
-         *external-format-functions*)
+(add-external-format-funs '(:ucs-2be :ucs2be)
+                          '(ucs-2be->string-aref string->ucs-2be))

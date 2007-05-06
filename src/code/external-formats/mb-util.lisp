@@ -276,7 +276,7 @@
 
        (instantiate-octets-definition ,define-mb->string)
 
-       (push '(,aliases
-               ,(make-od-name format '>string-aref) ,string->mb)
-             *external-format-functions*)
+       (add-external-format-funs ',aliases
+                                 '(,(make-od-name format '>string-aref)
+                                   ,string->mb))
        )))

@@ -1,4 +1,4 @@
-(in-package #:sb!impl)
+(in-package "SB!IMPL")
 
 (define-unibyte-mapper koi8-r->code-mapper code->koi8-r-mapper
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL
@@ -132,11 +132,11 @@
 )
 
 (declaim (inline get-koi8-r-bytes))
-(defun get-koi8-r-bytes(string pos end)
+(defun get-koi8-r-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->koi8-r-mapper :koi8-r string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->koi8-r-mapper :koi8-r string pos))
 
 (defun string->koi8-r (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -160,9 +160,8 @@
 
 (instantiate-octets-definition define-koi8-r->string)
 
-(push '((:koi8-r :|koi8-r|)
-        koi8-r->string-aref string->koi8-r)
-      *external-format-functions*)
+(add-external-format-funs '(:koi8-r :|koi8-r|)
+                          '(koi8-r->string-aref string->koi8-r))
 
 (define-external-format (:koi8-r :|koi8-r|)
     1 t
@@ -307,11 +306,11 @@
 )
 
 (declaim (inline get-koi8-u-bytes))
-(defun get-koi8-u-bytes(string pos end)
+(defun get-koi8-u-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->koi8-u-mapper :koi8-u string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->koi8-u-mapper :koi8-u string pos))
 
 (defun string->koi8-u (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -335,9 +334,8 @@
 
 (instantiate-octets-definition define-koi8-u->string)
 
-(push '((:koi8-u :|koi8-u|)
-        koi8-u->string-aref string->koi8-u)
-      *external-format-functions*)
+(add-external-format-funs '(:koi8-u :|koi8-u|)
+                          '(koi8-u->string-aref string->koi8-u))
 
 (define-external-format (:koi8-u :|koi8-u|)
     1 t
@@ -477,11 +475,11 @@
 )
 
 (declaim (inline get-x-mac-cyrillic-bytes))
-(defun get-x-mac-cyrillic-bytes(string pos end)
+(defun get-x-mac-cyrillic-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->x-mac-cyrillic-mapper :x-mac-cyrillic string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->x-mac-cyrillic-mapper :x-mac-cyrillic string pos))
 
 (defun string->x-mac-cyrillic (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -505,9 +503,8 @@
 
 (instantiate-octets-definition define-x-mac-cyrillic->string)
 
-(push '((:x-mac-cyrillic :|x-mac-cyrillic|)
-        x-mac-cyrillic->string-aref string->x-mac-cyrillic)
-      *external-format-functions*)
+(add-external-format-funs '(:x-mac-cyrillic :|x-mac-cyrillic|)
+                          '(x-mac-cyrillic->string-aref string->x-mac-cyrillic))
 
 (define-external-format (:x-mac-cyrillic :|x-mac-cyrillic|)
     1 t

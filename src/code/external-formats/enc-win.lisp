@@ -1,4 +1,4 @@
-(in-package #:sb!impl)
+(in-package "SB!IMPL")
 
 (define-unibyte-mapper cp1250->code-mapper code->cp1250-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -83,11 +83,11 @@
 )
 
 (declaim (inline get-cp1250-bytes))
-(defun get-cp1250-bytes(string pos end)
+(defun get-cp1250-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1250-mapper :cp1250 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1250-mapper :cp1250 string pos))
 
 (defun string->cp1250 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -111,9 +111,8 @@
 
 (instantiate-octets-definition define-cp1250->string)
 
-(push '((:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
-        cp1250->string-aref string->cp1250)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
+                          '(cp1250->string-aref string->cp1250))
 
 (define-external-format (:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
     1 t
@@ -243,11 +242,11 @@
 )
 
 (declaim (inline get-cp1251-bytes))
-(defun get-cp1251-bytes(string pos end)
+(defun get-cp1251-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1251-mapper :cp1251 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1251-mapper :cp1251 string pos))
 
 (defun string->cp1251 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -271,9 +270,8 @@
 
 (instantiate-octets-definition define-cp1251->string)
 
-(push '((:cp1251 :|cp1251|  :windows-1251 :|windows-1251|)
-        cp1251->string-aref string->cp1251)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1251 :|cp1251|  :windows-1251 :|windows-1251|)
+                          '(cp1251->string-aref string->cp1251))
 
 (define-external-format (:cp1251 :|cp1251| :windows-1251 :|windows-1251|)
     1 t
@@ -322,11 +320,11 @@
 )
 
 (declaim (inline get-cp1252-bytes))
-(defun get-cp1252-bytes(string pos end)
+(defun get-cp1252-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1252-mapper :cp1252 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1252-mapper :cp1252 string pos))
 
 (defun string->cp1252 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -350,9 +348,8 @@
 
 (instantiate-octets-definition define-cp1252->string)
 
-(push '((:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
-        cp1252->string-aref string->cp1252)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
+                          '(cp1252->string-aref string->cp1252))
 
 (define-external-format (:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
     1 t
@@ -476,11 +473,11 @@
 )
 
 (declaim (inline get-cp1253-bytes))
-(defun get-cp1253-bytes(string pos end)
+(defun get-cp1253-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1253-mapper :cp1253 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1253-mapper :cp1253 string pos))
 
 (defun string->cp1253 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -504,9 +501,8 @@
 
 (instantiate-octets-definition define-cp1253->string)
 
-(push '((:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
-        cp1253->string-aref string->cp1253)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
+                          '(cp1253->string-aref string->cp1253))
 
 (define-external-format (:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
     1 t
@@ -561,11 +557,11 @@
 )
 
 (declaim (inline get-cp1254-bytes))
-(defun get-cp1254-bytes(string pos end)
+(defun get-cp1254-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1254-mapper :cp1254 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1254-mapper :cp1254 string pos))
 
 (defun string->cp1254 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -589,9 +585,8 @@
 
 (instantiate-octets-definition define-cp1254->string)
 
-(push '((:cp1254 :|cp1254| :windows-1254 :|windows-1254|)
-        cp1254->string-aref string->cp1254)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1254 :|cp1254| :windows-1254 :|windows-1254|)
+                          '(cp1254->string-aref string->cp1254))
 
 (define-external-format (:cp1254 :|cp1254|)
     1 t
@@ -707,11 +702,11 @@
 )
 
 (declaim (inline get-cp1255-bytes))
-(defun get-cp1255-bytes(string pos end)
+(defun get-cp1255-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1255-mapper :cp1255 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1255-mapper :cp1255 string pos))
 
 (defun string->cp1255 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -735,9 +730,8 @@
 
 (instantiate-octets-definition define-cp1255->string)
 
-(push '((:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
-        cp1255->string-aref string->cp1255)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
+                          '(cp1255->string-aref string->cp1255))
 
 (define-external-format (:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
     1 t
@@ -839,11 +833,11 @@
 )
 
 (declaim (inline get-cp1256-bytes))
-(defun get-cp1256-bytes(string pos end)
+(defun get-cp1256-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1256-mapper :cp1256 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1256-mapper :cp1256 string pos))
 
 (defun string->cp1256 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -867,9 +861,8 @@
 
 (instantiate-octets-definition define-cp1256->string)
 
-(push '((:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
-        cp1256->string-aref string->cp1256)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
+                          '(cp1256->string-aref string->cp1256))
 
 (define-external-format (:cp1256 :|cp1256|)
     1 t
@@ -973,11 +966,11 @@
 )
 
 (declaim (inline get-cp1257-bytes))
-(defun get-cp1257-bytes(string pos end)
+(defun get-cp1257-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1257-mapper :cp1257 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1257-mapper :cp1257 string pos))
 
 (defun string->cp1257 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1001,9 +994,8 @@
 
 (instantiate-octets-definition define-cp1257->string)
 
-(push '((:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
-        cp1257->string-aref string->cp1257)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
+                          '(cp1257->string-aref string->cp1257))
 
 (define-external-format (:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
     1 t
@@ -1066,11 +1058,11 @@
 )
 
 (declaim (inline get-cp1258-bytes))
-(defun get-cp1258-bytes(string pos end)
+(defun get-cp1258-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp1258-mapper :cp1258 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp1258-mapper :cp1258 string pos))
 
 (defun string->cp1258 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1094,9 +1086,8 @@
 
 (instantiate-octets-definition define-cp1258->string)
 
-(push '((:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
-        cp1258->string-aref string->cp1258)
-      *external-format-functions*)
+(add-external-format-funs '(:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
+                          '(cp1258->string-aref string->cp1258))
 
 (define-external-format (:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
     1 t

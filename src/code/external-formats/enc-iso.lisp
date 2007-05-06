@@ -1,4 +1,4 @@
-(in-package #:sb!impl)
+(in-package "SB!IMPL")
 
 (define-unibyte-mapper iso-8859-2->code-mapper code->iso-8859-2-mapper
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
@@ -61,11 +61,11 @@
 )
 
 (declaim (inline get-iso-8859-2-bytes))
-(defun get-iso-8859-2-bytes(string pos end)
+(defun get-iso-8859-2-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-2-mapper :iso-8859-2 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-2-mapper :iso-8859-2 string pos))
 
 (defun string->iso-8859-2 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -89,9 +89,8 @@
 
 (instantiate-octets-definition define-iso-8859-2->string)
 
-(push '((:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
-        iso-8859-2->string-aref string->iso-8859-2)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
+                          '(iso-8859-2->string-aref string->iso-8859-2))
 
 (define-external-format (:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
     1 t
@@ -143,11 +142,11 @@
 )
 
 (declaim (inline get-iso-8859-3-bytes))
-(defun get-iso-8859-3-bytes(string pos end)
+(defun get-iso-8859-3-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-3-mapper :iso-8859-3 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-3-mapper :iso-8859-3 string pos))
 
 (defun string->iso-8859-3 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -171,9 +170,8 @@
 
 (instantiate-octets-definition define-iso-8859-3->string)
 
-(push '((:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
-        iso-8859-3->string-aref string->iso-8859-3)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
+                          '(iso-8859-3->string-aref string->iso-8859-3))
 
 (define-external-format (:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
     1 t
@@ -240,11 +238,11 @@
 )
 
 (declaim (inline get-iso-8859-4-bytes))
-(defun get-iso-8859-4-bytes(string pos end)
+(defun get-iso-8859-4-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-4-mapper :iso-8859-4 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-4-mapper :iso-8859-4 string pos))
 
 (defun string->iso-8859-4 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -268,9 +266,8 @@
 
 (instantiate-octets-definition define-iso-8859-4->string)
 
-(push '((:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
-        iso-8859-4->string-aref string->iso-8859-4)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
+                          '(iso-8859-4->string-aref string->iso-8859-4))
 
 (define-external-format (:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
     1 t
@@ -381,11 +378,11 @@
 )
 
 (declaim (inline get-iso-8859-5-bytes))
-(defun get-iso-8859-5-bytes(string pos end)
+(defun get-iso-8859-5-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-5-mapper :iso-8859-5 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-5-mapper :iso-8859-5 string pos))
 
 (defun string->iso-8859-5 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -409,9 +406,8 @@
 
 (instantiate-octets-definition define-iso-8859-5->string)
 
-(push '((:iso-8859-5 :|iso-8859-5|)
-        iso-8859-5->string-aref string->iso-8859-5)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-5 :|iso-8859-5|)
+                          '(iso-8859-5->string-aref string->iso-8859-5))
 
 (define-external-format (:iso-8859-5 :|iso-8859-5|)
     1 t
@@ -521,11 +517,11 @@
 )
 
 (declaim (inline get-iso-8859-6-bytes))
-(defun get-iso-8859-6-bytes(string pos end)
+(defun get-iso-8859-6-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-6-mapper :iso-8859-6 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-6-mapper :iso-8859-6 string pos))
 
 (defun string->iso-8859-6 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -549,9 +545,8 @@
 
 (instantiate-octets-definition define-iso-8859-6->string)
 
-(push '((:iso-8859-6 :|iso-8859-6|)
-        iso-8859-6->string-aref string->iso-8859-6)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-6 :|iso-8859-6|)
+                          '(iso-8859-6->string-aref string->iso-8859-6))
 
 (define-external-format (:iso-8859-6 :|iso-8859-6|)
     1 t
@@ -648,11 +643,11 @@
 )
 
 (declaim (inline get-iso-8859-7-bytes))
-(defun get-iso-8859-7-bytes(string pos end)
+(defun get-iso-8859-7-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-7-mapper :iso-8859-7 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-7-mapper :iso-8859-7 string pos))
 
 (defun string->iso-8859-7 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -676,9 +671,8 @@
 
 (instantiate-octets-definition define-iso-8859-7->string)
 
-(push '((:iso-8859-7 :|iso-8859-7|)
-        iso-8859-7->string-aref string->iso-8859-7)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-7 :|iso-8859-7|)
+                          '(iso-8859-7->string-aref string->iso-8859-7))
 
 (define-external-format (:iso-8859-7 :|iso-8859-7|)
     1 t
@@ -764,11 +758,11 @@
 )
 
 (declaim (inline get-iso-8859-8-bytes))
-(defun get-iso-8859-8-bytes(string pos end)
+(defun get-iso-8859-8-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-8-mapper :iso-8859-8 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-8-mapper :iso-8859-8 string pos))
 
 (defun string->iso-8859-8 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -792,9 +786,8 @@
 
 (instantiate-octets-definition define-iso-8859-8->string)
 
-(push '((:iso-8859-8 :|iso-8859-8|)
-        iso-8859-8->string-aref string->iso-8859-8)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-8 :|iso-8859-8|)
+                          '(iso-8859-8->string-aref string->iso-8859-8))
 
 (define-external-format (:iso-8859-8 :|iso-8859-8|)
     1 t
@@ -817,11 +810,11 @@
 )
 
 (declaim (inline get-iso-8859-9-bytes))
-(defun get-iso-8859-9-bytes(string pos end)
+(defun get-iso-8859-9-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-9-mapper :iso-8859-9 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-9-mapper :iso-8859-9 string pos))
 
 (defun string->iso-8859-9 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -845,9 +838,8 @@
 
 (instantiate-octets-definition define-iso-8859-9->string)
 
-(push '((:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
-        iso-8859-9->string-aref string->iso-8859-9)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
+                          '(iso-8859-9->string-aref string->iso-8859-9))
 
 (define-external-format (:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
     1 t
@@ -910,11 +902,11 @@
 )
 
 (declaim (inline get-iso-8859-10-bytes))
-(defun get-iso-8859-10-bytes(string pos end)
+(defun get-iso-8859-10-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-10-mapper :iso-8859-10 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-10-mapper :iso-8859-10 string pos))
 
 (defun string->iso-8859-10 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -938,9 +930,8 @@
 
 (instantiate-octets-definition define-iso-8859-10->string)
 
-(push '((:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
-        iso-8859-10->string-aref string->iso-8859-10)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
+                          '(iso-8859-10->string-aref string->iso-8859-10))
 
 (define-external-format (:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
     1 t
@@ -1052,11 +1043,11 @@
 )
 
 (declaim (inline get-iso-8859-11-bytes))
-(defun get-iso-8859-11-bytes(string pos end)
+(defun get-iso-8859-11-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-11-mapper :iso-8859-11 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-11-mapper :iso-8859-11 string pos))
 
 (defun string->iso-8859-11 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1080,9 +1071,8 @@
 
 (instantiate-octets-definition define-iso-8859-11->string)
 
-(push '((:iso-8859-11 :|iso-8859-11|)
-        iso-8859-11->string-aref string->iso-8859-11)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-11 :|iso-8859-11|)
+                          '(iso-8859-11->string-aref string->iso-8859-11))
 
 (define-external-format (:iso-8859-11 :|iso-8859-11|)
     1 t
@@ -1155,11 +1145,11 @@
 )
 
 (declaim (inline get-iso-8859-13-bytes))
-(defun get-iso-8859-13-bytes(string pos end)
+(defun get-iso-8859-13-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-13-mapper :iso-8859-13 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-13-mapper :iso-8859-13 string pos))
 
 (defun string->iso-8859-13 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1183,9 +1173,8 @@
 
 (instantiate-octets-definition define-iso-8859-13->string)
 
-(push '((:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
-        iso-8859-13->string-aref string->iso-8859-13)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
+                          '(iso-8859-13->string-aref string->iso-8859-13))
 
 (define-external-format (:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
     1 t
@@ -1233,11 +1222,11 @@
 )
 
 (declaim (inline get-iso-8859-14-bytes))
-(defun get-iso-8859-14-bytes(string pos end)
+(defun get-iso-8859-14-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->iso-8859-14-mapper :iso-8859-14 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->iso-8859-14-mapper :iso-8859-14 string pos))
 
 (defun string->iso-8859-14 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1261,9 +1250,8 @@
 
 (instantiate-octets-definition define-iso-8859-14->string)
 
-(push '((:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
-        iso-8859-14->string-aref string->iso-8859-14)
-      *external-format-functions*)
+(add-external-format-funs '(:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
+                          '(iso-8859-14->string-aref string->iso-8859-14))
 
 (define-external-format (:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
     1 t

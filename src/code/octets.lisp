@@ -172,37 +172,88 @@ one-past-the-end"
 
 ;;; to latin (including ascii)
 
+;;; Converting bytes to character codes is easy: just use a 256-element
+;;; lookup table that maps each possible byte to its corresponding
+;;; character code.
+;;;
+;;; Converting character codes to bytes is a little harder, since the
+;;; codes may be spare (e.g. we use codes 0-127, 3490, and 4598).  The
+;;; previous version of this macro utilized a gigantic CASE expression
+;;; to do the hard work, with the result that the code was huge (since
+;;; SBCL's then-current compilation strategy for CASE expressions was
+;;; (and still is) converting CASE into COND into if-the-elses--which is
+;;; also inefficient unless your code happens to occur very early in the
+;;; chain.
+;;;
+;;; The current strategy is to build a table:
+;;;
+;;; [ ... code_1 byte_1 code_2 byte_2 ... code_n byte_n ... ]
+;;;
+;;; such that the codes are sorted in order from lowest to highest.  We
+;;; can then binary search the table to discover the appropriate byte
+;;; for a character code.  We also implement an optimization: all unibyte
+;;; mappings do not remap ASCII (0-127) and some do not remap part of
+;;; the range beyond character code 127.  So we check to see if the
+;;; character code falls into that range first (a quick check, since
+;;; character codes are guaranteed to be positive) and then do the binary
+;;; search if not.  This optimization also enables us to cut down on the
+;;; size of our lookup table.
 (defmacro define-unibyte-mapper (byte-char-name code-byte-name &rest exceptions)
-  `(progn
-    (declaim (inline ,byte-char-name))
-    (defun ,byte-char-name (byte)
-      (declare (optimize speed (safety 0))
-               (type (unsigned-byte 8) byte))
-      (aref ,(make-array 256
-                         :initial-contents (loop for byte below 256
-                                                 collect
-                                                  (let ((exception (cadr (assoc byte exceptions))))
-                                                    (if exception
-                                                        exception
-                                                        byte))))
-            byte))
-    ;; This used to be inlined, but it caused huge slowdowns in SBCL builds,
-    ;; bloated the core by about 700k on x86-64. Removing the inlining
-    ;; didn't seem to have any performance effect. -- JES, 2005-10-15
-    (defun ,code-byte-name (code)
-      (declare (optimize speed (safety 0))
-               (type char-code code))
-      ;; FIXME: I'm not convinced doing this with CASE is a good idea as
-      ;; long as it's just macroexpanded into a stupid COND. Consider
-      ;; for example the output of (DISASSEMBLE 'SB-IMPL::CODE->CP1250-MAPPER)
-      ;; -- JES, 2005-10-15
-      (case code
-        ,@(mapcar (lambda (exception)
-                    (destructuring-bind (byte code) exception
-                      `(,code ,byte)))
-                  exceptions)
-        (,(mapcar #'car exceptions) nil)
-        (otherwise (if (< code 256) code nil))))))
+  (let* (;; Build a list of (CODE BYTE) pairs
+         (pairs (loop for byte below 256
+                   for code = (let ((exception (cdr (assoc byte exceptions))))
+                                (cond
+                                  ((car exception) (car exception))
+                                  ((null exception) byte)
+                                  (t nil)))
+                   when code collect (list code byte) into elements
+                   finally (return elements)))
+         ;; Find the smallest character code such that the corresponding
+         ;; byte is != to the code.
+         (lowest-non-equivalent-code (position-if-not #'(lambda (pair)
+                                                          (apply #'= pair))
+                                                      pairs))
+         ;; Sort them for our lookup table.
+         (sorted-pairs (sort (subseq pairs lowest-non-equivalent-code)
+                             #'< :key #'car))
+         ;; Create the lookup table.
+         (sorted-lookup-table
+          (reduce #'append sorted-pairs :from-end t :initial-value nil)))
+    `(progn
+       ; Can't inline it with a non-null lexical environment anyway.
+       ;(declaim (inline ,byte-char-name))
+       (let ((byte-to-code-table
+              ,(make-array 256 :element-type t #+nil 'char-code
+                           :initial-contents (loop for byte below 256
+                                                collect
+                                                (let ((exception (cadr (assoc byte exceptions))))
+                                                  (if exception
+                                                      exception
+                                                      byte)))))
+             (code-to-byte-table
+              ,(make-array (length sorted-lookup-table)
+                           :initial-contents sorted-lookup-table)))
+         (defun ,byte-char-name (byte)
+           (declare (optimize speed (safety 0))
+                    (type (unsigned-byte 8) byte))
+           (aref byte-to-code-table byte))
+         (defun ,code-byte-name (code)
+           (declare (optimize speed (safety 0))
+                    (type char-code code))
+           (if (< code ,lowest-non-equivalent-code)
+               code
+               ;; We could toss in some TRULY-THEs if we really needed to
+               ;; make this faster...
+               (loop with low = 0
+                  with high = (- (length code-to-byte-table) 2)
+                  while (< low high)
+                  do (let ((mid (logandc2 (truncate (+ low high 2) 2) 1)))
+                       (if (< code (aref code-to-byte-table mid))
+                           (setf high (- mid 2))
+                           (setf low mid)))
+                  finally (return (if (eql code (aref code-to-byte-table low))
+                                      (aref code-to-byte-table (1+ low))
+                                      nil)))))))))
 
 #!+sb-unicode
 (define-unibyte-mapper
@@ -218,8 +269,7 @@ one-past-the-end"
   (#xBE #x0178))
 
 (declaim (inline get-latin-bytes))
-(defun get-latin-bytes (mapper external-format string pos end)
-  (declare (ignore end))
+(defun get-latin-bytes (mapper external-format string pos)
   (let ((code (funcall mapper (char-code (char string pos)))))
     (declare (type (or null char-code) code))
     (values (cond
@@ -237,47 +287,80 @@ one-past-the-end"
       code))
 
 (declaim (inline get-ascii-bytes))
-(defun get-ascii-bytes (string pos end)
+(defun get-ascii-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->ascii-mapper :ascii string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->ascii-mapper :ascii string pos))
 
 (declaim (inline get-latin1-bytes))
-(defun get-latin1-bytes (string pos end)
+(defun get-latin1-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'identity :latin-1 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'identity :latin-1 string pos))
 
 #!+sb-unicode
 (progn
   (declaim (inline get-latin9-bytes))
-  (defun get-latin9-bytes (string pos end)
+  (defun get-latin9-bytes (string pos)
     (declare (optimize speed (safety 0))
              (type simple-string string)
-             (type array-range pos end))
-    (get-latin-bytes #'code->latin9-mapper :latin-9 string pos end)))
+             (type array-range pos))
+    (get-latin-bytes #'code->latin9-mapper :latin-9 string pos)))
 
 (declaim (inline string->latin%))
 (defun string->latin% (string sstart send get-bytes null-padding)
   (declare (optimize speed)
            (type simple-string string)
-           (type array-range sstart send null-padding)
+           (type index sstart send)
+           (type (integer 0 1) null-padding)
            (type function get-bytes))
-  (let ((octets (make-array 0 :adjustable t :fill-pointer 0 :element-type '(unsigned-byte 8))))
-    (loop for pos from sstart below send
-          do (let ((byte-or-bytes (funcall get-bytes string pos send)))
-               (declare (type (or (unsigned-byte 8) (simple-array (unsigned-byte 8) (*))) byte-or-bytes))
-               (cond
-                 ((numberp byte-or-bytes)
-                  (vector-push-extend byte-or-bytes octets))
-                 (t
-                  (dotimes (i (length byte-or-bytes))
-                    (vector-push-extend (aref byte-or-bytes i) octets))))))
-    (dotimes (i null-padding)
-      (vector-push-extend 0 octets))
-    (coerce octets '(simple-array (unsigned-byte 8) (*)))))
+  ;; The latin encodings are all unibyte encodings, so just directly
+  ;; compute the number of octets we're going to generate.
+  (let ((octets (make-array (+ (- send sstart) null-padding)
+                            ;; This takes care of any null padding the
+                            ;; caller requests.
+                            :initial-element 0
+                            :element-type '(unsigned-byte 8)))
+        (index 0)
+        (error-position 0))
+    (tagbody
+     :no-error
+       (loop for pos of-type index from sstart below send
+          do (let ((byte (funcall get-bytes string pos)))
+               (typecase byte
+                 ((unsigned-byte 8)
+                  (locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                    (setf (aref octets index) byte)))
+                 ((simple-array (unsigned-byte 8) (*))
+                  ;; KLUDGE: We ran into encoding errors.  Bail and do
+                  ;; things the slow way (does anybody actually use this
+                  ;; functionality besides our own test suite?).
+                  (setf error-position pos)
+                  (go :error)))
+               (incf index))
+          finally (return-from string->latin% octets))
+     :error
+       ;; We have encoded INDEX octets so far and we ran into an encoding
+       ;; error at ERROR-POSITION.
+       (let ((new-octets (make-array (* index 2)
+                                     :element-type '(unsigned-byte 8)
+                                     :adjustable t :fill-pointer index)))
+         (replace new-octets octets)
+         (loop for pos of-type index from error-position below send
+            do (let ((thing (funcall get-bytes string pos)))
+                 (typecase thing
+                   ((unsigned-byte 8)
+                    (vector-push-extend thing new-octets))
+                   ((simple-array (unsigned-byte 8) (*))
+                    (dotimes (i (length thing))
+                      (vector-push-extend (aref thing i) new-octets)))))
+            finally (return-from string->latin%
+                      (progn
+                        (unless (zerop null-padding)
+                          (vector-push-extend 0 new-octets))
+                        (copy-seq new-octets))))))))
 
 (defun string->ascii (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -311,44 +394,39 @@ one-past-the-end"
         ((< code #x110000) 4)
         (t (bug "can't happen"))))
 
-(declaim (inline char->utf8))
-(defun char->utf8 (char dest)
-  (declare (optimize speed (safety 0))
-           (type (array (unsigned-byte 8) (*)) dest))
-  (let ((code (char-code char)))
-    (flet ((add-byte (b)
-             (declare (type (unsigned-byte 8) b))
-             (vector-push-extend b dest)))
-      (declare (inline add-byte))
-      (ecase (char-len-as-utf8 code)
-        (1
-         (add-byte code))
-        (2
-         (add-byte (logior #b11000000 (ldb (byte 5 6) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
-        (3
-         (add-byte (logior #b11100000 (ldb (byte 4 12) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
-        (4
-         (add-byte (logior #b11110000 (ldb (byte 3 18) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 12) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
-         (add-byte (logior #b10000000 (ldb (byte 6 0) code))))))))
-
-(defun string->utf8 (string sstart send additional-space)
+(defun string->utf8 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range sstart send additional-space))
-  (let ((array (make-array (+ additional-space (- send sstart))
-                           :element-type '(unsigned-byte 8)
-                           :adjustable t
-                           :fill-pointer 0)))
-    (loop for i from sstart below send
-          do (char->utf8 (char string i) array))
-    (dotimes (i additional-space)
-      (vector-push-extend 0 array))
-    (coerce array '(simple-array (unsigned-byte 8) (*)))))
+           (type (integer 0 1) null-padding)
+           (type array-range sstart send))
+  (let* ((utf8-length (loop for i of-type index from sstart below send
+                         sum (char-len-as-utf8 (char-code (char string i)))))
+         (array (make-array (+ null-padding utf8-length)
+                            :initial-element 0
+                            :element-type '(unsigned-byte 8)))
+         (index 0))
+    (declare (type index index))
+    (flet ((add-byte (b)
+             (setf (aref array index) b)
+             (incf index)))
+      (loop for i of-type index from sstart below send
+          do (let ((code (char-code (char string i))))
+               (case (char-len-as-utf8 code)
+                 (1
+                  (add-byte code))
+                 (2
+                  (add-byte (logior #b11000000 (ldb (byte 5 6) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+                 (3
+                  (add-byte (logior #b11100000 (ldb (byte 4 12) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+                 (4
+                  (add-byte (logior #b11110000 (ldb (byte 3 18) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 12) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))))
+           finally (return array)))))
 
 ;;;; to-string conversions
 
@@ -687,23 +765,28 @@ one-past-the-end"
         (setf *default-external-format* external-format))))
 
 ;;; FIXME: OAOOM here vrt. DEFINE-EXTERNAL-FORMAT in fd-stream.lisp
-(defparameter *external-format-functions*
-  '(((:ascii :us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
-     ascii->string-aref string->ascii)
-    ((:latin1 :latin-1 :iso-8859-1 :iso8859-1)
-     latin1->string-aref string->latin1)
-    #!+sb-unicode
-    ((:latin9 :latin-9 :iso-8859-15 :iso8859-15)
-     latin9->string-aref string->latin9)
-    ((:utf8 :utf-8)
-     utf8->string-aref string->utf8)))
+(defparameter *external-format-functions* (make-hash-table))
+
+(defun add-external-format-funs (format-names funs)
+  (dolist (name format-names (values))
+    (setf (gethash name *external-format-functions*) funs)))
+
+(add-external-format-funs
+ '(:ascii :us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
+ '(ascii->string-aref string->ascii))
+(add-external-format-funs
+ '(:latin1 :latin-1 :iso-8859-1 :iso8859-1)
+ '(latin1->string-aref string->latin1))
+#!+sb-unicode
+(add-external-format-funs
+ '(:latin9 :latin-9 :iso-8859-15 :iso8859-15)
+ '(latin9->string-aref string->latin9))
+(add-external-format-funs '(:utf8 :utf-8) '(utf8->string-aref string->utf8))
 
 (defun external-formats-funs (external-format)
   (when (eql external-format :default)
     (setf external-format (default-external-format)))
-  (or (cdr (find external-format (the list *external-format-functions*)
-                 :test #'member
-                 :key #'car))
+  (or (gethash external-format *external-format-functions*)
       (error "Unknown external-format ~S" external-format)))
 
 ;;;; public interface

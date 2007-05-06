@@ -1,4 +1,4 @@
-(in-package #:sb!impl)
+(in-package "SB!IMPL")
 
 (define-unibyte-mapper cp437->code-mapper code->cp437-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -132,11 +132,11 @@
 )
 
 (declaim (inline get-cp437-bytes))
-(defun get-cp437-bytes(string pos end)
+(defun get-cp437-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp437-mapper :cp437 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp437-mapper :cp437 string pos))
 
 (defun string->cp437 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -160,9 +160,8 @@
 
 (instantiate-octets-definition define-cp437->string)
 
-(push '((:cp437 :|cp437|)
-        cp437->string-aref string->cp437)
-      *external-format-functions*)
+(add-external-format-funs '(:cp437 :|cp437|)
+                          '(cp437->string-aref string->cp437))
 
 (define-external-format (:cp437 :|cp437|)
     1 t
@@ -307,11 +306,11 @@
 )
 
 (declaim (inline get-cp850-bytes))
-(defun get-cp850-bytes(string pos end)
+(defun get-cp850-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp850-mapper :cp850 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp850-mapper :cp850 string pos))
 
 (defun string->cp850 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -335,9 +334,8 @@
 
 (instantiate-octets-definition define-cp850->string)
 
-(push '((:cp850 :|cp850|)
-        cp850->string-aref string->cp850)
-      *external-format-functions*)
+(add-external-format-funs '(:cp850 :|cp850|)
+                          '(cp850->string-aref string->cp850))
 
 (define-external-format (:cp850 :|cp850|)
     1 t
@@ -482,11 +480,11 @@
 )
 
 (declaim (inline get-cp852-bytes))
-(defun get-cp852-bytes(string pos end)
+(defun get-cp852-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp852-mapper :cp852 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp852-mapper :cp852 string pos))
 
 (defun string->cp852 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -510,9 +508,8 @@
 
 (instantiate-octets-definition define-cp852->string)
 
-(push '((:cp852 :|cp852|)
-        cp852->string-aref string->cp852)
-      *external-format-functions*)
+(add-external-format-funs '(:cp852 :|cp852|)
+                          '(cp852->string-aref string->cp852))
 
 (define-external-format (:cp852 :|cp852|)
     1 t
@@ -657,11 +654,11 @@
 )
 
 (declaim (inline get-cp855-bytes))
-(defun get-cp855-bytes(string pos end)
+(defun get-cp855-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp855-mapper :cp855 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp855-mapper :cp855 string pos))
 
 (defun string->cp855 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -685,9 +682,8 @@
 
 (instantiate-octets-definition define-cp855->string)
 
-(push '((:cp855 :|cp855|)
-        cp855->string-aref string->cp855)
-      *external-format-functions*)
+(add-external-format-funs '(:cp855 :|cp855|)
+                          '(cp855->string-aref string->cp855))
 
 (define-external-format (:cp855 :|cp855|)
     1 t
@@ -831,11 +827,11 @@
 )
 
 (declaim (inline get-cp857-bytes))
-(defun get-cp857-bytes(string pos end)
+(defun get-cp857-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp857-mapper :cp857 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp857-mapper :cp857 string pos))
 
 (defun string->cp857 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -859,9 +855,8 @@
 
 (instantiate-octets-definition define-cp857->string)
 
-(push '((:cp857 :|cp857|)
-        cp857->string-aref string->cp857)
-      *external-format-functions*)
+(add-external-format-funs '(:cp857 :|cp857|)
+                          '(cp857->string-aref string->cp857))
 
 (define-external-format (:cp857 :|cp857|)
     1 t
@@ -1006,11 +1001,11 @@
 )
 
 (declaim (inline get-cp860-bytes))
-(defun get-cp860-bytes(string pos end)
+(defun get-cp860-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp860-mapper :cp860 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp860-mapper :cp860 string pos))
 
 (defun string->cp860 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1034,9 +1029,8 @@
 
 (instantiate-octets-definition define-cp860->string)
 
-(push '((:cp860 :|cp860|)
-        cp860->string-aref string->cp860)
-      *external-format-functions*)
+(add-external-format-funs '(:cp860 :|cp860|)
+                          '(cp860->string-aref string->cp860))
 
 (define-external-format (:cp860 :|cp860|)
     1 t
@@ -1181,11 +1175,11 @@
 )
 
 (declaim (inline get-cp861-bytes))
-(defun get-cp861-bytes(string pos end)
+(defun get-cp861-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp861-mapper :cp861 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp861-mapper :cp861 string pos))
 
 (defun string->cp861 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1209,9 +1203,8 @@
 
 (instantiate-octets-definition define-cp861->string)
 
-(push '((:cp861 :|cp861|)
-        cp861->string-aref string->cp861)
-      *external-format-functions*)
+(add-external-format-funs '(:cp861 :|cp861|)
+                          '(cp861->string-aref string->cp861))
 
 (define-external-format (:cp861 :|cp861|)
     1 t
@@ -1356,11 +1349,11 @@
 )
 
 (declaim (inline get-cp862-bytes))
-(defun get-cp862-bytes(string pos end)
+(defun get-cp862-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp862-mapper :cp862 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp862-mapper :cp862 string pos))
 
 (defun string->cp862 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1384,9 +1377,8 @@
 
 (instantiate-octets-definition define-cp862->string)
 
-(push '((:cp862 :|cp862|)
-        cp862->string-aref string->cp862)
-      *external-format-functions*)
+(add-external-format-funs '(:cp862 :|cp862|)
+                          '(cp862->string-aref string->cp862))
 
 (define-external-format (:cp862 :|cp862|)
     1 t
@@ -1531,11 +1523,11 @@
 )
 
 (declaim (inline get-cp863-bytes))
-(defun get-cp863-bytes(string pos end)
+(defun get-cp863-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp863-mapper :cp863 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp863-mapper :cp863 string pos))
 
 (defun string->cp863 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1559,9 +1551,8 @@
 
 (instantiate-octets-definition define-cp863->string)
 
-(push '((:cp863 :|cp863|)
-        cp863->string-aref string->cp863)
-      *external-format-functions*)
+(add-external-format-funs '(:cp863 :|cp863|)
+                          '(cp863->string-aref string->cp863))
 
 (define-external-format (:cp863 :|cp863|)
     1 t
@@ -1703,11 +1694,11 @@
 )
 
 (declaim (inline get-cp864-bytes))
-(defun get-cp864-bytes(string pos end)
+(defun get-cp864-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp864-mapper :cp864 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp864-mapper :cp864 string pos))
 
 (defun string->cp864 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1731,9 +1722,8 @@
 
 (instantiate-octets-definition define-cp864->string)
 
-(push '((:cp864 :|cp864|)
-        cp864->string-aref string->cp864)
-      *external-format-functions*)
+(add-external-format-funs '(:cp864 :|cp864|)
+                          '(cp864->string-aref string->cp864))
 
 (define-external-format (:cp864 :|cp864|)
     1 t
@@ -1878,11 +1868,11 @@
 )
 
 (declaim (inline get-cp865-bytes))
-(defun get-cp865-bytes(string pos end)
+(defun get-cp865-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp865-mapper :cp865 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp865-mapper :cp865 string pos))
 
 (defun string->cp865 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -1906,9 +1896,8 @@
 
 (instantiate-octets-definition define-cp865->string)
 
-(push '((:cp865 :|cp865|)
-        cp865->string-aref string->cp865)
-      *external-format-functions*)
+(add-external-format-funs '(:cp865 :|cp865|)
+                          '(cp865->string-aref string->cp865))
 
 (define-external-format (:cp865 :|cp865|)
     1 t
@@ -2053,11 +2042,11 @@
 )
 
 (declaim (inline get-cp866-bytes))
-(defun get-cp866-bytes(string pos end)
+(defun get-cp866-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp866-mapper :cp866 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp866-mapper :cp866 string pos))
 
 (defun string->cp866 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2081,9 +2070,8 @@
 
 (instantiate-octets-definition define-cp866->string)
 
-(push '((:cp866 :|cp866|)
-        cp866->string-aref string->cp866)
-      *external-format-functions*)
+(add-external-format-funs '(:cp866 :|cp866|)
+                          '(cp866->string-aref string->cp866))
 
 (define-external-format (:cp866 :|cp866|)
     1 t
@@ -2228,11 +2216,11 @@
 )
 
 (declaim (inline get-cp869-bytes))
-(defun get-cp869-bytes(string pos end)
+(defun get-cp869-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp869-mapper :cp869 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp869-mapper :cp869 string pos))
 
 (defun string->cp869 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2256,9 +2244,8 @@
 
 (instantiate-octets-definition define-cp869->string)
 
-(push '((:cp869 :|cp869|)
-        cp869->string-aref string->cp869)
-      *external-format-functions*)
+(add-external-format-funs '(:cp869 :|cp869|)
+                          '(cp869->string-aref string->cp869))
 
 (define-external-format (:cp869 :|cp869|)
     1 t
@@ -2402,11 +2389,11 @@
 )
 
 (declaim (inline get-cp874-bytes))
-(defun get-cp874-bytes(string pos end)
+(defun get-cp874-bytes (string pos)
   (declare (optimize speed (safety 0))
            (type simple-string string)
-           (type array-range pos end))
-  (get-latin-bytes #'code->cp874-mapper :cp874 string pos end))
+           (type array-range pos))
+  (get-latin-bytes #'code->cp874-mapper :cp874 string pos))
 
 (defun string->cp874 (string sstart send null-padding)
   (declare (optimize speed (safety 0))
@@ -2430,9 +2417,8 @@
 
 (instantiate-octets-definition define-cp874->string)
 
-(push '((:cp874 :|cp874|)
-        cp874->string-aref string->cp874)
-      *external-format-functions*)
+(add-external-format-funs '(:cp874 :|cp874|)
+                          '(cp874->string-aref string->cp874))
 
 (define-external-format (:cp874 :|cp874|)
     1 t
