@@ -409,6 +409,42 @@
                                   :disp (- (* (+ ,offset index) n-word-bytes)
                                            ,lowtag)))))))
 
+(defmacro define-full-reffer+offset (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg)))
+       (:info offset)
+       (:arg-types ,type tagged-num
+                   (:constant (constant-displacement other-pointer-lowtag
+                                                     n-word-bytes vector-data-offset)))
+       (:results (value :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 3                    ; pw was 5
+         (inst mov value (make-ea :qword :base object :index index
+                                  :disp (- (* (+ ,offset offset) n-word-bytes)
+                                           ,lowtag)))))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg)))
+       (:info index offset)
+       (:arg-types ,type
+                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                ,(eval offset)))
+                   (:constant (constant-displacement other-pointer-lowtag
+                                                     n-word-bytes vector-data-offset)))
+       (:results (value :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 2                    ; pw was 5
+         (inst mov value (make-ea :qword :base object
+                                  :disp (- (* (+ ,offset index offset) n-word-bytes)
+                                           ,lowtag)))))))
+
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
@@ -442,6 +478,51 @@
        (:generator 3                    ; was 5
          (inst mov (make-ea :qword :base object
                             :disp (- (* (+ ,offset index) n-word-bytes)
+                                     ,lowtag))
+               value)
+         (move result value)))))
+
+(defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
+  `(progn
+     (define-vop (,name)
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg))
+              (value :scs ,scs :target result))
+       (:info offset)
+       (:arg-types ,type tagged-num
+                   (:constant (constant-displacement other-pointer-lowtag
+                                                     n-word-bytes
+                                                     vector-data-offset))
+                   ,el-type)
+       (:results (result :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 4                    ; was 5
+         (inst mov (make-ea :qword :base object :index index
+                            :disp (- (* (+ ,offset offset) n-word-bytes) ,lowtag))
+               value)
+         (move result value)))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (value :scs ,scs :target result))
+       (:info index offset)
+       (:arg-types ,type
+                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                ,(eval offset)))
+                   (:constant (constant-displacement other-pointer-lowtag
+                                                     n-word-bytes
+                                                     vector-data-offset))
+                   ,el-type)
+       (:results (result :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 3                    ; was 5
+         (inst mov (make-ea :qword :base object
+                            :disp (- (* (+ ,offset index offset) n-word-bytes)
                                      ,lowtag))
                value)
          (move result value)))))

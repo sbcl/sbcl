@@ -69,7 +69,7 @@
                           (* max-offset sb!vm:n-word-bytes))
                        scale)))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun displacement-bounds (lowtag element-size data-offset)
   (let* ((adjustment (- (* data-offset sb!vm:n-word-bytes) lowtag))
          (bytes-per-element (ceiling element-size sb!vm:n-byte-bits))
@@ -79,7 +79,7 @@
                         bytes-per-element)))
     (values min max)))
 
-#!+x86
+#!+(or x86 x86-64)
 (def!type constant-displacement (lowtag element-size data-offset)
   (flet ((integerify (x)
            (etypecase x

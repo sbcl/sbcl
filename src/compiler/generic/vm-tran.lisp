@@ -33,7 +33,7 @@
   '(if (< x 0) (- x) x))
 
 ;;; We don't want to clutter the bignum code.
-#!+x86
+#!+(or x86 x86-64)
 (define-source-transform sb!bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on
@@ -45,7 +45,7 @@
   `(sb!bignum:%bignum-ref-with-offset ,bignum
                                       (truly-the bignum-index ,index) 0))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun fold-index-addressing (fun-name element-size lowtag data-offset
                               index offset &optional setter-p)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
@@ -65,7 +65,7 @@
            (,fun-name thing index (,func off2 off1) ,@(when setter-p
                                                         '(value))))))))
 
-#!+x86
+#!+(or x86 x86-64)
 (deftransform sb!bignum:%bignum-ref-with-offset
     ((bignum index offset) * * :node node)
   (fold-index-addressing 'sb!bignum:%bignum-ref-with-offset
@@ -173,7 +173,7 @@
 
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
-#!+x86
+#!+(or x86 x86-64)
 (deftransform data-vector-ref ((array index) ((or (simple-unboxed-array (*))
                                                   simple-vector)
                                               t))
@@ -186,7 +186,7 @@
         (give-up-ir1-transform))
       `(data-vector-ref-with-offset array index 0))))
 
-#!+x86
+#!+(or x86 x86-64)
 (deftransform data-vector-ref-with-offset ((array index offset)
                                            ((or (simple-unboxed-array (*))
                                                 simple-vector)
@@ -262,7 +262,7 @@
 
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
-#!+x86
+#!+(or x86 x86-64)
 (deftransform data-vector-set ((array index new-value)
                                ((or (simple-unboxed-array (*)) simple-vector)
                                 t t))
@@ -275,7 +275,7 @@
         (give-up-ir1-transform))
       `(data-vector-set-with-offset array index 0 new-value))))
 
-#!+x86
+#!+(or x86 x86-64)
 (deftransform data-vector-set-with-offset ((array index offset new-value)
                                            ((or (simple-unboxed-array (*))
                                                 simple-vector)

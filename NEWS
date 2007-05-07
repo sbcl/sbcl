@@ -4,6 +4,10 @@ changes in sbcl-1.0.6 relative to sbcl-1.0.5:
     as a contrib module.
   * optimization: STRING-TO-OCTETS for unibyte encodings and UTF-8 is
     significantly faster.
+  * optimization: calls of the form (AREF FOO (+ INDEX <constant>)) now
+    produce more efficient code on x86-64 if the compiler can determine
+    that (+ INDEX <constant>) does not require a bounds check and FOO
+    has an element type at least 8 bits wide.
   * enhancement: a new, experimental synchronous timeout facility is
     provided. Refer to SB-SYS:WITH-DEADLINE for details.
   * enhancement: when a symbol name conflict error arises, the

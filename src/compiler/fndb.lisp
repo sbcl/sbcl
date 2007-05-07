@@ -1433,12 +1433,12 @@
 (defknown %check-bound (array index fixnum) index (movable foldable flushable))
 (defknown data-vector-ref (simple-array index) t
   (foldable explicit-check always-translatable))
-#!+x86
+#!+(or x86 x86-64)
 (defknown data-vector-ref-with-offset (simple-array index fixnum) t
   (foldable explicit-check always-translatable))
 (defknown data-vector-set (array index t) t
   (unsafe explicit-check always-translatable))
-#!+x86
+#!+(or x86 x86-64)
 (defknown data-vector-set-with-offset (array index fixnum t) t
   (unsafe explicit-check always-translatable))
 (defknown hairy-data-vector-ref (array index) t

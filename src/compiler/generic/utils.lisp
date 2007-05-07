@@ -19,7 +19,7 @@
       (error "~W is too big for a fixnum." num)))
 
 ;;; Determining whether a constant offset fits in an addressing mode.
-#!+x86
+#!+(or x86 x86-64)
 (defun foldable-constant-offset-p (element-size lowtag data-offset offset)
   (if (< element-size n-byte-bits)
       nil
