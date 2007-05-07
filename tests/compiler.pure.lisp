@@ -2248,3 +2248,6 @@
                                              (simple-vector s))
                                     (copy-seq s)))
                     (vector 1 2 3 4)))))
+
+;;; bug in adding DATA-VECTOR-REF-WITH-OFFSET to x86-64
+(assert (not (mismatch #(1.0f0 2.0f0) (make-array 2 :element-type 'single-float :initial-contents (list 1.0f0 2.0f0)))))

@@ -385,7 +385,7 @@
   (:generator 5
    (move dword-index index)
    (inst shr dword-index 1)
-   (inst movss (make-ea-for-float-ref object index offset 4) value)
+   (inst movss (make-ea-for-float-ref object dword-index offset 4) value)
    (unless (location= result value)
      (inst movss result value))))
 
