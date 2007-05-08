@@ -198,17 +198,17 @@
 
 #!+freebsd
 (progn
-  (def!constant read-only-space-start     #x10000000)
-  (def!constant read-only-space-end       #x100ff000)
+  (def!constant read-only-space-start     #x01000000)
+  (def!constant read-only-space-end       #x010ff000)
 
-  (def!constant static-space-start        #x10100000)
-  (def!constant static-space-end          #x101ff000)
+  (def!constant static-space-start        #x01100000)
+  (def!constant static-space-end          #x011ff000)
 
-  (def!constant dynamic-space-start       #x48000000)
-  (def!constant dynamic-space-end         #x88000000)
+  (def!constant dynamic-space-start       #x60000000)
+  (def!constant dynamic-space-end         #xA0000000)
 
-  (def!constant linkage-table-space-start #x10200000)
-  (def!constant linkage-table-space-end   #x102ff000))
+  (def!constant linkage-table-space-start #x01200000)
+  (def!constant linkage-table-space-end   #x012ff000))
 
 #!+openbsd
 (progn
