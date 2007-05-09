@@ -6,6 +6,11 @@
       (incf a))
     a))
 
+;;; Test for a bad interaction between *READ-SUPPRESS* and #. in
+;;; source location recording.
+(identity #+sbcl #.1
+          #+cmu #.3)
+
 ;;; This test would show that we do correct detection of non-cons
 ;;; source forms in non-PROGN-contexts. Which we don't, so this test
 ;;; is commented out.

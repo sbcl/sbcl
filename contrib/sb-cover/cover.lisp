@@ -113,13 +113,16 @@ files can be specified with the EXTERNAL-FORMAT parameter."
                  (loop with map = nil
                        with form = nil
                        with eof = nil
+                       for i from 0
                        do (setf (values form map)
                                 (handler-case
                                     (read-and-record-source-map stream)
                                   (end-of-file ()
                                     (setf eof t))
-                                  (error ()
-                                    (values nil nil))))
+                                  (error (error)
+                                    (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
+                                    (values nil
+                                            (make-hash-table)))))
                        until eof
                        when map
                        collect (cons form map)))))
@@ -427,12 +430,10 @@ The source locations are stored in SOURCE-MAP."
 (defun suppress-sharp-dot (readtable)
   (when (get-macro-character #\# readtable)
     (let ((sharp-dot (get-dispatch-macro-character #\# #\. readtable)))
-      (set-dispatch-macro-character #\# #\. (lambda (&rest args)
-                                              (let ((*read-suppress* t))
-                                                (apply sharp-dot args))
-                                              (if *read-suppress*
-                                                  (values)
-                                                  (list (gensym "#."))))
+      (set-dispatch-macro-character #\# #\.
+                                    (lambda (&rest args)
+                                      (let ((*read-suppress* t))
+                                        (apply sharp-dot args)))
                                     readtable))))
 
 (defun read-and-record-source-map (stream)
