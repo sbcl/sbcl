@@ -629,6 +629,22 @@
 (defmethod specializer-class ((specializer eql-specializer))
   (class-of (slot-value specializer 'object)))
 
+;;; KLUDGE: this is needed to allow for user-defined specializers in
+;;; RAISE-METATYPE; however, the list of methods is maintained by
+;;; hand, which is error-prone.  We can't just add a method to
+;;; SPECIALIZER-CLASS, or at least not with confidence, as that
+;;; function is used elsewhere in PCL.  -- CSR, 2007-05-10
+(defmethod specializer-class-or-nil ((specializer specializer))
+  nil)
+(defmethod specializer-class-or-nil ((specializer eql-specializer))
+  (specializer-class specializer))
+(defmethod specializer-class-or-nil ((specializer class))
+  (specializer-class specializer))
+(defmethod specializer-class-or-nil ((specializer class-eq-specializer))
+  (specializer-class specializer))
+(defmethod specializer-class-or-nil ((specializer class-prototype-specializer))
+  (specializer-class specializer))
+
 (defun error-need-at-least-n-args (function n)
   (error 'simple-program-error
          :format-control "~@<The function ~2I~_~S ~I~_requires ~

@@ -187,17 +187,31 @@
     (check-wrapper-validity instance)))
 
 ;;;  NIL: means nothing so far, no actual arg info has NILs in the
-;;;  metatype
+;;;  metatype.
 ;;;
 ;;;  CLASS: seen all sorts of metaclasses (specifically, more than one
 ;;;  of the next 5 values) or else have seen something which doesn't
-;;;  fall into a single category (SLOT-INSTANCE, FORWARD).
+;;;  fall into a single category (SLOT-INSTANCE, FORWARD).  Also used
+;;;  when seen a non-standard specializer.
 ;;;
-;;;  T: means everything so far is the class T
-;;;  STANDARD-INSTANCE: seen only standard classes
-;;;  BUILT-IN-INSTANCE: seen only built in classes
-;;;  STRUCTURE-INSTANCE: seen only structure classes
-;;;  CONDITION-INSTANCE: seen only condition classes
+;;;  T: means everything so far is the class T.
+;;;
+;;;  The above three are the really important ones, as they affect how
+;;;  discriminating functions are computed.  There are some other
+;;;  possible metatypes:
+;;;
+;;;  * STANDARD-INSTANCE: seen only standard classes
+;;;  * BUILT-IN-INSTANCE: seen only built in classes
+;;;  * STRUCTURE-INSTANCE: seen only structure classes
+;;;  * CONDITION-INSTANCE: seen only condition classes
+;;;
+;;;  but these are largely unexploited as of 2007-05-10.  The
+;;;  distinction between STANDARD-INSTANCE and the others is used in
+;;;  emitting wrapper/slot-getting code in accessor discriminating
+;;;  functions (see EMIT-FETCH-WRAPPER and EMIT-READER/WRITER); it is
+;;;  possible that there was an intention to use these metatypes to
+;;;  specialize cache implementation or discrimination nets, but this
+;;;  has not occurred as yet.
 (defun raise-metatype (metatype new-specializer)
   (let ((slot      (find-class 'slot-class))
         (standard  (find-class 'standard-class))
@@ -207,12 +221,13 @@
         (built-in  (find-class 'built-in-class))
         (frc       (find-class 'forward-referenced-class)))
     (flet ((specializer->metatype (x)
-             (let ((meta-specializer
-                     (if (eq *boot-state* 'complete)
-                         (class-of (specializer-class x))
-                         (class-of x))))
+             (let* ((specializer-class (if (eq *boot-state* 'complete)
+                                           (specializer-class-or-nil x)
+                                           x))
+                   (meta-specializer (class-of specializer-class)))
                (cond
                  ((eq x *the-class-t*) t)
+                 ((not specializer-class) 'non-standard)
                  ((*subtypep meta-specializer standard) 'standard-instance)
                  ((*subtypep meta-specializer fsc) 'standard-instance)
                  ((*subtypep meta-specializer condition) 'condition-instance)
@@ -232,6 +247,7 @@
       (let ((new-metatype (specializer->metatype new-specializer)))
         (cond ((eq new-metatype 'slot-instance) 'class)
               ((eq new-metatype 'forward) 'class)
+              ((eq new-metatype 'non-standard) 'class)
               ((null metatype) new-metatype)
               ((eq metatype new-metatype) new-metatype)
               (t 'class))))))

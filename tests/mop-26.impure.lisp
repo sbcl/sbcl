@@ -34,3 +34,9 @@
 
 (assert (test (make-instance 'super)))
 (assert (null (test (make-instance 'sub))))
+
+(let ((spec (sb-pcl::class-eq-specializer (find-class 't))))
+  (eval `(defmethod test ((x ,spec)) (class-of x))))
+
+(assert (test (make-instance 'super)))
+(assert (null (test (make-instance 'sub))))

@@ -545,10 +545,18 @@
              (fsc-instance-wrapper ,argument))
             (t
              (go ,miss-label))))
-    (class
+    ;; Sep92 PCL used to distinguish between some of these cases (and
+    ;; spuriously exclude others).  Since in SBCL
+    ;; WRAPPER-OF/LAYOUT-OF/BUILT-IN-OR-STRUCTURE-WRAPPER are all
+    ;; equivalent and inlined to each other, we can collapse some
+    ;; spurious differences.
+    ((class built-in-instance structure-instance condition-instance)
      (when slot (error "can't do a slot reg for this metatype"))
      `(wrapper-of ,argument))
-    ((built-in-instance structure-instance)
-     (when slot (error "can't do a slot reg for this metatype"))
-     `(built-in-or-structure-wrapper
-       ,argument))))
+    ;; a metatype of NIL should never be seen here, as NIL is only in
+    ;; the metatypes before a generic function is fully initialized.
+    ;; T should never be seen because we never need to get a wrapper
+    ;; to do dispatch if all methods have T as the respective
+    ;; specializer.
+    ((t nil)
+     (bug "~@<metatype ~S seen in ~S.~@:>" metatype 'emit-fetch-wrapper))))

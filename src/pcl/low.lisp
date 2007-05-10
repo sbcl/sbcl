@@ -260,8 +260,6 @@
   (when (pcl-instance-p instance)
     (get-slots instance)))
 
-(defmacro built-in-or-structure-wrapper (x) `(layout-of ,x))
-
 (defmacro get-wrapper (inst)
   (once-only ((wrapper `(wrapper-of ,inst)))
     `(progn

@@ -638,7 +638,7 @@ bootstrapping.
                  (cond
                    (class
                     (if (typep class '(or built-in-class structure-class))
-                        `(type ,specializer ,parameter)
+                        `(type ,class ,parameter)
                         ;; don't declare CLOS classes as parameters;
                         ;; it's too expensive.
                         '(ignorable)))
