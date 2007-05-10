@@ -216,10 +216,9 @@
 
 (defun expand-effective-method-function (gf effective-method &optional env)
   (declare (ignore env))
-  (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
+  (multiple-value-bind (nreq applyp)
       (get-generic-fun-info gf)
-    (declare (ignore nreq nkeys arg-info))
-    (let ((ll (make-fast-method-call-lambda-list metatypes applyp))
+    (let ((ll (make-fast-method-call-lambda-list nreq applyp))
           (check-applicable-keywords
            (when (and applyp (gf-requires-emf-keyword-checks gf))
              '((check-applicable-keywords))))
@@ -243,7 +242,7 @@
              (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
              ,effective-method)))
         (mc-args-p
-         (let* ((required (make-dfun-required-args metatypes))
+         (let* ((required (make-dfun-required-args nreq))
                 (gf-args (if applyp
                              `(list* ,@required
                                      (sb-c::%listify-rest-args
@@ -310,7 +309,7 @@
     (call-method
      (let ((gensym (get-effective-method-gensym)))
        (values (make-emf-call
-                metatypes applyp gensym
+                (length metatypes) applyp gensym
                 (make-effective-method-fun-type
                  generic-function form method-alist-p wrappers-p))
                (list gensym))))
@@ -319,7 +318,7 @@
            (type (make-effective-method-list-fun-type
                   generic-function form method-alist-p wrappers-p)))
        (values `(dolist (emf ,gensym nil)
-                 ,(make-emf-call metatypes applyp 'emf type))
+                 ,(make-emf-call (length metatypes) applyp 'emf type))
                (list gensym))))
     (check-applicable-keywords
      (values `(check-applicable-keywords .keyargs-start.

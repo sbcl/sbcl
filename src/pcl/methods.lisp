@@ -1337,11 +1337,12 @@
     (let* ((name (generic-function-name generic-function))
            (arg-info (gf-arg-info generic-function))
            (metatypes (arg-info-metatypes arg-info))
+           (nargs (length metatypes))
            (applyp (arg-info-applyp arg-info))
-           (fmc-arg-info (cons (length metatypes) applyp))
+           (fmc-arg-info (cons nargs applyp))
            (arglist (if function-p
-                        (make-dfun-lambda-list metatypes applyp)
-                        (make-fast-method-call-lambda-list metatypes applyp))))
+                        (make-dfun-lambda-list nargs applyp)
+                        (make-fast-method-call-lambda-list nargs applyp))))
       (multiple-value-bind (cfunction constants)
           (get-fun1 `(lambda
                       ,arglist
@@ -1349,7 +1350,7 @@
                           `((declare (ignore .pv-cell. .next-method-call.))))
                       (locally (declare #.*optimize-speed*)
                                (let ((emf ,net))
-                                 ,(make-emf-call metatypes applyp 'emf))))
+                                 ,(make-emf-call nargs applyp 'emf))))
                     #'net-test-converter
                     #'net-code-converter
                     (lambda (form)

@@ -43,17 +43,14 @@
       (format-symbol *pcl-package* ".SLOTS~A." arg-number)))
 
 (declaim (inline make-dfun-required-args))
-(defun make-dfun-required-args (metatypes)
-  ;; Micro-optimizations 'R Us
-  (labels ((rec (types i)
-             (declare (fixnum i))
-             (when types
-               (cons (dfun-arg-symbol i)
-                     (rec (cdr types) (1+ i))))))
-    (rec metatypes 0)))
+(defun make-dfun-required-args (count)
+  (declare (type index count))
+  (let (result)
+    (dotimes (i count (nreverse result))
+      (push (dfun-arg-symbol i) result))))
 
-(defun make-dfun-lambda-list (metatypes applyp)
-  (let ((required (make-dfun-required-args metatypes)))
+(defun make-dfun-lambda-list (nargs applyp)
+  (let ((required (make-dfun-required-args nargs)))
     (if applyp
         (nconc required
                ;; Use &MORE arguments to avoid consing up an &REST list
@@ -61,10 +58,10 @@
                ;; INVOKE-EFFECTIVE-METHOD-FUNCTION for the other
                ;; pieces.
                '(&more .dfun-more-context. .dfun-more-count.))
-      required)))
+        required)))
 
-(defun make-dlap-lambda-list (metatypes applyp)
-  (let* ((required (make-dfun-required-args metatypes))
+(defun make-dlap-lambda-list (nargs applyp)
+  (let* ((required (make-dfun-required-args nargs))
          (lambda-list (if applyp
                           (append required '(&more .more-context. .more-count.))
                           required)))
@@ -81,8 +78,8 @@
             (when applyp
               '(.more-context. .more-count.)))))
 
-(defun make-emf-call (metatypes applyp fn-variable &optional emf-type)
-  (let ((required (make-dfun-required-args metatypes)))
+(defun make-emf-call (nargs applyp fn-variable &optional emf-type)
+  (let ((required (make-dfun-required-args nargs)))
     `(,(if (eq emf-type 'fast-method-call)
            'invoke-effective-method-function-fast
            'invoke-effective-method-function)
@@ -102,9 +99,8 @@
        :more-arg ,(when applyp
                     '(.dfun-more-context. .dfun-more-count.)))))
 
-(defun make-fast-method-call-lambda-list (metatypes applyp)
-  (list* '.pv-cell. '.next-method-call.
-         (make-dfun-lambda-list metatypes applyp)))
+(defun make-fast-method-call-lambda-list (nargs applyp)
+  (list* '.pv-cell. '.next-method-call. (make-dfun-lambda-list nargs applyp)))
 
 ;;; Emitting various accessors.
 
@@ -184,7 +180,7 @@
       (return-from emit-default-only
         (emit-default-only-function metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
-      (make-dlap-lambda-list metatypes applyp)
+      (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp '(emf)
                      lambda-list
                      `(invoke-effective-method-function emf
@@ -264,7 +260,7 @@
                        (return-from access value)))))
                 (:boundp
                  `((let ((value ,read-form))
-                      (return-from access (not (eq value +slot-unbound+))))))
+                     (return-from access (not (eq value +slot-unbound+))))))
                 (:writer
                  `((return-from access (setf ,read-form ,(car arglist)))))))
           (funcall miss-fn ,@arglist))))))
@@ -345,7 +341,7 @@
         (emit-checking-or-caching-function
          cached-emf-p return-value-p metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
-      (make-dlap-lambda-list metatypes applyp)
+      (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp
      `(cache ,@(unless cached-emf-p '(emf)) miss-fn)
      lambda-list
