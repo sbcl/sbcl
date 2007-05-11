@@ -606,10 +606,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                 classes-list new-class)))
     (make-constant-value-dfun generic-function cache)))
 
+(defun gf-has-method-with-nonstandard-specializer-p (gf)
+  (let ((methods (generic-function-methods gf)))
+    (dolist (method methods nil)
+      (unless (every (lambda (s) (standard-specializer-p s))
+                     (method-specializers method))
+        (return t)))))
+
 (defun use-dispatch-dfun-p (gf &optional (caching-p (use-caching-dfun-p gf)))
   (when (eq *boot-state* 'complete)
     (unless (or caching-p
-                (gf-requires-emf-keyword-checks gf))
+                (gf-requires-emf-keyword-checks gf)
+                ;; DISPATCH-DFUN-COST will error if it encounters a
+                ;; method with a non-standard specializer.
+                (gf-has-method-with-nonstandard-specializer-p gf))
       ;; This should return T when almost all dispatching is by
       ;; eql specializers or built-in classes. In other words,
       ;; return NIL if we might ever need to do more than

@@ -610,7 +610,7 @@
    ))
 
 (defmethod same-specializer-p ((specl1 specializer) (specl2 specializer))
-  nil)
+  (eql specl1 specl2))
 
 (defmethod same-specializer-p ((specl1 class) (specl2 class))
   (eq specl1 specl2))
@@ -633,17 +633,19 @@
 ;;; RAISE-METATYPE; however, the list of methods is maintained by
 ;;; hand, which is error-prone.  We can't just add a method to
 ;;; SPECIALIZER-CLASS, or at least not with confidence, as that
-;;; function is used elsewhere in PCL.  -- CSR, 2007-05-10
-(defmethod specializer-class-or-nil ((specializer specializer))
-  nil)
-(defmethod specializer-class-or-nil ((specializer eql-specializer))
-  (specializer-class specializer))
-(defmethod specializer-class-or-nil ((specializer class))
-  (specializer-class specializer))
-(defmethod specializer-class-or-nil ((specializer class-eq-specializer))
-  (specializer-class specializer))
-(defmethod specializer-class-or-nil ((specializer class-prototype-specializer))
-  (specializer-class specializer))
+;;; function is used elsewhere in PCL.  `STANDARD' here is used in the
+;;; sense of `comes with PCL' rather than `blessed by the
+;;; authorities'.  -- CSR, 2007-05-10
+(defmethod standard-specializer-p ((specializer class)) t)
+(defmethod standard-specializer-p ((specializer eql-specializer)) t)
+(defmethod standard-specializer-p ((specializer class-eq-specializer)) t)
+(defmethod standard-specializer-p ((specializer class-prototype-specializer))
+  t)
+(defmethod standard-specializer-p ((specializer specializer)) nil)
+
+(defun specializer-class-or-nil (specializer)
+  (and (standard-specializer-p specializer)
+       (specializer-class specializer)))
 
 (defun error-need-at-least-n-args (function n)
   (error 'simple-program-error
