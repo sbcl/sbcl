@@ -98,7 +98,18 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return ((*os_context_register_addr(context,reg_ALLOC)) & 1);
+    /* FIXME: this foreign_function_call_active test is dubious at
+     * best. If a foreign call is made in a pseudo atomic section
+     * (?) or more likely a pseudo atomic section is in a foreign
+     * call then an interrupt is executed immediately. Maybe it
+     * has to do with C code not maintaining pseudo atomic
+     * properly. MG - 2005-08-10
+     *
+     * The foreign_function_call_active used to live at each call-site
+     * to arch_pseudo_atomic_atomic, but this seems clearer.
+     * --NS 2007-05-15 */
+    return (!foreign_function_call_active)
+        && ((*os_context_register_addr(context,reg_ALLOC)) & 1);
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)

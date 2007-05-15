@@ -2474,7 +2474,11 @@ maybe_gc(os_context_t *context)
          * blocked? Just skip the GC: we can't set GC_PENDING, because
          * that would block the next attempt, and we don't know when
          * we'd next check for it -- and it's hard to be sure that
-         * unblocking would be safe. */
+         * unblocking would be safe.
+         *
+         * FIXME: This is not actually much better: we may already have
+         * GC_PENDING set, and presumably our caller assumes that we will
+         * clear it. Perhaps we should, even though we don't actually GC? */
         if (sigismember(context_sigmask,SIG_STOP_FOR_GC)) {
             undo_fake_foreign_function_call(context);
             return 1;

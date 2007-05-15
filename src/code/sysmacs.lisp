@@ -48,14 +48,30 @@ stopped for GC while T2 is waiting for the lock inside WITHOUT-GCING the
 system will be deadlocked. Since SBCL does not currently document its internal
 locks, application code can never be certain that this invariant is
 maintained."
-  `(unwind-protect
-        (let* ((*interrupts-enabled* nil)
-               (*gc-inhibit* t))
-          ,@body)
-     (when (or (and *interrupts-enabled* *interrupt-pending*)
-               (and (not *gc-inhibit*)
-                    (or *gc-pending* #!+sb-thread *stop-for-gc-pending*)))
-       (sb!unix::receive-pending-interrupt))))
+  (with-unique-names (without-gcing-body)
+    `(flet ((,without-gcing-body ()
+              ,@body))
+       (if *gc-inhibit*
+           (,without-gcing-body)
+           (without-interrupts
+             ;; We need to disable interrupts before disabling GC, so that
+             ;; signal handlers using locks don't accidentally try to grab
+             ;; them with GC inhibited.
+             ;;
+             ;; It would be nice to implement this with just a single UWP, but
+             ;; unfortunately it seems that it cannot be done: the naive
+             ;; solution of binding both *INTERRUPTS-ENABLED* and
+             ;; *GC-INHIBIT*, and checking for both pending GC and interrupts
+             ;; in the cleanup breaks if we have a GC pending, but no
+             ;; interrupts, and we receive an asynch unwind while checking for
+             ;; the pending GC: we unwind before handling the pending GC, and
+             ;; will be left running with further GCs blocked due to the GC
+             ;; pending flag.
+             (unwind-protect
+                  (let ((*gc-inhibit* t))
+                    (,without-gcing-body))
+               (when (or *gc-pending* #!+sb-thread *stop-for-gc-pending*)
+                 (sb!unix::receive-pending-interrupt))))))))
 
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

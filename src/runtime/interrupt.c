@@ -155,11 +155,7 @@ check_interrupts_enabled_or_lose(os_context_t *context)
     struct thread *thread=arch_os_get_current_thread();
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
         lose("interrupts not enabled\n");
-    if (
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-        (!foreign_function_call_active) &&
-#endif
-        arch_pseudo_atomic_atomic(context))
+    if (arch_pseudo_atomic_atomic(context))
         lose ("in pseudo atomic section\n");
 }
 
@@ -397,7 +393,19 @@ interrupt_handle_pending(os_context_t *context)
 
     /* Win32 only needs to handle the GC cases (for now?) */
 
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread;
+
+    /* Punt if in PA section, marking it as interrupted. This can
+     * happenat least if we pick up a GC request while in a
+     * WITHOUT-GCING with an outer PA -- it is not immediately clear
+     * to me that this should/could ever happen, but better safe then
+     * sorry. --NS 2007-05-15 */
+    if (arch_pseudo_atomic_atomic(context)) {
+        arch_set_pseudo_atomic_interrupted(context);
+        return;
+    }
+
+    thread = arch_os_get_current_thread();
 
     FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
@@ -410,10 +418,8 @@ interrupt_handle_pending(os_context_t *context)
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
 #ifdef LISP_FEATURE_SB_THREAD
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
-            /* another thread has already initiated a gc, this attempt
-             * might as well be cancelled */
-            SetSymbolValue(GC_PENDING,NIL,thread);
-            SetSymbolValue(STOP_FOR_GC_PENDING,NIL,thread);
+            /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
+             * the signal handler if it actually stops us. */
             sig_stop_for_gc_handler(SIG_STOP_FOR_GC,NULL,context);
         } else
 #endif
@@ -429,12 +435,7 @@ interrupt_handle_pending(os_context_t *context)
 #ifndef LISP_FEATURE_WIN32
     /* we may be here only to do the gc stuff, if interrupts are
      * enabled run the pending handler */
-    if (!((SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) ||
-          (
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-           (!foreign_function_call_active) &&
-#endif
-           arch_pseudo_atomic_atomic(context)))) {
+    if (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) {
         struct interrupt_data *data = thread->interrupt_data;
 
         /* There may be no pending handler, because it was only a gc
@@ -449,7 +450,7 @@ interrupt_handle_pending(os_context_t *context)
              * to WITHOUT-INTERRUPTS, then INTERRUPT_PENDING is already
              * NIL, because maybe_defer_handler sets
              * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
-            SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
+            SetSymbolValue(INTERRUPT_PENDING, NIL, thread);
 
             /* restore the saved signal mask from the original signal (the
              * one that interrupted us during the critical section) into the
@@ -631,20 +632,10 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
                       (unsigned long)thread->os_thread));
         return 1;
     }
-    /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
+    /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
-    if (
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-        /* FIXME: this foreign_function_call_active test is dubious at
-         * best. If a foreign call is made in a pseudo atomic section
-         * (?) or more likely a pseudo atomic section is in a foreign
-         * call then an interrupt is executed immediately. Maybe it
-         * has to do with C code not maintaining pseudo atomic
-         * properly. MG - 2005-08-10 */
-        (!foreign_function_call_active) &&
-#endif
-        arch_pseudo_atomic_atomic(context)) {
+    if (arch_pseudo_atomic_atomic(context)) {
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         FSHOW_SIGNAL((stderr,
@@ -748,53 +739,67 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
-    if ((arch_pseudo_atomic_atomic(context) ||
-         SymbolValue(GC_INHIBIT,thread) != NIL)) {
+    if (arch_pseudo_atomic_atomic(context)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
-        if (SymbolValue(GC_INHIBIT,thread) == NIL)
-            arch_set_pseudo_atomic_interrupted(context);
-        FSHOW_SIGNAL((stderr,"thread=%lu sig_stop_for_gc deferred\n",
+        arch_set_pseudo_atomic_interrupted(context);
+        FSHOW_SIGNAL((stderr,"thread=%lu sig_stop_for_gc deferred (PA)\n",
                       thread->os_thread));
-    } else {
-        /* need the context stored so it can have registers scavenged */
-        fake_foreign_function_call(context);
+        return;
+    }
+    else if (SymbolValue(GC_INHIBIT,thread) != NIL) {
+        SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
+        FSHOW_SIGNAL((stderr,
+                      "thread=%lu sig_stop_for_gc deferred (*GC-INHIBIT*)\n",
+                      thread->os_thread));
+        return;
+    }
 
-        sigfillset(&ss); /* Block everything. */
-        thread_sigmask(SIG_BLOCK,&ss,0);
+    /* Not PA and GC not inhibited -- we can stop now. */
 
-        if(thread->state!=STATE_RUNNING) {
-            lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
-                 fixnum_value(thread->state));
-        }
-        thread->state=STATE_SUSPENDED;
-        FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
+    /* need the context stored so it can have registers scavenged */
+    fake_foreign_function_call(context);
+
+    /* Block everything. */
+    sigfillset(&ss);
+    thread_sigmask(SIG_BLOCK,&ss,0);
+
+    /* Not pending anymore. */
+    SetSymbolValue(GC_PENDING,NIL,thread);
+    SetSymbolValue(STOP_FOR_GC_PENDING,NIL,thread);
+
+    if(thread->state!=STATE_RUNNING) {
+        lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
+             fixnum_value(thread->state));
+    }
+
+    thread->state=STATE_SUSPENDED;
+    FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
 #if defined(SIG_RESUME_FROM_GC)
-        sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
+    sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
 #else
-        sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+    sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
 #endif
 
-        /* It is possible to get SIGCONT (and probably other
-         * non-blockable signals) here. */
+    /* It is possible to get SIGCONT (and probably other non-blockable
+     * signals) here. */
 #ifdef SIG_RESUME_FROM_GC
-        {
-            int sigret;
-            do { sigwait(&ss, &sigret); }
-            while (sigret != SIG_RESUME_FROM_GC);
-        }
+    {
+        int sigret;
+        do { sigwait(&ss, &sigret); }
+        while (sigret != SIG_RESUME_FROM_GC);
+    }
 #else
-        while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
+    while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
 #endif
 
-        FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
-        if(thread->state!=STATE_RUNNING) {
-            lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
-                 fixnum_value(thread->state));
-        }
-
-        undo_fake_foreign_function_call(context);
+    FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
+    if(thread->state!=STATE_RUNNING) {
+        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
+             fixnum_value(thread->state));
     }
+
+    undo_fake_foreign_function_call(context);
 }
 #endif
 
