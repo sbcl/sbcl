@@ -77,6 +77,7 @@ find . \( \
         -name '{arch}' -o \
         -name CVS -o \
         -name .hg -o \
+        -name .git -o \
         -name .svn \) -type d -prune -o \
        \( \
         -type l -o \
