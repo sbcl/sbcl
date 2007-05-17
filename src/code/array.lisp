@@ -56,9 +56,12 @@
         (values vector index))
       (values array index)))
 
-(defun %simple-vector-compare-and-swap (vector index old new)
+(defun safe-simple-vector-compare-and-swap (vector index old new)
   #!+(or x86 x86-64)
-  (%simple-vector-compare-and-swap vector index old new)
+  (%simple-vector-compare-and-swap vector
+                                   (%check-bound vector (length vector) index)
+                                   old
+                                   new)
   #!-(or x86 x86-64)
   (let ((n-old (svref vector index)))
     (when (eq old n-old)

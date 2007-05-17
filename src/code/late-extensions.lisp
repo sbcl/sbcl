@@ -48,7 +48,6 @@
 
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
-#!+sb-thread
 (defmacro define-structure-slot-compare-and-swap
     (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
