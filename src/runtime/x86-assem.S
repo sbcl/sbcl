@@ -124,7 +124,7 @@ GNAME(call_into_c):
 
 	cld                       # clear out DF: Darwin, Solaris and Win32 at
 	                          # least need this, and it should not hurt others
-	
+
 	call	*%eax		  # normal callout using Lisp stack
 	movl	%eax,%ecx	  # remember integer return value
 

@@ -220,3 +220,26 @@
                   array)
               (type-error ()
                 :good))))
+
+;;; SIMPLE-VECTOR-COMPARE-AND-SWAP
+
+(let ((v (vector 1)))
+  ;; basics
+  (assert (eql 1 (sb-kernel:simple-vector-compare-and-swap v 0 1 2)))
+  (assert (eql 2 (sb-kernel:simple-vector-compare-and-swap v 0 1 3)))
+  (assert (eql 2 (svref v 0)))
+  ;; bounds
+  (multiple-value-bind (res err)
+      (ignore-errors (sb-kernel:simple-vector-compare-and-swap v -1 1 2))
+    (assert (not res))
+    (assert (typep err 'type-error)))
+  (multiple-value-bind (res err)
+      (ignore-errors (sb-kernel:simple-vector-compare-and-swap v 1 1 2))
+    (assert (not res))
+    (assert (typep err 'type-error))))
+
+;; type of the first argument
+(multiple-value-bind (res err)
+    (ignore-errors (sb-kernel:simple-vector-compare-and-swap "foo" 1 1 2))
+    (assert (not res))
+    (assert (typep err 'type-error)))

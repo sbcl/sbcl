@@ -154,9 +154,9 @@ cat > $testfilestem.base.lisp <<EOF
   ;; that the location will be the same.
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
-  (enable-debugger)
+
   ;; automagic restarts
-  (setf *debugger-hook*
+  (setf *invoke-debugger-hook*
         (lambda (condition hook)
           (princ condition)
           (let ((cont (find-restart 'continue condition)))
@@ -174,6 +174,19 @@ cat $testfilestem.base.lisp >> $testfilestem.small.lisp
 
 # Test code
 cat > $testfilestem.test.lisp <<EOF
+  ;; FIXME: currently the start/small case fails on x86/Darwin. Moving
+  ;; this NOTE definition to the base.lisp file fixes that, but obviously
+  ;; it is better fo figure out what is going on instead of doing that...
+  ;;
+  ;; Other trivialish changes that mask the error include:
+  ;; * loading the .lisp file instead of the .fasl at the save test
+  ;; * --eval 'nil' before loading the .fasl at the save test
+  ;;
+  ;; HATE.
+  (defun note (x)
+     (write-line x *standard-output*)
+     (force-output *standard-output*))
+  (note "/initial assertions")
   (assert (= 31 (summish 10 20)))
   (assert (= 42 numberish))
   (setf numberish 13)
@@ -192,24 +205,27 @@ cat > $testfilestem.test.lisp <<EOF
   (assert (= 1 (long-test2 1 2 3 4 5 6 7 8 9 (+ 1 (ash 1 37)) 15)))
   (assert (= (ash 1 33) (return-long-long)))
 
-  (print :stage-1)
+  (note "/initial assertions ok")
 
   ;; test reloading object file with new definitions
   (assert (= 13 foo))
   (assert (= 42 (bar)))
+  (note "/original definitions ok")
   (rename-file "$testfilestem-b.so" "$testfilestem-b.bak")
   (rename-file "$testfilestem-b2.so" "$testfilestem-b.so")
   (load-shared-object "$testfilestem-b.so")
+  (note "/reloading ok")
   (assert (= 42 foo))
   (assert (= 13 (bar)))
+  (note "/redefined versions ok")
   (rename-file "$testfilestem-b.so" "$testfilestem-b2.so")
   (rename-file "$testfilestem-b.bak" "$testfilestem-b.so")
-
-  (print :stage-2)
+  (note "/renamed back to originals")
 
   ;; test late resolution
   #+linkage-table
   (progn
+    (note "/starting linkage table tests")
     (define-alien-variable late-foo int)
     (define-alien-routine late-bar int)
     (multiple-value-bind (val err) (ignore-errors late-foo)
@@ -220,9 +236,8 @@ cat > $testfilestem.test.lisp <<EOF
       (assert (typep err 'undefined-alien-error)))
     (load-shared-object "$testfilestem-c.so")
     (assert (= 43 late-foo))
-    (assert (= 14 (late-bar))))
-
-  (print :stage-3)
+    (assert (= 14 (late-bar)))
+    (note "/linkage table ok"))
 
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
@@ -261,7 +276,8 @@ test_use small
 test_use fast
 
 test_save() {
-    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.$1.core\"))" <<EOF
+    echo testing save $1 
+    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --eval "#+linkage-table (save-lisp-and-die \"$testfilestem.$1.core\") #-linkage-table nil" <<EOF
   (sb-ext:quit :unix-status 22) ; catch this
 EOF
     if [ $? = 22 ]; then
@@ -276,6 +292,7 @@ test_save small
 test_save fast
 
 test_start() {
+    echo testing start $1
     ${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.$1.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
     if [ $? != 52 ]; then
 	rm $testfilestem.*

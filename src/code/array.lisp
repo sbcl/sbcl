@@ -56,7 +56,7 @@
         (values vector index))
       (values array index)))
 
-(defun safe-simple-vector-compare-and-swap (vector index old new)
+(defun simple-vector-compare-and-swap (vector index old new)
   #!+(or x86 x86-64)
   (%simple-vector-compare-and-swap vector
                                    (%check-bound vector (length vector) index)
