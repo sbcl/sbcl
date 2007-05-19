@@ -706,7 +706,7 @@
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
              (index :scs (unsigned-reg) :to (:eval 0))
-             (value :scs ,scs :target rax))
+             (value :scs ,scs ,@(unless 8-bit-tns-p '(:target rax))))
       (:info offset)
       (:arg-types ,ptype positive-fixnum
                   (:constant (constant-displacement other-pointer-lowtag
@@ -730,7 +730,7 @@
       (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
-             (value :scs ,scs :target rax))
+             (value :scs ,scs ,@(unless 8-bit-tns-p '(:target rax))))
       (:info index offset)
       (:arg-types ,ptype (:constant low-index)
                   (:constant (constant-displacement other-pointer-lowtag
@@ -945,6 +945,7 @@
     unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-32 movsxd tagged-num
     signed-reg)
+  #!+sb-unicode
   (define-data-vector-frobs simple-character-string movzxd character
     character-reg))
 
