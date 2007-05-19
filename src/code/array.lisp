@@ -349,7 +349,7 @@ of specialized arrays is supported."
                             (:little-endian
                              (- sb!vm:other-pointer-lowtag))
                             (:big-endian
-                             (- (1- n-word-bytes) sb!vm:other-pointer-lowtag)))))
+                             (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
                    ;; WIDETAG-OF needs extra code to handle
                    ;; LIST and FUNCTION lowtags. We're only
                    ;; dispatching on other pointers, so let's
