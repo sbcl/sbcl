@@ -52,7 +52,7 @@
     (:little-endian
      `(inst ldb ,offset ,source ,target))
     (:big-endian
-     `(inst ldb (+ ,offset 3) ,source ,target))))
+     `(inst ldb (+ ,offset (1- n-word-bytes)) ,source ,target))))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.

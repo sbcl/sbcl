@@ -125,7 +125,8 @@
               (make-ea :byte :base ,n-source :disp ,n-offset)))
       (:big-endian
        `(inst mov ,n-target
-              (make-ea :byte :base ,n-source :disp (+ ,n-offset 4)))))))
+              (make-ea :byte :base ,n-source
+                             :disp (+ ,n-offset (1- n-word-bytes))))))))
 
 ;;;; allocation helpers
 

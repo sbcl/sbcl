@@ -70,7 +70,7 @@
       (:little-endian
        `(inst lbu ,n-target ,n-source ,n-offset))
       (:big-endian
-       `(inst lbu ,n-target ,n-source (+ ,n-offset 3))))))
+       `(inst lbu ,n-target ,n-source (+ ,n-offset (1- n-word-bytes)))))))
 
 
 ;;; Macros to handle the fact that we cannot use the machine native call and

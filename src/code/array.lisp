@@ -349,11 +349,7 @@ of specialized arrays is supported."
                             (:little-endian
                              (- sb!vm:other-pointer-lowtag))
                             (:big-endian
-                             ;; I'm not completely sure of what this
-                             ;; 3 represents symbolically. It's
-                             ;; just what all the LOAD-TYPE vops
-                             ;; are doing.
-                             (- 3 sb!vm:other-pointer-lowtag)))))
+                             (- (1- n-word-bytes) sb!vm:other-pointer-lowtag)))))
                    ;; WIDETAG-OF needs extra code to handle
                    ;; LIST and FUNCTION lowtags. We're only
                    ;; dispatching on other pointers, so let's

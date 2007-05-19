@@ -65,7 +65,7 @@ if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
 else
     DEVNULL=/dev/null
 fi
-SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit $DEVNULL --sysinit $DEVNULL}"
+SBCL_XC_HOST="${1:-sbcl --userinit $DEVNULL --sysinit $DEVNULL}"
 export DEVNULL
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
