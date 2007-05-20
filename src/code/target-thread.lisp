@@ -733,13 +733,15 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
      (with-mutex ((thread-interruptions-lock ,thread))
        ,@body)))
 
-;; Called from the signal handler.
+;; Called from the signal handler in C.
 (defun run-interruption ()
   (in-interruption ()
     (loop
        (let ((interruption (with-interruptions-lock (*current-thread*)
                              (pop (thread-interruptions *current-thread*)))))
          (if interruption
+             ;; This is safe because it's the IN-INTERRUPTION that
+             ;; has disabled interrupts.
              (with-interrupts
                (funcall interruption))
              (return))))))
@@ -759,21 +761,29 @@ nature: if you interrupt a thread that was holding important locks
 then do something that turns out to need those locks, you probably
 won't like the effect."
   #!-sb-thread (declare (ignore thread))
-  ;; not quite perfect, because it does not take WITHOUT-INTERRUPTS
-  ;; into account
-  #!-sb-thread
-  (funcall function)
-  #!+sb-thread
-  (if (eq thread *current-thread*)
-      (funcall function)
-      (let ((os-thread (thread-os-thread thread)))
-        (cond ((not os-thread)
-               (error 'interrupt-thread-error :thread thread))
-              (t
-               (with-interruptions-lock (thread)
-                 (push function (thread-interruptions thread)))
-               (when (minusp (signal-interrupt-thread os-thread))
-                 (error 'interrupt-thread-error :thread thread)))))))
+  (flet ((interrupt-self ()
+           ;; *IN-INTERRUPTION* is true IFF we're being called as an
+           ;; interruption without an intervening WITHOUT-INTERRUPTS,
+           ;; in which case it is safe to enable interrupts. Otherwise
+           ;; interrupts are either already enabled, or there is an outer
+           ;; WITHOUT-INTERRUPTS we know nothing about, which makes it
+           ;; unsafe to enable interrupts.
+           (if *in-interruption*
+               (with-interrupts (funcall function))
+               (funcall function))))
+    #!-sb-thread
+    (interrupt-self)
+    #!+sb-thread
+    (if (eq thread *current-thread*)
+        (interrupt-self)
+        (let ((os-thread (thread-os-thread thread)))
+          (cond ((not os-thread)
+                 (error 'interrupt-thread-error :thread thread))
+                (t
+                 (with-interruptions-lock (thread)
+                   (push function (thread-interruptions thread)))
+                 (when (minusp (signal-interrupt-thread os-thread))
+                   (error 'interrupt-thread-error :thread thread))))))))
 
 (defun terminate-thread (thread)
   #!+sb-doc

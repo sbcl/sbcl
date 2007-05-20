@@ -13,23 +13,17 @@
 
 (defun invoke-interruption (function)
   (without-interrupts
-    ;; FIXME: This is wrong. Imagine the following sequence:
+    ;; Reset signal mask: the C-side handler has blocked all
+    ;; deferrable interrupts before arranging return to lisp. This is
+    ;; safe because we can't get a pending interrupt before we unblock
+    ;; signals.
     ;;
-    ;; 1. an asynch interrupt arrives after entry to
-    ;;    WITHOUT-INTERRUPTS but before RESET-SIGNAL-MASK: pending
-    ;;    machinery blocks all signals and marks the signal as
-    ;;    pending.
-    ;;
-    ;; 2. RESET-SIGNAL-MASK is called, and all signals are unblocked.
-    ;;
-    ;; 3. Another signal arrives while we already have one pending.
-    ;;    Oops -- we lose().
-    ;;
-    ;; Not sure what the right thing is, but definitely not
-    ;; RESET-SIGNAL-MASK. Removing it breaks signals.impure.lisp
-    ;; right now, though, and this is a rare race, so...
+    ;; FIXME: Should we not reset the _entire_ mask, just restore it
+    ;; to the state before we got the interrupt?
     (reset-signal-mask)
-    (funcall function)))
+    ;; Tell INTERRUPT-THREAD it's ok to re-enable interrupts.
+    (let ((*in-interruption* t))
+      (funcall function))))
 
 (defmacro in-interruption ((&rest args) &body body)
   #!+sb-doc

@@ -40,6 +40,14 @@
 (defvar *interrupts-enabled* t)
 (defvar *interrupt-pending* nil)
 
+;;; KLUDGE: This tells INTERRUPT-THREAD that it is being invoked as an
+;;; interruption, so that if the thread being interrupted is the
+;;; current thread it knows to enable interrupts. INVOKE-INTERRUPTION
+;;; binds it to T, and WITHOUT-INTERRUPTS binds it to NIL, so that if
+;;; interrupts are disable between INTERRUPT-THREAD and this we don't
+;;; accidentally re-enable them.
+(defvar *in-interruption* nil)
+
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc
   "Execute BODY with all deferrable interrupts deferred. Deferrable interrupts
@@ -51,7 +59,8 @@ other threads."
     `(flet ((,name () ,@body))
        (if *interrupts-enabled*
            (unwind-protect
-                (let ((*interrupts-enabled* nil))
+                (let ((*interrupts-enabled* nil)
+                      (*in-interruption* nil))
                   (,name))
              ;; If we were interrupted in the protected section, then
              ;; the interrupts are still blocked and it remains so
