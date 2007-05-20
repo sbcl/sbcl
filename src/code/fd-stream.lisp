@@ -718,59 +718,80 @@
                              stream
                              errno)))))
 
-;;; Fill the input buffer, and return the number of bytes read. Throw
-;;; to EOF-INPUT-CATCHER if the eof was reached. Drop into
-;;; SYSTEM:SERVER if necessary.
+;;; If the read would block wait (using SERVE-EVENT) till input is available,
+;;; then fill the input buffer, and return the number of bytes read. Throws
+;;; to EOF-INPUT-CATCHER if the eof was reached.
 (defun refill-buffer/fd (stream)
   (let ((fd (fd-stream-fd stream))
-        (ibuf-sap (fd-stream-ibuf-sap stream))
-        (buflen (fd-stream-ibuf-length stream))
-        (head (fd-stream-ibuf-head stream))
-        (tail (fd-stream-ibuf-tail stream)))
-    (declare (type index head tail))
-    (unless (zerop head)
-      (cond ((eql head tail)
-             (setf head 0)
-             (setf tail 0)
-             (setf (fd-stream-ibuf-head stream) 0)
-             (setf (fd-stream-ibuf-tail stream) 0))
-            (t
-             (decf tail head)
-             (system-area-ub8-copy ibuf-sap head
-                                   ibuf-sap 0 tail)
-             (setf head 0)
-             (setf (fd-stream-ibuf-head stream) 0)
-             (setf (fd-stream-ibuf-tail stream) tail))))
-    (setf (fd-stream-listen stream) nil)
-    ;;This isn't quite the same on win32.  Then again, neither was
-    ;;(not (sb!win32:fd-listen fd)), as was originally here.  See
-    ;;comment in `sysread-may-block-p'.
-    (when (sysread-may-block-p stream)
-      (unless (wait-until-fd-usable
-               fd :input (fd-stream-timeout stream))
-        (signal-timeout 'io-timeout :stream stream :direction :read
-                        :seconds (fd-stream-timeout stream))))
-    (multiple-value-bind (count errno)
-        (sb!unix:unix-read fd
-                           (int-sap (+ (sap-int ibuf-sap) tail))
-                           (- buflen tail))
-      (cond ((null count)
-             (if #!-win32 (eql errno sb!unix:ewouldblock) #!+win32 t #!-win32
-                 (progn
-                   (unless (wait-until-fd-usable
-                            fd :input (fd-stream-timeout stream))
-                     (signal-timeout 'io-timeout
-                                     :stream stream :direction :read
-                                     :seconds (fd-stream-timeout stream)))
-                   (refill-buffer/fd stream))
-                 (simple-stream-perror "couldn't read from ~S" stream errno)))
-            ((zerop count)
-             (setf (fd-stream-listen stream) :eof)
-             (/show0 "THROWing EOF-INPUT-CATCHER")
-             (throw 'eof-input-catcher nil))
-            (t
-             (incf (fd-stream-ibuf-tail stream) count)
-             count)))))
+        (errno 0)
+        (count 0))
+    (tagbody
+       ;; Check for blocking input before touching the stream, as if
+       ;; we happen to wait we are liable to be interrupted, and the
+       ;; interrupt handler may use the same stream.
+       (if (sysread-may-block-p stream)
+           (go :wait-for-input)
+           (go :main))
+       ;; These (:CLOSED-FLAME and :READ-ERROR) tags are here so what
+       ;; we can signal errors outside the WITHOUT-INTERRUPTS.
+     :closed-flame
+       (closed-flame stream)
+     :read-error
+       (simple-stream-perror "couldn't read from ~S" stream errno)
+     :wait-for-input
+       ;; This tag is here so we can unwind outside the WITHOUT-INTERRUPTS
+       ;; to wait for input if read tells us EWOULDBLOCK.
+       (unless (wait-until-fd-usable fd :input (fd-stream-timeout stream))
+         (signal-timeout 'io-timeout :stream stream :direction :read
+                         :seconds (fd-stream-timeout stream)))
+     :main
+       ;; Since the read should not block, we'll disable the
+       ;; interrupts here, so that we don't accidentally unwind and
+       ;; leave the stream in an inconsistent state.
+       (without-interrupts
+         (let ((ibuf-sap (fd-stream-ibuf-sap stream))
+               (buflen (fd-stream-ibuf-length stream))
+               (head (fd-stream-ibuf-head stream))
+               (tail (fd-stream-ibuf-tail stream)))
+           (declare (type index head tail))
+           ;; Check the SAP: if it is null, then someone has closed
+           ;; the stream from underneath us. This is not ment to fix
+           ;; multithreaded races, but to deal with interrupt handlers
+           ;; closing the stream.
+           (unless ibuf-sap
+             (go :closed-flame))
+           (unless (zerop head)
+             (cond ((eql head tail)
+                    (setf head 0
+                          tail 0
+                          (fd-stream-ibuf-head stream) 0
+                          (fd-stream-ibuf-tail stream) 0))
+                   (t
+                    (decf tail head)
+                    (system-area-ub8-copy ibuf-sap head
+                                          ibuf-sap 0 tail)
+                    (setf head 0
+                          (fd-stream-ibuf-head stream) 0
+                          (fd-stream-ibuf-tail stream) tail))))
+           (setf (fd-stream-listen stream) nil)
+           (setf (values count errno)
+                 (sb!unix:unix-read fd (int-sap (+ (sap-int ibuf-sap) tail))
+                                    (- buflen tail)))
+           (cond ((null count)
+                  #!+win32
+                  (go :read-error)
+                  #!-win32
+                  (if (eql errno sb!unix:ewouldblock)
+                      (go :wait-for-input)
+                      (go :read-error)))
+                 ((zerop count)
+                  (setf (fd-stream-listen stream) :eof)
+                  (/show0 "THROWing EOF-INPUT-CATCHER")
+                  (throw 'eof-input-catcher nil))
+                 (t
+                  ;; Success!
+                  (incf (fd-stream-ibuf-tail stream) count))))))
+    count))
 
 ;;; Make sure there are at least BYTES number of bytes in the input
 ;;; buffer. Keep calling REFILL-BUFFER/FD until that condition is met.
