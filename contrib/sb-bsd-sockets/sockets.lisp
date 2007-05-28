@@ -356,7 +356,7 @@ SB-SYS:MAKE-FD-STREAM."))
     (unless stream
       (setf stream (apply #'sb-sys:make-fd-stream
                           (socket-file-descriptor socket)
-                          :name "a constant string"
+                          :name "a socket"
                           :dual-channel-p t
                           args))
       (setf (slot-value socket 'stream) stream)

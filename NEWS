@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.7 relative to sbcl-1.0.6:
+  * enhancement: name of a socket-stream is now "a socket" instead of
+    "a constant string".
+
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * new contrib: sb-cover, an experimental code coverage tool, is included
     as a contrib module.
