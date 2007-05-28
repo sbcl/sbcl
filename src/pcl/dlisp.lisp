@@ -220,9 +220,7 @@
   (let ((instance nil)
         (arglist  ())
         (closure-variables ())
-        (field +first-wrapper-cache-number-index+)
         (read-form (emit-slot-read-form class-slot-p 'index 'slots)))
-    ;;we need some field to do the fast obsolete check
     (ecase reader/writer
       ((:reader :boundp)
        (setq instance (dfun-arg-symbol 0)
@@ -248,7 +246,7 @@
                                (fsc-instance-wrapper ,instance)))))
         (block access
           (when (and wrapper
-                     (/= (layout-clos-hash wrapper ,field) 0)
+                     (/= (layout-clos-hash wrapper) 0)
                      ,@(if (eql 1 1-or-2-class)
                            `((eq wrapper wrapper-0))
                            `((or (eq wrapper wrapper-0)
@@ -385,13 +383,12 @@
       (error "Every metatype is T."))
     `(prog ()
         (return
-          (let ((field (cache-field ,cache-var))
-                (cache-vector (cache-vector ,cache-var))
+          (let ((cache-vector (cache-vector ,cache-var))
                 (mask (cache-mask ,cache-var))
                 (size (cache-size ,cache-var))
                 (overflow (cache-overflow ,cache-var))
                 ,@wrapper-bindings)
-            (declare (fixnum size field mask))
+            (declare (fixnum size mask))
             ,(emit-cache-lookup wrapper-vars miss-tag value-var)
             ,hit-form))
       ,miss-tag
@@ -500,7 +497,7 @@
              (go ,miss-label)))))))
 
 (defun emit-1-wrapper-compute-primary-cache-location (wrapper miss-label)
-  `(let ((wrapper-cache-no (layout-clos-hash ,wrapper field)))
+  `(let ((wrapper-cache-no (layout-clos-hash ,wrapper)))
      (declare (fixnum wrapper-cache-no))
      (when (zerop wrapper-cache-no) (go ,miss-label))
      ,(let ((form `(logand mask wrapper-cache-no)))
@@ -513,7 +510,7 @@
      ,@(let ((adds 0) (len (length wrappers)))
          (declare (fixnum adds len))
          (mapcar (lambda (wrapper)
-                   `(let ((wrapper-cache-no (layout-clos-hash ,wrapper field)))
+                   `(let ((wrapper-cache-no (layout-clos-hash ,wrapper)))
                       (declare (fixnum wrapper-cache-no))
                       (when (zerop wrapper-cache-no) (go ,miss-label))
                       (setq primary (the fixnum (+ primary wrapper-cache-no)))

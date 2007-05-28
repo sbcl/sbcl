@@ -142,10 +142,7 @@
 
     ;; FIXME: We are here inside PCL lock, but might someone be
     ;; accessing the wrapper at the same time from outside the lock?
-    ;; Can it matter that they get 0 from one slot and a valid value
-    ;; from another?
-    (dotimes (i layout-clos-hash-length)
-      (setf (layout-clos-hash owrapper i) 0))
+    (setf (layout-clos-hash owrapper) 0)
 
     ;; FIXME: We could save a whopping cons by using (STATE . WRAPPER)
     ;; instead

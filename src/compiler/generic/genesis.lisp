@@ -851,10 +851,27 @@ core and return a descriptor to it."
 ;;; the descriptor for layout's layout (needed when making layouts)
 (defvar *layout-layout*)
 
-;;; FIXME: This information should probably be pulled out of the
-;;; cross-compiler's tables at genesis time instead of inserted by
-;;; hand here as a bare numeric constant.
-(defconstant target-layout-length 18)
+(defconstant target-layout-length
+  (layout-length (find-layout 'layout)))
+
+(defun target-layout-index (slot-name)
+  ;; KLUDGE: this is a little bit sleazy, but the tricky thing is that
+  ;; structure slots don't have a terribly firm idea of their names.
+  ;; At least here if we change LAYOUT's package of definition, we
+  ;; only have to change one thing...
+  (let* ((name (find-symbol (symbol-name slot-name) "SB!KERNEL"))
+         (layout (find-layout 'layout))
+         (dd (layout-info layout))
+         (slots (dd-slots dd))
+         (dsd (find name slots :key #'dsd-name)))
+    (aver dsd)
+    (dsd-index dsd)))
+
+(defun cold-set-layout-slot (cold-layout slot-name value)
+  (write-wordindexed
+   cold-layout
+   (+ sb-vm:instance-slots-offset (target-layout-index slot-name))
+   value))
 
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
@@ -878,6 +895,7 @@ core and return a descriptor to it."
 (defun make-cold-layout (name length inherits depthoid nuntagged)
   (let ((result (allocate-boxed-object *dynamic*
                                        ;; KLUDGE: Why 1+? -- WHN 19990901
+                                       ;; header word? -- CSR 20051204
                                        (1+ target-layout-length)
                                        sb!vm:instance-pointer-lowtag)))
     (write-memory result
@@ -891,7 +909,7 @@ core and return a descriptor to it."
     ;; Set slot 0 = the layout of the layout.
     (write-wordindexed result sb!vm:instance-slots-offset *layout-layout*)
 
-    ;; Set the immediately following slots = CLOS hash values.
+    ;; Set the CLOS hash value.
     ;;
     ;; Note: CMU CL didn't set these in genesis, but instead arranged
     ;; for them to be set at cold init time. That resulted in slightly
@@ -917,41 +935,30 @@ core and return a descriptor to it."
     ;; before using it. However, they didn't, so we have a slight
     ;; problem. We address it by generating the hash values using a
     ;; different algorithm than we use in ordinary operation.
-    (dotimes (i sb!kernel:layout-clos-hash-length)
-      (let (;; The expression here is pretty arbitrary, we just want
-            ;; to make sure that it's not something which is (1)
-            ;; evenly distributed and (2) not foreordained to arise in
-            ;; the target Lisp's (RANDOM-LAYOUT-CLOS-HASH) sequence
-            ;; and show up as the CLOS-HASH value of some other
-            ;; LAYOUT.
-            (hash-value
-             (1+ (mod (logxor (logand   (random-layout-clos-hash) 15253)
-                              (logandc2 (random-layout-clos-hash) 15253)
-                              1)
-                      ;; (The MOD here is defensive programming
-                      ;; to make sure we never write an
-                      ;; out-of-range value even if some joker
-                      ;; sets LAYOUT-CLOS-HASH-MAX to other
-                      ;; than 2^n-1 at some time in the
-                      ;; future.)
-                      sb!kernel:layout-clos-hash-max))))
-        (write-wordindexed result
-                           (+ i sb!vm:instance-slots-offset 1)
-                           (make-fixnum-descriptor hash-value))))
+    (let (;; The expression here is pretty arbitrary, we just want
+          ;; to make sure that it's not something which is (1)
+          ;; evenly distributed and (2) not foreordained to arise in
+          ;; the target Lisp's (RANDOM-LAYOUT-CLOS-HASH) sequence
+          ;; and show up as the CLOS-HASH value of some other
+          ;; LAYOUT.
+          (hash-value
+           (1+ (mod (logxor (logand   (random-layout-clos-hash) 15253)
+                            (logandc2 (random-layout-clos-hash) 15253)
+                            1)
+                    (1- sb!kernel:layout-clos-hash-limit)))))
+      (cold-set-layout-slot result 'clos-hash
+                            (make-fixnum-descriptor hash-value)))
 
     ;; Set other slot values.
-    (let ((base (+ sb!vm:instance-slots-offset
-                   sb!kernel:layout-clos-hash-length
-                   1)))
-      ;; (Offset 0 is CLASS, "the class this is a layout for", which
-      ;; is uninitialized at this point.)
-      (write-wordindexed result (+ base 1) *nil-descriptor*) ; marked invalid
-      (write-wordindexed result (+ base 2) inherits)
-      (write-wordindexed result (+ base 3) depthoid)
-      (write-wordindexed result (+ base 4) length)
-      (write-wordindexed result (+ base 5) *nil-descriptor*) ; info
-      (write-wordindexed result (+ base 6) *nil-descriptor*) ; pure
-      (write-wordindexed result (+ base 7) nuntagged))
+    ;;
+    ;; leave CLASSOID uninitialized for now
+    (cold-set-layout-slot result 'invalid *nil-descriptor*)
+    (cold-set-layout-slot result 'inherits inherits)
+    (cold-set-layout-slot result 'depthoid depthoid)
+    (cold-set-layout-slot result 'length length)
+    (cold-set-layout-slot result 'info *nil-descriptor*)
+    (cold-set-layout-slot result 'pure *nil-descriptor*)
+    (cold-set-layout-slot result 'n-untagged-slots nuntagged)
 
     (setf (gethash name *cold-layouts*)
           (list result
@@ -971,17 +978,16 @@ core and return a descriptor to it."
   ;; We initially create the layout of LAYOUT itself with NIL as the LAYOUT and
   ;; #() as INHERITS,
   (setq *layout-layout* *nil-descriptor*)
-  (setq *layout-layout*
-        (make-cold-layout 'layout
-                          (number-to-core target-layout-length)
-                          (vector-in-core)
-                          ;; FIXME: hard-coded LAYOUT-DEPTHOID of LAYOUT..
-                          (number-to-core 3)
-                          ;; no raw slots in LAYOUT:
-                          (number-to-core 0)))
-  (write-wordindexed *layout-layout*
-                     sb!vm:instance-slots-offset
-                     *layout-layout*)
+  (let ((xlayout-layout (find-layout 'layout)))
+    (aver (= 0 (layout-n-untagged-slots xlayout-layout)))
+    (setq *layout-layout*
+          (make-cold-layout 'layout
+                            (number-to-core target-layout-length)
+                            (vector-in-core)
+                            (number-to-core (layout-depthoid xlayout-layout))
+                            (number-to-core 0)))
+  (write-wordindexed
+   *layout-layout* sb!vm:instance-slots-offset *layout-layout*)
 
   ;; Then we create the layouts that we'll need to make a correct INHERITS
   ;; vector for the layout of LAYOUT itself..
@@ -1013,13 +1019,7 @@ core and return a descriptor to it."
     ;; ..and return to backpatch the layout of LAYOUT.
     (setf (fourth (gethash 'layout *cold-layouts*))
           (listify-cold-inherits layout-inherits))
-    (write-wordindexed *layout-layout*
-                       ;; FIXME: hardcoded offset into layout struct
-                       (+ sb!vm:instance-slots-offset
-                          layout-clos-hash-length
-                          1
-                          2)
-                       layout-inherits)))
+    (cold-set-layout-slot *layout-layout* 'inherits layout-inherits))))
 
 ;;;; interning symbols in the cold image
 
@@ -1967,7 +1967,10 @@ core and return a descriptor to it."
          (layout (pop-stack))
          (nuntagged
           (descriptor-fixnum
-           (read-wordindexed layout (+ sb!vm:instance-slots-offset 16))))
+           (read-wordindexed
+            layout
+            (+ sb!vm:instance-slots-offset
+               (target-layout-index 'n-untagged-slots)))))
          (ntagged (- size nuntagged)))
     (write-memory result (make-other-immediate-descriptor
                           size sb!vm:instance-header-widetag))

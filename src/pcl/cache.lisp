@@ -137,9 +137,6 @@
                    1
                    (1+ old-count)))))))
 
-(deftype field-type ()
-  '(mod #.layout-clos-hash-length))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (declaim (ftype (function (fixnum) (values (and unsigned-byte fixnum) &optional))
                   power-of-two-ceiling))
@@ -161,7 +158,6 @@
   (nkeys 1 :type (integer 1 #.+nkeys-limit+))
   (valuep nil :type (member nil t))
   (nlines 0 :type fixnum)
-  (field 0 :type field-type)
   (limit-fn #'default-limit-fn :type function)
   (mask 0 :type fixnum)
   (size 0 :type fixnum)
@@ -186,13 +182,16 @@
 ;;; are the forms of this constant which it is more convenient for the
 ;;; runtime code to use.
 (defconstant wrapper-cache-number-length
-  (integer-length layout-clos-hash-max))
-(defconstant wrapper-cache-number-mask layout-clos-hash-max)
+  (integer-length (1- layout-clos-hash-limit)))
+(defconstant wrapper-cache-number-mask (1- layout-clos-hash-limit))
 (defconstant wrapper-cache-number-adds-ok
-  (truncate most-positive-fixnum layout-clos-hash-max))
+  (truncate most-positive-fixnum (1- layout-clos-hash-limit)))
 
 ;;;; wrappers themselves
 
+;;; FIXME: delete this comment, possibly replacing it with a reference
+;;; to Kiczales and Rodruigez
+;;;
 ;;; This caching algorithm requires that wrappers have more than one
 ;;; wrapper cache number. You should think of these multiple numbers
 ;;; as being in columns. That is, for a given cache, the same column
@@ -211,23 +210,8 @@
 ;;; `pack' the wrapper cache numbers on machines where the addressing
 ;;; modes make that a good idea.
 
-;;; In SBCL, as in CMU CL, we want to do type checking as early as
-;;; possible; structures help this. The structures are hard-wired to
-;;; have a fixed number of cache hash values, and that number must
-;;; correspond to the number of cache lines we use.
-(defconstant wrapper-cache-number-vector-length
-  layout-clos-hash-length)
-
 (unless (boundp '*the-class-t*)
   (setq *the-class-t* nil))
-
-(defconstant +first-wrapper-cache-number-index+ 0)
-
-(declaim (inline next-wrapper-cache-number-index))
-(defun next-wrapper-cache-number-index (field-number)
-  (and (< field-number #.(1- wrapper-cache-number-vector-length))
-       (1+ field-number)))
-
 
 (defun get-cache (nkeys valuep limit-fn nlines)
   (let ((cache (make-cache)))
@@ -237,7 +221,6 @@
       (setf (cache-nkeys cache) nkeys
             (cache-valuep cache) valuep
             (cache-nlines cache) nlines
-            (cache-field cache) +first-wrapper-cache-number-index+
             (cache-limit-fn cache) limit-fn
             (cache-mask cache) cache-mask
             (cache-size cache) actual-size
@@ -250,8 +233,7 @@
             (cache-overflow cache) nil)
       cache)))
 
-(defun get-cache-from-cache (old-cache new-nlines
-                             &optional (new-field +first-wrapper-cache-number-index+))
+(defun get-cache-from-cache (old-cache new-nlines)
   (let ((nkeys (cache-nkeys old-cache))
         (valuep (cache-valuep old-cache))
         (cache (make-cache)))
@@ -265,7 +247,6 @@
             (cache-nkeys cache) nkeys
             (cache-valuep cache) valuep
             (cache-nlines cache) nlines
-            (cache-field cache) new-field
             (cache-limit-fn cache) (cache-limit-fn old-cache)
             (cache-mask cache) cache-mask
             (cache-size cache) actual-size
@@ -330,17 +311,16 @@
 
 ;;; The basic functional version. This is used by the cache miss code to
 ;;; compute the primary location of an entry.
-(defun compute-primary-cache-location (field mask wrappers)
-  (declare (type field-type field) (fixnum mask))
+(defun compute-primary-cache-location (mask wrappers)
+  (declare (fixnum mask))
   (if (not (listp wrappers))
-      (logand mask (layout-clos-hash wrappers field))
+      (logand mask (layout-clos-hash wrappers))
       (let ((location 0)
             (i 0))
         (declare (fixnum location i))
         (dolist (wrapper wrappers)
           ;; First add the cache number of this wrapper to location.
-          (let ((wrapper-cache-number (layout-clos-hash wrapper field)))
-            (declare (fixnum wrapper-cache-number))
+          (let ((wrapper-cache-number (layout-clos-hash wrapper)))
             (if (zerop wrapper-cache-number)
                 (return-from compute-primary-cache-location 0)
                 (incf location wrapper-cache-number)))
@@ -368,17 +348,15 @@
   (declare (type cache to-cache from-cache) (fixnum from-location))
   (let ((result 0)
         (cache-vector (cache-vector from-cache))
-        (field (cache-field to-cache))
         (mask (cache-mask to-cache))
         (nkeys (cache-nkeys to-cache)))
-    (declare (type field-type field) (fixnum result mask nkeys)
+    (declare (fixnum result mask nkeys)
              (simple-vector cache-vector))
     (dotimes-fixnum (i nkeys)
       ;; FIXME: Sometimes we get NIL here as wrapper, apparently because
       ;; another thread has stomped on the cache-vector.
       (let* ((wrapper (cache-vector-ref cache-vector (+ i from-location)))
-             (wcn (layout-clos-hash wrapper field)))
-        (declare (fixnum wcn))
+             (wcn (layout-clos-hash wrapper)))
         (incf result wcn))
       (when (and (not (zerop i))
                  (zerop (mod i wrapper-cache-number-adds-ok)))
@@ -400,7 +378,6 @@
               (limit-fn () (cache-limit-fn .cache.))
               (size () (cache-size .cache.))
               (mask () (cache-mask .cache.))
-              (field () (cache-field .cache.))
               (overflow () (cache-overflow .cache.))
               ;;
               ;; Return T IFF this cache location is reserved.  The
@@ -578,7 +555,7 @@
                  (cache) (line-location line))))
        (declare (ignorable #'cache #'nkeys #'line-size #'c-vector #'valuep
                            #'nlines #'max-location #'limit-fn #'size
-                           #'mask #'field #'overflow #'line-reserved-p
+                           #'mask #'overflow #'line-reserved-p
                            #'location-reserved-p #'line-location
                            #'location-line #'line-wrappers #'location-wrappers
                            #'line-matches-wrappers-p
@@ -610,11 +587,6 @@
   ;; FILL-CACHE won't return if WRAPPERS is nil, might as well check..
   (aver wrappers)
   (or (fill-cache-p nil cache wrappers value)
-      (and (< (ceiling (* (cache-count cache) *cache-expand-threshold*))
-              (if (= (cache-nkeys cache) 1)
-                  (1- (cache-nlines cache))
-                  (cache-nlines cache)))
-           (adjust-cache cache wrappers value))
       (expand-cache cache wrappers value)))
 
 (defvar *check-cache-p* nil)
@@ -647,7 +619,7 @@
 (defun probe-cache (cache wrappers &optional default limit-fn)
   (aver wrappers)
   (with-local-cache-functions (cache)
-    (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
+    (let* ((location (compute-primary-cache-location (mask) wrappers))
            (limit (funcall (or limit-fn (limit-fn)) (nlines))))
       (declare (fixnum location limit))
       (when (location-reserved-p location)
@@ -701,7 +673,7 @@
 ;;; FIXME: Deceptive name as this has side-effects.
 (defun fill-cache-p (forcep cache wrappers value)
   (with-local-cache-functions (cache)
-    (let* ((location (compute-primary-cache-location (field) (mask) wrappers))
+    (let* ((location (compute-primary-cache-location (mask) wrappers))
            (primary (location-line location)))
       (declare (fixnum location primary))
       ;; FIXME: I tried (aver (> location 0)) and (aver (not
@@ -774,37 +746,6 @@
                                                           (+ from-loc i)))))))
             (maybe-check-cache cache)))))))
 
-;;; Returns NIL or (values <field> <cache-vector>)
-;;;
-;;; This is only called when it isn't possible to put the entry in the
-;;; cache the easy way. That is, this function assumes that
-;;; FILL-CACHE-P has been called as returned NIL.
-;;;
-;;; If this returns NIL, it means that it wasn't possible to find a
-;;; wrapper field for which all of the entries could be put in the
-;;; cache (within the limit).
-(defun adjust-cache (cache wrappers value)
-  (with-local-cache-functions (cache)
-    (let ((ncache (get-cache-from-cache cache (nlines) (field))))
-      (do ((nfield (cache-field ncache)
-                   (next-wrapper-cache-number-index nfield)))
-          ((null nfield) nil)
-        (setf (cache-field ncache) nfield)
-        (labels ((try-one-fill-from-line (line)
-                   (fill-cache-from-cache-p nil ncache cache line))
-                 (try-one-fill (wrappers value)
-                   (fill-cache-p nil ncache wrappers value)))
-          (if (and (dotimes-fixnum (i (nlines) t)
-                     (when (and (null (line-reserved-p i))
-                                (line-valid-p i wrappers))
-                       (unless (try-one-fill-from-line i) (return nil))))
-                   (dolist (wrappers+value (cache-overflow cache) t)
-                     (unless (try-one-fill (car wrappers+value) (cdr wrappers+value))
-                       (return nil)))
-                   (try-one-fill wrappers value))
-              (return (maybe-check-cache ncache))
-              (flush-cache-vector-internal (cache-vector ncache))))))))
-
 ;;; returns: (values <cache>)
 (defun expand-cache (cache wrappers value)
   ;;(declare (values cache))
@@ -814,8 +755,7 @@
                  (unless (fill-cache-from-cache-p nil ncache cache line)
                    (do-one-fill (line-wrappers line) (line-value line))))
                (do-one-fill (wrappers value)
-                 (setq ncache (or (adjust-cache ncache wrappers value)
-                                  (fill-cache-p t ncache wrappers value))))
+                 (setq ncache (fill-cache-p t ncache wrappers value)))
                (try-one-fill (wrappers value)
                  (fill-cache-p nil ncache wrappers value)))
         (dotimes-fixnum (i (nlines))

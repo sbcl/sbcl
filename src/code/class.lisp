@@ -84,9 +84,10 @@
 ;;; Note: This bound is set somewhat less than MOST-POSITIVE-FIXNUM
 ;;; in order to guarantee that several hash values can be added without
 ;;; overflowing into a bignum.
-(def!constant layout-clos-hash-max (ash sb!xc:most-positive-fixnum -3)
+(def!constant layout-clos-hash-limit (1+ (ash sb!xc:most-positive-fixnum -3))
   #!+sb-doc
-  "the inclusive upper bound on LAYOUT-CLOS-HASH values")
+  "the exclusive upper bound on LAYOUT-CLOS-HASH values")
+(def!type layout-clos-hash () '(integer 0 #.layout-clos-hash-limit))
 
 ;;; a list of conses, initialized by genesis
 ;;;
@@ -136,30 +137,9 @@
                                   ;; DEF!STRUCT setup. -- WHN 19990930
                                   #+sb-xc-host
                                   make-load-form-for-layout))
-  ;; hash bits which should be set to constant pseudo-random values
-  ;; for use by CLOS. Sleazily accessed via %INSTANCE-REF, see
-  ;; LAYOUT-CLOS-HASH.
-  ;;
-  ;; FIXME: We should get our story straight on what the type of these
-  ;; values is. (declared INDEX here, described as <=
-  ;; LAYOUT-CLOS-HASH-MAX by the doc string of that constant,
-  ;; generated as strictly positive in RANDOM-LAYOUT-CLOS-HASH..)
-  ;;
-  ;; [ CSR notes, several years later (2005-11-30) that the value 0 is
-  ;;   special for these hash slots, indicating that the wrapper is
-  ;;   obsolete. ]
-  ;;
-  ;; KLUDGE: The fact that the slots here start at offset 1 is known
-  ;; to the LAYOUT-CLOS-HASH function and to the LAYOUT-dumping code
-  ;; in GENESIS.
-  (clos-hash-0 (random-layout-clos-hash) :type index)
-  (clos-hash-1 (random-layout-clos-hash) :type index)
-  (clos-hash-2 (random-layout-clos-hash) :type index)
-  (clos-hash-3 (random-layout-clos-hash) :type index)
-  (clos-hash-4 (random-layout-clos-hash) :type index)
-  (clos-hash-5 (random-layout-clos-hash) :type index)
-  (clos-hash-6 (random-layout-clos-hash) :type index)
-  (clos-hash-7 (random-layout-clos-hash) :type index)
+  ;; a pseudo-random hash value for use by CLOS.  KLUDGE: The fact
+  ;; that this slot is at offset 1 is known to GENESIS.
+  (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
   (classoid (missing-arg) :type classoid)
   ;; The value of this slot can be:
@@ -220,23 +200,6 @@
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
-(def!constant layout-clos-hash-length 8)
-#!-sb-fluid (declaim (inline layout-clos-hash))
-(defun layout-clos-hash (layout i)
-  ;; FIXME: Either this I should be declared to be `(MOD
-  ;; ,LAYOUT-CLOS-HASH-LENGTH), or this is used in some inner loop
-  ;; where we can't afford to check that kind of thing and therefore
-  ;; should have some insane level of optimization. (This is true both
-  ;; of this function and of the SETF function below.)
-  (declare (type layout layout) (type index i))
-  ;; FIXME: LAYOUT slots should have type `(MOD ,LAYOUT-CLOS-HASH-MAX),
-  ;; not INDEX.
-  (truly-the index (%instance-ref layout (1+ i))))
-#!-sb-fluid (declaim (inline (setf layout-clos-hash)))
-(defun (setf layout-clos-hash) (new-value layout i)
-  (declare (type layout layout) (type index new-value i))
-  (setf (%instance-ref layout (1+ i)) new-value))
-
 ;;; a generator for random values suitable for the CLOS-HASH slots of
 ;;; LAYOUTs. We use our own RANDOM-STATE here because we'd like
 ;;; pseudo-random values to come the same way in the target even when
@@ -254,7 +217,7 @@
   ;;
   ;; an explanation is provided in Kiczales and Rodriguez, "Efficient
   ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
-  (1+ (random layout-clos-hash-max
+  (1+ (random (1- layout-clos-hash-limit)
               (if (boundp '*layout-clos-hash-random-state*)
                   *layout-clos-hash-random-state*
                   (setf *layout-clos-hash-random-state*
@@ -1474,8 +1437,7 @@ NIL is returned when no such class exists."
   (declare (type layout layout))
   (setf (layout-invalid layout) t
         (layout-depthoid layout) -1)
-  (dotimes (i layout-clos-hash-length)
-    (setf (layout-clos-hash layout i) 0))
+  (setf (layout-clos-hash layout) 0)
   (let ((inherits (layout-inherits layout))
         (classoid (layout-classoid layout)))
     (modify-classoid classoid)
