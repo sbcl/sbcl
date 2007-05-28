@@ -128,7 +128,6 @@
                 "SRC;PCL;WRAPPER"
                 "SRC;PCL;CACHE"
                 "SRC;PCL;DLISP"
-                "SRC;PCL;DLISP2"
                 "SRC;PCL;BOOT"
                 "SRC;PCL;VECTOR"
                 "SRC;PCL;SLOTS-BOOT"

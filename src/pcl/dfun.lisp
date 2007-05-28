@@ -401,7 +401,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                  (reader 'emit-one-index-readers)
                  (boundp 'emit-one-index-boundps)
                  (writer 'emit-one-index-writers)))
-         (cache (or cache (get-cache 1 nil #'one-index-limit-fn 4)))
+         (cache (or cache (make-cache :key-count 1 :value nil :size 4)))
          (dfun-info (one-index-dfun-info type index cache)))
     (declare (type cache cache))
     (values
@@ -412,19 +412,12 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
      cache
      dfun-info)))
 
-(defun make-final-one-index-accessor-dfun (gf type index table)
-  (let ((cache (fill-dfun-cache table nil 1 #'one-index-limit-fn)))
-    (make-one-index-accessor-dfun gf type index cache)))
-
-(defun one-index-limit-fn (nlines)
-  (default-limit-fn nlines))
-
 (defun make-n-n-accessor-dfun (gf type &optional cache)
   (let* ((emit (ecase type
                  (reader 'emit-n-n-readers)
                  (boundp 'emit-n-n-boundps)
                  (writer 'emit-n-n-writers)))
-         (cache (or cache (get-cache 1 t #'n-n-accessors-limit-fn 2)))
+         (cache (or cache (make-cache :key-count 1 :value t :size 2)))
          (dfun-info (n-n-dfun-info type cache)))
     (declare (type cache cache))
     (values
@@ -433,13 +426,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
               (accessor-miss-function gf dfun-info))
      cache
      dfun-info)))
-
-(defun make-final-n-n-accessor-dfun (gf type table)
-  (let ((cache (fill-dfun-cache table t 1 #'n-n-accessors-limit-fn)))
-    (make-n-n-accessor-dfun gf type cache)))
-
-(defun n-n-accessors-limit-fn (nlines)
-  (default-limit-fn nlines))
 
 (defun make-checking-dfun (generic-function function &optional cache)
   (unless cache
@@ -457,7 +443,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     function)
            nil
            dfun-info))
-        (let* ((cache (or cache (get-cache nkeys nil #'checking-limit-fn 2)))
+        (let* ((cache (or cache (make-cache :key-count nkeys :value nil :size 2)))
                (dfun-info (checking-dfun-info function cache)))
           (values
            (funcall (get-dfun-constructor 'emit-checking metatypes applyp)
@@ -468,8 +454,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            cache
            dfun-info)))))
 
-(defun make-final-checking-dfun (generic-function function
-                                                  classes-list new-class)
+(defun make-final-checking-dfun (generic-function function classes-list new-class)
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-fun-info generic-function)
     (declare (ignore nreq applyp nkeys))
@@ -477,9 +462,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (values (lambda (&rest args)
                   (invoke-emf function args))
                 nil (default-method-only-dfun-info))
-        (let ((cache (make-final-ordinary-dfun-internal
-                      generic-function nil #'checking-limit-fn
-                      classes-list new-class)))
+        (let ((cache (make-final-ordinary-dfun-cache
+                      generic-function nil classes-list new-class)))
           (make-checking-dfun generic-function function cache)))))
 
 (defun use-default-method-only-dfun-p (generic-function)
@@ -500,9 +484,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
              (if (early-gf-p generic-function)
                  (early-gf-methods generic-function)
                  (generic-function-methods generic-function)))))
-
-(defun checking-limit-fn (nlines)
-  (default-limit-fn nlines))
 
 (defun make-caching-dfun (generic-function &optional cache)
   (unless cache
@@ -515,7 +496,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-fun-info generic-function)
     (declare (ignore nreq))
-    (let* ((cache (or cache (get-cache nkeys t #'caching-limit-fn 2)))
+    (let* ((cache (or cache (make-cache :key-count nkeys :value t :size 2)))
            (dfun-info (caching-dfun-info cache)))
       (values
        (funcall (get-dfun-constructor 'emit-caching metatypes applyp)
@@ -526,13 +507,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
        dfun-info))))
 
 (defun make-final-caching-dfun (generic-function classes-list new-class)
-  (let ((cache (make-final-ordinary-dfun-internal
-                generic-function t #'caching-limit-fn
-                classes-list new-class)))
+  (let ((cache (make-final-ordinary-dfun-cache
+                generic-function t classes-list new-class)))
     (make-caching-dfun generic-function cache)))
-
-(defun caching-limit-fn (nlines)
-  (default-limit-fn nlines))
 
 (defun insure-caching-dfun (gf)
   (multiple-value-bind (nreq applyp metatypes nkeys)
@@ -590,8 +567,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-fun-info generic-function)
     (declare (ignore nreq applyp))
-    (let* ((cache (or cache (get-cache nkeys t #'caching-limit-fn 2)))
+    (let* ((cache (or cache (make-cache :key-count nkeys :value t :size 2)))
            (dfun-info (constant-value-dfun-info cache)))
+      (declare (type cache cache))
       (values
        (funcall (get-dfun-constructor 'emit-constant-value metatypes)
                 cache
@@ -601,9 +579,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
        dfun-info))))
 
 (defun make-final-constant-value-dfun (generic-function classes-list new-class)
-  (let ((cache (make-final-ordinary-dfun-internal
-                generic-function :constant-value #'caching-limit-fn
-                classes-list new-class)))
+  (let ((cache (make-final-ordinary-dfun-cache
+                generic-function :constant-value classes-list new-class)))
     (make-constant-value-dfun generic-function cache)))
 
 (defun gf-has-method-with-nonstandard-specializer-p (gf)
@@ -702,18 +679,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (dolist (gf (gfs-of-type '(dispatch initial-dispatch)))
     (dfun-update gf #'make-dispatch-dfun)))
 
-(defun fill-dfun-cache (table valuep nkeys limit-fn &optional cache)
-  (let ((cache (or cache (get-cache nkeys valuep limit-fn
-                                    (+ (hash-table-count table) 3)))))
-    (maphash (lambda (classes value)
-               (setq cache (fill-cache cache
-                                       (class-wrapper classes)
-                                       value)))
-             table)
-    cache))
-
-(defun make-final-ordinary-dfun-internal (generic-function valuep limit-fn
-                                                           classes-list new-class)
+(defun make-final-ordinary-dfun-cache
+    (generic-function valuep classes-list new-class)
   (let* ((arg-info (gf-arg-info generic-function))
          (nkeys (arg-info-nkeys arg-info))
          (new-class (and new-class
@@ -724,8 +691,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                          new-class))
          (cache (if new-class
                     (copy-cache (gf-dfun-cache generic-function))
-                    (get-cache nkeys (not (null valuep)) limit-fn 4))))
-      (make-emf-cache generic-function valuep cache classes-list new-class)))
+                    (make-cache :key-count nkeys :value (not (null valuep))
+                                :size 4))))
+    (make-emf-cache generic-function valuep cache classes-list new-class)))
 
 (defvar *dfun-miss-gfs-on-stack* ())
 
@@ -861,8 +829,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           ((use-caching-dfun-p gf)
            (dfun-update gf #'make-caching-dfun))
           (t
-           (dfun-update
-            gf #'make-checking-dfun
+           (dfun-update gf #'make-checking-dfun
             ;; nemf is suitable only for caching, have to do this:
             (cache-miss-values gf args 'checking))))))
 
@@ -871,6 +838,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (make-final-dfun-internal gf classes-list)
     (set-dfun gf dfun cache info)))
 
+;;; FIXME: What is this?
 (defvar *new-class* nil)
 
 (defun final-accessor-dfun-type (gf)
@@ -922,10 +890,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                        (w1 (class-wrapper second)))
                    (make-two-class-accessor-dfun gf type w0 w1 all-index)))
                 ((or (integerp all-index) (consp all-index))
-                 (make-final-one-index-accessor-dfun
-                  gf type all-index table))
+                 (let ((cache (hash-table-to-cache table :value nil :key-count 1)))
+                   (make-one-index-accessor-dfun gf type all-index cache)))
                 (no-class-slots-p
-                 (make-final-n-n-accessor-dfun gf type table))
+                 (let ((cache (hash-table-to-cache table :value t :key-count 1)))
+                   (make-n-n-accessor-dfun gf type cache)))
                 (t
                  (make-final-caching-dfun gf classes-list new-class)))
           (make-final-caching-dfun gf classes-list new-class)))))
@@ -961,6 +930,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (t
            (make-final-caching-dfun gf classes-list new-class)))))
 
+(defvar *pcl-misc-random-state* (make-random-state))
 
 (defun accessor-miss (gf new object dfun-info)
   (let* ((ostate (type-of dfun-info))
@@ -1000,7 +970,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                (let ((ncache (fill-cache cache wrappers nindex)))
                  (unless (eq ncache cache)
                    (funcall update-fn ncache)))))
-
         (cond ((null ntype)
                (caching))
               ((or invalidp
@@ -1045,6 +1014,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (dfun-miss (generic-function args wrappers invalidp nemf)
       (cond (invalidp)
             ((eq oemf nemf)
+             ;; The cache of a checking dfun doesn't hold any values,
+             ;; so this NIL appears to be just a dummy-value we use in
+             ;; order to insert the wrappers into the cache.
              (let ((ncache (fill-cache cache wrappers nil)))
                (unless (eq ncache cache)
                  (dfun-update generic-function #'make-checking-dfun
@@ -1070,9 +1042,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                 (typecase emf
                   (constant-fast-method-call
                    (constant-fast-method-call-value emf))
-                  (constant-method-call (constant-method-call-value emf))
-                  (t (bug "~S with non-constant EMF ~S"
-                          'constant-value-miss emf))))
+                  (constant-method-call
+                   (constant-method-call-value emf))
+                  (t
+                   (bug "~S with non-constant EMF ~S" 'constant-value-miss emf))))
                (ncache (fill-cache ocache wrappers value)))
           (unless (eq ncache ocache)
             (dfun-update generic-function
@@ -1749,6 +1722,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun update-dfun (generic-function &optional dfun cache info)
   (let* ((early-p (early-gf-p generic-function)))
+    ;; FIXME: How atomic wrt. SET-FUNCALLABLE-INSTANCE-FUN does
+    ;; this need to be?
     (set-dfun generic-function dfun cache info)
     (let ((dfun (if early-p
                     (or dfun (make-initial-dfun generic-function))

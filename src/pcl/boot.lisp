@@ -2009,8 +2009,6 @@ bootstrapping.
       (setf (gf-dfun-state generic-function) new-value)))
 
 (defun set-dfun (gf &optional dfun cache info)
-  (when cache
-    (setf (cache-owner cache) gf))
   (let ((new-state (if (and dfun (or cache info))
                        (list* dfun cache info)
                        dfun)))

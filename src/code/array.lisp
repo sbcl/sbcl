@@ -56,6 +56,7 @@
         (values vector index))
       (values array index)))
 
+(declaim (inline simple-vector-compare-and-swap))
 (defun simple-vector-compare-and-swap (vector index old new)
   #!+(or x86 x86-64)
   (%simple-vector-compare-and-swap vector

@@ -965,14 +965,12 @@
          (nkeys (arg-info-nkeys arg-info))
          (metatypes (arg-info-metatypes arg-info))
          (wrappers (unless (eq nkeys 1) (make-list nkeys)))
-         (precompute-p (gf-precompute-dfun-and-emf-p arg-info))
-         (default '(default)))
+         (precompute-p (gf-precompute-dfun-and-emf-p arg-info)))
     (flet ((add-class-list (classes)
              (when (or (null new-class) (memq new-class classes))
                (let ((%wrappers (get-wrappers-from-classes
                                  nkeys wrappers classes metatypes)))
-                 (when (and %wrappers
-                            (eq default (probe-cache cache %wrappers default)))
+                 (when (and %wrappers (not (probe-cache cache %wrappers)))
                    (let ((value (cond ((eq valuep t)
                                        (sdfun-for-caching generic-function
                                                           classes))
@@ -1541,6 +1539,10 @@
       ((gf-precompute-dfun-and-emf-p arg-info)
        (multiple-value-bind (dfun cache info)
            (make-final-dfun-internal gf)
+         ;; FIXME: What does the next comment mean? Presumably it
+         ;; refers to the age-old implementation where cache vectors
+         ;; where cached resources? Also, the first thing UPDATE-DFUN
+         ;; does it SET-DFUN, so do we really need it here?
          (set-dfun gf dfun cache info) ; lest the cache be freed twice
          (update-dfun gf dfun cache info))))))
 

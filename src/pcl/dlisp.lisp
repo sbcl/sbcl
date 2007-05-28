@@ -23,6 +23,7 @@
 
 (in-package "SB-PCL")
 
+
 ;;;; some support stuff for getting a hold of symbols that we need when
 ;;;; building the discriminator codes. It's OK for these to be interned
 ;;;; symbols because we don't capture any user code in the scope in which
@@ -246,7 +247,7 @@
                                (fsc-instance-wrapper ,instance)))))
         (block access
           (when (and wrapper
-                     (/= (layout-clos-hash wrapper) 0)
+                     (not (zerop (layout-clos-hash wrapper)))
                      ,@(if (eql 1 1-or-2-class)
                            `((eq wrapper wrapper-0))
                            `((or (eq wrapper wrapper-0)
@@ -383,146 +384,11 @@
       (error "Every metatype is T."))
     `(prog ()
         (return
-          (let ((cache-vector (cache-vector ,cache-var))
-                (mask (cache-mask ,cache-var))
-                (size (cache-size ,cache-var))
-                (overflow (cache-overflow ,cache-var))
-                ,@wrapper-bindings)
-            (declare (fixnum size mask))
-            ,(emit-cache-lookup wrapper-vars miss-tag value-var)
+          (let ,wrapper-bindings
+            ,(emit-cache-lookup cache-var wrapper-vars miss-tag value-var)
             ,hit-form))
       ,miss-tag
         (return ,miss-form))))
-
-(defun emit-cache-lookup (wrapper-vars miss-tag value-reg)
-  (cond ((cdr wrapper-vars)
-         (emit-greater-than-1-dlap wrapper-vars miss-tag value-reg))
-        (value-reg
-         (emit-1-t-dlap (car wrapper-vars) miss-tag value-reg))
-        (t
-         (emit-1-nil-dlap (car wrapper-vars) miss-tag))))
-
-(defun emit-1-nil-dlap (wrapper miss-label)
-  `(let* ((primary ,(emit-1-wrapper-compute-primary-cache-location wrapper
-                                                                   miss-label))
-          (location primary))
-     (declare (fixnum primary location))
-     (block search
-       (loop (when (eq ,wrapper (cache-vector-ref cache-vector location))
-               (return-from search nil))
-             (setq location (the fixnum (+ location 1)))
-             (when (= location size)
-               (setq location 0))
-             (when (= location primary)
-               (dolist (entry overflow)
-                 (when (eq (car entry) ,wrapper)
-                   (return-from search nil)))
-               (go ,miss-label))))))
-
-(defmacro get-cache-vector-lock-count (cache-vector)
-  `(let ((lock-count (cache-vector-lock-count ,cache-vector)))
-     (unless (typep lock-count 'fixnum)
-       (error "My cache got freed somehow."))
-     (the fixnum lock-count)))
-
-(defun emit-1-t-dlap (wrapper miss-label value)
-  `(let ((primary ,(emit-1-wrapper-compute-primary-cache-location wrapper
-                                                                  miss-label))
-         (initial-lock-count (get-cache-vector-lock-count cache-vector)))
-     (declare (fixnum primary initial-lock-count))
-     (let ((location primary))
-       (declare (fixnum location))
-       (block search
-         (loop (when (eq ,wrapper (cache-vector-ref cache-vector location))
-                 (setq ,value (cache-vector-ref cache-vector (1+ location)))
-                 (return-from search nil))
-               (setq location (the fixnum (+ location 2)))
-               (when (= location size)
-                 (setq location 0))
-               (when (= location primary)
-                 (dolist (entry overflow)
-                   (when (eq (car entry) ,wrapper)
-                     (setq ,value (cdr entry))
-                     (return-from search nil)))
-                 (go ,miss-label))))
-       (unless (= initial-lock-count
-                  (get-cache-vector-lock-count cache-vector))
-         (go ,miss-label)))))
-
-(defun emit-greater-than-1-dlap (wrappers miss-label value)
-  (declare (type list wrappers))
-  (let ((cache-line-size (compute-line-size (+ (length wrappers)
-                                               (if value 1 0)))))
-    `(let ((primary 0)
-           (size-1 (the fixnum (- size 1))))
-       (declare (fixnum primary size-1))
-       ,(emit-n-wrapper-compute-primary-cache-location wrappers miss-label)
-       (let ((initial-lock-count (get-cache-vector-lock-count cache-vector)))
-         (declare (fixnum initial-lock-count))
-         (let ((location primary)
-               (next-location 0))
-           (declare (fixnum location next-location))
-           (block search
-             (loop (setq next-location
-                         (the fixnum (+ location ,cache-line-size)))
-                   (when (and ,@(mapcar
-                                 (lambda (wrapper)
-                                   `(eq ,wrapper
-                                        (cache-vector-ref
-                                         cache-vector
-                                         (setq location
-                                               (the fixnum (+ location 1))))))
-                                 wrappers))
-                     ,@(when value
-                         `((setq location (the fixnum (+ location 1)))
-                           (setq ,value (cache-vector-ref cache-vector
-                                                          location))))
-                     (return-from search nil))
-                   (setq location next-location)
-                   (when (= location size-1)
-                     (setq location 0))
-                   (when (= location primary)
-                     (dolist (entry overflow)
-                       (let ((entry-wrappers (car entry)))
-                         (when (and ,@(mapcar (lambda (wrapper)
-                                                `(eq ,wrapper
-                                                     (pop entry-wrappers)))
-                                              wrappers))
-                           ,@(when value
-                               `((setq ,value (cdr entry))))
-                           (return-from search nil))))
-                     (go ,miss-label))))
-           (unless (= initial-lock-count
-                      (get-cache-vector-lock-count cache-vector))
-             (go ,miss-label)))))))
-
-(defun emit-1-wrapper-compute-primary-cache-location (wrapper miss-label)
-  `(let ((wrapper-cache-no (layout-clos-hash ,wrapper)))
-     (declare (fixnum wrapper-cache-no))
-     (when (zerop wrapper-cache-no) (go ,miss-label))
-     ,(let ((form `(logand mask wrapper-cache-no)))
-        `(the fixnum ,form))))
-
-(defun emit-n-wrapper-compute-primary-cache-location (wrappers miss-label)
-  (declare (type list wrappers))
-  ;; This returns 1 less that the actual location.
-  `(progn
-     ,@(let ((adds 0) (len (length wrappers)))
-         (declare (fixnum adds len))
-         (mapcar (lambda (wrapper)
-                   `(let ((wrapper-cache-no (layout-clos-hash ,wrapper)))
-                      (declare (fixnum wrapper-cache-no))
-                      (when (zerop wrapper-cache-no) (go ,miss-label))
-                      (setq primary (the fixnum (+ primary wrapper-cache-no)))
-                      ,@(progn
-                          (incf adds)
-                          (when (or (zerop (mod adds
-                                                wrapper-cache-number-adds-ok))
-                                    (eql adds len))
-                            `((setq primary
-                                    ,(let ((form `(logand primary mask)))
-                                       `(the fixnum ,form))))))))
-                 wrappers))))
 
 ;;; CMU17 (and SBCL) note: Since STD-INSTANCE-P is weakened in the
 ;;; CMU/SBCL approach of using funcallable instances, that branch may
@@ -531,7 +397,7 @@
 ;;; "slots" will be whatever the first slot is, but will be ignored.
 ;;; Similarly, FSC-INSTANCE-P returns true on funcallable structures
 ;;; as well as PCL fins.
-(defun emit-fetch-wrapper (metatype argument miss-label &optional slot)
+(defun emit-fetch-wrapper (metatype argument miss-tag &optional slot)
   (ecase metatype
     ((standard-instance)
      `(cond ((std-instance-p ,argument)
@@ -541,7 +407,7 @@
              ,@(when slot `((setq ,slot (fsc-instance-slots ,argument))))
              (fsc-instance-wrapper ,argument))
             (t
-             (go ,miss-label))))
+             (go ,miss-tag))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL
     ;; WRAPPER-OF/LAYOUT-OF/BUILT-IN-OR-STRUCTURE-WRAPPER are all

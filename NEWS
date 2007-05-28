@@ -2,6 +2,9 @@
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * enhancement: name of a socket-stream is now "a socket" instead of
     "a constant string".
+  * bug fix: the cache used by the CLOS to store precomputed effective
+    methods, slot offsets, and constant return values is now thread and
+    interrupt safe.
 
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * new contrib: sb-cover, an experimental code coverage tool, is included

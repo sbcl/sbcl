@@ -856,7 +856,7 @@
         (setf slots eslotds
               (wrapper-instance-slots-layout nwrapper) nlayout
               (wrapper-class-slots nwrapper) nwrapper-class-slots
-              (wrapper-no-of-instance-slots nwrapper) nslots
+              (layout-length nwrapper) nslots
               wrapper nwrapper)
         (do* ((slots (slot-value class 'slots) (cdr slots))
               (dupes nil))
@@ -1230,7 +1230,7 @@
               ;; good style.  There has to be a better way!  -- CSR,
               ;; 2002-10-29
               (eq (layout-invalid owrapper) t))
-      (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
+      (let ((nwrapper (make-wrapper (layout-length owrapper)
                                     class)))
         (setf (wrapper-instance-slots-layout nwrapper)
               (wrapper-instance-slots-layout owrapper))
@@ -1257,7 +1257,7 @@
 ;;; through the UPDATE-INSTANCE-FOR-REDEFINED-CLASS mechanism.
 (defmethod make-instances-obsolete ((class std-class))
   (let* ((owrapper (class-wrapper class))
-         (nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
+         (nwrapper (make-wrapper (layout-length owrapper)
                                  class)))
     (unless (class-finalized-p class)
       (if (class-has-a-forward-referenced-superclass-p class)
