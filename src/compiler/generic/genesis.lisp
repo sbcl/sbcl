@@ -870,7 +870,7 @@ core and return a descriptor to it."
 (defun cold-set-layout-slot (cold-layout slot-name value)
   (write-wordindexed
    cold-layout
-   (+ sb-vm:instance-slots-offset (target-layout-index slot-name))
+   (+ sb!vm:instance-slots-offset (target-layout-index slot-name))
    value))
 
 ;;; Return a list of names created from the cold layout INHERITS data
