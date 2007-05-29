@@ -161,25 +161,8 @@
 
 ;;; FIXME: What do these variables mean?
 (defvar *precompiling-lap* nil)
-(defvar *emit-function-p* t)
-
-;;; FIXME: This variable is motivated by Gerd Moellman's observation,
-;;; in <867kga1wra.fsf@gerd.free-bsd.org> on cmucl-imp 2002-10-22,
-;;; that the functions returned from EMIT-xxx-FUNCTION can cause an
-;;; order-of-magnitude slowdown.  We include this variable for now,
-;;; but maybe its effect should rather be controlled by compilation
-;;; policy if there is a noticeable space difference between the
-;;; branches, or else maybe the EMIT-xxx-FUNCTION branches should be
-;;; deleted.  It's not clear to me how all of this works, though, so
-;;; until proper benchmarks are done it's probably safest simply to
-;;; have this pseudo-constant to hide code.  -- CSR, 2003-02-14
-(defvar *optimize-cache-functions-p* t)
 
 (defun emit-default-only (metatypes applyp)
-  (unless *optimize-cache-functions-p*
-    (when (and (null *precompiling-lap*) *emit-function-p*)
-      (return-from emit-default-only
-        (emit-default-only-function metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
       (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp '(emf)
@@ -213,11 +196,6 @@
 ;;; FSC-INSTANCE-P returns true on funcallable structures as well as
 ;;; PCL fins.
 (defun emit-reader/writer (reader/writer 1-or-2-class class-slot-p)
-  (unless *optimize-cache-functions-p*
-    (when (and (null *precompiling-lap*) *emit-function-p*)
-      (return-from emit-reader/writer
-        (emit-reader/writer-function
-         reader/writer 1-or-2-class class-slot-p))))
   (let ((instance nil)
         (arglist  ())
         (closure-variables ())
@@ -284,19 +262,13 @@
       (:writer `(setf ,read-form ,(car arglist))))))
 
 (defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
-  (let ((*emit-function-p* nil)
-        (*precompiling-lap* t))
+  (let ((*precompiling-lap* t))
     (values
      (emit-reader/writer reader/writer 1-or-2-class class-slot-p))))
 
 (defun emit-one-or-n-index-reader/writer (reader/writer
                                           cached-index-p
                                           class-slot-p)
-  (unless *optimize-cache-functions-p*
-    (when (and (null *precompiling-lap*) *emit-function-p*)
-      (return-from emit-one-or-n-index-reader/writer
-        (emit-one-or-n-index-reader/writer-function
-         reader/writer cached-index-p class-slot-p))))
   (multiple-value-bind (arglist metatypes)
       (ecase reader/writer
         ((:reader :boundp)
@@ -318,8 +290,7 @@
 
 (defmacro emit-one-or-n-index-reader/writer-macro
     (reader/writer cached-index-p class-slot-p)
-  (let ((*emit-function-p* nil)
-        (*precompiling-lap* t))
+  (let ((*precompiling-lap* t))
     (values
      (emit-one-or-n-index-reader/writer reader/writer
                                         cached-index-p
@@ -334,11 +305,6 @@
       `(funcall ,miss-fn ,@args)))
 
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
-  (unless *optimize-cache-functions-p*
-    (when (and (null *precompiling-lap*) *emit-function-p*)
-      (return-from emit-checking-or-caching
-        (emit-checking-or-caching-function
-         cached-emf-p return-value-p metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
       (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp
@@ -360,8 +326,7 @@
                                           return-value-p
                                           metatypes
                                           applyp)
-  (let ((*emit-function-p* nil)
-        (*precompiling-lap* t))
+  (let ((*precompiling-lap* t))
     (values
      (emit-checking-or-caching cached-emf-p return-value-p metatypes applyp))))
 
