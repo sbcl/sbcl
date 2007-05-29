@@ -390,31 +390,42 @@
       ,miss-tag
         (return ,miss-form))))
 
-;;; CMU17 (and SBCL) note: Since STD-INSTANCE-P is weakened in the
-;;; CMU/SBCL approach of using funcallable instances, that branch may
-;;; run on non-pcl instances (structures). The result will be the
-;;; non-wrapper layout for the structure, which will cause a miss. The
-;;; "slots" will be whatever the first slot is, but will be ignored.
-;;; Similarly, FSC-INSTANCE-P returns true on funcallable structures
-;;; as well as PCL fins.
 (defun emit-fetch-wrapper (metatype argument miss-tag &optional slot)
   (ecase metatype
     ((standard-instance)
-     `(cond ((std-instance-p ,argument)
-             ,@(when slot `((setq ,slot (std-instance-slots ,argument))))
-             (std-instance-wrapper ,argument))
-            ((fsc-instance-p ,argument)
-             ,@(when slot `((setq ,slot (fsc-instance-slots ,argument))))
-             (fsc-instance-wrapper ,argument))
-            (t
-             (go ,miss-tag))))
+     ;; This branch may run on non-pcl instances (structures). The
+     ;; result will be the non-wrapper layout for the structure, which
+     ;; will cause a miss. Since refencing the structure is rather iffy
+     ;; if it should have no slots, or only raw slots, we use FOR-STD-CLASS-P
+     ;; to ensure that we have a wrapper.
+     ;;
+     ;; FIXME: If we unify layouts and wrappers we can use
+     ;; instance-slots-layout instead of for-std-class-p, as if there
+     ;; are no layouts there are no slots to worry about.
+     (with-unique-names (wrapper)
+       `(cond
+          ((std-instance-p ,argument)
+           (let ((,wrapper (std-instance-wrapper ,argument)))
+             ,@(when slot
+                     `((when (layout-for-std-class-p ,wrapper)
+                         (setq ,slot (std-instance-slots ,argument)))))
+             ,wrapper))
+          ((fsc-instance-p ,argument)
+           (let ((,wrapper (fsc-instance-wrapper ,argument)))
+             ,@(when slot
+                     `((when (layout-for-std-class-p ,wrapper)
+                         (setq ,slot (fsc-instance-slots ,argument)))))
+             ,wrapper))
+          (t (go ,miss-tag)))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL
     ;; WRAPPER-OF/LAYOUT-OF/BUILT-IN-OR-STRUCTURE-WRAPPER are all
     ;; equivalent and inlined to each other, we can collapse some
     ;; spurious differences.
     ((class built-in-instance structure-instance condition-instance)
-     (when slot (error "can't do a slot reg for this metatype"))
+     (when slot
+       (bug "SLOT requested for metatype ~S, but it isnt' going to happen."
+            metatype))
      `(wrapper-of ,argument))
     ;; a metatype of NIL should never be seen here, as NIL is only in
     ;; the metatypes before a generic function is fully initialized.

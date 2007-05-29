@@ -66,7 +66,9 @@
                       ;; default of WRAPPER-INVALID. Instead of trying
                       ;; to find out, I just overrode the LAYOUT
                       ;; default here. -- WHN 19991204
-                      (invalid nil))
+                      (invalid nil)
+                      ;; This allows quick testing of wrapperness.
+                      (for-std-class-p t))
             (:constructor make-wrapper-internal)
             (:copier nil))
   (instance-slots-layout nil :type list)

@@ -1721,19 +1721,22 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            (return t)))))
 
 (defun update-dfun (generic-function &optional dfun cache info)
-  (let* ((early-p (early-gf-p generic-function)))
-    ;; FIXME: How atomic wrt. SET-FUNCALLABLE-INSTANCE-FUN does
-    ;; this need to be?
-    (set-dfun generic-function dfun cache info)
-    (let ((dfun (if early-p
-                    (or dfun (make-initial-dfun generic-function))
-                    (compute-discriminating-function generic-function))))
-      (set-funcallable-instance-function generic-function dfun)
-      (let ((gf-name (if early-p
-                         (!early-gf-name generic-function)
-                         (generic-function-name generic-function))))
-        (set-fun-name generic-function gf-name)
-        dfun))))
+  ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
+  ;; access it, and so that it's there for eg. future cache updates.
+  ;;
+  ;; How atomic wrt. SET-FUNCALLABLE-INSTANCE-FUN does this need to
+  ;; be?
+  (set-dfun generic-function dfun cache info)
+  (let* ((early-p (early-gf-p generic-function))
+         (dfun (if early-p
+                   (or dfun (make-initial-dfun generic-function))
+                   (compute-discriminating-function generic-function))))
+    (set-funcallable-instance-function generic-function dfun)
+    (let ((gf-name (if early-p
+                       (!early-gf-name generic-function)
+                       (generic-function-name generic-function))))
+      (set-fun-name generic-function gf-name)
+      dfun)))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)

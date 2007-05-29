@@ -185,7 +185,16 @@
   ;; This slot is known to the C runtime support code.
   (n-untagged-slots 0 :type index)
   ;; Definition location
-  (source-location nil))
+  (source-location nil)
+  ;; True IFF the layout belongs to a standand-instance or a
+  ;; standard-funcallable-instance -- that is, true only if the layout
+  ;; is really a wrapper.
+  ;;
+  ;; FIXME: If we unify wrappers and layouts this can go away, since
+  ;; it is only used in SB-PCL::EMIT-FETCH-WRAPPERS, which can then
+  ;; use INSTANCE-SLOTS-LAYOUT instead (if there is are no slot
+  ;; layouts, there are no slots for it to pull.)
+  (for-std-class-p nil :type boolean :read-only t))
 
 (def!method print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)

@@ -1539,11 +1539,6 @@
       ((gf-precompute-dfun-and-emf-p arg-info)
        (multiple-value-bind (dfun cache info)
            (make-final-dfun-internal gf)
-         ;; FIXME: What does the next comment mean? Presumably it
-         ;; refers to the age-old implementation where cache vectors
-         ;; where cached resources? Also, the first thing UPDATE-DFUN
-         ;; does it SET-DFUN, so do we really need it here?
-         (set-dfun gf dfun cache info) ; lest the cache be freed twice
          (update-dfun gf dfun cache info))))))
 
 (defmethod (setf class-name) (new-value class)
