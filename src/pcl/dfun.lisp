@@ -1721,22 +1721,47 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            (return t)))))
 
 (defun update-dfun (generic-function &optional dfun cache info)
-  ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
-  ;; access it, and so that it's there for eg. future cache updates.
-  ;;
-  ;; How atomic wrt. SET-FUNCALLABLE-INSTANCE-FUN does this need to
-  ;; be?
-  (set-dfun generic-function dfun cache info)
-  (let* ((early-p (early-gf-p generic-function))
-         (dfun (if early-p
-                   (or dfun (make-initial-dfun generic-function))
-                   (compute-discriminating-function generic-function))))
-    (set-funcallable-instance-function generic-function dfun)
-    (let ((gf-name (if early-p
-                       (!early-gf-name generic-function)
-                       (generic-function-name generic-function))))
-      (set-fun-name generic-function gf-name)
-      dfun)))
+  (let ((early-p (early-gf-p generic-function)))
+    (flet ((update ()
+             ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
+             ;; access it, and so that it's there for eg. future cache updates.
+             (set-dfun generic-function dfun cache info)
+             (let ((dfun (if early-p
+                             (or dfun (make-initial-dfun generic-function))
+                             (compute-discriminating-function generic-function))))
+               (set-funcallable-instance-function generic-function dfun)
+               (let ((gf-name (if early-p
+                                  (!early-gf-name generic-function)
+                                  (generic-function-name generic-function))))
+                 (set-fun-name generic-function gf-name)
+                 dfun))))
+      ;; This needs to be atomic per generic function, consider:
+      ;;   1. T1 sets dfun-state to S1 and computes discr. fun using S1
+      ;;   2. T2 sets dfun-state to S2 and computes discr. fun using S2
+      ;;   3. T2 sets fin
+      ;;   4. T1 sets fin
+      ;; Oops: now dfun-state and fin don't match! Since just calling
+      ;; a generic can cause the dispatch function to be updated we
+      ;; need a lock here.
+      ;;
+      ;; We need to accept recursion, because PCL is nasty and twisty.
+      ;;
+      ;; KLUDGE: We need to disable interrupts as long as
+      ;; WITH-FOO-LOCK is interrupt unsafe. Once they are interrupt
+      ;; safe we can allow interrupts here. (But if someone some day
+      ;; manages to get rid of the need for a recursive lock here we
+      ;; _will_ need without-interrupts once again.)
+      ;;
+      ;; FIXME: When our mutexes are smart about the need to wake up
+      ;; sleepers we can put a mutex here instead -- but in the meantime
+      ;; we use a spinlock to avoid a syscall for every dfun update.
+      ;;
+      ;; KLUDGE: No need to lock during bootstrap.
+      (if early-p
+          (update)
+          (sb-sys:without-interrupts
+            (sb-thread::with-recursive-spinlock ((gf-lock generic-function))
+              (update)))))))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)

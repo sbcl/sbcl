@@ -314,7 +314,9 @@
                             definition-source-mixin
                             metaobject
                             funcallable-standard-object)
-  ((%documentation :initform nil :initarg :documentation)
+  ((%documentation
+    :initform nil
+    :initarg :documentation)
    ;; We need to make a distinction between the methods initially set
    ;; up by :METHOD options to DEFGENERIC and the ones set up later by
    ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
@@ -326,8 +328,9 @@
    ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
    ;; tends to leave the generic function in a state consistent with
    ;; the most-recently-loaded state of a.lisp and b.lisp.)
-   (initial-methods :initform ()
-                    :accessor generic-function-initial-methods))
+   (initial-methods
+    :initform ()
+    :accessor generic-function-initial-methods))
   (:metaclass funcallable-standard-class))
 
 (defclass standard-generic-function (generic-function)
@@ -358,7 +361,11 @@
     :reader gf-arg-info)
    (dfun-state
     :initform ()
-    :accessor gf-dfun-state))
+    :accessor gf-dfun-state)
+   ;; Used to make DFUN-STATE & FIN-FUNCTION updates atomic.
+   (%lock
+    :initform (sb-thread::make-spinlock :name "GF lock")
+    :reader gf-lock))
   (:metaclass funcallable-standard-class)
   (:default-initargs :method-class *the-class-standard-method*
                      :method-combination *standard-method-combination*))

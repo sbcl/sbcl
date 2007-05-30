@@ -183,7 +183,6 @@ in future versions."
   (sb!vm::current-thread-offset-sap n))
 
 ;;;; spinlocks
-#!+sb-thread
 (define-structure-slot-compare-and-swap
     compare-and-swap-spinlock-value
     :structure spinlock
@@ -192,24 +191,19 @@ in future versions."
 (declaim (inline get-spinlock release-spinlock))
 
 (defun get-spinlock (spinlock)
-  (declare (optimize (speed 3) (safety 0))
-           #!-sb-thread
-           (ignore spinlock))
-  ;; %instance-set-conditional can test for 0 (which is a fixnum) and
-  ;; store any value
-  #!+sb-thread
-  (loop until
-       (eql 0 (compare-and-swap-spinlock-value spinlock 0 1)))
+  (declare (optimize (speed 3) (safety 0)))
+  (let* ((new *current-thread*)
+         (old (compare-and-swap-spinlock-value spinlock nil new)))
+    (when old
+      (when (eq old new)
+        (error "Recursive lock attempt on ~S." spinlock))
+      #!+sb-thread
+      (loop while (compare-and-swap-spinlock-value spinlock nil new))))
   t)
 
 (defun release-spinlock (spinlock)
-  (declare (optimize (speed 3) (safety 0))
-           #!-sb-thread (ignore spinlock))
-  ;; %instance-set-conditional cannot compare arbitrary objects
-  ;; meaningfully, so (compare-and-swap-spinlock-value our-value 0)
-  ;; does not work for bignum thread ids.
-  #!+sb-thread
-  (setf (spinlock-value spinlock) 0)
+  (declare (optimize (speed 3) (safety 0)))
+  (setf (spinlock-value spinlock) nil)
   nil)
 
 ;;;; mutexes

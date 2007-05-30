@@ -127,16 +127,35 @@
       (assert (ours-p (mutex-value l)) nil "5"))
     (assert (eql (mutex-value l) nil) nil "6")))
 
+(labels ((ours-p (value)
+           (eq *current-thread* value)))
+  (let ((l (make-spinlock :name "rec")))
+    (assert (eql (spinlock-value l) nil) nil "1")
+    (with-recursive-spinlock (l)
+      (assert (ours-p (spinlock-value l)) nil "3")
+      (with-recursive-spinlock (l)
+        (assert (ours-p (spinlock-value l)) nil "4"))
+      (assert (ours-p (spinlock-value l)) nil "5"))
+    (assert (eql (spinlock-value l) nil) nil "6")))
+
 (with-test (:name (:mutex :nesting-mutex-and-recursive-lock))
   (let ((l (make-mutex :name "a mutex")))
     (with-mutex (l)
       (with-recursive-lock (l)))))
 
+(with-test (:name (:spinlock :nesting-spinlock-and-recursive-spinlock))
+  (let ((l (make-spinlock :name "a spinlock")))
+    (with-spinlock (l)
+      (with-recursive-spinlock (l)))))
+
 (let ((l (make-spinlock :name "spinlock")))
-  (assert (eql (spinlock-value l) 0) nil "1")
+  (assert (eql (spinlock-value l) nil) ((spinlock-value l))
+          "spinlock not free (1)")
   (with-spinlock (l)
-    (assert (eql (spinlock-value l) 1) nil "2"))
-  (assert (eql (spinlock-value l) 0) nil "3"))
+    (assert (eql (spinlock-value l) *current-thread*) ((spinlock-value l))
+            "spinlock not taken"))
+  (assert (eql (spinlock-value l) nil) ((spinlock-value l))
+          "spinlock not free (2)"))
 
 ;; test that SLEEP actually sleeps for at least the given time, even
 ;; if interrupted by another thread exiting/a gc/anything

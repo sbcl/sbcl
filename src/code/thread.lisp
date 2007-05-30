@@ -23,7 +23,7 @@
   #!+sb-doc
   "Spinlock type."
   (name nil :type (or null simple-string))
-  (value 0))
+  (value nil))
 
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
                             &body body)
@@ -71,6 +71,22 @@ provided the default value is used for the mutex."
                   ,@body))
          (unless ,inner-lock-p
            (release-mutex ,mutex1)))))
+  #!-sb-thread
+  `(locally ,@body))
+
+(sb!xc:defmacro with-recursive-spinlock ((spinlock) &body body)
+  #!-sb-thread
+  (declare (ignore spinlock))
+  #!+sb-thread
+  (with-unique-names (lock inner-lock-p got-it)
+    `(let* ((,lock ,spinlock)
+            (,inner-lock-p (eq (spinlock-value ,lock) *current-thread*))
+            (,got-it nil))
+       (unwind-protect
+            (when (or ,inner-lock-p (setf ,got-it (get-spinlock ,lock)))
+              (locally ,@body))
+         (when ,got-it
+           (release-spinlock ,lock)))))
   #!-sb-thread
   `(locally ,@body))
 
