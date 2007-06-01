@@ -916,7 +916,10 @@
                       (sb!impl::signal-bounding-indices-bad-error seq start end))))
          (let* ((size (- end start))
                 (result (make-array size :element-type ',element-type)))
-           ,(maybe-expand-copy-loop-inline 'seq 'start 'result 0 'size element-type)
+           ,(maybe-expand-copy-loop-inline 'seq (if (constant-lvar-p start)
+                                                    (lvar-value start)
+                                                    'start)
+                                           'result 0 'size element-type)
            result)))))
 
 (deftransform copy-seq ((seq) ((or (simple-unboxed-array (*)) simple-vector)) *)
