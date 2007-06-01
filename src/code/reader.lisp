@@ -401,12 +401,11 @@ standard Lisp readtable when NIL."
      (setq *ouch-ptr* (1- (the fixnum *ouch-ptr*)))))
 
 (defun grow-read-buffer ()
-  (let ((rbl (length (the simple-string *read-buffer*))))
-    (setq *read-buffer*
-          (concatenate 'simple-string
-                       *read-buffer*
-                       (make-string rbl)))
-    (setq *read-buffer-length* (* 2 rbl))))
+  (let* ((rbl (length *read-buffer*))
+         (new-length (* 2 rbl))
+         (new-buffer (make-string new-length)))
+    (setq *read-buffer* (replace new-buffer *read-buffer*))
+    (setq *read-buffer-length* new-length)))
 
 (defun inchpeek-read-buffer ()
   (if (>= (the fixnum *inch-ptr*) (the fixnum *ouch-ptr*))
@@ -776,16 +775,20 @@ variables to allow for nested and thread safe reading."
   (let ((case (readtable-case *readtable*)))
     (cond
      ((and (null escapes) (eq case :upcase))
-      (dotimes (i *ouch-ptr*)
-        (setf (schar *read-buffer* i)
-              (char-upcase (schar *read-buffer* i)))))
+      ;; Pull the special variable access out of the loop.
+      (let ((buffer *read-buffer*))
+        (dotimes (i *ouch-ptr*)
+          (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+          (setf (schar buffer i) (char-upcase (schar buffer i))))))
      ((eq case :preserve))
      (t
       (macrolet ((skip-esc (&body body)
                    `(do ((i (1- *ouch-ptr*) (1- i))
+                         (buffer *read-buffer*)
                          (escapes escapes))
                         ((minusp i))
-                      (declare (fixnum i))
+                      (declare (fixnum i)
+                               (optimize (sb!c::insert-array-bounds-checks 0)))
                       (when (or (null escapes)
                                 (let ((esc (first escapes)))
                                   (declare (fixnum esc))
@@ -794,12 +797,12 @@ variables to allow for nested and thread safe reading."
                                          (aver (= esc i))
                                          (pop escapes)
                                          nil))))
-                        (let ((ch (schar *read-buffer* i)))
+                        (let ((ch (schar buffer i)))
                           ,@body)))))
         (flet ((lower-em ()
-                 (skip-esc (setf (schar *read-buffer* i) (char-downcase ch))))
+                 (skip-esc (setf (schar buffer i) (char-downcase ch))))
                (raise-em ()
-                 (skip-esc (setf (schar *read-buffer* i) (char-upcase ch)))))
+                 (skip-esc (setf (schar buffer i) (char-upcase ch)))))
           (ecase case
             (:upcase (raise-em))
             (:downcase (lower-em))
