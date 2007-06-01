@@ -124,11 +124,17 @@
 
 (defmethod print-object ((cache cache) stream)
   (print-unreadable-object (cache stream :type t :identity t)
-    (format stream
-            "~W ~S ~W"
-            (cache-nkeys cache)
-            (cache-valuep cache)
-            (cache-nlines cache))))
+    (multiple-value-bind (lines-used lines-total max-depth depth-limit)
+        (cache-statistics cache)
+      (format stream
+              "~D key, ~P~:[no value~;value~], ~D/~D lines, depth ~D/~D"
+              (cache-key-count cache)
+              (cache-key-count cache)
+              (cache-value cache)
+              lines-used
+              lines-total
+              max-depth
+              depth-limit))))
 
 (defmethod print-object ((wrapper wrapper) stream)
   (print-unreadable-object (wrapper stream :type t :identity t)

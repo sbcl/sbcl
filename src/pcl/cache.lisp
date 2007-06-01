@@ -93,6 +93,17 @@
 (defun power-of-two-ceiling (x)
   (ash 1 (integer-length (1- x))))
 
+(defun cache-statistics (cache)
+  (let* ((vector (cache-vector cache))
+         (size (length vector))
+         (line-size (cache-line-size cache))
+         (total-lines (/ size line-size))
+         (free-lines (loop for i from 0 by line-size below size
+                           unless (eq (svref vector i) '..empty..)
+                           count t)))
+    (values (- total-lines free-lines) total-lines
+            (cache-depth cache) (cache-limit cache))))
+
 ;;; Don't allocate insanely huge caches.
 (defconstant +cache-vector-max-length+ (expt 2 14))
 
