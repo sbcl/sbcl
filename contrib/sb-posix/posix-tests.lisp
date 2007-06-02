@@ -624,3 +624,8 @@
             (sb-posix:unlink non-link-pathname))))
     #.sb-posix:enotdir)
   )
+
+(deftest getcwd.1
+    ;; FIXME: something saner, please
+    (equal (sb-unix::posix-getcwd) (sb-posix:getcwd))
+  t)

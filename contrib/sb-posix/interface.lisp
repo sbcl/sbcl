@@ -247,6 +247,27 @@
   (define-call "setpgid" int minusp (pid pid-t) (pgid pid-t))
   (define-call "setpgrp" int minusp))
 
+(defmacro with-growing-c-string ((buffer size) &body body)
+  (sb-int:with-unique-names (c-string-block)
+    `(block ,c-string-block
+       (let (,buffer)
+         (flet ((,buffer (&optional (size-incl-null))
+                  (when size-incl-null
+                    (setf (sb-sys:sap-ref-8 (sb-alien:alien-sap ,buffer) size-incl-null)
+                          0))
+                  (return-from ,c-string-block
+                    (sb-alien::c-string-to-string
+                     (sb-alien:alien-sap ,buffer)
+                     (sb-impl::default-external-format)
+                     'character))))
+           (loop for ,size = 128 then (* 2 ,size)
+                 do (unwind-protect
+                         (progn
+                           (setf ,buffer (make-alien c-string ,size))
+                           ,@body)
+                      (when ,buffer
+                        (free-alien ,buffer)))))))))
+
 #-win32
 (progn
   (export 'readlink :sb-posix)
@@ -255,22 +276,26 @@
              (alien-funcall
               (extern-alien "readlink" (function int c-string (* t) int))
               path buf length)))
-      (loop for size = 128 then (* 2 size)
-            for buf = (make-alien c-string size)
-            do (unwind-protect
-                    (let ((count (%readlink (filename pathspec) buf size)))
-                      (cond ((minusp count)
-                             (syscall-error))
-                            ((< 0 count size)
-                             (setf (sb-sys:sap-ref-8 (sb-alien:alien-sap buf)
-                                                     count)
-                                   0)
-                             (return
-                               (sb-alien::c-string-to-string
-                                (sb-alien:alien-sap buf)
-                                (sb-impl::default-external-format)
-                                'character)))))
-                 (free-alien buf))))))
+      (with-growing-c-string (buf size)
+        (let ((count (%readlink (filename pathspec) buf size)))
+          (cond ((minusp count)
+                 (syscall-error))
+                ((< 0 count size)
+                 (buf count))))))))
+
+(progn
+  (export 'getcwd :sb-posix)
+  (defun getcwd ()
+    (flet ((%getcwd (buffer size)
+             (alien-funcall
+              (extern-alien "getcwd" (function c-string (* t) int))
+              buffer size)))
+      (with-growing-c-string (buf size)
+        (let ((result (%getcwd buf size)))
+          (cond (result
+                 (buf))
+                ((/= (get-errno) sb-posix:erange)
+                 (syscall-error))))))))
 
 #-win32
 (progn
