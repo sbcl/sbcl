@@ -341,6 +341,12 @@
  (:integer f-getown "F_GETOWN" nil t)
  (:integer f-setown "F_SETOWN" nil t)
 
+ ;; lockf()
+ (:integer f-lock "F_LOCK" nil t)
+ (:integer f-tlock "F_TLOCK" nil t)
+ (:integer f-ulock "F_ULOCK" nil t)
+ (:integer f-test "F_TEST" nil t)
+
  ;; tcgetattr(), tcsetattr()
  #-win32
  (:type cc-t "cc_t")

@@ -519,6 +519,10 @@ Daniel Barlow:
   asdf-install, sb-bsd-sockets, sb-executable, sb-grovel and sb-posix
   contrib packages.
 
+Zach Beane:
+  He provided a number of additions to SB-POSIX and implemented the
+  original timer facility on which SBCL's timers are based.
+
 James Bielman:
   He assisted in work on the port to the Windows operating system.
 

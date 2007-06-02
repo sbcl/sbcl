@@ -145,6 +145,7 @@
   (define-call "lchown" int minusp (pathname filename)
                (owner uid-t)  (group gid-t))
   (define-call "link" int minusp (oldpath filename) (newpath filename))
+  (define-call "lockf" int minusp (fd file-descriptor) (cmd int) (len off-t))
   (define-call "mkfifo" int minusp (pathname filename) (mode mode-t))
   (define-call "symlink" int minusp (oldpath filename) (newpath filename))
   (define-call "sync" void never-fails)
