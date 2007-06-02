@@ -702,8 +702,9 @@
                   ;; Multiply by closed zero is special. The result
                   ;; is always a closed bound. But don't replace this
                   ;; with zero; we want the multiplication to produce
-                  ;; the correct signed zero, if needed.
-                  (* (type-bound-number x) (type-bound-number y)))
+                  ;; the correct signed zero, if needed. Use SIGNUM
+                  ;; to avoid trying to multiply huge bignums with 0.0.
+                  (* (signum (type-bound-number x)) (signum (type-bound-number y))))
                  ((or (and (floatp x) (float-infinity-p x))
                       (and (floatp y) (float-infinity-p y)))
                   ;; Infinity times anything is infinity

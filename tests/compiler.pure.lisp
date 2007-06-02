@@ -2251,3 +2251,16 @@
 
 ;;; bug in adding DATA-VECTOR-REF-WITH-OFFSET to x86-64
 (assert (not (mismatch #(1.0f0 2.0f0) (make-array 2 :element-type 'single-float :initial-contents (list 1.0f0 2.0f0)))))
+
+;;; bug in interval-arithmetic used by the compiler: needless attempt to coerce too
+;;; large bignums to floats
+(dolist (op '(* / + -))
+  (let ((fun (compile
+              nil
+              `(lambda (x)
+                 (declare (type (integer 0 #.(* 2 (truncate most-positive-double-float))) x))
+                 (,op 0.0d0 x)))))
+    (loop repeat 10
+          do (let ((arg (random (truncate most-positive-double-float))))
+               (assert (eql (funcall fun arg)
+                            (funcall op 0.0d0 arg)))))))
