@@ -1787,6 +1787,10 @@ versions of SBCL, and the other stuff in here is definitely not
 guaranteed to be present in later versions of SBCL.  Use of this
 package is deprecated in favour of SB-MOP."
       :use ("CL" "SB!MOP" "SB!INT" "SB!EXT" "SB!WALKER" "SB!KERNEL")
+      ;; experimental SBCL-only (for now) symbols
+      :export ("MAKE-METHOD-SPECIALIZERS-FORM"
+               "PARSE-SPECIALIZER-USING-CLASS"
+               "UNPARSE-SPECIALIZER-USING-CLASS")
       ;; FIXME: After a little while, these reexports can probably go
       ;; away, as they're superseded by the use of SB-MOP as the
       ;; publically-accessible package.

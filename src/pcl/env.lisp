@@ -31,6 +31,34 @@
 ;;; a "contrib" directory eventually?
 
 #|
+(defun parse-method-or-spec (spec &optional (errorp t))
+  (let (gf method name temp)
+    (if (method-p spec)
+        (setq method spec
+              gf (method-generic-function method)
+              temp (and gf (generic-function-name gf))
+              name (if temp
+                       (make-method-spec temp
+                                         (method-qualifiers method)
+                                         (unparse-specializers
+                                          (method-specializers method)))
+                       (make-symbol (format nil "~S" method))))
+        (multiple-value-bind (gf-spec quals specls)
+            (parse-defmethod spec)
+          (and (setq gf (and (or errorp (fboundp gf-spec))
+                             (gdefinition gf-spec)))
+               (let ((nreq (compute-discriminating-function-arglist-info gf)))
+                 (setq specls (append (parse-specializers specls)
+                                      (make-list (- nreq (length specls))
+                                                 :initial-element
+                                                 *the-class-t*)))
+                 (and
+                   (setq method (get-method gf quals specls errorp))
+                   (setq name
+                         (make-method-spec
+                          gf-spec quals (unparse-specializers specls))))))))
+    (values gf method name)))
+
 ;;; TRACE-METHOD and UNTRACE-METHOD accept method specs as arguments. A
 ;;; method-spec should be a list like:
 ;;;   (<generic-function-spec> qualifiers* (specializers*))
@@ -108,15 +136,19 @@
   (fdefinition name))
 |#
 
+#|
 ;;;; Helper for slightly newer trace implementation, based on
 ;;;; breakpoint stuff.  The above is potentially still useful, so it's
 ;;;; left in, commented.
+
+;;; (this turned out to be a roundabout way of doing things)
 (defun list-all-maybe-method-names (gf)
   (let (result)
     (dolist (method (generic-function-methods gf) (nreverse result))
       (let ((spec (nth-value 2 (parse-method-or-spec method))))
         (push spec result)
         (push (list* 'fast-method (cdr spec)) result)))))
+|#
 
 ;;;; MAKE-LOAD-FORM
 

@@ -336,6 +336,8 @@
 
 (defgeneric map-dependents (metaobject function))
 
+(defgeneric parse-specializer-using-class (generic-function specializer-name))
+
 (defgeneric remove-boundp-method (class generic-function))
 
 (defgeneric remove-dependent (metaobject dependent))
@@ -358,6 +360,8 @@
 
 ;;; This controls DESCRIBE-OBJECT (SLOT-OBJECT STREAM) behavior.
 (defgeneric slots-to-inspect (class object))
+
+(defgeneric unparse-specializer-using-class (generic-function specializer))
 
 (defgeneric update-gf-dfun (class gf))
 
@@ -415,20 +419,19 @@
 
 (defgeneric add-writer-method (class generic-function slot-name slot-documentation))
 
-(defgeneric make-method-lambda (proto-generic-function
-                                proto-method
-                                lambda-expression
-                                environment))
+(defgeneric make-method-lambda
+    (proto-generic-function proto-method lambda-expression environment))
+
+(defgeneric make-method-specializers-form
+    (proto-generic-function proto-method specializer-names environment))
 
 (defgeneric (setf slot-value-using-class) (new-value class object slotd))
 
 ;;;; 5 arguments
 
-(defgeneric make-method-initargs-form (proto-generic-function
-                                       proto-method
-                                       lambda-expression
-                                       lambda-list
-                                       environment))
+(defgeneric make-method-initargs-form
+    (proto-generic-function proto-method lambda-expression lambda-list
+     environment))
 
 ;;;; optional arguments
 

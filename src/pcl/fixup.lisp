@@ -24,6 +24,7 @@
 (in-package "SB-PCL")
 
 (!fix-early-generic-functions)
+(!fix-ensure-accessor-specializers)
 (compute-standard-slot-locations)
 (dolist (s '(condition structure-object))
   (dohash (k v (classoid-subclasses (find-classoid s)))

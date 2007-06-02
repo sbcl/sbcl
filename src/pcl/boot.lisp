@@ -68,18 +68,13 @@ bootstrapping.
 
 |#
 
-(declaim (notinline make-a-method
-                    add-named-method
+(declaim (notinline make-a-method add-named-method
                     ensure-generic-function-using-class
-                    add-method
-                    remove-method))
+                    add-method remove-method))
 
 (defvar *!early-functions*
-        '((make-a-method early-make-a-method
-                         real-make-a-method)
-          (add-named-method early-add-named-method
-                            real-add-named-method)
-          ))
+  '((make-a-method early-make-a-method real-make-a-method)
+    (add-named-method early-add-named-method real-add-named-method)))
 
 ;;; For each of the early functions, arrange to have it point to its
 ;;; early definition. Do this in a way that makes sure that if we
@@ -97,11 +92,14 @@ bootstrapping.
 ;;; *!GENERIC-FUNCTION-FIXUPS* is used by !FIX-EARLY-GENERIC-FUNCTIONS
 ;;; to convert the few functions in the bootstrap which are supposed
 ;;; to be generic functions but can't be early on.
+;;;
+;;; each entry is a list of name and lambda-list, class names as
+;;; specializers, and method body function name.
 (defvar *!generic-function-fixups*
   '((add-method
-     ((generic-function method)  ;lambda-list
-      (standard-generic-function method) ;specializers
-      real-add-method))          ;method-function
+     ((generic-function method)
+      (standard-generic-function method)
+      real-add-method))
     (remove-method
      ((generic-function method)
       (standard-generic-function method)
@@ -125,6 +123,18 @@ bootstrapping.
      ((proto-generic-function proto-method lambda-expression environment)
       (standard-generic-function standard-method t t)
       real-make-method-lambda))
+    (make-method-specializers-form
+     ((proto-generic-function proto-method specializer-names environment)
+      (standard-generic-function standard-method t t)
+      real-make-method-specializers-form))
+    (parse-specializer-using-class
+     ((generic-function specializer)
+      (standard-generic-function t)
+      real-parse-specializer-using-class))
+    (unparse-specializer-using-class
+     ((generic-function specializer)
+      (standard-generic-function t)
+      real-unparse-specializer-using-class))
     (make-method-initargs-form
      ((proto-generic-function proto-method
                               lambda-expression
@@ -358,11 +368,11 @@ bootstrapping.
       (add-method-declarations name qualifiers lambda-list body env)
     (multiple-value-bind (method-function-lambda initargs)
         (make-method-lambda proto-gf proto-method method-lambda env)
-      (let ((initargs-form (make-method-initargs-form proto-gf
-                                                      proto-method
-                                                      method-function-lambda
-                                                      initargs
-                                                      env)))
+      (let ((initargs-form (make-method-initargs-form
+                            proto-gf proto-method method-function-lambda
+                            initargs env))
+            (specializers-form (make-method-specializers-form
+                                proto-gf proto-method specializers env)))
         `(progn
           ;; Note: We could DECLAIM the ftype of the generic function
           ;; here, since ANSI specifies that we create it if it does
@@ -371,7 +381,7 @@ bootstrapping.
           ;; generic function has an explicit DEFGENERIC and any typos
           ;; in DEFMETHODs are warned about. Otherwise
           ;;
-          ;;   (DEFGENERIC FOO-BAR-BLETCH ((X T)))
+          ;;   (DEFGENERIC FOO-BAR-BLETCH (X))
           ;;   (DEFMETHOD FOO-BAR-BLETCH ((X HASH-TABLE)) ..)
           ;;   (DEFMETHOD FOO-BRA-BLETCH ((X SIMPLE-VECTOR)) ..)
           ;;   (DEFMETHOD FOO-BAR-BLETCH ((X VECTOR)) ..)
@@ -383,7 +393,7 @@ bootstrapping.
           ;; to VECTOR) but still doesn't do what was intended. I hate
           ;; that kind of bug (code which silently gives the wrong
           ;; answer), so we don't do a DECLAIM here. -- WHN 20000229
-          ,(make-defmethod-form name qualifiers specializers
+          ,(make-defmethod-form name qualifiers specializers-form
                                 unspecialized-lambda-list
                                 (if proto-method
                                     (class-name (class-of proto-method))
@@ -417,9 +427,20 @@ bootstrapping.
              (consp (setq fn (caddr initargs-form)))
              (eq (car fn) 'function)
              (consp (setq fn-lambda (cadr fn)))
-             (eq (car fn-lambda) 'lambda))
+             (eq (car fn-lambda) 'lambda)
+             (bug "Really got here"))
         (let* ((specls (mapcar (lambda (specl)
                                  (if (consp specl)
+                                     ;; CONSTANT-FORM-VALUE?  What I
+                                     ;; kind of want to know, though,
+                                     ;; is what happens if we don't do
+                                     ;; this for some slow-method
+                                     ;; function because of a hairy
+                                     ;; lexenv -- is the only bad
+                                     ;; effect that the method
+                                     ;; function ends up unnamed?  If
+                                     ;; so, couldn't we arrange to
+                                     ;; name it later?
                                      `(,(car specl) ,(eval (cadr specl)))
                                    specl))
                                specializers))
@@ -437,6 +458,8 @@ bootstrapping.
                        ,@(cdddr initargs-form)))))
         (make-defmethod-form-internal
          name qualifiers
+         specializers
+         #+nil
          `(list ,@(mapcar (lambda (specializer)
                             (if (consp specializer)
                                 ``(,',(car specializer)
@@ -528,6 +551,68 @@ bootstrapping.
 (defun real-make-method-lambda (proto-gf proto-method method-lambda env)
   (declare (ignore proto-gf proto-method))
   (make-method-lambda-internal method-lambda env))
+
+(unless (fboundp 'make-method-lambda)
+  (setf (gdefinition 'make-method-lambda)
+        (symbol-function 'real-make-method-lambda)))
+
+(defun real-make-method-specializers-form
+    (proto-gf proto-method specializer-names env)
+  (declare (ignore env proto-gf proto-method))
+  (flet ((parse (name)
+           (cond
+             ((and (eq *boot-state* 'complete)
+                   (specializerp name))
+              name)
+             ((symbolp name) `(find-class ',name))
+             ((consp name) (ecase (car name)
+                             ((eql) `(intern-eql-specializer ,(cadr name)))
+                             ((class-eq) `(class-eq-specializer (find-class ',(cadr name))))
+                             ((prototype) `(fixme))))
+             (t (bug "Foo")))))
+    `(list ,@(mapcar #'parse specializer-names))))
+
+(unless (fboundp 'make-method-specializers-form)
+  (setf (gdefinition 'make-method-specializers-form)
+        (symbol-function 'real-make-method-specializers-form)))
+
+(defun real-parse-specializer-using-class (generic-function specializer)
+  (let ((result (specializer-from-type specializer)))
+    (if (specializerp result)
+        result
+        (error "~@<~S cannot be parsed as a specializer for ~S.~@:>"
+               specializer generic-function))))
+
+(unless (fboundp 'parse-specializer-using-class)
+  (setf (gdefinition 'parse-specializer-using-class)
+        (symbol-function 'real-parse-specializer-using-class)))
+
+(defun real-unparse-specializer-using-class (generic-function specializer)
+  (if (specializerp specializer)
+      ;; FIXME: this HANDLER-CASE is a bit of a hammer to crack a nut:
+      ;; the idea is that we want to unparse permissively, so that the
+      ;; lazy (or rather the "portable") specializer extender (who
+      ;; does not define methods on these new SBCL-specific MOP
+      ;; functions) can still subclass specializer and define methods
+      ;; without everything going wrong.  Making it cleaner and
+      ;; clearer that that is what we are defending against would be
+      ;; nice.  -- CSR, 2007-06-01
+      (handler-case
+          (let ((type (specializer-type specializer)))
+            (if (and (consp type) (eq (car type) 'class))
+                (let* ((class (cadr type))
+                       (class-name (class-name class)))
+                  (if (eq class (find-class class-name nil))
+                      class-name
+                      type))
+                type))
+        (error () specializer))
+      (error "~@<~S is not a legal specializer for ~S.~@:>"
+             specializer generic-function)))
+
+(unless (fboundp 'unparse-specializer-using-class)
+  (setf (gdefinition 'unparse-specializer-using-class)
+        (symbol-function 'real-unparse-specializer-using-class)))
 
 ;;; a helper function for creating Python-friendly type declarations
 ;;; in DEFMETHOD forms
@@ -672,7 +757,15 @@ bootstrapping.
            (sll-decl (get-declaration '%method-lambda-list declarations))
            (method-name (when (consp name-decl) (car name-decl)))
            (generic-function-name (when method-name (car method-name)))
-           (specialized-lambda-list (or sll-decl (cadr method-lambda))))
+           (specialized-lambda-list (or sll-decl (cadr method-lambda)))
+           ;; the method-cell is a way of communicating what method a
+           ;; method-function implements, for the purpose of
+           ;; NO-NEXT-METHOD.  We need something that can be shared
+           ;; between function and initargs, but not something that
+           ;; will be coalesced as a constant (because we are naughty,
+           ;; oh yes) with the expansion of any other methods in the
+           ;; same file.  -- CSR, 2007-05-30
+           (method-cell (list (make-symbol "METHOD-CELL"))))
       (multiple-value-bind (parameters lambda-list specializers)
           (parse-specialized-lambda-list specialized-lambda-list)
         (let* ((required-parameters
@@ -792,14 +885,7 @@ bootstrapping.
                                            ,call-next-method-p
                                            :next-method-p-p ,next-method-p-p
                                            :setq-p ,setq-p
-                                           ;; we need to pass this along
-                                           ;; so that NO-NEXT-METHOD can
-                                           ;; be given a suitable METHOD
-                                           ;; argument; we need the
-                                           ;; QUALIFIERS and SPECIALIZERS
-                                           ;; inside the declaration to
-                                           ;; give to FIND-METHOD.
-                                           :method-name-declaration ,name-decl
+                                           :method-cell ,method-cell
                                            :closurep ,closurep
                                            :applyp ,applyp)
                            ,@walked-declarations
@@ -811,14 +897,9 @@ bootstrapping.
                                (declare (enable-package-locks
                                          %parameter-binding-modified))
                                ,@walked-lambda-body))))
-                      `(,@(when plist
-                                `(plist ,plist))
-                          ,@(when documentation
-                                  `(:documentation ,documentation)))))))))))
-
-(unless (fboundp 'make-method-lambda)
-  (setf (gdefinition 'make-method-lambda)
-        (symbol-function 'real-make-method-lambda)))
+                      `(,@(when call-next-method-p `(method-cell ,method-cell))
+                        ,@(when plist `(plist ,plist))
+                        ,@(when documentation `(:documentation ,documentation)))))))))))
 
 (defmacro simple-lexical-method-functions ((lambda-list
                                             method-args
@@ -844,7 +925,7 @@ bootstrapping.
 
 (defmacro bind-simple-lexical-method-functions
     ((method-args next-methods (&key call-next-method-p next-method-p-p setq-p
-                                     closurep applyp method-name-declaration))
+                                     closurep applyp method-cell))
      &body body
      &environment env)
   (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
@@ -859,7 +940,7 @@ bootstrapping.
                           ,@(if (safe-code-p env)
                                 `((%check-cnm-args cnm-args
                                                    ,method-args
-                                                   ',method-name-declaration))
+                                                   ',method-cell))
                                 nil)
                           (if .next-method.
                               (funcall (if (std-instance-p .next-method.)
@@ -868,25 +949,18 @@ bootstrapping.
                                        (or cnm-args ,method-args)
                                        ,next-methods)
                               (apply #'call-no-next-method
-                                     ',method-name-declaration
+                                     ',method-cell
                                      (or cnm-args ,method-args))))))
                 ,@(and next-method-p-p
                        '((next-method-p ()
                           (not (null .next-method.))))))
            ,@body))))
 
-(defun call-no-next-method (method-name-declaration &rest args)
-  (destructuring-bind (name) method-name-declaration
-    (destructuring-bind (name &rest qualifiers-and-specializers) name
-      ;; KLUDGE: inefficient traversal, but hey.  This should only
-      ;; happen on the slow error path anyway.
-      (let* ((qualifiers (butlast qualifiers-and-specializers))
-             (specializers (car (last qualifiers-and-specializers)))
-             (method (find-method (gdefinition name) qualifiers specializers)))
-        (apply #'no-next-method
-               (method-generic-function method)
-               method
-               args)))))
+(defun call-no-next-method (method-cell &rest args)
+  (let ((method (car method-cell)))
+    (aver method)
+    (apply #'no-next-method (method-generic-function method)
+           method args)))
 
 (defstruct (method-call (:copier nil))
   (function #'identity :type function)
@@ -1162,7 +1236,7 @@ bootstrapping.
 
 
 (defmacro fast-call-next-method-body ((args next-method-call rest-arg)
-                                      method-name-declaration
+                                      method-cell
                                       cnm-args)
   `(if ,next-method-call
        ,(let ((call `(invoke-narrow-effective-method-function
@@ -1177,7 +1251,7 @@ bootstrapping.
                               ,cnm-args)
                     ,call)
                   ,call))
-       (call-no-next-method ',method-name-declaration
+       (call-no-next-method ',method-cell
                             ,@args
                             ,@(when rest-arg
                                     `(,rest-arg)))))
@@ -1186,7 +1260,7 @@ bootstrapping.
     ((args rest-arg next-method-call (&key
                                       call-next-method-p
                                       setq-p
-                                      method-name-declaration
+                                      method-cell
                                       next-method-p-p
                                       closurep
                                       applyp))
@@ -1204,13 +1278,13 @@ bootstrapping.
                                      (optimize (sb-c:insert-step-conditions 0)))
                            ,@(if (safe-code-p env)
                                  `((%check-cnm-args cnm-args (list ,@args)
-                                                    ',method-name-declaration))
+                                                    ',method-cell))
                                  nil)
                            (fast-call-next-method-body (,args
                                                         ,next-method-call
                                                         ,rest-arg)
-                                                        ,method-name-declaration
-                                                       cnm-args))))
+                            ,method-cell
+                            cnm-args))))
                 ,@(when next-method-p-p
                         `((next-method-p ()
                            (declare (optimize (sb-c:insert-step-conditions 0)))
@@ -1234,9 +1308,9 @@ bootstrapping.
 ;;; for COMPUTE-APPLICABLE-METHODS and probably a lot more of such
 ;;; preconditions.  That looks hairy and is probably not worth it,
 ;;; because this check will never be fast.
-(defun %check-cnm-args (cnm-args orig-args method-name-declaration)
+(defun %check-cnm-args (cnm-args orig-args method-cell)
   (when cnm-args
-    (let* ((gf (fdefinition (caar method-name-declaration)))
+    (let* ((gf (method-generic-function (car method-cell)))
            (omethods (compute-applicable-methods gf orig-args))
            (nmethods (compute-applicable-methods gf cnm-args)))
       (unless (equal omethods nmethods)
@@ -1452,13 +1526,16 @@ bootstrapping.
             new-value)
       (setf (getf (object-plist method) key default) new-value)))
 
-(defun load-defmethod
-    (class name quals specls ll initargs source-location)
-  (setq initargs (copy-tree initargs))
-  (setf (getf (getf initargs 'plist) :name)
-        (make-method-spec name quals specls))
-  (load-defmethod-internal class name quals specls
-                           ll initargs source-location))
+(defun load-defmethod (class name quals specls ll initargs source-location)
+  (let ((method-cell (getf initargs 'method-cell)))
+    (setq initargs (copy-tree initargs))
+    (when method-cell
+      (setf (getf initargs 'method-cell) method-cell))
+    #+nil
+    (setf (getf (getf initargs 'plist) :name)
+          (make-method-spec name quals specls))
+    (load-defmethod-internal class name quals specls
+                             ll initargs source-location)))
 
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
@@ -1468,10 +1545,7 @@ bootstrapping.
     (let* ((gf (fdefinition gf-spec))
            (method (and (generic-function-p gf)
                         (generic-function-methods gf)
-                        (find-method gf
-                                     qualifiers
-                                     (parse-specializers specializers)
-                                     nil))))
+                        (find-method gf qualifiers specializers nil))))
       (when method
         (style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
                     gf-spec qualifiers specializers))))
@@ -1492,15 +1566,20 @@ bootstrapping.
               method-class (class-name (class-of method))))
     method))
 
-(defun make-method-spec (gf-spec qualifiers unparsed-specializers)
-  `(slow-method ,gf-spec ,@qualifiers ,unparsed-specializers))
+(defun make-method-spec (gf qualifiers specializers)
+  (let ((name (generic-function-name gf))
+        (unparsed-specializers (unparse-specializers gf specializers)))
+    `(slow-method ,name ,@qualifiers ,unparsed-specializers)))
 
 (defun initialize-method-function (initargs method)
   (let* ((mf (getf initargs :function))
          (mff (and (typep mf '%method-function)
                    (%method-function-fast-function mf)))
          (plist (getf initargs 'plist))
-         (name (getf plist :name)))
+         (name (getf plist :name))
+         (method-cell (getf initargs 'method-cell)))
+    (when method-cell
+      (setf (car method-cell) method))
     (when name
       (when mf
         (setq mf (set-fun-name mf name)))
@@ -1954,11 +2033,10 @@ bootstrapping.
          (if existing
              (make-early-gf spec lambda-list lambda-list-p existing
                             argument-precedence-order source-location)
-             (error "The function ~S is not already defined." spec)))
+             (bug "The function ~S is not already defined." spec)))
         (existing
-         (error "~S should be on the list ~S."
-                spec
-                '*!generic-function-fixups*))
+         (bug "~S should be on the list ~S."
+              spec '*!generic-function-fixups*))
         (t
          (pushnew spec *!early-generic-functions* :test #'equal)
          (make-early-gf spec lambda-list lambda-list-p nil
@@ -2203,7 +2281,6 @@ bootstrapping.
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
         &rest args &key slot-name object-class method-class-function)
-  (setq specializers (parse-specializers specializers))
   (if method-class-function
       (let* ((object-class (if (classp object-class) object-class
                                (find-class object-class)))
@@ -2276,11 +2353,8 @@ bootstrapping.
 (defun (setf early-method-initargs) (new-value early-method)
   (setf (fifth (fifth early-method)) new-value))
 
-(defun early-add-named-method (generic-function-name
-                               qualifiers
-                               specializers
-                               arglist
-                               &rest initargs)
+(defun early-add-named-method (generic-function-name qualifiers
+                               specializers arglist &rest initargs)
   (let* (;; we don't need to deal with the :generic-function-class
          ;; argument here because the default,
          ;; STANDARD-GENERIC-FUNCTION, is right for all early generic
@@ -2290,15 +2364,13 @@ bootstrapping.
            (dolist (m (early-gf-methods gf))
              (when (and (equal (early-method-specializers m) specializers)
                         (equal (early-method-qualifiers m) qualifiers))
-               (return m))))
-         (new (make-a-method 'standard-method
-                             qualifiers
-                             arglist
-                             specializers
-                             initargs
-                             ())))
-    (when existing (remove-method gf existing))
-    (add-method gf new)))
+               (return m)))))
+    (setf (getf (getf initargs 'plist) :name)
+          (make-method-spec gf qualifiers specializers))
+    (let ((new (make-a-method 'standard-method qualifiers arglist
+                              specializers initargs ())))
+      (when existing (remove-method gf existing))
+      (add-method gf new))))
 
 ;;; This is the early version of ADD-METHOD. Later this will become a
 ;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has
@@ -2405,7 +2477,7 @@ bootstrapping.
              (gf (gdefinition fspec))
              (methods (mapcar (lambda (method)
                                 (let* ((lambda-list (first method))
-                                       (specializers (second method))
+                                       (specializers (mapcar #'find-class (second method)))
                                        (method-fn-name (third method))
                                        (fn-name (or method-fn-name fspec))
                                        (fn (fdefinition fn-name))
@@ -2445,63 +2517,17 @@ bootstrapping.
     (setq spec-ll (pop cdr-of-form))
     (values name qualifiers spec-ll cdr-of-form)))
 
-(defun parse-specializers (specializers)
+(defun parse-specializers (generic-function specializers)
   (declare (list specializers))
   (flet ((parse (spec)
-           (let ((result (specializer-from-type spec)))
-             (if (specializerp result)
-                 result
-                 (if (symbolp spec)
-                     (error "~S was used as a specializer,~%~
-                             but is not the name of a class."
-                            spec)
-                     (error "~S is not a legal specializer." spec))))))
+           (parse-specializer-using-class generic-function spec)))
     (mapcar #'parse specializers)))
 
-(defun unparse-specializers (specializers-or-method)
-  (if (listp specializers-or-method)
-      (flet ((unparse (spec)
-               (if (specializerp spec)
-                   (let ((type (specializer-type spec)))
-                     (if (and (consp type)
-                              (eq (car type) 'class))
-                         (let* ((class (cadr type))
-                                (class-name (class-name class)))
-                           (if (eq class (find-class class-name nil))
-                               class-name
-                               type))
-                         type))
-                   (error "~S is not a legal specializer." spec))))
-        (mapcar #'unparse specializers-or-method))
-      (unparse-specializers (method-specializers specializers-or-method))))
-
-(defun parse-method-or-spec (spec &optional (errorp t))
-  (let (gf method name temp)
-    (if (method-p spec)
-        (setq method spec
-              gf (method-generic-function method)
-              temp (and gf (generic-function-name gf))
-              name (if temp
-                       (make-method-spec temp
-                                         (method-qualifiers method)
-                                         (unparse-specializers
-                                          (method-specializers method)))
-                       (make-symbol (format nil "~S" method))))
-        (multiple-value-bind (gf-spec quals specls)
-            (parse-defmethod spec)
-          (and (setq gf (and (or errorp (fboundp gf-spec))
-                             (gdefinition gf-spec)))
-               (let ((nreq (compute-discriminating-function-arglist-info gf)))
-                 (setq specls (append (parse-specializers specls)
-                                      (make-list (- nreq (length specls))
-                                                 :initial-element
-                                                 *the-class-t*)))
-                 (and
-                   (setq method (get-method gf quals specls errorp))
-                   (setq name
-                         (make-method-spec
-                          gf-spec quals (unparse-specializers specls))))))))
-    (values gf method name)))
+(defun unparse-specializers (generic-function specializers)
+  (declare (list specializers))
+  (flet ((unparse (spec)
+           (unparse-specializer-using-class generic-function spec)))
+    (mapcar #'unparse specializers)))
 
 (defun extract-parameters (specialized-lambda-list)
   (multiple-value-bind (parameters ignore1 ignore2)

@@ -88,8 +88,8 @@
     (assert (= 3 (b-of *foo*)))
     (assert (raises-error? (c-of *foo*)))))
 
-;; test that :documentation argument to slot specifiers are used as
-;; the docstrings of accessor methods.
+;;; test that :documentation argument to slot specifiers are used as
+;;; the docstrings of accessor methods.
 (defclass foo ()
   ((a :reader a-of :documentation "docstring for A")
    (b :writer set-b-of :documentation "docstring for B")
@@ -97,7 +97,26 @@
 
 (flet ((doc (fun)
          (documentation fun t)))
-  (assert (string= (doc (find-method #'a-of nil '((foo)))) "docstring for A"))
-  (assert (string= (doc (find-method #'set-b-of nil '(t (foo)))) "docstring for B"))
-  (assert (string= (doc (find-method #'c nil '((foo)))) "docstring for C"))
-  (assert (string= (doc (find-method #'(setf c) nil '(t (foo)))) "docstring for C")))
+  (assert (string= (doc (find-method #'a-of nil '(foo))) "docstring for A"))
+  (assert (string= (doc (find-method #'set-b-of nil '(t foo))) "docstring for B"))
+  (assert (string= (doc (find-method #'c nil '(foo))) "docstring for C"))
+  (assert (string= (doc (find-method #'(setf c) nil '(t foo))) "docstring for C")))
+
+;;; some nasty tests of NO-NEXT-METHOD.
+(defvar *method-with-no-next-method*)
+(defvar *nnm-count* 0)
+(defun make-nnm-tester (x)
+  (setq *method-with-no-next-method* (defmethod nnm-tester ((y (eql x))) (call-next-method))))
+(make-nnm-tester 1)
+(defmethod no-next-method ((gf (eql #'nnm-tester)) method &rest args)
+  (assert (eql method *method-with-no-next-method*))
+  (incf *nnm-count*))
+(with-test (:name (no-next-method :unknown-specializer))
+  (nnm-tester 1)
+  (assert (= *nnm-count* 1)))
+(let ((gf #'nnm-tester))
+  (reinitialize-instance gf :name 'new-nnm-tester)
+  (setf (fdefinition 'new-nnm-tester) gf))
+(with-test (:name (no-next-method :gf-name-changed))
+  (new-nnm-tester 1)
+  (assert (= *nnm-count* 2)))

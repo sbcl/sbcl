@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
+  * MOP improvement: support for user-defined subclasses of
+    SB-MOP:SPECIALIZER has been enhanced.  The experimental interface
+    function SB-PCL:MAKE-METHOD-SPECIALIZERS-FORM, called as part of
+    the expansion of DEFMETHOD, is responsible for generating a form
+    which creates a list of specializers when evaluated.  Additional
+    functions SB-PCL:[UN]PARSE-SPECIALIZER-USING-CLASS provide
+    debugging and introspective support.
   * minor incompatible change: the (unsupported) spinlock interface
     has changed: free spinlock now has the value NIL, and a held spinlock
     has the owning thread as its value.

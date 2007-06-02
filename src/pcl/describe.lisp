@@ -106,7 +106,7 @@
             (format stream "~&  (~A ~{~S ~}~:S)~%"
                     gf-name
                     (method-qualifiers method)
-                    (unparse-specializers method))
+                    (unparse-specializers fun (method-specializers method)))
             (when (documentation method t)
               (format stream "~&    Method documentation: ~A"
                       (documentation method t))))))))

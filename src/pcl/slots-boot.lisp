@@ -23,29 +23,38 @@
 
 (in-package "SB-PCL")
 
-(defun ensure-accessor (type fun-name slot-name)
-  (unless (fboundp fun-name)
-    (multiple-value-bind (lambda-list specializers method-class initargs doc)
-        (ecase type
-          ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
-          ;; behaviour for non-slot-objects too?
-          (reader
-           (values '(object) '(slot-object) 'global-reader-method
-                   (make-std-reader-method-function 'slot-object slot-name)
-                   "automatically-generated reader method"))
-          (writer
-           (values '(new-value object) '(t slot-object) 'global-writer-method
-                   (make-std-writer-method-function 'slot-object slot-name)
-                   "automatically-generated writer method"))
-          (boundp
-           (values '(object) '(slot-object) 'global-boundp-method
-                   (make-std-boundp-method-function 'slot-object slot-name)
-                   "automatically-generated boundp method")))
-      (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
-        (add-method gf (make-a-method method-class
-                                      () lambda-list specializers
-                                      initargs doc :slot-name slot-name)))))
-  t)
+(let ((reader-specializers '(slot-object))
+      (writer-specializers '(t slot-object)))
+  (defun ensure-accessor (type fun-name slot-name)
+    (unless (fboundp fun-name)
+      (multiple-value-bind (lambda-list specializers method-class initargs doc)
+          (ecase type
+            ;; FIXME: change SLOT-OBJECT here to T to get SLOT-MISSING
+            ;; behaviour for non-slot-objects too?
+            (reader
+             (values '(object) reader-specializers 'global-reader-method
+                     (make-std-reader-method-function 'slot-object slot-name)
+                     "automatically-generated reader method"))
+            (writer
+             (values '(new-value object) writer-specializers
+                     'global-writer-method
+                     (make-std-writer-method-function 'slot-object slot-name)
+                     "automatically-generated writer method"))
+            (boundp
+             (values '(object) reader-specializers 'global-boundp-method
+                     (make-std-boundp-method-function 'slot-object slot-name)
+                     "automatically-generated boundp method")))
+        (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
+          (add-method gf (make-a-method method-class
+                                        () lambda-list specializers
+                                        initargs doc :slot-name slot-name)))))
+    t)
+  ;; KLUDGE: this is maybe PCL bootstrap mechanism #6 or #7, invented
+  ;; by CSR in June 2007.  Making the bootstrap sane is getting higher
+  ;; on the "TODO: URGENT" list.
+  (defun !fix-ensure-accessor-specializers ()
+    (setf reader-specializers (mapcar #'find-class reader-specializers))
+    (setf writer-specializers (mapcar #'find-class writer-specializers))))
 
 (defmacro accessor-slot-value (object slot-name)
   (aver (constantp slot-name))

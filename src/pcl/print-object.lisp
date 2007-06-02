@@ -73,7 +73,9 @@
                   (and generic-function
                        (generic-function-name generic-function))
                   (method-qualifiers method)
-                  (unparse-specializers method)))
+                  (if generic-function
+                      (unparse-specializers generic-function (method-specializers method))
+                      (method-specializers method))))
         ;; FIXME: Why do we do CALL-NEXT-METHOD in this method (and
         ;; in the PRINT-OBJECT STANDARD-ACCESSOR-METHOD method too)?
         (call-next-method))))
@@ -86,7 +88,9 @@
                   (and generic-function
                        (generic-function-name generic-function))
                   (accessor-method-slot-name method)
-                  (unparse-specializers method)))
+                  (if generic-function
+                      (unparse-specializers generic-function (method-specializers method))
+                      (method-specializers method))))
         (call-next-method))))
 
 (defmethod print-object ((mc standard-method-combination) stream)

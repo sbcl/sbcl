@@ -421,21 +421,23 @@
       (setf (gethash fun *traced-funs*) info))
 
     (when (and (typep fun 'generic-function)
-               (trace-info-methods info))
-      (dolist (method-name (sb-pcl::list-all-maybe-method-names fun))
-        (when (fboundp method-name)
+               (trace-info-methods info)
+               ;; we are going to trace the method functions directly.
+               (not (trace-info-encapsulated info)))
+      (dolist (method (sb-mop:generic-function-methods fun))
+        (let ((mf (sb-mop:method-function method)))
           ;; NOTE: this direct style of tracing methods -- tracing the
           ;; pcl-internal method functions -- is only one possible
           ;; alternative.  It fails (a) when encapulation is
           ;; requested, because the function objects themselves are
           ;; stored in the method object; (b) when the method in
           ;; question is particularly simple, when the method
-          ;; functionality is in the dfun.  There is an alternative
-          ;; technique: to replace any currently active methods with
-          ;; methods which encapsulate the current one.  Steps towards
-          ;; this are currently commented out in src/pcl/env.lisp.  --
-          ;; CSR, 2005-01-03
-          (trace-1 method-name info)))))
+          ;; functionality is in the dfun.  See src/pcl/env.lisp for a
+          ;; stub implementation of encapsulating through a
+          ;; traced-method class.
+          (trace-1 mf info)
+          (when (typep mf 'sb-pcl::%method-function)
+            (trace-1 (sb-pcl::%method-function-fast-function mf) info))))))
 
   function-or-name)
 

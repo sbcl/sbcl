@@ -152,10 +152,9 @@
     (check-slot-name method slot-name)))
 
 (defmethod shared-initialize :after ((method standard-method) slot-names
-                                     &rest initargs &key)
-  (declare (ignore slot-names))
+                                     &rest initargs &key ((method-cell method-cell)))
+  (declare (ignore slot-names method-cell))
   (initialize-method-function initargs method))
-
 
 (defvar *the-class-generic-function*
   (find-class 'generic-function))
@@ -217,11 +216,8 @@
       (errorp (error "No generic function named ~S." name))
       (t nil))))
 
-(defun real-add-named-method (generic-function-name
-                              qualifiers
-                              specializers
-                              lambda-list
-                              &rest other-initargs)
+(defun real-add-named-method (generic-function-name qualifiers
+                              specializers lambda-list &rest other-initargs)
   (unless (and (fboundp generic-function-name)
                (typep (fdefinition generic-function-name) 'generic-function))
     (style-warn "implicitly creating new generic function ~S"
@@ -233,15 +229,14 @@
                generic-function-name
                :generic-function-class (class-of existing-gf))
               (ensure-generic-function generic-function-name)))
-         (specs (parse-specializers specializers))
-         (proto (method-prototype-for-gf generic-function-name))
-         (new (apply #'make-instance (class-of proto)
-                                     :qualifiers qualifiers
-                                     :specializers specs
-                                     :lambda-list lambda-list
-                                     other-initargs)))
-    (add-method generic-function new)
-    new))
+         (proto (method-prototype-for-gf generic-function-name)))
+    (setf (getf (getf other-initargs 'plist) :name)
+          (make-method-spec generic-function qualifiers specializers))
+    (let ((new (apply #'make-instance (class-of proto)
+                      :qualifiers qualifiers :specializers specializers
+                      :lambda-list lambda-list other-initargs)))
+      (add-method generic-function new)
+      new)))
 
 (define-condition find-method-length-mismatch
     (reference-condition simple-error)
@@ -290,11 +285,14 @@
   ;; function, or an error is signaled."
   ;;
   ;; This error checking is done by REAL-GET-METHOD.
-  (real-get-method generic-function
-                   qualifiers
-                   (parse-specializers specializers)
-                   errorp
-                   t))
+  (real-get-method
+   generic-function qualifiers
+   ;; ANSI for FIND-METHOD seems to imply that in fact specializers
+   ;; should always be passed in parsed form instead of being parsed
+   ;; at this point.  Since there's no ANSI-blessed way of getting an
+   ;; EQL specializer, that seems unnecessarily painful, so we are
+   ;; nice to our users.  -- CSR, 2007-06-01
+   (parse-specializers generic-function specializers) errorp t))
 
 ;;; Compute various information about a generic-function's arglist by looking
 ;;; at the argument lists of the methods. The hair for trying not to use

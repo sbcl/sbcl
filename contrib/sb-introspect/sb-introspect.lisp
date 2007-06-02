@@ -320,8 +320,11 @@ If an unsupported TYPE is requested, the function will return NIL.
        (when source
          (setf (definition-source-description source)
                (append (method-qualifiers object)
-                       (sb-pcl::unparse-specializers
-                        (sb-mop:method-specializers object)))))
+                       (if (sb-mop:method-generic-function object)
+                           (sb-pcl::unparse-specializers
+                            (sb-mop:method-generic-function object)
+                            (sb-mop:method-specializers object))
+                           (sb-mop:method-specializers object)))))
        source))
     #+sb-eval
     (sb-eval:interpreted-function

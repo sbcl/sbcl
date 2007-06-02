@@ -62,11 +62,12 @@
 
 ;;; interface
 (defun specializer-from-type (type &aux args)
+  (when (symbolp type)
+    (return-from specializer-from-type (find-class type)))
   (when (consp type)
     (setq args (cdr type) type (car type)))
   (cond ((symbolp type)
-         (or (and (null args) (find-class type))
-             (ecase type
+         (or (ecase type
                (class    (coerce-to-class (car args)))
                (prototype (make-instance 'class-prototype-specializer
                                          :object (coerce-to-class (car args))))
@@ -373,21 +374,11 @@
 (defclass method (metaobject) ())
 
 (defclass standard-method (plist-mixin definition-source-mixin method)
-  ((%generic-function
-    :initform nil
-    :accessor method-generic-function)
-   (qualifiers
-    :initform ()
-    :initarg  :qualifiers
-    :reader method-qualifiers)
-   (specializers
-    :initform ()
-    :initarg  :specializers
-    :reader method-specializers)
-   (lambda-list
-    :initform ()
-    :initarg  :lambda-list
-    :reader method-lambda-list)
+  ((%generic-function :initform nil :accessor method-generic-function)
+   (qualifiers :initform () :initarg :qualifiers :reader method-qualifiers)
+   (specializers :initform () :initarg :specializers
+                 :reader method-specializers)
+   (lambda-list :initform () :initarg :lambda-list :reader method-lambda-list)
    (%function :initform nil :initarg :function :reader method-function)
    (%documentation :initform nil :initarg :documentation)))
 
