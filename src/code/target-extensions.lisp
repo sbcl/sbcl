@@ -81,3 +81,33 @@ applications.")
          :format-arguments (list prefix-string (strerror errno))
          other-condition-args))
 
+;;; Constructing shortish strings one character at a time. More efficient then
+;;; a string-stream, as can directly use simple-base-strings when applicable,
+;;; and if the maximum size is know doesn't need to copy the result at all --
+;;; but if the result is going to be HUGE, string-streams will win.
+(defmacro with-push-char ((&key (element-type 'character) (initial-size 28)) &body body)
+  (with-unique-names (string size pointer)
+    `(let* ((,size ,initial-size)
+            (,string (make-array ,size :element-type ',element-type))
+            (,pointer 0))
+       (declare (type (integer 0 ,sb!xc:array-dimension-limit) ,size)
+                (type (integer 0 ,(1- sb!xc:array-dimension-limit)) ,pointer)
+                (type (simple-array ,element-type (*)) ,string))
+       (flet ((push-char (char)
+                (when (= ,pointer ,size)
+                  (let ((old ,string))
+                    (setf ,size (* 2 (+ ,size 2))
+                          ,string (make-array ,size :element-type ',element-type))
+                    (replace ,string old)))
+                (setf (char ,string ,pointer) char)
+                (incf ,pointer))
+              (get-pushed-string ()
+                (let ((string ,string)
+                      (size ,pointer))
+                  (setf ,size 0
+                        ,pointer 0
+                        ,string ,(coerce "" `(simple-array ,element-type (*))))
+                  ;; This is really local, so we can be destructive!
+                  (%shrink-vector string size)
+                  string)))
+         ,@body))))
