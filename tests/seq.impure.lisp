@@ -1075,4 +1075,10 @@
       (assert (test-inlined-bashing i))
       until (= i sb-vm:n-word-bits))
 
+;;; tests from the Sacla test suite via Eric Marsden, 2007-05-07
+(remove-duplicates (vector 1 2 2 1) :test-not (lambda (a b) (not (= a b))))
+
+(delete-duplicates (vector #\a #\b #\c #\a)
+                   :test-not (lambda (a b) (not (char-equal a b))))
+
 ;;; success

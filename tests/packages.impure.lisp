@@ -24,3 +24,8 @@
 
 (make-package "FOO")
 (assert (shadow #\a :foo))
+
+(defpackage :PACKAGE-DESIGNATOR-1 (:use #.(find-package :cl)))
+
+(defpackage :PACKAGE-DESIGNATOR-2
+  (:import-from #.(find-package :cl) "+"))

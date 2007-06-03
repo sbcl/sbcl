@@ -375,7 +375,7 @@ error if any of PACKAGES is not a valid package designator."
 
 ;;; Make a package name into a simple-string.
 (defun package-namify (n)
-  (stringify-name n "package"))
+  (stringify-package-designator n))
 
 ;;; ANSI specifies (in the definition of DELETE-PACKAGE) that PACKAGE-NAME
 ;;; returns NIL (not an error) for a deleted package, so this is a special
@@ -1299,7 +1299,7 @@ error if any of PACKAGES is not a valid package designator."
   of describing them."
   (if package-designator
       (let ((package (find-undeleted-package-or-lose package-designator))
-            (string (stringify-name string-designator "APROPOS search"))
+            (string (stringify-string-designator string-designator))
             (result nil))
         (do-symbols (symbol package)
           (when (and (eq (symbol-package symbol) package)

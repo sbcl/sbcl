@@ -1682,20 +1682,22 @@
     (do ((elt))
         ((= index end))
       (setq elt (aref vector index))
-      ;; FIXME: Relying on POSITION allowing both :TEST and :TEST-NOT
-      ;; arguments simultaneously is a little fragile, since ANSI says
-      ;; we can't depend on it, so we need to remember to keep that
-      ;; extension in our implementation. It'd probably be better to
-      ;; rewrite this to avoid passing both (as
-      ;; LIST-REMOVE-DUPLICATES* was rewritten ca. sbcl-0.7.12.18).
       (unless (or (and from-end
-                       (position (apply-key key elt) result
-                                 :start start :end jndex
-                                 :test test :test-not test-not :key key))
+                       (if test-not
+                           (position (apply-key key elt) result
+                                     :start start :end jndex
+                                     :test-not test-not :key key)
+                           (position (apply-key key elt) result
+                                     :start start :end jndex
+                                     :test test :key key)))
                   (and (not from-end)
-                       (position (apply-key key elt) vector
-                                 :start (1+ index) :end end
-                                 :test test :test-not test-not :key key)))
+                       (if test-not
+                           (position (apply-key key elt) vector
+                                     :start (1+ index) :end end
+                                     :test-not test-not :key key)
+                           (position (apply-key key elt) vector
+                                     :start (1+ index) :end end
+                                     :test test :key key))))
         (setf (aref result jndex) elt)
         (setq jndex (1+ jndex)))
       (setq index (1+ index)))
@@ -1770,9 +1772,15 @@
          (setf (aref vector jndex) (aref vector index))))
     (declare (fixnum index jndex))
     (setf (aref vector jndex) (aref vector index))
-    (unless (position (apply-key key (aref vector index)) vector :key key
-                      :start (if from-end start (1+ index)) :test test
-                      :end (if from-end jndex end) :test-not test-not)
+    (unless (if test-not
+                (position (apply-key key (aref vector index)) vector :key key
+                          :start (if from-end start (1+ index))
+                          :end (if from-end jndex end)
+                          :test-not test-not)
+                (position (apply-key key (aref vector index)) vector :key key
+                          :start (if from-end start (1+ index))
+                          :end (if from-end jndex end)
+                          :test test))
       (setq jndex (1+ jndex)))))
 
 (define-sequence-traverser delete-duplicates

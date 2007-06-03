@@ -206,7 +206,7 @@
 
 (with-test (:name (:throw :no-such-tag)
             :fails-on '(or
-                        (and :x86 (or :linux sunos))
+                        (and :x86 (or :sunos))
                         :alpha
                         :mips))
   (progn
@@ -251,7 +251,7 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(and :x86 (or :linux :sunos)))
+            :fails-on '(and :x86 (or :sunos)))
   (macrolet ((with-details (bool &body body)
                `(let ((sb-debug:*show-entry-point-details* ,bool))
                  ,@body)))

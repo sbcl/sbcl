@@ -55,7 +55,7 @@
         (imports nil)
         (interns nil)
         (exports nil)
-        (implement (stringify-names (list package) "package"))
+        (implement (stringify-package-designators (list package)))
         (implement-p nil)
         (lock nil)
         (doc nil))
@@ -68,7 +68,7 @@
                :format-arguments (list option)))
       (case (car option)
         (:nicknames
-         (setf nicknames (stringify-names (cdr option) "package")))
+         (setf nicknames (stringify-package-designators (cdr option))))
         (:size
          (cond (size
                 (error 'simple-program-error
@@ -82,11 +82,11 @@
                  :format-control ":SIZE is not a positive integer: ~S"
                  :format-arguments (list (second option))))))
         (:shadow
-         (let ((new (stringify-names (cdr option) "symbol")))
+         (let ((new (stringify-string-designators (cdr option))))
            (setf shadows (append shadows new))))
         (:shadowing-import-from
-         (let ((package-name (stringify-name (second option) "package"))
-               (names (stringify-names (cddr option) "symbol")))
+         (let ((package-name (stringify-package-designator (second option)))
+               (names (stringify-string-designators (cddr option))))
            (let ((assoc (assoc package-name shadowing-imports
                                :test #'string=)))
              (if assoc
@@ -94,27 +94,27 @@
                  (setf shadowing-imports
                        (acons package-name names shadowing-imports))))))
         (:use
-         (setf use (append use (stringify-names (cdr option) "package") )
+         (setf use (append use (stringify-package-designators (cdr option)) )
                use-p t))
         (:import-from
-         (let ((package-name (stringify-name (second option) "package"))
-               (names (stringify-names (cddr option) "symbol")))
+         (let ((package-name (stringify-package-designator (second option)))
+               (names (stringify-string-designators (cddr option))))
            (let ((assoc (assoc package-name imports
                                :test #'string=)))
              (if assoc
                  (setf (cdr assoc) (append (cdr assoc) names))
                  (setf imports (acons package-name names imports))))))
         (:intern
-         (let ((new (stringify-names (cdr option) "symbol")))
+         (let ((new (stringify-string-designators (cdr option))))
            (setf interns (append interns new))))
         (:export
-         (let ((new (stringify-names (cdr option) "symbol")))
+         (let ((new (stringify-string-designators (cdr option))))
            (setf exports (append exports new))))
         #!+sb-package-locks
         (:implement
          (unless implement-p
            (setf implement nil))
-         (let ((new (stringify-names (cdr option) "package")))
+         (let ((new (stringify-package-designators (cdr option))))
            (setf implement (append implement new)
                  implement-p t)))
         #!+sb-package-locks
@@ -140,7 +140,7 @@
                     `(:shadowing-import-from
                       ,@(apply #'append (mapcar #'rest shadowing-imports))))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%defpackage ,(stringify-name package "package") ',nicknames ',size
+       (%defpackage ,(stringify-string-designator package) ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
                     ',imports ',interns ',exports ',implement ',lock ',doc
                     (sb!c:source-location)))))
@@ -158,19 +158,31 @@
                                         but have common elements ~%   ~S"
                        :format-arguments (list (car x)(car y) z)))))
 
-(defun stringify-name (name kind)
-  (typecase name
-    (simple-string name)
-    (string (coerce name 'simple-string))
-    (symbol (symbol-name name))
-    (character (string name))
+(defun stringify-string-designator (string-designator)
+  (typecase string-designator
+    (simple-string string-designator)
+    (string (coerce string-designator 'simple-string))
+    (symbol (symbol-name string-designator))
+    (character (string string-designator))
     (t
-     (error "bogus ~A name: ~S" kind name))))
+     (error "~S does not designate a string" string-designator))))
 
-(defun stringify-names (names kind)
-  (mapcar (lambda (name)
-            (stringify-name name kind))
-          names))
+(defun stringify-string-designators (string-designators)
+  (mapcar #'stringify-string-designator string-designators))
+
+(defun stringify-package-designator (package-designator)
+  (typecase package-designator
+    (simple-string package-designator)
+    (string (coerce package-designator 'simple-string))
+    (symbol (symbol-name package-designator))
+    (character (string package-designator))
+    (package (package-name package-designator))
+    (t
+     (error "~S does not designate a package" package-designator))))
+
+(defun stringify-package-designators (package-designators)
+  (mapcar #'stringify-package-designator package-designators))
+
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
                     use imports interns exports implement lock doc-string
