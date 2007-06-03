@@ -1416,9 +1416,17 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                          (t specl2)))
              (class-eq (case (car type2)
                          (eql specl2)
+                         ;; FIXME: This says that all CLASS-EQ
+                         ;; specializers are equally specific, which
+                         ;; is fair enough because only one CLASS-EQ
+                         ;; specializer can ever be appliable.  If
+                         ;; ORDER-SPECIALIZERS should only ever be
+                         ;; called on specializers from applicable
+                         ;; methods, we could replace this with a BUG.
                          (class-eq nil)
                          (class type1)))
              (eql      (case (car type2)
+                         ;; similarly.
                          (eql nil)
                          (t specl1))))))))
 

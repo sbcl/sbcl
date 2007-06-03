@@ -199,6 +199,52 @@ states that any class found by @code{find-class}, no matter what its
 
 @end itemize
 
+In addition, SBCL supports extensions to the Metaobject protocol from
+AMOP; at present, they are:
+
+@itemize
+
+@item
+@findex defmethod
+@findex find-class
+@findex intern-eql-specializer
+@findex sb-mop:intern-eql-specializer
+@findex make-method-specializers-form
+@findex sb-pcl:make-method-specializers-form
+@findex make-method-lambda
+@findex sb-mop:make-method-lambda
+compile-time support for generating specializer metaobjects from
+specializer names in @code{defmethod} forms is provided by the
+@code{make-method-specializers-form} function, which returns a form
+which, when evaluated in the lexical environment of the
+@code{defmethod}, returns a list of specializer metaobjects.  This
+operator suffers from similar restrictions to those affecting
+@code{make-method-lambda}, namely that the generic function must be
+defined when the @code{defmethod} form is expanded, so that the
+correct method of @code{make-method-specializers-form} is invoked.
+The system-provided method on @code{make-method-specializers-form}
+generates a call to @code{find-class} for each symbol specializer
+name, and a call to @code{intern-eql-specializer} for each @code{(eql
+@var{x})} specializer name.
+
+@item
+@findex find-method
+@findex parse-specializer-using-class
+@findex unparse-specializer-using-class
+@findex sb-pcl:parse-specializer-using-class
+@findex sb-pcl:unparse-specializer-using-class
+run-time support for converting between specializer names and
+specializer metaobjects, mostly for the purposes of
+@code{find-method}, is provided by
+@code{parse-specializer-using-class} and
+@code{unparse-specializer-using-class}, which dispatch on their first
+argument, the generic function associated with a method with the given
+specializer.  The system-provided methods on those methods convert
+between classes and proper names and between lists of the form
+@code{(eql @var{x})} and interned eql specializer objects.
+
+@end itemize
+
 @node  Support For Unix
 @comment  node-name,  next,  previous,  up
 @section Support For Unix
