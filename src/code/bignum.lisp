@@ -996,15 +996,14 @@
           (res-len-1 (1- res-len))
           ,@(if result `((,result (%allocate-bignum res-len)))))
      (declare (type bignum-index res-len res-len-1))
-     (do ((i ,start-digit i+1)
-          (i+1 (1+ ,start-digit) (1+ i+1))
+     (do ((i ,start-digit (1+ i))
           (j 0 (1+ j)))
          ,termination
-       (declare (type bignum-index i i+1 j))
+       (declare (type bignum-index i j))
        (setf (%bignum-ref ,(if result result source) j)
              (%logior (%digit-logical-shift-right (%bignum-ref ,source i)
                                                   ,start-pos)
-                      (%ashl (%bignum-ref ,source i+1)
+                      (%ashl (%bignum-ref ,source (1+ i))
                              high-bits-in-first-digit))))))
 
 ) ; EVAL-WHEN
@@ -1130,8 +1129,7 @@
          (res-len-1 (1- res-len))
          (res (or res (%allocate-bignum res-len))))
     (declare (type bignum-index res-len res-len-1))
-    (do ((i 0 i+1)
-         (i+1 1 (1+ i+1))
+    (do ((i 0 (1+ i))
          (j (1+ digits) (1+ j)))
         ((= j res-len-1)
          (setf (%bignum-ref res digits)
@@ -1141,11 +1139,11 @@
          (if resp
              (%normalize-bignum-buffer res res-len)
              (%normalize-bignum res res-len)))
-      (declare (type bignum-index i i+1 j))
+      (declare (type bignum-index i j))
       (setf (%bignum-ref res j)
             (%logior (%digit-logical-shift-right (%bignum-ref bignum i)
                                                  remaining-bits)
-                     (%ashl (%bignum-ref bignum i+1) n-bits))))))
+                     (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
 
 ;;;; relational operators
 
@@ -1584,20 +1582,41 @@
         ;;; digit.
         ((bignum-truncate-single-digit (x len-x y)
            (declare (type bignum-index len-x))
-           (let ((q (%allocate-bignum len-x))
-                 (r 0)
-                 (y (%bignum-ref y 0)))
-             (declare (type bignum-element-type r y))
-             (do ((i (1- len-x) (1- i)))
-                 ((minusp i))
-               (multiple-value-bind (q-digit r-digit)
-                   (%floor r (%bignum-ref x i) y)
-                 (declare (type bignum-element-type q-digit r-digit))
-                 (setf (%bignum-ref q i) q-digit)
-                 (setf r r-digit)))
-             (let ((rem (%allocate-bignum 1)))
-               (setf (%bignum-ref rem 0) r)
-               (values q rem))))
+           (let ((y (%bignum-ref y 0)))
+             (declare (type bignum-element-type y))
+             (if (not (logtest y (1- y)))
+                 ;; Y is a power of two.
+                 (if (= y 1)
+                     ;; SHIFT-RIGHT-UNALIGNED won't do the right thing
+                     ;; with a shift count of 0, so special case this.
+                     ;; We could probably get away with (VALUES X 0)
+                     ;; here, but it's not clear that some of the
+                     ;; normalization logic further down would avoid
+                     ;; mutilating X.  Just go ahead and cons, consing's
+                     ;; cheap.
+                     (values (copy-bignum x len-x) 0)
+                     (let ((n-bits (1- (integer-length y))))
+                       (values
+                        (shift-right-unaligned x 0 n-bits len-x
+                                               ((= j res-len-1)
+                                                (setf (%bignum-ref res j)
+                                                      (%ashr (%bignum-ref x i) n-bits))
+                                                res)
+                                               res)
+                        (logand (%bignum-ref x 0) (1- y)))))
+                 (do ((i (1- len-x) (1- i))
+                      (q (%allocate-bignum len-x))
+                      (r 0))
+                     ((minusp i)
+                      (let ((rem (%allocate-bignum 1)))
+                        (setf (%bignum-ref rem 0) r)
+                        (values q rem)))
+                   (declare (type bignum-element-type r))
+                   (multiple-value-bind (q-digit r-digit)
+                       (%floor r (%bignum-ref x i) y)
+                     (declare (type bignum-element-type q-digit r-digit))
+                     (setf (%bignum-ref q i) q-digit)
+                     (setf r r-digit))))))
         ;;; This returns a guess for the next division step. Y1 is the
         ;;; highest y digit, and y2 is the second to highest y
         ;;; digit. The x... variables are the three highest x digits
