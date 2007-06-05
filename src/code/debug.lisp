@@ -1418,6 +1418,8 @@ reset to ~S."
 
 (defun find-binding-stack-pointer (frame)
   #!-stack-grows-downward-not-upward
+  (declare (ignore frame))
+  #!-stack-grows-downward-not-upward
   (error "Not implemented on this architecture")
   #!+stack-grows-downward-not-upward
   (let ((bsp (sb!vm::binding-stack-pointer-sap))
