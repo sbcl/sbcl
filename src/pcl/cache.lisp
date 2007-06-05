@@ -198,7 +198,8 @@
                      `(mixf ,n-index (hash-layout-or ,layout-var (go ,miss-tag))))
                    (cdr layout-vars))
          ;; align with cache lines
-         (setf ,n-index (logand (* ,line-size ,n-index) (cache-mask ,cache-var)))
+         (setf ,n-index (logand (the fixnum (* ,n-index ,line-size))
+                                (cache-mask ,cache-var)))
          (let ((,n-depth (cache-depth ,cache-var))
                (,n-pointer ,n-index)
                (,n-mask (cache-mask ,cache-var)))
