@@ -138,16 +138,17 @@ files can be specified with the EXTERNAL-FORMAT parameter."
             maps)
     ;; Go through all records, find the matching source in the file,
     ;; and update STATES to contain the state of the record in the
-    ;; indexes matching the source location. Process the longest paths
-    ;; first, so that the state of each index will reflect the state
-    ;; of the innermost containing form. Processes branch-records
-    ;; before expr-records of the same length, for the same reason.
+    ;; indexes matching the source location. We do this in two stages:
+    ;; the first stage records the character ranges, and the second stage
+    ;; does the update, in order from shortest to longest ranges. This
+    ;; ensures that for each index in STATES will reflect the state of
+    ;; the innermost containing form.
     (let ((counts (list :branch (make-instance 'sample-count :mode :branch)
                         :expression (make-instance 'sample-count
                                                    :mode :expression))))
-      (let ((records (append branch-records expr-records)))
-        (dolist (record (stable-sort records #'>
-                                     :key (lambda (e) (length (second e)))))
+      (let ((records (append branch-records expr-records))
+            (locations nil))
+        (dolist (record records)
           (destructuring-bind (mode path state) record
             (let* ((path (reverse path))
                    (tlf (car path))
@@ -174,10 +175,18 @@ files can be specified with the EXTERNAL-FORMAT parameter."
                           (source-path-source-position (cons 0 source-path)
                                                        source-form
                                                        source-map)
-                        (fill-with-state source states state start end))
+                        (push (list start end source state) locations))
                     (error ()
                       (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
-                  (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file))))))
+                  (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))
+        ;; Now process the locations, from the shortest range to the longest
+        ;; one.
+        (dolist (location (sort locations #'<
+                                :key (lambda (location)
+                                       (- (second location)
+                                          (first location)))))
+          (destructuring-bind (start end source state) location
+            (fill-with-state source states state start end))))
       (print-report html-stream file counts states source)
       (format html-stream "</body></html>")
       (list (getf counts :expression)
