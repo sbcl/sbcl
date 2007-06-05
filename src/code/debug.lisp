@@ -1380,11 +1380,103 @@ reset to ~S."
   (loop while (read-char-no-hang *standard-input*)))
 
 (defun unwind-to-frame-and-call (frame thunk)
+  #!+unwind-to-frame-and-call-vop
+  (flet ((sap-int/fixnum (sap)
+           ;; On unithreaded X86 *BINDING-STACK-POINTER* and
+           ;; *CURRENT-CATCH-BLOCK* are negative, so we need to jump through
+           ;; some hoops to make these calculated values negative too.
+           (ash (truly-the (signed-byte #.sb!vm:n-word-bits)
+                           (sap-int sap))
+                (- sb!vm::n-fixnum-tag-bits))))
+    ;; To properly unwind the stack, we need three pieces of information:
+    ;;   * The unwind block that should be active after the unwind
+    ;;   * The catch block that should be active after the unwind
+    ;;   * The values that the binding stack pointer should have after the
+    ;;     unwind.
+    (let* ((block (sap-int/fixnum (find-enclosing-catch-block frame)))
+           (unbind-to (sap-int/fixnum (find-binding-stack-pointer frame))))
+      ;; This VOP will run the neccessary cleanup forms, reset the fp, and
+      ;; then call the supplied function.
+      (sb!vm::%primitive sb!vm::unwind-to-frame-and-call
+                         (sb!di::frame-pointer frame)
+                         (find-enclosing-uwp frame)
+                         (lambda ()
+                           ;; Before calling the user-specified
+                           ;; function, we need to restore the binding
+                           ;; stack and the catch block. The unwind block
+                           ;; is taken care of by the VOP.
+                           (sb!vm::%primitive sb!vm::unbind-to-here
+                                              unbind-to)
+                           (setf sb!vm::*current-catch-block* block)
+                           (funcall thunk)))))
+  #!-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (sb!di:replace-frame-catch-tag frame
                                    'sb!c:debug-catch-tag
                                    tag)
     (throw tag thunk)))
+
+(defun find-binding-stack-pointer (frame)
+  #!-stack-grows-downward-not-upward
+  (error "Not implemented on this architecture")
+  #!+stack-grows-downward-not-upward
+  (let ((bsp (sb!vm::binding-stack-pointer-sap))
+        (unbind-to nil)
+        (fp (sb!di::frame-pointer frame))
+        (start (int-sap (ldb (byte #.sb!vm:n-word-bits 0)
+                             (ash sb!vm:*binding-stack-start*
+                                  sb!vm:n-fixnum-tag-bits)))))
+    ;; Walk the binding stack looking for an entry where the symbol is
+    ;; an unbound-symbol marker and the value is equal to the frame
+    ;; pointer.  These entries are inserted into the stack by the
+    ;; BIND-SENTINEL VOP and removed by UNBIND-SENTINEL (inserted into
+    ;; the function during IR2). If an entry wasn't found, the
+    ;; function that the frame corresponds to wasn't compiled with a
+    ;; high enough debug setting, and can't be restarted / returned
+    ;; from.
+    (loop until (sap= bsp start)
+          do (progn
+               (setf bsp (sap+ bsp
+                               (- (* sb!vm:binding-size sb!vm:n-word-bytes))))
+               (let ((symbol (sap-ref-word bsp (* sb!vm:binding-symbol-slot
+                                                  sb!vm:n-word-bytes)))
+                     (value (sap-ref-sap bsp (* sb!vm:binding-value-slot
+                                                sb!vm:n-word-bytes))))
+                 (when (eql symbol sb!vm:unbound-marker-widetag)
+                   (when (sap= value fp)
+                     (setf unbind-to bsp))))))
+    unbind-to))
+
+(defun find-enclosing-catch-block (frame)
+  ;; Walk the catch block chain looking for the first entry with an address
+  ;; higher than the pointer for FRAME or a null pointer.
+  (let* ((frame-pointer (sb!di::frame-pointer frame))
+         (current-block (int-sap (ldb (byte #.sb!vm:n-word-bits 0)
+                                      (ash sb!vm::*current-catch-block*
+                                           sb!vm:n-fixnum-tag-bits))))
+         (enclosing-block (loop for block = current-block
+                                then (sap-ref-sap block
+                                                  (* sb!vm:catch-block-previous-catch-slot
+                                                     sb!vm::n-word-bytes))
+                                when (or (zerop (sap-int block))
+                                         (sap> block frame-pointer))
+                                return block)))
+    enclosing-block))
+
+(defun find-enclosing-uwp (frame)
+  ;; Walk the UWP chain looking for the first entry with an address
+  ;; higher than the pointer for FRAME or a null pointer.
+  (let* ((frame-pointer (sb!di::frame-pointer frame))
+         (current-uwp (int-sap (ldb (byte #.sb!vm:n-word-bits 0)
+                                    (ash sb!vm::*current-unwind-protect-block*
+                                         sb!vm:n-fixnum-tag-bits))))
+         (enclosing-uwp (loop for uwp-block = current-uwp
+                              then (sap-ref-sap uwp-block
+                                                sb!vm:unwind-block-current-uwp-slot)
+                              when (or (zerop (sap-int uwp-block))
+                                       (sap> uwp-block frame-pointer))
+                              return uwp-block)))
+    enclosing-uwp))
 
 (!def-debug-command "RETURN" (&optional
                               (return (read-prompting-maybe
@@ -1414,6 +1506,9 @@ reset to ~S."
                  and recompiling)~:@>")))
 
 (defun frame-has-debug-tag-p (frame)
+  #!+unwind-to-frame-and-call-vop
+  (not (null (find-binding-stack-pointer frame)))
+  #!-unwind-to-frame-and-call-vop
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
 
 

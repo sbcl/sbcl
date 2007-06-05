@@ -253,3 +253,53 @@
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (unwind-to-frame-and-call)
+    (:args (ofp :scs (descriptor-reg))
+           (uwp :scs (descriptor-reg))
+           (function :scs (descriptor-reg)))
+  (:arg-types system-area-pointer system-area-pointer t)
+  (:temporary (:sc sap-reg) temp)
+  (:temporary (:sc unsigned-reg :offset eax-offset) block)
+  (:generator 22
+    ;; Store the function into a non-stack location, since we'll be
+    ;; unwinding the stack and destroying register contents before we
+    ;; use it.
+    (store-tl-symbol-value function
+                           *unwind-to-frame-function*
+                           temp)
+
+    ;; Allocate space for magic UWP block.
+    (inst sub esp-tn unwind-block-size)
+    ;; Set up magic catch / UWP block.
+    (move block esp-tn)
+    (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
+    (storew temp block unwind-block-current-uwp-slot)
+    (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
+    (storew temp block unwind-block-current-cont-slot)
+
+    (storew (make-fixup nil :code-object entry-label)
+            block
+            catch-block-entry-pc-slot)
+
+    ;; Run any required UWPs.
+    (inst jmp (make-fixup 'unwind :assembly-routine))
+    ENTRY-LABEL
+
+    ;; Load function from symbol
+    (load-tl-symbol-value block *unwind-to-frame-function*)
+
+    ;; No parameters
+    (inst xor ecx-tn ecx-tn)
+
+    ;; Clear the stack
+    (inst lea esp-tn
+          (make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
+
+    ;; Push the return-pc so it looks like we just called.
+    (pushw ebp-tn -2)
+
+    ;; Call it
+    (inst jmp (make-ea :dword :base block
+                       :disp (- (* closure-fun-slot n-word-bytes)
+                                fun-pointer-lowtag)))))

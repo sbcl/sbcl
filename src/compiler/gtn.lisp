@@ -108,11 +108,14 @@
 ;;; -- It appears to be more efficient to use the standard convention,
 ;;;    since there are no non-TR local calls that could benefit from
 ;;;    a non-standard convention.
+;;; -- We're compiling with RETURN-FROM-FRAME instrumentation, which
+;;;    only works (on x86 and x86-64) for the standard convention.
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
     (or (and (find-if #'xep-p funs)
              (find-if #'has-full-call-use funs))
+        (some (lambda (fun) (policy fun (>= insert-debug-catch 2))) funs)
         (block punt
           (dolist (fun funs t)
             (dolist (ref (leaf-refs fun))

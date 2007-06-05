@@ -228,3 +228,55 @@
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (unwind-to-frame-and-call)
+    (:args (ofp :scs (descriptor-reg))
+           (uwp :scs (descriptor-reg))
+           (function :scs (descriptor-reg)))
+  (:arg-types system-area-pointer system-area-pointer t)
+  (:temporary (:sc sap-reg) temp)
+  (:temporary (:sc unsigned-reg :offset rax-offset) block)
+  (:generator 22
+    ;; Store the function into a non-stack location, since we'll be
+    ;; unwinding the stack and destroying register contents before we
+    ;; use it.
+    (store-tl-symbol-value function
+                           *unwind-to-frame-function*
+                           temp)
+
+    ;; Allocate space for magic UWP block.
+    (inst sub rsp-tn unwind-block-size)
+    ;; Set up magic catch / UWP block.
+    (move block rsp-tn)
+    (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
+    (storew temp block unwind-block-current-uwp-slot)
+    (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
+    (storew temp block unwind-block-current-cont-slot)
+
+    (inst lea temp-reg-tn (make-fixup nil :code-object entry-label))
+    (storew temp-reg-tn
+            block
+            catch-block-entry-pc-slot)
+
+    ;; Run any required UWPs.
+    (inst lea temp-reg-tn (make-fixup 'unwind :assembly-routine))
+    (inst jmp temp-reg-tn)
+    ENTRY-LABEL
+
+    ;; Load function from symbol
+    (load-tl-symbol-value block *unwind-to-frame-function*)
+
+    ;; No parameters
+    (zeroize rcx-tn)
+
+    ;; Clear the stack
+    (inst lea rsp-tn
+          (make-ea :qword :base rbp-tn :disp (* -3 n-word-bytes)))
+
+    ;; Push the return-pc so it looks like we just called.
+    (pushw rbp-tn -2)
+
+    ;; Call it
+    (inst jmp (make-ea :qword :base block
+                       :disp (- (* closure-fun-slot n-word-bytes)
+                                fun-pointer-lowtag)))))

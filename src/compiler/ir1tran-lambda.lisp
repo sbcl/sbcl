@@ -932,6 +932,14 @@
         res))))
 
 (defun wrap-forms-in-debug-catch (forms)
+  #!+unwind-to-frame-and-call-vop
+  `((multiple-value-prog1
+      (progn
+        ,@forms)
+      ;; Just ensure that there won't be any tail-calls, IR2 magic will
+      ;; handle the rest.
+      (values)))
+  #!-unwind-to-frame-and-call-vop
   `( ;; Normally, we'll return from this block with the below RETURN-FROM.
     (block
         return-value-tag

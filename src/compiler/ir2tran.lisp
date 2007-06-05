@@ -1179,6 +1179,11 @@
                (ir2-physenv-return-pc-pass env)
                (ir2-physenv-return-pc env))
 
+    #!+unwind-to-frame-and-call-vop
+    (when (and (policy fun (>= insert-debug-catch 2))
+               (lambda-return fun))
+      (vop sb!vm::bind-sentinel node block))
+
     (let ((lab (gen-label)))
       (setf (ir2-physenv-environment-start env) lab)
       (vop note-environment-start node block lab)))
@@ -1204,6 +1209,9 @@
          (old-fp (ir2-physenv-old-fp env))
          (return-pc (ir2-physenv-return-pc env))
          (returns (tail-set-info (lambda-tail-set fun))))
+    #!+unwind-to-frame-and-call-vop
+    (when (policy fun (>= insert-debug-catch 2))
+      (vop sb!vm::unbind-sentinel node block))
     (cond
      ((and (eq (return-info-kind returns) :fixed)
            (not (xep-p fun)))

@@ -190,6 +190,9 @@
      ;; For GC-AND-SAVE
      *restart-lisp-function*
 
+     ;; For the UNWIND-TO-FRAME-AND-CALL VOP
+     *unwind-to-frame-function*
+
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
