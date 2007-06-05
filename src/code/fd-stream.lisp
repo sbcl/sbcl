@@ -555,14 +555,8 @@
                                  (simple-array character)
                                  string)
                    thing
-                 (and (find #\newline thing :start start :end end)
-                      ;; FIXME why do we need both calls?
-                      ;; Is find faster forwards than
-                      ;; position is backwards?
-                      (position #\newline thing
-                                :from-end t
-                                :start start
-                                :end end)))))
+                 (position #\newline thing :from-end t
+                           :start start :end end))))
           (if (and (typep thing 'base-string)
                    (eq (fd-stream-external-format stream) :latin-1))
               (ecase (fd-stream-buffering stream)
