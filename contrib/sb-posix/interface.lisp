@@ -288,7 +288,8 @@
   (defun getcwd ()
     (flet ((%getcwd (buffer size)
              (alien-funcall
-              (extern-alien "getcwd" (function c-string (* t) int))
+              (extern-alien #-win32 "getcwd"
+                            #+win32 "_getcwd" (function c-string (* t) int))
               buffer size)))
       (with-growing-c-string (buf size)
         (let ((result (%getcwd buf size)))
