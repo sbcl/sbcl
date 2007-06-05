@@ -37,6 +37,7 @@
                   *interrupts-enabled*
                   *interrupt-pending*
                   *free-interrupt-context-index*
+                  sb!vm::*unwind-to-frame-function*
                   sb!vm::*allocation-pointer*
                   sb!vm::*binding-stack-pointer*
                   sb!vm::*fp-constant-0d0*

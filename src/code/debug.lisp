@@ -1379,6 +1379,8 @@ reset to ~S."
 (!def-debug-command "SLURP" ()
   (loop while (read-char-no-hang *standard-input*)))
 
+;;; RETURN-FROM-FRAME and RESTART-FRAME
+
 (defun unwind-to-frame-and-call (frame thunk)
   #!+unwind-to-frame-and-call-vop
   (flet ((sap-int/fixnum (sap)
@@ -1512,6 +1514,10 @@ reset to ~S."
   (not (null (find-binding-stack-pointer frame)))
   #!-unwind-to-frame-and-call-vop
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
+
+;; Hack: ensure that *U-T-F-F* has a tls index.
+#!+unwind-to-frame-and-call-vop
+(let ((sb!vm::*unwind-to-frame-function* (lambda ()))))
 
 
 ;;;; debug loop command utilities
