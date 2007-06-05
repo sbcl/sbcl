@@ -793,7 +793,8 @@
           (when (or (eq (symbol-name obj) object)
                     (eq (symbol-package obj) object)
                     (eq (symbol-plist obj) object)
-                    (eq (symbol-value obj) object))
+                    (and (boundp obj)
+                         (eq (symbol-value obj) object)))
             (maybe-call fun obj)))))
      space)))
 
