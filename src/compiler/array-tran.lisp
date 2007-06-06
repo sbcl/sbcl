@@ -666,10 +666,23 @@
                                 :node node
                                 :policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
-  (let ((element-type (upgraded-element-type-specifier-or-give-up array)))
-    `(%with-array-data-macro array start end
-                             :unsafe? ,(policy node (= safety 0))
-                             :element-type ,element-type)))
+  (let ((element-type (upgraded-element-type-specifier-or-give-up array))
+        (type (lvar-type array)))
+    (if (and (array-type-p type)
+             (listp (array-type-dimensions type))
+             (not (null (cdr (array-type-dimensions type)))))
+        ;; If it's a simple multidimensional array, then just return its
+        ;; data vector directly rather than going through
+        ;; %WITH-ARRAY-DATA-MACRO.  SBCL doesn't generally generate code
+        ;; that would use this currently, but we have encouraged users
+        ;; to use WITH-ARRAY-DATA and we may use it ourselves at some
+        ;; point in the future for optimized libraries or similar.
+        `(let ((data (truly-the (simple-array ,element-type (*))
+                                (%array-data-vector array))))
+           (values data 0 (length data) 0))
+        `(%with-array-data-macro array start end
+                                 :unsafe? ,(policy node (= safety 0))
+                                 :element-type ,element-type))))
 
 ;;;; array accessors
 
