@@ -538,53 +538,40 @@
 ;;; unbuffered, slam the string down the file descriptor, otherwise
 ;;; use OUTPUT-RAW-BYTES to buffer the string. Update charpos by
 ;;; checking to see where the last newline was.
-;;;
-;;; Note: some bozos (the FASL dumper) call write-string with things
-;;; other than strings. Therefore, we must make sure we have a string
-;;; before calling POSITION on it.
-;;; KLUDGE: It would be better to fix the bozos instead of trying to
-;;; cover for them here. -- WHN 20000203
 (defun fd-sout (stream thing start end)
+  (declare (type fd-stream stream) (type string thing))
   (let ((start (or start 0))
         (end (or end (length (the vector thing)))))
     (declare (fixnum start end))
-    (if (stringp thing)
-        (let ((last-newline
-               (string-dispatch (simple-base-string
-                                 #!+sb-unicode
-                                 (simple-array character)
-                                 string)
-                   thing
-                 (position #\newline thing :from-end t
-                           :start start :end end))))
-          (if (and (typep thing 'base-string)
-                   (eq (fd-stream-external-format stream) :latin-1))
-              (ecase (fd-stream-buffering stream)
-                (:full
-                 (output-raw-bytes stream thing start end))
-                (:line
-                 (output-raw-bytes stream thing start end)
-                 (when last-newline
-                   (flush-output-buffer stream)))
-                (:none
-                 (frob-output stream thing start end nil)))
-              (ecase (fd-stream-buffering stream)
-                (:full (funcall (fd-stream-output-bytes stream)
-                                stream thing nil start end))
-                (:line (funcall (fd-stream-output-bytes stream)
-                                stream thing last-newline start end))
-                (:none (funcall (fd-stream-output-bytes stream)
-                                stream thing t start end))))
-          (if last-newline
-              (setf (fd-stream-char-pos stream)
-                    (- end last-newline 1))
-              (incf (fd-stream-char-pos stream)
-                    (- end start))))
-        (ecase (fd-stream-buffering stream)
-          ((:line :full)
-           (output-raw-bytes stream thing start end))
-          (:none
-           (frob-output stream thing start end nil))))))
+    (let ((last-newline
+           (string-dispatch (simple-base-string
+                             #!+sb-unicode
+                             (simple-array character (*))
+                             string)
+               thing
+             (position #\newline thing :from-end t
+                       :start start :end end))))
+      (if (and (typep thing 'base-string)
+               (eq (fd-stream-external-format stream) :latin-1))
+          (ecase (fd-stream-buffering stream)
+            (:full
+             (output-raw-bytes stream thing start end))
+            (:line
+             (output-raw-bytes stream thing start end)
+             (when last-newline
+               (flush-output-buffer stream)))
+            (:none
+             (frob-output stream thing start end nil)))
+          (ecase (fd-stream-buffering stream)
+            (:full (funcall (fd-stream-output-bytes stream)
+                            stream thing nil start end))
+            (:line (funcall (fd-stream-output-bytes stream)
+                            stream thing last-newline start end))
+            (:none (funcall (fd-stream-output-bytes stream)
+                            stream thing t start end))))
+      (if last-newline
+          (setf (fd-stream-char-pos stream) (- end last-newline 1))
+          (incf (fd-stream-char-pos stream) (- end start))))))
 
 (defvar *external-formats* ()
   #!+sb-doc
