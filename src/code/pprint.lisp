@@ -138,7 +138,7 @@
     (unless (= start end)
       (sb!impl::string-dispatch (simple-base-string
                                  #!+sb-unicode
-                                 (simple-array character))
+                                 (simple-array character (*)))
           string
         ;; For POSITION transform
         (declare (optimize (speed 2)))

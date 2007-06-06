@@ -1111,7 +1111,7 @@
             (setf (fd-stream-obuf-tail stream)
                   (string-dispatch (simple-base-string
                                     #!+sb-unicode
-                                    (simple-array character)
+                                    (simple-array character (*))
                                     string)
                       string
                     (let ((len (fd-stream-obuf-length stream))
@@ -1291,7 +1291,7 @@
             (setf (fd-stream-obuf-tail stream)
                   (string-dispatch (simple-base-string
                                     #!+sb-unicode
-                                    (simple-array character)
+                                    (simple-array character (*))
                                     string)
                       string
                     (let ((len (fd-stream-obuf-length stream))
