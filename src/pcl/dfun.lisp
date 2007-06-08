@@ -1752,13 +1752,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       ;; a generic can cause the dispatch function to be updated we
       ;; need a lock here.
       ;;
-      ;; We need to accept recursion, because PCL is nasty and twisty.
+      ;; We need to accept recursion, because PCL is nasty and twisty,
+      ;; and we need to disable interrupts because it would be bad if
+      ;; we updated the DFUN-STATE but not the dispatch function.
       ;;
-      ;; KLUDGE: We need to disable interrupts as long as
-      ;; WITH-FOO-LOCK is interrupt unsafe. Once they are interrupt
-      ;; safe we can allow interrupts here. (But if someone some day
-      ;; manages to get rid of the need for a recursive lock here we
-      ;; _will_ need without-interrupts once again.)
+      ;; This is sufficient, because all the other calls to SET-DFUN
+      ;; are part of this same code path (done while the lock is held),
+      ;; which we AVER.
       ;;
       ;; FIXME: When our mutexes are smart about the need to wake up
       ;; sleepers we can put a mutex here instead -- but in the meantime
@@ -1767,9 +1767,14 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       ;; KLUDGE: No need to lock during bootstrap.
       (if early-p
           (update)
-          (sb-sys:without-interrupts
-            (sb-thread::with-recursive-spinlock ((gf-lock generic-function))
-              (update)))))))
+          (let ((lock (gf-lock generic-function)))
+            ;; FIXME: GF-LOCK is a generic function... Are there cases
+            ;; where we can end up in a metacircular loop here? In
+            ;; case there are, better fetch it while interrupts are
+            ;; still enabled...
+            (sb-sys:without-interrupts
+              (sb-thread::with-recursive-spinlock (lock)
+                (update))))))))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)
