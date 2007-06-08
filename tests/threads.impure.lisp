@@ -16,6 +16,8 @@
 (use-package :test-util)
 (use-package "ASSERTOID")
 
+(setf sb-unix::*on-dangerous-select* :error)
+
 (defun wait-for-threads (threads)
   (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
   (assert (not (some #'sb-thread:thread-alive-p threads))))
@@ -489,6 +491,7 @@
 
 (format t "~&thread startup sigmask test done~%")
 
+;; FIXME: What is this supposed to test?
 (sb-debug::enable-debugger)
 (let* ((main-thread *current-thread*)
        (interruptor-thread
@@ -496,7 +499,8 @@
                        (sleep 2)
                        (interrupt-thread main-thread #'break)
                        (sleep 2)
-                       (interrupt-thread main-thread #'continue)))))
+                       (interrupt-thread main-thread #'continue))
+                     :name "interruptor")))
   (with-session-lock (*session*)
     (sleep 3))
   (loop while (thread-alive-p interruptor-thread)))

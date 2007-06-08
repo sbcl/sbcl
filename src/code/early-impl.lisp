@@ -33,7 +33,7 @@
                   ;; pseudo-atomicity too, but they handle it without
                   ;; messing with special variables.)
                   #!+(or x86 x86-64) *pseudo-atomic-bits*
-                  *in-interruption*
+                  *allow-with-interrupts*
                   *interrupts-enabled*
                   *interrupt-pending*
                   *free-interrupt-context-index*

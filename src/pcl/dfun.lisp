@@ -260,8 +260,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;;     This is the most general case. In this case, the accessor
 ;;;     generic function has seen more than one class of argument and
 ;;;     more than one slot index. A cache vector stores the wrappers
-;;;     and corresponding slot indexes. Because each cache line is
-;;;     more than one element long, a cache lock count is used.
+;;;     and corresponding slot indexes.
+
 (defstruct (dfun-info (:constructor nil)
                       (:copier nil))
   (cache nil))
@@ -1664,7 +1664,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                             all-applicable-p
                                             (all-sorted-p t)
                                             function-p)
-  (if (null methods)
+   (if (null methods)
       (if function-p
           (lambda (method-alist wrappers)
             (declare (ignore method-alist wrappers))
@@ -1772,9 +1772,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             ;; where we can end up in a metacircular loop here? In
             ;; case there are, better fetch it while interrupts are
             ;; still enabled...
-            (sb-sys:without-interrupts
-              (sb-thread::with-recursive-spinlock (lock)
-                (update))))))))
+            (sb-thread::call-with-recursive-system-spinlock #'update lock))))))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)
@@ -1784,7 +1782,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; I'm aware of, but they look like they might be useful for
 ;;; debugging or performance tweaking or something, so I've just
 ;;; commented them out instead of deleting them. -- WHN 2001-03-28
-#|
 (defun list-dfun (gf)
   (let* ((sym (type-of (gf-dfun-info gf)))
          (a (assq sym *dfun-list*)))
@@ -1847,7 +1844,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (format t "~%   ~S~%" (caddr type+count+sizes)))
         *dfun-count*)
   (values))
-|#
+||#
 
 (defun gfs-of-type (type)
   (unless (consp type) (setq type (list type)))

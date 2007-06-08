@@ -21,9 +21,7 @@
     ;; FIXME: Should we not reset the _entire_ mask, just restore it
     ;; to the state before we got the interrupt?
     (reset-signal-mask)
-    ;; Tell INTERRUPT-THREAD it's ok to re-enable interrupts.
-    (let ((*in-interruption* t))
-      (funcall function))))
+    (allow-with-interrupts (funcall function))))
 
 (defmacro in-interruption ((&rest args) &body body)
   #!+sb-doc

@@ -154,9 +154,7 @@
 ;;; accesses it, that's why we need without-interrupts.
 (defmacro with-active-processes-lock (() &body body)
   #-win32
-  `(without-interrupts
-    (sb-thread:with-mutex (*active-processes-lock*)
-      ,@body))
+  `(sb-thread::call-with-system-mutex (lambda () ,@body) *active-processes-lock*)
   #+win32
   `(progn ,@body))
 

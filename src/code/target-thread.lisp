@@ -60,12 +60,7 @@ in future versions."
 (defvar *all-threads-lock* (make-mutex :name "all threads lock"))
 
 (defmacro with-all-threads-lock (&body body)
-  #!-sb-thread
-  `(locally ,@body)
-  #!+sb-thread
-  `(without-interrupts
-     (with-mutex (*all-threads-lock*)
-       ,@body)))
+  `(call-with-system-mutex (lambda () ,@body) *all-threads-lock*))
 
 (defun list-all-threads ()
   #!+sb-doc
@@ -115,25 +110,25 @@ in future versions."
     (declaim (inline %lutex-init %lutex-wait %lutex-wake
                      %lutex-lock %lutex-unlock))
 
-    (sb!alien:define-alien-routine ("lutex_init" %lutex-init)
+    (define-alien-routine ("lutex_init" %lutex-init)
         int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine ("lutex_wait" %lutex-wait)
+    (define-alien-routine ("lutex_wait" %lutex-wait)
         int (queue-lutex unsigned-long) (mutex-lutex unsigned-long))
 
-    (sb!alien:define-alien-routine ("lutex_wake" %lutex-wake)
+    (define-alien-routine ("lutex_wake" %lutex-wake)
         int (lutex unsigned-long) (n int))
 
-    (sb!alien:define-alien-routine ("lutex_lock" %lutex-lock)
+    (define-alien-routine ("lutex_lock" %lutex-lock)
         int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine ("lutex_trylock" %lutex-trylock)
+    (define-alien-routine ("lutex_trylock" %lutex-trylock)
         int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine ("lutex_unlock" %lutex-unlock)
+    (define-alien-routine ("lutex_unlock" %lutex-unlock)
         int (lutex unsigned-long))
 
-    (sb!alien:define-alien-routine ("lutex_destroy" %lutex-destroy)
+    (define-alien-routine ("lutex_destroy" %lutex-destroy)
         int (lutex unsigned-long))
 
     ;; FIXME: Defining a whole bunch of alien-type machinery just for
@@ -160,13 +155,17 @@ in future versions."
 
   #!-sb-lutex
   (progn
-    (declaim (inline futex-wait futex-wake))
+    (declaim (inline futex-wait %futex-wait futex-wake))
 
-    (sb!alien:define-alien-routine "futex_wait"
+    (define-alien-routine ("futex_wait" %futex-wait)
         int (word unsigned-long) (old-value unsigned-long)
         (to-sec long) (to-usec unsigned-long))
 
-    (sb!alien:define-alien-routine "futex_wake"
+    (defun futex-wait (word old to-sec to-usec)
+      (with-interrupts
+        (%futex-wait word old to-sec to-usec)))
+
+    (define-alien-routine "futex_wake"
         int (word unsigned-long) (n unsigned-long))))
 
 ;;; used by debug-int.lisp to access interrupt contexts
@@ -190,6 +189,7 @@ in future versions."
 
 (declaim (inline get-spinlock release-spinlock))
 
+;; Should always be called with interrupts disabled.
 (defun get-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
   (let* ((new *current-thread*)
@@ -198,8 +198,17 @@ in future versions."
       (when (eq old new)
         (error "Recursive lock attempt on ~S." spinlock))
       #!+sb-thread
-      (loop while (compare-and-swap-spinlock-value spinlock nil new))))
-  t)
+      (flet ((cas ()
+               (unless (compare-and-swap-spinlock-value spinlock nil new)
+                 (return-from get-spinlock t))))
+        (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
+            ;; If interrupts are enabled, but we are allowed to enabled them,
+            ;; check for pending interrupts every once in a while.
+            (loop
+              (loop repeat 128 do (cas)) ; 128 is arbitrary here
+              (sb!unix::%check-interrupts))
+            (loop (cas)))))
+    t))
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
@@ -228,9 +237,8 @@ in future versions."
 
 (defun get-mutex (mutex &optional (new-value *current-thread*) (waitp t))
   #!+sb-doc
-  "Acquire MUTEX, setting it to NEW-VALUE or some suitable default
-value if NIL. If WAITP is non-NIL and the mutex is in use, sleep
-until it is available."
+  "Acquire MUTEX, setting it to NEW-VALUE or some suitable default value if
+NIL. If WAITP is non-NIL and the mutex is in use, sleep until it is available."
   (declare (type mutex mutex) (optimize (speed 3)))
   (/show0 "Entering GET-MUTEX")
   (unless new-value
@@ -254,10 +262,15 @@ until it is available."
     ;; on Darwin pthread_foo_timedbar functions are not supported:
     ;; this means that we probably need to use the Carbon multiprocessing
     ;; functions on Darwin.
+    ;;
+    ;; FIXME: This is definitely not interrupt safe: what happens if
+    ;; we get hit (1) during the lutex calls (ok, they may be safe,
+    ;; but has that been checked?) (2) after the lutex call, but
+    ;; before setting the mutex value.
     #!+sb-lutex
     (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
                    (if waitp
-                       (%lutex-lock lutex)
+                       (with-interrupts (%lutex-lock lutex))
                        (%lutex-trylock lutex))))
       (setf (mutex-value mutex) new-value))
     #!-sb-lutex
@@ -328,6 +341,7 @@ time we reacquire MUTEX and return to the caller."
     (/show0 "CONDITION-WAITing")
     #!+sb-lutex
     (progn
+      ;; FIXME: This doesn't look interrupt safe!
       (setf (mutex-value mutex) nil)
       (with-lutex-address (queue-lutex-address (waitqueue-lutex queue))
         (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
@@ -336,8 +350,8 @@ time we reacquire MUTEX and return to the caller."
     #!-sb-lutex
     (unwind-protect
          (let ((me *current-thread*))
-           ;; XXX we should do something to ensure that the result of this setf
-           ;; is visible to all CPUs
+           ;; FIXME: should we do something to ensure that the result
+           ;; of this setf is visible to all CPUs?
            (setf (waitqueue-data queue) me)
            (release-mutex mutex)
            ;; Now we go to sleep using futex-wait.  If anyone else
@@ -445,13 +459,7 @@ this semaphore, then N of them is woken up."
 ;;; funny situations (like getting a sigint while holding the session
 ;;; lock) occur
 (defmacro with-session-lock ((session) &body body)
-  #!-sb-thread (declare (ignore session))
-  #!-sb-thread
-  `(locally ,@body)
-  #!+sb-thread
-  `(without-interrupts
-     (with-mutex ((session-lock ,session))
-       ,@body)))
+  `(call-with-system-mutex (lambda () ,@body) (session-lock ,session)))
 
 (defun new-session ()
   (make-session :threads (list *current-thread*)
@@ -723,9 +731,7 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
       "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
-  `(without-interrupts
-     (with-mutex ((thread-interruptions-lock ,thread))
-       ,@body)))
+  `(call-with-system-mutex (lambda () ,@body) (thread-interruptions-lock ,thread)))
 
 ;; Called from the signal handler in C.
 (defun run-interruption ()
@@ -734,8 +740,6 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
        (let ((interruption (with-interruptions-lock (*current-thread*)
                              (pop (thread-interruptions *current-thread*)))))
          (if interruption
-             ;; This is safe because it's the IN-INTERRUPTION that
-             ;; has disabled interrupts.
              (with-interrupts
                (funcall interruption))
              (return))))))
@@ -755,29 +759,19 @@ nature: if you interrupt a thread that was holding important locks
 then do something that turns out to need those locks, you probably
 won't like the effect."
   #!-sb-thread (declare (ignore thread))
-  (flet ((interrupt-self ()
-           ;; *IN-INTERRUPTION* is true IFF we're being called as an
-           ;; interruption without an intervening WITHOUT-INTERRUPTS,
-           ;; in which case it is safe to enable interrupts. Otherwise
-           ;; interrupts are either already enabled, or there is an outer
-           ;; WITHOUT-INTERRUPTS we know nothing about, which makes it
-           ;; unsafe to enable interrupts.
-           (if *in-interruption*
-               (with-interrupts (funcall function))
-               (funcall function))))
-    #!-sb-thread
-    (interrupt-self)
-    #!+sb-thread
-    (if (eq thread *current-thread*)
-        (interrupt-self)
-        (let ((os-thread (thread-os-thread thread)))
-          (cond ((not os-thread)
-                 (error 'interrupt-thread-error :thread thread))
-                (t
-                 (with-interruptions-lock (thread)
-                   (push function (thread-interruptions thread)))
-                 (when (minusp (signal-interrupt-thread os-thread))
-                   (error 'interrupt-thread-error :thread thread))))))))
+  #!-sb-thread
+  (with-interrupts (funcall function))
+  #!+sb-thread
+  (if (eq thread *current-thread*)
+      (with-interrupts (funcall function))
+      (let ((os-thread (thread-os-thread thread)))
+        (cond ((not os-thread)
+               (error 'interrupt-thread-error :thread thread))
+              (t
+               (with-interruptions-lock (thread)
+                 (push function (thread-interruptions thread)))
+               (when (minusp (signal-interrupt-thread os-thread))
+                 (error 'interrupt-thread-error :thread thread)))))))
 
 (defun terminate-thread (thread)
   #!+sb-doc

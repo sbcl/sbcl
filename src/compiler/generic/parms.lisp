@@ -52,6 +52,7 @@
     ;; interrupt handling
     *alloc-signal*
     *free-interrupt-context-index*
+    sb!unix::*allow-with-interrupts*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
     *gc-inhibit*

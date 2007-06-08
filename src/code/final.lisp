@@ -16,6 +16,11 @@
 (defvar *finalizer-store-lock*
   (sb!thread:make-mutex :name "Finalizer store lock."))
 
+(defmacro with-finalizer-store-lock (&body body)
+  `(sb!thread::call-with-system-mutex (lambda () ,@body)
+                                      *finalizer-store-lock*
+                                      t))
+
 (defun finalize (object function)
   #!+sb-doc
   "Arrange for the designated FUNCTION to be called when there
@@ -57,10 +62,9 @@ Examples:
     (finalize \"oops\" #'oops)
     (oops)) ; causes GC and re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
-  (sb!sys:without-gcing
-      (sb!thread:with-mutex (*finalizer-store-lock*)
-        (push (cons (make-weak-pointer object) function)
-              *finalizer-store*)))
+  (with-finalizer-store-lock
+      (push (cons (make-weak-pointer object) function)
+            *finalizer-store*))
   object)
 
 (defun cancel-finalization (object)
@@ -69,24 +73,22 @@ Examples:
   ;; Check for NIL to avoid deleting finalizers that are waiting to be
   ;; run.
   (when object
-    (sb!sys:without-gcing
-        (sb!thread:with-mutex (*finalizer-store-lock*)
-          (setf *finalizer-store*
-                (delete object *finalizer-store*
-                        :key (lambda (pair)
-                               (weak-pointer-value (car pair)))))))
+    (with-finalizer-store-lock
+        (setf *finalizer-store*
+              (delete object *finalizer-store*
+                      :key (lambda (pair)
+                             (weak-pointer-value (car pair))))))
     object))
 
 (defun run-pending-finalizers ()
   (let (pending)
-    (sb!sys:without-gcing
-        (sb!thread:with-mutex (*finalizer-store-lock*)
-          (setf *finalizer-store*
-                (delete-if  (lambda (pair)
-                              (when (null (weak-pointer-value (car pair)))
-                                (push (cdr pair) pending)
-                                t))
-                            *finalizer-store*))))
+    (with-finalizer-store-lock
+        (setf *finalizer-store*
+              (delete-if  (lambda (pair)
+                            (when (null (weak-pointer-value (car pair)))
+                              (push (cdr pair) pending)
+                              t))
+                          *finalizer-store*)))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.
     (dolist (fun pending)

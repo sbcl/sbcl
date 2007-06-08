@@ -26,6 +26,7 @@
 
 ;;; FIXME: These could be converted to DEFVARs.
 (declaim (special #!+(or x86 x86-64) *pseudo-atomic-bits*
+                  *allow-with-interrupts*
                   *interrupts-enabled*
                   *interrupt-pending*
                   *type-system-initialized*))

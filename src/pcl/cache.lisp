@@ -343,7 +343,10 @@
       (setf length (* 2 length)))
     (tagbody
      :again
-       (setf (cache-vector copy) (make-array length :initial-element '..empty..)
+       ;; Blow way the old vector first, so a GC potentially triggered by
+       ;; MAKE-ARRAY can collect it.
+       (setf (cache-vector copy) #()
+             (cache-vector copy) (make-array length :initial-element '..empty..)
              (cache-depth copy) 0
              (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))

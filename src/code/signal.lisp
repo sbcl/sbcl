@@ -36,59 +36,145 @@
 ;;; any system calls, and by then the cost of the extra system calls
 ;;; are lost in the noise when compared with the cost of delivering
 ;;; the signal in the first place.
+;;;
+;;; The conditional bindings done by this code here are worth the
+;;; trouble as binding is more expensive then read & test -- so
+;;;  (if *foo*
+;;;      (foo)
+;;;      (let ((*foo* t))
+;;;        (foo)))
+;;; is faster then
+;;;  (let ((*foo* t))
+;;;    (foo))
+;;; provided that the first branch is true "often enough".
 
 (defvar *interrupts-enabled* t)
 (defvar *interrupt-pending* nil)
-
-;;; KLUDGE: This tells INTERRUPT-THREAD that it is being invoked as an
-;;; interruption, so that if the thread being interrupted is the
-;;; current thread it knows to enable interrupts. INVOKE-INTERRUPTION
-;;; binds it to T, and WITHOUT-INTERRUPTS binds it to NIL, so that if
-;;; interrupts are disable between INTERRUPT-THREAD and this we don't
-;;; accidentally re-enable them.
-(defvar *in-interruption* nil)
+(defvar *allow-with-interrupts* t)
 
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc
-  "Execute BODY with all deferrable interrupts deferred. Deferrable interrupts
-include most blockable POSIX signals, and SB-THREAD:INTERRUPT-THREAD. Does not
-interfere with garbage collection, and unlike in many traditional Lisps using
-userspace threads, in SBCL WITHOUT-INTERRUPTS does not inhibit scheduling of
-other threads."
-  (let ((name (gensym "WITHOUT-INTERRUPTS-BODY-")))
-    `(flet ((,name () ,@body))
-       (if *interrupts-enabled*
-           (unwind-protect
-                (let ((*interrupts-enabled* nil)
-                      (*in-interruption* nil))
-                  (,name))
-             ;; If we were interrupted in the protected section, then
-             ;; the interrupts are still blocked and it remains so
-             ;; until the pending interrupt is handled.
-             ;;
-             ;; If we were not interrupted in the protected section,
-             ;; but here, then even if the interrupt handler enters
-             ;; another WITHOUT-INTERRUPTS, the pending interrupt will
-             ;; be handled immediately upon exit from said
-             ;; WITHOUT-INTERRUPTS, so it is as if nothing has
-             ;; happened.
-             (when *interrupt-pending*
-               (receive-pending-interrupt)))
-           (,name)))))
+  "Executes BODY with all deferrable interrupts disabled. Deferrable
+interrupts arriving during execution of the BODY take effect after BODY has
+been executed.
+
+Deferrable interrupts include most blockable POSIX signals, and
+SB-THREAD:INTERRUPT-THREAD. Does not interfere with garbage collection, and
+unlike in many traditional Lisps using userspace threads, in SBCL
+WITHOUT-INTERRUPTS does not inhibit scheduling of other threads.
+
+Binds ALLOW-WITH-INTERRUPTS and WITH-LOCAL-INTERRUPTS as a local macros.
+
+ALLOW-WITH-INTERRUPTS allows the WITH-INTERRUPTS to take effect during the
+dynamic scope of its body, unless there is an outer WITHOUT-INTERRUPTS without
+a corresponding ALLOW-WITH-INTERRUPTS.
+
+WITH-LOCAL-INTERRUPTS executes its body with interrupts enabled provided that
+for there is an ALLOW-WITH-INTERRUPTS for every WITHOUT-INTERRUPTS surrounding
+the current one. WITH-LOCAL-INTERRUPTS is equivalent to:
+
+  (allow-with-interrupts (with-interrupts ...))
+
+Care must be taken not to let either ALLOW-WITH-INTERRUPTS or
+WITH-LOCAL-INTERRUPTS appear in a function that escapes from inside the
+WITHOUT-INTERRUPTS in:
+
+  (without-interrupts
+    ;; The body of the lambda would be executed with WITH-INTERRUPTS allowed
+    ;; regardless of the interrupt policy in effect when it is called.
+    (lambda () (allow-with-interrupts ...)))
+
+  (without-interrupts
+    ;; The body of the lambda would be executed with interrupts enabled
+    ;; regardless of the interrupt policy in effect when it is called.
+    (lambda () (with-local-interrupts ...)))
+"
+  (with-unique-names (outer-allow-with-interrupts)
+    `(call-without-interrupts
+      (lambda (,outer-allow-with-interrupts)
+        (declare (disable-package-locks allow-with-interrupts with-interrupts)
+                 (ignorable ,outer-allow-with-interrupts))
+        (macrolet ((allow-with-interrupts (&body allow-forms)
+                     `(call-allowing-with-interrupts
+                       (lambda () ,@allow-forms)
+                       ,',outer-allow-with-interrupts))
+                   (with-local-interrupts (&body with-forms)
+                     `(call-with-local-interrupts
+                       (lambda () ,@with-forms)
+                       ,',outer-allow-with-interrupts)))
+         (declare (enable-package-locks allow-with-interrupts with-interrupts))
+         ,@body)))))
 
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc
-  "Allow interrupts while executing BODY. As interrupts are normally allowed,
-this is only useful inside a SB-SYS:WITHOUT-INTERRUPTS. Signals a runtime
-warning if used inside the dynamic countour of SB-SYS:WITHOUT-GCING."
-  (let ((name (gensym)))
-    `(flet ((,name () ,@body))
-       (if *interrupts-enabled*
-           (,name)
-           (progn
-             (when sb!kernel:*gc-inhibit*
-               (warn "Re-enabling interrupts while GC is inhibited."))
-             (let ((*interrupts-enabled* t))
-               (when *interrupt-pending*
-                 (receive-pending-interrupt))
-               (,name)))))))
+  "Executes BODY with deferrable interrupts conditionally enabled. If there
+are pending interrupts they take effect prior to executing BODY.
+
+As interrupts are normally allowed WITH-INTERRUPTS only makes sense if there
+is an outer WITHOUT-INTERRUPTS with a corresponding ALLOW-WITH-INTERRUPTS:
+interrupts are not enabled if any outer WITHOUT-INTERRUPTS is not accompanied
+by ALLOW-WITH-INTERRUPTS."
+  `(call-with-interrupts
+    (lambda () ,@body)
+    (and (not *interrupts-enabled*) *allow-with-interrupts*)))
+
+(defun call-allowing-with-interrupts (function allowp)
+  (declare (function function))
+  (if allowp
+      (let ((*allow-with-interrupts* t))
+        (funcall function))
+      (funcall function)))
+
+(defun call-with-interrupts (function allowp)
+  (declare (function function))
+  (if allowp
+      (let ((*interrupts-enabled* t))
+        (when *interrupt-pending*
+          (receive-pending-interrupt))
+        (funcall function))
+      (funcall function)))
+
+;; Distinct from CALL-WITH-INTERRUPTS as it needs to bind both *A-W-I*
+;; and *I-E*.
+(defun call-with-local-interrupts (function allowp)
+  (declare (function function))
+  (if allowp
+      (let* ((*allow-with-interrupts* t)
+             (*interrupts-enabled* t))
+        (when *interrupt-pending*
+          (receive-pending-interrupt))
+        (funcall function))
+      (funcall function)))
+
+(defun call-without-interrupts (function)
+  (declare (function function))
+  (flet ((run-without-interrupts ()
+           (if *allow-with-interrupts*
+               (let ((*allow-with-interrupts* nil))
+                 (funcall function t))
+               (funcall function nil))))
+    (if *interrupts-enabled*
+        (unwind-protect
+             (let ((*interrupts-enabled* nil))
+               (run-without-interrupts))
+          ;; If we were interrupted in the protected section, then the
+          ;; interrupts are still blocked and it remains so until the
+          ;; pending interrupt is handled.
+          ;;
+          ;; If we were not interrupted in the protected section, but
+          ;; here, then even if the interrupt handler enters another
+          ;; WITHOUT-INTERRUPTS, the pending interrupt will be handled
+          ;; immediately upon exit from said WITHOUT-INTERRUPTS, so it
+          ;; is as if nothing has happened.
+          (when *interrupt-pending*
+            (receive-pending-interrupt)))
+        (run-without-interrupts))))
+
+;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is false,
+;;; and *ALLOW-WITH-INTERRUPTS* is true.
+(defun %check-interrupts ()
+  ;; Here we check for pending interrupts first, because reading a special
+  ;; is faster then binding it!
+  (when *interrupt-pending*
+    (let ((*interrupts-enabled* t))
+      (receive-pending-interrupt))))

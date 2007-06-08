@@ -96,6 +96,7 @@
         *gc-inhibit* t
         *gc-pending* nil
         #!+sb-thread *stop-for-gc-pending* #!+sb-thread nil
+        *allow-with-interrupts* t
         *interrupts-enabled* t
         *interrupt-pending* nil
         *break-on-signals* nil
@@ -289,15 +290,15 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
 (defun reinit ()
   (setf *default-external-format* nil)
   (setf sb!alien::*default-c-string-external-format* nil)
-  (without-interrupts
-    (without-gcing
-        (os-cold-init-or-reinit)
-      (thread-init-or-reinit)
-      (stream-reinit)
-      #!-win32
-      (signal-cold-init-or-reinit)
-      (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
-      (float-cold-init-or-reinit)))
+  ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
+  (without-gcing
+    (os-cold-init-or-reinit)
+    (thread-init-or-reinit)
+    (stream-reinit)
+    #!-win32
+    (signal-cold-init-or-reinit)
+    (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
+    (float-cold-init-or-reinit))
   (gc-reinit)
   (foreign-reinit)
   (time-reinit)

@@ -203,9 +203,7 @@ from now. For timers with a repeat interval it returns true."
 
 (defmacro with-scheduler-lock ((&optional) &body body)
   ;; don't let the SIGALRM handler mess things up
-  `(sb!sys:without-interrupts
-    (sb!thread:with-mutex (*scheduler-lock*)
-      ,@body)))
+  `(sb!thread::call-with-system-mutex (lambda () ,@body) *scheduler-lock*))
 
 (defun under-scheduler-lock-p ()
   #!-sb-thread

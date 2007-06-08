@@ -29,7 +29,11 @@
 ;;; use address-dependent (and thus GC-dependent) hashes, and we only
 ;;; have a single thread of control.
 (defmacro without-interrupts (&rest forms)
-  `(progn ,@forms))
+  `(macrolet ((allow-with-interrupts (&body body)
+                `(progn ,@body))
+              (with-local-interrupts (&body body)
+                `(progn ,@body)))
+     ,@forms))
 
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended

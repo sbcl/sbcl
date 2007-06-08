@@ -462,6 +462,7 @@ create_thread_struct(lispobj initial_function) {
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
+    bind_variable(ALLOW_WITH_INTERRUPTS,T,th);
     bind_variable(GC_PENDING,NIL,th);
 #ifdef LISP_FEATURE_SB_THREAD
     bind_variable(STOP_FOR_GC_PENDING,NIL,th);

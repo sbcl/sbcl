@@ -62,8 +62,11 @@ Experimental."
   #!+sb-doc
   "Signals a timeout condition while inhibiting further timeouts due to
 deadlines while the condition is being handled."
-  (let ((*deadline* nil))
-    (apply #'error datum arguments)))
+  ;; FIXME: Maybe we should make ERROR do WITH-INTERRUPTS instead of
+  ;; putting it all over the place (now that we have ALLOW-WITH-INTERRUPTS.)
+  (with-interrupts
+    (let ((*deadline* nil))
+      (apply #'error datum arguments))))
 
 (defun signal-deadline ()
   #!+sb-doc

@@ -31,25 +31,11 @@
   "Acquire MUTEX for the dynamic scope of BODY, setting it to
 NEW-VALUE or some suitable default value if NIL.  If WAIT-P is non-NIL
 and the mutex is in use, sleep until it is available"
-  #!-sb-thread (declare (ignore mutex value wait-p))
-  #!+sb-thread
-  (with-unique-names (got mutex1)
-    `(let ((,mutex1 ,mutex)
-           ,got)
-       (/show0 "WITH-MUTEX")
-       (unwind-protect
-            ;; FIXME: async unwind in SETQ form
-            (when (setq ,got (get-mutex ,mutex1 ,value ,wait-p))
-              (locally
-                  ,@body))
-         (when ,got
-           (release-mutex ,mutex1)))))
-  ;; KLUDGE: this separate expansion for (NOT SB-THREAD) is not
-  ;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.
-  ;; However, there would be a (possibly slight) performance hit in
-  ;; using them.
-  #!-sb-thread
-  `(locally ,@body))
+  `(call-with-mutex
+    (lambda () ,@body)
+    ,mutex
+    ,value
+    ,wait-p))
 
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-doc
@@ -57,51 +43,136 @@ and the mutex is in use, sleep until it is available"
 further recursive lock attempts for the same mutex succeed. It is
 allowed to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same mutex
 provided the default value is used for the mutex."
-  #!-sb-thread
-  (declare (ignore mutex))
-  #!+sb-thread
-  (with-unique-names (mutex1 inner-lock-p)
-    `(let* ((,mutex1 ,mutex)
-            (,inner-lock-p (eq (mutex-value ,mutex1) *current-thread*)))
-       (unwind-protect
-            (progn
-              (unless ,inner-lock-p
-                (get-mutex ,mutex1))
-              (locally
-                  ,@body))
-         (unless ,inner-lock-p
-           (release-mutex ,mutex1)))))
-  #!-sb-thread
-  `(locally ,@body))
+  `(call-with-recursive-lock
+    (lambda () ,@body)
+    ,mutex))
 
 (sb!xc:defmacro with-recursive-spinlock ((spinlock) &body body)
-  #!-sb-thread
-  (declare (ignore spinlock))
-  #!+sb-thread
-  (with-unique-names (lock inner-lock-p got-it)
-    `(let* ((,lock ,spinlock)
-            (,inner-lock-p (eq (spinlock-value ,lock) *current-thread*))
-            (,got-it nil))
-       (unwind-protect
-            (when (or ,inner-lock-p (setf ,got-it (get-spinlock ,lock)))
-              (locally ,@body))
-         (when ,got-it
-           (release-spinlock ,lock)))))
-  #!-sb-thread
-  `(locally ,@body))
+  `(call-with-recursive-spinlock
+    (lambda () ,@body)
+    ,spinlock))
 
 (sb!xc:defmacro with-spinlock ((spinlock) &body body)
-  #!-sb-thread
-  (declare (ignore spinlock))
-  #!-sb-thread
-  `(locally ,@body)
-  #!+sb-thread
-  (with-unique-names (lock got-it)
-    `(let ((,lock ,spinlock)
-           (,got-it nil))
-      (unwind-protect
-           (progn
-             (setf ,got-it (get-spinlock ,lock))
-             (locally ,@body))
-        (when ,got-it
-          (release-spinlock ,lock))))))
+  `(call-with-spinlock
+    (lambda () ,@body)
+    ,spinlock))
+
+;;; KLUDGE: this separate implementation for (NOT SB-THREAD) is not
+;;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.
+;;; However, there would be a (possibly slight) performance hit in
+;;; using them.
+#!-sb-thread
+(progn
+  (defun call-with-system-mutex (function mutex &optional without-gcing-p)
+    (declare (ignore mutex)
+             (function function))
+    (if without-gcing-p
+        (without-gcing
+          (funcall function))
+        (without-interrupts
+          (funcall function))))
+
+  (defun call-with-system-spinlock (function lock &optional without-gcing-p)
+    (declare (ignore lock)
+             (function function))
+    (if without-gcing-p
+        (without-gcing
+          (funcall function))
+        (without-interrupts
+          (funcall function))))
+
+  (defun call-with-mutex (function mutex value waitp)
+    (declare (ignore mutex value waitp)
+             (function function))
+    (funcall function))
+
+  (defun call-with-recursive-lock (function mutex)
+    (declare (ignore mutex) (function function))
+    (funcall function))
+
+  (defun call-with-spinlock (function spinlock)
+    (declare (ignore spinlock) (function function))
+    (funcall function))
+
+  (defun call-with-recursive-spinlock (function spinlock)
+    (declare (ignore spinlock) (function function))
+    (funcall function)))
+
+#!+sb-thread
+(progn
+  (defun call-with-system-mutex (function mutex &optional without-gcing-p)
+    (declare (function function))
+    (flet ((%call-with-system-mutex ()
+             (let (got-it)
+               (unwind-protect
+                    (when (setf got-it (get-mutex mutex))
+                      (funcall function))
+                 (when got-it
+                   (release-mutex mutex))))))
+      (if without-gcing-p
+          (without-gcing
+            (%call-with-system-mutex))
+          (without-interrupts
+            (%call-with-system-mutex)))))
+
+  (defun call-with-recursive-system-spinlock (function lock &optional without-gcing-p)
+    (declare (function function))
+    (flet ((%call-with-system-spinlock ()
+             (let ((inner-lock-p (eq *current-thread* (spinlock-value lock)))
+                   (got-it nil))
+               (unwind-protect
+                    (when (or inner-lock-p (setf got-it (get-spinlock lock)))
+                      (funcall function))
+                 (when got-it
+                   (release-spinlock lock))))))
+      (if without-gcing-p
+          (without-gcing
+            (%call-with-system-spinlock))
+          (without-interrupts
+            (%call-with-system-spinlock)))))
+
+  (defun call-with-mutex (function mutex value waitp)
+    (declare (function function))
+    (let ((got-it nil))
+      (without-interrupts
+        (unwind-protect
+             (when (setq got-it (allow-with-interrupts
+                                 (get-mutex mutex value waitp)))
+               (with-local-interrupts (funcall function)))
+          (when got-it
+            (release-mutex mutex))))))
+
+  (defun call-with-recursive-lock (function mutex)
+    (declare (function function))
+    (let ((inner-lock-p (eq (mutex-value mutex) *current-thread*))
+          (got-it nil))
+      (without-interrupts
+        (unwind-protect
+             (when (or inner-lock-p (setf got-it (allow-with-interrupts
+                                                  (get-mutex mutex))))
+               (with-local-interrupts (funcall function)))
+          (when got-it
+            (release-mutex mutex))))))
+
+  (defun call-with-spinlock (function spinlock)
+    (declare (function function))
+    (let ((got-it nil))
+      (without-interrupts
+        (unwind-protect
+             (when (setf got-it (allow-with-interrupts
+                                 (get-spinlock spinlock)))
+               (with-local-interrupts (funcall function)))
+          (when got-it
+            (release-spinlock spinlock))))))
+
+  (defun call-with-recursive-spinlock (function spinlock)
+    (declare (function function))
+    (let ((inner-lock-p (eq (spinlock-value spinlock) *current-thread*))
+          (got-it nil))
+      (without-interrupts
+        (unwind-protect
+             (when (or inner-lock-p (setf got-it (allow-with-interrupts
+                                                  (get-spinlock spinlock))))
+               (with-local-interrupts (funcall function)))
+          (when got-it
+            (release-spinlock spinlock)))))))

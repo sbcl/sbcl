@@ -27,12 +27,11 @@
   "Mutex for access to *AVAILABLE-BUFFERS*.")
 
 (defmacro with-available-buffers-lock ((&optional) &body body)
-  ;; WITHOUT-INTERRUPTS because streams are low-level enough to be
+  ;; CALL-WITH-SYSTEM-MUTEX because streams are low-level enough to be
   ;; async signal safe, and in particular a C-c that brings up the
   ;; debugger while holding the mutex would lose badly
-  `(without-interrupts
-    (sb!thread:with-mutex (*available-buffers-mutex*)
-      ,@body)))
+  `(sb!thread::call-with-system-mutex (lambda () ,@body)
+                                    *available-buffers-mutex*))
 
 (defconstant bytes-per-buffer (* 4 1024)
   #!+sb-doc
