@@ -119,8 +119,10 @@
     (values (- total-lines free-lines) total-lines
             (cache-depth cache) (cache-limit cache))))
 
-;;; Don't allocate insanely huge caches.
-(defconstant +cache-vector-max-length+ (expt 2 14))
+;;; Don't allocate insanely huge caches: this is 4096 lines for a
+;;; value cache with 8-15 keys -- probably "big enough for anyone",
+;;; and 16384 lines for a commonplace 2-key value cache.
+(defconstant +cache-vector-max-length+ (expt 2 16))
 
 ;;; Compute the maximum allowed probe depth as a function of cache size.
 ;;; Cache size refers to number of cache lines, not the length of the
