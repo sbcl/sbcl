@@ -135,8 +135,6 @@
   ;; FUNCTION until the other is called, from when it does nothing.
   (let ((mutex (sb!thread:make-mutex))
         (cancelled-p nil))
-    #!-sb-thread
-    (declare (ignore mutex))
     (list
      #'(lambda ()
          (sb!thread:with-recursive-lock (mutex)

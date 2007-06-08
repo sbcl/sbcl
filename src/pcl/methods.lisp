@@ -230,6 +230,7 @@
                :generic-function-class (class-of existing-gf))
               (ensure-generic-function generic-function-name)))
          (proto (method-prototype-for-gf generic-function-name)))
+    ;; FIXME: Destructive modification of &REST list.
     (setf (getf (getf other-initargs 'plist) :name)
           (make-method-spec generic-function qualifiers specializers))
     (let ((new (apply #'make-instance (class-of proto)
@@ -448,107 +449,119 @@
                     (= a-nopt b-nopt)
                     (eq (or a-keyp a-restp)
                         (or b-keyp b-restp)))))))
-      (let* ((name (generic-function-name generic-function))
-             (qualifiers (method-qualifiers method))
-             (specializers (method-specializers method))
-             (existing (get-method generic-function
-                                   qualifiers
-                                   specializers
-                                   nil)))
+    (let ((lock (gf-lock generic-function)))
+      ;; HANDLER-CASE takes care of releasing the lock and enabling
+      ;; interrupts before going forth with the error.
+      (handler-case
+          ;; System lock because interrupts need to be disabled as
+          ;; well: it would be bad to unwind and leave the gf in an
+          ;; inconsistent state.
+          (sb-thread::with-recursive-system-spinlock (lock)
+            (let* ((qualifiers (method-qualifiers method))
+                   (specializers (method-specializers method))
+                   (existing (get-method generic-function
+                                         qualifiers
+                                         specializers
+                                         nil)))
 
-        ;; If there is already a method like this one then we must get
-        ;; rid of it before proceeding.  Note that we call the generic
-        ;; function REMOVE-METHOD to remove it rather than doing it in
-        ;; some internal way.
-        (when (and existing (similar-lambda-lists-p existing method))
-          (remove-method generic-function existing))
+              ;; If there is already a method like this one then we must get
+              ;; rid of it before proceeding.  Note that we call the generic
+              ;; function REMOVE-METHOD to remove it rather than doing it in
+              ;; some internal way.
+              (when (and existing (similar-lambda-lists-p existing method))
+                (remove-method generic-function existing))
 
-        ;; KLUDGE: We have a special case here, as we disallow
-        ;; specializations of the NEW-VALUE argument to (SETF
-        ;; SLOT-VALUE-USING-CLASS).  GET-ACCESSOR-METHOD-FUNCTION is
-        ;; the optimizing function here: it precomputes the effective
-        ;; method, assuming that there is no dispatch to be done on
-        ;; the new-value argument.
-        (when (and (eq generic-function #'(setf slot-value-using-class))
-                   (not (eq *the-class-t* (first specializers))))
-          (error 'new-value-specialization
-                 :method method))
+              ;; KLUDGE: We have a special case here, as we disallow
+              ;; specializations of the NEW-VALUE argument to (SETF
+              ;; SLOT-VALUE-USING-CLASS).  GET-ACCESSOR-METHOD-FUNCTION is
+              ;; the optimizing function here: it precomputes the effective
+              ;; method, assuming that there is no dispatch to be done on
+              ;; the new-value argument.
+              (when (and (eq generic-function #'(setf slot-value-using-class))
+                         (not (eq *the-class-t* (first specializers))))
+                (error 'new-value-specialization :method  method))
 
-        (setf (method-generic-function method) generic-function)
-        (pushnew method (generic-function-methods generic-function))
-        (dolist (specializer specializers)
-          (add-direct-method specializer method))
+              (setf (method-generic-function method) generic-function)
+              (pushnew method (generic-function-methods generic-function))
+              (dolist (specializer specializers)
+                (add-direct-method specializer method))
 
-        ;; KLUDGE: SET-ARG-INFO contains the error-detecting logic for
-        ;; detecting attempts to add methods with incongruent lambda
-        ;; lists.  However, according to Gerd Moellmann on cmucl-imp,
-        ;; it also depends on the new method already having been added
-        ;; to the generic function.  Therefore, we need to remove it
-        ;; again on error:
-        (let ((remove-again-p t))
-          (unwind-protect
-               (progn
-                 (set-arg-info generic-function :new-method method)
-                 (setq remove-again-p nil))
-            (when remove-again-p
-              (remove-method generic-function method))))
+              ;; KLUDGE: SET-ARG-INFO contains the error-detecting logic for
+              ;; detecting attempts to add methods with incongruent lambda
+              ;; lists.  However, according to Gerd Moellmann on cmucl-imp,
+              ;; it also depends on the new method already having been added
+              ;; to the generic function.  Therefore, we need to remove it
+              ;; again on error:
+              (let ((remove-again-p t))
+                (unwind-protect
+                     (progn
+                       (set-arg-info generic-function :new-method method)
+                       (setq remove-again-p nil))
+                  (when remove-again-p
+                    (remove-method generic-function method))))
 
-        ;; KLUDGE II: ANSI saith that it is not an error to add a
-        ;; method with invalid qualifiers to a generic function of the
-        ;; wrong kind; it's only an error at generic function
-        ;; invocation time; I dunno what the rationale was, and it
-        ;; sucks.  Nevertheless, it's probably a programmer error, so
-        ;; let's warn anyway. -- CSR, 2003-08-20
-        (let ((mc (generic-function-method-combination generic-functioN)))
-          (cond
-            ((eq mc *standard-method-combination*)
-             (when (and qualifiers
-                        (or (cdr qualifiers)
-                            (not (memq (car qualifiers)
-                                       '(:around :before :after)))))
-               (warn "~@<Invalid qualifiers for standard method combination ~
-                      in method ~S:~2I~_~S.~@:>"
-                     method qualifiers)))
-            ((short-method-combination-p mc)
-             (let ((mc-name (method-combination-type-name mc)))
-               (when (or (null qualifiers)
-                         (cdr qualifiers)
-                         (and (neq (car qualifiers) :around)
-                              (neq (car qualifiers) mc-name)))
-                 (warn "~@<Invalid qualifiers for ~S method combination ~
-                        in method ~S:~2I~_~S.~@:>"
-                       mc-name method qualifiers))))))
+              ;; KLUDGE II: ANSI saith that it is not an error to add a
+              ;; method with invalid qualifiers to a generic function of the
+              ;; wrong kind; it's only an error at generic function
+              ;; invocation time; I dunno what the rationale was, and it
+              ;; sucks.  Nevertheless, it's probably a programmer error, so
+              ;; let's warn anyway. -- CSR, 2003-08-20
+              (let ((mc (generic-function-method-combination generic-functioN)))
+                (cond
+                  ((eq mc *standard-method-combination*)
+                   (when (and qualifiers
+                              (or (cdr qualifiers)
+                                  (not (memq (car qualifiers)
+                                             '(:around :before :after)))))
+                     (warn "~@<Invalid qualifiers for standard method ~
+                            combination in method ~S:~2I~_~S.~@:>"
+                           method qualifiers)))
+                  ((short-method-combination-p mc)
+                   (let ((mc-name (method-combination-type-name mc)))
+                     (when (or (null qualifiers)
+                               (cdr qualifiers)
+                               (and (neq (car qualifiers) :around)
+                                    (neq (car qualifiers) mc-name)))
+                       (warn "~@<Invalid qualifiers for ~S method combination ~
+                              in method ~S:~2I~_~S.~@:>"
+                             mc-name method qualifiers))))))
 
-        (unless skip-dfun-update-p
-          (update-ctors 'add-method
-                        :generic-function generic-function
-                        :method method)
-          (update-dfun generic-function))
-        (map-dependents generic-function
-                        (lambda (dep)
-                          (update-dependent generic-function
-                                            dep 'add-method method)))
-        generic-function)))
+              (unless skip-dfun-update-p
+                (update-ctors 'add-method
+                              :generic-function generic-function
+                              :method method)
+                (update-dfun generic-function))
+              (map-dependents generic-function
+                              (lambda (dep)
+                                (update-dependent generic-function
+                                                  dep 'add-method method)))))
+        (serious-condition (c)
+          (error c)))))
+  generic-function)
 
 (defun real-remove-method (generic-function method)
   (when (eq generic-function (method-generic-function method))
-    (let* ((name (generic-function-name generic-function))
-           (specializers (method-specializers method))
-           (methods (generic-function-methods generic-function))
-           (new-methods (remove method methods)))
-      (setf (method-generic-function method) nil)
-      (setf (generic-function-methods generic-function) new-methods)
-      (dolist (specializer (method-specializers method))
-        (remove-direct-method specializer method))
-      (set-arg-info generic-function)
-      (update-ctors 'remove-method
-                    :generic-function generic-function
-                    :method method)
-      (update-dfun generic-function)
-      (map-dependents generic-function
-                      (lambda (dep)
-                        (update-dependent generic-function
-                                          dep 'remove-method method)))))
+    (let ((lock (gf-lock generic-function)))
+      ;; System lock because interrupts need to be disabled as well:
+      ;; it would be bad to unwind and leave the gf in an inconsistent
+      ;; state.
+      (sb-thread::with-recursive-system-spinlock (lock)
+        (let* ((specializers (method-specializers method))
+               (methods (generic-function-methods generic-function))
+               (new-methods (remove method methods)))
+          (setf (method-generic-function method) nil
+                (generic-function-methods generic-function) new-methods)
+          (dolist (specializer (method-specializers method))
+            (remove-direct-method specializer method))
+          (set-arg-info generic-function)
+          (update-ctors 'remove-method
+                        :generic-function generic-function
+                        :method method)
+          (update-dfun generic-function)
+          (map-dependents generic-function
+                          (lambda (dep)
+                            (update-dependent generic-function
+                                              dep 'remove-method method)))))))
   generic-function)
 
 (defun compute-applicable-methods-function (generic-function arguments)

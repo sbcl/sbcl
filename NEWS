@@ -25,6 +25,8 @@ changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * bug fix: generic function dispatch function updating is now thread
     and interrupt safe (in the sense that the known issues have been
     fixed.)
+  * bug fix: ADD/REMOVE-METHOD is now thread and interrupt safe.
+  * bug fix: interning EQL-specializers is now thread and interrupt safe.
 
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * new contrib: sb-cover, an experimental code coverage tool, is included

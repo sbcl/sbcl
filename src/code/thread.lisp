@@ -37,6 +37,12 @@ and the mutex is in use, sleep until it is available"
     ,value
     ,wait-p))
 
+(sb!xc:defmacro with-system-mutex ((mutex &key without-gcing) &body body)
+  `(call-with-system-mutex
+    (lambda () ,@body)
+    ,mutex
+    ,without-gcing))
+
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-doc
   "Acquires MUTEX for the dynamic scope of BODY. Within that scope
@@ -51,6 +57,13 @@ provided the default value is used for the mutex."
   `(call-with-recursive-spinlock
     (lambda () ,@body)
     ,spinlock))
+
+(sb!xc:defmacro with-recursive-system-spinlock ((spinlock &key without-gcing)
+                                                &body body)
+  `(call-with-recursive-system-spinlock
+    (lambda () ,@body)
+    ,spinlock
+    ,without-gcing))
 
 (sb!xc:defmacro with-spinlock ((spinlock) &body body)
   `(call-with-spinlock
@@ -72,7 +85,8 @@ provided the default value is used for the mutex."
         (without-interrupts
           (funcall function))))
 
-  (defun call-with-system-spinlock (function lock &optional without-gcing-p)
+  (defun call-with-recursive-system-spinlock (function lock
+                                              &optional without-gcing-p)
     (declare (ignore lock)
              (function function))
     (if without-gcing-p

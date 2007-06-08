@@ -18,9 +18,8 @@
 (defvar *available-buffers* ()
   #!+sb-doc
   "List of available buffers. Each buffer is an sap pointing to
-  bytes-per-buffer of memory.")
+bytes-per-buffer of memory.")
 
-#!+sb-thread
 (defvar *available-buffers-mutex* (sb!thread:make-mutex
                                    :name "lock for *AVAILABLE-BUFFERS*")
   #!+sb-doc

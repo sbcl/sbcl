@@ -64,9 +64,9 @@
         (write-line string)))))
 
 (defun test-loop ()
-  (note "/~S waiting for permission to run" sb-thread:*current-thread*)  
+  (note "/~S waiting for permission to run" sb-thread:*current-thread*)
   (loop until *run-cache-test*)
-  (note "/~S joining the tundering herd" sb-thread:*current-thread*)
+  (note "/~S joining the thundering herd" sb-thread:*current-thread*)
   (handler-case
       (loop repeat 1024 do (test-cache))
     (error (e)
@@ -82,8 +82,10 @@
   (mapcar #'sb-thread:join-thread threads))
 
 #-sb-thread
-(loop repeat 4
-      do (test-loop))
+(progn
+  (setf *run-cache-test* t)
+  (loop repeat 4
+        do (test-loop)))
 
 ;;; Check that the test tests what it was supposed to test: the cache.
 (assert (sb-pcl::cache-p (sb-pcl::gf-dfun-cache #'cache-test)))

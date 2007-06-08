@@ -173,15 +173,40 @@
 ;;; In each case, we maintain one value which is a cons. The car is the list
 ;;; methods. The cdr is a list of the generic functions. The cdr is always
 ;;; computed lazily.
+
+;;; This needs to be used recursively, in case a non-trivial user
+;;; defined ADD/REMOVE-DIRECT-METHOD method ends up calling another
+;;; function using the same lock.
+(defvar *specializer-lock* (sb-thread::make-spinlock :name "Specializer lock"))
+
+(defmethod add-direct-method :around ((specializer specializer) method)
+  ;; All the actions done under this lock are done in an order
+  ;; that is safe to unwind at any point.
+  (sb-thread::with-recursive-spinlock (*specializer-lock*)
+    (call-next-method)))
+
+(defmethod remove-direct-method :around ((specializer specializer) method)
+  ;; All the actions done under this lock are done in an order
+  ;; that is safe to unwind at any point.
+  (sb-thread::with-recursive-spinlock (*specializer-lock*)
+    (call-next-method)))
+
 (defmethod add-direct-method ((specializer class) (method method))
-  (with-slots (direct-methods) specializer
-    (setf (car direct-methods) (adjoin method (car direct-methods))     ;PUSH
-          (cdr direct-methods) ()))
+  (let ((cell (slot-value specializer 'direct-methods)))
+    ;; We need to first smash the CDR, because a parallel read may
+    ;; be in progress, and because if an interrupt catches us we
+    ;; need to have a consistent state.
+    (setf (cdr cell) ()
+          (car cell) (adjoin method (car cell))))
   method)
+
 (defmethod remove-direct-method ((specializer class) (method method))
-  (with-slots (direct-methods) specializer
-    (setf (car direct-methods) (remove method (car direct-methods))
-          (cdr direct-methods) ()))
+  (let ((cell (slot-value specializer 'direct-methods)))
+    ;; We need to first smash the CDR, because a parallel read may
+    ;; be in progress, and because if an interrupt catches us we
+    ;; need to have a consistent state.
+    (setf (cdr cell) ()
+          (car cell) (remove method (car cell))))
   method)
 
 (defmethod specializer-direct-methods ((specializer class))
@@ -189,15 +214,19 @@
     (car direct-methods)))
 
 (defmethod specializer-direct-generic-functions ((specializer class))
-  (with-slots (direct-methods) specializer
-    (or (cdr direct-methods)
-        (setf (cdr direct-methods)
-              (let (collect)
-                (dolist (m (car direct-methods))
-                  ;; the old PCL code used COLLECTING-ONCE which used
-                  ;; #'EQ to check for newness
-                  (pushnew (method-generic-function m) collect :test #'eq))
-                (nreverse collect))))))
+  (let ((cell (slot-value specializer 'direct-methods)))
+    ;; If an ADD/REMOVE-METHOD is in progress, no matter: either
+    ;; we behave as if we got just first or just after -- it's just
+    ;; for update that we need to lock.
+    (or (cdr cell)
+        (sb-thread::with-spinlock (*specializer-lock*)
+          (setf (cdr cell)
+                (let (collect)
+                  (dolist (m (car cell))
+                    ;; the old PCL code used COLLECTING-ONCE which used
+                    ;; #'EQ to check for newness
+                    (pushnew (method-generic-function m) collect :test #'eq))
+                  (nreverse collect)))))))
 
 ;;; This hash table is used to store the direct methods and direct generic
 ;;; functions of EQL specializers. Each value in the table is the cons.
@@ -215,12 +244,17 @@
   (let* ((object (specializer-object specializer))
          (table (specializer-method-table specializer))
          (entry (gethash object table)))
+    ;; This table is shared between multiple specializers, but
+    ;; no worries as (at least for the time being) our hash-tables
+    ;; are thread safe.
     (unless entry
-      (setq entry
-            (setf (gethash object table)
-                  (cons nil nil))))
-    (setf (car entry) (adjoin method (car entry))
-          (cdr entry) ())
+      (setf entry
+            (setf (gethash object table) (cons nil nil))))
+    ;; We need to first smash the CDR, because a parallel read may
+    ;; be in progress, and because if an interrupt catches us we
+    ;; need to have a consistent state.
+    (setf (cdr entry) ()
+          (car entry) (adjoin method (car entry)))
     method))
 
 (defmethod remove-direct-method ((specializer specializer-with-object)
@@ -228,8 +262,11 @@
   (let* ((object (specializer-object specializer))
          (entry (gethash object (specializer-method-table specializer))))
     (when entry
-      (setf (car entry) (remove method (car entry))
-            (cdr entry) ()))
+      ;; We need to first smash the CDR, because a parallel read may
+      ;; be in progress, and because if an interrupt catches us we
+      ;; need to have a consistent state.
+      (setf (cdr entry) ()
+            (car entry) (remove method (car entry))))
     method))
 
 (defmethod specializer-direct-methods ((specializer specializer-with-object))
@@ -242,11 +279,12 @@
          (entry (gethash object (specializer-method-table specializer))))
     (when entry
       (or (cdr entry)
-          (setf (cdr entry)
-                (let (collect)
-                  (dolist (m (car entry))
-                    (pushnew (method-generic-function m) collect :test #'eq))
-                  (nreverse collect)))))))
+          (sb-thread::with-spinlock (*specializer-lock*)
+            (setf (cdr entry)
+                  (let (collect)
+                    (dolist (m (car entry))
+                      (pushnew (method-generic-function m) collect :test #'eq))
+                    (nreverse collect))))))))
 
 (defun map-specializers (function)
   (map-all-classes (lambda (class)
