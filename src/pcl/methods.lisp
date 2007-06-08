@@ -1514,7 +1514,7 @@
       (eq gf #'slot-boundp-using-class)))
 
 (defmethod compute-discriminating-function ((gf standard-generic-function))
-  (with-slots (dfun-state arg-info) gf
+  (let ((dfun-state (slot-value gf 'dfun-state)))
     (when (special-case-for-compute-discriminating-function-p gf)
       ;; if we have a special case for
       ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
@@ -1535,7 +1535,7 @@
          ((eq gf #'slot-boundp-using-class)
           (update-slot-value-gf-info gf 'boundp)
           #'slot-boundp-using-class-dfun)
-         ((gf-precompute-dfun-and-emf-p arg-info)
+         ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
           (make-final-dfun gf))
          (t
           (make-initial-dfun gf))))
