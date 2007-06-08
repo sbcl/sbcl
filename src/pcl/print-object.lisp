@@ -131,7 +131,7 @@
     (multiple-value-bind (lines-used lines-total max-depth depth-limit)
         (cache-statistics cache)
       (format stream
-              "~D key, ~P~:[no value~;value~], ~D/~D lines, depth ~D/~D"
+              "~D key~P, ~:[no value~;value~], ~D/~D lines, depth ~D/~D"
               (cache-key-count cache)
               (cache-key-count cache)
               (cache-value cache)

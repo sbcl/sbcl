@@ -416,3 +416,26 @@ altogether.  The former option is probably easier than the latter.
 Dynamic extent allocation doesn't currently work for one-element lists,
 since there's a source transform from (LIST X) to (CONS X NIL).
 
+--------------------------------------------------------------------------------
+#38
+
+(setf (subseq s1 start1 end1) (subseq s2 start2 end1))
+
+could be transformed into
+
+(let ((#:s2 s2)
+      (#:start2 start2)
+      (#:end2 end2))
+ (replace s1 #:s2 :start1 start1 :end1 end1 :start2 #:start2 :end2 #:end2))
+
+when the return value is unused, avoiding the need to cons up the new sequence.
+
+--------------------------------------------------------------------------------
+#39
+
+(let ((*foo* 42)) ...)
+
+currently compiles to code that ensures the TLS index at runtime, which
+is both a decently large chunk of code and unnecessary, as we could ensure
+the TLS index at load-time as well.
+

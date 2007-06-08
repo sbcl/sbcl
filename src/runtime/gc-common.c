@@ -358,7 +358,8 @@ scav_code_header(lispobj *where, lispobj object)
          entry_point != NIL;
          entry_point = function_ptr->next) {
 
-        gc_assert_verbose(is_lisp_pointer(entry_point), "Entry point %lx\n",
+        gc_assert_verbose(is_lisp_pointer(entry_point),
+                          "Entry point %lx\n is not a lisp pointer.",
                           (long)entry_point);
 
         function_ptr = (struct simple_fun *) native_pointer(entry_point);

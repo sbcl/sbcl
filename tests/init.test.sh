@@ -25,6 +25,10 @@ $SBCL <<EOF
         sb-impl::*sysinit-pathname-function* 'custom-sysinit-pathname)
   (save-lisp-and-die "$tmpcore")
 EOF
+if [ $? != 0 ]; then
+    echo "failure saving core"
+    exit 1
+fi
 $SBCL_ALLOWING_CORE --core "$tmpcore" --disable-debugger <<EOF
   (userinit-quit (sysinit-21))
 EOF

@@ -81,12 +81,27 @@
   ;;   (mod index (length vector))
   ;; using a bitmask.
   (vector #() :type simple-vector)
-  ;; The bitmask used to calculate (mod index (length vector))l
+  ;; The bitmask used to calculate (mod (* line-size line-hash) (length vector))).
   (mask 0 :type fixnum)
   ;; Current probe-depth needed in the cache.
   (depth 0 :type index)
   ;; Maximum allowed probe-depth before the cache needs to expand.
   (limit 0 :type index))
+
+(defun compute-cache-mask (vector-length line-size)
+  ;; Since both vector-length and line-size are powers of two, we
+  ;; can compute a bitmask such that
+  ;;
+  ;;  (logand <mask> <combined-layout-hash>)
+  ;;
+  ;; is "morally equal" to
+  ;;
+  ;;  (mod (* <line-size> <combined-layout-hash>) <vector-length>)
+  ;;
+  ;; This is it: (1- vector-length) is #b111... of the approriate size
+  ;; to get the MOD, and (- line-size) gives right the number of zero
+  ;; bits at the low end.
+  (logand (1- vector-length) (- line-size)))
 
 ;;; The smallest power of two that is equal to or greater then X.
 (declaim (inline power-of-two-ceiling))
@@ -115,7 +130,7 @@
 ;;; policy into account here (speed vs. space.)
 (declaim (inline compute-limit))
 (defun compute-limit (size)
-  (ceiling (sqrt size) 2))
+  (ceiling (sqrt (sqrt size))))
 
 ;;; Returns VALUE if it is not ..EMPTY.., otherwise executes ELSE:
 (defmacro non-empty-or (value else)
@@ -173,10 +188,11 @@
 (defun compute-cache-index (cache layouts)
   (let ((index (hash-layout-or (car layouts)
                                (return-from compute-cache-index nil))))
+    (declare (fixnum index))
     (dolist (layout (cdr layouts))
       (mixf index (hash-layout-or layout (return-from compute-cache-index nil))))
     ;; align with cache lines
-    (logand (* (cache-line-size cache) index) (cache-mask cache))))
+    (logand index (cache-mask cache))))
 
 ;;; Emit code that does lookup in cache bound to CACHE-VAR using
 ;;; layouts bound to LAYOUT-VARS. Go to MISS-TAG on event of a miss or
@@ -192,17 +208,16 @@
     (with-unique-names (n-index n-vector n-depth n-pointer n-mask
                        MATCH-WRAPPERS EXIT-WITH-HIT)
       `(let* ((,n-index (hash-layout-or ,(car layout-vars) (go ,miss-tag)))
-              (,n-vector (cache-vector ,cache-var)))
+              (,n-vector (cache-vector ,cache-var))
+              (,n-mask (cache-mask ,cache-var)))
          (declare (index ,n-index))
          ,@(mapcar (lambda (layout-var)
                      `(mixf ,n-index (hash-layout-or ,layout-var (go ,miss-tag))))
                    (cdr layout-vars))
          ;; align with cache lines
-         (setf ,n-index (logand (the fixnum (* ,n-index ,line-size))
-                                (cache-mask ,cache-var)))
+         (setf ,n-index (logand ,n-index ,n-mask))
          (let ((,n-depth (cache-depth ,cache-var))
-               (,n-pointer ,n-index)
-               (,n-mask (cache-mask ,cache-var)))
+               (,n-pointer ,n-index))
            (declare (index ,n-depth ,n-pointer))
            (tagbody
             ,MATCH-WRAPPERS
@@ -312,7 +327,7 @@
                      :line-size line-size
                      :vector (make-array length :initial-element '..empty..)
                      :value value
-                     :mask (1- length)
+                     :mask (compute-cache-mask length line-size)
                      :limit (compute-limit adjusted-size))
         ;; Make a smaller one, then
         (make-cache :key-count key-count :value value :size (ceiling size 2)))))
@@ -328,7 +343,7 @@
      :again
        (setf (cache-vector copy) (make-array length :initial-element '..empty..)
              (cache-depth copy) 0
-             (cache-mask copy) (1- length)
+             (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))
        (map-cache (lambda (layouts value)
                     (unless (try-update-cache copy layouts value)
@@ -347,11 +362,30 @@
     copy))
 
 (defun cache-has-invalid-entries-p (cache)
-  (and (find-if (lambda (elt)
-                  (and (typep elt 'layout)
-                       (zerop (layout-clos-hash elt))))
-                (cache-vector cache))
-       t))
+  (let ((vector (cache-vector cache))
+        (line-size (cache-line-size cache))
+        (key-count (cache-key-count cache))
+        (mask (cache-mask cache))
+        (index 0))
+    (loop
+      ;; Check if the line is in use, and check validity of the keys.
+      (let ((key1 (svref vector index)))
+        (when (cache-key-p key1)
+          (if (zerop (layout-clos-hash key1))
+              ;; First key invalid.
+              (return-from cache-has-invalid-entries-p t)
+              ;; Line is in use and the first key is valid: check the rest.
+              (loop for offset from 1 below key-count
+                    do (let ((thing (svref vector (+ index offset))))
+                         (when (or (not (cache-key-p thing))
+                                   (zerop (layout-clos-hash thing)))
+                           ;; Incomplete line or invalid layout.
+                           (return-from cache-has-invalid-entries-p t)))))))
+      ;; Line empty of valid, onwards.
+      (setf index (next-cache-index mask index line-size))
+      (when (zerop index)
+        ;; wrapped around
+        (return-from cache-has-invalid-entries-p nil)))))
 
 (defun hash-table-to-cache (table &key value key-count)
   (let ((cache (make-cache :key-count key-count :value value
@@ -417,8 +451,8 @@
          (line-size (cache-line-size cache))
          (key-count (cache-key-count cache))
          (valuep (cache-value cache))
-         (size (/ (length vector) line-size))
          (mask (cache-mask cache))
+         (size (/ (length vector) line-size))
          (index 0)
          (elt nil)
          (depth 0))
@@ -453,5 +487,33 @@
                  :key-count (cache-key-count cache)
                  :line-size line-size
                  :value valuep
-                 :mask (cache-mask cache)
+                 :mask mask
                  :limit (cache-limit cache))))
+
+;;;; For debugging & collecting statistics.
+
+(defun map-all-caches (function)
+  (dolist (p (list-all-packages))
+    (do-symbols (s p)
+      (when (eq p (symbol-package s))
+        (dolist (name (list s
+                            `(setf ,s)
+                            (slot-reader-name s)
+                            (slot-writer-name s)
+                            (slot-boundp-name s)))
+          (when (fboundp name)
+            (let ((fun (fdefinition name)))
+              (when (typep fun 'generic-function)
+                (let ((cache (gf-dfun-cache fun)))
+                  (when cache
+                    (funcall function name cache)))))))))))
+
+(defun check-cache-consistency (cache)
+  (let ((table (make-hash-table :test 'equal)))
+    (map-cache (lambda (layouts value)
+                 (declare (ignore value))
+                 (if (gethash layouts table)
+                     (cerror "Check futher."
+                             "Multiple appearances of ~S." layouts)
+                     (setf (gethash layouts table) t)))
+               cache)))
