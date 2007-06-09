@@ -17,6 +17,8 @@ changes in sbcl-1.0.7 relative to sbcl-1.0.6:
     "a constant string".
   * enhancement: SB-POSIX now supports lockf(). (Thanks to Zach Beane.)  
   * enhancement: SB-POSIX now supports getcwd(). (Thanks to Tassilo Horn.)
+  * optimization: bignum printing speed has been improved by 20-40%
+    (depending on the bignum size.)
   * bug fix: WITH-MUTEX and WITH-RECURSIVE-LOCK are now interrupt safe
     on Linux.
   * bug fix: the cache used by the CLOS to store precomputed effective

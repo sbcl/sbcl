@@ -252,6 +252,9 @@ run in any thread.")
   ;; as having these cons more then we have space left leads to huge
   ;; badness.
   (scrub-control-stack)
+  ;; Power cache of the bignum printer: drops overly large bignums and
+  ;; removes duplicate entries.
+  (scrub-power-cache)
   ;; FIXME: CTYPE-OF-CACHE-CLEAR isn't thread-safe.
   #!-sb-thread
   (ctype-of-cache-clear))

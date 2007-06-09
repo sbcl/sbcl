@@ -982,17 +982,17 @@
                 (2 #\b)
                 (8 #\o)
                 (16 #\x)
-                (t (%output-fixnum-in-base base 10 stream)
+                (t (%output-reasonable-integer-in-base base 10 stream)
                    #\r))
               stream))
 
-(defun %output-fixnum-in-base (n base stream)
+(defun %output-reasonable-integer-in-base (n base stream)
   (multiple-value-bind (q r)
       (truncate n base)
     ;; Recurse until you have all the digits pushed on
     ;; the stack.
     (unless (zerop q)
-      (%output-fixnum-in-base q base stream))
+      (%output-reasonable-integer-in-base q base stream))
     ;; Then as each recursive call unwinds, turn the
     ;; digit (in remainder) into a character and output
     ;; the character.
@@ -1000,21 +1000,89 @@
      (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" r)
      stream)))
 
+;;; *POWER-CACHE* is an alist mapping bases to power-vectors. It is
+;;; filled and probed by POWERS-FOR-BASE. SCRUB-POWER-CACHE is called
+;;; always prior a GC to drop overly large bignums from the cache.
+;;;
+;;; It doesn't need a lock, but if you work on SCRUB-POWER-CACHE or
+;;; POWERS-FOR-BASE, see that you don't break the assumptions!
+(defvar *power-cache* nil)
+
+(defconstant +power-cache-integer-length-limit+ 2048)
+
+(defun scrub-power-cache ()
+  (let ((cache *power-cache*))
+    (dolist (cell cache)
+      (let ((powers (cdr cell)))
+        (declare (simple-vector powers))
+        (let ((too-big (position-if
+                        (lambda (x)
+                          (>= (integer-length x)
+                              +power-cache-integer-length-limit+))
+                        powers)))
+          (when too-big
+            (setf (cdr cell) (subseq powers 0 too-big))))))
+    ;; Since base 10 is overwhelmingly common, make sure it's at head.
+    ;; Try to keep other bases in a hopefully sensible order as well.
+    (if (eql 10 (caar cache))
+        (setf *power-cache* cache)
+        ;; If we modify the list destructively we need to copy it, otherwise
+        ;; an alist lookup in progress might be screwed.
+        (setf *power-cache* (sort (copy-list cache)
+                                  (lambda (a b)
+                                    (declare (fixnum a b))
+                                    (cond ((= 10 a) t)
+                                          ((= 10 b) nil)
+                                          ((= 16 a) t)
+                                          ((= 16 b) nil)
+                                          ((= 2 a) t)
+                                          ((= 2 b) nil)
+                                          (t (< a b))))
+                                  :key #'car)))))
+
+;;; Compute (and cache) a power vector for a BASE and LIMIT:
+;;; the vector holds integers for which
+;;;    (aref powers k) == (expt base (expt 2 k))
+;;; holds.
+(defun powers-for-base (base limit)
+  (flet ((compute-powers (from)
+           (let (powers)
+             (do ((p from (* p p)))
+                 ((> p limit)
+                  ;; We don't actually need this, but we also
+                  ;; prefer not to cons it up a second time...
+                  (push p powers))
+               (push p powers))
+             (nreverse powers))))
+    ;; Grab a local reference so that we won't stuff consed at the
+    ;; head by other threads -- or sorting by SCRUB-POWER-CACHE.
+    (let ((cache *power-cache*))
+      (let ((cell (assoc base cache)))
+        (if cell
+            (let* ((powers (cdr cell))
+                   (len (length powers))
+                   (max (svref powers (1- len))))
+              (if (> max limit)
+                  powers
+                  (let ((new
+                         (concatenate 'vector powers
+                                      (compute-powers (* max max)))))
+                    (setf (cdr cell) new)
+                    new)))
+            (let ((powers (coerce (compute-powers base) 'vector)))
+              ;; Add new base to head: SCRUB-POWER-CACHE will later
+              ;; put it to a better place.
+              (setf *power-cache* (acons base powers cache))
+              powers))))))
+
 ;; Algorithm by Harald Hanche-Olsen, sbcl-devel 2005-02-05
-(defun %output-bignum-in-base (n base stream)
+(defun %output-huge-integer-in-base (n base stream)
   (declare (type bignum n) (type fixnum base))
-  (let ((power (make-array 10 :adjustable t :fill-pointer 0)))
-    ;; Here there be the bottleneck for big bignums, in the (* p p).
-    ;; A special purpose SQUARE-BIGNUM might help a bit. See eg: Dan
-    ;; Zuras, "On Squaring and Multiplying Large Integers", ARITH-11:
-    ;; IEEE Symposium on Computer Arithmetic, 1993, pp. 260 to 271.
-    ;; Reprinted as "More on Multiplying and Squaring Large Integers",
-    ;; IEEE Transactions on Computers, volume 43, number 8, August
-    ;; 1994, pp. 899-908.
-    (do ((p base (* p p)))
-        ((> p n))
-      (vector-push-extend p power))
-    ;; (aref power k) == (expt base (expt 2 k))
+  ;; POWER is a vector for which the following holds:
+  ;;   (aref power k) == (expt base (expt 2 k))
+  (let* ((power (powers-for-base base n))
+         (k-start (or (position-if (lambda (x) (> x n)) power)
+                      (bug "power-vector too short"))))
     (labels ((bisect (n k exactp)
                (declare (fixnum k))
                ;; N is the number to bisect
@@ -1036,15 +1104,19 @@
                         ;; doesn't get any leading zeros.
                         (bisect q k exactp)
                         (bisect r k (or exactp (plusp q))))))))
-      (bisect n (fill-pointer power) nil))))
+      (bisect n k-start nil))))
 
 (defun %output-integer-in-base (integer base stream)
   (when (minusp integer)
     (write-char #\- stream)
     (setf integer (- integer)))
-  (if (fixnump integer)
-      (%output-fixnum-in-base integer base stream)
-      (%output-bignum-in-base integer base stream)))
+  ;; The ideal cutoff point between these two algorithms is almost
+  ;; certainly quite platform dependent: this gives 87 for 32 bit
+  ;; SBCL, which is about right at least for x86/Darwin.
+  (if (or (fixnump integer)
+          (< (integer-length integer) (* 3 sb!vm:n-positive-fixnum-bits)))
+      (%output-reasonable-integer-in-base integer base stream)
+      (%output-huge-integer-in-base integer base stream)))
 
 (defun output-integer (integer stream)
   (let ((base *print-base*))
