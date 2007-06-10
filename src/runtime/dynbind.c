@@ -95,7 +95,9 @@ unbind_to_here(lispobj *bsp,void *th)
 
         symbol = binding->symbol;
         if (symbol) {
-            SetTlSymbolValue(symbol, binding->value,thread);
+            if (symbol != UNBOUND_MARKER_WIDETAG) {
+                SetTlSymbolValue(symbol, binding->value,thread);
+            }
             binding->symbol = 0;
         }
     }
