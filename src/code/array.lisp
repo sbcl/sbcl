@@ -482,6 +482,9 @@ of specialized arrays is supported."
 (defun data-vector-ref (array index)
   (hairy-data-vector-ref array index))
 
+(defun data-vector-ref-with-offset (array index offset)
+  (hairy-data-vector-ref array (+ index offset)))
+
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
 (defun %array-row-major-index (array subscripts
                                      &optional (invalid-index-error-p t))

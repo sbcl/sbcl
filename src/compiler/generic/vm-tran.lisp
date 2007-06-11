@@ -172,31 +172,26 @@
                           index)))))
 
 ;;; Transform data vector access to a form that opens up optimization
-;;; opportunities.
+;;; opportunities. On platforms that support DATA-VECTOR-REF-WITH-OFFSET
+;;; DATA-VECTOR-REF is not supported at all.
 #!+(or x86 x86-64)
-(deftransform data-vector-ref ((array index) ((or (simple-unboxed-array (*))
-                                                  simple-vector)
-                                              t))
-  (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find-saetp element-type)))
-      (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
-        (give-up-ir1-transform))
-      `(data-vector-ref-with-offset array index 0))))
+(define-source-transform data-vector-ref (array index)
+  `(data-vector-ref-with-offset ,array ,index 0))
 
 #!+(or x86 x86-64)
-(deftransform data-vector-ref-with-offset ((array index offset)
-                                           ((or (simple-unboxed-array (*))
-                                                simple-vector)
-                                            t t))
+(deftransform data-vector-ref-with-offset ((array index offset))
   (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
+    (when (or (not (array-type-p array-type))
+              (eql (array-type-specialized-element-type array-type)
+                   *wild-type*))
       (give-up-ir1-transform))
+    ;; It shouldn't be possible to get here with anything but a non-complex
+    ;; vector.
+    (aver (not (array-type-complexp array-type)))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
            (saetp (find-saetp element-type)))
-      (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
+      (when (< (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
+        (give-up-ir1-transform))
       (fold-index-addressing 'data-vector-ref-with-offset
                              (sb!vm:saetp-n-bits saetp)
                              sb!vm:other-pointer-lowtag
@@ -263,29 +258,23 @@
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
 #!+(or x86 x86-64)
-(deftransform data-vector-set ((array index new-value)
-                               ((or (simple-unboxed-array (*)) simple-vector)
-                                t t))
-  (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
-           (saetp (find-saetp element-type)))
-      (unless (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
-        (give-up-ir1-transform))
-      `(data-vector-set-with-offset array index 0 new-value))))
+(define-source-transform data-vector-set (array index new-value)
+  `(data-vector-set-with-offset ,array ,index 0 ,new-value))
 
 #!+(or x86 x86-64)
-(deftransform data-vector-set-with-offset ((array index offset new-value)
-                                           ((or (simple-unboxed-array (*))
-                                                simple-vector)
-                                            t t t))
+(deftransform data-vector-set-with-offset ((array index offset new-value))
   (let ((array-type (lvar-type array)))
-    (unless (array-type-p array-type)
+    (when (or (not (array-type-p array-type))
+              (eql (array-type-specialized-element-type array-type)
+                   *wild-type*))
+      ;; We don't yet know the exact element type, but will get that
+      ;; knowledge after some more type propagation.
       (give-up-ir1-transform))
+    (aver (not (array-type-complexp array-type)))
     (let* ((element-type (type-specifier (array-type-specialized-element-type array-type)))
            (saetp (find-saetp element-type)))
-      (aver (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits))
+      (when (< (sb!vm:saetp-n-bits saetp) sb!vm:n-byte-bits)
+        (give-up-ir1-transform))
       (fold-index-addressing 'data-vector-set-with-offset
                              (sb!vm:saetp-n-bits saetp)
                              sb!vm:other-pointer-lowtag

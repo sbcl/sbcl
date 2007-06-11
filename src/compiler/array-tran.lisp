@@ -774,11 +774,22 @@
 
 ;; For AREF of vectors we do the bounds checking in the callee. This
 ;; lets us do a significantly more efficient check for simple-arrays
-;; without bloating the code.
+;; without bloating the code. If we already know the type of the array
+;; with sufficient precision, skip directly to DATA-VECTOR-REF.
 (deftransform aref ((array index) (t t) * :node node)
-  (if (policy node (zerop insert-array-bounds-checks))
-      `(hairy-data-vector-ref array index)
-      `(hairy-data-vector-ref/check-bounds array index)))
+  (let ((type (lvar-type array)))
+    (cond ((and (array-type-p type)
+                (null (array-type-complexp type))
+                (not (eql (extract-upgraded-element-type array)
+                          *wild-type*))
+                (eql (length (array-type-dimensions type)) 1))
+           `(data-vector-ref array (%check-bound array
+                                                 (array-dimension array 0)
+                                                 index)))
+          ((policy node (zerop insert-array-bounds-checks))
+           `(hairy-data-vector-ref array index))
+          (t
+           `(hairy-data-vector-ref/check-bounds array index)))))
 
 (deftransform %aset ((array index new-value) (t t t) * :node node)
   (if (policy node (zerop insert-array-bounds-checks))
@@ -816,18 +827,6 @@
       hairy-data-vector-ref nil nil)
   (define hairy-data-vector-set/check-bounds
       hairy-data-vector-set (new-value) (*)))
-
-(deftransform aref ((array index) ((or simple-vector
-                                       (simple-unboxed-array 1))
-                                   index))
-  (let ((type (lvar-type array)))
-    (unless (array-type-p type)
-      ;; Not an exactly specified one-dimensional simple array -> punt
-      ;; to the complex version.
-      (give-up-ir1-transform)))
-  `(data-vector-ref array (%check-bound array
-                                        (array-dimension array 0)
-                                        index)))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the

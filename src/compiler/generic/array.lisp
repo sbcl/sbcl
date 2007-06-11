@@ -49,6 +49,39 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop nil-array-accessed-error object)))
+
+(define-vop (data-vector-ref-with-offset/simple-array-nil)
+  (:translate data-vector-ref-with-offset)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg)))
+  (:info offset)
+  (:arg-types simple-array-nil positive-fixnum
+              (:constant (integer 0 0)))
+  (:results (value :scs (descriptor-reg)))
+  (:result-types *)
+  (:ignore index value offset)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 1
+    (error-call vop nil-array-accessed-error object)))
+
+(define-vop (data-vector-set/simple-array-nil)
+  (:translate data-vector-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg))
+         (value :scs (descriptor-reg)))
+  (:info offset)
+  (:arg-types simple-array-nil positive-fixnum *
+              (:constant (integer 0 0)))
+  (:results (result :scs (descriptor-reg)))
+  (:result-types *)
+  (:ignore index value result offset)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 1
+    (error-call vop nil-array-accessed-error object)))
 
 ;;; FIXME: There is probably plenty of other array stuff that looks
 ;;; the same or similar enough to be genericized.  Do so, and move it
