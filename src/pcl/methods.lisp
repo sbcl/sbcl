@@ -640,20 +640,6 @@
 (defmethod specializer-class ((specializer eql-specializer))
   (class-of (slot-value specializer 'object)))
 
-;;; KLUDGE: this is needed to allow for user-defined specializers in
-;;; RAISE-METATYPE; however, the list of methods is maintained by
-;;; hand, which is error-prone.  We can't just add a method to
-;;; SPECIALIZER-CLASS, or at least not with confidence, as that
-;;; function is used elsewhere in PCL.  `STANDARD' here is used in the
-;;; sense of `comes with PCL' rather than `blessed by the
-;;; authorities'.  -- CSR, 2007-05-10
-(defmethod standard-specializer-p ((specializer class)) t)
-(defmethod standard-specializer-p ((specializer eql-specializer)) t)
-(defmethod standard-specializer-p ((specializer class-eq-specializer)) t)
-(defmethod standard-specializer-p ((specializer class-prototype-specializer))
-  t)
-(defmethod standard-specializer-p ((specializer specializer)) nil)
-
 (defun specializer-class-or-nil (specializer)
   (and (standard-specializer-p specializer)
        (specializer-class specializer)))

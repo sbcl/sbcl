@@ -550,22 +550,28 @@
   ;; responses in comp.lang.lisp).  -- CSR, 2006-02-27
   ((%type :initform nil :reader specializer-type)))
 
+;;; STANDARD in this name doesn't mean "blessed by a standard" but
+;;; "comes as standard with PCL"; that is, it includes CLASS-EQ
+;;; and vestiges of PROTOTYPE specializers
+(defclass standard-specializer (specializer) ())
+
 (defclass specializer-with-object (specializer) ())
 
 (defclass exact-class-specializer (specializer) ())
 
-(defclass class-eq-specializer (exact-class-specializer
+(defclass class-eq-specializer (standard-specializer
+                                exact-class-specializer
                                 specializer-with-object)
   ((object :initarg :class
            :reader specializer-class
            :reader specializer-object)))
 
-(defclass class-prototype-specializer (specializer-with-object)
+(defclass class-prototype-specializer (standard-specializer specializer-with-object)
   ((object :initarg :class
            :reader specializer-class
            :reader specializer-object)))
 
-(defclass eql-specializer (exact-class-specializer specializer-with-object)
+(defclass eql-specializer (standard-specializer exact-class-specializer specializer-with-object)
   ((object :initarg :object :reader specializer-object
            :reader eql-specializer-object)))
 
@@ -584,7 +590,7 @@
 
 (defclass class (dependent-update-mixin
                  definition-source-mixin
-                 specializer)
+                 standard-specializer)
   ((name
     :initform nil
     :initarg :name
@@ -698,6 +704,7 @@
 
 (defparameter *early-class-predicates*
   '((specializer specializerp)
+    (standard-specializer standard-specializer-p)
     (exact-class-specializer exact-class-specializer-p)
     (class-eq-specializer class-eq-specializer-p)
     (eql-specializer eql-specializer-p)

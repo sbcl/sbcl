@@ -81,7 +81,8 @@
   ;;   (mod index (length vector))
   ;; using a bitmask.
   (vector #() :type simple-vector)
-  ;; The bitmask used to calculate (mod (* line-size line-hash) (length vector))).
+  ;; The bitmask used to calculate
+  ;;   (mod (* line-size line-hash) (length vector))).
   (mask 0 :type fixnum)
   ;; Current probe-depth needed in the cache.
   (depth 0 :type index)
