@@ -45,3 +45,11 @@ interfaces documented here might change in later versions.
 
 @include fun-sb-cover-clear-coverage.texinfo
 
+@include fun-sb-cover-save-coverage.texinfo
+
+@include fun-sb-cover-save-coverage-in-file.texinfo
+
+@include fun-sb-cover-restore-coverage.texinfo
+
+@include fun-sb-cover-restore-coverage-from-file.texinfo
+

@@ -9,6 +9,8 @@
   (:use #:cl #:sb-c)
   (:export #:report
            #:reset-coverage #:clear-coverage
+           #:restore-coverage #:restore-coverage-from-file
+           #:save-coverage #:save-coverage-in-file
            #:store-coverage-data))
 
 (in-package #:sb-cover)
@@ -28,6 +30,51 @@ image."
 (defun reset-coverage ()
   "Reset all coverage data back to the `Not executed` state."
   (sb-c::reset-code-coverage))
+
+(defun save-coverage ()
+  "Returns an opaque representation of the current code coverage state.
+The only operation that may be done on the state is passing it to
+RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
+A representation that has been printed and read back will work identically
+in RESTORE-COVERAGE."
+  (loop for file being the hash-keys of sb-c::*code-coverage-info*
+        using (hash-value states)
+        collect (cons file states)))
+
+(defun restore-coverage (coverage-state)
+  "Restore the code coverage data back to an earlier state produced by
+SAVE-COVERAGE."
+  (loop for (file . states) in coverage-state
+        do (let ((image-states (gethash file sb-c::*code-coverage-info*))
+                 (table (make-hash-table :test 'equal)))
+             (when image-states
+               (loop for cons in image-states
+                     do (setf (gethash (car cons) table) cons))
+               (loop for (key . value) in states
+                     do (let ((state (gethash key table)))
+                          (when state
+                            (setf (cdr state) value))))))))
+
+(defun save-coverage-in-file (pathname)
+  "Call SAVE-COVERAGE and write the results of that operation into the
+file designated by PATHNAME."
+  (with-open-file (stream pathname
+                          :direction :output
+                          :if-exists :supersede
+                          :if-does-not-exist :create)
+    (with-standard-io-syntax
+      (let ((*package* (find-package :sb-cover)))
+        (write (save-coverage) :stream stream)))
+    (values)))
+
+(defun restore-coverage-from-file (pathname)
+  "READ the contents of the file designated by PATHNAME and pass the
+result to RESTORE-COVERAGE."
+  (with-open-file (stream pathname :direction :input)
+    (with-standard-io-syntax
+      (let ((*package* (find-package :sb-cover)))
+        (restore-coverage (read stream))))
+    (values)))
 
 (defun report (directory &key (external-format :default))
   "Print a code coverage report of all instrumented files into DIRECTORY.
