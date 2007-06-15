@@ -65,6 +65,7 @@ deadlines while the condition is being handled."
   ;; FIXME: Maybe we should make ERROR do WITH-INTERRUPTS instead of
   ;; putting it all over the place (now that we have ALLOW-WITH-INTERRUPTS.)
   (with-interrupts
+    ;; Don't signal a deadline while handling a non-deadline timeout.
     (let ((*deadline* nil))
       (apply #'error datum arguments))))
 
@@ -72,6 +73,10 @@ deadlines while the condition is being handled."
   #!+sb-doc
   "Signal a DEADLINE-TIMEOUT condition. Implementors of blocking functions
 are responsible for calling this when a deadline is reached."
+  ;; Make sure we don't signal the same deadline twice. LET is not good
+  ;; enough: we might catch the same deadline again while unwinding.
+  (when *deadline*
+    (setf *deadline* nil))
   (signal-timeout 'deadline-timeout :seconds *deadline-seconds*))
 
 ;;; Returns TIMEOUT-SEC, TIMEOUT-USEC, DEADLINE-SEC, DEADLINE-USEC, SIGNALP

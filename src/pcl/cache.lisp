@@ -337,7 +337,7 @@
 
 ;;;; Copies and expands the cache, dropping any invalidated or
 ;;;; incomplete lines.
-(defun copy-and-expand-cache (cache)
+(defun copy-and-expand-cache (cache layouts value)
   (let ((copy (%copy-cache cache))
         (length (length (cache-vector cache))))
     (when (< length +cache-vector-max-length+)
@@ -351,6 +351,11 @@
              (cache-depth copy) 0
              (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))
+       ;; First insert the new one -- if we don't do this first and
+       ;; the cache has reached it's maximum size we may end up
+       ;; looping in FILL-CACHE.
+       (unless (try-update-cache copy layouts value)
+         (bug "Could not insert ~S:~S to supposedly empty ~S." layouts value cache))
        (map-cache (lambda (layouts value)
                     (unless (try-update-cache copy layouts value)
                       ;; If the cache would grow too much we drop the
@@ -413,7 +418,7 @@
                 ;; we just drop the invalid entries.
                 (%fill-cache (copy-cache cache) layouts value))
                (t
-                (%fill-cache (copy-and-expand-cache cache) layouts value)))))
+                (copy-and-expand-cache cache layouts value)))))
     (if (listp layouts)
         (%fill-cache cache layouts value)
         (%fill-cache cache (list layouts) value))))
