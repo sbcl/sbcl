@@ -13,6 +13,7 @@
 		 (:file "macros" :depends-on ("designator"))
 		 (sb-grovel:grovel-constants-file
 		  "constants"
+                  :do-not-grovel (progn #-sb-compiling-contribs t)
 		  :package :sb-posix :depends-on  ("defpackage"))
 		 (:file "interface" :depends-on ("constants" "macros" "designator"))))
 
@@ -35,7 +36,7 @@
 			        collect sym)))
     (cond
       ((null failures)
-       t)	     
+       t)
       ((null (set-difference failures ignored-failures))
        (warn "~@<some POSIX implementations return incorrect error values for ~
               failing calls, but there is legitimate variation between ~

@@ -16,10 +16,12 @@
 		 #-win32 (sb-grovel:grovel-constants-file
 			  "constants"
 			  :package :sockint
+                          :do-not-grovel (progn #-sb-compiling-contribs t)
 			  :depends-on  ("defpackage"))
 		 #+win32 (sb-grovel:grovel-constants-file
 			  "win32-constants"
 			  :package :sockint
+                          :do-not-grovel (progn #-sb-compiling-contribs t)
 			  :depends-on  ("defpackage" "win32-lib"))
                  #+win32 (:file "win32-sockets"
 				:depends-on ("win32-constants"))

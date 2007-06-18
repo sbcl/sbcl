@@ -151,7 +151,10 @@ code:
         (print-c-source  f headers definitions package)))))
 
 (defclass grovel-constants-file (asdf:cl-source-file)
-  ((package :accessor constants-package :initarg :package)))
+  ((package :accessor constants-package :initarg :package)
+   (do-not-grovel :accessor do-not-grovel
+                     :initform nil
+                     :initarg :do-not-grovel)))
 
 (define-condition c-compile-failed (compile-failed) ()
   (:report (lambda (c s)
@@ -183,46 +186,47 @@ code:
     (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
-    (let* ((cc (or (sb-ext:posix-getenv "CC")
-                   ;; It might be nice to include a CONTINUE or
-                   ;; USE-VALUE restart here, but ASDF seems to insist
-                   ;; on handling the errors itself.
-                   (error "The CC environment variable has not been set in SB-GROVEL. Since this variable should always be set during the SBCL build process, this might indicate an SBCL with a broken contrib installation.")))
-           (code (sb-ext:process-exit-code
-                  (sb-ext:run-program
-                   cc
-                   (append
-                    (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
-                    #+(and linux largefile)
-                    '("-D_LARGEFILE_SOURCE"
-                     "-D_LARGEFILE64_SOURCE"
-                      "-D_FILE_OFFSET_BITS=64")
-                    #+(and x86-64 darwin)
-                    '("-arch" "x86_64")
-                    (list "-o"
-                         (namestring tmp-a-dot-out)
-                         (namestring tmp-c-source)))
-                   :search t
-                   :input nil
-                   :output *trace-output*))))
-      (unless (= code 0)
-        (case (operation-on-failure op)
-          (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
-                       op component))
-          (:error
-           (error 'c-compile-failed :operation op :component component)))))
-    (let ((code (sb-ext:process-exit-code
-                 (sb-ext:run-program (namestring tmp-a-dot-out)
-                                     (list (namestring tmp-constants))
-                                     :search nil
-                                     :input nil
-                                     :output *trace-output*))))
-      (unless (= code 0)
-        (case (operation-on-failure op)
-          (:warn (warn "~@<a.out failure when performing ~A on ~A.~@:>"
-                       op component))
-          (:error
-           (error 'a-dot-out-failed :operation op :component component)))))
+    (unless (do-not-grovel component)
+      (let* ((cc (or (sb-ext:posix-getenv "CC")
+                     ;; It might be nice to include a CONTINUE or
+                     ;; USE-VALUE restart here, but ASDF seems to insist
+                     ;; on handling the errors itself.
+                     (error "The CC environment variable has not been set in SB-GROVEL. Since this variable should always be set during the SBCL build process, this might indicate an SBCL with a broken contrib installation.")))
+             (code (sb-ext:process-exit-code
+                    (sb-ext:run-program
+                     cc
+                     (append
+                      (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+                      #+(and linux largefile)
+                      '("-D_LARGEFILE_SOURCE"
+                        "-D_LARGEFILE64_SOURCE"
+                        "-D_FILE_OFFSET_BITS=64")
+                      #+(and x86-64 darwin)
+                      '("-arch" "x86_64")
+                      (list "-o"
+                            (namestring tmp-a-dot-out)
+                            (namestring tmp-c-source)))
+                     :search t
+                     :input nil
+                     :output *trace-output*))))
+        (unless (= code 0)
+          (case (operation-on-failure op)
+            (:warn (warn "~@<C compiler failure when performing ~A on ~A.~@:>"
+                         op component))
+            (:error
+             (error 'c-compile-failed :operation op :component component)))))
+      (let ((code (sb-ext:process-exit-code
+                   (sb-ext:run-program (namestring tmp-a-dot-out)
+                                       (list (namestring tmp-constants))
+                                       :search nil
+                                       :input nil
+                                       :output *trace-output*))))
+        (unless (= code 0)
+          (case (operation-on-failure op)
+            (:warn (warn "~@<a.out failure when performing ~A on ~A.~@:>"
+                         op component))
+            (:error
+             (error 'a-dot-out-failed :operation op :component component))))))
     (multiple-value-bind (output warnings-p failure-p)
         (compile-file tmp-constants :output-file output-file)
       (when warnings-p
