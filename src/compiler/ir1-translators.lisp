@@ -1051,6 +1051,7 @@ due to normal completion or a non-local exit such as THROW)."
                     (%unwind-protect (%escape-fun ,exit-tag)
                                      (%cleanup-fun ,cleanup-fun))
                   (return-from ,drop-thru-tag ,protected)))
+            (declare (optimize (insert-debug-catch 0)))
             (,cleanup-fun)
             (%continue-unwind ,next ,start ,count)))))))
 

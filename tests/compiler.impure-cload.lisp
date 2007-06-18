@@ -499,3 +499,21 @@
       (locally
           (declare)
         2))
+
+;;; Bug in the interaction of BIND-SENTINEL and UNBIND-TO-HERE, as
+;;; used by PROGV.
+
+(defvar *foo-1* nil)
+(defvar *foo-2* nil)
+
+(defun foo ()
+  (declare (optimize (debug 2)))
+  (let ((*foo-1* nil))
+    (progv
+        (list '*foo-2*)
+        (list nil)
+      (write-line "foo-2"))
+    (write-line "foo-1"))
+  (write-line "foo-0"))
+
+(foo)

@@ -1448,6 +1448,15 @@
                  (,bind ,vars ,vals))
                nil
                ,@body)
+          ;; Technically ANSI CL doesn't allow declarations at the
+          ;; start of the cleanup form. SBCL happens to allow for
+          ;; them, due to the way the UNWIND-PROTECT ir1 translation
+          ;; is implemented; the cleanup forms are directly spliced
+          ;; into an FLET definition body. And a declaration here
+          ;; actually has exactly the right scope for what we need
+          ;; (ensure that debug instrumentation is not emitted for the
+          ;; cleanup function). -- JES, 2007-06-16
+          (declare (optimize (insert-debug-catch 0)))
           (%primitive unbind-to-here ,n-save-bs))))))
 
 ;;;; non-local exit

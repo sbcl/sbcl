@@ -906,9 +906,11 @@
       (binding* (((*lexenv* result-type post-binding-lexenv)
                   (process-decls decls (append aux-vars vars) nil
                                  :binding-form-p t))
-                 (forms (if (and maybe-add-debug-catch
-                                 *allow-instrumenting*
-                                 (policy *lexenv* (>= insert-debug-catch 2)))
+                 (debug-catch-p (and maybe-add-debug-catch
+                                     *allow-instrumenting*
+                                     (policy *lexenv*
+                                             (>= insert-debug-catch 2))))
+                 (forms (if debug-catch-p
                             (wrap-forms-in-debug-catch forms)
                             forms))
                  (forms (if (eq result-type *wild-type*)
