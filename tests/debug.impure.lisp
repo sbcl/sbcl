@@ -150,7 +150,8 @@
          (funcall fun)))
 
   (with-test (:name (:undefined-function :bug-346)
-              :fails-on '(or :alpha (and :x86-64 :freebsd))) ; bug 346
+              :fails-on '(or :alpha :ppc :sparc
+                          (and :x86-64 (or :freebsd :darwin))))
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
@@ -193,12 +194,12 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
   (with-test (:name (:divide-by-zero :bug-346)
-              :fails-on '(or :alpha))   ; bug 346
+              :fails-on '(or :alpha (and :x86-64 :darwin)))   ; bug 346
     (assert (verify-backtrace (lambda () (test #'optimized))
                               (list '(/ 42 &rest)
                                     (list '(flet test) #'optimized)))))
   (with-test (:name (:divide-by-zero :bug-356)
-              :fails-on '(or :alpha))   ; bug 356
+              :fails-on '(or :alpha (and :x86-64 :darwin)))   ; bug 356
     (assert (verify-backtrace (lambda () (test #'not-optimized))
                               (list '(/ 42 &rest)
                                     '((flet not-optimized))
@@ -206,7 +207,9 @@
 
 (with-test (:name (:throw :no-such-tag)
             :fails-on '(or
-                        (and :x86 (or :sunos))
+                        (and :x86 :sunos)
+                        (and :x86-64 :darwin)
+                        (and :sparc :linux)
                         :alpha
                         :mips))
   (progn
@@ -251,7 +254,8 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(and :x86 (or :sunos)))
+            :fails-on '(or (and :x86 (or :sunos))
+                           (and :x86-64 :darwin)))
   (macrolet ((with-details (bool &body body)
                `(let ((sb-debug:*show-entry-point-details* ,bool))
                  ,@body)))

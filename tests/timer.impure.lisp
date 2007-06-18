@@ -17,7 +17,8 @@
   `(handler-case (progn (progn ,@body) nil)
     (sb-ext:timeout () t)))
 
-(with-test (:name (:timer :relative))
+(with-test (:name (:timer :relative)
+            :fails-on '(and :sparc :linux))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -28,7 +29,8 @@
     (assert has-run-p)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:timer :absolute))
+(with-test (:name (:timer :absolute)
+            :fails-on '(and :sparc :linux))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -57,7 +59,8 @@
                  :thread t)))
     (schedule-timer timer 0.1)))
 
-(with-test (:name (:timer :repeat-and-unschedule))
+(with-test (:name (:timer :repeat-and-unschedule)
+            :fails-on '(and :sparc :linux))
   (let* ((run-count 0)
          timer)
     (setq timer

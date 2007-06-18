@@ -125,7 +125,7 @@
 (funcall (compile nil '(lambda () (tan (tan (round 0))))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :ppc :darwin :mips))
+            :fails-on '(or :ppc :darwin :mips (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1
                   (ignore-errors
@@ -158,8 +158,8 @@
                      (+ x0 x1 x6 x7) (+ x2 x3 x4 x5)))))))
 
 
-#-x86-64
-(with-test (:name :nan-comparisons)
+(with-test (:name :nan-comparisons
+            :fails-on (or :x86-64 :sparc))
   (sb-int:with-float-traps-masked (:invalid)
     (macrolet ((test (form)
                  (let ((nform (subst '(/ 0.0 0.0) 'nan form)))
