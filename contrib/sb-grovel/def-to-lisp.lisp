@@ -153,8 +153,8 @@ code:
 (defclass grovel-constants-file (asdf:cl-source-file)
   ((package :accessor constants-package :initarg :package)
    (do-not-grovel :accessor do-not-grovel
-                     :initform nil
-                     :initarg :do-not-grovel)))
+                  :initform nil
+                  :initarg :do-not-grovel)))
 
 (define-condition c-compile-failed (compile-failed) ()
   (:report (lambda (c s)

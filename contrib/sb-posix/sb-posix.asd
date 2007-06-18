@@ -13,7 +13,7 @@
 		 (:file "macros" :depends-on ("designator"))
 		 (sb-grovel:grovel-constants-file
 		  "constants"
-                  :do-not-grovel (progn #-sb-compiling-contribs t)
+                  :do-not-grovel #.(progn #-sb-building-contrib t)
 		  :package :sb-posix :depends-on  ("defpackage"))
 		 (:file "interface" :depends-on ("constants" "macros" "designator"))))
 
