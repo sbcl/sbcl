@@ -50,9 +50,9 @@
 #include "genesis/hash-table.h"
 #include "genesis/instance.h"
 #include "genesis/layout.h"
-
-#ifdef LUTEX_WIDETAG
-#include "genesis/lutex.h"
+#include "gencgc.h"
+#if defined(LUTEX_WIDETAG)
+#include "pthread-lutex.h"
 #endif
 
 /* forward declarations */
@@ -1938,7 +1938,7 @@ reap_lutexes (generation_index_t gen) {
     while (lutex) {
         struct lutex *next = lutex->next;
         if (!lutex->live) {
-            lutex_destroy(lutex);
+            lutex_destroy((tagged_lutex_t) lutex);
             gencgc_unregister_lutex(lutex);
         }
         lutex = next;
@@ -1997,7 +1997,7 @@ scav_lutex(lispobj *where, lispobj object)
 static lispobj
 trans_lutex(lispobj object)
 {
-    struct lutex *lutex = native_pointer(object);
+    struct lutex *lutex = (struct lutex *) native_pointer(object);
     lispobj copied;
     size_t words = CEILING(sizeof(struct lutex)/sizeof(lispobj), 2);
     gc_assert(is_lisp_pointer(object));
@@ -2005,13 +2005,14 @@ trans_lutex(lispobj object)
 
     /* Update the links, since the lutex moved in memory. */
     if (lutex->next) {
-        lutex->next->prev = native_pointer(copied);
+        lutex->next->prev = (struct lutex *) native_pointer(copied);
     }
 
     if (lutex->prev) {
-        lutex->prev->next = native_pointer(copied);
+        lutex->prev->next = (struct lutex *) native_pointer(copied);
     } else {
-        generations[lutex->gen].lutexes = native_pointer(copied);
+        generations[lutex->gen].lutexes =
+          (struct lutex *) native_pointer(copied);
     }
 
     return copied;
@@ -2114,6 +2115,8 @@ search_dynamic_space(void *pointer)
                             (((lispobj *)pointer)+2)-start,
                             (lispobj *)pointer));
 }
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 /* Is there any possibility that pointer is a valid Lisp object
  * reference, and/or something else (e.g. subroutine call return
@@ -2387,8 +2390,6 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
     return 1;
 }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-
 /* Adjust large bignum and vector objects. This will adjust the
  * allocated region if the size has shrunk, and move unboxed objects
  * into unboxed pages. The pages are not promoted here, and the
@@ -2563,8 +2564,6 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
-#endif
-
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -2577,8 +2576,6 @@ maybe_adjust_large_object(lispobj *where)
  *
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
-
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 static void
 preserve_pointer(void *addr)
@@ -2696,7 +2693,7 @@ preserve_pointer(void *addr)
     gc_assert(page_table[addr_page_index].dont_move != 0);
 }
 
-#endif
+#endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 
 /* If the given page is not write-protected, then scan it for pointers
@@ -3856,7 +3853,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     unsigned long bytes_freed;
     page_index_t i;
     unsigned long static_space_size;
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     struct thread *th;
+#endif
     gc_assert(generation <= HIGHEST_NORMAL_GENERATION);
 
     /* The oldest generation can't be raised. */

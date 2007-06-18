@@ -34,6 +34,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
+#include "gencgc.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
  * a lot of hairy and fragile ifdeffage in here to support purify on
@@ -497,7 +498,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
           return ptrans_unboxed(thing, header);
 #ifdef LUTEX_WIDETAG
       case LUTEX_WIDETAG:
-          gencgc_unregister_lutex(native_pointer(thing));
+          gencgc_unregister_lutex((struct lutex *) native_pointer(thing));
           return ptrans_unboxed(thing, header);
 #endif
 

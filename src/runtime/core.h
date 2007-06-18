@@ -39,6 +39,6 @@ extern os_vm_offset_t search_for_embedded_core(char *file);
  * against a .core built without :SB-SHOW (or against various grosser
  * mismatches, e.g. a .core built with an old version of the code
  * against a runtime with patches which add new C code) */
-extern unsigned char build_id[];
+extern char build_id[];
 
 #endif

@@ -27,6 +27,8 @@
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
 extern void check_blockables_blocked_or_lose();
+extern void check_gc_signals_unblocked_or_lose();
+extern void unblock_gc_signals();
 
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
@@ -80,13 +82,12 @@ extern void do_pending_interrupt(void);
 extern void interrupt_thread_handler(int, siginfo_t*, void*);
 extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);
 #endif
-extern void undoably_install_low_level_interrupt_handler (int signal,
-                                                          void
-                                                          handler(int,
-                                                                  siginfo_t*,
-                                                                  void*));
+typedef void (*interrupt_handler_t)(int, siginfo_t *, void *);
+extern void undoably_install_low_level_interrupt_handler (
+                        int signal,
+                        interrupt_handler_t handler);
 extern unsigned long install_handler(int signal,
-                                     void handler(int, siginfo_t*, void*));
+                                     interrupt_handler_t handler);
 
 extern union interrupt_handler interrupt_handlers[NSIG];
 

@@ -898,8 +898,10 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *(register_save_area + 7) = *os_context_register_addr(context,reg_EAX);
     *(register_save_area + 8) = *context_eflags_addr(context);
 
-    *os_context_pc_addr(context) = call_into_lisp_tramp;
-    *os_context_register_addr(context,reg_ECX) = register_save_area;
+    *os_context_pc_addr(context) =
+      (os_context_register_t) call_into_lisp_tramp;
+    *os_context_register_addr(context,reg_ECX) =
+      (os_context_register_t) register_save_area;
 #else
 
     /* return address for call_into_lisp: */
@@ -1158,9 +1160,7 @@ low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 
 void
 undoably_install_low_level_interrupt_handler (int signal,
-                                              void handler(int,
-                                                           siginfo_t*,
-                                                           void*))
+                                              interrupt_handler_t handler)
 {
     struct sigaction sa;
 

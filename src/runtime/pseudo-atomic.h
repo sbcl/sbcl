@@ -53,8 +53,9 @@
 #elif defined(LISP_FEATURE_PPC) && defined(LISP_FEATURE_GENCGC)
 
 #define set_alloc_pointer(value) \
-    (dynamic_space_free_pointer =                                       \
-     (value) | (((unsigned long)dynamic_space_free_pointer) & LOWTAG_MASK))
+    (dynamic_space_free_pointer = \
+     ((lispobj *) \
+      ((value) | (((unsigned long)dynamic_space_free_pointer) & LOWTAG_MASK))))
 
 #define get_alloc_pointer()                                     \
     ((unsigned long) dynamic_space_free_pointer & ~LOWTAG_MASK)

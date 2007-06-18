@@ -22,10 +22,10 @@
 #include "arch.h"
 #include "target-arch-os.h"
 #include "os.h"
+#include "pthread-lutex.h"
+#include "gencgc.h"
 
 #include "genesis/lutex.h"
-
-typedef unsigned long tagged_lutex_t;
 
 #if 1
 # define lutex_assert(ex)                                              \

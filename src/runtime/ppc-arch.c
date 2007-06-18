@@ -21,6 +21,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
+#include "alloc.h"
 
 #if defined(LISP_FEATURE_GENCGC)
 #include "gencgc-alloc-region.h"
@@ -422,9 +423,10 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 }
 
 static void
-sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
+sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     unsigned int code;
+    os_context_t *context = void_context;
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
@@ -469,7 +471,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         return;
     }
 
-    interrupt_handle_now(signal, code, context);
+    interrupt_handle_now(signal, (siginfo_t *)code, context);
 #ifdef LISP_FEATURE_DARWIN
     /* Work around G5 bug */
     DARWIN_FIX_CONTEXT(context);
@@ -479,8 +481,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGILL,sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGILL, sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 }
 
 void

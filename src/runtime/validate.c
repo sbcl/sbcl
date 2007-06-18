@@ -22,6 +22,8 @@
 #include "globals.h"
 #include "interr.h"
 #include "validate.h"
+#include "interr.h"                     /* for declaration of lose */
+
 
 static void
 ensure_space(lispobj *start, unsigned long size)

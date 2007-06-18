@@ -230,7 +230,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
          file);
     {
         unsigned char *p;
-        for (p = build_id; *p; ++p)
+        for (p = (unsigned char *)build_id; *p; ++p)
             write_lispobj(*p, file);
     }
 
@@ -302,7 +302,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
     if(n_lutexes > 0) {
         long offset;
-        printf("writing %d lutexes to the core...\n", n_lutexes);
+        printf("writing %ld lutexes to the core...\n", n_lutexes);
         write_lispobj(LUTEX_TABLE_CORE_ENTRY_TYPE_CODE, file);
         /* word count of the entry */
         write_lispobj(4, file);

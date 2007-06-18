@@ -61,13 +61,13 @@ pa_alloc(int bytes)
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 #error "!C_STACK_IS_CONTROL_STACK and STACK_GROWS_DOWNWARD_NOT_UPWARD is not supported"
 #endif
-        *current_control_stack_pointer = result;
+        *current_control_stack_pointer = (lispobj) result;
         current_control_stack_pointer += 1;
 #endif
         do_pending_interrupt();
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         current_control_stack_pointer -= 1;
-        result = *current_control_stack_pointer;
+        result = (lispobj *) *current_control_stack_pointer;
 #endif
     }
 #else

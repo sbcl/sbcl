@@ -38,10 +38,11 @@
 /* lutex stuff */
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
 #include "genesis/sap.h"
+#include "pthread-lutex.h"
 #endif
 
 
-unsigned char build_id[] =
+char build_id[] =
 #include "../../output/build-id.tmp"
 ;
 
@@ -324,7 +325,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                         struct lutex *lutex = lutexes_to_resurrect[i];
 
                         FSHOW((stderr, "re-init'ing lutex @ %p\n", lutex));
-                        lutex_init(lutex);
+                        lutex_init((tagged_lutex_t) lutex);
                     }
 
                     free(lutexes_to_resurrect);

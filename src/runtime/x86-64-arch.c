@@ -231,7 +231,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 void
 sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
-    int code = info->si_code;
     os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 

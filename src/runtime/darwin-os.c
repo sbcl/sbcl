@@ -28,7 +28,7 @@ char *
 os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
-    size_t size = sizeof(path);
+    uint32_t size = sizeof(path);
 
     if (_NSGetExecutablePath(path, &size) == -1)
         return NULL;

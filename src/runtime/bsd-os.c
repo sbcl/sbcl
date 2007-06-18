@@ -152,16 +152,17 @@ boolean
 is_valid_lisp_addr(os_vm_address_t addr)
 {
     struct thread *th;
-    if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-       in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size))
+
+    if (in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
+        in_range_p(addr, STATIC_SPACE_START, STATIC_SPACE_SIZE) ||
+        in_range_p(addr, DYNAMIC_SPACE_START, dynamic_space_size))
         return 1;
     for_each_thread(th) {
-        if(((os_vm_address_t)th->control_stack_start <= addr) &&
-           (addr < (os_vm_address_t)th->control_stack_end))
+        if (((os_vm_address_t)th->control_stack_start <= addr) &&
+            (addr < (os_vm_address_t)th->control_stack_end))
             return 1;
-        if(in_range_p(addr, (lispobj)th->binding_stack_start,
-                      BINDING_STACK_SIZE))
+        if (in_range_p(addr, (lispobj) th->binding_stack_start,
+                       BINDING_STACK_SIZE))
             return 1;
     }
     return 0;
@@ -266,7 +267,9 @@ static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+#if 0
     unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
+#endif
     os_vm_address_t addr;
 
     addr = arch_get_bad_addr(signal, info, context);

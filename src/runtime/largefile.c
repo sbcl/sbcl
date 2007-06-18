@@ -63,7 +63,7 @@ lstat_largefile(const char *file_name, struct stat *buf) {
 
 struct dirent64 *
 readdir_largefile(DIR *dir) {
-    return readdir(dir);
+    return readdir64(dir);
 }
 
 #endif

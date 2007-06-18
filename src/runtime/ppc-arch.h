@@ -16,4 +16,6 @@ release_spinlock(lispobj *word)
 
 #define ARCH_HAS_LINK_REGISTER
 
+extern void ppc_flush_icache(os_vm_address_t address, os_vm_size_t length);
+
 #endif /* _PPC_ARCH_H */

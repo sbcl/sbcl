@@ -9,6 +9,8 @@
 #error genesis/config.h (or sbcl.h) must be included before this file
 #endif
 
+#include "interr.h"                     /* for declaration of lose() */
+
 #define ARCH_HAS_STACK_POINTER
 
 /* FIXME: Do we also want

@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include "darwin-langinfo.h"
 
 char *nl_langinfo(nl_item item)

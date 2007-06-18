@@ -15,6 +15,10 @@
 #include "sbcl.h"
 #include "runtime.h"
 
+#ifdef LISP_FEATURE_GENCGC
+extern lispobj *alloc(int bytes);
+#endif
+
 extern lispobj alloc_cons(lispobj car, lispobj cdr);
 extern lispobj alloc_number(long n);
 extern lispobj alloc_string(char *str);
