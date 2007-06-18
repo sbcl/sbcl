@@ -75,9 +75,54 @@
 (assert (matchp-name :function 'cl-user::one 2))
 (sb-profile:unprofile cl-user::one)
 
-;;; Test the xref facility
+
+;;;; Check correctness of FUNCTION-ARGLIST.
+
+(assert (equal (function-arglist 'cl-user::one)
+               '(cl-user::a cl-user::b cl-user::c)))
+(assert (equal (function-arglist 'the)
+               '(type sb-c::value)))
+
+;;; Check wrt. interplay of generic functions and their methods.
+
+(defgeneric xuuq (gf.a gf.b          &rest gf.rest &key gf.k-X))
+(defmethod  xuuq ((m1.a number) m1.b &rest m1.rest &key gf.k-X m1.k-Y m1.k-Z)
+  (declare (ignore m1.a m1.b m1.rest gf.k-X m1.k-Y m1.k-Z))
+  'm1)
+(defmethod  xuuq ((m2.a string) m2.b &rest m2.rest &key gf.k-X m1.k-Y m2.k-Q)
+  (declare (ignore m2.a m2.b m2.rest gf.k-X m1.k-Y m2.k-Q))
+  'm2)
+
+;; XUUQ's lambda list should look similiar to
+;;
+;;    (GF.A GF.B &REST GF.REST &KEY GF.K-X M1.K-Z M1.K-Y M2.K-Q)
+;;
+(multiple-value-bind (required optional restp rest keyp keys allowp
+                      auxp aux morep more-context more-count)
+    (sb-int:parse-lambda-list (function-arglist #'xuuq))
+  (assert (equal required '(gf.a gf.b)))
+  (assert (null optional))
+  (assert (and restp (eql rest 'gf.rest)))
+  (assert (and keyp
+               (member 'gf.k-X keys)
+               (member 'm1.k-Y keys)
+               (member 'm1.k-Z keys)
+               (member 'm2.k-Q keys)))
+  (assert (not allowp))
+  (assert (and (not auxp) (null aux)))
+  (assert (and (not morep) (null more-context) (not more-count))))
+
+;;; Check what happens when there's no explicit DEFGENERIC.
+
+(defmethod kroolz (r1 r2 &optional opt &aux aux)
+  (declare (ignore r1 r2 opt aux))
+  'kroolz)
+(assert (equal (function-arglist #'kroolz) '(r1 r2 &optional opt)))
+
+
+;;;; Test the xref facility
 
 (load (merge-pathnames "xref-test.lisp" *load-pathname*))
 
-;;; Unix success convention for exit codes
+;;;; Unix success convention for exit codes
 (sb-ext:quit :unix-status 0)

@@ -1550,13 +1550,14 @@
   (reinitialize-instance generic-function :name new-value)
   new-value)
 
-(defmethod function-keywords ((method standard-method))
-  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
+(defmethod function-keyword-parameters ((method standard-method))
+  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
+                        keywords keyword-parameters)
       (analyze-lambda-list (if (consp method)
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
-    (declare (ignore nreq nopt keysp restp))
-    (values keywords allow-other-keys-p)))
+    (declare (ignore nreq nopt keysp restp keywords))
+    (values keyword-parameters allow-other-keys-p)))
 
 (defun method-ll->generic-function-ll (ll)
   (multiple-value-bind
@@ -1568,67 +1569,59 @@
                      (eq s '&allow-other-keys)))
                ll)))
 
-;;; This is based on the rules of method lambda list congruency defined in
-;;; the spec. The lambda list it constructs is the pretty union of the
-;;; lambda lists of all the methods. It doesn't take method applicability
-;;; into account at all yet.
+;;; This is based on the rules of method lambda list congruency
+;;; defined in the spec. The lambda list it constructs is the pretty
+;;; union of the lambda lists of the generic function and of all its
+;;; methods.  It doesn't take method applicability into account at all
+;;; yet.
+
+;;; (Notice that we ignore &AUX variables as they're not part of the
+;;; "public interface" of a function.)
+
 (defmethod generic-function-pretty-arglist
            ((generic-function standard-generic-function))
-  (let ((methods (generic-function-methods generic-function)))
-    (if methods
-      (let ((arglist ()))
-        ;; arglist is constructed from the GF's methods - maybe with
-        ;; keys and rest stuff added
-        (multiple-value-bind (required optional rest key allow-other-keys)
-            (method-pretty-arglist (car methods))
-          (dolist (m (cdr methods))
-            (multiple-value-bind (method-key-keywords
-                                  method-allow-other-keys
-                                  method-key)
-                (function-keywords m)
-              ;; we've modified function-keywords to return what we want as
-              ;;  the third value, no other change here.
-              (declare (ignore method-key-keywords))
-              (setq key (union key method-key))
-              (setq allow-other-keys (or allow-other-keys
-                                         method-allow-other-keys))))
-          (when allow-other-keys
-            (setq arglist '(&allow-other-keys)))
-          (when key
-            (setq arglist (nconc (list '&key) key arglist)))
-          (when rest
-            (setq arglist (nconc (list '&rest rest) arglist)))
-          (when optional
-            (setq arglist (nconc (list '&optional) optional arglist)))
-          (nconc required arglist)))
-      ;; otherwise we take the lambda-list from the GF directly, with no
-      ;; other 'keys' added ...
-      (let ((lambda-list (generic-function-lambda-list generic-function)))
-        lambda-list))))
+  (let ((gf-lambda-list (generic-function-lambda-list generic-function))
+        (methods (generic-function-methods generic-function)))
+    (if (null methods)
+        gf-lambda-list
+        (multiple-value-bind (gf.required gf.optional gf.rest gf.keys gf.allowp)
+            (%split-arglist gf-lambda-list)
+          ;; Possibly extend the keyword parameters of the gf by
+          ;; additional key parameters of its methods:
+          (let ((methods.keys nil) (methods.allowp nil))
+            (dolist (m methods)
+              (multiple-value-bind (m.keyparams m.allow-other-keys)
+                  (function-keyword-parameters m)
+                (setq methods.keys (union methods.keys m.keyparams :key #'maybe-car))
+                (setq methods.allowp (or methods.allowp m.allow-other-keys))))
+            (let ((arglist '()))
+              (when (or gf.allowp methods.allowp)
+                (push '&allow-other-keys arglist))
+              (when (or gf.keys methods.keys)
+                ;; We make sure that the keys of the gf appear before
+                ;; those of its methods, since they're probably more
+                ;; generally appliable.
+                (setq arglist (nconc (list '&key) gf.keys
+                                     (nset-difference methods.keys gf.keys)
+                                     arglist)))
+              (when gf.rest
+                (setq arglist (nconc (list '&rest gf.rest) arglist)))
+              (when gf.optional
+                (setq arglist (nconc (list '&optional) gf.optional arglist)))
+              (nconc gf.required arglist)))))))
 
-(defmethod method-pretty-arglist ((method standard-method))
-  (let ((required ())
-        (optional ())
-        (rest nil)
-        (key ())
-        (allow-other-keys nil)
-        (state 'required)
-        (arglist (method-lambda-list method)))
-    (dolist (arg arglist)
-      (cond ((eq arg '&optional)         (setq state 'optional))
-            ((eq arg '&rest)             (setq state 'rest))
-            ((eq arg '&key)              (setq state 'key))
-            ((eq arg '&allow-other-keys) (setq allow-other-keys t))
-            ((memq arg lambda-list-keywords))
-            (t
-             (ecase state
-               (required (push arg required))
-               (optional (push arg optional))
-               (key      (push arg key))
-               (rest     (setq rest arg))))))
-    (values (nreverse required)
-            (nreverse optional)
-            rest
-            (nreverse key)
-            allow-other-keys)))
+(defun maybe-car (thing)
+  (if (listp thing)
+      (car thing)
+      thing))
 
+
+(defun %split-arglist (lambda-list)
+  ;; This function serves to shrink the number of returned values of
+  ;; PARSE-LAMBDA-LIST to something handier.
+  (multiple-value-bind (required optional restp rest keyp keys allowp
+                        auxp aux morep more-context more-count)
+      (parse-lambda-list lambda-list)
+    (declare (ignore restp keyp auxp aux morep))
+    (declare (ignore more-context more-count))
+    (values required optional rest keys allowp)))

@@ -257,7 +257,7 @@
 
 (defgeneric finalize-inheritance (class))
 
-(defgeneric function-keywords (method))
+(defgeneric function-keyword-parameters (method))
 
 (defgeneric generic-function-argument-precedence-order (gf))
 
@@ -274,8 +274,6 @@
 (defgeneric method-function (method))
 
 (defgeneric method-lambda-list (m))
-
-(defgeneric method-pretty-arglist (method))
 
 (defgeneric method-qualifiers (m))
 

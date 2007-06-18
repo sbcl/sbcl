@@ -17,6 +17,8 @@ changes in sbcl-1.0.7 relative to sbcl-1.0.6:
     "a constant string".
   * enhancement: SB-POSIX now supports lockf(). (Thanks to Zach Beane.)  
   * enhancement: SB-POSIX now supports getcwd(). (Thanks to Tassilo Horn.)
+  * enhancement: SB-INTROSPECT:FUNCTION-ARGLIST shows nicer argument lists
+    for generic functions. (Thanks to Tobias C. Rittweiler)
   * optimization: bignum printing speed has been improved by 20-40%
     (depending on the bignum size.)
   * bug fix: WITH-MUTEX and WITH-RECURSIVE-LOCK are now interrupt safe
@@ -29,6 +31,8 @@ changes in sbcl-1.0.7 relative to sbcl-1.0.6:
     fixed.)
   * bug fix: ADD/REMOVE-METHOD is now thread and interrupt safe.
   * bug fix: interning EQL-specializers is now thread and interrupt safe.
+  * bug fix: asdf systems with dependencies to the SB-POSIX or 
+    SB-BSD-SOCKETS contribs can be loaded with :FORCE T.
 
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * new contrib: sb-cover, an experimental code coverage tool, is included
