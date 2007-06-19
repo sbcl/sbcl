@@ -1257,3 +1257,38 @@
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
 
+;;; Helper for making the DX closure allocation in macros expanding
+;;; to CALL-WITH-FOO less ugly.
+;;;
+;;; This expands to something like
+;;;
+;;;  (flet ((foo (...) <body-of-foo>))
+;;;     (declare (optimize stack-allocate-dynamic-extent))
+;;;     (flet ((foo (...)
+;;;              (foo ...))
+;;;        (declare (dynamic-extent #'foo))
+;;;        <body-of-dx-flet>)))
+;;;
+;;; The outer FLETs are inlined into the inner ones, and the inner ones
+;;; are DX-allocated. The double-fletting is done to keep the bodies of
+;;; the functions in an environment with correct policy: we don't want
+;;; to force DX allocation in their bodies, which would be bad eg.
+;;; in safe code.
+(defmacro dx-flet (functions &body forms)
+  `(flet ,functions
+     (declare (optimize sb!c::stack-allocate-dynamic-extent))
+     (flet ,(mapcar
+             (lambda (f)
+               (let ((args (cadr f))
+                     (name (car f)))
+                 (when (intersection args lambda-list-keywords)
+                   ;; No fundamental reason not to support them, but we
+                   ;; don't currently need them here.
+                   (error "Non-required arguments not implemented for DX-FLET."))
+                 `(,name ,args
+                    (,name ,@args))))
+             functions)
+       (declare (dynamic-extent ,@(mapcar (lambda (f)
+                                            `(function ,(car f)))
+                                          functions)))
+       ,@forms)))

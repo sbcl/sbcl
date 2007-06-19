@@ -31,17 +31,19 @@
   "Acquire MUTEX for the dynamic scope of BODY, setting it to
 NEW-VALUE or some suitable default value if NIL.  If WAIT-P is non-NIL
 and the mutex is in use, sleep until it is available"
-  `(call-with-mutex
-    (lambda () ,@body)
-    ,mutex
-    ,value
-    ,wait-p))
+  `(dx-flet ((with-mutex-thunk () ,@body))
+     (call-with-mutex
+      #'with-mutex-thunk
+      ,mutex
+      ,value
+      ,wait-p)))
 
 (sb!xc:defmacro with-system-mutex ((mutex &key without-gcing) &body body)
-  `(call-with-system-mutex
-    (lambda () ,@body)
-    ,mutex
-    ,without-gcing))
+  `(dx-flet ((with-system-mutex-thunk () ,@body))
+     (call-with-system-mutex
+      #'with-system-mutex-thunk
+      ,mutex
+      ,without-gcing)))
 
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-doc
@@ -49,26 +51,30 @@ and the mutex is in use, sleep until it is available"
 further recursive lock attempts for the same mutex succeed. It is
 allowed to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same mutex
 provided the default value is used for the mutex."
-  `(call-with-recursive-lock
-    (lambda () ,@body)
-    ,mutex))
+  `(dx-flet ((with-recursive-lock-thunk () ,@body))
+     (call-with-recursive-lock
+      #'with-recursive-lock-thunk
+      ,mutex)))
 
 (sb!xc:defmacro with-recursive-spinlock ((spinlock) &body body)
-  `(call-with-recursive-spinlock
-    (lambda () ,@body)
-    ,spinlock))
+  `(dx-flet ((with-recursive-spinlock-thunk () ,@body))
+     (call-with-recursive-spinlock
+      #'with-recursive-spinlock-thunk
+      ,spinlock)))
 
 (sb!xc:defmacro with-recursive-system-spinlock ((spinlock &key without-gcing)
                                                 &body body)
-  `(call-with-recursive-system-spinlock
-    (lambda () ,@body)
-    ,spinlock
-    ,without-gcing))
+  `(dx-flet ((with-recursive-system-spinlock-thunk () ,@body))
+     (call-with-recursive-system-spinlock
+      #'with-recursive-system-spinlock-thunk
+      ,spinlock
+      ,without-gcing)))
 
 (sb!xc:defmacro with-spinlock ((spinlock) &body body)
-  `(call-with-spinlock
-    (lambda () ,@body)
-    ,spinlock))
+  `(dx-flet ((with-spinlock-thunk () ,@body))
+     (call-with-spinlock
+      #'with-spinlock-thunk
+      ,spinlock)))
 
 ;;; KLUDGE: this separate implementation for (NOT SB-THREAD) is not
 ;;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.

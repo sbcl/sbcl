@@ -25,6 +25,10 @@
 ;;; may then have to wade through some irrelevant warnings).
 (declaim (declaration inhibit-warnings))
 
+;;; We sometimes want to enable DX unconditionally in our own code,
+;;; but the host can ignore this without harm.
+(declaim (declaration sb!c::stack-allocate-dynamic-extent))
+
 ;;; Interrupt control isn't an issue in the cross-compiler: we don't
 ;;; use address-dependent (and thus GC-dependent) hashes, and we only
 ;;; have a single thread of control.

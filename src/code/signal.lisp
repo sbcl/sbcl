@@ -90,47 +90,26 @@ WITHOUT-INTERRUPTS in:
     (lambda () (with-local-interrupts ...)))
 "
   (with-unique-names (outer-allow-with-interrupts)
-    `(call-with-dx-function (call-without-interrupts
-                             ,outer-allow-with-interrupts)
-       (declare (disable-package-locks allow-with-interrupts with-interrupts)
-                (ignorable ,outer-allow-with-interrupts))
-       (macrolet ((allow-with-interrupts (&body allow-forms)
-                    `(call-allowing-with-interrupts
-                      (lambda () ,@allow-forms)
-                      ,',outer-allow-with-interrupts))
-                  (with-local-interrupts (&body with-forms)
-                    `(call-with-local-interrupts
-                      (lambda () ,@with-forms)
-                      ,',outer-allow-with-interrupts)))
-         (declare (enable-package-locks allow-with-interrupts with-interrupts))
-         ,@body))))
-
-;;; Helper for making the DX closure allocation in WITHOUT-INTERRUPTS
-;;; less ugly.
-;;;
-;;; TODO: generalize for cases where FUNCTION takes more arguments
-;;; than just the thunk; use in other WITH-FOO macros that expand to a
-;;; CALL-WITH-FOO. I just did WITHOUT-INTERRUPTS since it's
-;;; performance critical (for example each call to GETHASH was consing
-;;; 48 bytes of WITHOUT-INTERRUPTS closures). --JES, 2007-06-08
-(sb!xc:defmacro call-with-dx-function ((function &rest args) &body body)
-  (with-unique-names (fun1 fun2)
-    `(flet ((,fun1 (,@args)
-              ,@body))
-       (declare (optimize sb!c::stack-allocate-dynamic-extent))
-       (flet ((,fun2 (,@args)
-                ;; Avoid consing up a closure: FUN1 will be inlined
-                ;; and FUN2 will be stack-allocated, so we avoid
-                ;; consing up a closure. This is split into two
-                ;; separate functions to ensure that the body doesn't
-                ;; get compiled with (OPTIMIZE
-                ;; SB!C::STACK-ALLOCATE-DYNAMIC-EXTENT), which could
-                ;; cause problems e.g. when the body contains
-                ;; DYNAMIC-EXTENT declarations and the code is being
-                ;; compiled with (SAFETY 3).
-                (,fun1 ,@args)))
-         (declare (dynamic-extent (function ,fun2)))
-         (,function (function ,fun2))))))
+    `(dx-flet ((without-interrupts-thunk (,outer-allow-with-interrupts)
+                 (declare (disable-package-locks allow-with-interrupts
+                                                 with-interrupts)
+                          (ignorable ,outer-allow-with-interrupts))
+                 (macrolet ((allow-with-interrupts (&body allow-forms)
+                              `(dx-flet ((allow-with-interrupts-thunk ()
+                                            ,@allow-forms))
+                                 (call-allowing-with-interrupts
+                                  #'allow-with-interrupts-thunk
+                                  ,',outer-allow-with-interrupts)))
+                            (with-local-interrupts (&body with-forms)
+                              `(dx-flet ((with-local-interrupts-thunk ()
+                                           ,@with-forms))
+                                 (call-with-local-interrupts
+                                  #'with-local-interrupts-thunk
+                                  ,',outer-allow-with-interrupts))))
+                   (declare (enable-package-locks allow-with-interrupts
+                                                  with-interrupts))
+                   ,@body)))
+       (call-without-interrupts #'without-interrupts-thunk))))
 
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc
@@ -141,9 +120,10 @@ As interrupts are normally allowed WITH-INTERRUPTS only makes sense if there
 is an outer WITHOUT-INTERRUPTS with a corresponding ALLOW-WITH-INTERRUPTS:
 interrupts are not enabled if any outer WITHOUT-INTERRUPTS is not accompanied
 by ALLOW-WITH-INTERRUPTS."
-  `(call-with-interrupts
-    (lambda () ,@body)
-    (and (not *interrupts-enabled*) *allow-with-interrupts*)))
+  `(dx-flet ((with-interrupts-thunk () ,@body))
+     (call-with-interrupts
+      #'with-interrupts-thunk
+      (and (not *interrupts-enabled*) *allow-with-interrupts*))))
 
 (defun call-allowing-with-interrupts (function allowp)
   (declare (function function))
