@@ -1071,9 +1071,9 @@ void
 gc_heap_exhausted_error_or_lose (long available, long requested)
 {
     /* Write basic information before doing anything else: if we don't
-     * call to lisp this is a must, and even if we do there is always the
-     * danger that we bounce back here before the error has been handled,
-     * or indeed even printed.
+     * call to lisp this is a must, and even if we do there is always
+     * the danger that we bounce back here before the error has been
+     * handled, or indeed even printed.
      */
     fprintf(stderr, "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
             gc_active_p ? "garbage collection" : "allocation", available, requested);
@@ -1081,14 +1081,23 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
         /* If we are in GC, or totally out of memory there is no way
          * to sanely transfer control to the lisp-side of things.
          */
+        struct thread *thread = arch_os_get_current_thread();
         print_generation_stats(1);
+        fprintf(stderr, "GC control variables:\n");
+        fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",                
+                SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
+                SymbolValue(GC_PENDING,thread)==NIL ? "false" : "true");
+#ifdef LISP_FEATURE_SB_THREAD
+        fprintf(stderr, " *STOP-FOR-GC-PENDING* = %s\n",
+                SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
+#endif
         lose("Heap exhausted, game over.");
     }
     else {
         /* FIXME: assert free_pages_lock held */
         thread_mutex_unlock(&free_pages_lock);
         funcall2(SymbolFunction(HEAP_EXHAUSTED_ERROR),
-                 make_fixnum(available), make_fixnum(requested));
+                 alloc_number(available), alloc_number(requested));
         lose("HEAP-EXHAUSTED-ERROR fell through");
     }
 }
