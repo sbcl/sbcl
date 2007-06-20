@@ -33,6 +33,8 @@ changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * bug fix: interning EQL-specializers is now thread and interrupt safe.
   * bug fix: asdf systems with dependencies to the SB-POSIX or 
     SB-BSD-SOCKETS contribs can be loaded with :FORCE T.
+  * bug fix: interrupt safety of applicable method computation has been
+    improved.
 
 changes in sbcl-1.0.6 relative to sbcl-1.0.5:
   * new contrib: sb-cover, an experimental code coverage tool, is included

@@ -11,22 +11,36 @@
 
 (in-package "SB!UNIX")
 
-(defun invoke-interruption (function)
-  (without-interrupts
-    ;; Reset signal mask: the C-side handler has blocked all
-    ;; deferrable interrupts before arranging return to lisp. This is
-    ;; safe because we can't get a pending interrupt before we unblock
-    ;; signals.
-    ;;
-    ;; FIXME: Should we not reset the _entire_ mask, just restore it
-    ;; to the state before we got the interrupt?
-    (reset-signal-mask)
-    (allow-with-interrupts (funcall function))))
+(defmacro with-interrupt-bindings (&body body)
+  `(let
+      ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
+      ;; handler runs doesn't really matter, since we're not on the
+      ;; same call stack, really -- and if we don't bind these (esp.
+      ;; the cache one) we can get a bogus metacircle if an interrupt
+      ;; handler calls a GF that was being computed when the interrupt
+      ;; hit.
+      ((sb!pcl::*cache-miss-values-stack* nil)
+       (sb!pcl::*dfun-miss-gfs-on-stack* nil))
+     ,@body))
 
-(defmacro in-interruption ((&rest args) &body body)
+(defun invoke-interruption (function)
+  (with-interrupt-bindings
+    (without-interrupts
+      ;; Reset signal mask: the C-side handler has blocked all
+      ;; deferrable interrupts before arranging return to lisp. This is
+      ;; safe because we can't get a pending interrupt before we unblock
+      ;; signals.
+      ;;
+      ;; FIXME: Should we not reset the _entire_ mask, but just
+      ;; restore it to the state before we got the interrupt?
+      (reset-signal-mask)
+      (allow-with-interrupts (funcall function)))))
+
+(defmacro in-interruption ((&key) &body body)
   #!+sb-doc
   "Convenience macro on top of INVOKE-INTERRUPTION."
-  `(invoke-interruption (lambda () ,@body) ,@args))
+  `(dx-flet ((interruption () ,@body))
+     (invoke-interruption #'interruption)))
 
 ;;;; system calls that deal with signals
 

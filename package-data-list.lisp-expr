@@ -2037,6 +2037,7 @@ SB-KERNEL) have been undone, but probably more remain."
                "WITH-INTERRUPTS" "WITH-LOCAL-INTERRUPTS"
                "WITH-PINNED-OBJECTS" "WITHOUT-GCING"
                "WITHOUT-INTERRUPTS"
+               "WITH-INTERRUPT-BINDINGS"
                "WORDS"))
 
    #s(sb-cold:package-data

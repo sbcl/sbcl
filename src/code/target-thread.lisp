@@ -760,10 +760,12 @@ then do something that turns out to need those locks, you probably
 won't like the effect."
   #!-sb-thread (declare (ignore thread))
   #!-sb-thread
-  (with-interrupts (funcall function))
+  (with-interrupt-bindings
+    (with-interrupts (funcall function)))
   #!+sb-thread
   (if (eq thread *current-thread*)
-      (with-interrupts (funcall function))
+      (with-interrupt-bindings
+        (with-interrupts (funcall function)))
       (let ((os-thread (thread-os-thread thread)))
         (cond ((not os-thread)
                (error 'interrupt-thread-error :thread thread))

@@ -1084,7 +1084,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
         struct thread *thread = arch_os_get_current_thread();
         print_generation_stats(1);
         fprintf(stderr, "GC control variables:\n");
-        fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",                
+        fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",
                 SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
                 SymbolValue(GC_PENDING,thread)==NIL ? "false" : "true");
 #ifdef LISP_FEATURE_SB_THREAD
