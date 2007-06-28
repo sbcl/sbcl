@@ -252,7 +252,7 @@
 (defknown %set-stack-ref (system-area-pointer index t) t (unsafe))
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
-(defknown make-lisp-obj (sb!vm:word) t (movable flushable))
+(defknown %make-lisp-obj (sb!vm:word) t (movable flushable))
 (defknown get-lisp-obj-address (t) sb!vm:word (movable flushable))
 (defknown fun-word-offset (function) index (movable flushable))
 

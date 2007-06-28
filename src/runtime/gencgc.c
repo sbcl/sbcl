@@ -2127,37 +2127,28 @@ search_dynamic_space(void *pointer)
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
-/* Is there any possibility that pointer is a valid Lisp object
- * reference, and/or something else (e.g. subroutine call return
- * address) which should prevent us from moving the referred-to thing?
- * This is called from preserve_pointers() */
+/* Helper for valid_lisp_pointer_p and
+ * possibly_valid_dynamic_space_pointer.
+ *
+ * pointer is the pointer to validate, and start_addr is the address
+ * of the enclosing object.
+ */
 static int
-possibly_valid_dynamic_space_pointer(lispobj *pointer)
+looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
 {
-    lispobj *start_addr;
-
-    /* Find the object start address. */
-    if ((start_addr = search_dynamic_space(pointer)) == NULL) {
-        return 0;
-    }
-
     /* We need to allow raw pointers into Code objects for return
      * addresses. This will also pick up pointers to functions in code
      * objects. */
-    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG) {
+    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG)
         /* XXX could do some further checks here */
         return 1;
-    }
 
-    /* If it's not a return address then it needs to be a valid Lisp
-     * pointer. */
     if (!is_lisp_pointer((lispobj)pointer)) {
         return 0;
     }
 
     /* Check that the object pointed to is consistent with the pointer
-     * low tag.
-     */
+     * low tag. */
     switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
         /* Start_addr should be the enclosing code object, or a closure
@@ -2397,6 +2388,47 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 
     /* looks good */
     return 1;
+}
+
+/* Used by the debugger to validate possibly bogus pointers before
+ * calling MAKE-LISP-OBJ on them.
+ *
+ * FIXME: We would like to make this perfect, because if the debugger
+ * constructs a reference to a bugs lisp object, and it ends up in a
+ * location scavenged by the GC all hell breaks loose.
+ *
+ * Whereas possibly_valid_dynamic_space_pointer has to be conservative
+ * and return true for all valid pointers, this could actually be eager
+ * and lie about a few pointers without bad results... but that should
+ * be reflected in the name.
+ */
+int
+valid_lisp_pointer_p(lispobj *pointer)
+{
+    lispobj *start;
+    if (((start=search_dynamic_space(pointer))!=NULL) ||
+        ((start=search_static_space(pointer))!=NULL) ||
+        ((start=search_read_only_space(pointer))!=NULL))
+        return looks_like_valid_lisp_pointer_p(pointer, start);
+    else
+        return 0;
+}
+
+/* Is there any possibility that pointer is a valid Lisp object
+ * reference, and/or something else (e.g. subroutine call return
+ * address) which should prevent us from moving the referred-to thing?
+ * This is called from preserve_pointers() */
+static int
+possibly_valid_dynamic_space_pointer(lispobj *pointer)
+{
+    lispobj *start_addr;
+
+    /* Find the object start address. */
+    if ((start_addr = search_dynamic_space(pointer)) == NULL) {
+        return 0;
+    }
+
+    return looks_like_valid_lisp_pointer_p(pointer, start_addr);
 }
 
 /* Adjust large bignum and vector objects. This will adjust the

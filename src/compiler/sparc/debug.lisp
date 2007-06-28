@@ -11,16 +11,6 @@
 
 (in-package "SB!VM")
 
-;;; (defknown di::current-sp () system-area-pointer (movable flushable))
-;;; (defknown di::current-fp () system-area-pointer (movable flushable))
-;;; (defknown di::stack-ref (system-area-pointer index) t (flushable))
-;;; (defknown di::%set-stack-ref (system-area-pointer index t) t (unsafe))
-;;; (defknown di::lra-code-header (t) t (movable flushable))
-;;; (defknown di::function-code-header (t) t (movable flushable))
-;;; (defknown di::make-lisp-obj ((unsigned-byte 32)) t (movable flushable))
-;;; (defknown di::get-lisp-obj-address (t) (unsigned-byte 32) (movable flushable))
-;;; (defknown di::function-word-offset (function) index (movable flushable))
-
 (define-vop (debug-cur-sp)
   (:translate current-sp)
   (:policy :fast-safe)
@@ -92,9 +82,9 @@
   (:translate fun-code-header)
   (:variant fun-pointer-lowtag))
 
-(define-vop (make-lisp-obj)
+(define-vop (%make-lisp-obj)
   (:policy :fast-safe)
-  (:translate make-lisp-obj)
+  (:translate %make-lisp-obj)
   (:args (value :scs (unsigned-reg) :target result))
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))

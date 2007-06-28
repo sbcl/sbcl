@@ -510,7 +510,7 @@
 (defun %set-stack-ref (s n value) (%set-stack-ref s n value))
 (defun fun-code-header (fun) (fun-code-header fun))
 (defun lra-code-header (lra) (lra-code-header lra))
-(defun make-lisp-obj (value) (make-lisp-obj value))
+(defun %make-lisp-obj (value) (%make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 (defun fun-word-offset (fun) (fun-word-offset fun))
 
@@ -535,6 +535,10 @@
 (declaim (inline component-ptr-from-pc))
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
+
+#!+(or x86 x86-64)
+(sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
+  (pointer system-area-pointer))
 
 (declaim (inline component-from-component-ptr))
 (defun component-from-component-ptr (component-ptr)
@@ -982,7 +986,7 @@ register."
 #!-(or x86 x86-64)
 (defun code-object-from-bits (bits)
   (declare (type (unsigned-byte 32) bits))
-  (let ((object (make-lisp-obj bits)))
+  (let ((object (make-lisp-obj bits nil)))
     (if (functionp object)
         (or (fun-code-header object)
             :undefined-function)
@@ -1990,12 +1994,12 @@ register."
            (compiled-debug-var-sc-offset debug-var))))))
 
 ;;; a helper function for working with possibly-invalid values:
-;;; Do (MAKE-LISP-OBJ VAL) only if the value looks valid.
+;;; Do (%MAKE-LISP-OBJ VAL) only if the value looks valid.
 ;;;
 ;;; (Such values can arise in registers on machines with conservative
 ;;; GC, and might also arise in debug variable locations when
 ;;; those variables are invalid.)
-(defun make-valid-lisp-obj (val)
+(defun make-lisp-obj (val &optional (errorp t))
   (if (or
        ;; fixnum
        (zerop (logand val sb!vm:fixnum-tag-mask))
@@ -2008,20 +2012,27 @@ register."
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)
        ;; pointer
-       (and (logbitp 0 val)
-            ;; Check that the pointer is valid. XXX Could do a better
-            ;; job. FIXME: e.g. by calling out to an is_valid_pointer
-            ;; routine in the C runtime support code
-            (or (< sb!vm:read-only-space-start val
-                   (* sb!vm:*read-only-space-free-pointer*
-                      sb!vm:n-word-bytes))
-                (< sb!vm:static-space-start val
-                   (* sb!vm:*static-space-free-pointer*
-                      sb!vm:n-word-bytes))
-                (< (current-dynamic-space-start) val
-                   (sap-int (dynamic-space-free-pointer))))))
-      (make-lisp-obj val)
-      :invalid-object))
+       #!+(or x86 x86-64)
+       (not (zerop (valid-lisp-pointer-p (int-sap val))))
+      ;; FIXME: There is no fundamental reason not to use the above
+      ;; function on other platforms as well, but I didn't have
+      ;; others available while doing this. --NS 2007-06-21
+      #!-(or x86 x86-64)
+      (and (logbitp 0 val)
+           (or (< sb!vm:read-only-space-start val
+                  (* sb!vm:*read-only-space-free-pointer*
+                     sb!vm:n-word-bytes))
+               (< sb!vm:static-space-start val
+                  (* sb!vm:*static-space-free-pointer*
+                     sb!vm:n-word-bytes))
+               (< (current-dynamic-space-start) val
+                  (sap-int (dynamic-space-free-pointer))))))
+      (values (%make-lisp-obj val) t)
+      (if errorp
+          (error "~S is not a valid argument to ~S"
+                 val 'make-lisp-obj)
+          (values (make-unprintable-object (format nil "invalid object #x~X" val))
+                  nil))))
 
 #!-(or x86 x86-64)
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
@@ -2057,8 +2068,8 @@ register."
         #.sb!vm:descriptor-reg-sc-number
         #!+rt #.sb!vm:word-pointer-reg-sc-number)
        (sb!sys:without-gcing
-        (with-escaped-value (val) (sb!kernel:make-lisp-obj val))))
-
+        (with-escaped-value (val)
+          (make-lisp-obj val nil))))
       (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
@@ -2193,7 +2204,7 @@ register."
       ((#.sb!vm:any-reg-sc-number #.sb!vm:descriptor-reg-sc-number)
        (without-gcing
         (with-escaped-value (val)
-          (make-valid-lisp-obj val))))
+          (make-lisp-obj val nil))))
       (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
@@ -3396,7 +3407,7 @@ register."
 (defun handle-single-step-around-trap (context callee-register-offset)
   ;; Fetch the function / fdefn we're about to call from the
   ;; appropriate register.
-  (let* ((callee (sb!kernel::make-lisp-obj
+  (let* ((callee (make-lisp-obj
                   (context-register context callee-register-offset)))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no

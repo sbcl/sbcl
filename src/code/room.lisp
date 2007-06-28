@@ -299,13 +299,13 @@
                     (eq (room-info-kind info) :lowtag))
                 (let ((size (* cons-size n-word-bytes)))
                   (funcall fun
-                           (make-lisp-obj (logior (sap-int current)
+                           (%make-lisp-obj (logior (sap-int current)
                                                   list-pointer-lowtag))
                            list-pointer-lowtag
                            size)
                   (setq current (sap+ current size))))
                ((eql header-widetag closure-header-widetag)
-                (let* ((obj (make-lisp-obj (logior (sap-int current)
+                (let* ((obj (%make-lisp-obj (logior (sap-int current)
                                                    fun-pointer-lowtag)))
                        (size (round-to-dualword
                               (* (the fixnum (1+ (get-closure-length obj)))
@@ -313,7 +313,7 @@
                   (funcall fun obj header-widetag size)
                   (setq current (sap+ current size))))
                ((eq (room-info-kind info) :instance)
-                (let* ((obj (make-lisp-obj
+                (let* ((obj (%make-lisp-obj
                              (logior (sap-int current) instance-pointer-lowtag)))
                        (size (round-to-dualword
                               (* (+ (%instance-length obj) 1) n-word-bytes))))
@@ -322,7 +322,7 @@
                   (aver (zerop (logand size lowtag-mask)))
                   (setq current (sap+ current size))))
                (t
-                (let* ((obj (make-lisp-obj
+                (let* ((obj (%make-lisp-obj
                              (logior (sap-int current) other-pointer-lowtag)))
                        (size (ecase (room-info-kind info)
                                (:fixed
