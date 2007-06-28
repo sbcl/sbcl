@@ -1275,20 +1275,34 @@ to :INTERPRET, an interpreter will be used.")
 ;;; to force DX allocation in their bodies, which would be bad eg.
 ;;; in safe code.
 (defmacro dx-flet (functions &body forms)
-  `(flet ,functions
-     (declare (optimize sb!c::stack-allocate-dynamic-extent))
-     (flet ,(mapcar
-             (lambda (f)
-               (let ((args (cadr f))
-                     (name (car f)))
-                 (when (intersection args lambda-list-keywords)
-                   ;; No fundamental reason not to support them, but we
-                   ;; don't currently need them here.
-                   (error "Non-required arguments not implemented for DX-FLET."))
-                 `(,name ,args
-                    (,name ,@args))))
-             functions)
-       (declare (dynamic-extent ,@(mapcar (lambda (f)
-                                            `(function ,(car f)))
-                                          functions)))
+  (let ((names (mapcar #'car functions)))
+    `(flet ,functions
+       #-sb-xc-host
+       (declare (optimize sb!c::stack-allocate-dynamic-extent))
+       (flet ,(mapcar
+               (lambda (f)
+                 (let ((args (cadr f))
+                       (name (car f)))
+                   (when (intersection args lambda-list-keywords)
+                     ;; No fundamental reason not to support them, but we
+                     ;; don't currently need them here.
+                     (error "Non-required arguments not implemented for DX-FLET."))
+                   `(,name ,args
+                      (,name ,@args))))
+               functions)
+         (declare (dynamic-extent ,@(mapcar (lambda (x) `(function ,x)) names)))
+         ,@forms))))
+
+;;; Another similar one -- but actually touches the policy of the body,
+;;; so take care with this one...
+(defmacro dx-let (bindings &body forms)
+  `(locally
+       #-sb-xc-host
+       (declare (optimize sb!c::stack-allocate-dynamic-extent))
+     (let ,bindings
+       (declare (dynamic-extent ,@(mapcar (lambda (bind)
+                                            (if (consp bind)
+                                                (car bind)
+                                                bind))
+                                          bindings)))
        ,@forms)))

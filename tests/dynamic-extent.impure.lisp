@@ -126,6 +126,26 @@
 
 (assert (eq t (dxclosure 13)))
 
+;;; value-cells
+
+(defun-with-dx dx-value-cell (x)
+  ;; Not implemented everywhere, yet.
+  #+(or x86 x86-64)
+  (let ((cell x))
+    (declare (dynamic-extent cell))
+    (flet ((f ()
+             (incf cell)))
+      (declare (dynamic-extent #'f))
+      (true #'f))))
+
+;;; with-spinlock should use DX and not cons
+
+(defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
+
+(defun test-spinlock ()
+  (sb-thread::with-spinlock (*slock*)
+    (true *slock*)))
+
 
 (defmacro assert-no-consing (form &optional times)
   `(%assert-no-consing (lambda () ,form) ,times))
@@ -147,7 +167,10 @@
   (assert-no-consing (test-nip-values))
   (assert-no-consing (test-let-var-subst1 17))
   (assert-no-consing (test-let-var-subst2 17))
-  (assert-no-consing (test-lvar-subst 11)))
+  (assert-no-consing (test-lvar-subst 11))
+  (assert-no-consing (dx-value-cell 13))
+  #+sb-thread
+  (assert-no-consing (test-spinlock)))
 
 
 ;;; Bugs found by Paul F. Dietz

@@ -119,11 +119,14 @@ provided the default value is used for the mutex."
     (funcall function)))
 
 #!+sb-thread
+;;; KLUDGE: These need to use DX-LET, because the cleanup form that
+;;; closes over GOT-IT causes a value-cell to be allocated for it -- and
+;;; we prefer that to go on the stack since it can.
 (progn
   (defun call-with-system-mutex (function mutex &optional without-gcing-p)
     (declare (function function))
     (flet ((%call-with-system-mutex ()
-             (let (got-it)
+             (dx-let (got-it)
                (unwind-protect
                     (when (setf got-it (get-mutex mutex))
                       (funcall function))
@@ -138,8 +141,8 @@ provided the default value is used for the mutex."
   (defun call-with-recursive-system-spinlock (function lock &optional without-gcing-p)
     (declare (function function))
     (flet ((%call-with-system-spinlock ()
-             (let ((inner-lock-p (eq *current-thread* (spinlock-value lock)))
-                   (got-it nil))
+             (dx-let ((inner-lock-p (eq *current-thread* (spinlock-value lock)))
+                      (got-it nil))
                (unwind-protect
                     (when (or inner-lock-p (setf got-it (get-spinlock lock)))
                       (funcall function))
@@ -151,9 +154,20 @@ provided the default value is used for the mutex."
           (without-interrupts
             (%call-with-system-spinlock)))))
 
+  (defun call-with-spinlock (function spinlock)
+    (declare (function function))
+    (dx-let ((got-it nil))
+      (without-interrupts
+        (unwind-protect
+             (when (setf got-it (allow-with-interrupts
+                                 (get-spinlock spinlock)))
+               (with-local-interrupts (funcall function)))
+          (when got-it
+            (release-spinlock spinlock))))))
+
   (defun call-with-mutex (function mutex value waitp)
     (declare (function function))
-    (let ((got-it nil))
+    (dx-let ((got-it nil))
       (without-interrupts
         (unwind-protect
              (when (setq got-it (allow-with-interrupts
@@ -164,8 +178,8 @@ provided the default value is used for the mutex."
 
   (defun call-with-recursive-lock (function mutex)
     (declare (function function))
-    (let ((inner-lock-p (eq (mutex-value mutex) *current-thread*))
-          (got-it nil))
+    (dx-let ((inner-lock-p (eq (mutex-value mutex) *current-thread*))
+             (got-it nil))
       (without-interrupts
         (unwind-protect
              (when (or inner-lock-p (setf got-it (allow-with-interrupts
@@ -174,20 +188,11 @@ provided the default value is used for the mutex."
           (when got-it
             (release-mutex mutex))))))
 
-  (defun call-with-spinlock (function spinlock)
-    (declare (function function))
-    (let ((got-it nil))
-      (without-interrupts
-        (unwind-protect
-             (when (setf got-it (allow-with-interrupts
-                                 (get-spinlock spinlock)))
-               (with-local-interrupts (funcall function)))
-          (when got-it
-            (release-spinlock spinlock))))))
+
 
   (defun call-with-recursive-spinlock (function spinlock)
     (declare (function function))
-    (let ((inner-lock-p (eq (spinlock-value spinlock) *current-thread*))
+    (dx-let ((inner-lock-p (eq (spinlock-value spinlock) *current-thread*))
           (got-it nil))
       (without-interrupts
         (unwind-protect

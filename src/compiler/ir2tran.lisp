@@ -52,12 +52,13 @@
   (emit-move-template node block (type-check-template type) value result)
   (values))
 
-;;; Allocate an indirect value cell. Maybe do some clever stack
-;;; allocation someday.
+;;; Allocate an indirect value cell.
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
-  (vop make-value-cell node block value res))
+  (let ((leaf (tn-leaf res)))
+    (vop make-value-cell node block value (and leaf (leaf-dynamic-extent leaf))
+         res)))
 
 ;;;; leaf reference
 

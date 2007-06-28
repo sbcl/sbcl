@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.8 relative to sbcl-1.0.7:
+  * enhancement: closed over variables can be stack-allocated on x86 and
+    x86-64.
+
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of
     SB-MOP:SPECIALIZER has been enhanced.  The experimental interface

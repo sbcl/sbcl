@@ -255,10 +255,11 @@
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg) :to :result))
   (:results (result :scs (descriptor-reg) :from :eval))
+  (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
     (with-fixed-allocation
-        (result value-cell-header-widetag value-cell-size node)
+        (result value-cell-header-widetag value-cell-size node stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; automatic allocators for primitive objects

@@ -133,6 +133,8 @@
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
+  (:info stack-allocate-p)
+  (:ignore stack-allocate-p)
   (:generator 10
     (with-fixed-allocation
         (result temp value-cell-header-widetag value-cell-size))

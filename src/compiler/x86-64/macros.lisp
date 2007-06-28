@@ -226,13 +226,13 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defmacro with-fixed-allocation ((result-tn widetag size &optional inline)
+(defmacro with-fixed-allocation ((result-tn widetag size &optional inline stack-allocate-p)
                                  &body forms)
   (unless forms
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
-  (once-only ((result-tn result-tn) (size size))
-    `(pseudo-atomic
-      (allocation ,result-tn (pad-data-block ,size) ,inline)
+  (once-only ((result-tn result-tn) (size size) (stack-allocate-p stack-allocate-p))
+    `(maybe-pseudo-atomic ,stack-allocate-p
+      (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p)
       (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
               ,result-tn)
       (inst lea ,result-tn
