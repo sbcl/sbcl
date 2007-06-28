@@ -146,6 +146,13 @@
   (sb-thread::with-spinlock (*slock*)
     (true *slock*)))
 
+;;; not really DX, but GETHASH and (SETF GETHASH) should not cons
+
+(defvar *table* (make-hash-table))
+
+(defun test-hash-table ()
+  (setf (gethash 5 *table*) 13)
+  (gethash 5 *table*))
 
 (defmacro assert-no-consing (form &optional times)
   `(%assert-no-consing (lambda () ,form) ,times))
@@ -169,6 +176,8 @@
   (assert-no-consing (test-let-var-subst2 17))
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
+  ;; Not strictly DX..
+  (assert-no-consing (test-hash-table))
   #+sb-thread
   (assert-no-consing (test-spinlock)))
 
