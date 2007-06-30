@@ -14,6 +14,41 @@
 ;;; a value for an optimization declaration
 (def!type policy-quality () '(integer 0 3))
 
+;;; global policy restrictions
+(defvar *policy-restrictions* nil)
+
+(defun restrict-compiler-policy (&optional quality (min 0))
+  #!+sb-doc
+  "Assing a minimum value to an optimization quality. QUALITY is the name of
+the optimization quality to restrict, and MIN (defaulting to zero) is the
+minimum allowed value.
+
+Returns the alist describing the current policy restrictions.
+
+If QUALITY is NIL or not given, nothing is done.
+
+Otherwise, if MIN is zero or not given, any existing restrictions of QUALITY
+are removed. If MIN is between one and three inclusive, it becomes the new
+minimum value for the optimization quality: any future proclamations or
+declarations of the quality with a value less then MIN behave as if the value
+was MIN instead.
+
+This is intended to be used interactively, to facilitate recompiling large
+bodies of code with eg. a known minimum safety.
+
+EXPERIMENTAL INTERFACE: Subject to change."
+  (declare (policy-quality min))
+  (when quality
+    (aver (policy-quality-name-p quality))
+    (if (zerop min)
+        (setf *policy-restrictions*
+              (remove quality *policy-restrictions* :key #'car))
+        (let ((cell (assoc quality *policy-restrictions*)))
+          (if cell
+              (setf (cdr cell) min)
+              (push (cons quality min) *policy-restrictions*)))))
+  *policy-restrictions*)
+
 ;;; CMU CL used a special STRUCTURE-OBJECT type POLICY to represent
 ;;; the state of optimization policy at any point in compilation. This
 ;;; was a natural choice, but in SBCL it became a little troublesome
@@ -72,6 +107,7 @@
                   ;; value, we do.
                   (cons name 1))
                 *policy-qualities*))
+  (setf *policy-restrictions* nil)
   ;; not actually POLICY, but very similar
   (setf *handled-conditions* nil
         *disabled-package-locks* nil))
@@ -86,9 +122,13 @@
 ;;; it's an error if it's called for a quality which isn't defined.
 (defun policy-quality (policy quality-name)
   (aver (policy-quality-name-p quality-name))
+  (%policy-quality policy quality-name))
+
+(defun %policy-quality (policy quality-name)
   (let* ((acons (assoc quality-name policy))
+         (min (or (cdr (assoc quality-name *policy-restrictions*)) 0))
          (result (or (cdr acons) 1)))
-    result))
+    (max result min)))
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;

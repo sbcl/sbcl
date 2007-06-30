@@ -1401,7 +1401,9 @@
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)
 #!+stack-grows-downward-not-upward
-(defknown %more-kw-arg (t index) (values t t))
+;;; FIXME: The second argument here should really be NEGATIVE-INDEX, but doing that
+;;; breaks the build, and I cannot seem to figure out why. --NS 2006-06-29
+(defknown %more-kw-arg (t fixnum) (values t t))
 (defknown %more-arg-values (t index index) * (flushable))
 (defknown %verify-arg-count (index index) (values))
 (defknown %arg-count-error (t) nil)

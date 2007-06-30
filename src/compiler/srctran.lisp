@@ -4127,7 +4127,5 @@
   (unless (and (constant-lvar-p quality-name)
                (policy-quality-name-p (lvar-value quality-name)))
     (give-up-ir1-transform))
-  `(let* ((acons (assoc quality-name policy))
-          (result (or (cdr acons) 1)))
-     result))
+  '(%policy-quality policy quality-name))
 

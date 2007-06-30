@@ -1,11 +1,15 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
-  * enhancement: closed over variables can be stack-allocated on x86 and
-    x86-64.
-  * performance bug fix: GETHASH and (SETF GETHASH) are once again non-consing.
-  * bug fix: backtrace construction is now more careful when
-    making lisp-objects from pointers on the stack, to avoid creating
-    bogus objects that can be seen by the GC.
+  * enhancement: experimental function SB-EXT:RESTRICT-COMPILER-POLICY
+    allows assining a global minimum value to optimization qualities
+    (overriding proclamations and declarations).
+  * enhancement: closed over variables can be stack-allocated on x86
+    and x86-64.
+  * performance bug fix: GETHASH and (SETF GETHASH) are once again
+    non-consing.
+  * bug fix: backtrace construction is now more careful when making
+    lisp-objects from pointers on the stack, to avoid creating bogus
+    objects that can be seen by the GC.
 
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of

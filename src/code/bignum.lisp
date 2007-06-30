@@ -550,7 +550,7 @@
 ;;; it, we pay a heavy price in BIGNUM-GCD when compiled by the
 ;;; cross-compiler. -- CSR, 2004-07-19
 (declaim (ftype (sfunction (bignum-type bignum-index bignum-type bignum-index)
-                           sb!vm::positive-fixnum)
+                           (and unsigned-byte fixnum))
                 bignum-factors-of-two))
 (defun bignum-factors-of-two (a len-a b len-b)
   (declare (type bignum-index len-a len-b) (type bignum-type a b))
