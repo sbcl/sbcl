@@ -822,7 +822,7 @@ NIL is returned when no such class exists."
 (defun update-object-layout-or-invalid (object layout)
   (if (typep (classoid-of object) 'standard-classoid)
       (sb!pcl::check-wrapper-validity object)
-      (%layout-invalid-error object layout)))
+      (sb!c::%layout-invalid-error object layout)))
 
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those

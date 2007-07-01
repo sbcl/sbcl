@@ -156,27 +156,32 @@
   (let* ((owrapper (wrapper-of instance))
          (state (layout-invalid owrapper)))
     (aver (not (eq state :uninitialized)))
-    (etypecase state
-      (null owrapper)
-      ;; FIXME: I can't help thinking that, while this does cure the
-      ;; symptoms observed from some class redefinitions, this isn't
-      ;; the place to be doing this flushing.  Nevertheless...  --
-      ;; CSR, 2003-05-31
-      ;;
-      ;; CMUCL comment:
-      ;;    We assume in this case, that the :INVALID is from a
-      ;;    previous call to REGISTER-LAYOUT for a superclass of
-      ;;    INSTANCE's class.  See also the comment above
-      ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
-      ((member t)
-       (force-cache-flushes (class-of instance))
-       (check-wrapper-validity instance))
-      (cons
-       (ecase (car state)
-         (:flush
-          (flush-cache-trap owrapper (cadr state) instance))
-         (:obsolete
-          (obsolete-instance-trap owrapper (cadr state) instance)))))))
+    (cond ((not state)
+           owrapper)
+          ((not (layout-for-std-class-p owrapper))
+           ;; Obsolete structure trap.
+           (obsolete-instance-trap owrapper nil instance))
+          ((eq t state)
+           ;; FIXME: I can't help thinking that, while this does cure
+           ;; the symptoms observed from some class redefinitions,
+           ;; this isn't the place to be doing this flushing.
+           ;; Nevertheless... -- CSR, 2003-05-31
+           ;;
+           ;; CMUCL comment:
+           ;;    We assume in this case, that the :INVALID is from a
+           ;;    previous call to REGISTER-LAYOUT for a superclass of
+           ;;    INSTANCE's class.  See also the comment above
+           ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
+           (force-cache-flushes (class-of instance))
+           (check-wrapper-validity instance))
+          ((consp state)
+           (ecase (car state)
+             (:flush
+              (flush-cache-trap owrapper (cadr state) instance))
+             (:obsolete
+              (obsolete-instance-trap owrapper (cadr state) instance))))
+          (t
+           (bug "Invalid LAYOUT-INVALID: ~S" state)))))
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)

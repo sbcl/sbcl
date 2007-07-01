@@ -1357,7 +1357,7 @@
              (type-of (obsolete-structure-datum condition))))))
 
 (defun obsolete-instance-trap (owrapper nwrapper instance)
-  (if (not (pcl-instance-p instance))
+  (if (not (layout-for-std-class-p owrapper))
       (if *in-obsolete-instance-trap*
           *the-wrapper-of-structure-object*
            (let ((*in-obsolete-instance-trap* t))

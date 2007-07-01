@@ -671,5 +671,33 @@
                            (aref (vector x) (incf i)))
                   (bug-348-x x))))
 
+;;; obsolete instance trapping
+;;;
+;;; FIXME: Both error conditions below should possibly be instances
+;;; of the same class. (Putting this FIXME here, since this is the only
+;;; place where they appear together.)
+
+(with-test (:name obsolete-defstruct/print-object)
+  (eval '(defstruct born-to-change))
+  (let ((x (make-born-to-change)))
+    (handler-bind ((error 'continue))
+      (eval '(defstruct born-to-change slot)))
+    (assert (eq :error
+                (handler-case
+                    (princ-to-string x)
+                  (sb-pcl::obsolete-structure ()
+                    :error))))))
+
+(with-test (:name obsolete-defstruct/typep)
+  (eval '(defstruct born-to-change-2))
+  (let ((x (make-born-to-change-2)))
+    (handler-bind ((error 'continue))
+      (eval '(defstruct born-to-change-2 slot)))
+      (assert (eq :error2
+                  (handler-case
+                      (typep x (find-class 'standard-class))
+                    (sb-kernel:layout-invalid ()
+                      :error2))))))
+
 ;;; success
 (format t "~&/returning success~%")
