@@ -7,6 +7,8 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     and x86-64.
   * performance bug fix: GETHASH and (SETF GETHASH) are once again
     non-consing.
+  * bug fix: threads waiting on GET-FOREGROUND can be interrupted.
+    (reported by Kristoffer Kvello)
   * bug fix: backtrace construction is now more careful when making
     lisp-objects from pointers on the stack, to avoid creating bogus
     objects that can be seen by the GC.

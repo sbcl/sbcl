@@ -50,3 +50,24 @@
     (condition-notify queue)
     (sleep 1)
     (assert (not (thread-alive-p thread)))))
+
+;;; GET-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
+
+#+sb-thread
+(with-test (:name without-interrupts+get-mutex
+            :fails-on :sb-lutex)
+  (let* ((lock (make-mutex))
+         (foo (get-mutex lock))
+         (thread (make-thread (lambda ()
+                                (sb-sys:without-interrupts
+                                  (with-mutex (lock)
+                                    :fini))))))
+    (sleep 1)
+    (assert (thread-alive-p thread))
+    (terminate-thread thread)
+    (sleep 1)
+    (assert (thread-alive-p thread))
+    (release-mutex lock)
+    (sleep 1)
+    (assert (not (thread-alive-p thread)))
+    (assert (eq :fini (join-thread thread)))))
