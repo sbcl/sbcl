@@ -89,7 +89,7 @@ provided the default value is used for the mutex."
         (without-gcing
           (funcall function))
         (without-interrupts
-          (funcall function))))
+          (allow-with-interrupts (funcall function)))))
 
   (defun call-with-recursive-system-spinlock (function lock
                                               &optional without-gcing-p)
@@ -99,7 +99,7 @@ provided the default value is used for the mutex."
         (without-gcing
           (funcall function))
         (without-interrupts
-          (funcall function))))
+          (allow-with-interrupts (funcall function)))))
 
   (defun call-with-mutex (function mutex value waitp)
     (declare (ignore mutex value waitp)
@@ -136,9 +136,10 @@ provided the default value is used for the mutex."
           (without-gcing
             (%call-with-system-mutex))
           (without-interrupts
-            (%call-with-system-mutex)))))
+            (allow-with-interrupts (%call-with-system-mutex))))))
 
-  (defun call-with-recursive-system-spinlock (function lock &optional without-gcing-p)
+  (defun call-with-recursive-system-spinlock (function lock
+                                              &optional without-gcing-p)
     (declare (function function))
     (flet ((%call-with-system-spinlock ()
              (dx-let ((inner-lock-p (eq *current-thread* (spinlock-value lock)))
@@ -152,7 +153,7 @@ provided the default value is used for the mutex."
           (without-gcing
             (%call-with-system-spinlock))
           (without-interrupts
-            (%call-with-system-spinlock)))))
+            (allow-with-interrupts (%call-with-system-spinlock))))))
 
   (defun call-with-spinlock (function spinlock)
     (declare (function function))
