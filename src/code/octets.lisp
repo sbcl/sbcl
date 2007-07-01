@@ -395,38 +395,60 @@ one-past-the-end"
         (t (bug "can't happen"))))
 
 (defun string->utf8 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
+  (declare (optimize (speed 3) (safety 0))
            (type simple-string string)
            (type (integer 0 1) null-padding)
            (type array-range sstart send))
-  (let* ((utf8-length (loop for i of-type index from sstart below send
-                         sum (char-len-as-utf8 (char-code (char string i)))))
-         (array (make-array (+ null-padding utf8-length)
-                            :initial-element 0
-                            :element-type '(unsigned-byte 8)))
-         (index 0))
-    (declare (type index index))
-    (flet ((add-byte (b)
-             (setf (aref array index) b)
-             (incf index)))
-      (loop for i of-type index from sstart below send
-          do (let ((code (char-code (char string i))))
-               (case (char-len-as-utf8 code)
-                 (1
-                  (add-byte code))
-                 (2
-                  (add-byte (logior #b11000000 (ldb (byte 5 6) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
-                 (3
-                  (add-byte (logior #b11100000 (ldb (byte 4 12) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
-                 (4
-                  (add-byte (logior #b11110000 (ldb (byte 3 18) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 12) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
-                  (add-byte (logior #b10000000 (ldb (byte 6 0) code))))))
-           finally (return array)))))
+  (macrolet ((ascii-bash ()
+               '(let ((array (make-array (+ null-padding (- send sstart))
+                                         :element-type '(unsigned-byte 8))))
+                 (loop for i from sstart below send
+                       do (setf (aref array i) (char-code (char string i))))
+                 array)))
+    (etypecase string
+      ((simple-array character (*))
+       (let ((utf8-length 0))
+         ;; Since it has to fit in a vector, it must be a fixnum!
+         (declare (type (and unsigned-byte fixnum) utf8-length))
+         (loop for i of-type index from sstart below send
+               do (incf utf8-length (char-len-as-utf8 (char-code (char string i)))))
+         (if (= utf8-length (- send sstart))
+             (ascii-bash)
+             (let ((array (make-array (+ null-padding utf8-length)
+                                      :element-type '(unsigned-byte 8)))
+                   (index 0))
+               (declare (type index index))
+               (flet ((add-byte (b)
+                        (setf (aref array index) b)
+                        (incf index)))
+                 (declare (inline add-byte))
+                 (loop for i of-type index from sstart below send
+                       do (let ((code (char-code (char string i))))
+                            (case (char-len-as-utf8 code)
+                              (1
+                               (add-byte code))
+                              (2
+                               (add-byte (logior #b11000000 (ldb (byte 5 6) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+                              (3
+                               (add-byte (logior #b11100000 (ldb (byte 4 12) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 0) code))))
+                              (4
+                               (add-byte (logior #b11110000 (ldb (byte 3 18) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 12) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 6) code)))
+                               (add-byte (logior #b10000000 (ldb (byte 6 0) code))))))
+                       finally (return array)))))))
+      #!+sb-unicode
+      ((simple-array base-char (*))
+       ;; On unicode builds BASE-STRINGs are limited to ASCII range, so we can take
+       ;; a fast path -- and get benefit of the element type information. On non-unicode
+       ;; build BASE-CHAR == CHARACTER.
+       (ascii-bash))
+      ((simple-array nil (*))
+       ;; Just get the error...
+       (aref string sstart)))))
 
 ;;;; to-string conversions
 

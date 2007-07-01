@@ -7,6 +7,7 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     and x86-64.
   * performance bug fix: GETHASH and (SETF GETHASH) are once again
     non-consing.
+  * optimization: STRING-TO-OCTETS is now up to 60% faster for UTF-8.
   * bug fix: using obsoleted structure instances with TYPEP and
     generic functions now signals a sensible error.
   * bug fix: threads waiting on GET-FOREGROUND can be interrupted.
