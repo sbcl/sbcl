@@ -285,8 +285,7 @@
           (count-okay (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
-      (inst nop)
-      (inst jmp-short regs-defaulted)
+      (inst jmp :c regs-defaulted)
 
       ;; Default the register args, and set up the stack as if we
       ;; entered the MV return point.

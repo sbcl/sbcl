@@ -18,8 +18,8 @@
 
 ;;;; These three forms should be equivalent.
 
-;;;; This used to be a bug in the handling of null-lexenv vs toplevel
-;;;; policy: LOCALLY and MACROLET hid the toplevel policy from view.
+;;; This used to be a bug in the handling of null-lexenv vs toplevel
+;;; policy: LOCALLY and MACROLET hid the toplevel policy from view.
 
 (locally
     (defun foo (n)
@@ -51,9 +51,9 @@
 (assert (equal (test) '(0 0 0)))
 (assert (equal (test) '(13 13 13))) ; sanity check
 
-;; Bug in 1.0.2 and 1.0.3, where the XEP was compiled with the wrong
-;; policy. (Test-case derived from code posted by alexander.ekart in
-;; comp.lang.lisp).
+;;; Bug in 1.0.2 and 1.0.3, where the XEP was compiled with the wrong
+;;; policy. (Test-case derived from code posted by alexander.ekart in
+;;; comp.lang.lisp).
 
 (locally
     (declare (optimize (safety 0)))
@@ -64,4 +64,3 @@
     (aref x y)))
 
 (assert (raises-error? (bubblesort (make-array 10) 9)))
-

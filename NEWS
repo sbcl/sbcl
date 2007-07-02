@@ -15,6 +15,8 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * bug fix: backtrace construction is now more careful when making
     lisp-objects from pointers on the stack, to avoid creating bogus
     objects that can be seen by the GC.
+  * bug fix: defaulting of values in contexts expecting more than 7
+    variables now works on x86-64.  (reported by Christopher Laux)
 
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of

@@ -1431,4 +1431,21 @@
                        (declare (optimize debug))
                        (list x y z)))))
 
+;;; long-standing bug in defaulting unknown values on the x86-64,
+;;; since changing the calling convention (test case by Christopher
+;;; Laux sbcl-help 30-06-2007)
+
+(defun default-values-bug-demo-sub ()
+  (format t "test")
+  nil)
+(compile 'default-values-bug-demo-sub)
+
+(defun default-values-bug-demo-main ()
+  (multiple-value-bind (a b c d e f g h)
+      (default-values-bug-demo-sub)
+    (if a (+ a b c d e f g h) t)))
+(compile 'default-values-bug-demo-main)
+
+(assert (default-values-bug-demo-main))
+
 ;;; success

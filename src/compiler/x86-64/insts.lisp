@@ -2575,11 +2575,6 @@
           (emit-byte segment #b11111111)
           (emit-ea segment where #b100)))))
 
-(define-instruction jmp-short (segment label)
-  (:emitter
-   (emit-byte segment #b11101011)
-   (emit-byte-displacement-backpatch segment label)))
-
 (define-instruction ret (segment &optional stack-delta)
   (:printer byte ((op #b11000011)))
   (:printer byte ((op #b11000010) (imm nil :type 'imm-word-16))
