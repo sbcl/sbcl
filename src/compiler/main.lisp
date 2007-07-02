@@ -1556,6 +1556,7 @@
          (format *error-output*
                  "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
                  condition))
+       (finish-output *error-output*)
        (values nil t t)))))
 
 ;;; Return a pathname for the named file. The file must exist.
