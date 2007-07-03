@@ -49,14 +49,16 @@
           (*interrupting* t))
       ;; Test both interrupting yourself and using another thread
       ;; for to interrupting.
-      (write-line "interrupt-1")
-      (sb-thread:join-thread (sb-thread:make-thread
-                              (lambda ()
-                                (sb-thread:interrupt-thread
-                                 self
-                                 (lambda ()
-                                   (compute-test 1 2))))))
-      (write-line "interrupt-2")
+      #+sb-thread
+      (progn
+        (write-line "/interrupt-other")
+        (sb-thread:join-thread (sb-thread:make-thread
+                                (lambda ()
+                                  (sb-thread:interrupt-thread
+                                   self
+                                   (lambda ()
+                                     (compute-test 1 2)))))))
+      (write-line "/interrupt-self")
       (sb-thread:interrupt-thread self (lambda () (compute-test 1 2))))))
 
 (defvar *interrupted-gfs* nil)
