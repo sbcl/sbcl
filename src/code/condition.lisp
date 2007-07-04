@@ -755,13 +755,14 @@
                               (or (position #\Newline string :from-end t) -1)
                               1))))
            (file-position-or-nil-for-error error-stream pos))
-         (format stream
-                 "READER-ERROR ~@[at ~W ~]~
-                  ~@[(line ~W~]~@[, column ~W) ~]~
-                  on ~S:~%~?"
-                 pos lineno colno error-stream
-                 (reader-error-format-control condition)
-                 (reader-error-format-arguments condition)))))))
+         (pprint-logical-block (stream nil)
+           (format stream
+                   "READER-ERROR ~@[at ~W ~]~
+                    ~@[(line ~W~]~@[, column ~W) ~]~
+                    on ~S:~2I~_~?"
+                   pos lineno colno error-stream
+                   (reader-error-format-control condition)
+                   (reader-error-format-arguments condition))))))))
 
 ;;;; special SBCL extension conditions
 
@@ -811,7 +812,7 @@
 ;;; unimplemented and (2) unintentionally just screwed up somehow.
 ;;; (Before this condition was defined, test code tried to deal with
 ;;; this by checking for FBOUNDP, but that didn't work reliably. In
-;;; sbcl-0.7.0, a a package screwup left the definition of
+;;; sbcl-0.7.0, a package screwup left the definition of
 ;;; LOAD-FOREIGN in the wrong package, so it was unFBOUNDP even on
 ;;; architectures where it was supposed to be supported, and the
 ;;; regression tests cheerfully passed because they assumed that
