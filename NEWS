@@ -17,6 +17,8 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     objects that can be seen by the GC.
   * bug fix: defaulting of values in contexts expecting more than 7
     variables now works on x86-64.  (reported by Christopher Laux)
+  * bug fix: modifications to packages (INTERN, EXPORT, etc) are now
+    thread safe.
 
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of
