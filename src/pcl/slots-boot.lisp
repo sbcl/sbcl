@@ -56,9 +56,9 @@
     (setf reader-specializers (mapcar #'find-class reader-specializers))
     (setf writer-specializers (mapcar #'find-class writer-specializers))))
 
-(defmacro accessor-slot-value (object slot-name)
-  (aver (constantp slot-name))
-  (let* ((slot-name (constant-form-value slot-name))
+(defmacro accessor-slot-value (object slot-name &environment env)
+  (aver (constantp slot-name env))
+  (let* ((slot-name (constant-form-value slot-name env))
          (reader-name (slot-reader-name slot-name)))
     `(let ((.ignore. (load-time-value
                       (ensure-accessor 'reader ',reader-name ',slot-name))))
@@ -67,14 +67,14 @@
                  (funcall #',reader-name ,object)))))
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
-  (aver (constantp slot-name))
+  (aver (constantp slot-name env))
   (setq object (macroexpand object env))
-  (setq slot-name (macroexpand slot-name env))
-  (let* ((slot-name (constant-form-value slot-name))
-         (bindings (unless (or (constantp new-value) (atom new-value))
-                     (let ((object-var (gensym)))
-                       (prog1 `((,object-var ,object))
-                         (setq object object-var)))))
+  (let* ((slot-name (constant-form-value slot-name env))
+         (bind-object (unless (or (constantp new-value env) (atom new-value))
+                        (let* ((object-var (gensym))
+                               (bind `((,object-var ,object))))
+                          (setf object object-var)
+                          bind)))
          (writer-name (slot-writer-name slot-name))
          (form
           `(let ((.ignore.
@@ -84,13 +84,13 @@
             (declare (ignore .ignore.))
             (funcall #',writer-name .new-value. ,object)
             .new-value.)))
-    (if bindings
-        `(let ,bindings ,form)
+    (if bind-object
+        `(let ,bind-object ,form)
         form)))
 
-(defmacro accessor-slot-boundp (object slot-name)
-  (aver (constantp slot-name))
-  (let* ((slot-name (constant-form-value slot-name))
+(defmacro accessor-slot-boundp (object slot-name &environment env)
+  (aver (constantp slot-name env))
+  (let* ((slot-name (constant-form-value slot-name env))
          (boundp-name (slot-boundp-name slot-name)))
     `(let ((.ignore. (load-time-value
                       (ensure-accessor 'boundp ',boundp-name ',slot-name))))

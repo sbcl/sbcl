@@ -98,3 +98,42 @@
   new-value)
 
 (defsetf sb-pcl::random-documentation sb-pcl::set-random-documentation)
+
+;;;; SLOT-VALUE optimizations
+
+(defknown slot-value (t symbol) t (any))
+(defknown sb-pcl::set-slot-value (t symbol t) t (any))
+
+(defun pcl-boot-state-complete-p ()
+  (eq 'sb-pcl::complete sb-pcl::*boot-state*))
+
+;;; These essentially duplicate what the compiler-macros in slots.lisp
+;;; do, but catch more cases. We retain the compiler-macros since they
+;;; can be used during the build, and because they catch common cases
+;;; slightly more cheaply then the transforms. (Transforms add new
+;;; lambdas, which requires more work by the compiler.)
+
+(deftransform slot-value ((object slot-name) * * :important t)
+  "optimize"
+  (let (c-slot-name)
+    (if (and (pcl-boot-state-complete-p)
+             (constant-lvar-p slot-name)
+             (setf c-slot-name (lvar-value slot-name))
+             (sb-pcl::interned-symbol-p c-slot-name))
+        `(sb-pcl::accessor-slot-value object ',c-slot-name)
+        (give-up-ir1-transform "Slot name is not constant."))))
+
+(deftransform sb-pcl::set-slot-value ((object slot-name new-value)
+                                      (t symbol t) t
+                                      :important t
+                                      ;; see comment in the
+                                      ;; compiler-macro
+                                      :policy (< safety 3))
+  "optimize"
+  (let (c-slot-name)
+    (if (and (pcl-boot-state-complete-p)
+             (constant-lvar-p slot-name)
+             (setf c-slot-name (lvar-value slot-name))
+             (sb-pcl::interned-symbol-p c-slot-name))
+        `(sb-pcl::accessor-set-slot-value object ',c-slot-name new-value)
+        (give-up-ir1-transform "Slot name is not constant."))))

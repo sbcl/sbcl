@@ -88,9 +88,10 @@
         (values (slot-missing class object slot-name 'slot-value))
         (slot-value-using-class class object slot-definition))))
 
-(define-compiler-macro slot-value (&whole form object slot-name)
-  (if (and (constantp slot-name)
-           (interned-symbol-p (constant-form-value slot-name)))
+(define-compiler-macro slot-value (&whole form object slot-name
+                                   &environment env)
+  (if (and (constantp slot-name env)
+           (interned-symbol-p (constant-form-value slot-name env)))
       `(accessor-slot-value ,object ,slot-name)
       form))
 
@@ -111,9 +112,9 @@
   (set-slot-value object slot-name new-value))
 
 (define-compiler-macro set-slot-value (&whole form object slot-name new-value
-                                              &environment env)
-  (if (and (constantp slot-name)
-           (interned-symbol-p (constant-form-value slot-name))
+                                      &environment env)
+  (if (and (constantp slot-name env)
+           (interned-symbol-p (constant-form-value slot-name env))
            ;; We can't use the ACCESSOR-SET-SLOT-VALUE path in safe
            ;; code, since it'll use the global automatically generated
            ;; accessor, which won't do typechecking. (SLOT-OBJECT
@@ -132,9 +133,10 @@
 
 (setf (gdefinition 'slot-boundp-normal) #'slot-boundp)
 
-(define-compiler-macro slot-boundp (&whole form object slot-name)
-  (if (and (constantp slot-name)
-           (interned-symbol-p (constant-form-value slot-name)))
+(define-compiler-macro slot-boundp (&whole form object slot-name
+                                    &environment env)
+  (if (and (constantp slot-name env)
+           (interned-symbol-p (constant-form-value slot-name env)))
       `(accessor-slot-boundp ,object ,slot-name)
       form))
 
@@ -389,3 +391,4 @@
 (defmethod allocate-instance ((class built-in-class) &rest initargs)
   (declare (ignore initargs))
   (error "Cannot allocate an instance of ~S." class)) ; So sayeth AMOP
+
