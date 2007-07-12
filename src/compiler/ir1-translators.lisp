@@ -478,7 +478,7 @@ Return VALUE without evaluating it."
      (second thing))
     ((lambda instance-lambda)
      `(lambda ,(second thing)))
-    ((lambda-with-lexenv)'
+    ((lambda-with-lexenv)
      `(lambda ,(fifth thing)))))
 
 (defun fun-name-leaf (thing)
