@@ -124,6 +124,16 @@
 
 ;;;; GENSYM tricks
 
+;;; GENSYM variant for easier debugging and better backtraces: append
+;;; the closest enclosing non-nil block name to the provided stem.
+(defun block-gensym (&optional (name "G") (env (when (boundp 'sb!c::*lexenv*)
+                                             (symbol-value 'sb!c::*lexenv*))))
+  (let ((block-name (when env
+                      (car (find-if #'car (sb!c::lexenv-blocks env))))))
+    (if block-name
+        (gensym (format nil "~A[~S]" name block-name))
+        (gensym name))))
+
 ;;; Automate an idiom often found in macros:
 ;;;   (LET ((FOO (GENSYM "FOO"))
 ;;;         (MAX-INDEX (GENSYM "MAX-INDEX-")))
@@ -139,7 +149,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (concatenate 'string symbol-name "-"))))
-                     `(,symbol (gensym ,stem))))
+                     `(,symbol (block-gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -147,7 +157,7 @@
 ;;; macros and other code-manipulating code.)
 (declaim (ftype (function (index) list) make-gensym-list))
 (defun make-gensym-list (n)
-  (loop repeat n collect (gensym)))
+  (loop repeat n collect (block-gensym)))
 
 ;;;; miscellany
 

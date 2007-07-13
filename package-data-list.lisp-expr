@@ -801,6 +801,10 @@ possibly temporariliy, because it might be used internally."
                "INFO"
                "MAKE-INFO-ENVIRONMENT"
 
+               ;; GENSYM variant that appends the current non-nil block
+               ;; name to the string if possible
+               "BLOCK-GENSYM"
+
                ;; Constant form evaluation
                "CONSTANT-FORM-VALUE"
                "CONSTANT-TYPEP"
