@@ -32,6 +32,20 @@
          name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
+#!+compare-and-swap-vops
+(defoptimizer ir2-convert-casser
+    ((object old new) node block name offset lowtag)
+  (let* ((lvar (node-lvar node))
+         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (res (first locs)))
+    (vop compare-and-swap-slot node block
+         (lvar-tn node block object)
+         (lvar-tn node block old)
+         (lvar-tn node block new)
+         name offset lowtag
+         res)
+    (move-lvar-result node block locs lvar)))
+
 (defun emit-inits (node block name result lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil))

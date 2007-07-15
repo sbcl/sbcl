@@ -40,8 +40,10 @@
 
 (define-primitive-object (cons :lowtag list-pointer-lowtag
                                :alloc-trans cons)
-  (car :ref-trans car :set-trans sb!c::%rplaca :init :arg)
-  (cdr :ref-trans cdr :set-trans sb!c::%rplacd :init :arg))
+  (car :ref-trans car :set-trans sb!c::%rplaca :init :arg
+       :cas-trans %compare-and-swap-car)
+  (cdr :ref-trans cdr :set-trans sb!c::%rplacd :init :arg
+       :cas-trans %compare-and-swap-cdr))
 
 (define-primitive-object (instance :lowtag instance-pointer-lowtag
                                    :widetag instance-header-widetag
@@ -321,6 +323,7 @@
 
   (plist :ref-trans symbol-plist
          :set-trans %set-symbol-plist
+         :cas-trans %compare-and-swap-symbol-plist
          :init :null)
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans symbol-package

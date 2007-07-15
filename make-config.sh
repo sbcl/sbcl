@@ -274,7 +274,8 @@ cd $original_dir
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
-    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack  :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+    printf ' :compare-and-swap-vop :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "darwin" ] || [ "$sbcl_os" = "win32" ]; then
         printf ' :linkage-table' >> $ltf
@@ -285,7 +286,8 @@ if [ "$sbcl_arch" = "x86" ]; then
         printf ' :os-provides-dlopen' >> $ltf
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
-    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
+    printf ' :compare-and-swap-vop :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf

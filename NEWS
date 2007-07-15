@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
+  * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides
+    atomic compare-and-swap operations on threaded platforms.
   * enhancement: experimental function SB-EXT:RESTRICT-COMPILER-POLICY
     allows assining a global minimum value to optimization qualities
     (overriding proclamations and declarations).

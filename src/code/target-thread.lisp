@@ -181,25 +181,19 @@ in future versions."
   (declare (type (unsigned-byte 27) n))
   (sb!vm::current-thread-offset-sap n))
 
-;;;; spinlocks
-(define-structure-slot-compare-and-swap
-    compare-and-swap-spinlock-value
-    :structure spinlock
-    :slot value)
-
 (declaim (inline get-spinlock release-spinlock))
 
 ;; Should always be called with interrupts disabled.
 (defun get-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
   (let* ((new *current-thread*)
-         (old (compare-and-swap-spinlock-value spinlock nil new)))
+         (old (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)))
     (when old
       (when (eq old new)
         (error "Recursive lock attempt on ~S." spinlock))
       #!+sb-thread
       (flet ((cas ()
-               (unless (compare-and-swap-spinlock-value spinlock nil new)
+               (unless (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
                  (return-from get-spinlock t))))
         (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
             ;; If interrupts are enabled, but we are allowed to enabled them,
@@ -226,14 +220,9 @@ in future versions."
       "The value of the mutex. NIL if the mutex is free. Setfable.")
 
 #!+(and sb-thread (not sb-lutex))
-(progn
-  (define-structure-slot-addressor mutex-value-address
+(define-structure-slot-addressor mutex-value-address
       :structure mutex
       :slot value)
-  (define-structure-slot-compare-and-swap
-      compare-and-swap-mutex-value
-      :structure mutex
-      :slot value))
 
 (defun get-mutex (mutex &optional (new-value *current-thread*) (waitp t))
   #!+sb-doc
@@ -275,7 +264,7 @@ NIL. If WAITP is non-NIL and the mutex is in use, sleep until it is available."
       (setf (mutex-value mutex) new-value))
     #!-sb-lutex
     (let (old)
-      (when (and (setf old (compare-and-swap-mutex-value mutex nil new-value))
+      (when (and (setf old (sb!ext:compare-and-swap (mutex-value mutex) nil new-value))
                  waitp)
         (loop while old
               do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
@@ -285,7 +274,7 @@ NIL. If WAITP is non-NIL and the mutex is in use, sleep until it is available."
                                             (or to-sec -1)
                                             (or to-usec 0))))
                      (signal-deadline)))
-              (setf old (compare-and-swap-mutex-value mutex nil new-value))))
+              (setf old (sb!ext:compare-and-swap (mutex-value mutex) nil new-value))))
       (not old))))
 
 (defun release-mutex (mutex)

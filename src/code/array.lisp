@@ -56,19 +56,6 @@
         (values vector index))
       (values array index)))
 
-(declaim (inline simple-vector-compare-and-swap))
-(defun simple-vector-compare-and-swap (vector index old new)
-  #!+(or x86 x86-64)
-  (%simple-vector-compare-and-swap vector
-                                   (%check-bound vector (length vector) index)
-                                   old
-                                   new)
-  #!-(or x86 x86-64)
-  (let ((n-old (svref vector index)))
-    (when (eq old n-old)
-      (setf (svref vector index) new))
-    n-old))
-
 ;;; It'd waste space to expand copies of error handling in every
 ;;; inline %WITH-ARRAY-DATA, so we have them call this function
 ;;; instead. This is just a wrapper which is known never to return.

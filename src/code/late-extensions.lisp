@@ -48,26 +48,7 @@
 
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
-(defmacro define-structure-slot-compare-and-swap
-    (name &key structure slot)
-  (let* ((dd (find-defstruct-description structure t))
-         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
-         (type (when slotd (dsd-type slotd)))
-         (index (when slotd (dsd-index slotd))))
-    (unless index
-      (error "Slot ~S not found in ~S." slot structure))
-    (unless (eq t (dsd-raw-type slotd))
-      (error "Cannot define compare-and-swap on a raw slot."))
-    (when (dsd-read-only slotd)
-      (error "Cannot define compare-and-swap on a read-only slot."))
-    `(progn
-       (declaim (inline ,name))
-       (defun ,name (instance old new)
-         (declare (type ,structure instance)
-                  (type ,type old new))
-         (%instance-compare-and-swap instance ,index old new)))))
 
-;;; Ditto
 #!+sb-thread
 (defmacro define-structure-slot-addressor (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
@@ -85,3 +66,77 @@
              (- (* ,(+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
                 sb!vm:instance-pointer-lowtag)))))))
 
+(defmacro compare-and-swap (place old new)
+  "Atomically stores NEW in PLACE if OLD matches the current value of PLACE.
+Two values are considered to match if they are EQ. Returns the previous value
+of PLACE: if the returned value if EQ to OLD, the swap was carried out.
+
+PLACE must be an accessor form whose CAR is one of the following:
+
+ CAR, CDR, FIRST, REST, SYMBOL-PLIST, SYMBOL-VALUE, SVREF
+
+or the name of a DEFSTRUCT created accessor for a slot whose declared type is
+either FIXNUM or T. Results are unspecified if the slot has a declared type
+other then FIXNUM or T.
+
+EXPERIMENTAL: Interface subject to change."
+  (flet ((invalid-place ()
+           (error "Invalid first argument to COMPARE-AND-SWAP: ~S" place)))
+    (unless (consp place)
+      (invalid-place))
+  ;; FIXME: Not the nicest way to do this...
+  (destructuring-bind (op &rest args) place
+    (case op
+      ((car first)
+       `(%compare-and-swap-car (the cons ,@args) ,old ,new))
+      ((cdr rest)
+       `(%compare-and-swap-cdr (the cons ,@args) ,old ,new))
+      (symbol-plist
+       `(%compare-and-swap-symbol-plist (the symbol ,@args) ,old ,new))
+      (symbol-value
+       `(%compare-and-swap-symbol-value (the symbol ,@args) ,old ,new))
+      (svref
+       (let ((vector (car args))
+             (index (cadr args)))
+         (unless (and vector index (not (cddr args)))
+           (invalid-place))
+         (with-unique-names (v)
+           `(let ((,v ,vector))
+              (declare (simple-vector ,v))
+              (%compare-and-swap-svref ,v (%check-bound ,v (length ,v) ,index) ,old ,new)))))
+      (t
+       (let ((dd (info :function :structure-accessor op)))
+         (if dd
+             (let* ((structure (dd-name dd))
+                    (slotd (find op (dd-slots dd) :key #'dsd-accessor-name))
+                    (index (dsd-index slotd))
+                    (type (dsd-type slotd)))
+               (unless (eq t (dsd-raw-type slotd))
+                 (error "Cannot use COMPARE-AND-SWAP with structure accessor for a typed slot: ~S"
+                        place))
+               (when (dsd-read-only slotd)
+                 (error "Cannot use COMPARE-AND-SWAP with structure accessor for a read-only slot: ~S"
+                        place))
+               `(truly-the (values ,type &optional)
+                           (%compare-and-swap-instance-ref (the ,structure ,@args)
+                                                           ,index
+                                                           (the ,type ,old) (the ,type ,new))))
+             (error "Invalid first argument to COMPARE-AND-SWAP: ~S" place))))))))
+
+(macrolet ((def (name lambda-list ref &optional set)
+             `(defun ,name (,@lambda-list old new)
+                #!+compare-and-swap-vops
+                (,name ,@lambda-list old new)
+                #!-compare-and-swap-vops
+                (let ((current (,ref ,@lambda-list)))
+                  (when (eq current old)
+                    ,(if set
+                         `(,set ,@lambda-list new)
+                         `(setf (,ref ,@lambda-list) new)))
+                  current))))
+  (def %compare-and-swap-car (cons) car)
+  (def %compare-and-swap-cdr (cons) cdr)
+  (def %compare-and-swap-instance-ref (instance index) %instance-ref %instance-set)
+  (def %compare-and-swap-symbol-plist (symbol) symbol-plist)
+  (def %compare-and-swap-symbol-value (symbol) symbol-value)
+  (def %compare-and-swap-svref (vector index) svref))

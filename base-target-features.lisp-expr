@@ -323,6 +323,9 @@
  ;;   :alien-callbacks
  ;;     Alien callbacks have been implemented for this platform.
  ;;
+ ;;   :compare-and-swap-vops
+ ;;     The backend implements compare-and-swap VOPs.
+ ;;
  ;; operating system features:
  ;;   :linux   = We're intended to run under some version of Linux.
  ;;   :bsd     = We're intended to run under some version of BSD Unix. (This

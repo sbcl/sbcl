@@ -1050,6 +1050,12 @@
   :type :definition
   :type-spec (or fdefn null)
   :default nil)
+
+(define-info-type
+  :class :function
+  :type :structure-accessor
+  :type-spec (or defstruct-description null)
+  :default nil)
 
 ;;;; definitions for other miscellaneous information
 

@@ -46,10 +46,66 @@
                           temp))
         ;; Else, value not immediate.
         (storew value object offset lowtag))))
+
+(define-vop (compare-and-swap-slot)
+  (:args (object :scs (descriptor-reg) :to :eval)
+         (old :scs (descriptor-reg any-reg) :target rax)
+         (new :scs (descriptor-reg any-reg)))
+  (:temporary (:sc descriptor-reg :offset rax-offset
+                   :from (:argument 1) :to :result :target result)
+              rax)
+  (:info name offset lowtag)
+  (:ignore name)
+  (:results (result :scs (descriptor-reg any-reg)))
+  (:generator 5
+     (move rax old)
+     #!+sb-thread
+     (inst lock)
+     (inst cmpxchg (make-ea :qword :base object
+                            :disp (- (* offset n-word-bytes) lowtag))
+           new)
+     (move result rax)))
 
-
-
 ;;;; symbol hacking VOPs
+
+(define-vop (%compare-and-swap-symbol-value)
+  (:translate %compare-and-swap-symbol-value)
+  (:args (symbol :scs (descriptor-reg) :to (:result 1))
+         (old :scs (descriptor-reg any-reg) :target rax)
+         (new :scs (descriptor-reg any-reg)))
+  (:temporary (:sc descriptor-reg :offset rax-offset) rax)
+  #!+sb-thread
+  (:temporary (:sc descriptor-reg) tls)
+  (:results (result :scs (descriptor-reg any-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 15
+    ;; This code has to pathological cases: NO-TLS-VALUE-MARKER
+    ;; or UNBOUND-MARKER as NEW: in either case we would end up
+    ;; doing possible damage with CMPXCHG -- so don't do that!
+    (let ((unbound (generate-error-code vop unbound-symbol-error symbol))
+          (check (gen-label)))
+      (move rax old)
+      #!+sb-thread
+      (progn
+        (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
+        ;; Thread-local area, not LOCK needed.
+        (inst cmpxchg (make-ea :qword :base thread-base-tn
+                               :index tls :scale 1)
+              new)
+        (inst cmp rax no-tls-value-marker-widetag)
+        (inst jmp :ne check)
+        (move rax old)
+        (inst lock))
+      (inst cmpxchg (make-ea :qword :base symbol
+                             :disp (- (* symbol-value-slot n-word-bytes)
+                                      other-pointer-lowtag)
+                             :scale 1)
+            new)
+      (emit-label check)
+      (move result rax)
+      (inst cmp result unbound-marker-widetag)
+      (inst jmp :e unbound))))
 
 ;;; these next two cf the sparc version, by jrd.
 ;;; FIXME: Deref this ^ reference.
@@ -463,9 +519,10 @@
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-set)
 
-(define-full-compare-and-swap instance-compare-and-swap instance
-  instance-slots-offset instance-pointer-lowtag (any-reg descriptor-reg)
-  * %instance-compare-and-swap)
+(define-full-compare-and-swap %compare-and-swap-instance-ref instance
+  instance-slots-offset instance-pointer-lowtag
+  (any-reg descriptor-reg) *
+  %compare-and-swap-instance-ref)
 
 ;;;; code object frobbing
 

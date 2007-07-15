@@ -34,3 +34,9 @@
                 (ir2-convert-fixed-allocation node block name words header
                                               lowtag inits)))))
   name)
+
+(defun %def-casser (name offset lowtag)
+  (let ((fun-info (fun-info-or-lose name)))
+    (setf (fun-info-ir2-convert fun-info)
+          (lambda (node block)
+            (ir2-convert-casser node block name offset lowtag)))))

@@ -1034,6 +1034,7 @@
       (let* ((accessor-name (dsd-accessor-name dsd))
              (dsd-type (dsd-type dsd)))
         (when accessor-name
+          (setf (info :function :structure-accessor accessor-name) dd)
           (let ((inherited (accessor-inherited-data accessor-name dd)))
             (cond
               ((not inherited)

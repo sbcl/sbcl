@@ -76,6 +76,7 @@
                        ((:type slot-type) t) init
                        (ref-known nil ref-known-p) ref-trans
                        (set-known nil set-known-p) set-trans
+                       cas-trans
                        &allow-other-keys)
             (if (atom spec) (list spec) spec)
           (slots (make-slot slot-name docs rest-p offset
@@ -99,6 +100,15 @@
                                 ,slot-type
                         ,set-known)))
             (forms `(def-setter ,set-trans ,offset ,lowtag)))
+          (when cas-trans
+            (when rest-p
+              (error ":REST-P and :CAS-TRANS incompatible."))
+            (forms
+             `(progn
+                (defknown ,cas-trans (,type ,slot-type ,slot-type)
+                    ,slot-type (unsafe))
+                #!+compare-and-swap-vops
+                (def-casser ,cas-trans ,offset ,lowtag))))
           (when init
             (inits (cons init offset)))
           (when rest-p
@@ -133,6 +143,9 @@
   `(%def-setter ',name ,offset ,lowtag))
 (defmacro def-alloc (name words variable-length-p header lowtag inits)
   `(%def-alloc ',name ,words ,variable-length-p ,header ,lowtag ,inits))
+#!+compare-and-swap-vops
+(defmacro def-casser (name offset lowtag)
+  `(%def-casser ',name ,offset ,lowtag))
 ;;; KLUDGE: The %DEF-FOO functions used to implement the macros here
 ;;; are defined later in another file, since they use structure slot
 ;;; setters defined later, and we can't have physical forward

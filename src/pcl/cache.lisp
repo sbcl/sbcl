@@ -149,22 +149,6 @@
 (defun cache-key-p (thing)
   (not (symbolp thing)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (sb-kernel:define-structure-slot-compare-and-swap compare-and-swap-cache-depth
-      :structure cache
-      :slot depth))
-
-;;; Utility macro for atomic updates without locking... doesn't
-;;; do much right now, and it would be nice to make this more magical.
-(defmacro compare-and-swap (place old new)
-  (unless (consp place)
-    (error "Don't know how to compare and swap ~S." place))
-  (ecase (car place)
-    (svref
-     `(simple-vector-compare-and-swap ,@(cdr place) ,old ,new))
-    (cache-depth
-     `(compare-and-swap-cache-depth ,@(cdr place) ,old ,new))))
-
 ;;; Atomically update the current probe depth of a cache.
 (defun note-cache-depth (cache depth)
   (loop for old = (cache-depth cache)

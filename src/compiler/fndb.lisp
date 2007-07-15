@@ -1554,9 +1554,9 @@
 (defknown style-warn (string &rest t) null ())
 
 ;;;; atomic ops
-#!+(or x86 x86-64)
-(progn
-  (defknown %simple-vector-compare-and-swap (simple-vector index t t) t
-      (unsafe))
-  (defknown %instance-compare-and-swap (instance index t t) t
-      (unsafe)))
+(defknown %compare-and-swap-svref (simple-vector index t t) t
+    (unsafe))
+(defknown %compare-and-swap-instance-ref (instance index t t) t
+    (unsafe))
+(defknown %compare-and-swap-symbol-value (symbol t t) t
+    (unsafe unwind))

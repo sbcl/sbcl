@@ -97,6 +97,7 @@
       (frob :kind)
       (frob :inline-expansion-designator)
       (frob :source-transform)
+      (frob :structure-accessor)
       (frob :assumed-type)))
   (values))
 
