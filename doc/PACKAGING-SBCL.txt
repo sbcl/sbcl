@@ -1,0 +1,19 @@
+Packaging SBCL
+==============
+
+If you package SBCL for a distribution, please edit version.lisp-expr,
+and append ".packaging-target-or-patch[.version]".
+
+Examples:
+
+ "1.0.7.gentoo"
+ "1.0.7.mikes-rpms.2"
+
+This will make the startup banner, --version, and
+(lisp-implementation-version) all identify the packaged version
+correctly.
+
+We ask you to do this because users report bugs that are intimately
+tied up with configuration issues at regular intervals, and much
+confusion can result from mistaking a packaged SBCL for the upstream
+one.
