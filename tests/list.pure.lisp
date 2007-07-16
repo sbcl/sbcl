@@ -136,3 +136,13 @@
                         (assoc x '(nil (a . b) nil (nil . c) (c . d))
                          :test #'eq)))))
   (assert (equal (funcall f 'nil) '(nil . c))))
+
+;;; enforce lists in symbol-plist
+(let ((s (gensym))
+      (l (list 1 3 4)))
+  (assert (not (symbol-plist s)))
+  (assert (eq l (setf (symbol-plist s) l)))
+  (multiple-value-bind (res err)
+      (ignore-errors (setf (symbol-plist s) (car l)))
+    (assert (not res))
+    (assert (typep err 'type-error))))

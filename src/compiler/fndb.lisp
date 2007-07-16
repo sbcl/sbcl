@@ -1509,7 +1509,7 @@
   :destroyed-constant-args (nth-constant-args 1))
 (defknown %set-symbol-value (symbol t) t (unsafe))
 (defknown (setf symbol-function) (function symbol) function (unsafe))
-(defknown %set-symbol-plist (symbol t) t (unsafe))
+(defknown %set-symbol-plist (symbol list) list (unsafe))
 (defknown (setf fdocumentation) ((or string null) t symbol)
   (or string null)
   ())

@@ -324,6 +324,7 @@
   (plist :ref-trans symbol-plist
          :set-trans %set-symbol-plist
          :cas-trans %compare-and-swap-symbol-plist
+         :type list
          :init :null)
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans symbol-package

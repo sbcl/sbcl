@@ -21,6 +21,8 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     variables now works on x86-64.  (reported by Christopher Laux)
   * bug fix: modifications to packages (INTERN, EXPORT, etc) are now
     thread safe.
+  * bug fix: (SETF SYMBOL-PLIST) no longer allows assigning a non-list
+    as the property-list of a symbol.
 
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of
