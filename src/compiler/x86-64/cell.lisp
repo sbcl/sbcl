@@ -89,7 +89,7 @@
       #!+sb-thread
       (progn
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
-        ;; Thread-local area, not LOCK needed.
+        ;; Thread-local area, no LOCK needed.
         (inst cmpxchg (make-ea :qword :base thread-base-tn
                                :index tls :scale 1)
               new)
@@ -122,8 +122,6 @@
     (let ((global-val (gen-label))
           (done (gen-label)))
       (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
-      (inst or tls tls)
-      (inst jmp :z global-val)
       (inst cmp (make-ea :qword :base thread-base-tn :scale 1 :index tls)
             no-tls-value-marker-widetag)
       (inst jmp :z global-val)
@@ -330,7 +328,7 @@
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:sc descriptor-reg :offset rax-offset) rax)
-  (:temporary (:sc unsigned-reg) tls-index temp bsp)
+  (:temporary (:sc unsigned-reg) tls-index bsp)
   (:generator 10
     (let ((tls-index-valid (gen-label))
           (get-tls-index-lock (gen-label))
@@ -342,12 +340,17 @@
       (inst or tls-index tls-index)
       (inst jmp :ne tls-index-valid)
 
+      ;; FIXME:
+      ;; * We should ensure the existence of TLS index for LET-bound specials
+      ;;   at compile/load time, and use write a FAST-BIND for use with those.
+      ;; * PROGV will need to do this, but even there this should not be inline.
+      ;;   This is probably best moved to C, since dynbind.c also needs to do this.
       (pseudo-atomic
        (emit-label get-tls-index-lock)
-       (inst mov temp 1)
+       (inst mov tls-index 1)
        (zeroize rax)
        (inst lock)
-       (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) temp)
+       (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) tls-index)
        (inst jmp :ne get-tls-index-lock)
        ;; now with the lock held, see if the symbol's tls index has
        ;; been set in the meantime
@@ -356,17 +359,14 @@
        (inst jmp :ne release-tls-index-lock)
        ;; allocate a new tls-index
        (load-symbol-value tls-index *free-tls-index*)
-       (inst add tls-index 8)          ;XXX surely we can do this more
-       (store-symbol-value tls-index *free-tls-index*) ;succintly
-       (inst sub tls-index 8)
+       (inst add (make-ea-for-symbol-value *free-tls-index*) 8) ; fixnum + 1
        (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
        (emit-label release-tls-index-lock)
        (store-symbol-value 0 *tls-index-lock*))
 
       (emit-label tls-index-valid)
-      (inst mov temp
-            (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
-      (storew temp bsp (- binding-value-slot binding-size))
+      (inst mov rax (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
+      (storew rax bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
       (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
             val))))
