@@ -177,3 +177,10 @@
   (assert (typep (ctor-literal-class) 'ctor-literal-class)))
 (with-test (:name (:ctor :literal-class-quoted))
   (assert (typep (ctor-literal-class2) 'ctor-literal-class2)))
+
+;;; test that call-next-method and eval-when doesn't cause an
+;;; undumpable method object to arise in the effective source code.
+;;; (from Sascha Wilde sbcl-devel 2007-07-15)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmethod just-call-next-method (thing)
+    (call-next-method)))

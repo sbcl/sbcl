@@ -23,6 +23,10 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     thread safe.
   * bug fix: (SETF SYMBOL-PLIST) no longer allows assigning a non-list
     as the property-list of a symbol.
+  * bug fix: DEFMETHOD forms with CALL-NEXT-METHOD in the method body,
+    in EVAL-WHEN forms with both :COMPILE-TOPLEVEL and :LOAD-TOPLEVEL 
+    situations requested, are once again file-compileable.  (reported
+    by Sascha Wilde)
 
 changes in sbcl-1.0.7 relative to sbcl-1.0.6:
   * MOP improvement: support for user-defined subclasses of

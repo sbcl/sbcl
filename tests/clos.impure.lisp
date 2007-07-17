@@ -61,9 +61,7 @@
       (ignore-errors (progn ,@body))
       (declare (ignore res))
       (typep condition 'error))))
-(assert (expect-error
-         (macroexpand-1
-          '(defmethod foo0 ((x t) &rest) nil))))
+(assert (expect-error (defmethod foo0 ((x t) &rest) nil)))
 (assert (expect-error (defgeneric foo1 (x &rest))))
 (assert (expect-error (defgeneric foo2 (x a &rest))))
 (defgeneric foo3 (x &rest y))
@@ -71,7 +69,7 @@
 (defmethod foo4 ((x t) &rest z &key y) nil)
 (defgeneric foo4 (x &rest z &key y))
 (assert (expect-error (defgeneric foo5 (x &rest))))
-(assert (expect-error (macroexpand-1 '(defmethod foo6 (x &rest)))))
+(assert (expect-error (defmethod foo6 (x &rest))))
 
 ;;; more lambda-list checking
 ;;;
