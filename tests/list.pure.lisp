@@ -146,3 +146,37 @@
       (ignore-errors (setf (symbol-plist s) (car l)))
     (assert (not res))
     (assert (typep err 'type-error))))
+
+;;; member
+
+(macrolet ((test  (expected form)
+             `(progn
+                (assert (eq ,expected (funcall fun ,@(cdr form))))
+                (assert (eq ,expected (funcall (lambda ()
+                                                 (declare (optimize speed))
+                                                 ,form))))
+                (assert (eq ,expected (funcall (lambda ()
+                                                 (declare (optimize space))
+                                                 ,form)))))))
+  (let ((numbers '(1 2))
+        (fun (car (list 'member))))
+    (test numbers (member 1 numbers))
+    (test (cdr numbers) (member 2 numbers))
+    (test nil (member 1.0 numbers ))
+
+    (test numbers (member 1.0 numbers :test #'=))
+    (test numbers (member 1.0 numbers :test #'= :key nil))
+    (test (cdr numbers) (member 2.0 numbers :test '=))
+    (test nil (member 0 numbers :test '=))
+
+    (test numbers (member 0 numbers :test-not #'>))
+    (test (cdr numbers) (member 1 numbers :test-not 'eql))
+    (test nil (member 0 numbers :test-not '<))
+
+    (test numbers (member -1 numbers :key #'-))
+    (test (cdr numbers) (member -2 numbers :key '-))
+    (test nil (member -1.0 numbers :key #'-))
+
+    (test numbers (member -1.0 numbers :key #'- :test '=))
+    (test (cdr numbers) (member -2.0 numbers :key #'- :test '=))
+    (test nil (member -1.0 numbers :key #'- :test 'eql))))

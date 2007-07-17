@@ -292,28 +292,73 @@
             (or end length)
             (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
-(macrolet ((def (name)
-             `(deftransform ,name ((e l &key (test #'eql)) * *
-                                   :node node)
-                (unless (constant-lvar-p l)
-                  (give-up-ir1-transform))
 
-                (let ((val (lvar-value l)))
-                  (unless (policy node
-                                  (or (= speed 3)
-                                      (and (>= speed space)
-                                           (<= (length val) 5))))
-                    (give-up-ir1-transform))
+(deftransform member ((item list &key key test test-not) * * :node node)
+  ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
+  ;; not there at all. If it might be NIL, make up a form to that
+  ;; ensure it is a function.
+  (multiple-value-bind (key key-form)
+      (if key
+          (let ((key-type (lvar-type key))
+                (null-type (specifier-type 'null)))
+            (cond ((csubtypep key-type null-type)
+                   (values nil nil))
+                  ((csubtypep null-type key-type)
+                   (values key '(if key 
+                                 (%coerce-callable-to-fun key)
+                                 #'identity)))
+                  (t
+                   (values key '(%coerce-callable-to-fun key))))))
+    (multiple-value-bind (out-of-line funs test-expr)
+        (cond ((and (not key) (not test) (not test-not))
+               (values '%member
+                       '()
+                       '(eql item car)))
+              ((and key (not test) (not test-not))
+               (values '%member-key
+                       '(key)
+                       '(eql item (%funcall key car))))
+              ((and key test)
+               (values '%member-key-test
+                       '(key test)
+                       '(%funcall test item (%funcall key car))))
+              ((and key test-not)
+               (values '%member-key-test-not
+                       '(key test-not)
+                       '(not (%funcall test-not item (%funcall key car)))))
+              (test
+               (values '%member-test
+                       '(test)
+                       '(%funcall test item car)))
+              (test-not
+               (values '%member-test-not
+                       '(test-not)
+                       '(not (%funcall test item car))))
+              (t
+               (bug "never")))
+      (labels ((open-code (tail)
+                 (when tail
+                   `(if (let ((car ',(car tail)))
+                          ,test-expr)
+                        ',tail
+                        ,(open-code (cdr tail)))))
+               (ensure-fun (fun)
+                 (if (eq 'key fun)
+                     key-form
+                     `(%coerce-callable-to-fun ,fun))))
+        (if (and (constant-lvar-p list) (policy node (>= speed space)))
+            `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
+               ,(open-code (lvar-value list)))
+            `(,out-of-line item list ,@(mapcar #'ensure-fun funs)))))))
 
-                  (labels ((frob (els)
-                             (if els
-                                 `(if (funcall test e ',(car els))
-                                      ',els
-                                      ,(frob (cdr els)))
-                                 nil)))
-                    (frob val))))))
-  (def member)
-  (def memq))
+(deftransform memq ((item list) (t (constant-arg list)))
+  (labels ((rec (tail)
+             (if tail
+                 `(if (eq item ',(car tail))
+                      ',tail
+                      ,(rec (cdr tail)))
+                 nil)))
+    (rec (lvar-value list))))
 
 ;;; FIXME: We have rewritten the original code that used DOLIST to this
 ;;; more natural MACROLET.  However, the original code suggested that when
