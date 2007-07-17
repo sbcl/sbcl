@@ -75,11 +75,7 @@
          (t
           (error "unrecognized instance type")))))
 
-(defun early-find-slot-definition (class slot-name)
-  (dolist (slot (class-slots class) nil)
-    (when (eql slot-name (slot-definition-name slot))
-      (return slot))))
-(setf (fdefinition 'find-slot-definition) #'early-find-slot-definition)
+;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP
 
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)

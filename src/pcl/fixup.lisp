@@ -35,15 +35,3 @@
   (declare (ignore depth))
   (print-object instance stream))
 
-;;; Access the slot-vector created by MAKE-SLOT-VECTOR.
-(defun find-slot-definition (class slot-name)
-  (declare (symbol slot-name) (inline getf))
-  (let* ((vector (class-slot-vector class))
-         (index (rem (sxhash slot-name) (length vector))))
-    (declare (simple-vector vector) (index index))
-    (do ((plist (svref vector index) (cdr plist)))
-        ((not plist))
-      (let ((key (car plist)))
-        (setf plist (cdr plist))
-        (when (eq key slot-name)
-          (return (car plist)))))))
