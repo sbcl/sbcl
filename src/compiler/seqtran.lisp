@@ -27,31 +27,30 @@
           (args-to-fn (if take-car `(car ,v) v))))
 
       (let* ((fn-sym (gensym))  ; for ONCE-ONLY-ish purposes
-             (call `(funcall ,fn-sym . ,(args-to-fn)))
+             (call `(%funcall ,fn-sym . ,(args-to-fn)))
              (endtest `(or ,@(tests))))
-        (ecase accumulate
-          (:nconc
-           (let ((temp (gensym))
-                 (map-result (gensym)))
-             `(let ((,fn-sym ,fn)
-                    (,map-result (list nil)))
-                (do-anonymous ((,temp ,map-result) . ,(do-clauses))
-                              (,endtest (cdr ,map-result))
-                  (setq ,temp (last (nconc ,temp ,call)))))))
-          (:list
-           (let ((temp (gensym))
-                 (map-result (gensym)))
-             `(let ((,fn-sym ,fn)
-                    (,map-result (list nil)))
-                (do-anonymous ((,temp ,map-result) . ,(do-clauses))
-                              (,endtest (truly-the list (cdr ,map-result)))
-                  (rplacd ,temp (setq ,temp (list ,call)))))))
-          ((nil)
-           `(let ((,fn-sym ,fn)
-                  (,n-first ,(first arglists)))
-              (do-anonymous ,(do-clauses)
-                            (,endtest (truly-the list ,n-first))
-                            ,call))))))))
+
+        `(let ((,fn-sym (%coerce-callable-to-fun ,fn)))
+           ,(ecase accumulate
+             (:nconc
+              (let ((temp (gensym))
+                    (map-result (gensym)))
+                `(let ((,map-result (list nil)))
+                   (do-anonymous ((,temp ,map-result) . ,(do-clauses))
+                     (,endtest (cdr ,map-result))
+                     (setq ,temp (last (nconc ,temp ,call)))))))
+             (:list
+              (let ((temp (gensym))
+                    (map-result (gensym)))
+                `(let ((,map-result (list nil)))
+                   (do-anonymous ((,temp ,map-result) . ,(do-clauses))
+                     (,endtest (truly-the list (cdr ,map-result)))
+                     (rplacd ,temp (setq ,temp (list ,call)))))))
+             ((nil)
+              `(let ((,n-first ,(first arglists)))
+                 (do-anonymous ,(do-clauses)
+                   (,endtest (truly-the list ,n-first))
+                   ,call)))))))))
 
 (define-source-transform mapc (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) nil t))

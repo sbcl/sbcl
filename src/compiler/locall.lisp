@@ -191,7 +191,7 @@
          (optional-dispatch-entry-point-fun fun 0)
          (loop for ep in (optional-dispatch-entry-points fun)
                and n from min
-               do (entries `((= ,n-supplied ,n)
+               do (entries `((eql ,n-supplied ,n)
                              (%funcall ,(force ep) ,@(subseq temps 0 n)))))
          `(lambda (,n-supplied ,@temps)
             ;; FIXME: Make sure that INDEX type distinguishes between
@@ -201,7 +201,9 @@
             (cond
              ,@(if more (butlast (entries)) (entries))
              ,@(when more
-                 `((,(if (zerop min) t `(>= ,n-supplied ,max))
+                 ;; KLUDGE: (NOT (< ...)) instead of >= avoids one round of
+                 ;; deftransforms and lambda-conversion.
+                 `((,(if (zerop min) t `(not (< ,n-supplied ,max)))
                     ,(let ((n-context (gensym))
                            (n-count (gensym)))
                        `(multiple-value-bind (,n-context ,n-count)

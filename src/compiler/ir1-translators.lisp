@@ -575,7 +575,7 @@ be a lambda expression."
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
 (define-source-transform funcall (function &rest args)
-  (if (and (consp function) (eq (car function) 'function))
+  (if (and (consp function) (member (car function) '(function lambda)))
       `(%funcall ,function ,@args)
       (let ((name (constant-global-fun-name function)))
         (if name
@@ -585,6 +585,11 @@ be a lambda expression."
 (deftransform %coerce-callable-to-fun ((thing) (function) *)
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
+
+(define-source-transform %coerce-callable-to-fun (thing)
+  (if (and (consp thing) (member (car thing) '(function lambda)))
+      thing
+      (values nil t)))
 
 ;;;; LET and LET*
 ;;;;
