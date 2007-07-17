@@ -304,7 +304,7 @@
             (cond ((csubtypep key-type null-type)
                    (values nil nil))
                   ((csubtypep null-type key-type)
-                   (values key '(if key 
+                   (values key '(if key
                                  (%coerce-callable-to-fun key)
                                  #'identity)))
                   (t

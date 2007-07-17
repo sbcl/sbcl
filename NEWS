@@ -9,6 +9,8 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
     and x86-64.
   * performance bug fix: GETHASH and (SETF GETHASH) are once again
     non-consing.
+  * optimization: slot definition lookup is now O(1). This speeds up
+    eg. SLOT-VALUE and (SETF SLOT-VALUE) with variable slot names.
   * optimization: STRING-TO-OCTETS is now up to 60% faster for UTF-8.
   * optimization: MEMBER can now be open-coded for all combinations
     of keyword arguments when second argument is constant, and in other

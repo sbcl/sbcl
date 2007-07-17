@@ -660,7 +660,32 @@
     :accessor class-direct-slots)
    (slots
     :initform ()
-    :accessor class-slots)))
+    :accessor class-slots)
+   (slot-vector
+    :initform #(nil)
+    :reader class-slot-vector)))
+
+;;; Make the slot-vector accessed by the after-fixup FIND-SLOT-DEFINITION.
+;;; The slot vector is a simple-vector containing plists of slot-definitions
+;;; keyd by their names. Slot definitions are put in the position indicated
+;;; by (REM (SXHASH SLOT-NAME) (LENGTH SLOT-VECTOR)).
+;;;
+;;; We make the vector slightly longer then the number of slots both
+;;; to reduce collisions (but we're not too picky, really) and to
+;;; allow FIND-SLOT-DEFINTIONS work on slotless classes without
+;;; needing to check for zero-length vectors.
+(defun make-slot-vector (slots)
+  (let* ((n (+ (length slots) 2))
+         (vector (make-array n :initial-element nil)))
+    (flet ((add-to-vector (name slot)
+             (setf (svref vector (rem (sxhash name) n))
+                   (list* name slot (svref vector (rem (sxhash name) n))))))
+      (if (eq 'complete *boot-state*)
+         (dolist (slot slots)
+           (add-to-vector (slot-definition-name slot) slot))
+         (dolist (slot slots)
+           (add-to-vector (early-slot-definition-name slot) slot))))
+    vector))
 
 ;;; The class STD-CLASS is an implementation-specific common
 ;;; superclass of the classes STANDARD-CLASS and

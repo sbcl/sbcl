@@ -309,7 +309,8 @@
                                  structure-class condition-class
                                  slot-class))
       (set-slot 'direct-slots direct-slots)
-      (set-slot 'slots slots))
+      (set-slot 'slots slots)
+      (set-slot 'slot-vector (make-slot-vector slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't

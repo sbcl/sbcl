@@ -343,13 +343,13 @@ bootstrapping.
       (eval-when (:execute)
         (%defmethod-expander ,name ,qualifiers ,lambda-list ,body)))))
 
-(defmacro %defmethod-expander 
+(defmacro %defmethod-expander
     (name qualifiers lambda-list body &environment env)
   (multiple-value-bind (proto-gf proto-method)
       (prototypes-for-make-method-lambda name)
     (expand-defmethod name proto-gf proto-method qualifiers
                       lambda-list body env)))
-  
+
 
 (defun prototypes-for-make-method-lambda (name)
   (if (not (eq *boot-state* 'complete))

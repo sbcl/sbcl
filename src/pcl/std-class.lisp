@@ -534,7 +534,9 @@
       (setq %class-precedence-list (compute-class-precedence-list class))
       (setq cpl-available-p t)
       (add-direct-subclasses class direct-superclasses)
-      (setf (slot-value class 'slots) (compute-slots class))))
+      (let ((slots (compute-slots class)))
+        (setf (slot-value class 'slots) slots
+              (slot-value class 'slot-vector) (make-slot-vector slots)))))
   ;; Comment from Gerd's PCL, 2003-05-15:
   ;;
   ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
@@ -714,7 +716,9 @@
     (setf (slot-value class '%class-precedence-list)
           (compute-class-precedence-list class))
     (setf (slot-value class 'cpl-available-p) t)
-    (setf (slot-value class 'slots) (compute-slots class))
+    (let ((slots (compute-slots class)))
+      (setf (slot-value class 'slots) slots
+            (slot-value class 'slot-vector) (make-slot-vector slots)))
     (let ((lclass (find-classoid (class-name class))))
       (setf (classoid-pcl-class lclass) class)
       (setf (slot-value class 'wrapper) (classoid-layout lclass)))
@@ -889,31 +893,31 @@
                    (make-instances-obsolete class)
                    (class-wrapper class)))))
 
-      (with-slots (wrapper slots) class
-        (update-lisp-class-layout class nwrapper)
-        (setf slots eslotds
-              (wrapper-instance-slots-layout nwrapper) nlayout
-              (wrapper-class-slots nwrapper) nwrapper-class-slots
-              (layout-length nwrapper) nslots
-              wrapper nwrapper)
-        (do* ((slots (slot-value class 'slots) (cdr slots))
-              (dupes nil))
-             ((null slots)
-              (when dupes
-                (style-warn
-                 "~@<slot names with the same SYMBOL-NAME but ~
+      (update-lisp-class-layout class nwrapper)
+      (setf (slot-value class 'slots) eslotds
+            (slot-value class 'slot-vector) (make-slot-vector eslotds)
+            (wrapper-instance-slots-layout nwrapper) nlayout
+            (wrapper-class-slots nwrapper) nwrapper-class-slots
+            (layout-length nwrapper) nslots
+            (slot-value class 'wrapper) nwrapper)
+      (do* ((slots (slot-value class 'slots) (cdr slots))
+            (dupes nil))
+           ((null slots)
+            (when dupes
+              (style-warn
+               "~@<slot names with the same SYMBOL-NAME but ~
                   different SYMBOL-PACKAGE (possible package problem) ~
                   for class ~S:~4I~@:_~<~@{~S~^~:@_~}~:>~@:>"
-                  class dupes)))
-          (let* ((slot (car slots))
-                 (oslots (remove (slot-definition-name slot) (cdr slots)
-                                 :test #'string/=
-                                 :key #'slot-definition-name)))
-            (when oslots
-              (pushnew (cons (slot-definition-name slot)
-                             (mapcar #'slot-definition-name oslots))
-                       dupes
-                       :test #'string= :key #'car)))))
+               class dupes)))
+        (let* ((slot (car slots))
+               (oslots (remove (slot-definition-name slot) (cdr slots)
+                               :test #'string/=
+                               :key #'slot-definition-name)))
+          (when oslots
+            (pushnew (cons (slot-definition-name slot)
+                           (mapcar #'slot-definition-name oslots))
+                     dupes
+                     :test #'string= :key #'car))))
       (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
         (update-pv-table-cache-info class)
