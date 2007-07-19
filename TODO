@@ -1,221 +1,191 @@
-planned incompatible changes in 0.8.x:
-  * (not done yet, but planned:) When the profiling interface settles
-    down, it might impact TRACE. They both encapsulate functions, and
-    it's not clear yet how e.g. UNPROFILE will interact with TRACE
-    and UNTRACE. (This shouldn't matter, though, unless you are using
-    profiling. If you never profile anything, TRACE should continue to
-    behave as before.)
-  * (not done yet, but planned:) Inlining can now be controlled the
-    ANSI way, without MAYBE-INLINE, since the idiom
-	(DECLAIM (INLINE FOO))
-	(DEFUN FOO (..) ..)
-	(DECLAIM (NOTINLINE FOO))
-	(DEFUN BAR (..) (FOO ..))
-	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
-    now does what ANSI says it should. The CMU-CL-style 
-    SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.
+SBCL TODO
+=========
 
-for early 0.8.x:
+     "There's nothing an agnostic can't do as long as he doesn't know
+     whether he believes in anything or not."
+       -- Monty Python.
 
-* test file reworking
-	** ports with less than 256Mb of heap (sparc, ppc and mips)
-		now don't fail bit-vector.impure-cload.lisp
-* faster bootstrapping (both make.sh and slam.sh)
-	** added mechanisms for automatically finding dead code, and
-		used them to remove dead code
-	** moved stuff from warm init into cold init where possible
-		(so that slam.sh will run faster and also just because
-		ideally everything would be in cold init)
-	** profiled and tweaked
-* fixed (TRACE :REPORT PROFILE ...) interface to profiling
-* more EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** made %COMPILE understand magicality of DEFUN FOO
+     "God grant me serenity to accept the code I cannot change, courage
+     to change the code I can, and wisdom to know the difference."
+       -- Erik Naggum
+
+     "Accumulation of half-understood design decisions eventually
+     chokes a program as a water weed chokes a canal. By refactoring
+     you can ensure that your full understanding of how the program
+     should be designed is always reflected in the program. As a water
+     weed quickly spreads its tendrils, partially understood design
+     decisions quickly spread their effects throughout your program. No
+     one or two or even ten individual actions will be enough to
+     eradicate the problem."
+       -- Martin Fowler, in _Refactoring: Improving the Design of Existing
+          Code_, p. 360
+
+     "I wish I didn't know now what I didn't know then."
+       -- Bob Seger
+
+  This files is maintained as part of the SBCL distribution, and
+  describes flying pies and moons on sticks that SBCL developers dream
+  about. The items are in no particular order.
+
+  The omission of an item is no guarantee that no-one would like it,
+  just like the inclusion of an item is no guarantee that someone is
+  actively working on it.
+
+  In addition to this file, there is the BUGS file, and there are also
+  hundreds of FIXME notes in the sources. (Things marked as KLUDGE are
+  in general things which are ugly or confusing, but that, for
+  whatever reason, may stay that way indefinitely.)
+
+THREADING INTERFACE
+
+  SB-THREAD has some problems: recursivity of a mutex should probably
+  be a feature of the mutex, and not of the lexical location. Thread
+  local variables are needed. Sessions and sharing the terminal need
+  to be thought about.
+
+PEEPHOLE OPTIMIZER
+
+  Have you ever read SBCL disassembly?
+
+DEFGLOBAL
+
+  Global lexical variables. Esp. since with threads special variable
+  accesses is no speed daemon.
+
+FINISHING EXTERNAL FORMATS
+
+  Byte order marks. Newline conventions. A way to specify an external
+  format without needing to duplicate code. Fixing the inefficiencies.
+
+TIMEOUTS
+
+  Asyncronous unwinds suck horribly, but to implement reliable systems
+  one simply needs timeouts. These should probably be local, since
+  otherwise they effectively become asynchronous unwinds. Basically,
+  for any potentially blocking operation there should be a :TIMEOUT
+  arguent (or a version of the operation that accepts the argument).
+
+ADVICE/FWRAP
+
+  SBCL has an internal function encapsulation mechanism, and is able to
+  install breakpoint to function start/end -- this is used to implement
+  the instrumentation based profiler and tracing. It would be good to
+  have this as an exported interface, and it would be good if the
+  SYMBOL-FUNCTION / FDEFINITION confusion was fixed: currently the
+  latter returns the underlying definition, whereas the first returns
+  the encapsulation.
+
+GENERIC FUNCTION TRACING
+
+  This sucks currently. It would also be good to be able to trace
+  individual methods.
+
+POLICY MADNESS
+
+  The interactions between various optimization policies are far from
+  obvious. Someone should figure out how to make this better, and fix
+  it. One option would be to have just a few (eg. DEBUG, SMALL,
+  FAST-SAFE, FAST-UNSAFE) "dominant" policies, and expose the rest
+  as separately declarable optimization toggles.
+
+  MAYBE-INLINE is also nice, but it would be good if someone could
+  figure out how to get rid of it while retaining the semantics it
+  provides. Inlining recursive functions is also something to think
+  about.
+
+  INHIBIT-WARNINGS really needs to go away.
+
+WINDOWS
+
+  Needs love.
+
+DARWIN
+
+  Needs love, particularly threads and exceptions/signals. slam.sh is
+  also broken there.
+
+FUNCTION NAMES
+
+  We'd like to be able to (SETF %FUNCTION-NAME) on a closure.
+
+UNDEFINED FUNCTION / VARIABLE RESTARTS
+
+  You know, like Allegro is reputed to have.
+
+MISC CLEANUPS
+
+  These need to be taken a good look at -- it might be that some of them
+  are already done, or otherwise no longer relevant.)
+
+   * EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanups:
+	** make %COMPILE understand magicality of DEFUN FOO
 		w.r.t. e.g. preexisting inlineness of FOO
-	** used %COMPILE where COMPILE-TOP-LEVEL used to be used
-	** removed now-redundant COMPILE-TOP-LEVEL and 
+	** use %COMPILE where COMPILE-TOP-LEVEL used to be used
+	** remove redundant COMPILE-TOP-LEVEL and
 		FUNCTIONAL-KIND=:TOP-LEVEL stuff from the compiler
-	** (ideally, but perhaps too hard, given what I've discovered
-		about the godawful internals of function debug names):
-		made FUNCTION-NAME logic work on closures, so that
-		various public functions like CL:PACKAGEP which
-		are now implemented as closures (because
-		they're structure slot accessors) won't be so
-		nasty in the debugger
-* outstanding embarrassments
+   * outstanding embarrassments
 	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
 		reasonable to support this as a crutch when initially
 		bootstrapping from balky xc hosts with their own
 		idiosyncratic ideas of what merits FAILURE-P, but it's
-		embarrassing to have to use it when bootstrapping 
+		embarrassing to have to use it when bootstrapping
 		under SBCL!),
-* fixups now feasible because of pre7 changes
-	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE,
-		including e.g. on the man page)
-	** (maybe) allow INLINE of a recursive function, so that the
-		body is inlined once
-* miscellaneous simple refactoring
+   * miscellaneous simple refactoring
 	* belated renaming:
-		** renamed %PRIMITIVE to %VOP
+		** rename %PRIMITIVE to %VOP
 		** A few hundred things named FN and FCN should be
-			named FUN (but maybe not while drichards is
-			working on a Windows port).
+			named FUN
 	* These days ANSI C has inline functions, so..
-		** redid many cpp macros as inline functions: 
+		** redo many cpp macros as inline functions:
 			HeaderValue, Pointerp, CEILING, ALIGNED_SIZE,
 			GET_FREE_POINTER, SET_FREE_POINTER,
 			GET_GC_TRIGGER, SET_GC_TRIGGER, GetBSP, SetBSP,
 			os_trunc_foo(), os_round_up_foo()
-		** removed various avoid-evaluating-C-macro-arg-twice
+		** remove various avoid-evaluating-C-macro-arg-twice
 			cruft
-* Either get rid of or at least rework the fdefinition/encapsulation
-	system so that (SYMBOL-FUNCTION 'FOO) is identically equal to
-	(FDEFINITION 'FOO).
-* Make the system sources understandable to the system, so that
-	searching for sources doesn't error out quite so often
-	(e.g. in error handlers)
-	** provided a suitable readtable for reading in the source
-		files when necessary, and a mechanism for activating
-		this readtable rather than the standard one.
-* Some work on conditions emitted by the system
-	** eliminated COMPILER-WARN and COMPILER-STYLE-WARN, which
+  * Some work on conditions emitted by the system
+	** eliminate COMPILER-WARN and COMPILER-STYLE-WARN, which
 		were simply limited versions of WARN and STYLE-WARN.
-	** made STYLE-WARN parallel WARN more closely (by accepting
+	** make STYLE-WARN parallel WARN more closely (by accepting
 		a condition type, which should be a subtype of
 		STYLE-WARNING, and initargs, as well as a format
 		string and format arguments for SIMPLE-STYLE-WARNING.
 		(WARN can also be used to signal STYLE-WARNINGs, but
 		STYLE-WARN helps to document the code)
-	** eliminated use of INHIBIT-WARNINGS by code emitted by the
+	** eliminate use of INHIBIT-WARNINGS by code emitted by the
 		system from user code.
-	** caused use of INHIBIT-WARNINGS to signal a STYLE-WARNING.
-	** eliminated use of INHIBIT-WARNINGS within the system
-	** deprecated INHIBIT-WARNINGS, causing its use to signal a
+	** cause use of INHIBIT-WARNINGS to signal a STYLE-WARNING.
+	** eliminate use of INHIBIT-WARNINGS within the system
+	** deprecate INHIBIT-WARNINGS, causing its use to signal a
 		full WARNING.
-	** began work on developing a class hierarchy of conditions
+	** begin work on developing a class hierarchy of conditions
 		along semantic lines.
-	** annotated conditions emitted by the system to have
-		references to documentation where applicable, so that
-		users can easily find an explanation for the
-		conditions they're seeing.
 
-=======================================================================
-for 0.9:
+PCL INTEGRATION
 
-[ note: much of the below refers to preparation for merging SB-PCL:FOO
-  and CL:FOO.  However, it turned out to be surprisingly
-  straightforward to do this notional end goal without doing many of
-  the preparatory operations.  That doesn't mean that plenty of the
-  goals below aren't worthwhile, but the motivation is somewhat
-  different. ]
+  AKA CLOS in cold init.
 
-* refactored in preparation for moving CLOS into cold init and merging
-	SB-PCL:FOO with CL:FOO (for FOO=CLASS, FOO=CLASS-OF, etc.)
-	** systematized support for MOP (more regression tests, maybe) 
-		to try to make sure things don't get mislaid in the 
-		upcoming CLOS restructuring
-	** extracted type system (and maybe CLASSOIDs) from SB-KERNEL 
-		into new SB-TYPE package
-	** reimplemented GENERIC-FUNCTION as a primitive object (or
-		maybe made SB-MOP:FUNCALLABLE-STANDARD-OBJECT the
-		primitive object, and then let GENERIC-FUNCTIONs
-		inherit from that) instead of structures with
-		:ALTERNATE-METACLASS and funcallableness. Now
-		FUNCALLABLE-INSTANCE can go away. (And now the new
-		funcallable primitive objects need to go into
-		collections like *FUN-HEADER-WIDETAGS* where
-		FUNCALLABLE-INSTANCE objects used to be.)
-	** reimplemented CONDITIONs as primitive objects instead of 
-		structures with :ALTERNATE-METACLASS. Now (between
-		this and the change to GENERIC-FUNCTIONs)
-		DEFSTRUCT :ALTERNATE-METACLASS can go away.
-	** (maybe) Now INSTANCE_POINTER_LOWTAG can become just
-		STRUCTURE_POINTER_LOWTAG, and the concept of
-		SB-KERNEL:INSTANCE (including INSTANCEP, 
-		(SPECIFIER-TYPE 'INSTANCE), etc.) can go away.
-* moved CLOS into cold init, in order to allow CLOS to be used in the
-	implementation of the core system (e.g. the type system and the
-	compiler) and in order to support merger of CL:CLASS with 
-	SB-PCL:CLASS
-* (maybe) eliminated warm init altogether in favor of cold init
-* (maybe, especially if warm init can be eliminated) rationalized
-	the build process, fixing miscellaneous pre-0.5.0 stuff that's
-	transparently not the right thing
-	** removed separate build directories, now just building in 
-		place with .sbclcoldfasl extensions
-* (maybe) more refactoring in preparation for merging SB-PCL:FOO
-	into CL:FOO: reimplemented type system OO dispatch
-	(!DEFINE-TYPE-METHOD, etc.) in terms of CLOS OO dispatch
-* added some automatic tests for basic binary compatibility, in hopes
-	that it might be practical to maintain binary compatibility
-	between minor maintenance releases on the stable branch (but no
-	promises, sorry, since I've never tried to do this before, and 
-	have no idea how much of a pain this'll be)
-========================================================================
-for 1.0 (fixes of lower priority which I'd nonetheless be embarrassed
-to leave unfixed in 1.0):
-* all too many BUGS entries and FIXMEs
-=======================================================================
-other priorities, no particular time:
+HIGH LEVEL SOCKET INTERFACE
 
-* bug fixes, especially really annoying bugs (ANSI or not) and any
-	ANSI bugs (i.e. not just bugs in extras like the debugger or
-	"declarations are assertions", but violations of the standard)
-* better communication with the outside world (scratching WHN's
-	personal itch): I don't want socket-level stuff so much as I
-	want RPC-level or higher (CORBA?) interfaces and (possibly
-	through RPC or CORBA) GUI support
-* Especially when ldb is not compiled in, the default "assertion failed"
-	behaviour in many parts of the runtime is unfriendly.  It may
-	be appropriate to look at some of these and see if they can be 
-	handled in some less abrupt way than aborting
-=======================================================================
-important but out of scope (for WHN, anyway: Patches from other people
-are still welcome!) until after 1.0:
-	* DYNAMIC-EXTENT
-	* sadly deteriorated support for ANSI-style block compilation
-		(static linking of DEFUNs within a single file or 
-		WITH-COMPILATION-UNIT)
-	* various GC issues (exuberant cut-and-paste coding,
-		possibly dangerously over-conservative handling
-		of neighbors of function objects, general GC efficiency)
-	* package issues other than SB!TYPE, SB!MOP, and dead exported
-		symbols
-	* Any systematic effort to fix compiler consistency checks is
-		out of scope. (However, it still might be possible to
-		determine that some or all of them are hopelessly stale
-		and delete them.)
-=======================================================================
-other known issues with no particular target date:
+  Something slightly above the level of BSD sockets would be nice.
 
-bugs listed on the man page
+RPC INTERFACE
 
-hundreds of FIXME notes in the sources from WHN
+  For talking with other processes.
 
-various other unfinished business from CMU CL and before, marked with 
-  "XX" or "XXX" or "###" or "***" or "???" or "pfw" or "@@@@" or "zzzzz"
-or probably also other codes that I haven't noticed or have forgotten.
+CROSS PLATFORM GUI
 
-(Things marked as KLUDGE are in general things which are ugly or
-confusing, but that, for whatever reason, may stay that way
-indefinitely.)
-=======================================================================
-"There's nothing an agnostic can't do as long as he doesn't know
-whether he believes in anything or not."
-  -- Monty Python.
+  Since this is a high priority we're waiting for PHP coders to
+  offer their help to build a website about this.
 
-"God grant me serenity to accept the code I cannot change, courage to
-change the code I can, and wisdom to know the difference."
-  -- Erik Naggum
+BLOCK COMPILATION
 
-"Accumulation of half-understood design decisions eventually chokes a
-program as a water weed chokes a canal. By refactoring you can ensure
-that your full understanding of how the program should be designed is
-always reflected in the program. As a water weed quickly spreads its
-tendrils, partially understood design decisions quickly spread their
-effects throughout your program. No one or two or even ten individual
-actions will be enough to eradicate the problem."
-  -- Martin Fowler, in _Refactoring: Improving the Design of Existing
-     Code_, p. 360 
+  You know, like CMUCL does.
 
-"I wish I didn't know now what I didn't know then."
-  -- Bob Seger
+(MOSTLY) PARALLEL GC
+
+  Several algorithms exist, even one would be nice.
+
+INCREMENTAL GC
+
+  For those who need it.
