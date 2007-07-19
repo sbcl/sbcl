@@ -28,7 +28,8 @@
   (declare (type simple-stream-buffer buffer)
            (type (integer 0 #.most-positive-fixnum) index))
   (if (vectorp buffer)
-      (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index)
+      (sb-sys:with-pinned-objects (buffer)
+        (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index))
       (sb-sys:sap-ref-8 buffer index)))
 
 (defun (setf bref) (octet buffer index)
@@ -36,7 +37,8 @@
            (type simple-stream-buffer buffer)
            (type (integer 0 #.most-positive-fixnum) index))
   (if (vectorp buffer)
-      (setf (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index) octet)
+      (sb-sys:with-pinned-objects (buffer)
+        (setf (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index) octet))
       (setf (sb-sys:sap-ref-8 buffer index) octet)))
 
 (defun buffer-copy (src soff dst doff length)
@@ -338,8 +340,9 @@
                          (setf (bref buffer i) 0))
                        (setf (bref buffer (1- end)) 0)
                        (multiple-value-bind (bytes errno)
-                           (sb-unix:unix-read fd (buffer-sap buffer start)
-                                              (the fixnum (- end start)))
+                           (sb-sys:with-pinned-objects (buffer)
+                             (sb-unix:unix-read fd (buffer-sap buffer start)
+                                                (the fixnum (- end start))))
                          (declare (type (or null fixnum) bytes)
                                   (type (integer 0 100) errno))
                          (when bytes
@@ -388,8 +391,9 @@
                 (let ((count 0))
                   (tagbody again
                      (multiple-value-bind (bytes errno)
-                         (sb-unix:unix-write fd (buffer-sap buffer) start
-                                          (- end start))
+                         (sb-sys:with-pinned-objects (buffer)
+                           (sb-unix:unix-write fd (buffer-sap buffer) start
+                                               (- end start)))
                        (when bytes
                          (incf count bytes)
                          (incf start bytes))
@@ -419,7 +423,8 @@
                      (type sb-int:index start end len))
             (tagbody again
                (multiple-value-bind (bytes errno)
-                   (sb-unix:unix-write fd (buffer-sap buffer) start len)
+                   (sb-sys:with-pinned-objects (buffer)
+                     (sb-unix:unix-write fd (buffer-sap buffer) start len))
                  (cond ((null bytes)
                         (if (= errno sb-unix:eintr)
                             (go again)

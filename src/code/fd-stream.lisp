@@ -1227,26 +1227,22 @@ bytes-per-buffer of memory.")
             (let* ((length (length string))
                    (,n-buffer (make-array (* (1+ length) ,size)
                                           :element-type '(unsigned-byte 8)))
-                   ;; This SAP-taking may seem unsafe without pinning,
-                   ;; but since the variable name is a gensym OUT-EXPR
-                   ;; cannot close over it even if it tried, so the buffer
-                   ;; will always be either in a register or on stack.
-                   ;; FIXME: But ...this is true on x86oids only!
-                   (sap (vector-sap ,n-buffer))
                    (tail 0)
                    (stream ,name))
-              (declare (type index length tail)
-                       (type system-area-pointer sap))
-              (dotimes (i length)
-                (let* ((byte (aref string i))
-                       (bits (char-code byte)))
-                  (declare (ignorable byte bits))
-                  ,out-expr)
-                (incf tail ,size))
-              (let* ((bits 0)
-                     (byte (code-char bits)))
-                (declare (ignorable bits byte))
-                ,out-expr)
+              (declare (type index length tail))
+              (with-pinned-objects (,n-buffer)
+                (let ((sap (vector-sap ,n-buffer)))
+                  (declare (system-area-pointer sap))
+                  (dotimes (i length)
+                    (let* ((byte (aref string i))
+                           (bits (char-code byte)))
+                      (declare (ignorable byte bits))
+                      ,out-expr)
+                    (incf tail ,size))
+                  (let* ((bits 0)
+                         (byte (code-char bits)))
+                    (declare (ignorable bits byte))
+                    ,out-expr)))
               ,n-buffer)))
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
@@ -1479,29 +1475,25 @@ bytes-per-buffer of memory.")
                  (tail 0)
                  (,n-buffer (make-array buffer-length
                                         :element-type '(unsigned-byte 8)))
-                 ;; This SAP-taking may seem unsafe without pinning,
-                 ;; but since the variable name is a gensym OUT-EXPR
-                 ;; cannot close over it even if it tried, so the buffer
-                 ;; will always be either in a register or on stack.
-                 ;; FIXME: But ...this is true on x86oids only!
-                 (sap (vector-sap ,n-buffer))
                  stream)
             (declare (type index length buffer-length tail)
-                     (type system-area-pointer sap)
                      (type null stream)
                      (ignorable stream))
-            (loop for i of-type index below length
-                  for byte of-type character = (aref string i)
-                  for bits = (char-code byte)
-                  for size of-type index = (aref char-length i)
-                  do (prog1
-                         ,out-expr
-                       (incf tail size)))
-            (let* ((bits 0)
-                   (byte (code-char bits))
-                   (size (aref char-length length)))
-              (declare (ignorable bits byte size))
-              ,out-expr)
+            (with-pinned-objects (,n-buffer)
+              (let ((sap (vector-sap ,n-buffer)))
+                (declare (system-area-pointer sap))
+                (loop for i of-type index below length
+                      for byte of-type character = (aref string i)
+                      for bits = (char-code byte)
+                      for size of-type index = (aref char-length i)
+                      do (prog1
+                             ,out-expr
+                           (incf tail size)))
+                (let* ((bits 0)
+                       (byte (code-char bits))
+                       (size (aref char-length length)))
+                  (declare (ignorable bits byte size))
+                  ,out-expr)))
             ,n-buffer)))
 
       (setf *external-formats*

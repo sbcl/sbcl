@@ -792,6 +792,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
                 (vector-push-extend
                  (alien-callback-lisp-trampoline wrapper function)
                  *alien-callback-trampolines*)
+                ;; Assembler-wrapper is static, so sap-taking is safe.
                 (let ((sap (vector-sap assembler-wrapper)))
                   (push (cons sap (make-callback-info :specifier specifier
                                                       :function function

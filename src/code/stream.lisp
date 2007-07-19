@@ -1136,14 +1136,14 @@
             (truly-the index (+ index copy)))
       ;; FIXME: why are we VECTOR-SAP'ing things here?  what's the point?
       ;; and are there SB-UNICODE issues here as well?  --njf, 2005-03-24
-      (without-gcing
-       (system-area-ub8-copy (vector-sap string)
-                             index
-                             (if (typep buffer 'system-area-pointer)
-                                 buffer
-                                 (vector-sap buffer))
-                             start
-                             copy)))
+      (with-pinned-objects (string buffer)
+        (system-area-ub8-copy (vector-sap string)
+                              index
+                              (if (typep buffer 'system-area-pointer)
+                                  buffer
+                                  (vector-sap buffer))
+                              start
+                              copy)))
     (if (and (> requested copy) eof-error-p)
         (error 'end-of-file :stream stream)
         copy)))

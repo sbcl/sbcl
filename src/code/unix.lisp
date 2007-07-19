@@ -295,19 +295,19 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (defun unix-write (fd buf offset len)
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) offset len))
-  (int-syscall ("write" int (* char) int)
-               fd
-               (with-alien ((ptr (* char) (etypecase buf
-                                            ((simple-array * (*))
-                                             ;; This SAP-taking is
-                                             ;; safe as BUF remains
-                                             ;; either in a register
-                                             ;; or on stack.
-                                             (vector-sap buf))
-                                            (system-area-pointer
-                                             buf))))
-                 (addr (deref ptr offset)))
-               len))
+  (flet ((%write (sap)
+           (declare (system-area-pointer sap))
+           (int-syscall ("write" int (* char) int)
+                        fd
+                        (with-alien ((ptr (* char) sap))
+                          (addr (deref ptr offset)))
+                        len)))
+    (etypecase buf
+      ((simple-array * (*))
+       (with-pinned-objects (buf)
+         (%write (vector-sap buf))))
+      (system-area-pointer
+       (%write buf)))))
 
 ;;; Set up a unix-piping mechanism consisting of an input pipe and an
 ;;; output pipe. Return two values: if no error occurred the first

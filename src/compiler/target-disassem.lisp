@@ -796,6 +796,7 @@
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
   (let ((sap
+         ;; FIXME: What is this for? This cannot be safe!
          (sb!sys:vector-sap (coerce #() '(vector (unsigned-byte 8)))))
         (alignment *disassem-inst-alignment-bytes*)
         (arg-column
@@ -827,8 +828,8 @@
 
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.
 
+;; FIXME: Are the objects we are taking saps for always pinned?
 #!-sb-fluid (declaim (inline sap-maker))
-
 (defun sap-maker (function input offset)
   (declare (optimize (speed 3))
            (type (function (t) sb!sys:system-area-pointer) function)

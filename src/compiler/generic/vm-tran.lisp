@@ -599,7 +599,7 @@
               ;; declare it in the DEFKNOWN too.)
               ((simple-unboxed-array (*)) (vector-sap thing)))))
      (declare (inline sapify))
-     (without-gcing
+    (with-pinned-objects (dst src)
       (memmove (sap+ (sapify dst) dst-start)
                (sap+ (sapify src) src-start)
                (- dst-end dst-start)))

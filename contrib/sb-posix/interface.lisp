@@ -305,9 +305,10 @@
  (defun wait (&optional statusptr)
    (declare (type (or null (simple-array (signed-byte 32) (1))) statusptr))
    (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (alien-funcall
-                (extern-alien "wait" (function pid-t (* int)))
-                (sb-sys:vector-sap ptr))))
+          (pid (sb-sys:with-pinned-objects (ptr)
+                 (alien-funcall
+                  (extern-alien "wait" (function pid-t (* int)))
+                  (sb-sys:vector-sap ptr)))))
      (if (minusp pid)
          (syscall-error)
          (values pid (aref ptr 0))))))
@@ -321,10 +322,11 @@
             (type (sb-alien:alien int) options)
             (type (or null (simple-array (signed-byte 32) (1))) statusptr))
    (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (alien-funcall
-                (extern-alien "waitpid" (function pid-t
-                                                  pid-t (* int) int))
-                pid (sb-sys:vector-sap ptr) options)))
+          (pid (sb-sys:with-pinned-objects (ptr)
+                 (alien-funcall
+                  (extern-alien "waitpid" (function pid-t
+                                                    pid-t (* int) int))
+                  pid (sb-sys:vector-sap ptr) options))))
      (if (minusp pid)
          (syscall-error)
          (values pid (aref ptr 0)))))
@@ -457,10 +459,11 @@
    (declare (type (or null (simple-array (signed-byte 32) (2))) filedes2))
    (unless filedes2
      (setq filedes2 (make-array 2 :element-type '(signed-byte 32))))
-   (let ((r (alien-funcall
-             ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
-             (extern-alien "pipe" (function int (* int)))
-             (sb-sys:vector-sap filedes2))))
+   (let ((r (sb-sys:with-pinned-objects (filedes2)
+              (alien-funcall
+               ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
+               (extern-alien "pipe" (function int (* int)))
+               (sb-sys:vector-sap filedes2)))))
      (when (minusp r)
        (syscall-error)))
    (values (aref filedes2 0) (aref filedes2 1))))
