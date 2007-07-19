@@ -335,10 +335,16 @@
                  (if (eq 'key fun)
                      key-form
                      `(%coerce-callable-to-fun ,fun))))
-        (if (and (constant-lvar-p list) (policy node (>= speed space)))
-            `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
-               ,(open-code (lvar-value list)))
-            `(,out-of-line item list ,@(mapcar #'ensure-fun funs)))))))
+        (let* ((cp (constant-lvar-p list))
+               (c-list (when cp (lvar-value list))))
+          (cond ((and cp c-list (policy node (>= speed space)))
+                 `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
+                    ,(open-code c-list)))
+                ((and cp (not c-list))
+                 ;; constant nil list -- nothing to find!
+                 nil)
+                (t
+                 `(,out-of-line item list ,@(mapcar #'ensure-fun funs)))))))))
 
 (deftransform member ((item list &key key test test-not) * * :node node)
   (transform-list-item-seek 'member list key test test-not node))
