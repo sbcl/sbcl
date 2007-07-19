@@ -130,13 +130,6 @@
   (assert (null (butlast s (* 1440 most-positive-fixnum))))
   (assert (null (nbutlast s (* 1440 most-positive-fixnum)))))
 
-;;; Bug reported by Paul Dietz: ASSOC should ignore NIL elements in a
-;;; alist
-(let ((f (compile nil '(lambda (x)
-                        (assoc x '(nil (a . b) nil (nil . c) (c . d))
-                         :test #'eq)))))
-  (assert (equal (funcall f 'nil) '(nil . c))))
-
 ;;; enforce lists in symbol-plist
 (let ((s (gensym))
       (l (list 1 3 4)))
@@ -151,32 +144,80 @@
 
 (macrolet ((test  (expected form)
              `(progn
-                (assert (eq ,expected (funcall fun ,@(cdr form))))
-                (assert (eq ,expected (funcall (lambda ()
-                                                 (declare (optimize speed))
-                                                 ,form))))
-                (assert (eq ,expected (funcall (lambda ()
-                                                 (declare (optimize space))
-                                                 ,form)))))))
-  (let ((numbers '(1 2))
+                (assert (equal ,expected (let ((numbers '(1 2)))
+                                           (funcall fun ,@(cdr form)))))
+                (assert (equal ,expected (funcall (lambda ()
+                                                    (declare (optimize speed))
+                                                    (let ((numbers '(1 2)))
+                                                      ,form)))))
+                (assert (equal ,expected (funcall (lambda ()
+                                                    (declare (optimize space))
+                                                    (let ((numbers '(1 2)))
+                                                      ,form))))))))
+  (let ((x-numbers '(1 2))
         (fun (car (list 'member))))
-    (test numbers (member 1 numbers))
-    (test (cdr numbers) (member 2 numbers))
+    (test x-numbers (member 1 numbers))
+    (test (cdr x-numbers) (member 2 numbers))
     (test nil (member 1.0 numbers ))
 
-    (test numbers (member 1.0 numbers :test #'=))
-    (test numbers (member 1.0 numbers :test #'= :key nil))
-    (test (cdr numbers) (member 2.0 numbers :test '=))
+    (test x-numbers (member 1.0 numbers :test #'=))
+    (test x-numbers (member 1.0 numbers :test #'= :key nil))
+    (test (cdr x-numbers) (member 2.0 numbers :test '=))
     (test nil (member 0 numbers :test '=))
 
-    (test numbers (member 0 numbers :test-not #'>))
-    (test (cdr numbers) (member 1 numbers :test-not 'eql))
+    (test x-numbers (member 0 numbers :test-not #'>))
+    (test (cdr x-numbers) (member 1 numbers :test-not 'eql))
     (test nil (member 0 numbers :test-not '<))
 
-    (test numbers (member -1 numbers :key #'-))
-    (test (cdr numbers) (member -2 numbers :key '-))
+    (test x-numbers (member -1 numbers :key #'-))
+    (test (cdr x-numbers) (member -2 numbers :key '-))
     (test nil (member -1.0 numbers :key #'-))
 
-    (test numbers (member -1.0 numbers :key #'- :test '=))
-    (test (cdr numbers) (member -2.0 numbers :key #'- :test '=))
+    (test x-numbers (member -1.0 numbers :key #'- :test '=))
+    (test (cdr x-numbers) (member -2.0 numbers :key #'- :test '=))
     (test nil (member -1.0 numbers :key #'- :test 'eql))))
+
+;;; assoc
+
+(macrolet ((test  (expected form)
+             (let ((numbers '((1 a) (2 b)))
+                   (tricky '(nil (a . b) nil (nil . c) (c . d))))
+               `(progn
+                  (assert (equal ',expected (let ((numbers ',numbers)
+                                                  (tricky ',tricky))
+                                              (funcall fun ,@(cdr form)))))
+                 (assert (equal ',expected (funcall (lambda ()
+                                                      (declare (optimize speed))
+                                                      (let ((numbers ',numbers)
+                                                            (tricky ',tricky))
+                                                        ,form)))))
+                 (assert (equal ',expected (funcall (lambda ()
+                                                      (declare (optimize space))
+                                                      (let ((numbers ',numbers)
+                                                            (tricky ',tricky))
+                                                        ,form)))))))))
+  (let ((fun (car (list 'assoc))))
+    (test (1 a) (assoc 1 numbers))
+    (test (2 b) (assoc 2 numbers))
+    (test nil (assoc 1.0 numbers))
+
+    (test (1 a) (assoc 1.0 numbers :test #'=))
+    (test (1 a) (assoc 1.0 numbers :test #'= :key nil))
+    (test (2 b) (assoc 2.0 numbers :test '=))
+    (test nil (assoc 0 numbers :test '=))
+
+    (test (1 a) (assoc 0 numbers :test-not #'>))
+    (test (2 b) (assoc 1 numbers :test-not 'eql))
+    (test nil (assoc 0 numbers :test-not '<))
+
+    (test (1 a) (assoc -1 numbers :key #'-))
+    (test (2 b) (assoc -2 numbers :key '-))
+    (test nil (assoc -1.0 numbers :key #'-))
+
+    (test (1 a) (assoc -1.0 numbers :key #'- :test '=))
+    (test (2 b) (assoc -2.0 numbers :key #'- :test '=))
+    (test nil (assoc -1.0 numbers :key #'- :test 'eql))
+
+    ;; Bug reported by Paul Dietz: ASSOC should ignore NIL elements in a
+    ;; alist
+    (test (nil . c) (assoc nil tricky :test #'eq))))

@@ -737,26 +737,6 @@
         (when (satisfies-the-test item car)
           (return list))))))
 
-(macrolet ((def (name funs form)
-             `(defun ,name (item list ,@funs)
-                ,@(when funs `((declare (function ,@funs))))
-                (do ((list list (cdr list)))
-                    ((null list) nil)
-                  (when ,form
-                    (return list))))))
-  (def %member ()
-    (eql item (car list)))
-  (def %member-key (key)
-    (eql item (funcall key (car list))))
-  (def %member-key-test (key test)
-    (funcall test item (funcall key (car list))))
-  (def %member-key-test-not (key test-not)
-    (not (funcall test-not item (funcall key (car list)))))
-  (def %member-test (test)
-    (funcall test item (car list)))
-  (def %member-test-not (test-not)
-    (not (funcall test-not item (car list)))))
-
 (defun member-if (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element satisfying TEST."
@@ -1177,3 +1157,43 @@
   #!+sb-doc
   "Apply FUNCTION to successive CDRs of lists. Return NCONC of results."
   (map1 function (cons list more-lists) :nconc nil))
+
+;;;; Specialized versions
+
+;;; %MEMBER-* and %ASSOC-* function. The transforms for %MEMBER and %ASSOC pick
+;;; the appropriate version. These win because they have only positional arguments,
+;;; the TEST & KEY functions are known to exist (or not), and are known to be
+;;; functions, not function designators.
+(macrolet ((def (funs form)
+             (flet ((%def (name)
+                      `(defun ,(intern (format nil "%~A~{-~A~}" name funs))
+                           (item list ,@funs)
+                         ,@(when funs `((declare (function ,@funs))))
+                         (do ((list list (cdr list)))
+                             ((null list) nil)
+                           (let ((this (car list)))
+                             ,(ecase name
+                                    (assoc
+                                     `(when this
+                                        (let ((target (car this)))
+                                          (when (and this ,form)
+                                            (return this)))))
+                                    (member
+                                     `(let ((target this))
+                                        (when ,form
+                                          (return list))))))))))
+               `(progn
+                  ,(%def 'member)
+                  ,(%def 'assoc)))))
+  (def ()
+      (eql item target))
+  (def (key)
+      (eql item (funcall key target)))
+  (def (key test)
+      (funcall test item (funcall key target)))
+  (def (key test-not)
+      (not (funcall test-not item (funcall key target))))
+  (def (test)
+      (funcall test item target))
+  (def (test-not)
+    (not (funcall test-not item target))))

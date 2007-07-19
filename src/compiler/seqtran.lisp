@@ -291,8 +291,7 @@
             (or end length)
             (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
-
-(deftransform member ((item list &key key test test-not) * * :node node)
+(defun transform-list-item-seek (name list key test test-not node)
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
   ;; ensure it is a function.
@@ -308,38 +307,29 @@
                                  #'identity)))
                   (t
                    (values key '(%coerce-callable-to-fun key))))))
-    (multiple-value-bind (out-of-line funs test-expr)
-        (cond ((and (not key) (not test) (not test-not))
-               (values '%member
-                       '()
-                       '(eql item car)))
-              ((and key (not test) (not test-not))
-               (values '%member-key
-                       '(key)
-                       '(eql item (%funcall key car))))
-              ((and key test)
-               (values '%member-key-test
-                       '(key test)
-                       '(%funcall test item (%funcall key car))))
-              ((and key test-not)
-               (values '%member-key-test-not
-                       '(key test-not)
-                       '(not (%funcall test-not item (%funcall key car)))))
-              (test
-               (values '%member-test
-                       '(test)
-                       '(%funcall test item car)))
-              (test-not
-               (values '%member-test-not
-                       '(test-not)
-                       '(not (%funcall test item car))))
-              (t
-               (bug "never")))
+    (let* ((funs (remove nil (list (and key 'key) (cond (test 'test)
+                                                        (test-not 'test-not)))))
+           (out-of-line (or (find-symbol (format nil "%~A~{-~A~}" name funs)
+                                         (load-time-value (find-package "SB!KERNEL")))
+                            (bug "Unknown list item seek transform: name=~S, funs=~S"
+                                 name funs)))
+           (target-expr (if key '(%funcall key target) 'target))
+           (test-expr (cond (test `(%funcall test item ,target-expr))
+                            (test-not `(not (%funcall test-not item ,target-expr)))
+                            (t `(eql item ,target-expr)))))
       (labels ((open-code (tail)
                  (when tail
-                   `(if (let ((car ',(car tail)))
-                          ,test-expr)
-                        ',tail
+                   `(if (let ((this ',(car tail)))
+                          ,(ecase name
+                                  (assoc
+                                   `(and this (let ((target (car this)))
+                                                ,test-expr)))
+                                  (member
+                                   `(let ((target this))
+                                      ,test-expr))))
+                        ',(ecase name
+                                 (assoc (car tail))
+                                 (member tail))
                         ,(open-code (cdr tail)))))
                (ensure-fun (fun)
                  (if (eq 'key fun)
@@ -350,6 +340,12 @@
                ,(open-code (lvar-value list)))
             `(,out-of-line item list ,@(mapcar #'ensure-fun funs)))))))
 
+(deftransform member ((item list &key key test test-not) * * :node node)
+  (transform-list-item-seek 'member list key test test-not node))
+
+(deftransform assoc ((item list &key key test test-not) * * :node node)
+  (transform-list-item-seek 'assoc list key test test-not node))
+
 (deftransform memq ((item list) (t (constant-arg list)))
   (labels ((rec (tail)
              (if tail
@@ -359,32 +355,28 @@
                  nil)))
     (rec (lvar-value list))))
 
-;;; FIXME: We have rewritten the original code that used DOLIST to this
-;;; more natural MACROLET.  However, the original code suggested that when
-;;; this was done, a few bytes could be saved by a call to a shared
-;;; function.  This remains to be done.
-(macrolet ((def (fun eq-fun)
-             `(deftransform ,fun ((item list &key test) (t list &rest t) *)
-                "convert to EQ test"
-                ;; FIXME: The scope of this transformation could be
-                ;; widened somewhat, letting it work whenever the test is
-                ;; 'EQL and we know from the type of ITEM that it #'EQ
-                ;; works like #'EQL on it. (E.g. types FIXNUM, CHARACTER,
-                ;; and SYMBOL.)
-                ;;   If TEST is EQ, apply transform, else
-                ;;   if test is not EQL, then give up on transform, else
-                ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
-                ;;   transform, else give up on transform.
-                (cond (test
-                       (unless (lvar-fun-is test '(eq))
-                         (give-up-ir1-transform)))
-                      ((types-equal-or-intersect (lvar-type item)
-                                                 (specifier-type 'number))
-                       (give-up-ir1-transform "Item might be a number.")))
-                `(,',eq-fun item list))))
-  (def delete delq)
-  (def assoc assq)
-  (def member memq))
+;;; A similar transform used to apply to MEMBER and ASSOC, but since
+;;; TRANSFORM-LIST-ITEM-SEEK now takes care of them those transform
+;;; would never fire, and (%MEMBER-TEST ITEM LIST #'EQ) should be
+;;; almost as fast as MEMQ.
+(deftransform delete ((item list &key test) (t list &rest t) *)
+  "convert to EQ test"
+  ;; FIXME: The scope of this transformation could be
+  ;; widened somewhat, letting it work whenever the test is
+  ;; 'EQL and we know from the type of ITEM that it #'EQ
+  ;; works like #'EQL on it. (E.g. types FIXNUM, CHARACTER,
+  ;; and SYMBOL.)
+  ;;   If TEST is EQ, apply transform, else
+  ;;   if test is not EQL, then give up on transform, else
+  ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
+  ;;   transform, else give up on transform.
+  (cond (test
+         (unless (lvar-fun-is test '(eq))
+           (give-up-ir1-transform)))
+        ((types-equal-or-intersect (lvar-type item)
+                                   (specifier-type 'number))
+         (give-up-ir1-transform "Item might be a number.")))
+  `(delq item list))
 
 (deftransform delete-if ((pred list) (t list))
   "open code"

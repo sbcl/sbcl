@@ -12,9 +12,10 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * optimization: slot definition lookup is now O(1). This speeds up
     eg. SLOT-VALUE and (SETF SLOT-VALUE) with variable slot names.
   * optimization: STRING-TO-OCTETS is now up to 60% faster for UTF-8.
-  * optimization: MEMBER can now be open-coded for all combinations
-    of keyword arguments when second argument is constant, and in other
-    cases a specialized version is selected.
+  * optimization: ASSOC and MEMBER can now be open-coded for all
+    combinations of keyword arguments when second argument is constant
+    and SPEED >= SPACE. In other cases a specialized version is
+    selected.
   * bug fix: using obsoleted structure instances with TYPEP and
     generic functions now signals a sensible error.
   * bug fix: threads waiting on GET-FOREGROUND can be interrupted.
