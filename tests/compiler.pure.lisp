@@ -2264,3 +2264,15 @@
           do (let ((arg (random (truncate most-positive-double-float))))
                (assert (eql (funcall fun arg)
                             (funcall op 0.0d0 arg)))))))
+
+(with-test (:name :high-debug-known-function-inlining)
+  (let ((fun (compile nil
+                      '(lambda ()
+                        (declare (optimize (debug 3)) (inline append))
+                        (let ((fun (lambda (body)
+                                     (append
+                                      (first body)
+                                      nil))))
+                          (funcall fun
+                                   '((foo (bar)))))))))
+    (funcall fun)))
