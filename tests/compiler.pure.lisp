@@ -2276,3 +2276,14 @@
                           (funcall fun
                                    '((foo (bar)))))))))
     (funcall fun)))
+
+(with-test (:name :high-debug-known-function-transform-with-optional-arguments)
+  (compile nil '(lambda (x y)
+               (declare (optimize sb-c::preserve-single-use-debug-variables))
+               (if (block nil
+                     (some-unknown-function
+                      (lambda ()
+                        (return (member x y))))
+                     t)
+                   t
+                   (error "~a" y)))))

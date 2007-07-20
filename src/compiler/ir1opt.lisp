@@ -1125,9 +1125,24 @@
   (aver (and (legal-fun-name-p source-name)
              (not (eql source-name '.anonymous.))))
   (node-ends-block call)
+  ;; The internal variables of a transform are not going to be
+  ;; interesting to the debugger, so there's no sense in
+  ;; suppressing the substitution of variables with only one use
+  ;; (the extra variables can slow down constraint propagation).
+  ;;
+  ;; This needs to be done before the WITH-IR1-ENVIRONMENT-FROM-NODE,
+  ;; so that it will bind *LEXENV* to the right environment.
+  (setf (combination-lexenv call)
+        (make-lexenv :default (combination-lexenv call)
+                     :policy (process-optimize-decl
+                              '(optimize
+                                (preserve-single-use-debug-variables 0))
+                              (lexenv-policy
+                                   (combination-lexenv call)))))
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
+
       (let ((new-fun (ir1-convert-inline-lambda
                       res
                       :debug-name (debug-name 'lambda-inlined source-name)
@@ -1135,17 +1150,6 @@
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
-        ;; The internal variables of a transform are not going to be
-        ;; interesting to the debugger, so there's no sense in
-        ;; suppressing the substitution of variables with only one use
-        ;; (the extra variables can slow down constraint propagation).
-        (setf (combination-lexenv call)
-              (make-lexenv :default (combination-lexenv call)
-                           :policy (process-optimize-decl
-                                    '(optimize
-                                      (preserve-single-use-debug-variables 0))
-                                    (lexenv-policy
-                                     (combination-lexenv call)))))
         (locall-analyze-component *current-component*))))
   (values))
 
