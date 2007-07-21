@@ -113,7 +113,7 @@
 ;;; slightly more cheaply then the transforms. (Transforms add new
 ;;; lambdas, which requires more work by the compiler.)
 
-(deftransform slot-value ((object slot-name) * * :important t)
+(deftransform slot-value ((object slot-name))
   "optimize"
   (let (c-slot-name)
     (if (and (pcl-boot-state-complete-p)
@@ -125,9 +125,11 @@
 
 (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
                                       (t symbol t) t
-                                      :important t
-                                      ;; see comment in the
-                                      ;; compiler-macro
+                                      ;; Safe code wants to check the
+                                      ;; type, and the global accessor
+                                      ;; won't do that. Also see the
+                                      ;; comment in the
+                                      ;; compiler-macro.
                                       :policy (< safety 3))
   "optimize"
   (let (c-slot-name)

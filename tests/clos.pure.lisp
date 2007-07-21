@@ -71,3 +71,13 @@
                      (when (and std (< std last))
                        (push `(:std ,c) result))))))
     (assert (null result))))
+
+;; No compiler-notes for non-constant slot-names in default policy.
+(handler-case
+    (compile nil '(lambda (x y z)
+                   (setf (slot-value x z)
+                         (slot-value y z))))
+  (sb-ext:compiler-note (e)
+    (error e)))
+
+
