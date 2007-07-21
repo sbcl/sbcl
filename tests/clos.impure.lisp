@@ -1545,5 +1545,26 @@
 (assert (equal '(:foo 13)
                (apply #'test-long-form-with-&rest :foo (make-list 13))))
 
+;;;; slot-missing for non-standard classes on SLOT-VALUE
+;;;;
+;;;; FIXME: This is arguably not right, actually: CLHS seems to say
+;;;; we should just signal an error at least for built-in classes, but
+;;;; for a while we were hitting NO-APPLICABLE-METHOD, which is definitely
+;;;; wrong -- so test this for now at least.
+
+(defvar *magic-symbol* (gensym "MAGIC"))
+
+(set *magic-symbol* 42)
+
+(defmethod slot-missing (class instance (slot-name (eql *magic-symbol*)) op
+                         &optional new)
+  (if (eq 'setf op)
+      (setf (symbol-value *magic-symbol*)  new)
+      (symbol-value *magic-symbol*)))
+
+(assert (eql 42 (slot-value (cons t t) *magic-symbol*)))
+(assert (eql 13 (setf (slot-value 123 *magic-symbol*) 13)))
+(assert (eql 13 (slot-value 'foobar *magic-symbol*)))
+
 
 ;;;; success

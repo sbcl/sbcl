@@ -1557,6 +1557,11 @@
   (def class-direct-default-initargs)
   (def class-default-initargs))
 
+(defmethod class-slot-vector (class)
+  ;; Default method to cause FIND-SLOT-DEFINITION return NIL for all
+  ;; non SLOT-CLASS classes.
+  #(nil))
+
 (defmethod validate-superclass ((c class) (s built-in-class))
   (or (eq s *the-class-t*) (eq s *the-class-stream*)
       ;; FIXME: bad things happen if someone tries to mix in both

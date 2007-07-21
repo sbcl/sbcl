@@ -551,7 +551,7 @@
 ;;;    empty vector separately: it just returns a NIL.
 
 (defun find-slot-definition (class slot-name)
-  (declare (symbol slot-name) (inline getf))
+  (declare (symbol slot-name))
   (let* ((vector (class-slot-vector class))
          (index (rem (sxhash slot-name) (length vector))))
     (declare (simple-vector vector) (index index)
