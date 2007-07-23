@@ -798,9 +798,9 @@ default-value-8
                     ;; Construct a trap code with the low bits from
                     ;; SINGLE-STEP-AROUND-TRAP and the high bits from
                     ;; the register number of CALLABLE-TN.
-                    (inst break (logior single-step-around-trap
-                                        (ash (reg-tn-encoding callable-tn)
-                                             5)))
+                    (inst break 0 (logior single-step-around-trap
+                                          (ash (reg-tn-encoding callable-tn)
+                                               5)))
                     (emit-label step-done-label))))
 
            ,@(if named
