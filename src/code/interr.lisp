@@ -485,7 +485,7 @@
 
 ;;; This is SIGTRAP / EXCEPTION_BREAKPOINT that runtime could not deal
 ;;; with. Prior to Windows we just had a Lisp side handler for
-;;; SIGTRAP, but now we need to deal this portably.
+;;; SIGTRAP, but now we need to deal with this portably.
 (defun unhandled-trap-error (context-sap)
   (declare (type system-area-pointer context-sap))
   (infinite-error-protect
