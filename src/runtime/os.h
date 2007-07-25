@@ -175,6 +175,6 @@ int os_get_errno(void);
 /* Return an absolute path to the runtime executable, or NULL if this
  * information is unavailable.  If a non-null pathname is returned, it
  * must be 'free'd. */
-extern char *os_get_runtime_executable_path();
+extern char *os_get_runtime_executable_path(void);
 
 #endif

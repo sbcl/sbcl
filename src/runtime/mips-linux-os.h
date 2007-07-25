@@ -4,7 +4,8 @@
 typedef struct ucontext os_context_t;
 typedef unsigned long long os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context) {
+static inline os_context_t *arch_os_get_context(void **void_context)
+{
     return (os_context_t *) *void_context;
 }
 

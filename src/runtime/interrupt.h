@@ -26,9 +26,9 @@
 /* FIXME: do not rely on NSIG being a multiple of 8 */
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
-extern void check_blockables_blocked_or_lose();
-extern void check_gc_signals_unblocked_or_lose();
-extern void unblock_gc_signals();
+extern void check_blockables_blocked_or_lose(void);
+extern void check_gc_signals_unblocked_or_lose(void);
+extern void unblock_gc_signals(void);
 
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
@@ -62,7 +62,7 @@ struct interrupt_data {
 };
 
 
-extern void interrupt_init();
+extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
 extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
@@ -96,7 +96,7 @@ extern void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
 extern void sigaddset_blockable(sigset_t *s);
 
-extern void block_blockable_signals();
+extern void block_blockable_signals(void);
 
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:

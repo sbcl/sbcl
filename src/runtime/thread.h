@@ -42,7 +42,8 @@ extern int dynamic_values_bytes;
 #endif
 
 static inline lispobj
-SymbolValue(u64 tagged_symbol_pointer, void *thread) {
+SymbolValue(u64 tagged_symbol_pointer, void *thread)
+{
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -57,7 +58,8 @@ SymbolValue(u64 tagged_symbol_pointer, void *thread) {
 }
 
 static inline lispobj
-SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
+SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
+{
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -69,7 +71,8 @@ SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
 }
 
 static inline void
-SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
+SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
+{
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -84,8 +87,10 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
 #endif
     sym->value = val;
 }
+
 static inline void
-SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
+SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
+{
 #ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
@@ -109,7 +114,8 @@ os_context_t *get_interrupt_context_for_thread(struct thread *th)
  * much stuff like struct thread and all_threads to be defined, which
  * usually aren't by that time.  So, it's here instead.  Sorry */
 
-static inline struct thread *arch_os_get_current_thread() {
+static inline struct thread *arch_os_get_current_thread(void)
+{
 #if defined(LISP_FEATURE_SB_THREAD)
 #if defined(LISP_FEATURE_X86)
     register struct thread *me=0;

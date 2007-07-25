@@ -12,7 +12,8 @@
 #ifndef _FIXNUMP_H
 #define _FIXNUMP_H
 
-static inline int fixnump(lispobj obj) {
+static inline int fixnump(lispobj obj)
+{
     return((obj &
             (LOWTAG_MASK &
              (~(EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG))))

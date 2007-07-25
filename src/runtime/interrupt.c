@@ -597,7 +597,8 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
  * already; we're just doing the Lisp-level processing now that we
  * put off then */
 static void
-run_deferred_handler(struct interrupt_data *data, void *v_context) {
+run_deferred_handler(struct interrupt_data *data, void *v_context)
+{
     /* The pending_handler may enable interrupts and then another
      * interrupt may hit, overwrite interrupt_data, so reset the
      * pending handler before calling it. Trust the handler to finish
@@ -1023,7 +1024,8 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
  * functions and variables.
  */
 void
-undefined_alien_function() {
+undefined_alien_function(void)
+{
     funcall0(SymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
@@ -1112,7 +1114,7 @@ sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
 }
 
 static void
-see_if_sigaction_nodefer_works()
+see_if_sigaction_nodefer_works(void)
 {
     struct sigaction sa, old_sa;
 
@@ -1255,7 +1257,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 }
 
 void
-interrupt_init()
+interrupt_init(void)
 {
 #ifndef LISP_FEATURE_WIN32
     int i;
@@ -1302,7 +1304,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 }
 #endif
 
-void
+static void
 unhandled_trap_error(os_context_t *context)
 {
     lispobj context_sap;
@@ -1315,7 +1317,7 @@ unhandled_trap_error(os_context_t *context)
     lose("UNHANDLED-TRAP-ERROR fell through");
 }
 
-/* Common logic far trapping instructions. How we actually handle each
+/* Common logic for trapping instructions. How we actually handle each
  * case is highly architecture dependent, but the overall shape is
  * this. */
 void

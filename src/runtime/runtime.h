@@ -80,12 +80,14 @@ typedef unsigned int lispobj;
 #endif
 
 static inline int
-lowtag_of(lispobj obj) {
+lowtag_of(lispobj obj)
+{
     return obj & LOWTAG_MASK;
 }
 
 static inline int
-widetag_of(lispobj obj) {
+widetag_of(lispobj obj)
+{
     return obj & WIDETAG_MASK;
 }
 
@@ -128,6 +130,7 @@ native_pointer(lispobj obj)
 {
     return (lispobj *) ((pointer_sized_uint_t) (obj & ~LOWTAG_MASK));
 }
+
 /* inverse operation: create a suitably tagged lispobj from a native
  * pointer or integer.  Needs to be a macro due to the tedious C type
  * system */
