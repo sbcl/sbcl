@@ -171,7 +171,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end, os_vm_offset_t fil
 #endif
 
     printf("writing %lu bytes from the %s space at 0x%08lx\n",
-           bytes, names[id], (unsigned long)addr);
+           (unsigned long)bytes, names[id], (unsigned long)addr);
 
     data = write_bytes(file, (char *)addr, bytes, file_offset);
 
