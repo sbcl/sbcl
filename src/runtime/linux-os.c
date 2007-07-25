@@ -52,6 +52,8 @@
 #include "gc.h"
 #if defined LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"
+#else
+#include "cheneygc-internal.h"
 #endif
 
 #ifdef LISP_FEATURE_X86

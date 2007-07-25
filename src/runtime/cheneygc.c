@@ -30,6 +30,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "thread.h"
+#include "arch.h"
 
 /* So you need to debug? */
 #if 0
