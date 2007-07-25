@@ -49,20 +49,26 @@ arch_os_thread_cleanup(struct thread *thread)
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
-    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_regs[offset]);
+    mcontext_t *mctx = &context->uc_mcontext;
+    struct sigcontext *ctx = (struct sigcontext *)mctx;
+    return &ctx->sc_regs[offset];
 }
 
 os_context_register_t *
 os_context_fpregister_addr(os_context_t *context, int offset)
 {
-    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_fpregs[offset]);
+    mcontext_t *mctx = &context->uc_mcontext;
+    struct sigcontext *ctx = (struct sigcontext *)mctx;
+    return &ctx->sc_fpregs[offset];
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     /* Why do I get all the silly ports? -- CSR, 2002-08-11 */
-    return &(((struct sigcontext *)&(context->uc_mcontext))->sc_pc);
+    mcontext_t *mctx = &context->uc_mcontext;
+    struct sigcontext *ctx = (struct sigcontext *)mctx;
+    return &ctx->sc_pc;
 }
 
 sigset_t *
