@@ -1590,7 +1590,7 @@
 ;;;     :OFFSET SB-Offset
 ;;;         Force the temporary to be allocated in the specified SC
 ;;;         with the specified offset. Offset is evaluated at
-;;;         macroexpand time. If Offset is emitted, the register
+;;;         macroexpand time. If Offset is omitted, the register
 ;;;         allocator chooses a free location in SC. If both SC and
 ;;;         Offset are omitted, then the temporary is packed according
 ;;;         to its primitive type.
@@ -1600,7 +1600,7 @@
 ;;;         Similar to the argument/result option, this specifies the
 ;;;         start and end of the temporaries' lives. The defaults are
 ;;;         :LOAD and :SAVE, i.e. the duration of the VOP. The other
-;;;         intervening phases are :ARGUMENT,:EVAL and :RESULT.
+;;;         intervening phases are :ARGUMENT, :EVAL and :RESULT.
 ;;;         Non-zero sub-phases can be specified by a list, e.g. by
 ;;;         default the second argument's life ends at (:ARGUMENT 1).
 ;;;
