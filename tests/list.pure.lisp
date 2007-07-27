@@ -186,15 +186,15 @@
                   (assert (equal ',expected (let ((numbers ',numbers)
                                                   (tricky ',tricky))
                                               (funcall fun ,@(cdr form)))))
-                 (assert (equal ',expected (funcall (lambda ()
-                                                      (declare (optimize speed))
-                                                      (let ((numbers ',numbers)
-                                                            (tricky ',tricky))
-                                                        ,form)))))
-                 (assert (equal ',expected (funcall (lambda ()
-                                                      (declare (optimize space))
-                                                      (let ((numbers ',numbers)
-                                                            (tricky ',tricky))
+                  (assert (equal ',expected (funcall (lambda ()
+                                                       (declare (optimize speed))
+                                                       (let ((numbers ',numbers)
+                                                             (tricky ',tricky))
+                                                         ,form)))))
+                  (assert (equal ',expected (funcall (lambda ()
+                                                       (declare (optimize space))
+                                                       (let ((numbers ',numbers)
+                                                             (tricky ',tricky))
                                                         ,form)))))))))
   (let ((fun (car (list 'assoc))))
     (test (1 a) (assoc 1 numbers))
@@ -221,3 +221,11 @@
     ;; Bug reported by Paul Dietz: ASSOC should ignore NIL elements in a
     ;; alist
     (test (nil . c) (assoc nil tricky :test #'eq))))
+
+;;; bug reported by Dan Corkill: *PRINT-CASE* affected the compiler transforms
+;;; for ASSOC & MEMBER
+(let ((*print-case* :downcase))
+  (assert (eql 2 (cdr (funcall (compile nil '(lambda (i l) (assoc i l)))
+                               :b '((:a . 1) (:b . 2))))))
+  (assert (equal '(3 4 5) (funcall (compile nil '(lambda (i l) (member i l)))
+                                   3 '(1 2 3 4 5)))))

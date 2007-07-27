@@ -291,6 +291,21 @@
             (or end length)
             (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
+(defun specialized-list-seek-function-name (function-name key-functions)
+  (or (find-symbol (with-output-to-string (s)
+                     ;; Write "%NAME-FUN1-FUN2-FUN3", etc. Not only is
+                     ;; this ever so slightly faster then FORMAT, this
+                     ;; way we are also proof against *PRINT-CASE*
+                     ;; frobbing and such.
+                     (write-char #\% s)
+                     (write-string (symbol-name function-name) s)
+                     (dolist (f key-functions)
+                       (write-char #\- s)
+                       (write-string (symbol-name f) s)))
+                   (load-time-value (find-package "SB!KERNEL")))
+      (bug "Unknown list item seek transform: name=~S, key-functions=~S"
+           function-name key-functions)))
+
 (defun transform-list-item-seek (name list key test test-not node)
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
@@ -309,10 +324,6 @@
                    (values key '(%coerce-callable-to-fun key))))))
     (let* ((funs (remove nil (list (and key 'key) (cond (test 'test)
                                                         (test-not 'test-not)))))
-           (out-of-line (or (find-symbol (format nil "%~A~{-~A~}" name funs)
-                                         (load-time-value (find-package "SB!KERNEL")))
-                            (bug "Unknown list item seek transform: name=~S, funs=~S"
-                                 name funs)))
            (target-expr (if key '(%funcall key target) 'target))
            (test-expr (cond (test `(%funcall test item ,target-expr))
                             (test-not `(not (%funcall test-not item ,target-expr)))
@@ -344,7 +355,9 @@
                  ;; constant nil list -- nothing to find!
                  nil)
                 (t
-                 `(,out-of-line item list ,@(mapcar #'ensure-fun funs)))))))))
+                 ;; specialized out-of-line version
+                 `(,(specialized-list-seek-function-name name funs)
+                    item list ,@(mapcar #'ensure-fun funs)))))))))
 
 (deftransform member ((item list &key key test test-not) * * :node node)
   (transform-list-item-seek 'member list key test test-not node))

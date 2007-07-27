@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.9 relative to sbcl-1.0.8:
+  * bug fix: new compiler transforms for MEMBER and ASSOC were affected
+    by printer control variables. (reported by Dan Corkill)
+
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides
     atomic compare-and-swap operations on threaded platforms.
