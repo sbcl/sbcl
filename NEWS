@@ -2,6 +2,8 @@
 changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * bug fix: new compiler transforms for MEMBER and ASSOC were affected
     by printer control variables. (reported by Dan Corkill)
+  * bug fix: system leaked memory when delayed output was performed by
+    the OS in smaller chunks then expected. (thanks to David Smith)
 
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides

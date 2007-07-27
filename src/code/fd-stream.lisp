@@ -219,7 +219,8 @@ bytes-per-buffer of memory.")
             ((not (null count)) ; sorta worked..
              (push (list base
                          (the index (+ start count))
-                         end)
+                         end
+                         reuse-sap)
                    (fd-stream-output-later stream))))))
   (unless (fd-stream-output-later stream)
     (remove-fd-handler (fd-stream-handler stream))
