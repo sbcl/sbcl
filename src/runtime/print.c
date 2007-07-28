@@ -335,7 +335,7 @@ static void brief_list(lispobj obj)
                 obj = NIL;
                 break;
             }
-            print_obj(NULL, cons->car);
+            print_obj("", cons->car);
             obj = cons->cdr;
             space = 1;
             if (obj == NIL)
@@ -343,7 +343,7 @@ static void brief_list(lispobj obj)
         }
         if (obj != NIL) {
             printf(" . ");
-            print_obj(NULL, obj);
+            print_obj("", obj);
         }
         putchar(')');
     }
@@ -731,8 +731,10 @@ static void print_obj(char *prefix, lispobj obj)
         dont_descend = 1;
 
     if (var == NULL &&
-        /* FIXME: What does this "x & y & z & .." expression mean? */
-        (obj & FUN_POINTER_LOWTAG & LIST_POINTER_LOWTAG & INSTANCE_POINTER_LOWTAG & OTHER_POINTER_LOWTAG) != 0)
+        ((obj & LOWTAG_MASK) == FUN_POINTER_LOWTAG ||
+	 (obj & LOWTAG_MASK) == LIST_POINTER_LOWTAG ||
+	 (obj & LOWTAG_MASK) == INSTANCE_POINTER_LOWTAG ||
+	 (obj & LOWTAG_MASK) == OTHER_POINTER_LOWTAG))
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)
