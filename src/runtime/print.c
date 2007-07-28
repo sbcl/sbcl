@@ -732,9 +732,9 @@ static void print_obj(char *prefix, lispobj obj)
 
     if (var == NULL &&
         ((obj & LOWTAG_MASK) == FUN_POINTER_LOWTAG ||
-	 (obj & LOWTAG_MASK) == LIST_POINTER_LOWTAG ||
-	 (obj & LOWTAG_MASK) == INSTANCE_POINTER_LOWTAG ||
-	 (obj & LOWTAG_MASK) == OTHER_POINTER_LOWTAG))
+         (obj & LOWTAG_MASK) == LIST_POINTER_LOWTAG ||
+         (obj & LOWTAG_MASK) == INSTANCE_POINTER_LOWTAG ||
+         (obj & LOWTAG_MASK) == OTHER_POINTER_LOWTAG))
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)
