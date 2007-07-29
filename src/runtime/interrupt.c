@@ -1295,7 +1295,7 @@ void
 lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 {
    /* FIXME: This is lossy: if we get another memory fault (eg. from
-    * another thread) before lisp has read this, we the information.
+    * another thread) before lisp has read this, we lose the information.
     * However, since this is mostly informative, we'll live with that for
     * now -- some address is better then no address in this case.
     */
