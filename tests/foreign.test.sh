@@ -27,7 +27,7 @@ testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
 build_so() {
   echo building $1.so
-  if [ "`uname -m`" = x86_64 ]; then
+  if [ "`uname -m`" = x86_64 -o "`uname -m`" = amd64 ]; then
     CFLAGS="$CFLAGS -fPIC"
   fi
   if [ "`uname`" = Darwin ]; then
