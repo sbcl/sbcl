@@ -776,10 +776,11 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     thread->state=STATE_SUSPENDED;
     FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
 
+    sigemptyset(&ss);
 #if defined(SIG_RESUME_FROM_GC)
-    sigemptyset(&ss); sigaddset(&ss,SIG_RESUME_FROM_GC);
+    sigaddset(&ss,SIG_RESUME_FROM_GC);
 #else
-    sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
+    sigaddset(&ss,SIG_STOP_FOR_GC);
 #endif
 
     /* It is possible to get SIGCONT (and probably other non-blockable
