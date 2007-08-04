@@ -16,4 +16,8 @@
   "SBCL")
 
 (defun sb!xc:lisp-implementation-version ()
-  #.(sb-cold:read-from-file "version.lisp-expr"))
+  #.(format nil "~A~@[.~A~]"
+            (sb-cold:read-from-file "version.lisp-expr")
+            (let ((pathname "branch-version.lisp-expr"))
+              (when (probe-file pathname)
+                (sb-cold:read-from-file pathname)))))
