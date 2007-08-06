@@ -2058,7 +2058,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                     (funcall write-function stream (aref data i))))))
            (if (and (fd-stream-p stream)
                     (compatible-vector-and-stream-element-types-p data stream))
-               (output-raw-bytes stream data offset-start offset-end)
+               (buffer-output stream data offset-start offset-end)
                (output-seq-in-loop)))))))
   seq)
 

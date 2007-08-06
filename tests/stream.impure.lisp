@@ -91,7 +91,10 @@
     (with-standard-io-syntax
       (prin1 'insert s)))
   (with-open-file (s p)
-    (assert (string= (read-line s) "THESE INSERTMBOLS")))
+    (let ((line (read-line s))
+          (want "THESE INSERTMBOLS"))
+      (unless (equal line want)
+        (error "wanted ~S, got ~S" want line))))
   (delete-file p))
 
 ;;; :DIRECTION :IO didn't work on non-existent pathnames

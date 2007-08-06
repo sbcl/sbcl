@@ -307,7 +307,7 @@
 ;;; improperly.
 ;;;
 ;;; This test assumes that buffering is still done until a buffer of
-;;; SB-IMPL::BYTES-PER-BUFFER bytes is filled up, that the buffer may
+;;; SB-IMPL::+BYTES-PER-BUFFER+ bytes is filled up, that the buffer may
 ;;; immediately be completely filled for normal files, and that the
 ;;; buffer-fill routine is responsible for figuring out when we've
 ;;; reached EOF.
@@ -316,8 +316,8 @@
         ;; If non-NIL, size (in bytes) of the file that will exercise
         ;; the LISTEN problem.
         (bytes-per-buffer-sometime
-         (and (boundp 'sb-impl::bytes-per-buffer)
-              (symbol-value 'sb-impl::bytes-per-buffer))))
+         (and (boundp 'sb-impl::+bytes-per-buffer+)
+              (symbol-value 'sb-impl::+bytes-per-buffer+))))
     (when bytes-per-buffer-sometime
       (unwind-protect
            (progn

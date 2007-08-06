@@ -11,38 +11,107 @@
 
 (in-package "SB!IMPL")
 
-;;;; buffer manipulation routines
+;;;; BUFFER
+;;;;
+;;;; Streams hold BUFFER objects, which contain a SAP, size of the
+;;;; memory area the SAP stands for (LENGTH bytes), and HEAD and TAIL
+;;;; indexes which delimit the "valid", or "active" area of the
+;;;; memory.
+;;;;
+;;;; Buffers get allocated lazily, and are recycled by returning them
+;;;; to the *AVAILABLE-BUFFERS* list. Every buffer has it's own
+;;;; finalizer, to take care of releasing the SAP memory when a stream
+;;;; is not properly closed.
 
-;;; FIXME: Is it really good to maintain this pool separate from the
-;;; GC and the C malloc logic?
+(declaim (inline buffer-sap buffer-length buffer-head buffer-tail
+                 (setf buffer-head) (setf buffer-tail)))
+(defstruct (buffer (:constructor %make-buffer (sap length)))
+  (sap (missing-arg) :type system-area-pointer :read-only t)
+  (length (missing-arg) :type index :read-only t)
+  (head 0 :type index)
+  (tail 0 :type index))
+
 (defvar *available-buffers* ()
   #!+sb-doc
-  "List of available buffers. Each buffer is an sap pointing to
-bytes-per-buffer of memory.")
+  "List of available buffers.")
 
-(defvar *available-buffers-mutex* (sb!thread:make-mutex
-                                   :name "lock for *AVAILABLE-BUFFERS*")
+(defvar *available-buffers-spinlock* (sb!thread::make-spinlock
+                                      :name "lock for *AVAILABLE-BUFFERS*")
   #!+sb-doc
   "Mutex for access to *AVAILABLE-BUFFERS*.")
 
 (defmacro with-available-buffers-lock ((&optional) &body body)
-  ;; CALL-WITH-SYSTEM-MUTEX because streams are low-level enough to be
-  ;; async signal safe, and in particular a C-c that brings up the
-  ;; debugger while holding the mutex would lose badly
-  `(sb!thread::call-with-system-mutex (lambda () ,@body)
-                                    *available-buffers-mutex*))
+  ;; CALL-WITH-SYSTEM-SPINLOCK because
+  ;;
+  ;; 1. streams are low-level enough to be async signal safe, and in
+  ;;    particular a C-c that brings up the debugger while holding the
+  ;;    mutex would lose badly
+  ;;
+  ;; 2. this can potentially be a fairly busy (but also probably
+  ;;    uncontended) lock, so we don't want to pay the syscall per
+  ;;    release -- hence a spinlock.
+  ;;
+  ;; ...again, once we have smarted locks the spinlock here can become
+  ;; a mutex.
+  `(sb!thread::call-with-system-spinlock (lambda () ,@body)
+                                         *available-buffers-spinlock*))
 
-(defconstant bytes-per-buffer (* 4 1024)
+(defconstant +bytes-per-buffer+ (* 4 1024)
   #!+sb-doc
-  "Number of bytes per buffer.")
+  "Default number of bytes per buffer.")
 
-;;; Return the next available buffer, creating one if necessary.
-#!-sb-fluid (declaim (inline next-available-buffer))
-(defun next-available-buffer ()
+(defun alloc-buffer (&optional (size +bytes-per-buffer+))
+  ;; Don't want to allocate & unwind before the finalizer is in place.
+  (without-interrupts
+    (let* ((sap (allocate-system-memory size))
+           (buffer (%make-buffer sap size)))
+      (finalize buffer (lambda ()
+                         (deallocate-system-memory sap size)))
+      buffer)))
+
+(defun get-buffer ()
+  ;; Don't go for the lock if there is nothing to be had -- sure,
+  ;; another thread might just release one before we get it, but that
+  ;; is not worth the cost of locking. Also release the lock before
+  ;; allocation, since it's going to take a while.
+  (if *available-buffers*
+      (or (with-available-buffers-lock ()
+            (pop *available-buffers*))
+          (alloc-buffer))
+      (alloc-buffer)))
+
+(declaim (inline reset-buffer))
+(defun reset-buffer (buffer)
+  (setf (buffer-head buffer) 0
+        (buffer-tail buffer) 0)
+  buffer)
+
+(defun release-buffer (buffer)
+  (reset-buffer buffer)
   (with-available-buffers-lock ()
-    (if *available-buffers*
-        (pop *available-buffers*)
-        (allocate-system-memory bytes-per-buffer))))
+    (push buffer *available-buffers*)))
+
+;;; This is a separate buffer management function, as it wants to be
+;;; clever about locking -- grabbing the lock just once.
+(defun release-fd-stream-buffers (fd-stream)
+  (let ((ibuf (fd-stream-ibuf fd-stream))
+        (obuf (fd-stream-obuf fd-stream))
+        (queue (loop for item in (fd-stream-output-queue fd-stream)
+                       when (bufferp item)
+                       collect (reset-buffer item))))
+    (when ibuf
+      (push (reset-buffer ibuf) queue))
+    (when obuf
+      (push (reset-buffer obuf) queue))
+    ;; ...so, anything found?
+    (when queue
+      ;; detach from stream
+      (setf (fd-stream-ibuf fd-stream) nil
+            (fd-stream-obuf fd-stream) nil
+            (fd-stream-output-queue fd-stream) nil)
+      ;; splice to *available-buffers*
+      (with-available-buffers-lock ()
+        (setf *available-buffers* (nconc queue *available-buffers*))))))
 
 ;;;; the FD-STREAM structure
 
@@ -83,18 +152,13 @@ bytes-per-buffer of memory.")
 
   ;; the input buffer
   (unread nil)
-  (ibuf-sap nil :type (or system-area-pointer null))
-  (ibuf-length nil :type (or index null))
-  (ibuf-head 0 :type index)
-  (ibuf-tail 0 :type index)
+  (ibuf nil :type (or buffer null))
 
   ;; the output buffer
-  (obuf-sap nil :type (or system-area-pointer null))
-  (obuf-length nil :type (or index null))
-  (obuf-tail 0 :type index)
+  (obuf nil :type (or buffer null))
 
   ;; output flushed, but not written due to non-blocking io?
-  (output-later nil)
+  (output-queue nil)
   (handler nil)
   ;; timeout specified for this stream as seconds or NIL if none
   (timeout nil :type (or single-float null))
@@ -106,6 +170,196 @@ bytes-per-buffer of memory.")
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
+
+;;;; CORE OUTPUT FUNCTIONS
+
+;;; Buffer the section of THING delimited by START and END by copying
+;;; to output buffer(s) of stream.
+(defun buffer-output (stream thing start end)
+  (declare (index start end))
+  (when (< end start)
+    (error ":END before :START!"))
+  (when (> end start)
+    ;; Copy bytes from THING to buffers.
+    (flet ((copy-to-buffer (buffer offset count)
+             (declare (buffer buffer) (index offset count))
+             (aver (plusp count))
+             (let ((sap (buffer-sap buffer)))
+               (etypecase thing
+                 (system-area-pointer
+                  (system-area-ub8-copy thing start sap offset count))
+                 ((simple-unboxed-array (*))
+                  (copy-ub8-to-system-area thing start sap offset count))))
+             (incf (buffer-tail buffer) count)
+             (incf start count)))
+      (tagbody
+         ;; First copy is special: the buffer may already contain
+         ;; something, or be even full.
+         (let* ((obuf (fd-stream-obuf stream))
+                (tail (buffer-tail obuf))
+                (space (- (buffer-length obuf) tail)))
+           (when (plusp space)
+             (copy-to-buffer obuf tail (min space (- end start)))
+             (go :more-output-p)))
+       :flush-and-fill
+         ;; Later copies always have an empty buffer, since they are freshly
+         ;; flushed.
+         (let* ((obuf (flush-output-buffer stream))
+                (offset (buffer-tail obuf)))
+           (aver (zerop offset))
+           (copy-to-buffer obuf offset (min (buffer-length obuf) (- end start))))
+       :more-output-p
+         (when (> end start)
+           (go :flush-and-fill))))))
+
+;;; Flush the current output buffer of the stream, ensuring that the
+;;; new buffer is empty. Returns (for convenience) the new output
+;;; buffer -- which may or may not be EQ to the old one. If the is no
+;;; queued output we try to write the buffer immediately -- otherwise
+;;; we queue it for later.
+(defun flush-output-buffer (stream)
+  (let ((obuf (fd-stream-obuf stream)))
+    (when obuf
+      (let ((head (buffer-head obuf))
+            (tail (buffer-tail obuf)))
+        (cond ((eql head tail)
+               ;; Buffer is already empty -- just ensure that is is
+               ;; set to zero as well.
+               (reset-buffer obuf))
+              ((fd-stream-output-queue stream)
+               ;; There is already stuff on the queue -- go directly
+               ;; there.
+               (aver (< head tail))
+               (%queue-and-replace-output-buffer stream))
+              (t
+               ;; Try a non-blocking write, queue whatever is left over.
+               (aver (< head tail))
+               (synchronize-stream-output stream)
+               (let ((length (- tail head)))
+                 (multiple-value-bind (count errno)
+                     (sb!unix:unix-write (fd-stream-fd stream) (buffer-sap obuf) head length)
+                   (cond ((eql count length)
+                          ;; Complete write -- we can use the same buffer.
+                          (reset-buffer obuf))
+                         (count
+                          ;; Partial write -- update buffer status and queue.
+                          (incf (buffer-head obuf) count)
+                          (%queue-and-replace-output-buffer stream))
+                         #!-win32
+                         ((eql errno sb!unix:ewouldblock)
+                          ;; Blocking, queue.
+                          (%queue-and-replace-output-buffer stream))
+                         (t
+                          (simple-stream-perror "Couldn't write to ~s" stream errno)))))))))))
+
+;;; Helper for FLUSH-OUTPUT-BUFFER -- returns the new buffer.
+(defun %queue-and-replace-output-buffer (stream)
+  (let ((queue (fd-stream-output-queue stream))
+        (later (list (or (fd-stream-obuf stream) (bug "Missing obuf."))))
+        (new (get-buffer)))
+    ;; Important: before putting the buffer on queue, give the stream
+    ;; a new one. If we get an interrupt and unwind losing the buffer
+    ;; is relatively OK, but having the same buffer in two places
+    ;; would be bad.
+    (setf (fd-stream-obuf stream) new)
+    (cond (queue
+           (nconc queue later))
+          (t
+           (setf (fd-stream-output-queue stream) later)))
+    (unless (fd-stream-handler stream)
+      (setf (fd-stream-handler stream)
+            (add-fd-handler (fd-stream-fd stream)
+                            :output
+                            (lambda (fd)
+                              (declare (ignore fd))
+                              (write-output-from-queue stream)))))
+    new))
+
+;;; This is called by the FD-HANDLER for the stream when output is
+;;; possible.
+(defun write-output-from-queue (stream)
+  (synchronize-stream-output stream)
+  (let (not-first-p)
+    (tagbody
+     :pop-buffer
+       (let* ((buffer (pop (fd-stream-output-queue stream)))
+              (head (buffer-head buffer))
+              (length (- (buffer-tail buffer) head)))
+         (declare (index head length))
+         (multiple-value-bind (count errno)
+            (sb!unix:unix-write (fd-stream-fd stream) (buffer-sap buffer) head length)
+           (cond ((eql count length)
+                  ;; Complete write, see if we can do another right
+                  ;; away, or remove the handler if we're done.
+                  (release-buffer buffer)
+                  (cond ((fd-stream-output-queue stream)
+                         (setf not-first-p t)
+                         (go :pop-buffer))
+                        (t
+                         (let ((handler (fd-stream-handler stream)))
+                           (aver handler)
+                           (setf (fd-stream-handler stream) nil)
+                           (remove-fd-handler handler)))))
+                 (count
+                  ;; Partial write. Update buffer status and requeue.
+                  (aver (< count length))
+                  (incf (buffer-head buffer) (or count 0))
+                  (push buffer (fd-stream-output-queue stream)))
+                 (not-first-p
+                  ;; We tried to do multiple writes, and finally our
+                  ;; luck ran out. Requeue.
+                  (push buffer (fd-stream-output-queue stream)))
+                 (t
+                  ;; Could not write on the first try at all!
+                  #!+win32
+                  (simple-stream-perror "Couldn't write to ~S." stream errno)
+                  #!-win32
+                  (if (= errno sb!unix:ewouldblock)
+                      (bug "Unexpected blocking write in WRITE-OUTPUT-FROM-QUEUE.")
+                      (simple-stream-perror "Couldn't write to ~S" stream errno))))))))
+  nil)
+
+;;; Try to write THING directly to STREAM without buffering, if
+;;; possible. If direct write doesn't happen, buffer.
+(defun write-or-buffer-output (stream thing start end)
+  (declare (index start end))
+  (cond ((fd-stream-output-queue stream)
+         (buffer-output stream thing start end))
+        ((< end start)
+         (error ":END before :START!"))
+        ((> end start)
+         (let ((length (- end start)))
+           (synchronize-stream-output stream)
+           (multiple-value-bind (count errno)
+               (sb!unix:unix-write (fd-stream-fd stream) thing start length)
+             (cond ((eql count length)
+                    ;; Complete write -- done!
+                    )
+                   (count
+                    (aver (< count length))
+                    ;; Partial write -- buffer the rest.
+                    (buffer-output stream thing (+ start count) end))
+                   (t
+                    ;; Could not write -- buffer or error.
+                    #!+win32
+                    (simple-stream-perror "couldn't write to ~s" stream errno)
+                    #!-win32
+                    (if (= errno sb!unix:ewouldblock)
+                        (buffer-output stream thing start end)
+                        (simple-stream-perror "couldn't write to ~s" stream errno)))))))))
+
+;;; Deprecated -- can go away after 1.1 or so. Deprecated because
+;;; this is not something we want to export. Nikodemus thinks the
+;;; right thing is to support a low-level non-stream like IO layer,
+;;; akin to java.nio.
+(defun output-raw-bytes (stream thing &optional start end)
+  (write-or-buffer-output stream thing (or start 0) (or end (length thing))))
+
+(define-compiler-macro output-raw-bytes (stream thing &optional start end)
+  (deprecation-warning 'output-raw-bytes)
+  (let ((x (gensym "THING")))
+    `(let ((,x ,thing))
+       (write-or-buffer-output ,stream ,x (or ,start 0) (or ,end (length ,x))))))
 
 ;;;; output routines and related noise
 
@@ -154,8 +408,9 @@ bytes-per-buffer of memory.")
 (defun stream-decoding-error-and-handle (stream octet-count)
   (restart-case
       (stream-decoding-error stream
-                             (let ((sap (fd-stream-ibuf-sap stream))
-                                   (head (fd-stream-ibuf-head stream)))
+                             (let* ((buffer (fd-stream-ibuf stream))
+                                    (sap (buffer-sap buffer))
+                                    (head (buffer-head buffer)))
                                (loop for i from 0 below octet-count
                                      collect (sap-ref-8 sap (+ head i)))))
     (attempt-resync ()
@@ -188,155 +443,72 @@ bytes-per-buffer of memory.")
       (stream-decoding-error stream octet-count)
       (c-string-decoding-error stream octet-count)))
 
-;;; This is called by the server when we can write to the given file
-;;; descriptor. Attempt to write the data again. If it worked, remove
-;;; the data from the OUTPUT-LATER list. If it didn't work, something
-;;; is wrong.
-(defun frob-output-later (stream)
-  (let* ((stuff (pop (fd-stream-output-later stream)))
-         (base (car stuff))
-         (start (cadr stuff))
-         (end (caddr stuff))
-         (reuse-sap (cadddr stuff))
-         (length (- end start)))
-    (declare (type index start end length))
-    (multiple-value-bind (count errno)
-        (sb!unix:unix-write (fd-stream-fd stream)
-                            base
-                            start
-                            length)
-      (cond ((not count)
-             #!+win32
-             (simple-stream-perror "couldn't write to ~S" stream errno)
-             #!-win32
-             (if (= errno sb!unix:ewouldblock)
-                 (error "Write would have blocked, but SERVER told us to go.")
-                 (simple-stream-perror "couldn't write to ~S" stream errno)))
-            ((eql count length) ; Hot damn, it worked.
-             (when reuse-sap
-               (with-available-buffers-lock ()
-                 (push base *available-buffers*))))
-            ((not (null count)) ; sorta worked..
-             (push (list base
-                         (the index (+ start count))
-                         end
-                         reuse-sap)
-                   (fd-stream-output-later stream))))))
-  (unless (fd-stream-output-later stream)
-    (remove-fd-handler (fd-stream-handler stream))
-    (setf (fd-stream-handler stream) nil)))
-
-;;; Arange to output the string when we can write on the file descriptor.
-(defun output-later (stream base start end reuse-sap)
-  (cond ((null (fd-stream-output-later stream))
-         (setf (fd-stream-output-later stream)
-               (list (list base start end reuse-sap)))
-         (setf (fd-stream-handler stream)
-               (add-fd-handler (fd-stream-fd stream)
-                                      :output
-                                      (lambda (fd)
-                                        (declare (ignore fd))
-                                        (frob-output-later stream)))))
-        (t
-         (nconc (fd-stream-output-later stream)
-                (list (list base start end reuse-sap)))))
-  (when reuse-sap
-    (let ((new-buffer (next-available-buffer)))
-      (setf (fd-stream-obuf-sap stream) new-buffer)
-      (setf (fd-stream-obuf-length stream) bytes-per-buffer))))
-
-;;; Output the given noise. Check to see whether there are any pending
-;;; writes. If so, just queue this one. Otherwise, try to write it. If
-;;; this would block, queue it.
-(defun frob-output (stream base start end reuse-sap)
-  (declare (type fd-stream stream)
-           (type (or system-area-pointer (simple-array * (*))) base)
-           (type index start end))
-  (if (not (null (fd-stream-output-later stream))) ; something buffered.
-      (output-later stream base start end reuse-sap)
-      ;; ### check to see whether any of this noise can be output
-      (let ((length (- end start)))
-        (multiple-value-bind (count errno)
-            (sb!unix:unix-write (fd-stream-fd stream) base start length)
-          (cond ((not count)
-                 #!+win32
-                 (simple-stream-perror "Couldn't write to ~S" stream errno)
-                 #!-win32
-                 (if (= errno sb!unix:ewouldblock)
-                     (output-later stream base start end reuse-sap)
-                     (simple-stream-perror "Couldn't write to ~S"
-                                           stream errno)))
-                ((not (eql count length))
-                 (output-later stream base (the index (+ start count))
-                               end reuse-sap)))))))
-
-;;; Flush any data in the output buffer.
-(defun flush-output-buffer (stream)
-  (let ((length (fd-stream-obuf-tail stream)))
-    (unless (= length 0)
-      (frob-output stream (fd-stream-obuf-sap stream) 0 length t)
-      (setf (fd-stream-obuf-tail stream) 0))))
+(defun synchronize-stream-output (stream)
+  ;; If we're reading and writing on the same file, flush buffered
+  ;; input and rewind file position accordingly.
+  (unless (fd-stream-dual-channel-p stream)
+    (let ((adjust (nth-value 1 (flush-input-buffer stream))))
+      (unless (eql 0 adjust)
+        (sb!unix:unix-lseek (fd-stream-fd stream) (- adjust) sb!unix:l_incr)))))
 
 (defun fd-stream-output-finished-p (stream)
-  (and (zerop (fd-stream-obuf-tail stream))
-       (not (fd-stream-output-later stream))))
+  (let ((obuf (fd-stream-obuf stream)))
+    (or (not obuf)
+        (and (zerop (buffer-tail obuf)))
+        (not (fd-stream-output-queue stream)))))
 
 (defmacro output-wrapper/variable-width ((stream size buffering restart)
                                          &body body)
-  (let ((stream-var (gensym)))
-    `(let ((,stream-var ,stream)
-           (size ,size))
+  (let ((stream-var (gensym "STREAM")))
+    `(let* ((,stream-var ,stream)
+            (obuf (fd-stream-obuf ,stream-var))
+            (size ,size))
       ,(unless (eq (car buffering) :none)
-         `(when (< (fd-stream-obuf-length ,stream-var)
-                   (+ (fd-stream-obuf-tail ,stream-var)
-                       size))
-            (flush-output-buffer ,stream-var)))
+         `(when (< (buffer-length obuf)
+                   (+ (buffer-tail obuf) size))
+            (setf obuf (flush-output-buffer ,stream-var))))
       ,(unless (eq (car buffering) :none)
-         `(when (and (not (fd-stream-dual-channel-p ,stream-var))
-                     (> (fd-stream-ibuf-tail ,stream-var)
-                        (fd-stream-ibuf-head ,stream-var)))
-            (file-position ,stream-var (file-position ,stream-var))))
+         ;; FIXME: Why this here? Doesn't seem necessary.
+         `(synchronize-stream-output ,stream-var))
       ,(if restart
            `(catch 'output-nothing
               ,@body
-              (incf (fd-stream-obuf-tail ,stream-var) size))
+              (incf (buffer-tail obuf) size))
            `(progn
              ,@body
-             (incf (fd-stream-obuf-tail ,stream-var) size)))
+             (incf (buffer-tail obuf) size)))
       ,(ecase (car buffering)
          (:none
           `(flush-output-buffer ,stream-var))
          (:line
-          `(when (eq (char-code byte) (char-code #\Newline))
+          `(when (eql byte #\Newline)
              (flush-output-buffer ,stream-var)))
          (:full))
     (values))))
 
 (defmacro output-wrapper ((stream size buffering restart) &body body)
-  (let ((stream-var (gensym)))
-    `(let ((,stream-var ,stream))
+  (let ((stream-var (gensym "STREAM")))
+    `(let* ((,stream-var ,stream)
+            (obuf (fd-stream-obuf ,stream-var)))
       ,(unless (eq (car buffering) :none)
-         `(when (< (fd-stream-obuf-length ,stream-var)
-                   (+ (fd-stream-obuf-tail ,stream-var)
-                       ,size))
-            (flush-output-buffer ,stream-var)))
+         `(when (< (buffer-length obuf)
+                   (+ (buffer-tail obuf) ,size))
+            (setf obuf (flush-output-buffer ,stream-var))))
+      ;; FIXME: Why this here? Doesn't seem necessary.
       ,(unless (eq (car buffering) :none)
-         `(when (and (not (fd-stream-dual-channel-p ,stream-var))
-                     (> (fd-stream-ibuf-tail ,stream-var)
-                        (fd-stream-ibuf-head ,stream-var)))
-            (file-position ,stream-var (file-position ,stream-var))))
+         `(synchronize-stream-output ,stream-var))
       ,(if restart
            `(catch 'output-nothing
               ,@body
-              (incf (fd-stream-obuf-tail ,stream-var) ,size))
+              (incf (buffer-tail obuf) ,size))
            `(progn
              ,@body
-             (incf (fd-stream-obuf-tail ,stream-var) ,size)))
+             (incf (buffer-tail obuf) ,size)))
       ,(ecase (car buffering)
          (:none
           `(flush-output-buffer ,stream-var))
          (:line
-          `(when (eq (char-code byte) (char-code #\Newline))
+          `(when (eql byte #\Newline)
              (flush-output-buffer ,stream-var)))
          (:full))
     (values))))
@@ -400,10 +572,10 @@ bytes-per-buffer of memory.")
                       (:none character)
                       (:line character)
                       (:full character))
-  (if (char= byte #\Newline)
+  (if (eql byte #\Newline)
       (setf (fd-stream-char-pos stream) 0)
       (incf (fd-stream-char-pos stream)))
-  (setf (sap-ref-8 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+  (setf (sap-ref-8 (buffer-sap obuf) (buffer-tail obuf))
         (char-code byte)))
 
 (def-output-routines ("OUTPUT-UNSIGNED-BYTE-~A-BUFFERED"
@@ -411,7 +583,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (unsigned-byte 8))
                       (:full (unsigned-byte 8)))
-  (setf (sap-ref-8 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+  (setf (sap-ref-8 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 (def-output-routines ("OUTPUT-SIGNED-BYTE-~A-BUFFERED"
@@ -419,8 +591,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (signed-byte 8))
                       (:full (signed-byte 8)))
-  (setf (signed-sap-ref-8 (fd-stream-obuf-sap stream)
-                          (fd-stream-obuf-tail stream))
+  (setf (signed-sap-ref-8 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 (def-output-routines ("OUTPUT-UNSIGNED-SHORT-~A-BUFFERED"
@@ -428,7 +599,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (unsigned-byte 16))
                       (:full (unsigned-byte 16)))
-  (setf (sap-ref-16 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+  (setf (sap-ref-16 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 (def-output-routines ("OUTPUT-SIGNED-SHORT-~A-BUFFERED"
@@ -436,8 +607,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (signed-byte 16))
                       (:full (signed-byte 16)))
-  (setf (signed-sap-ref-16 (fd-stream-obuf-sap stream)
-                           (fd-stream-obuf-tail stream))
+  (setf (signed-sap-ref-16 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 (def-output-routines ("OUTPUT-UNSIGNED-LONG-~A-BUFFERED"
@@ -445,7 +615,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (unsigned-byte 32))
                       (:full (unsigned-byte 32)))
-  (setf (sap-ref-32 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+  (setf (sap-ref-32 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 (def-output-routines ("OUTPUT-SIGNED-LONG-~A-BUFFERED"
@@ -453,8 +623,7 @@ bytes-per-buffer of memory.")
                       nil
                       (:none (signed-byte 32))
                       (:full (signed-byte 32)))
-  (setf (signed-sap-ref-32 (fd-stream-obuf-sap stream)
-                           (fd-stream-obuf-tail stream))
+  (setf (signed-sap-ref-32 (buffer-sap obuf) (buffer-tail obuf))
         byte))
 
 #+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
@@ -464,74 +633,15 @@ bytes-per-buffer of memory.")
                         nil
                         (:none (unsigned-byte 64))
                         (:full (unsigned-byte 64)))
-    (setf (sap-ref-64 (fd-stream-obuf-sap stream) (fd-stream-obuf-tail stream))
+    (setf (sap-ref-64 (buffer-sap obuf) (buffer-tail obuf))
           byte))
   (def-output-routines ("OUTPUT-SIGNED-LONG-LONG-~A-BUFFERED"
                         8
                         nil
                         (:none (signed-byte 64))
                         (:full (signed-byte 64)))
-    (setf (signed-sap-ref-64 (fd-stream-obuf-sap stream)
-                             (fd-stream-obuf-tail stream))
+    (setf (signed-sap-ref-64 (buffer-sap obuf) (buffer-tail obuf))
           byte)))
-
-;;; Do the actual output. If there is space to buffer the string,
-;;; buffer it. If the string would normally fit in the buffer, but
-;;; doesn't because of other stuff in the buffer, flush the old noise
-;;; out of the buffer and put the string in it. Otherwise we have a
-;;; very long string, so just send it directly (after flushing the
-;;; buffer, of course).
-(defun output-raw-bytes (fd-stream thing &optional start end)
-  #!+sb-doc
-  "Output THING to FD-STREAM. THING can be any kind of vector or a SAP. If
-  THING is a SAP, END must be supplied (as length won't work)."
-  (let ((start (or start 0))
-        (end (or end (length (the (simple-array * (*)) thing)))))
-    (declare (type index start end))
-    (when (and (not (fd-stream-dual-channel-p fd-stream))
-               (> (fd-stream-ibuf-tail fd-stream)
-                  (fd-stream-ibuf-head fd-stream)))
-      (file-position fd-stream (file-position fd-stream)))
-    (let* ((len (fd-stream-obuf-length fd-stream))
-           (tail (fd-stream-obuf-tail fd-stream))
-           (space (- len tail))
-           (bytes (- end start))
-           (newtail (+ tail bytes)))
-      (cond ((minusp bytes) ; error case
-             (error ":END before :START!"))
-            ((zerop bytes)) ; easy case
-            ((<= bytes space)
-             (if (system-area-pointer-p thing)
-                 (system-area-ub8-copy thing start
-                                       (fd-stream-obuf-sap fd-stream)
-                                       tail
-                                       bytes)
-                 ;; FIXME: There should be some type checking somewhere to
-                 ;; verify that THING here is a vector, not just <not a SAP>.
-                 (copy-ub8-to-system-area thing start
-                                          (fd-stream-obuf-sap fd-stream)
-                                          tail
-                                          bytes))
-             (setf (fd-stream-obuf-tail fd-stream) newtail))
-            ((<= bytes len)
-             (flush-output-buffer fd-stream)
-             (if (system-area-pointer-p thing)
-                 (system-area-ub8-copy thing
-                                       start
-                                       (fd-stream-obuf-sap fd-stream)
-                                       0
-                                       bytes)
-                 ;; FIXME: There should be some type checking somewhere to
-                 ;; verify that THING here is a vector, not just <not a SAP>.
-                 (copy-ub8-to-system-area thing
-                                          start
-                                          (fd-stream-obuf-sap fd-stream)
-                                          0
-                                          bytes))
-             (setf (fd-stream-obuf-tail fd-stream) bytes))
-            (t
-             (flush-output-buffer fd-stream)
-             (frob-output fd-stream thing start end nil))))))
 
 ;;; the routine to use to output a string. If the stream is
 ;;; unbuffered, slam the string down the file descriptor, otherwise
@@ -554,13 +664,13 @@ bytes-per-buffer of memory.")
                (eq (fd-stream-external-format stream) :latin-1))
           (ecase (fd-stream-buffering stream)
             (:full
-             (output-raw-bytes stream thing start end))
+             (buffer-output stream thing start end))
             (:line
-             (output-raw-bytes stream thing start end)
+             (buffer-output stream thing start end)
              (when last-newline
                (flush-output-buffer stream)))
             (:none
-             (frob-output stream thing start end nil)))
+             (write-or-buffer-output stream thing start end)))
           (ecase (fd-stream-buffering stream)
             (:full (funcall (fd-stream-output-bytes stream)
                             stream thing nil start end))
@@ -626,17 +736,15 @@ bytes-per-buffer of memory.")
                  (lambda (stream byte)
                    (output-wrapper (stream (/ i 8) (:none) nil)
                      (loop for j from 0 below (/ i 8)
-                           do (setf (sap-ref-8
-                                     (fd-stream-obuf-sap stream)
-                                     (+ j (fd-stream-obuf-tail stream)))
+                           do (setf (sap-ref-8 (buffer-sap obuf)
+                                               (+ j (buffer-tail obuf)))
                                     (ldb (byte 8 (- i 8 (* j 8))) byte))))))
                 (:full
                  (lambda (stream byte)
                    (output-wrapper (stream (/ i 8) (:full) nil)
                      (loop for j from 0 below (/ i 8)
-                           do (setf (sap-ref-8
-                                     (fd-stream-obuf-sap stream)
-                                     (+ j (fd-stream-obuf-tail stream)))
+                           do (setf (sap-ref-8 (buffer-sap obuf)
+                                               (+ j (buffer-tail obuf)))
                                     (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
               `(unsigned-byte ,i)
               (/ i 8))))
@@ -649,17 +757,15 @@ bytes-per-buffer of memory.")
                  (lambda (stream byte)
                    (output-wrapper (stream (/ i 8) (:none) nil)
                      (loop for j from 0 below (/ i 8)
-                           do (setf (sap-ref-8
-                                     (fd-stream-obuf-sap stream)
-                                     (+ j (fd-stream-obuf-tail stream)))
+                           do (setf (sap-ref-8 (buffer-sap obuf)
+                                               (+ j (buffer-tail obuf)))
                                     (ldb (byte 8 (- i 8 (* j 8))) byte))))))
                 (:full
                  (lambda (stream byte)
                    (output-wrapper (stream (/ i 8) (:full) nil)
                      (loop for j from 0 below (/ i 8)
-                           do (setf (sap-ref-8
-                                     (fd-stream-obuf-sap stream)
-                                     (+ j (fd-stream-obuf-tail stream)))
+                           do (setf (sap-ref-8 (buffer-sap obuf)
+                                               (+ j (buffer-tail obuf)))
                                     (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
               `(signed-byte ,i)
               (/ i 8)))))
@@ -701,7 +807,7 @@ bytes-per-buffer of memory.")
 ;;; If the read would block wait (using SERVE-EVENT) till input is available,
 ;;; then fill the input buffer, and return the number of bytes read. Throws
 ;;; to EOF-INPUT-CATCHER if the eof was reached.
-(defun refill-buffer/fd (stream)
+(defun refill-input-buffer (stream)
   (let ((fd (fd-stream-fd stream))
         (errno 0)
         (count 0))
@@ -729,34 +835,35 @@ bytes-per-buffer of memory.")
        ;; interrupts here, so that we don't accidentally unwind and
        ;; leave the stream in an inconsistent state.
        (without-interrupts
-         (let ((ibuf-sap (fd-stream-ibuf-sap stream))
-               (buflen (fd-stream-ibuf-length stream))
-               (head (fd-stream-ibuf-head stream))
-               (tail (fd-stream-ibuf-tail stream)))
-           (declare (type index head tail))
-           ;; Check the SAP: if it is null, then someone has closed
-           ;; the stream from underneath us. This is not ment to fix
-           ;; multithreaded races, but to deal with interrupt handlers
-           ;; closing the stream.
-           (unless ibuf-sap
-             (go :closed-flame))
+         ;; Check the buffer: if it is null, then someone has closed
+         ;; the stream from underneath us. This is not ment to fix
+         ;; multithreaded races, but to deal with interrupt handlers
+         ;; closing the stream.
+         (let* ((ibuf (or (fd-stream-ibuf stream) (go :closed-flame)))
+                (sap (buffer-sap ibuf))
+                (length (buffer-length ibuf))
+                (head (buffer-head ibuf))
+                (tail (buffer-tail ibuf)))
+           (declare (index length head tail))
            (unless (zerop head)
              (cond ((eql head tail)
+                    ;; Buffer is empty, but not at yet reset -- make it so.
                     (setf head 0
-                          tail 0
-                          (fd-stream-ibuf-head stream) 0
-                          (fd-stream-ibuf-tail stream) 0))
+                          tail 0)
+                    (reset-buffer ibuf))
                    (t
-                    (decf tail head)
-                    (system-area-ub8-copy ibuf-sap head
-                                          ibuf-sap 0 tail)
-                    (setf head 0
-                          (fd-stream-ibuf-head stream) 0
-                          (fd-stream-ibuf-tail stream) tail))))
+                    ;; Buffer has things in it, but they are not at the head
+                    ;; -- move them there.
+                    (let ((n (- tail head)))
+                      (system-area-ub8-copy sap head sap 0 n)
+                      (setf head 0
+                            (buffer-head ibuf) head
+                            tail n
+                            (buffer-tail ibuf) tail)))))
+
            (setf (fd-stream-listen stream) nil)
            (setf (values count errno)
-                 (sb!unix:unix-read fd (int-sap (+ (sap-int ibuf-sap) tail))
-                                    (- buflen tail)))
+                 (sb!unix:unix-read fd (sap+ sap tail) (- length tail)))
            (cond ((null count)
                   #!+win32
                   (go :read-error)
@@ -770,30 +877,33 @@ bytes-per-buffer of memory.")
                   (throw 'eof-input-catcher nil))
                  (t
                   ;; Success!
-                  (incf (fd-stream-ibuf-tail stream) count))))))
+                  (incf (buffer-tail ibuf) count))))))
     count))
 
 ;;; Make sure there are at least BYTES number of bytes in the input
-;;; buffer. Keep calling REFILL-BUFFER/FD until that condition is met.
+;;; buffer. Keep calling REFILL-INPUT-BUFFER until that condition is met.
 (defmacro input-at-least (stream bytes)
-  (let ((stream-var (gensym))
-        (bytes-var (gensym)))
-    `(let ((,stream-var ,stream)
-           (,bytes-var ,bytes))
+  (let ((stream-var (gensym "STREAM"))
+        (bytes-var (gensym "BYTES"))
+        (buffer-var (gensym "IBUF")))
+    `(let* ((,stream-var ,stream)
+            (,bytes-var ,bytes)
+            (,buffer-var (fd-stream-ibuf ,stream-var)))
        (loop
-         (when (>= (- (fd-stream-ibuf-tail ,stream-var)
-                      (fd-stream-ibuf-head ,stream-var))
+         (when (>= (- (buffer-tail ,buffer-var)
+                      (buffer-head ,buffer-var))
                    ,bytes-var)
            (return))
-         (refill-buffer/fd ,stream-var)))))
+         (refill-input-buffer ,stream-var)))))
 
 (defmacro input-wrapper/variable-width ((stream bytes eof-error eof-value)
                                         &body read-forms)
-  (let ((stream-var (gensym))
-        (retry-var (gensym))
-        (element-var (gensym)))
-    `(let ((,stream-var ,stream)
-           (size nil))
+  (let ((stream-var (gensym "STREAM"))
+        (retry-var (gensym "RETRY"))
+        (element-var (gensym "ELT")))
+    `(let* ((,stream-var ,stream)
+            (ibuf (fd-stream-ibuf ,stream-var))
+            (size nil))
        (if (fd-stream-unread ,stream-var)
            (prog1
                (fd-stream-unread ,stream-var)
@@ -808,10 +918,8 @@ bytes-per-buffer of memory.")
                      (setf decode-break-reason
                            (block decode-break-reason
                              (input-at-least ,stream-var 1)
-                             (let* ((byte (sap-ref-8 (fd-stream-ibuf-sap
-                                                      ,stream-var)
-                                                     (fd-stream-ibuf-head
-                                                      ,stream-var))))
+                             (let* ((byte (sap-ref-8 (buffer-sap ibuf)
+                                                     (buffer-head ibuf))))
                                (declare (ignorable byte))
                                (setq size ,bytes)
                                (input-at-least ,stream-var size)
@@ -822,8 +930,8 @@ bytes-per-buffer of memory.")
                        (stream-decoding-error-and-handle stream
                                                          decode-break-reason))
                      t)
-                 (let ((octet-count (- (fd-stream-ibuf-tail ,stream-var)
-                                      (fd-stream-ibuf-head ,stream-var))))
+                 (let ((octet-count (- (buffer-tail ibuf)
+                                       (buffer-head ibuf))))
                    (when (or (zerop octet-count)
                              (and (not ,element-var)
                                   (not decode-break-reason)
@@ -831,16 +939,17 @@ bytes-per-buffer of memory.")
                                    stream octet-count)))
                      (setq ,retry-var nil)))))
              (cond (,element-var
-                    (incf (fd-stream-ibuf-head ,stream-var) size)
+                    (incf (buffer-head ibuf) size)
                     ,element-var)
                    (t
                     (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
 
 ;;; a macro to wrap around all input routines to handle EOF-ERROR noise
 (defmacro input-wrapper ((stream bytes eof-error eof-value) &body read-forms)
-  (let ((stream-var (gensym))
-        (element-var (gensym)))
-    `(let ((,stream-var ,stream))
+  (let ((stream-var (gensym "STREAM"))
+        (element-var (gensym "ELT")))
+    `(let* ((,stream-var ,stream)
+            (ibuf (fd-stream-ibuf ,stream-var)))
        (if (fd-stream-unread ,stream-var)
            (prog1
                (fd-stream-unread ,stream-var)
@@ -851,7 +960,7 @@ bytes-per-buffer of memory.")
                     (input-at-least ,stream-var ,bytes)
                     (locally ,@read-forms))))
              (cond (,element-var
-                    (incf (fd-stream-ibuf-head ,stream-var) ,bytes)
+                    (incf (buffer-head (fd-stream-ibuf ,stream-var)) ,bytes)
                     ,element-var)
                    (t
                     (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
@@ -862,8 +971,8 @@ bytes-per-buffer of memory.")
   `(progn
      (defun ,name (stream eof-error eof-value)
        (input-wrapper/variable-width (stream ,size eof-error eof-value)
-         (let ((,sap (fd-stream-ibuf-sap stream))
-               (,head (fd-stream-ibuf-head stream)))
+         (let ((,sap (buffer-sap ibuf))
+               (,head (buffer-head ibuf)))
            ,@body)))
      (setf *input-routines*
            (nconc *input-routines*
@@ -875,8 +984,8 @@ bytes-per-buffer of memory.")
   `(progn
      (defun ,name (stream eof-error eof-value)
        (input-wrapper (stream ,size eof-error eof-value)
-         (let ((,sap (fd-stream-ibuf-sap stream))
-               (,head (fd-stream-ibuf-head stream)))
+         (let ((,sap (buffer-sap ibuf))
+               (,head (buffer-head ibuf)))
            ,@body)))
      (setf *input-routines*
            (nconc *input-routines*
@@ -956,8 +1065,8 @@ bytes-per-buffer of memory.")
              (values
               (lambda (stream eof-error eof-value)
                 (input-wrapper (stream (/ i 8) eof-error eof-value)
-                  (let ((sap (fd-stream-ibuf-sap stream))
-                        (head (fd-stream-ibuf-head stream)))
+                  (let ((sap (buffer-sap ibuf))
+                        (head (buffer-head ibuf)))
                     (loop for j from 0 below (/ i 8)
                           with result = 0
                           do (setf result
@@ -972,8 +1081,8 @@ bytes-per-buffer of memory.")
              (values
               (lambda (stream eof-error eof-value)
                 (input-wrapper (stream (/ i 8) eof-error eof-value)
-                  (let ((sap (fd-stream-ibuf-sap stream))
-                        (head (fd-stream-ibuf-head stream)))
+                  (let ((sap (buffer-sap ibuf))
+                        (head (buffer-head ibuf)))
                     (loop for j from 0 below (/ i 8)
                           with result = 0
                           do (setf result
@@ -984,16 +1093,6 @@ bytes-per-buffer of memory.")
                                               result))))))
               `(signed-byte ,i)
               (/ i 8)))))
-
-;;; Return a string constructed from SAP, START, and END.
-(defun string-from-sap (sap start end)
-  (declare (type index start end))
-  (let* ((length (- end start))
-         (string (make-string length)))
-    (copy-ub8-from-system-area sap start
-                               string 0
-                               length)
-    string))
 
 ;;; the N-BIN method for FD-STREAMs
 ;;;
@@ -1023,25 +1122,26 @@ bytes-per-buffer of memory.")
   (do ()
       (nil)
     (let* ((remaining-request (- requested total-copied))
-           (head (fd-stream-ibuf-head stream))
-           (tail (fd-stream-ibuf-tail stream))
+           (ibuf (fd-stream-ibuf stream))
+           (head (buffer-head ibuf))
+           (tail (buffer-tail ibuf))
            (available (- tail head))
            (n-this-copy (min remaining-request available))
            (this-start (+ start total-copied))
            (this-end (+ this-start n-this-copy))
-           (sap (fd-stream-ibuf-sap stream)))
+           (sap (buffer-sap ibuf)))
       (declare (type index remaining-request head tail available))
       (declare (type index n-this-copy))
       ;; Copy data from stream buffer into user's buffer.
       (%byte-blt sap head buffer this-start this-end)
-      (incf (fd-stream-ibuf-head stream) n-this-copy)
+      (incf (buffer-head ibuf) n-this-copy)
       (incf total-copied n-this-copy)
       ;; Maybe we need to refill the stream buffer.
       (cond (;; If there were enough data in the stream buffer, we're done.
-             (= total-copied requested)
+             (eql total-copied requested)
              (return total-copied))
             (;; If EOF, we're done in another way.
-             (null (catch 'eof-input-catcher (refill-buffer/fd stream)))
+             (null (catch 'eof-input-catcher (refill-input-buffer stream)))
              (if eof-error-p
                  (error 'end-of-file :stream stream)
                  (return total-copied)))
@@ -1099,27 +1199,26 @@ bytes-per-buffer of memory.")
         (let ((start (or start 0))
               (end (or end (length string))))
           (declare (type index start end))
-          (when (and (not (fd-stream-dual-channel-p stream))
-                     (> (fd-stream-ibuf-tail stream)
-                        (fd-stream-ibuf-head stream)))
-            (file-position stream (file-position stream)))
+          (synchronize-stream-output stream)
           (unless (<= 0 start end (length string))
             (signal-bounding-indices-bad-error string start end))
           (do ()
               ((= end start))
-            (setf (fd-stream-obuf-tail stream)
-                  (string-dispatch (simple-base-string
-                                    #!+sb-unicode
-                                    (simple-array character (*))
-                                    string)
-                      string
-                    (let ((len (fd-stream-obuf-length stream))
-                          (sap (fd-stream-obuf-sap stream))
-                          (tail (fd-stream-obuf-tail stream)))
-                      (declare (type index tail)
-                               ;; STRING bounds have already been checked.
-                               (optimize (safety 0)))
-                      (loop
+            (let ((obuf (fd-stream-obuf stream)))
+              (setf (buffer-tail obuf)
+                    (string-dispatch (simple-base-string
+                                      #!+sb-unicode
+                                      (simple-array character (*))
+                                      string)
+                        string
+                      (let ((sap (buffer-sap obuf))
+                            (len (buffer-length obuf))
+                            ;; FIXME: rename
+                            (tail (buffer-tail obuf)))
+                       (declare (type index tail)
+                                ;; STRING bounds have already been checked.
+                                (optimize (safety 0)))
+                       (loop
                          (,@(if output-restart
                                 `(catch 'output-nothing)
                                 `(progn))
@@ -1134,7 +1233,7 @@ bytes-per-buffer of memory.")
                             (return tail))
                          ;; Exited via CATCH. Skip the current character
                          ;; and try the inner loop again.
-                         (incf start)))))
+                         (incf start))))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1145,13 +1244,14 @@ bytes-per-buffer of memory.")
                             (:none character)
                             (:line character)
                             (:full character))
-          (if (char= byte #\Newline)
+          (if (eql byte #\Newline)
               (setf (fd-stream-char-pos stream) 0)
               (incf (fd-stream-char-pos stream)))
-        (let ((bits (char-code byte))
-              (sap (fd-stream-obuf-sap stream))
-              (tail (fd-stream-obuf-tail stream)))
-          ,out-expr))
+          (let* ((obuf (fd-stream-obuf stream))
+                 (bits (char-code byte))
+                 (sap (buffer-sap obuf))
+                 (tail (buffer-tail obuf)))
+            ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
                            &aux (index start) (end (+ start requested)))
         (declare (type fd-stream stream)
@@ -1167,9 +1267,10 @@ bytes-per-buffer of memory.")
             (incf index)))
         (do ()
             (nil)
-          (let* ((head (fd-stream-ibuf-head stream))
-                 (tail (fd-stream-ibuf-tail stream))
-                 (sap (fd-stream-ibuf-sap stream)))
+          (let* ((ibuf (fd-stream-ibuf stream))
+                 (head (buffer-head ibuf))
+                 (tail (buffer-tail ibuf))
+                 (sap (buffer-sap ibuf)))
             (declare (type index head tail)
                      (type system-area-pointer sap))
             ;; Copy data from stream buffer into user's buffer.
@@ -1180,13 +1281,13 @@ bytes-per-buffer of memory.")
                 (setf (aref buffer index) ,in-expr)
                 (incf index)
                 (incf head ,size)))
-            (setf (fd-stream-ibuf-head stream) head)
+            (setf (buffer-head ibuf) head)
             ;; Maybe we need to refill the stream buffer.
             (cond ( ;; If there was enough data in the stream buffer, we're done.
                    (= index end)
                    (return (- index start)))
                   ( ;; If EOF, we're done in another way.
-                   (null (catch 'eof-input-catcher (refill-buffer/fd stream)))
+                   (null (catch 'eof-input-catcher (refill-input-buffer stream)))
                    (if eof-error-p
                        (error 'end-of-file :stream stream)
                        (return (- index start))))
@@ -1275,43 +1376,42 @@ bytes-per-buffer of memory.")
         (let ((start (or start 0))
               (end (or end (length string))))
           (declare (type index start end))
-          (when (and (not (fd-stream-dual-channel-p stream))
-                     (> (fd-stream-ibuf-tail stream)
-                        (fd-stream-ibuf-head stream)))
-            (file-position stream (file-position stream)))
+          (synchronize-stream-output stream)
           (unless (<= 0 start end (length string))
             (signal-bounding-indices-bad-error string start end))
           (do ()
               ((= end start))
-            (setf (fd-stream-obuf-tail stream)
-                  (string-dispatch (simple-base-string
-                                    #!+sb-unicode
-                                    (simple-array character (*))
-                                    string)
-                      string
-                    (let ((len (fd-stream-obuf-length stream))
-                          (sap (fd-stream-obuf-sap stream))
-                          (tail (fd-stream-obuf-tail stream)))
-                      (declare (type index tail)
-                               ;; STRING bounds have already been checked.
-                               (optimize (safety 0)))
-                      (loop
-                         (,@(if output-restart
-                                `(catch 'output-nothing)
-                                `(progn))
-                            (do* ()
-                                 ((or (= start end) (< (- len tail) 4)))
-                              (let* ((byte (aref string start))
-                                     (bits (char-code byte))
-                                     (size ,out-size-expr))
-                                ,out-expr
-                                (incf tail size)
-                                (incf start)))
-                            ;; Exited from the loop normally
-                            (return tail))
-                         ;; Exited via CATCH. Skip the current character
-                         ;; and try the inner loop again.
-                         (incf start)))))
+            (let ((obuf (fd-stream-obuf stream)))
+              (setf (buffer-tail obuf)
+                    (string-dispatch (simple-base-string
+                                      #!+sb-unicode
+                                      (simple-array character (*))
+                                      string)
+                        string
+                      (let ((len (buffer-length obuf))
+                            (sap (buffer-sap obuf))
+                            ;; FIXME: Rename
+                            (tail (buffer-tail obuf)))
+                        (declare (type index tail)
+                                 ;; STRING bounds have already been checked.
+                                 (optimize (safety 0)))
+                        (loop
+                          (,@(if output-restart
+                                 `(catch 'output-nothing)
+                                 `(progn))
+                             (do* ()
+                                  ((or (= start end) (< (- len tail) 4)))
+                               (let* ((byte (aref string start))
+                                      (bits (char-code byte))
+                                      (size ,out-size-expr))
+                                 ,out-expr
+                                 (incf tail size)
+                                 (incf start)))
+                             ;; Exited from the loop normally
+                             (return tail))
+                          ;; Exited via CATCH. Skip the current character
+                          ;; and try the inner loop again.
+                          (incf start))))))
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1323,12 +1423,12 @@ bytes-per-buffer of memory.")
                                            (:none character)
                                            (:line character)
                                            (:full character))
-          (if (char= byte #\Newline)
+          (if (eql byte #\Newline)
               (setf (fd-stream-char-pos stream) 0)
               (incf (fd-stream-char-pos stream)))
         (let ((bits (char-code byte))
-              (sap (fd-stream-obuf-sap stream))
-              (tail (fd-stream-obuf-tail stream)))
+              (sap (buffer-sap obuf))
+              (tail (buffer-tail obuf)))
           ,out-expr))
       (defun ,in-function (stream buffer start requested eof-error-p
                            &aux (total-copied 0))
@@ -1345,9 +1445,10 @@ bytes-per-buffer of memory.")
             (incf total-copied)))
         (do ()
             (nil)
-          (let* ((head (fd-stream-ibuf-head stream))
-                 (tail (fd-stream-ibuf-tail stream))
-                 (sap (fd-stream-ibuf-sap stream))
+          (let* ((ibuf (fd-stream-ibuf stream))
+                 (head (buffer-head ibuf))
+                 (tail (buffer-tail ibuf))
+                 (sap (buffer-sap ibuf))
                  (decode-break-reason nil))
             (declare (type index head tail))
             ;; Copy data from stream buffer into user's buffer.
@@ -1364,7 +1465,7 @@ bytes-per-buffer of memory.")
                         (incf total-copied)
                         (incf head size))
                       nil))
-              (setf (fd-stream-ibuf-head stream) head)
+              (setf (buffer-head ibuf) head)
               (when decode-break-reason
                 ;; If we've already read some characters on when the invalid
                 ;; code sequence is detected, we return immediately. The
@@ -1379,9 +1480,9 @@ bytes-per-buffer of memory.")
                   (if eof-error-p
                       (error 'end-of-file :stream stream)
                       (return-from ,in-function total-copied)))
-                (setf head (fd-stream-ibuf-head stream))
-                (setf tail (fd-stream-ibuf-tail stream))))
-            (setf (fd-stream-ibuf-head stream) head)
+                (setf head (buffer-head ibuf))
+                (setf tail (buffer-tail ibuf))))
+            (setf (buffer-head ibuf) head)
             ;; Maybe we need to refill the stream buffer.
             (cond ( ;; If there were enough data in the stream buffer, we're done.
                    (= total-copied requested)
@@ -1389,7 +1490,7 @@ bytes-per-buffer of memory.")
                   ( ;; If EOF, we're done in another way.
                    (or (eq decode-break-reason 'eof)
                        (null (catch 'eof-input-catcher
-                               (refill-buffer/fd stream))))
+                               (refill-input-buffer stream))))
                    (if eof-error-p
                        (error 'end-of-file :stream stream)
                        (return total-copied)))
@@ -1404,20 +1505,21 @@ bytes-per-buffer of memory.")
           (declare (ignorable byte))
           ,in-expr))
       (defun ,resync-function (stream)
-        (loop (input-at-least stream 2)
-              (incf (fd-stream-ibuf-head stream))
-              (unless (block decode-break-reason
-                        (let* ((sap (fd-stream-ibuf-sap stream))
-                               (head (fd-stream-ibuf-head stream))
-                               (byte (sap-ref-8 sap head))
-                               (size ,in-size-expr))
-                          (declare (ignorable byte))
-                          (input-at-least stream size)
-                          (let ((sap (fd-stream-ibuf-sap stream))
-                                (head (fd-stream-ibuf-head stream)))
-                            ,in-expr))
-                        nil)
-                (return))))
+        (let ((ibuf (fd-stream-ibuf stream)))
+          (loop
+            (input-at-least stream 2)
+            (incf (buffer-head ibuf))
+            (unless (block decode-break-reason
+                      (let* ((sap (buffer-sap ibuf))
+                             (head (buffer-head ibuf))
+                             (byte (sap-ref-8 sap head))
+                             (size ,in-size-expr))
+                        (declare (ignorable byte))
+                        (input-at-least stream size)
+                        (setf head (buffer-head ibuf))
+                        ,in-expr)
+                     nil)
+             (return)))))
       (defun ,read-c-string-function (sap element-type)
         (declare (type system-area-pointer sap))
         (locally
@@ -1596,13 +1698,13 @@ bytes-per-buffer of memory.")
           (t 4)))
   (ecase size
     (1 (setf (sap-ref-8 sap tail) bits))
-    (2 (setf (sap-ref-8 sap tail) (logior #xc0 (ldb (byte 5 6) bits))
-             (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (3 (setf (sap-ref-8 sap tail) (logior #xe0 (ldb (byte 4 12) bits))
-             (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 6) bits))
+    (2 (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
+             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits))))
+    (3 (setf (sap-ref-8 sap tail)       (logior #xe0 (ldb (byte 4 12) bits))
+             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 6) bits))
              (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (4 (setf (sap-ref-8 sap tail) (logior #xf0 (ldb (byte 3 18) bits))
-             (sap-ref-8 sap (1+ tail)) (logior #x80 (ldb (byte 6 12) bits))
+    (4 (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
+             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
              (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
              (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
   (cond ((< byte #x80) 1)
@@ -1667,23 +1769,28 @@ bytes-per-buffer of memory.")
          (output-size nil)
          (output-bytes #'ill-bout))
 
-    ;; drop buffers when direction changes
-    (when (and (fd-stream-obuf-sap fd-stream) (not output-p))
-      (with-available-buffers-lock ()
-        (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
-        (setf (fd-stream-obuf-sap fd-stream) nil)))
-    (when (and (fd-stream-ibuf-sap fd-stream) (not input-p))
-      (with-available-buffers-lock ()
-        (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
-        (setf (fd-stream-ibuf-sap fd-stream) nil)))
-    (when input-p
-      (setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
-      (setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
-      (setf (fd-stream-ibuf-tail fd-stream) 0))
+    ;; Ensure that we have buffers in the desired direction(s) only,
+    ;; getting new ones and dropping/resetting old ones as necessary.
+    (let ((obuf (fd-stream-obuf fd-stream)))
+      (if output-p
+          (if obuf
+              (reset-buffer obuf)
+              (setf (fd-stream-obuf fd-stream) (get-buffer)))
+          (when obuf
+            (setf (fd-stream-obuf fd-stream) nil)
+            (release-buffer obuf))))
+
+    (let ((ibuf (fd-stream-ibuf fd-stream)))
+      (if input-p
+          (if ibuf
+              (reset-buffer ibuf)
+              (setf (fd-stream-ibuf fd-stream) (get-buffer)))
+          (when ibuf
+            (setf (fd-stream-ibuf fd-stream) nil)
+            (release-buffer ibuf))))
+
+    ;; FIXME: Why only for output? Why unconditionally?
     (when output-p
-      (setf (fd-stream-obuf-sap fd-stream) (next-available-buffer))
-      (setf (fd-stream-obuf-length fd-stream) bytes-per-buffer)
-      (setf (fd-stream-obuf-tail fd-stream) 0)
       (setf (fd-stream-char-pos fd-stream) 0))
 
     (when (and character-stream-p
@@ -1797,40 +1904,86 @@ bytes-per-buffer of memory.")
                         input-type
                         output-type))))))
 
+;;; Handles the resource-release aspects of stream closing.
+(defun release-fd-stream-resources (fd-stream)
+  (handler-case
+      (without-interrupts
+        ;; Disable interrupts so that a asynch unwind will not leave
+        ;; us with a dangling finalizer (that would close the same
+        ;; --possibly reassigned-- FD again).
+        (sb!unix:unix-close (fd-stream-fd fd-stream))
+        (when (fboundp 'cancel-finalization)
+          (cancel-finalization fd-stream)))
+    ;; On error unwind from WITHOUT-INTERRUPTS.
+    (serious-condition (e)
+      (error e)))
+
+  ;; Release all buffers. If this is undone, or interrupted,
+  ;; we're still safe: buffers have finalizers of their own.
+  (release-fd-stream-buffers fd-stream))
+
+;;; Flushes the current input buffer and unread chatacter, and returns
+;;; the input buffer, and the amount of of flushed input in bytes.
+(defun flush-input-buffer (stream)
+  (let ((unread (if (fd-stream-unread stream)
+                    1
+                    0)))
+    (setf (fd-stream-unread stream) nil)
+    (let ((ibuf (fd-stream-ibuf stream)))
+      (if ibuf
+          (let ((head (buffer-head ibuf))
+                (tail (buffer-tail ibuf)))
+            (values (reset-buffer ibuf) (- (+ unread tail) head)))
+          (values nil unread)))))
+
+(defun fd-stream-clear-input (stream)
+  (flush-input-buffer stream)
+  #!+win32
+  (progn
+    (sb!win32:fd-clear-input (fd-stream-fd stream))
+    (setf (fd-stream-listen stream) nil))
+  #!-win32
+  (catch 'eof-input-catcher
+    (loop until (sysread-may-block-p stream)
+          do
+          (refill-input-buffer stream)
+          (reset-buffer (fd-stream-ibuf stream)))
+    t))
+
 ;;; Handle miscellaneous operations on FD-STREAM.
 (defun fd-stream-misc-routine (fd-stream operation &optional arg1 arg2)
   (declare (ignore arg2))
   (case operation
     (:listen
      (labels ((do-listen ()
-                (or (not (eql (fd-stream-ibuf-head fd-stream)
-                              (fd-stream-ibuf-tail fd-stream)))
-                    (fd-stream-listen fd-stream)
-                    #!+win32
-                    (sb!win32:fd-listen (fd-stream-fd fd-stream))
-                    #!-win32
-                    ;; If the read can block, LISTEN will certainly return NIL.
-                    (if (sysread-may-block-p fd-stream)
-                        nil
-                        ;; Otherwise select(2) and CL:LISTEN have slightly
-                        ;; different semantics.  The former returns that an FD
-                        ;; is readable when a read operation wouldn't block.
-                        ;; That includes EOF.  However, LISTEN must return NIL
-                        ;; at EOF.
-                        (progn (catch 'eof-input-catcher
-                                 ;; r-b/f too calls select, but it shouldn't
-                                 ;; block as long as read can return once w/o
-                                 ;; blocking
-                                 (refill-buffer/fd fd-stream))
-                               ;; At this point either IBUF-HEAD != IBUF-TAIL
-                               ;; and FD-STREAM-LISTEN is NIL, in which case
-                               ;; we should return T, or IBUF-HEAD ==
-                               ;; IBUF-TAIL and FD-STREAM-LISTEN is :EOF, in
-                               ;; which case we should return :EOF for this
-                               ;; call and all future LISTEN call on this stream.
-                               ;; Call ourselves again to determine which case
-                               ;; applies.
-                               (do-listen))))))
+                (let ((ibuf (fd-stream-ibuf fd-stream)))
+                  (or (not (eql (buffer-head ibuf) (buffer-tail ibuf)))
+                      (fd-stream-listen fd-stream)
+                      #!+win32
+                      (sb!win32:fd-listen (fd-stream-fd fd-stream))
+                      #!-win32
+                      ;; If the read can block, LISTEN will certainly return NIL.
+                      (if (sysread-may-block-p fd-stream)
+                          nil
+                          ;; Otherwise select(2) and CL:LISTEN have slightly
+                          ;; different semantics.  The former returns that an FD
+                          ;; is readable when a read operation wouldn't block.
+                          ;; That includes EOF.  However, LISTEN must return NIL
+                          ;; at EOF.
+                          (progn (catch 'eof-input-catcher
+                                   ;; r-b/f too calls select, but it shouldn't
+                                   ;; block as long as read can return once w/o
+                                   ;; blocking
+                                   (refill-input-buffer fd-stream))
+                                 ;; At this point either IBUF-HEAD != IBUF-TAIL
+                                 ;; and FD-STREAM-LISTEN is NIL, in which case
+                                 ;; we should return T, or IBUF-HEAD ==
+                                 ;; IBUF-TAIL and FD-STREAM-LISTEN is :EOF, in
+                                 ;; which case we should return :EOF for this
+                                 ;; call and all future LISTEN call on this stream.
+                                 ;; Call ourselves again to determine which case
+                                 ;; applies.
+                                 (do-listen)))))))
        (do-listen)))
     (:unread
      (setf (fd-stream-unread fd-stream) arg1)
@@ -1843,8 +1996,7 @@ bytes-per-buffer of memory.")
             ;; We can't do anything unless we know what file were
             ;; dealing with, and we don't want to do anything
             ;; strange unless we were writing to the file.
-            (when (and (fd-stream-file fd-stream)
-                       (fd-stream-obuf-sap fd-stream))
+            (when (and (fd-stream-file fd-stream) (fd-stream-obuf fd-stream))
               (if (fd-stream-original fd-stream)
                   ;; If the original is EQ to file we are appending
                   ;; and can just close the file without renaming.
@@ -1880,7 +2032,7 @@ bytes-per-buffer of memory.")
                              :format-arguments (list (fd-stream-file fd-stream)
                                                      (strerror err))))))))
            (t
-            (fd-stream-misc-routine fd-stream :finish-output)
+            (finish-fd-stream-output fd-stream)
             (when (and (fd-stream-original fd-stream)
                        (fd-stream-delete-original fd-stream))
               (multiple-value-bind (okay err)
@@ -1895,34 +2047,11 @@ bytes-per-buffer of memory.")
                          (list (fd-stream-original fd-stream)
                                fd-stream
                                (strerror err))))))))
-     (when (fboundp 'cancel-finalization)
-       (cancel-finalization fd-stream))
-     (sb!unix:unix-close (fd-stream-fd fd-stream))
-     (when (fd-stream-obuf-sap fd-stream)
-       (with-available-buffers-lock ()
-         (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
-         (setf (fd-stream-obuf-sap fd-stream) nil)))
-     (when (fd-stream-ibuf-sap fd-stream)
-       (with-available-buffers-lock ()
-         (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
-         (setf (fd-stream-ibuf-sap fd-stream) nil)))
+     (release-fd-stream-resources fd-stream)
+     ;; Mark as closed. FIXME: Maybe this should be the first thing done?
      (sb!impl::set-closed-flame fd-stream))
     (:clear-input
-     (setf (fd-stream-unread fd-stream) nil)
-     (setf (fd-stream-ibuf-head fd-stream) 0)
-     (setf (fd-stream-ibuf-tail fd-stream) 0)
-     #!+win32
-     (progn
-       (sb!win32:fd-clear-input (fd-stream-fd fd-stream))
-       (setf (fd-stream-listen fd-stream) nil))
-     #!-win32
-     (catch 'eof-input-catcher
-       (loop until (sysread-may-block-p fd-stream)
-             do
-             (refill-buffer/fd fd-stream)
-             (setf (fd-stream-ibuf-head fd-stream) 0)
-             (setf (fd-stream-ibuf-tail fd-stream) 0))
-       t))
+     (fd-stream-clear-input fd-stream))
     (:force-output
      (flush-output-buffer fd-stream))
     (:finish-output
@@ -1972,7 +2101,7 @@ bytes-per-buffer of memory.")
 ;;
 ;; (defun finish-fd-stream-output (fd-stream)
 ;;   (let ((timeout (fd-stream-timeout fd-stream)))
-;;     (loop while (fd-stream-output-later fd-stream)
+;;     (loop while (fd-stream-output-queue fd-stream)
 ;;        ;; FIXME: SIGINT while waiting for a timeout will
 ;;        ;; cause a timeout here.
 ;;        do (when (and (not (serve-event timeout)) timeout)
@@ -1984,7 +2113,7 @@ bytes-per-buffer of memory.")
 (defun finish-fd-stream-output (stream)
   (flush-output-buffer stream)
   (do ()
-      ((null (fd-stream-output-later stream)))
+      ((null (fd-stream-output-queue stream)))
     (serve-all-events)))
 
 (defun fd-stream-get-file-position (stream)
@@ -2001,16 +2130,19 @@ bytes-per-buffer of memory.")
         ;; than reported by lseek() because lseek() obviously
         ;; cannot take into account output we have not sent
         ;; yet.
-        (dolist (later (fd-stream-output-later stream))
-          (incf posn (- (caddr later) (cadr later))))
-        (incf posn (fd-stream-obuf-tail stream))
+        (dolist (buffer (fd-stream-output-queue stream))
+          (incf posn (- (buffer-tail buffer) (buffer-head buffer))))
+        (let ((obuf (fd-stream-obuf stream)))
+          (when obuf
+            (incf posn (buffer-tail obuf))))
         ;; Adjust for unread input: If there is any input
         ;; read from UNIX but not supplied to the user of the
         ;; stream, the *real* file position will smaller than
         ;; reported, because we want to look like the unread
         ;; stuff is still available.
-        (decf posn (- (fd-stream-ibuf-tail stream)
-                      (fd-stream-ibuf-head stream)))
+        (let ((ibuf (fd-stream-ibuf stream)))
+          (when ibuf
+            (decf posn (- (buffer-tail ibuf) (buffer-head ibuf)))))
         (when (fd-stream-unread stream)
           (decf posn))
         ;; Divide bytes by element size.
@@ -2038,21 +2170,19 @@ bytes-per-buffer of memory.")
          (go :again))
        ;; Clear out any pending input to force the next read to go to
        ;; the disk.
-       (setf (fd-stream-unread stream) nil
-             (fd-stream-ibuf-head stream) 0
-             (fd-stream-ibuf-tail stream) 0)
+       (flush-input-buffer stream)
        ;; Trash cached value for listen, so that we check next time.
        (setf (fd-stream-listen stream) nil)
          ;; Now move it.
          (multiple-value-bind (offset origin)
              (case position-spec
-           (:start
-            (values 0 sb!unix:l_set))
-           (:end
-            (values 0 sb!unix:l_xtnd))
-           (t
-            (values (* position-spec (fd-stream-element-size stream))
-                    sb!unix:l_set)))
+               (:start
+                (values 0 sb!unix:l_set))
+               (:end
+                (values 0 sb!unix:l_xtnd))
+               (t
+                (values (* position-spec (fd-stream-element-size stream))
+                        sb!unix:l_set)))
            (declare (type (alien sb!unix:off-t) offset))
            (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream)
                                            offset origin)))

@@ -33,7 +33,8 @@
 ;;; vector-like thing that we can BLT from.
 (defun dump-raw-bytes (vec n fasl-output)
   (declare (type index n) (type fasl-output fasl-output))
-  (sb!sys:output-raw-bytes (fasl-output-stream fasl-output) vec 0 n)
+  ;; FIXME: Why not WRITE-SEQUENCE?
+  (sb!impl::buffer-output (fasl-output-stream fasl-output) vec 0 n)
   (values))
 
 ;;; Dump a multi-dimensional array. Note: any displacements are folded out.

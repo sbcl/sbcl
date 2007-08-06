@@ -53,9 +53,9 @@
 
 (defmethod device-clear-input ((stream terminal-simple-stream) buffer-only)
   (unless buffer-only
-    (let ((buffer (allocate-buffer sb-impl::bytes-per-buffer)))
+    (let ((buffer (allocate-buffer sb-impl::+bytes-per-buffer+)))
       (unwind-protect
            (loop until (<= (read-octets stream buffer
-                                        0 sb-impl::bytes-per-buffer nil)
+                                        0 sb-impl::+bytes-per-buffer+ nil)
                            0))
         (free-buffer buffer)))))

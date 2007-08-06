@@ -35,7 +35,9 @@
     (with-open-file (s "external-format-test.txt" :direction :input
                      :external-format xf)
       (loop for character across standard-characters
-            do (assert (eql (read-char s) character))))))
+            do (let ((got (read-char s)))
+                 (unless (eql character got)
+                   (error "wanted ~S, got ~S" character got)))))))
 
 (delete-file "external-format-test.txt")
 #-sb-unicode
@@ -53,14 +55,16 @@
                        :if-exists :supersede :external-format :utf-8)
         (dotimes (n offset)
           (write-char #\a s))
-        (dotimes (n 4097)
+        (dotimes (n (+ 4 sb-impl::+bytes-per-buffer+))
           (write-char character s)))
       (with-open-file (s "external-format-test.txt" :direction :input
                        :external-format :utf-8)
         (dotimes (n offset)
           (assert (eql (read-char s) #\a)))
-        (dotimes (n 4097)
-          (assert (eql (read-char s) character)))
+        (dotimes (n (+ 4 sb-impl::+bytes-per-buffer+))
+          (let ((got (read-char s)))
+            (unless (eql got character)
+              (error "wanted ~S, got ~S (~S)" character got n))))
         (assert (eql (read-char s nil s) s))))))
 
 ;;; Test character decode restarts.

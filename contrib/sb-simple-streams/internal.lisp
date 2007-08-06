@@ -44,21 +44,18 @@
 (defun buffer-copy (src soff dst doff length)
   (declare (type simple-stream-buffer src dst)
            (type fixnum soff doff length))
-  (sb-sys:without-gcing ;; is this necessary??
+  ;; FIXME: Should probably be with-pinned-objects
+  (sb-sys:without-gcing
    (sb-kernel:system-area-ub8-copy (buffer-sap src) soff
                                    (buffer-sap dst) doff
                                    length)))
 
 (defun allocate-buffer (size)
-  (if (= size sb-impl::bytes-per-buffer)
-      (sb-impl::next-available-buffer)
-      (make-array size :element-type '(unsigned-byte 8))))
+  (make-array size :element-type '(unsigned-byte 8)))
 
 (defun free-buffer (buffer)
-  (when (sb-sys:system-area-pointer-p buffer)
-    (push buffer sb-impl::*available-buffers*))
+  (sb-int:aver (typep buffer '(simple-array (unsigned-byte 8) (*))))
   t)
-
 
 (defun make-control-table (&rest inits)
   (let ((table (make-array 32 :initial-element nil)))
