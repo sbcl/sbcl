@@ -3991,7 +3991,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #else
             esp = (void **)((void *)&raise);
 #endif
-            for (ptr = ((void **)th->control_stack_end)-1; ptr > esp;  ptr--) {
+            for (ptr = ((void **)th->control_stack_end)-1; ptr >= esp;  ptr--) {
                 preserve_pointer(*ptr);
             }
         }
