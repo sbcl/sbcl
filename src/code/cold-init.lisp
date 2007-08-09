@@ -294,7 +294,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
   (without-gcing
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
-    (stream-reinit)
+    (stream-reinit t)
     #!-win32
     (signal-cold-init-or-reinit)
     (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)

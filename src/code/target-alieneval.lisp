@@ -446,7 +446,8 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
      (lambda ()
        (alien-funcall
         (extern-alien "free" (function (values) system-area-pointer))
-        alien-sap)))
+        alien-sap))
+     :dont-save t)
     alien))
 
 (defun note-local-alien-type (info alien)

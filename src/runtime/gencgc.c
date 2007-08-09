@@ -4682,7 +4682,7 @@ alloc(long nbytes)
  * catch GENCGC-related write-protect violations
  */
 
-void unhandled_sigmemoryfault(void);
+void unhandled_sigmemoryfault(void* addr);
 
 /* Depending on which OS we're running under, different signals might
  * be raised for a violation of write protection in the heap. This
@@ -4709,7 +4709,7 @@ gencgc_handle_wp_violation(void* fault_addr)
 
         /* It can be helpful to be able to put a breakpoint on this
          * case to help diagnose low-level problems. */
-        unhandled_sigmemoryfault();
+        unhandled_sigmemoryfault(fault_addr);
 
         /* not within the dynamic space -- not our responsibility */
         return 0;
@@ -4740,7 +4740,7 @@ gencgc_handle_wp_violation(void* fault_addr)
  * are about to let Lisp deal with it. It's basically just a
  * convenient place to set a gdb breakpoint. */
 void
-unhandled_sigmemoryfault()
+unhandled_sigmemoryfault(void *addr)
 {}
 
 void gc_alloc_update_all_page_tables(void)

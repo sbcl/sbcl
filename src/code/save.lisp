@@ -152,10 +152,9 @@ sufficiently motivated to do lengthy fixes."
       (funcall hook)))
   (when (rest (sb!thread:list-all-threads))
     (error "Cannot save core with multiple threads running."))
-  #!-win32
-  (when (fboundp 'cancel-finalization)
-    (cancel-finalization sb!sys:*tty*))
   (float-deinit)
   (profile-deinit)
   (debug-deinit)
-  (foreign-deinit))
+  (foreign-deinit)
+  (stream-deinit)
+  (deinit-finalizers))

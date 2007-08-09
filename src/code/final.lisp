@@ -21,11 +21,16 @@
                                       *finalizer-store-lock*
                                       t))
 
-(defun finalize (object function)
+(defun finalize (object function &key dont-save)
   #!+sb-doc
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
+
+If DONT-SAVE is true, the finalizer will be cancelled when
+SAVE-LISP-AND-DIE is called: this is useful for finalizers
+deallocating system memory, which might otherwise be called
+with addresses from the old image.
 
 In a multithreaded environment FUNCTION may be called in any
 thread. In both single and multithreaded environments FUNCTION
@@ -62,10 +67,18 @@ Examples:
     (finalize \"oops\" #'oops)
     (oops)) ; causes GC and re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
+  (unless object
+    (error "Cannot finalize NIL."))
   (with-finalizer-store-lock
-      (push (cons (make-weak-pointer object) function)
-            *finalizer-store*))
+    (push (list (make-weak-pointer object) function dont-save)
+          *finalizer-store*))
   object)
+
+(defun deinit-finalizers ()
+  ;; remove :dont-save finalizers
+  (with-finalizer-store-lock
+    (setf *finalizer-store* (delete-if #'third *finalizer-store*)))
+  nil)
 
 (defun cancel-finalization (object)
   #!+sb-doc
@@ -76,18 +89,18 @@ Examples:
     (with-finalizer-store-lock
         (setf *finalizer-store*
               (delete object *finalizer-store*
-                      :key (lambda (pair)
-                             (weak-pointer-value (car pair))))))
+                      :key (lambda (list)
+                             (weak-pointer-value (car list))))))
     object))
 
 (defun run-pending-finalizers ()
   (let (pending)
     (with-finalizer-store-lock
         (setf *finalizer-store*
-              (delete-if  (lambda (pair)
-                            (when (null (weak-pointer-value (car pair)))
-                              (push (cdr pair) pending)
-                              t))
+              (delete-if (lambda (list)
+                           (when (null (weak-pointer-value (car list)))
+                             (push (second list) pending)
+                             t))
                           *finalizer-store*)))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.

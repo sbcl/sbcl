@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * minor incompatible change: SB-SYS:OUTPUT-RAW-BYTES is deprecated.
+  * enhancement: SB-EXT:FINALIZE accepts a :DONT-SAVE keyword argument,
+    indicating the finalizer should be cancelled when SAVE-LISP-AND-DIE
+    is called.
   * bug fix: new compiler transforms for MEMBER and ASSOC were affected
     by printer control variables. (reported by Dan Corkill)
   * bug fix: system leaked memory when delayed output was performed by
@@ -10,6 +13,8 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * bug fix: large objects written to slow streams that were modified
     after the write could end up with the modified state written to
     the underlying file descriptor.
+  * bug fix: multiple threads operating in parallel on the same stream
+    could cause buffer-overflows.
 
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides
