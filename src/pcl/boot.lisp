@@ -513,9 +513,6 @@ bootstrapping.
     (sb-c:source-location)))
 
 (defmacro make-method-function (method-lambda &environment env)
-  (make-method-function-internal method-lambda env))
-
-(defun make-method-function-internal (method-lambda &optional env)
   (multiple-value-bind (proto-gf proto-method)
       (prototypes-for-make-method-lambda nil)
     (multiple-value-bind (method-function-lambda initargs)
