@@ -225,9 +225,6 @@
 (defun make-pv-type-declaration (var)
   `(type simple-vector ,var))
 
-(defmacro pvref (pv index)
-  `(svref ,pv ,index))
-
 (defmacro copy-pv (pv)
   `(copy-seq ,pv))
 
@@ -295,7 +292,7 @@
           (let ((map (svref pv-map i)))
             (when map
               (aver (= (car map) 0))
-              (setf (pvref pv i) (cdr map))))))
+              (setf (svref pv i) (cdr map))))))
       (when (memq cwrapper wrappers)
         (let ((param 0))
           (dolist (wrapper wrappers)
@@ -303,7 +300,7 @@
               (dotimes-fixnum (i pv-size)
                 (let ((map (svref pv-map i)))
                   (when (and map (= (car map) param))
-                    (setf (pvref pv i) (cdr map))))))
+                    (setf (svref pv i) (cdr map))))))
             (incf param))))))
 
 (defun can-optimize-access (form required-parameters env)
@@ -552,7 +549,7 @@
       (let* ((index (gensym))
              (value index))
         `(locally (declare #.*optimize-speed*)
-          (let ((,index (pvref ,pv ,pv-offset)))
+          (let ((,index (svref ,pv ,pv-offset)))
             (setq ,value (typecase ,index
                            ;; FIXME: the line marked by KLUDGE below
                            ;; (and the analogous spot in
@@ -592,7 +589,7 @@
       default
       (let* ((index (gensym)))
         `(locally (declare #.*optimize-speed*)
-          (let ((,index (pvref ,pv ,pv-offset)))
+          (let ((,index (svref ,pv ,pv-offset)))
             (typecase ,index
               ,@(when (or (null kind) (eq kind :instance))
                   `((fixnum (and ,slots
@@ -624,7 +621,7 @@
       default
       (let* ((index (gensym)))
         `(locally (declare #.*optimize-speed*)
-          (let ((,index (pvref ,pv ,pv-offset)))
+          (let ((,index (svref ,pv ,pv-offset)))
             (typecase ,index
               ,@(when (or (null kind) (eq kind :instance))
                   `((fixnum (not (and ,slots
