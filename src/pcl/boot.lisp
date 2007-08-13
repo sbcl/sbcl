@@ -2668,13 +2668,18 @@ bootstrapping.
 ;;; walker stuff was only used for implementing stuff like that; maybe
 ;;; it's not needed any more? Hunt down what it was used for and see.
 
+(defun extract-the (form)
+  (cond ((and (consp form) (eq (car form) 'the))
+         (aver (proper-list-of-length-p 3))
+         (third form))
+        (t
+         form)))
+
 (defmacro with-slots (slots instance &body body)
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))
-       ,@(let ((instance (if (and (consp instance) (eq (car instance) 'the))
-                             (third instance)
-                             instance)))
+       ,@(let ((instance (extract-the instance)))
            (and (symbolp instance)
                 `((declare (%variable-rebinding ,in ,instance)))))
        ,in
@@ -2696,9 +2701,7 @@ bootstrapping.
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))
-       ,@(let ((instance (if (and (consp instance) (eq (car instance) 'the))
-                             (third instance)
-                             instance)))
+       ,@(let ((instance (extract-the instance)))
            (and (symbolp instance)
                 `((declare (%variable-rebinding ,in ,instance)))))
        ,in

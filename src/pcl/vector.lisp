@@ -308,15 +308,8 @@
                 (slot-value 'reader)
                 (set-slot-value 'writer)
                 (slot-boundp 'boundp)))
-        (var (cadr form))
+        (var (extract-the (cadr form)))
         (slot-name (eval (caddr form)))) ; known to be constant
-    (when (and (consp var) (eq 'the (car var)))
-      ;; FIXME: We should assert list of length 3 here. Or maybe we
-      ;; should just define EXTRACT-THE, replace the whole (WHEN ..)
-      ;; form with (AWHEN (EXTRACT-THE VAR) (SETF VAR IT)) and then
-      ;; use EXTRACT-THE similarly to clean up the other tests against
-      ;; 'THE scattered through the PCL code.
-      (setq var (caddr var)))
     (when (symbolp var)
       (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
              (parameter-or-nil (car (memq (or rebound? var)
