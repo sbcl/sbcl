@@ -310,45 +310,32 @@
                 (slot-boundp 'boundp)))
         (var (cadr form))
         (slot-name (eval (caddr form)))) ; known to be constant
-    (can-optimize-access1 var required-parameters env type slot-name)))
-
-;;; FIXME: This looks like an internal helper function for
-;;; CAN-OPTIMIZE-ACCESS, and it is used that way, but it's also called
-;;; bare from several places in the code. Perhaps the two functions
-;;; should be renamed CAN-OPTIMIZE-ACCESS-FOR-FORM and
-;;; CAN-OPTIMIZE-ACCESS-FOR-VAR. If so, I'd just as soon use keyword
-;;; args instead of optional ones, too.
-(defun can-optimize-access1 (var required-parameters env
-                             &optional type slot-name)
-  (when (and (consp var) (eq 'the (car var)))
-    ;; FIXME: We should assert list of length 3 here. Or maybe we
-    ;; should just define EXTRACT-THE, replace the whole
-    ;;   (WHEN ..)
-    ;; form with
-    ;;   (AWHEN (EXTRACT-THE VAR)
-    ;;     (SETF VAR IT))
-    ;; and then use EXTRACT-THE similarly to clean up the other tests
-    ;; against 'THE scattered through the PCL code.
-    (setq var (caddr var)))
-  (when (symbolp var)
-    (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
-           (parameter-or-nil (car (memq (or rebound? var)
-                                        required-parameters))))
-      (when parameter-or-nil
-        (let* ((class-name (caddr (var-declaration '%class
-                                                   parameter-or-nil
-                                                   env)))
-               (class (find-class class-name nil)))
-          (when (or (not (eq *boot-state* 'complete))
-                    (and class (not (class-finalized-p class))))
-            (setq class nil))
-          (when (and class-name (not (eq class-name t)))
-            (when (or (null type)
-                      (not (and class
-                                (memq *the-class-structure-object*
-                                      (class-precedence-list class))))
-                      (optimize-slot-value-by-class-p class slot-name type))
-              (cons parameter-or-nil (or class class-name)))))))))
+    (when (and (consp var) (eq 'the (car var)))
+      ;; FIXME: We should assert list of length 3 here. Or maybe we
+      ;; should just define EXTRACT-THE, replace the whole (WHEN ..)
+      ;; form with (AWHEN (EXTRACT-THE VAR) (SETF VAR IT)) and then
+      ;; use EXTRACT-THE similarly to clean up the other tests against
+      ;; 'THE scattered through the PCL code.
+      (setq var (caddr var)))
+    (when (symbolp var)
+      (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
+             (parameter-or-nil (car (memq (or rebound? var)
+                                          required-parameters))))
+        (when parameter-or-nil
+          (let* ((class-name (caddr (var-declaration '%class
+                                                     parameter-or-nil
+                                                     env)))
+                 (class (find-class class-name nil)))
+            (when (or (not (eq *boot-state* 'complete))
+                      (and class (not (class-finalized-p class))))
+              (setq class nil))
+            (when (and class-name (not (eq class-name t)))
+              (when (or (null type)
+                        (not (and class
+                                  (memq *the-class-structure-object*
+                                        (class-precedence-list class))))
+                        (optimize-slot-value-by-class-p class slot-name type))
+                (cons parameter-or-nil (or class class-name))))))))))
 
 ;;; Check whether the binding of the named variable is modified in the
 ;;; method body.
