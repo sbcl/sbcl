@@ -580,7 +580,159 @@ bootstrapping.
 
 (defun real-make-method-lambda (proto-gf proto-method method-lambda env)
   (declare (ignore proto-gf proto-method))
-  (make-method-lambda-internal method-lambda env))
+  (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
+    (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
+            is not a lambda form."
+           method-lambda))
+  (multiple-value-bind (real-body declarations documentation)
+      (parse-body (cddr method-lambda))
+    (let* ((name-decl (get-declaration '%method-name declarations))
+           (sll-decl (get-declaration '%method-lambda-list declarations))
+           (method-name (when (consp name-decl) (car name-decl)))
+           (generic-function-name (when method-name (car method-name)))
+           (specialized-lambda-list (or sll-decl (cadr method-lambda)))
+           ;; the method-cell is a way of communicating what method a
+           ;; method-function implements, for the purpose of
+           ;; NO-NEXT-METHOD.  We need something that can be shared
+           ;; between function and initargs, but not something that
+           ;; will be coalesced as a constant (because we are naughty,
+           ;; oh yes) with the expansion of any other methods in the
+           ;; same file.  -- CSR, 2007-05-30
+           (method-cell (list (make-symbol "METHOD-CELL"))))
+      (multiple-value-bind (parameters lambda-list specializers)
+          (parse-specialized-lambda-list specialized-lambda-list)
+        (let* ((required-parameters
+                (mapcar (lambda (r s) (declare (ignore s)) r)
+                        parameters
+                        specializers))
+               (slots (mapcar #'list required-parameters))
+               (calls (list nil))
+               (class-declarations
+                `(declare
+                  ;; These declarations seem to be used by PCL to pass
+                  ;; information to itself; when I tried to delete 'em
+                  ;; ca. 0.6.10 it didn't work. I'm not sure how
+                  ;; they work, but note the (VAR-DECLARATION '%CLASS ..)
+                  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
+                  ,@(remove nil
+                            (mapcar (lambda (a s) (and (symbolp s)
+                                                       (neq s t)
+                                                       `(%class ,a ,s)))
+                                    parameters
+                                    specializers))
+                  ;; These TYPE declarations weren't in the original
+                  ;; PCL code, but the Python compiler likes them a
+                  ;; lot. (We're telling the compiler about our
+                  ;; knowledge of specialized argument types so that
+                  ;; it can avoid run-time type dispatch overhead,
+                  ;; which can be a huge win for Python.)
+                  ;;
+                  ;; KLUDGE: when I tried moving these to
+                  ;; ADD-METHOD-DECLARATIONS, things broke.  No idea
+                  ;; why.  -- CSR, 2004-06-16
+                  ,@(mapcar #'parameter-specializer-declaration-in-defmethod
+                            parameters
+                            specializers)))
+               (method-lambda
+                ;; Remove the documentation string and insert the
+                ;; appropriate class declarations. The documentation
+                ;; string is removed to make it easy for us to insert
+                ;; new declarations later, they will just go after the
+                ;; CADR of the method lambda. The class declarations
+                ;; are inserted to communicate the class of the method's
+                ;; arguments to the code walk.
+                `(lambda ,lambda-list
+                   ;; The default ignorability of method parameters
+                   ;; doesn't seem to be specified by ANSI. PCL had
+                   ;; them basically ignorable but was a little
+                   ;; inconsistent. E.g. even though the two
+                   ;; method definitions
+                   ;;   (DEFMETHOD FOO ((X T) (Y T)) "Z")
+                   ;;   (DEFMETHOD FOO ((X T) Y) "Z")
+                   ;; are otherwise equivalent, PCL treated Y as
+                   ;; ignorable in the first definition but not in the
+                   ;; second definition. We make all required
+                   ;; parameters ignorable as a way of systematizing
+                   ;; the old PCL behavior. -- WHN 2000-11-24
+                   (declare (ignorable ,@required-parameters))
+                   ,class-declarations
+                   ,@declarations
+                   (block ,(fun-name-block-name generic-function-name)
+                     ,@real-body)))
+               (constant-value-p (and (null (cdr real-body))
+                                      (constantp (car real-body))))
+               (constant-value (and constant-value-p
+                                    (constant-form-value (car real-body))))
+               (plist (and constant-value-p
+                           (or (typep constant-value
+                                      '(or number character))
+                               (and (symbolp constant-value)
+                                    (symbol-package constant-value)))
+                           (list :constant-value constant-value)))
+               (applyp (dolist (p lambda-list nil)
+                         (cond ((memq p '(&optional &rest &key))
+                                (return t))
+                               ((eq p '&aux)
+                                (return nil))))))
+          (multiple-value-bind
+                (walked-lambda call-next-method-p closurep
+                               next-method-p-p setq-p
+                               parameters-setqd)
+              (walk-method-lambda method-lambda
+                                  required-parameters
+                                  env
+                                  slots
+                                  calls)
+            (multiple-value-bind (walked-lambda-body
+                                  walked-declarations
+                                  walked-documentation)
+                (parse-body (cddr walked-lambda))
+              (declare (ignore walked-documentation))
+              (when (some #'cdr slots)
+                (multiple-value-bind (slot-name-lists call-list)
+                    (slot-name-lists-from-slots slots calls)
+                  (setq plist
+                        `(,@(when slot-name-lists
+                                  `(:slot-name-lists ,slot-name-lists))
+                            ,@(when call-list
+                                    `(:call-list ,call-list))
+                            ,@plist))
+                  (setq walked-lambda-body
+                        `((pv-binding (,required-parameters
+                                       ,slot-name-lists
+                                       (load-time-value
+                                        (intern-pv-table
+                                         :slot-name-lists ',slot-name-lists
+                                         :call-list ',call-list)))
+                            ,@walked-lambda-body)))))
+              (when (and (memq '&key lambda-list)
+                         (not (memq '&allow-other-keys lambda-list)))
+                (let ((aux (memq '&aux lambda-list)))
+                  (setq lambda-list (nconc (ldiff lambda-list aux)
+                                           (list '&allow-other-keys)
+                                           aux))))
+              (values `(lambda (.method-args. .next-methods.)
+                         (simple-lexical-method-functions
+                             (,lambda-list .method-args. .next-methods.
+                                           :call-next-method-p
+                                           ,call-next-method-p
+                                           :next-method-p-p ,next-method-p-p
+                                           :setq-p ,setq-p
+                                           :method-cell ,method-cell
+                                           :closurep ,closurep
+                                           :applyp ,applyp)
+                           ,@walked-declarations
+                           (locally
+                               (declare (disable-package-locks
+                                         %parameter-binding-modified))
+                             (symbol-macrolet ((%parameter-binding-modified
+                                                ',@parameters-setqd))
+                               (declare (enable-package-locks
+                                         %parameter-binding-modified))
+                               ,@walked-lambda-body))))
+                      `(,@(when call-next-method-p `(method-cell ,method-cell))
+                          ,@(when plist `(plist ,plist))
+                          ,@(when documentation `(:documentation ,documentation)))))))))))
 
 (unless (fboundp 'make-method-lambda)
   (setf (gdefinition 'make-method-lambda)
@@ -775,161 +927,6 @@ bootstrapping.
 ;;; parameters whose bindings are modified in the method body to the
 ;;; optimized-slot-value* macros.
 (define-symbol-macro %parameter-binding-modified ())
-
-(defun make-method-lambda-internal (method-lambda &optional env)
-  (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
-    (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
-            is not a lambda form."
-           method-lambda))
-  (multiple-value-bind (real-body declarations documentation)
-      (parse-body (cddr method-lambda))
-    (let* ((name-decl (get-declaration '%method-name declarations))
-           (sll-decl (get-declaration '%method-lambda-list declarations))
-           (method-name (when (consp name-decl) (car name-decl)))
-           (generic-function-name (when method-name (car method-name)))
-           (specialized-lambda-list (or sll-decl (cadr method-lambda)))
-           ;; the method-cell is a way of communicating what method a
-           ;; method-function implements, for the purpose of
-           ;; NO-NEXT-METHOD.  We need something that can be shared
-           ;; between function and initargs, but not something that
-           ;; will be coalesced as a constant (because we are naughty,
-           ;; oh yes) with the expansion of any other methods in the
-           ;; same file.  -- CSR, 2007-05-30
-           (method-cell (list (make-symbol "METHOD-CELL"))))
-      (multiple-value-bind (parameters lambda-list specializers)
-          (parse-specialized-lambda-list specialized-lambda-list)
-        (let* ((required-parameters
-                (mapcar (lambda (r s) (declare (ignore s)) r)
-                        parameters
-                        specializers))
-               (slots (mapcar #'list required-parameters))
-               (calls (list nil))
-               (class-declarations
-                `(declare
-                  ;; These declarations seem to be used by PCL to pass
-                  ;; information to itself; when I tried to delete 'em
-                  ;; ca. 0.6.10 it didn't work. I'm not sure how
-                  ;; they work, but note the (VAR-DECLARATION '%CLASS ..)
-                  ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN 2000-12-30
-                  ,@(remove nil
-                            (mapcar (lambda (a s) (and (symbolp s)
-                                                       (neq s t)
-                                                       `(%class ,a ,s)))
-                                    parameters
-                                    specializers))
-                  ;; These TYPE declarations weren't in the original
-                  ;; PCL code, but the Python compiler likes them a
-                  ;; lot. (We're telling the compiler about our
-                  ;; knowledge of specialized argument types so that
-                  ;; it can avoid run-time type dispatch overhead,
-                  ;; which can be a huge win for Python.)
-                  ;;
-                  ;; KLUDGE: when I tried moving these to
-                  ;; ADD-METHOD-DECLARATIONS, things broke.  No idea
-                  ;; why.  -- CSR, 2004-06-16
-                  ,@(mapcar #'parameter-specializer-declaration-in-defmethod
-                            parameters
-                            specializers)))
-               (method-lambda
-                ;; Remove the documentation string and insert the
-                ;; appropriate class declarations. The documentation
-                ;; string is removed to make it easy for us to insert
-                ;; new declarations later, they will just go after the
-                ;; CADR of the method lambda. The class declarations
-                ;; are inserted to communicate the class of the method's
-                ;; arguments to the code walk.
-                `(lambda ,lambda-list
-                   ;; The default ignorability of method parameters
-                   ;; doesn't seem to be specified by ANSI. PCL had
-                   ;; them basically ignorable but was a little
-                   ;; inconsistent. E.g. even though the two
-                   ;; method definitions
-                   ;;   (DEFMETHOD FOO ((X T) (Y T)) "Z")
-                   ;;   (DEFMETHOD FOO ((X T) Y) "Z")
-                   ;; are otherwise equivalent, PCL treated Y as
-                   ;; ignorable in the first definition but not in the
-                   ;; second definition. We make all required
-                   ;; parameters ignorable as a way of systematizing
-                   ;; the old PCL behavior. -- WHN 2000-11-24
-                   (declare (ignorable ,@required-parameters))
-                   ,class-declarations
-                   ,@declarations
-                   (block ,(fun-name-block-name generic-function-name)
-                     ,@real-body)))
-               (constant-value-p (and (null (cdr real-body))
-                                      (constantp (car real-body))))
-               (constant-value (and constant-value-p
-                                    (constant-form-value (car real-body))))
-               (plist (and constant-value-p
-                           (or (typep constant-value
-                                      '(or number character))
-                               (and (symbolp constant-value)
-                                    (symbol-package constant-value)))
-                           (list :constant-value constant-value)))
-               (applyp (dolist (p lambda-list nil)
-                         (cond ((memq p '(&optional &rest &key))
-                                (return t))
-                               ((eq p '&aux)
-                                (return nil))))))
-          (multiple-value-bind
-                (walked-lambda call-next-method-p closurep
-                               next-method-p-p setq-p
-                               parameters-setqd)
-              (walk-method-lambda method-lambda
-                                  required-parameters
-                                  env
-                                  slots
-                                  calls)
-            (multiple-value-bind (walked-lambda-body
-                                  walked-declarations
-                                  walked-documentation)
-                (parse-body (cddr walked-lambda))
-              (declare (ignore walked-documentation))
-              (when (some #'cdr slots)
-                (multiple-value-bind (slot-name-lists call-list)
-                    (slot-name-lists-from-slots slots calls)
-                  (setq plist
-                        `(,@(when slot-name-lists
-                                  `(:slot-name-lists ,slot-name-lists))
-                            ,@(when call-list
-                                    `(:call-list ,call-list))
-                            ,@plist))
-                  (setq walked-lambda-body
-                        `((pv-binding (,required-parameters
-                                       ,slot-name-lists
-                                       (load-time-value
-                                        (intern-pv-table
-                                         :slot-name-lists ',slot-name-lists
-                                         :call-list ',call-list)))
-                            ,@walked-lambda-body)))))
-              (when (and (memq '&key lambda-list)
-                         (not (memq '&allow-other-keys lambda-list)))
-                (let ((aux (memq '&aux lambda-list)))
-                  (setq lambda-list (nconc (ldiff lambda-list aux)
-                                           (list '&allow-other-keys)
-                                           aux))))
-              (values `(lambda (.method-args. .next-methods.)
-                         (simple-lexical-method-functions
-                             (,lambda-list .method-args. .next-methods.
-                                           :call-next-method-p
-                                           ,call-next-method-p
-                                           :next-method-p-p ,next-method-p-p
-                                           :setq-p ,setq-p
-                                           :method-cell ,method-cell
-                                           :closurep ,closurep
-                                           :applyp ,applyp)
-                           ,@walked-declarations
-                           (locally
-                               (declare (disable-package-locks
-                                         %parameter-binding-modified))
-                             (symbol-macrolet ((%parameter-binding-modified
-                                                ',@parameters-setqd))
-                               (declare (enable-package-locks
-                                         %parameter-binding-modified))
-                               ,@walked-lambda-body))))
-                      `(,@(when call-next-method-p `(method-cell ,method-cell))
-                        ,@(when plist `(plist ,plist))
-                        ,@(when documentation `(:documentation ,documentation)))))))))))
 
 (defmacro simple-lexical-method-functions ((lambda-list
                                             method-args
