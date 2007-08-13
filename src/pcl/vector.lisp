@@ -304,31 +304,34 @@
             (incf param))))))
 
 (defun can-optimize-access (form required-parameters env)
-  (let ((type (ecase (car form)
-                (slot-value 'reader)
-                (set-slot-value 'writer)
-                (slot-boundp 'boundp)))
-        (var (extract-the (cadr form)))
-        (slot-name (eval (caddr form)))) ; known to be constant
-    (when (symbolp var)
-      (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
-             (parameter-or-nil (car (memq (or rebound? var)
-                                          required-parameters))))
-        (when parameter-or-nil
-          (let* ((class-name (caddr (var-declaration '%class
-                                                     parameter-or-nil
-                                                     env)))
-                 (class (find-class class-name nil)))
-            (when (or (not (eq *boot-state* 'complete))
-                      (and class (not (class-finalized-p class))))
-              (setq class nil))
-            (when (and class-name (not (eq class-name t)))
-              (when (or (null type)
-                        (not (and class
-                                  (memq *the-class-structure-object*
-                                        (class-precedence-list class))))
-                        (optimize-slot-value-by-class-p class slot-name type))
-                (cons parameter-or-nil (or class class-name))))))))))
+  (destructuring-bind (op var-form slot-name-form &optional new-value) form
+      (let ((type (ecase op
+                    (slot-value 'reader)
+                    (set-slot-value 'writer)
+                    (slot-boundp 'boundp)))
+            (var (extract-the var-form))
+            (slot-name (constant-form-value slot-name-form env)))
+        (when (symbolp var)
+          (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
+                 (parameter-or-nil (car (memq (or rebound? var)
+                                              required-parameters))))
+            (when parameter-or-nil
+              (let* ((class-name (caddr (var-declaration '%class
+                                                         parameter-or-nil
+                                                         env)))
+                     (class (find-class class-name nil)))
+                (when (or (not (eq *boot-state* 'complete))
+                          (and class (not (class-finalized-p class))))
+                  (setq class nil))
+                (when (and class-name (not (eq class-name t)))
+                  (when (or (null type)
+                            (not (and class
+                                      (memq *the-class-structure-object*
+                                            (class-precedence-list class))))
+                            (optimize-slot-value-by-class-p class slot-name type))
+                    (values (cons parameter-or-nil (or class class-name))
+                            slot-name
+                            new-value))))))))))
 
 ;;; Check whether the binding of the named variable is modified in the
 ;;; method body.
@@ -336,32 +339,31 @@
   (let ((modified-variables (macroexpand '%parameter-binding-modified env)))
     (memq parameter-name modified-variables)))
 
-(defun optimize-slot-value (slots sparameter form)
-  (if sparameter
-      (let ((optimized-form
-             (destructuring-bind (ignore1 ignore2 slot-name-form) form
-               (declare (ignore ignore1 ignore2))
-               (let ((slot-name (eval slot-name-form)))
-                 (optimize-instance-access slots :read sparameter
-                                           slot-name nil)))))
-        ;; We don't return the optimized form directly, since there's
-        ;; still a chance that we'll find out later on that the
-        ;; optimization should not have been done, for example due to
-        ;; the walker encountering a SETQ on SPARAMETER later on in
-        ;; the body [ see for example clos.impure.lisp test with :name
-        ;; ((:setq :method-parameter) slot-value)) ]. Instead we defer
-        ;; the decision until the compiler macroexpands
-        ;; OPTIMIZED-SLOT-VALUE.
-        ;;
-        ;; Note that we must still call OPTIMIZE-INSTANCE-ACCESS at
-        ;; this point (instead of when expanding
-        ;; OPTIMIZED-SLOT-VALUE), since it mutates the structure of
-        ;; SLOTS. If that mutation isn't done during the walking,
-        ;; MAKE-METHOD-LAMBDA-INTERNAL won't wrap a correct PV-BINDING
-        ;; form around the body, and compilation will fail.  -- JES,
-        ;; 2006-09-18
-        `(optimized-slot-value ,form ,(car sparameter) ,optimized-form))
-      `(accessor-slot-value ,@(cdr form))))
+(defun optimize-slot-value (form slots required-parameters env)
+  (multiple-value-bind (sparameter slot-name)
+      (can-optimize-access form required-parameters env)
+    (if sparameter
+        (let ((optimized-form
+               (optimize-instance-access slots :read sparameter
+                                         slot-name nil)))
+             ;; We don't return the optimized form directly, since there's
+             ;; still a chance that we'll find out later on that the
+             ;; optimization should not have been done, for example due to
+             ;; the walker encountering a SETQ on SPARAMETER later on in
+             ;; the body [ see for example clos.impure.lisp test with :name
+             ;; ((:setq :method-parameter) slot-value)) ]. Instead we defer
+             ;; the decision until the compiler macroexpands
+             ;; OPTIMIZED-SLOT-VALUE.
+             ;;
+             ;; Note that we must still call OPTIMIZE-INSTANCE-ACCESS at
+             ;; this point (instead of when expanding
+             ;; OPTIMIZED-SLOT-VALUE), since it mutates the structure of
+             ;; SLOTS. If that mutation isn't done during the walking,
+             ;; MAKE-METHOD-LAMBDA-INTERNAL won't wrap a correct PV-BINDING
+             ;; form around the body, and compilation will fail.  -- JES,
+             ;; 2006-09-18
+             `(optimized-slot-value ,form ,(car sparameter) ,optimized-form))
+           `(accessor-slot-value ,@(cdr form)))))
 
 (defmacro optimized-slot-value (form parameter-name optimized-form
                                 &environment env)
@@ -371,20 +373,16 @@
       `(accessor-slot-value ,@(cdr form))
       optimized-form))
 
-(defun optimize-set-slot-value (slots sparameter form)
-  (if sparameter
-      (let ((optimized-form
-             (destructuring-bind (ignore1 ignore2 slot-name-form new-value) form
-               (declare (ignore ignore1 ignore2))
-               (let ((slot-name (eval slot-name-form)))
-                 (optimize-instance-access slots
-                                           :write
-                                           sparameter
-                                           slot-name
-                                           new-value)))))
-        ;; See OPTIMIZE-SLOT-VALUE
-        `(optimized-set-slot-value ,form ,(car sparameter) ,optimized-form))
-      `(accessor-set-slot-value ,@(cdr form))))
+(defun optimize-set-slot-value (form slots required-parameters env)
+  (multiple-value-bind (sparameter slot-name new-value)
+      (can-optimize-access form required-parameters env)
+    (if sparameter
+        (let ((optimized-form
+               (optimize-instance-access slots :write sparameter
+                                         slot-name new-value)))
+             ;; See OPTIMIZE-SLOT-VALUE
+             `(optimized-set-slot-value ,form ,(car sparameter) ,optimized-form))
+           `(accessor-set-slot-value ,@(cdr form)))))
 
 (defmacro optimized-set-slot-value (form parameter-name optimized-form
                                     &environment env)
@@ -399,40 +397,16 @@
         (t
          optimized-form)))
 
-(defun optimize-slot-boundp (slots sparameter form)
-  (if sparameter
-      (let ((optimized-form
-             (destructuring-bind
-                   ;; FIXME: In CMU CL ca. 19991205, this binding list
-                   ;; had a fourth element in it, NEW-VALUE. It's hard
-                   ;; to see how that could possibly be right, since
-                   ;; SLOT-BOUNDP has no NEW-VALUE. Since it was
-                   ;; causing a failure in building PCL for SBCL, so I
-                   ;; changed it to match the definition of
-                   ;; SLOT-BOUNDP (and also to match the list used in
-                   ;; the similar OPTIMIZE-SLOT-VALUE,
-                   ;; above). However, I'm weirded out by this, since
-                   ;; this is old code which has worked for ages to
-                   ;; build PCL for CMU CL, so it's hard to see why it
-                   ;; should need a patch like this in order to build
-                   ;; PCL for SBCL. I'd like to return to this and
-                   ;; find a test case which exercises this function
-                   ;; both in CMU CL, to see whether it's really a
-                   ;; previously-unexercised bug or whether I've
-                   ;; misunderstood something (and, presumably,
-                   ;; patched it wrong).
-                   (slot-boundp-symbol instance slot-name-form)
-                 form
-               (declare (ignore slot-boundp-symbol instance))
-               (let ((slot-name (eval slot-name-form)))
-                 (optimize-instance-access slots
-                                           :boundp
-                                           sparameter
-                                           slot-name
-                                           nil)))))
-        ;; See OPTIMIZE-SLOT-VALUE
-        `(optimized-slot-boundp ,form ,(car sparameter) ,optimized-form))
-      `(accessor-slot-boundp ,@(cdr form))))
+(defun optimize-slot-boundp (form slots required-parameters env)
+  (multiple-value-bind (sparameter slot-name)
+      (can-optimize-access form required-parameters env)
+    (if sparameter
+        (let ((optimized-form
+               (optimize-instance-access slots :boundp sparameter
+                                         slot-name nil)))
+          ;; See OPTIMIZE-SLOT-VALUE
+          `(optimized-slot-boundp ,form ,(car sparameter) ,optimized-form))
+        `(accessor-slot-boundp ,@(cdr form)))))
 
 (defmacro optimized-slot-boundp (form parameter-name optimized-form
                                  &environment env)

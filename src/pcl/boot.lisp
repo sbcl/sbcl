@@ -1506,15 +1506,12 @@ bootstrapping.
                                (t nil))))
                    ((and (memq (car form)
                                '(slot-value set-slot-value slot-boundp))
-                         (constantp (caddr form)))
-                    (let ((parameter (can-optimize-access form
-                                                          required-parameters
-                                                          env)))
-                      (let ((fun (ecase (car form)
-                                   (slot-value #'optimize-slot-value)
-                                   (set-slot-value #'optimize-set-slot-value)
-                                   (slot-boundp #'optimize-slot-boundp))))
-                        (funcall fun slots parameter form))))
+                         (constantp (caddr form) env))
+                    (let ((fun (ecase (car form)
+                                 (slot-value #'optimize-slot-value)
+                                 (set-slot-value #'optimize-set-slot-value)
+                                 (slot-boundp #'optimize-slot-boundp))))
+                        (funcall fun form slots required-parameters env)))
                    (t form))))
 
       (let ((walked-lambda (walk-form method-lambda env #'walk-function)))
