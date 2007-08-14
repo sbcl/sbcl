@@ -20,5 +20,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                         :doc-string-allowed nil
                         :wrap-block nil)
       `(let ((,whole-name ,expression))
+         ;; This declaration-as-assertion should protect us from
+         ;; (DESTRUCTURING-BIND (X . Y) 'NOT-A-LIST ...).
+         (declare (type list ,whole-name))
          ,@local-decls
          ,body))))

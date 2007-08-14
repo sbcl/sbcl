@@ -91,7 +91,7 @@
          (aux-seen nil)
          (optional-seen nil)
          ;; ANSI specifies that dotted lists are "treated exactly as if the
-         ;; parameter name that ends the list had appeared preceded by &rest."
+         ;; parameter name that ends the list had appeared preceded by &REST."
          ;; We force this behavior by transforming dotted lists into ordinary
          ;; lists with explicit &REST elements.
          (lambda-list (do ((in-pdll possibly-dotted-lambda-list (cdr in-pdll))
@@ -106,14 +106,14 @@
       (error "&WHOLE may only appear first in ~S lambda-list." context))
     ;; Special case compiler-macros: if car of the form is FUNCALL,
     ;; skip over it for destructuring, pretending cdr of the form is
-    ;; the actual form. Save original for &whole
+    ;; the actual form. Save original for &WHOLE.
     (when (eq context 'define-compiler-macro)
       (push-let-binding compiler-macro-whole whole-var :system t)
       (push compiler-macro-whole *ignorable-vars*)
       (push-let-binding whole-var whole-var
                         :system t
                         :when `(not (eq 'funcall (car ,whole-var)))
-                        ;; do we need to SETF too?
+                        ;; Do we need to SETF too?
                         :else `(setf ,whole-var (cdr ,whole-var))))
     (do ((rest-of-lambda-list lambda-list (cdr rest-of-lambda-list)))
         ((null rest-of-lambda-list))
