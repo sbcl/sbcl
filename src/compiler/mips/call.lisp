@@ -789,8 +789,8 @@ default-value-8
                                 (truncate (static-symbol-offset 'sb!impl::*stepping*)
                                           n-word-bytes))
                              other-pointer-lowtag))
-                    ;; If it's not null, trap.
-                    (inst beq stepping step-done-label)
+                    ;; If it's not NIL, trap.
+                    (inst beq stepping null-tn step-done-label)
                     (inst nop)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
@@ -1297,13 +1297,13 @@ default-value-8
                 (truncate (static-symbol-offset 'sb!impl::*stepping*)
                           n-word-bytes))
              other-pointer-lowtag))
-    ;; If it's not null, trap.
-    (inst beq stepping DONE)
+    ;; If it's not NIL, trap.
+    (inst beq stepping null-tn DONE)
     (inst nop)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
     (note-this-location vop :step-before-vop)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
-    (inst break single-step-before-trap)
+    (inst break 0 single-step-before-trap)
     DONE))
