@@ -575,7 +575,21 @@ bootstrapping.
   (setf (gdefinition 'make-method-initargs-form)
         (symbol-function 'real-make-method-initargs-form)))
 
+;;; When bootstrapping PCL MAKE-METHOD-LAMBDA starts out as a regular
+;;; functions: REAL-MAKE-METHOD-LAMBDA set to the fdefinition of
+;;; MAKE-METHOD-LAMBDA. Once generic functions are born, the
+;;; REAL-MAKE-METHOD lambda is used as the body of the default method.
+;;; MAKE-METHOD-LAMBDA-INTERNAL is split out into a separate function
+;;; so that changing it in a live image is easy, and changes actually
+;;; take effect.
 (defun real-make-method-lambda (proto-gf proto-method method-lambda env)
+  (make-method-lambda-internal proto-gf proto-method method-lambda env))
+
+(unless (fboundp 'make-method-lambda)
+  (setf (gdefinition 'make-method-lambda)
+        (symbol-function 'real-make-method-lambda)))
+
+(defun make-method-lambda-internal (proto-gf proto-method method-lambda env)
   (declare (ignore proto-gf proto-method))
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
     (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
@@ -730,10 +744,6 @@ bootstrapping.
                       `(,@(when call-next-method-p `(method-cell ,method-cell))
                           ,@(when plist `(plist ,plist))
                           ,@(when documentation `(:documentation ,documentation)))))))))))
-
-(unless (fboundp 'make-method-lambda)
-  (setf (gdefinition 'make-method-lambda)
-        (symbol-function 'real-make-method-lambda)))
 
 (defun real-make-method-specializers-form
     (proto-gf proto-method specializer-names env)
