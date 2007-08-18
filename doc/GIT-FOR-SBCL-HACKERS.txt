@@ -264,6 +264,17 @@ wish to commit the changes you have wrought on branch foo-hacks
  review, fix any problems
  cvs commit -F .msg
 
+To make things a bit easier, add eg. this stanza to ~/sbcl-git/.git/config:
+
+ [alias]
+    sbcl-export = ! cd ~/sbcl-cvs && GIT_DIR=~/sbcl-git/.git git-cvsexportcommit -v
+
+Then you can just run
+
+ git sbcl-export foo-hacks-to-cvs
+
+from inside ~/sbcl-git/, and have it prepare your CVS tree for commit.
+
 git-cvsexportcommit is fairly conservative by default, and will fail
 if the patch doens't apply cleanly. If that happens, you can fix the
 issues manually:
