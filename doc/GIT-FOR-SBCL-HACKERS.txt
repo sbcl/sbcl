@@ -1,0 +1,298 @@
+Git For SBCL Hackers
+====================
+
+Git is structured as a ton of programs called git-foo, accessible
+either directly, or as "git foo". Commands "git help" and "git help
+foo" provide the documentation -- which is there also as the manual
+pages.
+
+Make sure you have Git 1.5.something.
+
+When running on tty the commands pipe their output through less
+automatically, so you don't need to mentally add "| less" anywhere.
+
+Let's get started. First off, we need a gitified SBCL repository
+to clone. At the time of writing there are two Git mirrors for
+the CVS history:
+
+ git://sbcl.boinkor.net/sbcl.git
+ 
+and
+
+ git://repo.or.cz/sbcl.git
+
+but the latter is actually a mirror of the first one, so it doesn't
+matter which one you use, really.
+
+The command
+
+ git clone git://sbcl.boinkor.net/sbcl.git sbcl-git
+
+clones the SBCL Git mirror into the directory sbcl-git (there's a
+naming convention in play here, but ignore that for now.) The clone
+contains full history, and is an independent repository on it's own
+right. Doing the clone takes as long as downloading 25Mb takes on your
+line, but after that things are very fast.
+
+To update your clone from the original source at a later date, use
+git-pull. Go ahead and try out now, to see that it works, and see how
+snazzy a no-op pull is.
+
+ git pull
+
+The directory .git inside the clone contains gits view of the
+repository -- no other Git files or directories are in the tree. Just
+for kicks:
+
+ cd sbcl-git
+ rm -rf *                # leaves .git alone
+ time git reset --hard   # this takes < 2 seconds, restores everything
+
+So, two commands so far:
+
+ git-clone
+   One-time operation to clone a repository.
+
+ git-reset
+   Used to restore state: using the --hard flag resets the entire tree
+   to the state of the last commit but doesn't delete new files which
+   may be in the tree. (It doesn't actually "restore state", or rather
+   does it as a side, effect, but you can learn the details on your
+   own.)
+
+Let's hack a bit.
+
+ git branch hack-a-bit   # creates a new branch called "hack-a-bit"
+ git branch              # shows all branches and tells which one is active
+ git checkout hack-a-bit # switches to the "hack-a-bit" branch
+ git branch              # shows that we're now on "hack-a-bit"
+
+Once you get your bearings you can do the create-branch-and-checkout
+in one step, which you will be doing a lot, since branches are really
+nice in Git! The magic is: "git checkout -b hack-a-bit-more" -- but
+leave that for another time.
+
+Let's do something. Edit version.lisp-expr, and maybe give SBCL some
+love.
+
+ git diff                # shows you the changes in your tree
+ git status              # shows you the state of files in the tree
+
+git-status will tell you that some files have been modified, but it
+has "no changes added to commit". If you tried git-commit right now,
+nothing would happen. What's going on?
+
+Git has a notion of a separate "staging area", from which commits are
+made. You can add content to the it by using git-add:
+
+ git add version.lisp-expr
+ git status
+ git diff
+
+Now git-status shows changes as part of a pending commit, but git-diff
+is silent!
+
+By default git-diff shows the differences between the working tree and
+the staging area (or the last commit if the staging area is empty.)
+
+Edit version.lisp-expr again. Now you have three versions of it
+(ignoring all the historical versions for a second) to compare:
+
+ git diff               # between tree and staging area
+ git diff HEAD          # between tree last commit
+ git diff --cached      # between staging area and last commit
+
+If we were to do a git-commit now, it would commit the version in the
+staging area, not the one in the tree.
+
+We like our latest version, so do
+
+ git add version.lisp-expr
+
+again. Now the latest version is in the staging area, and version that
+used to be there is gone. You don't need to worry about the staging
+area. Either you will find out that it's pretty neat (consider it a
+temporary commit), or you can mostly ignore it. Do
+
+ git commit
+
+now, and we'll move on in a second. Just to call spade a spade, the
+staging area is really called "index".
+
+Now, our changes are in the repository, and git-status should show a
+clean tree. (By the way, can you imagine how long all the diffs and
+statuses you've done during this tutorial would have taken with CVS?)
+
+To get the differences between your current branch, and the master
+branch, do
+
+ git diff master
+
+To view the last commit on master, do
+
+ git diff master^..master
+
+To view the commit logs, do
+
+ git log
+
+You'll see long hex-string at the head of each commit. This is the
+commit id, which is a SHA1 hash based on the content of the tree, so
+you can share these with other hackers, and they can use the same
+commit id to poke at their own repositories. Locally any unique prefix
+of the hash is enough to identify a commit, so you don't need to use
+the full hashes.
+
+This is where the fun starts. Pick an interesting looking commit a
+while back, copy the commit id, and do
+
+ git diff <<paste commit id here>>
+
+Git will show you all the changes between the commit you selected and
+current version as a single diff. Similarly,
+
+ git diff -w <<commit id 1>> <<commit id 2>>
+
+can be used to compare two arbitrary versions. The -w switch tells Git
+to ignore whitespace changes -- you can usually leave it out, but it's
+nice when diffing across the great whilespacification patch.
+
+Onwards: just so that we have a bit more history on the branch, edit
+version.lisp-expr again, and git-commit again. You can use
+
+ git commit -a
+
+to automatically add all the changed files to the staging area to
+speed things up. Repeat. Now git-log should show a few local changes.
+
+Let's see how merging works. To create a new branch based on master
+and switch to it do
+
+ git checkout -b merge-experiment master
+
+Merge the changes we did on the hack-a-bit branch.
+
+ git merge hack-a-bit
+
+Bing-bada-bing! Done. Have a look at git-log. You see that we have
+full branch history merged. If there had been conflicts, the merge
+would not have been automatic, but you would have been called to
+resolve conflicts, etc.
+
+This is very nice for merging short-lived local branches, but not so
+good for merging things back onto master, or into "mainline" history:
+
+ * We don't want the version.lisp-expr from the branch, but a new one.
+   (Once we live in the brave new distributed world we may want to
+   rethink the version.lisp-expr a bit -- but that is neither here nor
+   now.)
+
+ * When merging a long-lived branch with several small commits it
+   makes for a more readable history if we are able to merge it as a
+   few logical patches.
+
+First option is to use --squash to squash all the commits into a
+single one.
+
+ git checkout -b merge-experiment-2 master
+ git merge --squash hack-a-bit
+
+This has the side-effect of not committing the changes immediately, so
+we can edit version.lisp-expr to taste, and commit changes (remeber to
+git-add the edited version.lisp-expr.)
+
+This is in effect similar to the usual way of merging back changes
+from a CVS branch: if we're told that the patch came from a branch, we
+can then go and look at the branch history, but we don't see the
+evolution of the branch in the mainline history.
+
+If the changeset is small, --squash is exactly what we want, but for
+long-lived branches that are best merged in a few steps we can use
+
+ git merge --squash <<commit id>>
+
+to merge the changes upto a certain commit. Repeat a few times, and
+you have the whole branch merged. Other Git commands provide more
+advanced options. See eg. git-cherry-pick.
+
+Now, let's assume we have a private Git repository in ~/sbcl-git, and
+we want to publish it to the world. The easiest way is to fire up a
+browser, and go to
+
+ http://repo.or.cz/w/sbcl.git
+
+There, click on the "fork" link, and set up your own SBCL repository,
+called sbcl/yourname. Select the "push" mode, and write something
+along the lines of "My private SBCL tree. Pulls from main sbcl.git
+repository, and trickles changes back to upstream CVS manually --
+from where they end up in sbcl.git. Turtles, you see." in the comment
+box. Then you will be directed to set up an account, which you will
+then have to add as a "pusher" to your SBCL fork. 
+
+Finally, add the following snipped (adjusting for your own name) in
+~/sbcl-git/.git/config
+
+ [remote "public"]
+        url = git+ssh://repo.or.cz/srv/git/sbcl/yourname.git
+
+After that is done, you're ready to publish your tree.
+
+ git push --all public
+
+Now anyone can get at your repository at
+
+ git://repo.or.cz/sbcl/yourname.git
+
+and you can publish your own hacks on it via git-push.
+
+ git push public <<name of branch to update>>
+
+Since we're not (yet?) officially using Git, we want to get our
+changes back into the CVS. git-cvsexport is the perfect tool for this.
+This assumes that you have a developer CVS checkout in ~/sbcl-cvs, and
+wish to commit the changes you have wrought on branch foo-hacks
+(compared to master):
+
+ git checkout -b foo-hacks-to-cvs master
+ git merge --squash foo-hacks
+ edit version.lisp-expr to be "CVS ready"
+ git commit -a               # edit the message to be "CVS ready"
+ cd ~/sbcl-cvs
+ GIT_DIR=~/sbcl-git/.git git cvsexportcommit -v foo-hacks-to-cvs
+ review, fix any problems
+ cvs commit -F .msg
+
+git-cvsexportcommit is fairly conservative by default, and will fail
+if the patch doens't apply cleanly. If that happens, you can fix the
+issues manually:
+
+ .cvsexportcommit.diff   -- holds the patch
+ .msg                    -- holds the commit message
+
+Finally, delete the foo-hacks-to-cvs branch after you've committed
+code to CVS. Of course, instead of using git-cvexportcommit you can
+also manually make and apply patches, etc. For hairier cases it may
+even be easier in the end.
+
+To get latest changes from the CVS Git mirror you originally cloned
+from, do
+
+  git pull
+
+on the branch you want to update on your private repository.
+
+This completes our whirlwind tour. I'm not saying this makes you
+proficient in using Git, but at least you should be up and walking.
+Reading
+
+ http://www.kernel.org/pub/software/scm/git/docs/everyday.html
+
+and
+
+ http://eagain.net/articles/git-for-computer-scientists/
+ 
+and various Git manual pages is a good idea, as is building a decent
+mental model of the way Git actually works. One command I can in
+particular recommend getting familiar with is git-rebase. git-gui,
+git-citool, and gitk provide graphical interfaces for working with
+Git.
