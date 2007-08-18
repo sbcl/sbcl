@@ -159,11 +159,21 @@
       (slot-value object slot-name)
       default))
 
+(declaim (inline standard-instance-access (setf standard-instance-access)
+                 funcallable-standard-instance-access
+                 (setf funcallable-standard-instance-access)))
+
 (defun standard-instance-access (instance location)
   (clos-slots-ref (std-instance-slots instance) location))
 
+(defun (setf standard-instance-access) (new-value instance location)
+  (setf (clos-slots-ref (std-instance-slots instance) location) new-value))
+
 (defun funcallable-standard-instance-access (instance location)
   (clos-slots-ref (fsc-instance-slots instance) location))
+
+(defun (setf funcallable-standard-instance-access) (new-value instance location)
+  (setf (clos-slots-ref (fsc-instance-slots instance) location) new-value))
 
 (defmethod slot-value-using-class ((class std-class)
                                    (object standard-object)

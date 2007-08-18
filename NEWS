@@ -7,6 +7,9 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * enhancement: default PRINT-OBJECT methods for classes, slot-definitions,
     and generic function now print the object identity for anonymous
     instances. (thanks to Attila Lendvai)
+  * enhancement: as an extension to MOP, SBCL now supports SETF of
+    STANDARD-INSTANCE-ACCESS and FUNCALLABLE-STANDARD-INSTANCE-ACCESS.
+    (thanks to Attila Lendvai)
   * bug fix: new compiler transforms for MEMBER and ASSOC were affected
     by printer control variables. (reported by Dan Corkill)
   * bug fix: system leaked memory when delayed output was performed by
