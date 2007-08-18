@@ -11,9 +11,9 @@ Make sure you have Git 1.5.something.
 When running on tty the commands pipe their output through less
 automatically, so you don't need to mentally add "| less" anywhere.
 
-Let's get started. First off, we need a gitified SBCL repository
-to clone. At the time of writing there are two Git mirrors for
-the CVS history:
+Let's get started. First off, we need a gitified SBCL repository to
+clone. At the time of writing there are two Git mirrors for the CVS
+history:
 
  git://sbcl.boinkor.net/sbcl.git
  
@@ -40,7 +40,7 @@ snazzy a no-op pull is.
 
  git pull
 
-The directory .git inside the clone contains gits view of the
+The directory .git inside the clone contains Git's view of the
 repository -- no other Git files or directories are in the tree. Just
 for kicks:
 
@@ -93,13 +93,13 @@ Now git-status shows changes as part of a pending commit, but git-diff
 is silent!
 
 By default git-diff shows the differences between the working tree and
-the staging area (or the last commit if the staging area is empty.)
+the staging area (which starts out identical to HEAD after a checkout).
 
 Edit version.lisp-expr again. Now you have three versions of it
 (ignoring all the historical versions for a second) to compare:
 
  git diff               # between tree and staging area
- git diff HEAD          # between tree last commit
+ git diff HEAD          # between tree and last commit
  git diff --cached      # between staging area and last commit
 
 If we were to do a git-commit now, it would commit the version in the
@@ -155,7 +155,7 @@ current version as a single diff. Similarly,
 
 can be used to compare two arbitrary versions. The -w switch tells Git
 to ignore whitespace changes -- you can usually leave it out, but it's
-nice when diffing across the great whilespacification patch.
+nice when diffing across the great whilespacification patches.
 
 Onwards: just so that we have a bit more history on the branch, edit
 version.lisp-expr again, and git-commit again. You can use
@@ -179,17 +179,20 @@ full branch history merged. If there had been conflicts, the merge
 would not have been automatic, but you would have been called to
 resolve conflicts, etc.
 
-This is very nice for merging short-lived local branches, but not so
-good for merging things back onto master, or into "mainline" history:
+This is very nice for merging short-lived local branches, but not
+always so good for merging things back onto master, or into "mainline"
+history since you get all the commits that happened on the branch:
 
- * We don't want the version.lisp-expr from the branch, but a new one.
-   (Once we live in the brave new distributed world we may want to
-   rethink the version.lisp-expr a bit -- but that is neither here nor
-   now.)
+  "first cut at x"
+  "first cut at y"
+  "oops, x was wrong"
+  "implemented z"
+  "aargh, x was still wrong"
+  ...
 
- * When merging a long-lived branch with several small commits it
-   makes for a more readable history if we are able to merge it as a
-   few logical patches.
+When merging a branch like this, with oopses in the history, it is far
+better if we are able to merge it as a few logical patches -- the
+resulting history will be easier to understand.
 
 First option is to use --squash to squash all the commits into a
 single one.
@@ -197,9 +200,7 @@ single one.
  git checkout -b merge-experiment-2 master
  git merge --squash hack-a-bit
 
-This has the side-effect of not committing the changes immediately, so
-we can edit version.lisp-expr to taste, and commit changes (remeber to
-git-add the edited version.lisp-expr.)
+This has the side-effect of not committing the changes immediately.
 
 This is in effect similar to the usual way of merging back changes
 from a CVS branch: if we're told that the patch came from a branch, we
@@ -213,7 +214,8 @@ long-lived branches that are best merged in a few steps we can use
 
 to merge the changes upto a certain commit. Repeat a few times, and
 you have the whole branch merged. Other Git commands provide more
-advanced options. See eg. git-cherry-pick.
+advanced options. See eg. git-cherry-pick, which you will end up
+using sooner or later.
 
 Now, let's assume we have a private Git repository in ~/sbcl-git, and
 we want to publish it to the world. The easiest way is to fire up a
@@ -272,7 +274,16 @@ issues manually:
 Finally, delete the foo-hacks-to-cvs branch after you've committed
 code to CVS. Of course, instead of using git-cvexportcommit you can
 also manually make and apply patches, etc. For hairier cases it may
-even be easier in the end.
+even be easier in the end:
+
+  git format-patch -p master..foo-hacks
+
+Generates a patch for each commit between master and the HEAD of
+foo-hacks, naming them
+
+  0001-first-line-of-commit-message.patch
+  0002-and-so-and-so-forth.patch
+  ...
 
 To get latest changes from the CVS Git mirror you originally cloned
 from, do
@@ -285,14 +296,13 @@ This completes our whirlwind tour. I'm not saying this makes you
 proficient in using Git, but at least you should be up and walking.
 Reading
 
- http://www.kernel.org/pub/software/scm/git/docs/everyday.html
-
-and
-
  http://eagain.net/articles/git-for-computer-scientists/
+ http://www.kernel.org/pub/software/scm/git/docs/everyday.html
+ http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
  
-and various Git manual pages is a good idea, as is building a decent
-mental model of the way Git actually works. One command I can in
-particular recommend getting familiar with is git-rebase. git-gui,
-git-citool, and gitk provide graphical interfaces for working with
-Git.
+and various Git manual pages is a good idea.
+
+One command I can in particular recommend getting familiar with is
+git-rebase. git-gui, git-citool, and gitk provide graphical interfaces
+for working with Git -- particularly gitk is an invaluable tool for
+visualizing history.
