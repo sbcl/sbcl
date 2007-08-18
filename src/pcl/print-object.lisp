@@ -102,15 +102,11 @@
 
 (defun named-object-print-function (instance stream
                                     &optional (extra nil extra-p))
-  (print-unreadable-object (instance stream :type t)
-    (if extra-p
-        (format stream
-                "~S ~:S"
-                (slot-value-or-default instance 'name)
-                extra)
-        (format stream
-                "~S"
-                (slot-value-or-default instance 'name)))))
+  (let ((name (slot-value-or-default instance 'name)))
+    (print-unreadable-object (instance stream :type t :identity (not name))
+      (if extra-p
+          (format stream "~S ~:S" name extra)
+          (format stream "~S" name)))))
 
 (defmethod print-object ((class class) stream)
   (named-object-print-function class stream))
