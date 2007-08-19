@@ -94,6 +94,14 @@
     (declare (type (alien (* os-context-register-t)) addr))
     (setf (deref addr) (coerce new format))))
 
+(define-alien-routine
+    ("arch_get_fp_control" floating-point-modes) unsigned-int)
+
+(define-alien-routine
+    ("arch_set_fp_control" %floating-point-modes-setter) void (fp unsigned-int))
+
+(defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
+
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)

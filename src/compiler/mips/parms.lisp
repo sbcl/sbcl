@@ -52,6 +52,7 @@
 (def!constant float-overflow-trap-bit (ash 1 2))
 (def!constant float-divide-by-zero-trap-bit (ash 1 3))
 (def!constant float-invalid-trap-bit (ash 1 4))
+(def!constant float-unimplemented-trap-bit (ash 1 5))
 
 (def!constant float-round-to-nearest 0)
 (def!constant float-round-to-zero 1)
@@ -61,7 +62,7 @@
 (defconstant-eqx float-rounding-mode (byte 2 0) #'equalp)
 (defconstant-eqx float-sticky-bits (byte 5 2) #'equalp)
 (defconstant-eqx float-traps-byte (byte 5 7) #'equalp)
-(defconstant-eqx float-exceptions-byte (byte 5 12) #'equalp)
+(defconstant-eqx float-exceptions-byte (byte 6 12) #'equalp)
 (defconstant-eqx float-condition-bit (ash 1 23) #'equalp)
 (def!constant float-fast-bit (ash 1 24))
 

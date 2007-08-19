@@ -80,14 +80,17 @@ os_context_sigmask_addr(os_context_t *context)
 unsigned int
 os_context_fp_control(os_context_t *context)
 {
-    /* FIXME: Probably do something. */
-    return 0;
+    mcontext_t *mctx = &context->uc_mcontext;
+    struct sigcontext *ctx = (struct sigcontext *)mctx;
+    return ctx->sc_fpc_csr;
 }
 
 void
 os_restore_fp_control(os_context_t *context)
 {
-    /* FIXME: Probably do something. */
+    unsigned int ctl = os_context_fp_control(context);
+    ctl &= ~(FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK);
+    arch_set_fp_control(ctl);
 }
 
 unsigned int

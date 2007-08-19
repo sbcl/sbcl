@@ -75,19 +75,34 @@
 
 (!define-float-dispatching-function float-nan-p
   "Return true if the float X is a NaN (Not a Number)."
+  #!-(or mips hppa)
   (not (zerop (ldb sb!vm:single-float-significand-byte bits)))
+  #!+(or mips hppa)
+  (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
+                 sb!vm:single-float-trapping-nan-bit))
+  #!-(or mips hppa)
   (or (not (zerop (ldb sb!vm:double-float-significand-byte hi)))
       (not (zerop lo)))
+  #!+(or mips hppa)
+  (zerop (logand (ldb sb!vm:double-float-significand-byte hi)
+                 sb!vm:double-float-trapping-nan-bit))
   #!+(and long-float x86)
   (or (not (zerop (ldb sb!vm:long-float-significand-byte hi)))
       (not (zerop lo))))
 
 (!define-float-dispatching-function float-trapping-nan-p
   "Return true if the float X is a trapping NaN (Not a Number)."
+  #!-(or mips hppa)
   (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
                  sb!vm:single-float-trapping-nan-bit))
+  #!+(or mips hppa)
+  (not (zerop (ldb sb!vm:single-float-significand-byte bits)))
+  #!-(or mips hppa)
   (zerop (logand (ldb sb!vm:double-float-significand-byte hi)
                  sb!vm:double-float-trapping-nan-bit))
+  #!+(or mips hppa)
+  (or (not (zerop (ldb sb!vm:double-float-significand-byte hi)))
+      (not (zerop lo)))
   #!+(and long-float x86)
   (zerop (logand (ldb sb!vm:long-float-significand-byte hi)
                  sb!vm:long-float-trapping-nan-bit)))

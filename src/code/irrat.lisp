@@ -211,6 +211,7 @@
                    (when (zerop (logior y-ihi y-lo))
                      (return-from real-expt (coerce 1d0 rtype)))
                    ;; +-NaN return x+y
+                   ;; FIXME: Hardcoded qNaN/sNaN values are not portable.
                    (when (or (> x-ihi #x7ff00000)
                              (and (= x-ihi #x7ff00000) (/= x-lo 0))
                              (> y-ihi #x7ff00000)

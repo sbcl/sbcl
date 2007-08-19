@@ -400,6 +400,9 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
     /* FIXME: This magic number is pseudo-atomic-trap from parms.lisp.
      * Genesis should provide the proper #define, but it specialcases
      * pseudo-atomic-trap to work around some oddity on SPARC.
@@ -422,6 +425,9 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
     unsigned int op, rs, rt, rd, funct, dest = 32;
     int immed;
     int result;
+#ifdef LISP_FEATURE_LINUX
+    os_restore_fp_control(context);
+#endif
 
     op = (bad_inst >> 26) & 0x3f;
     rs = (bad_inst >> 21) & 0x1f;
@@ -471,6 +477,22 @@ sigfpe_handler(int signal, siginfo_t *info, void *void_context)
         (unsigned int) dynamic_space_free_pointer;
 
     arch_skip_instruction(context);
+}
+
+unsigned int
+arch_get_fp_control(void)
+{
+    register unsigned int ret asm("$2");
+
+    __asm__ __volatile__ ("cfc1 %0, $31" : "=r" (ret));
+
+    return ret;
+}
+
+void
+arch_set_fp_control(unsigned int fp)
+{
+    __asm__ __volatile__ ("ctc1 %0, $31" :: "r" (fp));
 }
 
 void
