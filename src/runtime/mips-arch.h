@@ -41,7 +41,20 @@ get_spinlock(volatile lispobj *word, long value)
 static inline void
 release_spinlock(volatile lispobj *word)
 {
+#ifdef LISP_FEATURE_SB_THREAD
+    __asm__ __volatile__ (
+        "       .set push\n"
+        "       .set mips2\n"
+        "       .set noreorder\n"
+        "       sw      $0,%[__mem]\n"
+        "       sync\n"
+        "       .set pop"
+        :
+        : [__mem] "R" (*word)
+        : "memory");
+#else /* LISP_FEATURE_SB_THREAD */
     *word=0;
+#endif
 }
 
 #endif /* _MIPS_ARCH_H */
