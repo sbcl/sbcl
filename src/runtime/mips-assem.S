@@ -192,13 +192,13 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	/* Nested lisp -> C calls may have clobbered gp. */
 	lw	gp, framesize-16(sp)
 
+	/* Mark us as in C land. */
+	sw	reg_CSP, foreign_function_call_active
+
 	/* Set the pseudo-atomic flag. */
 	li	reg_NL4, 0
 	addu	reg_ALLOC, 1
 	.set	reorder
-
-	/* Mark us as in C land. */
-	sw	reg_CSP, foreign_function_call_active
 
 	/* Save LISP state. */
 	subu	reg_NL0, reg_ALLOC, 1
@@ -262,14 +262,14 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	move	reg_CFP, reg_CSP
 	addu	reg_CSP, reg_CFP, 32
 
+	/* Mark us as in C land. */
+	sw	reg_CSP, foreign_function_call_active
+
 	/* Set the pseudo-atomic flag. */
 	.set	noreorder
 	li	reg_NL4, 0
 	addu	reg_ALLOC, 1
 	.set	reorder
-
-	/* Mark us as in C land. */
-	sw	reg_CSP, foreign_function_call_active
 
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
