@@ -150,7 +150,7 @@
          (funcall fun)))
 
   (with-test (:name (:undefined-function :bug-346)
-              :fails-on '(or :alpha :ppc :sparc
+              :fails-on '(or :alpha :ppc :sparc :mips
                           (and :x86-64 (or :freebsd :darwin))))
     (assert (verify-backtrace
              (lambda () (test #'optimized))
@@ -165,7 +165,7 @@
               ;; the presence of the IR1 stepper instrumentation (and
               ;; is thus again failing now that the instrumentation is
               ;; no more).
-              :fails-on '(or :x86 :x86-64 :alpha))
+              :fails-on '(or :x86 :x86-64 :alpha :mips))
     (assert (verify-backtrace
              (lambda () (test #'not-optimized))
              (list *undefined-function-frame*

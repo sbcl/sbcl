@@ -225,7 +225,8 @@
   (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-out)))
 
-(with-test (:name :step-start-from-break)
+(with-test (:name :step-start-from-break
+            :fails-on :mips)
   (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-start-from-break)))
 
