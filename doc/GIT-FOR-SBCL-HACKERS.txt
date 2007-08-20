@@ -30,7 +30,7 @@ The command
 
 clones the SBCL Git mirror into the directory sbcl-git (there's a
 naming convention in play here, but ignore that for now.) The clone
-contains full history, and is an independent repository on it's own
+contains full history, and is an independent repository on its own
 right. Doing the clone takes as long as downloading 25Mb takes on your
 line, but after that things are very fast.
 
@@ -155,7 +155,7 @@ current version as a single diff. Similarly,
 
 can be used to compare two arbitrary versions. The -w switch tells Git
 to ignore whitespace changes -- you can usually leave it out, but it's
-nice when diffing across the great whilespacification patches.
+nice when diffing across the great whitespacification patches.
 
 Onwards: just so that we have a bit more history on the branch, edit
 version.lisp-expr again, and git-commit again. You can use
@@ -231,7 +231,7 @@ from where they end up in sbcl.git. Turtles, you see." in the comment
 box. Then you will be directed to set up an account, which you will
 then have to add as a "pusher" to your SBCL fork. 
 
-Finally, add the following snipped (adjusting for your own name) in
+Finally, add the following snippet (adjusting for your own name) in
 ~/sbcl-git/.git/config
 
  [remote "public"]
