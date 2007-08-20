@@ -10,6 +10,10 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * enhancement: as an extension to MOP, SBCL now supports SETF of
     STANDARD-INSTANCE-ACCESS and FUNCALLABLE-STANDARD-INSTANCE-ACCESS.
     (thanks to Attila Lendvai)
+  * enhancement: sb-cover has an alternate annotation mode which puts
+    the form annotations at the car of the form, instead of annotating
+    it completely. The benefit of this mode is that it shows better
+    which forms were instrumented by the compiler.
   * bug fix: new compiler transforms for MEMBER and ASSOC were affected
     by printer control variables. (reported by Dan Corkill)
   * bug fix: system leaked memory when delayed output was performed by
@@ -21,6 +25,12 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
     the underlying file descriptor.
   * bug fix: multiple threads operating in parallel on the same stream
     could cause buffer-overflows.
+  * bug fix: source location information is stored correctly 
+    (broken since 1.0.6). This bug would generally show up as the
+    Slime debugger higlighting the wrong form when the sldb-show-source
+    command was used.
+  * bug fix: Branch forms are again annotated as branches in the sb-cover
+    annotations.
 
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides

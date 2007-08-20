@@ -447,11 +447,12 @@
                             (sub-find-source-paths fm (cons pos path))
                             ;; Otherwise store the containing form. It's
                             ;; not perfect, but better than nothing.
-                            (setf (gethash subform *source-paths*)
-                                  (list* 'original-source-start
-                                         *current-form-number*
-                                         pos
-                                         path)))
+                            (unless (zerop pos)
+                              (setf (gethash subform *source-paths*)
+                                    (list* 'original-source-start
+                                           *current-form-number*
+                                           pos
+                                           path))))
                         (incf pos))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
@@ -873,7 +874,7 @@
                  (not (gethash form *source-paths*)))
         (let ((*current-path* (gethash forms *source-paths*)))
           (when *current-path*
-            (instrument-coverage start :progn form))))
+            (instrument-coverage start nil form))))
       start))
 
 (defun record-code-coverage (info cc)

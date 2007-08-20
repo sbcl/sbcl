@@ -15,6 +15,9 @@
 
 (in-package #:sb-cover)
 
+(declaim (type (member :whole :car) *source-path-mode*))
+(defvar *source-path-mode* :whole)
+
 (defclass sample-count ()
   ((mode :accessor mode-of :initarg :mode)
    (all :accessor all-of :initform 0)
@@ -76,11 +79,18 @@ result to RESTORE-COVERAGE."
         (restore-coverage (read stream))))
     (values)))
 
-(defun report (directory &key (external-format :default))
+(defun report (directory &key ((:form-mode *source-path-mode*) :whole)
+               (external-format :default))
   "Print a code coverage report of all instrumented files into DIRECTORY.
 If DIRECTORY does not exist, it will be created. The main report will be
 printed to the file cover-index.html. The external format of the source
-files can be specified with the EXTERNAL-FORMAT parameter."
+files can be specified with the EXTERNAL-FORMAT parameter.
+
+If the keyword argument FORM-MODE has the value :CAR, the annotations in
+the coverage report will be placed on the CARs of any cons-forms, while if
+it has the value :WHOLE the whole form will be annotated (the default).
+The former mode shows explicitly which forms were instrumented, while the
+latter mode is generally easier to read."
   (let ((paths)
         (*default-pathname-defaults* (merge-pathnames (pathname directory))))
     (ensure-directories-exist *default-pathname-defaults*)
@@ -227,11 +237,15 @@ files can be specified with the EXTERNAL-FORMAT parameter."
                       (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
                   (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))
         ;; Now process the locations, from the shortest range to the longest
-        ;; one.
-        (dolist (location (sort locations #'<
-                                :key (lambda (location)
-                                       (- (second location)
-                                          (first location)))))
+        ;; one. If two locations have the same range, the one with the higher
+        ;; state takes precedence. The latter condition ensures that if
+        ;; there are both normal- and a branch-states for the same form,
+        ;; the branch-state will be used.
+        (setf locations (sort locations #'> :key #'fourth))
+        (dolist (location (stable-sort locations #'<
+                                       :key (lambda (location)
+                                              (- (second location)
+                                                 (first location)))))
           (destructuring-bind (start end source state) location
             (fill-with-state source states state start end))))
       (print-report html-stream file counts states source)
@@ -477,7 +491,7 @@ The source locations are stored in SOURCE-MAP."
             ;; allows the possibility that a comment was read
             (when listobj
              (unless (consp (car listobj))
-                (setf (car listobj) (gensym))
+               (setf (car listobj) (gensym))
                 (push (list start end *read-suppress*)
                       (gethash (car listobj) source-map)))
               (rplacd listtail listobj)
@@ -543,15 +557,15 @@ subforms along the path are considered and the start and end position
 of the deepest (i.e. smallest) possible form is returned."
   ;; compute all subforms along path
   (let ((forms (loop for n in path
-                     for m on path
-                     for dummy = (when (eql n :progn)
-                                   (return forms))
                      for f = form then (nth n f)
-                     unless (null (cdr m))
                      collect f into forms
                      finally (return forms))))
     ;; select the first subform present in source-map
-    (loop for form in (reverse forms)
+    (loop for real-form in (reverse forms)
+          for form = (if (or (eql *source-path-mode* :whole)
+                             (not (consp real-form)))
+                         real-form
+                         (car real-form))
           for positions = (gethash form source-map)
           until (and positions (null (cdr positions)))
           finally (destructuring-bind ((start end suppress)) positions
