@@ -427,7 +427,7 @@
          ;; FIXME 2: Signals are currently unblocked in
          ;; interrupt.c:internal_error before we do stack unwinding, can this
          ;; introduce a race condition?
-         #!+(or linux mips)
+         #!+(and linux mips)
          (sb!unix::reset-signal-mask)
          (let ((fp (int-sap (sb!vm:context-register alien-context
                                                     sb!vm::cfp-offset)))
