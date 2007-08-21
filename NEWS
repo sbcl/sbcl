@@ -31,6 +31,11 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
     command was used.
   * bug fix: Branch forms are again annotated as branches in the sb-cover
     annotations.
+  * bug fix: GCD on MOST-NEGATIVE-FIXNUM no longer causes an infinite loop
+    on x86-64. (reported by Gregory Vanuxem)
+  * bug fix: EQUALP could return wrong results for structures with raw
+    slots (slots with a :TYPE of SINGLE-FLOAT, DOUBLE-FLOAT, or a machine
+    word). (reported by Vjacheslav Fyodorov)
 
 changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides

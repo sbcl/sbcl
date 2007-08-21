@@ -417,6 +417,31 @@
             (%raw-instance-ref/word structure i)))
 
     res))
+
+
+
+;; Do an EQUALP comparison on the raw slots (only, not the normal slots) of a
+;; structure.
+(defun raw-instance-slots-equalp (layout x y)
+  ;; This implementation sucks, but hopefully EQUALP on raw structures
+  ;; won't be a major bottleneck for anyone. It'd be tempting to do
+  ;; all this with %RAW-INSTANCE-REF/WORD and bitwise comparisons, but
+  ;; that'll fail in some cases. For example -0.0 and 0.0 are EQUALP
+  ;; but have different bit patterns. -- JES, 2007-08-21
+  (loop with i = -1
+        for dsd in (dd-slots (layout-info layout))
+        for raw-type = (dsd-raw-type dsd)
+        for rsd = (when raw-type
+                    (find raw-type
+                          *raw-slot-data-list*
+                          :key 'raw-slot-data-raw-type))
+        for accessor = (when rsd
+                         (raw-slot-data-accessor-name rsd))
+        always (or (not accessor)
+                   (progn
+                     (incf i)
+                     (equalp (funcall accessor x i)
+                             (funcall accessor y i))))))
 
 ;;; default PRINT-OBJECT method
 

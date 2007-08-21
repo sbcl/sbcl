@@ -699,5 +699,19 @@
                     (sb-kernel:layout-invalid ()
                       :error2))))))
 
-;;; success
-(format t "~&/returning success~%")
+;; EQUALP didn't work for structures with float slots (reported by
+;; Vjacheslav Fyodorov).
+(defstruct raw-slot-equalp-bug
+  (b 0s0 :type single-float)
+  c
+  (a 0d0 :type double-float))
+
+(with-test (:name raw-slot-equalp)
+  (assert (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
+                  (make-raw-slot-equalp-bug :a 1d0 :b 2s0)))
+  (assert (equalp (make-raw-slot-equalp-bug :a 1d0 :b 0s0)
+                  (make-raw-slot-equalp-bug :a 1d0 :b -0s0)))
+  (assert (not (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
+                       (make-raw-slot-equalp-bug :a 1d0 :b 3s0))))
+  (assert (not (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
+                       (make-raw-slot-equalp-bug :a 2d0 :b 2s0)))))
