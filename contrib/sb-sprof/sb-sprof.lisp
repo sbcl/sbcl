@@ -556,6 +556,7 @@ on the depth of the call stack.")
         (sb-sys:without-gcing
           (with-alien ((scp (* os-context-t) :local scp))
             (locally (declare (optimize (inhibit-warnings 2)))
+              (incf (samples-trace-count samples))
               (record-trace-start samples)
               (let* ((pc-ptr (sb-vm:context-pc scp))
                      (fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
