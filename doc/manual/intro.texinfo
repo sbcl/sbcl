@@ -79,7 +79,7 @@ of SMP on multiprocessor machines. @xref{Threading}.
 
 @item Network Interface
 @code{sb-bsd-sockets} is a low-level networking interface, providing
-both TCP and UDP sockets. x@ref{Networking}.
+both TCP and UDP sockets. @xref{Networking}.
 
 @item Introspective Facilities
 @code{sb-introspect} module offers numerous introspective extensions,
@@ -271,6 +271,7 @@ case, but still isn't as of SBCL 0.7.6.)
 @menu
 * Editor Integration::          
 * Language Reference::          
+* Generating Executables::      
 @end menu
 
 @node Editor Integration
@@ -297,12 +298,21 @@ SLIME can be downloaded from
 @subsection Language Reference
 
 @dfn{CLHS} (Common Lisp Hyperspec) is a hypertext version of the ANSI
-standard, made freely available by @emph{Xanalyst} -- an invaluable
+standard, made freely available by @emph{LispWorks} -- an invaluable
 reference.
 
 See: @uref{http://www.lispworks.com/reference/HyperSpec/index.html}
 
+@node Generating Executables
+@comment  node-name,  next,  previous,  up
+@subsection Generating Executables
 
+SBCL can generate stand-alone executables.  The generated executables
+include the SBCL runtime itself, so no restrictions are placed on
+program functionality.  For example, a deployed program can call
+@code{compile} and @code{load}, which requires the compiler to be present
+in the executable.  For further information, @xref{Function
+sb-ext:save-lisp-and-die}.
 
 
 @node More SBCL Information
