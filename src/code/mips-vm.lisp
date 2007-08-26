@@ -79,8 +79,8 @@
 ;;; long is another question. This stuff still needs testing.
 (define-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
     (* os-context-register-t)
-  (context (* os-context-t))
-  (index int))
+  (context (* os-context-t) :in)
+  (index int :in))
 
 (defun context-float-register (context index format)
   (declare (type (alien (* os-context-t)) context))
@@ -98,7 +98,7 @@
     ("arch_get_fp_control" floating-point-modes) unsigned-int)
 
 (define-alien-routine
-    ("arch_set_fp_control" %floating-point-modes-setter) void (fp unsigned-int))
+    ("arch_set_fp_control" %floating-point-modes-setter) void (fp unsigned-int :in))
 
 (defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
 
@@ -106,7 +106,7 @@
 ;;; the same format as returned by FLOATING-POINT-MODES.
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     unsigned-int
-  (context (* os-context-t)))
+  (context (* os-context-t) :in))
 
 ;;;; Internal-error-arguments.
 
