@@ -4,6 +4,7 @@
 *.lisp-temp
 *.tmp
 *~
+.gdb_history
 output
 obj
 local-target-features.lisp-expr
