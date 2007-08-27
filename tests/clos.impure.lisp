@@ -913,6 +913,31 @@
 (assert (= (slot-value *yao-super* 'obs) 3))
 (assert (= (slot-value *yao-sub* 'obs) 3))
 
+;;; one more MIO test: variable slot names
+(defclass mio () ((x :initform 42)))
+(defvar *mio-slot* 'x)
+(defparameter *mio-counter* 0)
+(defmethod update-instance-for-redefined-class ((instance mio) new old plist &key)
+  (incf *mio-counter*))
+
+(let ((x (make-instance 'mio)))
+  (make-instances-obsolete 'mio)
+  (slot-value x *mio-slot*))
+
+(let ((x (make-instance 'mio)))
+  (make-instances-obsolete 'mio)
+  (setf (slot-value x *mio-slot*) 13))
+
+(let ((x (make-instance 'mio)))
+  (make-instances-obsolete 'mio)
+  (slot-boundp x *mio-slot*))
+
+(let ((x (make-instance 'mio)))
+  (make-instances-obsolete 'mio)
+  (slot-makunbound x *mio-slot*))
+
+(assert (= 4 *mio-counter*))
+
 ;;; shared -> local slot transfers of inherited slots, reported by
 ;;; Bruno Haible
 (let (i)

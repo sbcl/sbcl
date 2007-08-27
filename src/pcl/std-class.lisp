@@ -536,7 +536,7 @@
       (add-direct-subclasses class direct-superclasses)
       (let ((slots (compute-slots class)))
         (setf (slot-value class 'slots) slots
-              (slot-value class 'slot-vector) (make-slot-vector slots)))))
+              (slot-value class 'slot-vector) (make-slot-vector class slots)))))
   ;; Comment from Gerd's PCL, 2003-05-15:
   ;;
   ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
@@ -718,7 +718,7 @@
     (setf (slot-value class 'cpl-available-p) t)
     (let ((slots (compute-slots class)))
       (setf (slot-value class 'slots) slots
-            (slot-value class 'slot-vector) (make-slot-vector slots)))
+            (slot-value class 'slot-vector) (make-slot-vector class slots)))
     (let ((lclass (find-classoid (class-name class))))
       (setf (classoid-pcl-class lclass) class)
       (setf (slot-value class 'wrapper) (classoid-layout lclass)))
@@ -895,7 +895,7 @@
 
       (update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
-            (slot-value class 'slot-vector) (make-slot-vector eslotds)
+            (slot-value class 'slot-vector) (make-slot-vector class eslotds)
             (wrapper-instance-slots-layout nwrapper) nlayout
             (wrapper-class-slots nwrapper) nwrapper-class-slots
             (layout-length nwrapper) nslots

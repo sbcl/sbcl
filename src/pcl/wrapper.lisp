@@ -187,6 +187,12 @@
 (defun check-obsolete-instance (instance)
   (when (invalid-wrapper-p (layout-of instance))
     (check-wrapper-validity instance)))
+
+(defun check-obsolete-instance/class-of (instance)
+  (let ((wrapper (wrapper-of instance)))
+    (when (invalid-wrapper-p wrapper)
+      (check-wrapper-validity instance))
+    (wrapper-class* wrapper)))
 
 ;;;  NIL: means nothing so far, no actual arg info has NILs in the
 ;;;  metatype.

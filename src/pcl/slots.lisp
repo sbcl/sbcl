@@ -75,15 +75,49 @@
          (t
           (error "unrecognized instance type")))))
 
-;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP
+;;;; STANDARD-INSTANCE-ACCESS
+
+(declaim (inline standard-instance-access (setf standard-instance-access)
+                 funcallable-standard-instance-access
+                 (setf funcallable-standard-instance-access)))
+
+(defun standard-instance-access (instance location)
+  (clos-slots-ref (std-instance-slots instance) location))
+
+(defun (setf standard-instance-access) (new-value instance location)
+  (setf (clos-slots-ref (std-instance-slots instance) location) new-value))
+
+(defun funcallable-standard-instance-access (instance location)
+  (clos-slots-ref (fsc-instance-slots instance) location))
+
+(defun (setf funcallable-standard-instance-access) (new-value instance location)
+  (setf (clos-slots-ref (fsc-instance-slots instance) location) new-value))
+
+;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
-  (let* ((class (class-of object))
-         (slot-definition (find-slot-definition class slot-name)))
-    (if (null slot-definition)
-        (values (slot-missing class object slot-name 'slot-value))
-        (slot-value-using-class class object slot-definition))))
+  (let* ((class (check-obsolete-instance/class-of object))
+         (cell (find-slot-cell class slot-name))
+         (location (car cell))
+         (value
+          (cond ((fixnump location)
+                 (if (std-instance-p object)
+                     (standard-instance-access object location)
+                     (funcallable-standard-instance-access object location)))
+                ((consp location)
+                 (cdr location))
+                ((eq t location)
+                 (return-from slot-value
+                   (slot-value-using-class class object (cddr cell))))
+                ((not cell)
+                 (return-from slot-value
+                   (values (slot-missing class object slot-name 'slot-value))))
+                (t
+                 (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
+    (if (eq +slot-unbound+ value)
+        (slot-unbound class object slot-name)
+        value)))
 
 (define-compiler-macro slot-value (&whole form object slot-name
                                    &environment env)
@@ -93,13 +127,26 @@
       form))
 
 (defun set-slot-value (object slot-name new-value)
-  (let* ((class (class-of object))
-         (slot-definition (find-slot-definition class slot-name)))
-    (if (null slot-definition)
-        (progn (slot-missing class object slot-name 'setf new-value)
-               new-value)
-        (setf (slot-value-using-class class object slot-definition)
-              new-value))))
+  (let* ((class (check-obsolete-instance/class-of object))
+         (cell (find-slot-cell class slot-name))
+         (location (car cell))
+         (type-check-function (cadr cell)))
+    (when type-check-function
+      (funcall (the function type-check-function) new-value))
+    (cond ((fixnump location)
+           (if (std-instance-p object)
+               (setf (standard-instance-access object location) new-value)
+               (setf (funcallable-standard-instance-access object location)
+                     new-value)))
+          ((consp location)
+           (setf (cdr location) new-value))
+          ((eq t location)
+           (setf (slot-value-using-class class object (cddr cell)) new-value))
+          ((not cell)
+           (slot-missing class object slot-name 'setf new-value))
+          (t
+           (bug "Bogus slot-cell in SET-SLOT-VALUE: ~S" cell))))
+  new-value)
 
 ;;; A version of SET-SLOT-VALUE for use in safe code, where we want to
 ;;; check types when writing to slots:
@@ -122,13 +169,25 @@
       form))
 
 (defun slot-boundp (object slot-name)
-  (let* ((class (class-of object))
-         (slot-definition (find-slot-definition class slot-name)))
-    (if (null slot-definition)
-        (not (not (slot-missing class object slot-name 'slot-boundp)))
-        (slot-boundp-using-class class object slot-definition))))
-
-(setf (gdefinition 'slot-boundp-normal) #'slot-boundp)
+  (let* ((class (check-obsolete-instance/class-of object))
+         (cell (find-slot-cell class slot-name))
+         (location (car cell))
+         (value
+          (cond ((fixnump location)
+                 (if (std-instance-p object)
+                     (standard-instance-access object location)
+                     (funcallable-standard-instance-access object location)))
+                ((consp location)
+                 (cdr location))
+                ((eq t location)
+                 (return-from slot-boundp
+                   (slot-boundp-using-class class object (cddr cell))))
+                ((not cell)
+                 (return-from slot-boundp
+                   (and (slot-missing class object slot-name 'slot-boundp) t)))
+                (t
+                 (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
+    (not (eq +slot-unbound+ value))))
 
 (define-compiler-macro slot-boundp (&whole form object slot-name
                                     &environment env)
@@ -138,12 +197,23 @@
       form))
 
 (defun slot-makunbound (object slot-name)
-  (let* ((class (class-of object))
-         (slot-definition (find-slot-definition class slot-name)))
-    (if (null slot-definition)
-        (slot-missing class object slot-name 'slot-makunbound)
-        (slot-makunbound-using-class class object slot-definition))
-    object))
+  (let* ((class (check-obsolete-instance/class-of object))
+         (cell (find-slot-cell class slot-name))
+         (location (car cell)))
+    (cond ((fixnump location)
+           (if (std-instance-p object)
+               (setf (standard-instance-access object location) +slot-unbound+)
+               (setf (funcallable-standard-instance-access object location)
+                     +slot-unbound+)))
+          ((consp location)
+           (setf (cdr location) +slot-unbound+))
+          ((eq t location)
+           (slot-makunbound-using-class class object (cddr cell)))
+          ((not cell)
+           (slot-missing class object slot-name 'slot-makunbound))
+          (t
+           (bug "Bogus slot-cell in SLOT-MAKUNBOUND: ~S" cell))))
+  object)
 
 (defun slot-exists-p (object slot-name)
   (let ((class (class-of object)))
@@ -158,26 +228,12 @@
   (if (slot-boundp object slot-name)
       (slot-value object slot-name)
       default))
-
-(declaim (inline standard-instance-access (setf standard-instance-access)
-                 funcallable-standard-instance-access
-                 (setf funcallable-standard-instance-access)))
-
-(defun standard-instance-access (instance location)
-  (clos-slots-ref (std-instance-slots instance) location))
-
-(defun (setf standard-instance-access) (new-value instance location)
-  (setf (clos-slots-ref (std-instance-slots instance) location) new-value))
-
-(defun funcallable-standard-instance-access (instance location)
-  (clos-slots-ref (fsc-instance-slots instance) location))
-
-(defun (setf funcallable-standard-instance-access) (new-value instance location)
-  (setf (clos-slots-ref (fsc-instance-slots instance) location) new-value))
 
 (defmethod slot-value-using-class ((class std-class)
                                    (object standard-object)
                                    (slotd standard-effective-slot-definition))
+  ;; FIXME: Do we need this? SLOT-VALUE checks for obsolete
+  ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
          (value
@@ -204,6 +260,8 @@
            (new-value (class std-class)
                       (object standard-object)
                       (slotd standard-effective-slot-definition))
+  ;; FIXME: Do we need this? SET-SLOT-VALUE checks for obsolete
+  ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
   (let ((location (slot-definition-location slotd))
         (type-check-function
@@ -233,6 +291,8 @@
            ((class std-class)
             (object standard-object)
             (slotd standard-effective-slot-definition))
+  ;; FIXME: Do we need this? SLOT-BOUNDP checks for obsolete
+  ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
          (value

@@ -529,14 +529,14 @@
 ;;; requires a GF call (for SLOT-DEFINITION-NAME) for each slot in
 ;;; list up to the desired one.
 ;;;
-;;; As of 1.0.7.26 SBCL hashes the effective slot definitions into a
-;;; simple-vector, with bucket chains made out of plists keyed by the
-;;; slot names. This fixes gives O(1) performance, and avoid the GF
-;;; calls.
+;;; Current SBCL hashes the effective slot definitions, and some
+;;; information pulled out from them into a simple-vector, with bucket
+;;; chains made out of plists keyed by the slot names. This fixes
+;;; gives O(1) performance, and avoid the GF calls.
 ;;;
 ;;; MAKE-SLOT-VECTOR constructs the hashed vector out of a list of
-;;; effective slot definitions, and FIND-SLOT-DEFINITION knows how to
-;;; look up slots in that vector.
+;;; effective slot definitions and the class they pertain to, and
+;;; FIND-SLOT-DEFINITION knows how to look up slots in that vector.
 ;;;
 ;;; The only bit of cleverness in the implementation is to make the
 ;;; vectors fairly tight, but always longer then 0 elements:
@@ -549,6 +549,20 @@
 ;;; -- As long as the vector always has a length > 0
 ;;;    FIND-SLOT-DEFINITION doesn't need to handle the rare case of an
 ;;;    empty vector separately: it just returns a NIL.
+;;;
+;;; In addition to the slot-definition we also store the slot-location
+;;; and type-check function for instances of standard metaclasses, so
+;;; that SLOT-VALUE &co using variable slot names can get at them
+;;; without additional GF calls.
+;;;
+;;; Notes:
+;;;   It would be probably better to store the vector in wrapper
+;;;   instead: one less memory indirection, one less CLOS slot
+;;;   access to get at it.
+;;;
+;;;   It would also be nice to have STANDARD-INSTANCE-STRUCTURE-P
+;;;   generic instead of checking versus STANDARD-CLASS and
+;;;   FUNCALLABLE-STANDARD-CLASS.
 
 (defun find-slot-definition (class slot-name)
   (declare (symbol slot-name))
@@ -561,16 +575,44 @@
       (let ((key (car plist)))
         (setf plist (cdr plist))
         (when (eq key slot-name)
+          (return (cddar plist)))))))
+
+(defun find-slot-cell (class slot-name)
+  (declare (symbol slot-name))
+  (let* ((vector (class-slot-vector class))
+         (index (rem (sxhash slot-name) (length vector))))
+    (declare (simple-vector vector) (index index)
+             (optimize (sb-c::insert-array-bounds-checks 0)))
+    (do ((plist (the list (svref vector index)) (cdr plist)))
+        ((not (consp plist)))
+      (let ((key (car plist)))
+        (setf plist (cdr plist))
+        (when (eq key slot-name)
           (return (car plist)))))))
 
-(defun make-slot-vector (slots)
+(defun make-slot-vector (class slots)
   (let* ((n (+ (length slots) 2))
-         (vector (make-array n :initial-element nil)))
+         (vector (make-array n :initial-element nil))
+         (save-slot-location-p
+          (when (eq 'complete *boot-state*)
+            (let ((metaclass (class-of class)))
+              (or (eq metaclass *the-class-standard-class*)
+                  (eq metaclass *the-class-funcallable-standard-class*)))))
+         (save-type-check-function-p (and save-slot-location-p (safe-p class))))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
-             (setf (svref vector (rem (sxhash name) n))
-                   (list* name slot (svref vector (rem (sxhash name) n))))))
+             (let ((index (rem (sxhash name) n)))
+               (setf (svref vector index)
+                     (list* name (list* (if save-slot-location-p
+                                            (slot-definition-location slot)
+                                            ;; T tells SLOT-VALUE & SET-SLOT-VALUE
+                                            ;; that this is a non-standard class.
+                                            t)
+                                        (when save-type-check-function-p
+                                          (slot-definition-type-check-function slot))
+                                        slot)
+                            (svref vector index))))))
       (if (eq 'complete *boot-state*)
          (dolist (slot slots)
            (add-to-vector (slot-definition-name slot) slot))
