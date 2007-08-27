@@ -398,35 +398,62 @@
   (members nil :type list))
 (defun make-member-type (&key members)
   (declare (type list members))
-  ;; make sure that we've removed duplicates
-  (aver (= (length members) (length (remove-duplicates members))))
   ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
-  (let ((singlep (subsetp `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0) members))
-        (doublep (subsetp `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
+  (let ((n-single (load-time-value
+                   (make-unportable-float :single-float-negative-zero)))
+        (n-double (load-time-value
+                   (make-unportable-float :double-float-negative-zero)))
         #!+long-float
-        (longp (subsetp `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members)))
-    (if (or singlep doublep #!+long-float longp)
-        (let (union-types)
-          (when singlep
-            (push (ctype-of 0.0f0) union-types)
-            (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
-          (when doublep
-            (push (ctype-of 0.0d0) union-types)
-            (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
-          #!+long-float
-          (when longp
-            (push (ctype-of 0.0l0) union-types)
-            (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
-          (aver (not (null union-types)))
-          (make-union-type t
-                           (if (null members)
-                               union-types
-                               (cons (%make-member-type members)
-                                     union-types))))
-        (%make-member-type members))))
+        (n-long (load-time-value
+                 (make-unportable-float :long-float-negative-zero)))
+        (singles nil)
+        (doubles nil)
+        #!+long-float
+        (longs nil))
+    ;; Just a single traversal, please! MEMBERS2 starts as with MEMBERS,
+    ;; sans any zeroes -- if there are any paired zeroes then the
+    ;; unpaired ones are added back to it.
+    (let (members2)
+      (dolist (elt members)
+        (if (and (numberp elt) (zerop elt))
+            (typecase elt
+              (single-float (push elt singles))
+              (double-float (push elt doubles))
+              #!+long-float
+              (long-float   (push elt longs)))
+            (push elt members2)))
+      (let ((singlep (and (member 0.0f0 singles)
+                          (member n-single singles)
+                          (or (aver (= 2 (length singles))) t)))
+            (doublep (and (member 0.0d0 doubles)
+                          (member n-double doubles)
+                          (or (aver (= 2 (length doubles))) t)))
+            #!+long-float
+            (longp (and (member 0.0lo longs)
+                        (member n-long longs)
+                        (or (aver (= 2 (lenght longs))) t))))
+        (if (or singlep doublep #!+long-float longp)
+            (let (union-types)
+              (if singlep
+                  (push (ctype-of 0.0f0) union-types)
+                  (setf members2 (nconc singles members2)))
+              (if doublep
+                  (push (ctype-of 0.0d0) union-types)
+                  (setf members2 (nconc doubles members2)))
+              #!+long-float
+              (if longp
+                  (push (ctype-of 0.0l0) union-types)
+                  (setf members2 (nconc longs members2)))
+              (aver (not (null union-types)))
+              (make-union-type t
+                               (if (null members2)
+                                   union-types
+                                   (cons (%make-member-type members2)
+                                         union-types))))
+            (%make-member-type members))))))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.

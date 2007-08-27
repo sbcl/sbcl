@@ -780,22 +780,46 @@
         list
         (cons item list))))
 
+(defconstant +list-based-union-limit+ 80)
+
 (defun union (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return the union of LIST1 and LIST2."
   (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  ;; We assumes LIST2 is the result, adding to it from LIST1 as
-  ;; necessary. LIST2 must initialize the result value, so the call to
-  ;; MEMBER will apply the test to the elements from LIST1 and LIST2
-  ;; in the correct order.
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (let ((res list2))
-      (dolist (elt list1)
-        (unless (with-set-keys (member (apply-key key elt) list2))
-          (push elt res)))
-      res)))
+  ;; We have to possibilities here: for shortish lists we pick up the
+  ;; shorter one as the result, and add the other one to it. For long
+  ;; lists we use a hash-table when possible.
+  (let ((n1 (length list1))
+        (n2 (length list2))
+        (key (and key (%coerce-callable-to-fun key)))
+        (test (if notp
+                  (let ((test-not-fun (%coerce-callable-to-fun test-not)))
+                    (lambda (x) (not (funcall test-not-fun x))))
+                  (%coerce-callable-to-fun test))))
+    (multiple-value-bind (short long n-short)
+        (if (< n1 n2)
+            (values list1 list2 n1)
+            (values list2 list1 n2))
+      (if (or (< n-short +list-based-union-limit+)
+              (not (member test (list #'eq #'eql #'equal #'equalp))))
+          (let ((orig short))
+            (dolist (elt long)
+              (unless (member (apply-key key elt) orig :key key :test test)
+                (push elt short)))
+            short)
+          (let ((table (make-hash-table :test test :size (+ n1 n2)))
+                (union nil))
+            (dolist (elt long)
+              (setf (gethash (apply-key key elt) table) elt))
+            (dolist (elt short)
+              (setf (gethash (apply-key key elt) table) elt))
+            (maphash (lambda (k v)
+                       (declare (ignore k))
+                       (push v union))
+                     table)
+            union)))))
 
 ;;; Destination and source are SETF-able and many-evaluable. Set the
 ;;; SOURCE to the CDR, and "cons" the 1st elt of source to DESTINATION.
@@ -813,15 +837,44 @@
   (declare (inline member))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (let ((res list2)
-          (list1 list1))
-      (do ()
-          ((endp list1))
-        (if (not (with-set-keys (member (apply-key key (car list1)) list2)))
-            (steve-splice list1 res)
-            (setf list1 (cdr list1))))
-      res)))
+  ;; We have to possibilities here: for shortish lists we pick up the
+  ;; shorter one as the result, and add the other one to it. For long
+  ;; lists we use a hash-table when possible.
+  (let ((n1 (length list1))
+        (n2 (length list2))
+        (key (and key (%coerce-callable-to-fun key)))
+        (test (if notp
+                  (let ((test-not-fun (%coerce-callable-to-fun test-not)))
+                    (lambda (x) (not (funcall test-not-fun x))))
+                  (%coerce-callable-to-fun test))))
+    (multiple-value-bind (short long n-short)
+        (if (< n1 n2)
+            (values list1 list2 n1)
+            (values list2 list1 n2))
+      (if (or (< n-short +list-based-union-limit+)
+              (not (member test (list #'eq #'eql #'equal #'equalp))))
+          (let ((orig short))
+            (do ((elt (car long) (car long)))
+                ((endp long))
+              (if (not (member (apply-key key elt) orig :key key :test test))
+                  (steve-splice long short)
+                  (setf long (cdr long))))
+            short)
+          (let ((table (make-hash-table :test test :size (+ n1 n2))))
+            (dolist (elt long)
+              (setf (gethash (apply-key key elt) table) elt))
+            (dolist (elt short)
+              (setf (gethash (apply-key key elt) table) elt))
+            (let ((union long)
+                  (head long))
+              (maphash (lambda (k v)
+                         (declare (ignore k))
+                         (if head
+                             (setf (car head) v
+                                   head (cdr head))
+                             (push v union)))
+                      table)
+              union))))))
 
 (defun intersection (list1 list2
                      &key key (test #'eql testp) (test-not nil notp))
