@@ -2054,6 +2054,7 @@ bootstrapping.
                                                               lambda-list-p)
                                             argument-precedence-order
                                             source-location
+                                            documentation
                                             &allow-other-keys)
   (declare (ignore keys))
   (cond ((and existing (early-gf-p existing))
@@ -2063,7 +2064,8 @@ bootstrapping.
         ((assoc spec *!generic-function-fixups* :test #'equal)
          (if existing
              (make-early-gf spec lambda-list lambda-list-p existing
-                            argument-precedence-order source-location)
+                            argument-precedence-order source-location
+                            documentation)
              (bug "The function ~S is not already defined." spec)))
         (existing
          (bug "~S should be on the list ~S."
@@ -2071,10 +2073,12 @@ bootstrapping.
         (t
          (pushnew spec *!early-generic-functions* :test #'equal)
          (make-early-gf spec lambda-list lambda-list-p nil
-                        argument-precedence-order source-location))))
+                        argument-precedence-order source-location
+                        documentation))))
 
 (defun make-early-gf (spec &optional lambda-list lambda-list-p
-                      function argument-precedence-order source-location)
+                      function argument-precedence-order source-location
+                      documentation)
   (let ((fin (allocate-standard-funcallable-instance
               *sgf-wrapper* *sgf-slots-init*)))
     (set-funcallable-instance-function
@@ -2090,10 +2094,10 @@ bootstrapping.
                          has not been set." fin)))))
     (setf (gdefinition spec) fin)
     (!bootstrap-set-slot 'standard-generic-function fin 'name spec)
-    (!bootstrap-set-slot 'standard-generic-function
-                         fin
-                         'source
-                         source-location)
+    (!bootstrap-set-slot 'standard-generic-function fin
+                         'source source-location)
+    (!bootstrap-set-slot 'standard-generic-function fin
+                         '%documentation documentation)
     (set-fun-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
@@ -2404,7 +2408,7 @@ bootstrapping.
     (setf (getf (getf initargs 'plist) :name)
           (make-method-spec gf qualifiers specializers))
     (let ((new (make-a-method 'standard-method qualifiers arglist
-                              specializers initargs ())))
+                              specializers initargs (getf initargs :documentation))))
       (when existing (remove-method gf existing))
       (add-method gf new))))
 
