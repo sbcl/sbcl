@@ -484,16 +484,11 @@
     (and (eq *boot-state* 'complete)
          (standard-class-p class)
          (not (eq class *the-class-t*)) ; shouldn't happen, though.
+         ;; FIXME: Is this really right? "Don't skip if there is
+         ;; no slot definition."
          (let ((slotd (find-slot-definition class slot-name)))
-           (and slotd (skip-optimize-slot-value-by-class-p class
-                                                           slot-name
-                                                           type))))))
-
-(defun skip-optimize-slot-value-by-class-p (class slot-name type)
-  (let ((slotd (find-slot-definition class slot-name)))
-    (and slotd
-         (eq *boot-state* 'complete)
-         (not (slot-accessor-std-p slotd type)))))
+           (and slotd
+                (not (slot-accessor-std-p slotd type)))))))
 
 (defmacro instance-read-internal (pv slots pv-offset default &optional kind)
   (unless (member kind '(nil :instance :class :default))
