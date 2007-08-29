@@ -114,6 +114,13 @@
 ;;; type checking and garbage collection. Whenever a class is
 ;;; incompatibly redefined, a new layout is allocated. If two object's
 ;;; layouts are EQ, then they are exactly the same type.
+;;;
+;;; *** IMPORTANT ***
+;;;
+;;; If you change the slots of LAYOUT, you need to alter genesis as
+;;; well, since the initialization of layout slots is hardcoded there.
+;;;
+;;; FIXME: ...it would be better to automate this, of course...
 (def!struct (layout
              ;; KLUDGE: A special hack keeps this from being
              ;; called when building code for the

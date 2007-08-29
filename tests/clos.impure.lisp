@@ -1591,5 +1591,11 @@
 (assert (eql 13 (setf (slot-value 123 *magic-symbol*) 13)))
 (assert (eql 13 (slot-value 'foobar *magic-symbol*)))
 
+;;;; Built-in structure and condition layouts should have NIL in
+;;;; LAYOUT-FOR-STD-CLASS-P, and classes should have T.
+
+(assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
+(assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
+(assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object))))
 
 ;;;; success
