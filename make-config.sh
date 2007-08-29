@@ -63,7 +63,7 @@ link_or_copy() {
    if [ "$sbcl_os" = "win32" ] ; then
        cp -r "$1" "$2"
    else
-        ln -s "$1" "$2"
+       ln -s "$1" "$2"
    fi
 }
 
@@ -160,6 +160,7 @@ link_or_copy $sbcl_arch-arch.h target-arch.h
 link_or_copy $sbcl_arch-lispregs.h target-lispregs.h
 case "$sbcl_os" in
     linux)
+        printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :linux' >> $ltf
 
@@ -178,6 +179,7 @@ case "$sbcl_os" in
         link_or_copy linux-os.h target-os.h
         ;;
     osf1)
+        printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :osf1' >> $ltf
         link_or_copy Config.$sbcl_arch-osf1 Config
@@ -185,6 +187,7 @@ case "$sbcl_os" in
         link_or_copy osf1-os.h target-os.h
         ;;
     *bsd)
+        printf ' :unix' >> $ltf
         printf ' :bsd' >> $ltf
         link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
@@ -215,6 +218,7 @@ case "$sbcl_os" in
         esac
         ;;
     darwin)
+        printf ' :unix' >> $ltf
         printf ' :mach-o' >> $ltf
         printf ' :bsd' >> $ltf
         printf ' :darwin' >> $ltf
@@ -229,6 +233,7 @@ case "$sbcl_os" in
         link_or_copy Config.$sbcl_arch-darwin Config
         ;;
     sunos)
+        printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
         if [ $sbcl_arch = "x86" ]; then

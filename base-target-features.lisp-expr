@@ -57,14 +57,6 @@
  ;; local-target-features.lisp-expr via make-config.sh, as alpha,
  ;; sparc and ppc ports don't currently support it. -- CSR, 2002-02-21
 
- ;; We're running under a UNIX. This is sort of redundant, and it was also
- ;; sort of redundant under CMU CL, which we inherited it from: neither SBCL
- ;; nor CMU CL supports anything but UNIX (and "technically not UNIX"es
- ;; such as *BSD and Linux). But someday, maybe we might, and in that case
- ;; we'd presumably remove this, so its presence conveys the information
- ;; that the system isn't one which follows such a change.
- :unix
-
  ;;
  ;; features present in this particular build
  ;;
@@ -327,6 +319,9 @@
  ;;     The backend implements compare-and-swap VOPs.
  ;;
  ;; operating system features:
+ ;;   :unix    = We're intended to run under some Unix-like OS. (This is not
+ ;;              exclusive with the features which indicate which particular
+ ;;              Unix-like OS we're intended to run under.)
  ;;   :linux   = We're intended to run under some version of Linux.
  ;;   :bsd     = We're intended to run under some version of BSD Unix. (This
  ;;              is not exclusive with the features which indicate which
@@ -339,8 +334,8 @@
  ;;              with the SunOS kernel.
  ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
  ;;              aka OSF/1).
- ;; (No others are supported by SBCL as of 0.9.6, but :hpux or :irix
+ ;;   :win32   = We're intended to under some version of Microsoft Windows.
+ ;; (No others are supported by SBCL as of 1.0.8, but :hpux or :irix
  ;; support could be ported from CMU CL if anyone is sufficiently
- ;; motivated to do so, and it'd even be possible, though harder, to
- ;; port the system to Microsoft Windows.)
+ ;; motivated to do so.)
  )

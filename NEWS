@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.10 relative to sbcl-1.0.9:
+  * minor incompatible change: :UNIX is no longer present in *FEATURES*
+    on Windows. (thanks to Luis Oliviera)
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) are now >20% faster
     for variable slot names, when the class of the instance is
     an instance of STANDARD-CLASS or FUNCALLABLE-STANDARD-CLASS, and not
