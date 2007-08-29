@@ -232,8 +232,13 @@
                             "Name" "PATH"
                             "Part" "first"
                             "Value" "[INSTALLDIR]"))
-            ,(make-extension "fasl" "application/x-lisp-fasl")
-            ,(make-extension "lisp" "text/x-lisp-source")
+            ;; If we want to associate files with SBCL, this
+            ;; is how it's done -- but doing this by default
+            ;; and without asking the user for permission Is
+            ;; Bad. Before this is enabled we need to figure out
+            ;; how to make WiX ask for permission for this...
+            ;; ,(make-extension "fasl" "application/x-lisp-fasl")
+            ;; ,(make-extension "lisp" "text/x-lisp-source")
             ("File" ("Id" "sbcl.exe"
                      "Name" "sbcl.exe"
                      "Source" "../src/runtime/sbcl.exe")
