@@ -896,11 +896,11 @@
 
       (update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
+            (layout-slot-table nwrapper) (make-slot-table class eslotds)
             (wrapper-instance-slots-layout nwrapper) nlayout
             (wrapper-class-slots nwrapper) nwrapper-class-slots
             (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
-      (setf (layout-slot-table nwrapper) (make-slot-table class eslotds))
       (do* ((slots (slot-value class 'slots) (cdr slots))
             (dupes nil))
            ((null slots)
@@ -1279,6 +1279,8 @@
               (wrapper-instance-slots-layout owrapper))
         (setf (wrapper-class-slots nwrapper)
               (wrapper-class-slots owrapper))
+        (setf (wrapper-slot-table nwrapper)
+              (wrapper-slot-table owrapper))
         (with-pcl-lock
           (update-lisp-class-layout class nwrapper)
           (setf (slot-value class 'wrapper) nwrapper)
