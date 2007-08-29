@@ -415,7 +415,7 @@
         (assert (= (type-error-datum condition) -1))
         (assert (subtypep (type-error-expected-type condition)
                           '(unsigned-byte 8))))))
-  
+
   (delete-file pathname))
 
 ;;; writing looong lines. takes way too long and way too much space

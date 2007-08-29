@@ -535,8 +535,8 @@
       (setq cpl-available-p t)
       (add-direct-subclasses class direct-superclasses)
       (let ((slots (compute-slots class)))
-        (setf (slot-value class 'slots) slots
-              (slot-value class 'slot-table) (make-slot-table class slots)))))
+        (setf (slot-value class 'slots) slots)
+        (setf (layout-slot-table wrapper) (make-slot-table class slots)))))
   ;; Comment from Gerd's PCL, 2003-05-15:
   ;;
   ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
@@ -717,11 +717,12 @@
           (compute-class-precedence-list class))
     (setf (slot-value class 'cpl-available-p) t)
     (let ((slots (compute-slots class)))
-      (setf (slot-value class 'slots) slots
-            (slot-value class 'slot-table) (make-slot-table class slots)))
-    (let ((lclass (find-classoid (class-name class))))
-      (setf (classoid-pcl-class lclass) class)
-      (setf (slot-value class 'wrapper) (classoid-layout lclass)))
+      (setf (slot-value class 'slots) slots)
+      (let* ((lclass (find-classoid (class-name class)))
+             (layout (classoid-layout lclass)))
+        (setf (classoid-pcl-class lclass) class)
+        (setf (slot-value class 'wrapper) layout)
+        (setf (layout-slot-table layout) (make-slot-table class slots))))
     (setf (slot-value class 'finalized-p) t)
     (update-pv-table-cache-info class)
     (add-slot-accessors class direct-slots)))
@@ -895,11 +896,11 @@
 
       (update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
-            (slot-value class 'slot-table) (make-slot-table class eslotds)
             (wrapper-instance-slots-layout nwrapper) nlayout
             (wrapper-class-slots nwrapper) nwrapper-class-slots
             (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
+      (setf (layout-slot-table nwrapper) (make-slot-table class eslotds))
       (do* ((slots (slot-value class 'slots) (cdr slots))
             (dupes nil))
            ((null slots)
@@ -1556,11 +1557,6 @@
   (def class-slots)
   (def class-direct-default-initargs)
   (def class-default-initargs))
-
-(defmethod class-slot-table (class)
-  ;; Default method to cause FIND-SLOT-DEFINITION return NIL for all
-  ;; non SLOT-CLASS classes.
-  #(nil))
 
 (defmethod validate-superclass ((c class) (s built-in-class))
   (or (eq s *the-class-t*) (eq s *the-class-stream*)

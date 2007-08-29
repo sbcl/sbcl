@@ -186,6 +186,9 @@
   (n-untagged-slots 0 :type index)
   ;; Definition location
   (source-location nil)
+  ;; Information about slots in the class to PCL: this provides fast
+  ;; access to slot-definitions and locations by name, etc.
+  (slot-table #(nil) :type simple-vector)
   ;; True IFF the layout belongs to a standand-instance or a
   ;; standard-funcallable-instance -- that is, true only if the layout
   ;; is really a wrapper.
