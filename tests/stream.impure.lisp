@@ -302,7 +302,8 @@
         (type-error (condition)
           (assert (eql (type-error-datum condition) (code-char 255)))
           (assert (subtypep (type-error-expected-type condition)
-                            '(signed-byte 8))))))))
+                            '(signed-byte 8)))))))
+  (delete-file pathname))
 
 ;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
 ;;; write a sequence element.
@@ -413,7 +414,9 @@
       (type-error (condition)
         (assert (= (type-error-datum condition) -1))
         (assert (subtypep (type-error-expected-type condition)
-                          '(unsigned-byte 8)))))))
+                          '(unsigned-byte 8))))))
+  
+  (delete-file pathname))
 
 ;;; writing looong lines. takes way too long and way too much space
 ;;; to test on 64 bit platforms

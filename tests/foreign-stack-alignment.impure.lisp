@@ -75,4 +75,7 @@
   (assert (= *good-offset* (trampoline (alien-lambda int ()
                                        (stack-alignment-offset *required-alignment*))))))
 
+(delete-file "stack-alignment-offset")
+(delete-file "stack-alignment-offset.so")
+
 ;;;; success!

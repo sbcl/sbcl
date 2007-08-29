@@ -22,6 +22,7 @@ src/runtime/target-arch-os.h
 src/runtime/target-arch.h
 src/runtime/target-lispregs.h
 src/runtime/target-os.h
+tests/test-status.lisp-expr
 tools-for-build/grovel-headers
 contrib/*/test-passed
 contrib/*/foo.c

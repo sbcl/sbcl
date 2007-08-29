@@ -107,7 +107,7 @@
  :search t)
 (sb-alien:load-shared-object "threads-foreign.so")
 (sb-alien:define-alien-routine loop-forever sb-alien:void)
-
+(delete-file "threads-foreign.c")
 
 ;;; elementary "can we get a lock and release it again"
 (let ((l (make-mutex :name "foo"))
