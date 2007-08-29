@@ -307,8 +307,9 @@ GET-SETF-EXPANSION directly."
   "Creates a new read-modify-write macro like PUSH or INCF."
   (let ((other-args nil)
         (rest-arg nil)
-        (env (gensym))
-        (reference (gensym)))
+        (env (make-symbol "ENV"))          ; To beautify resulting arglist.
+        (reference (make-symbol "PLACE"))) ; Note that these will be nonexistent
+                                           ;  in the final expansion anyway.
     ;; Parse out the variable names and &REST arg from the lambda list.
     (do ((ll lambda-list (cdr ll))
          (arg nil))

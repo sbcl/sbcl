@@ -13,6 +13,9 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * optimization: UNION and NUNION are now O(N+M) for large
     inputs as long as the :TEST function is one of EQ, EQL, EQUAL, or
     EQUALP.
+  * enhancement: DEFINE-MODIFY-MACRO lambda-list information is
+    now more readable in environments like Slime which display it.
+    (thanks to Tobias C. Rittweiler)
 
 changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * minor incompatible change: SB-SYS:OUTPUT-RAW-BYTES is deprecated.
