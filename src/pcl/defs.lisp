@@ -661,9 +661,9 @@
    (slots
     :initform ()
     :reader class-slots)
-   (slot-vector
+   (slot-table
     :initform #(nil)
-    :reader class-slot-vector)))
+    :reader class-slot-table)))
 
 ;;; The class STD-CLASS is an implementation-specific common
 ;;; superclass of the classes STANDARD-CLASS and

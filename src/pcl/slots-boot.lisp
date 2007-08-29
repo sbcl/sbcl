@@ -566,7 +566,7 @@
 
 (defun find-slot-definition (class slot-name)
   (declare (symbol slot-name))
-  (let* ((vector (class-slot-vector class))
+  (let* ((vector (class-slot-table class))
          (index (rem (sxhash slot-name) (length vector))))
     (declare (simple-vector vector) (index index)
              (optimize (sb-c::insert-array-bounds-checks 0)))
@@ -579,7 +579,7 @@
 
 (defun find-slot-cell (class slot-name)
   (declare (symbol slot-name))
-  (let* ((vector (class-slot-vector class))
+  (let* ((vector (class-slot-table class))
          (index (rem (sxhash slot-name) (length vector))))
     (declare (simple-vector vector) (index index)
              (optimize (sb-c::insert-array-bounds-checks 0)))
@@ -590,7 +590,7 @@
         (when (eq key slot-name)
           (return (car plist)))))))
 
-(defun make-slot-vector (class slots)
+(defun make-slot-table (class slots)
   (let* ((n (+ (length slots) 2))
          (vector (make-array n :initial-element nil))
          (save-slot-location-p

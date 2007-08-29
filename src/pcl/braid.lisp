@@ -310,7 +310,7 @@
                                  slot-class))
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots)
-      (set-slot 'slot-vector (make-slot-vector class slots)))
+      (set-slot 'slot-table (make-slot-table class slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't
