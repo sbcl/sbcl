@@ -780,7 +780,9 @@
 #!-(or x86 x86-64)
 (defun compute-calling-frame (caller lra up-frame)
   (declare (type system-area-pointer caller))
+  (/noshow0 "entering COMPUTE-CALLING-FRAME")
   (when (control-stack-pointer-valid-p caller)
+    (/noshow0 "in WHEN")
     (multiple-value-bind (code pc-offset escaped)
         (if lra
             (multiple-value-bind (word-offset code)
@@ -816,6 +818,7 @@
                            "bogus stack frame"))
                          (t
                           (debug-fun-from-pc code pc-offset)))))
+            (/noshow0 "returning MAKE-COMPILED-FRAME from COMPUTE-CALLING-FRAME")
             (make-compiled-frame caller up-frame d-fun
                                  (code-location-from-pc d-fun pc-offset
                                                         escaped)
@@ -915,13 +918,18 @@
 #!-(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
+  (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
+      (/noshow0 "at head of WITH-ALIEN")
     (let ((scp (nth-interrupt-context index)))
+        (/noshow0 "got SCP")
       (when (= (sap-int frame-pointer)
                (sb!vm:context-register scp sb!vm::cfp-offset))
         (without-gcing
+         (/noshow0 "in WITHOUT-GCING")
          (let ((code (code-object-from-bits
                       (sb!vm:context-register scp sb!vm::code-offset))))
+           (/noshow0 "got CODE")
            (when (symbolp code)
              (return (values code 0 scp)))
            (let* ((code-header-len (* (get-header-data code)
@@ -958,6 +966,7 @@
                      ;; pc-offset to 0 to keep the backtrace from
                      ;; exploding.
                      (setf pc-offset 0)))))
+             (/noshow0 "returning from FIND-ESCAPED-FRAME")
              (return
                (if (eq (%code-debug-info code) :bogus-lra)
                    (let ((real-lra (code-header-ref code
