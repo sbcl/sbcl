@@ -14,7 +14,7 @@
 ;;; Test generation utilities.
 (defun %test-fixnum (value target not-p &key temp)
   (assemble ()
-    (inst and temp value 3)
+    (inst and temp value fixnum-tag-mask)
     (if not-p
         (inst bne temp zero-tn target)
         (inst beq temp zero-tn target))
@@ -23,14 +23,14 @@
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
-      (inst and temp value 3)
+      (inst and temp value fixnum-tag-mask)
       (inst beq temp zero-tn (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
                    :drop-through drop-through :temp temp)))
 
 (defun %test-immediate (value target not-p immediate &key temp)
   (assemble ()
-    (inst and temp value 255)
+    (inst and temp value widetag-mask)
     (inst xor temp immediate)
     (if not-p
         (inst bne temp zero-tn target)
@@ -151,7 +151,7 @@
           (values not-target target)
           (values target not-target))
     (assemble ()
-      (inst and temp value 3)
+      (inst and temp value fixnum-tag-mask)
       (inst beq temp zero-tn yep)
       (inst and temp value lowtag-mask)
       (inst xor temp other-pointer-lowtag)
@@ -189,7 +189,7 @@
                            (values target not-target))
     (assemble ()
       ;; Is it a fixnum?
-      (inst and temp value 3)
+      (inst and temp value fixnum-tag-mask)
       (inst beq temp zero-tn fixnum)
       (move temp value t)
 
