@@ -315,6 +315,7 @@
 ;;; callback wrapper
 #-sb-xc-host
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
+  #!+sb-doc
   "Cons up a piece of code which calls enter-alien-callback with INDEX
 and a pointer to the arguments."
   (flet ((make-gpr (n)

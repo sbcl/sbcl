@@ -24,6 +24,7 @@
 ;;; Instruction-like macros.
 
 (defmacro move (dst src &optional (always-emit-code-p nil))
+  #!+sb-doc
   "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P
   is nil)."
   (once-only ((n-dst dst)
@@ -61,6 +62,7 @@
             (- other-pointer-lowtag))))
 
 (defmacro load-type (target source &optional (offset 0))
+  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)
@@ -77,6 +79,7 @@
 ;;; return instructions.
 
 (defmacro lisp-jump (function lip)
+  #!+sb-doc
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
      (inst addu ,lip ,function (- (ash simple-fun-code-offset word-shift)
@@ -85,6 +88,7 @@
      (move code-tn ,function t)))
 
 (defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
+  #!+sb-doc
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
   `(progn
      (inst addu ,lip ,return-pc
@@ -96,6 +100,7 @@
 
 
 (defmacro emit-return-pc (label)
+  #!+sb-doc
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
   `(progn
      (align n-lowtag-bits)
@@ -124,6 +129,7 @@
           (storew reg cfp-tn offset))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
+  #!+sb-doc
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
@@ -216,12 +222,14 @@
         (align word-shift)))))
 
 (defmacro error-call (vop error-code &rest values)
+  #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
   (cons 'progn
         (emit-error-break vop error-trap error-code values)))
 
 
 (defmacro cerror-call (vop label error-code &rest values)
+  #!+sb-doc
   "Cause a continuable error.  If the error is continued, execution resumes at
   LABEL."
   `(progn
@@ -230,6 +238,7 @@
        ,@(emit-error-break vop cerror-trap error-code values))))
 
 (defmacro generate-error-code (vop error-code &rest values)
+  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   `(assemble (*elsewhere*)
@@ -239,6 +248,7 @@
        start-lab)))
 
 (defmacro generate-cerror-code (vop error-code &rest values)
+  #!+sb-doc
   "Generate-CError-Code Error-code Value*
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
