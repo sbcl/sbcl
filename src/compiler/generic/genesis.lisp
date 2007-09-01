@@ -1609,7 +1609,7 @@ core and return a descriptor to it."
 (defvar *cold-assembler-fixups*)
 
 (defun record-cold-assembler-routine (name address)
-  (/show "in RECORD-COLD-ASSEMBLER-ROUTINE" name address)
+  (/xhow "in RECORD-COLD-ASSEMBLER-ROUTINE" name address)
   (push (cons name address)
         *cold-assembler-routines*))
 
