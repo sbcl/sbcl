@@ -46,13 +46,6 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
              "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE"
              "CAST" "C-STRING"
              "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
-
-             ;; FIXME: These old names don't match the DEFFOO - vs. -
-             ;; DEFINE-FOO convention used in the ANSI spec, and so
-             ;; were deprecated in sbcl-0.7.0. After a year or so
-             ;; they can go away completely.
-             "DEF-ALIEN-ROUTINE" "DEF-ALIEN-TYPE" "DEF-ALIEN-VARIABLE"
-
              "DEREF" "DOUBLE"
              "ENUM" "EXTERN-ALIEN"
              "FREE-ALIEN"

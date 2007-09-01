@@ -285,9 +285,6 @@
              `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
          ,@(when name
              `((%define-alien-type ',name ',alien-type)))))))
-(def!macro def-alien-type (&rest rest)
-  (deprecation-warning 'def-alien-type 'define-alien-type)
-  `(define-alien-type ,@rest))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %def-auxiliary-alien-types (types)

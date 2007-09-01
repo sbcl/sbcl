@@ -61,10 +61,6 @@
                                    ',alien-name
                                    ',alien-type))))))
 
-(defmacro def-alien-variable (&rest rest)
-  (deprecation-warning 'def-alien-variable 'define-alien-variable)
-  `(define-alien-variable ,@rest))
-
 ;;; Do the actual work of DEFINE-ALIEN-VARIABLE.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %define-alien-variable (lisp-name alien-name type)
@@ -728,10 +724,6 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
                       (values ,@temps ,@(results))))
                  (values (alien-funcall ,lisp-name ,@(alien-args))
                          ,@(results)))))))))
-
-(defmacro def-alien-routine (&rest rest)
-  (deprecation-warning 'def-alien-routine 'define-alien-routine)
-  `(define-alien-routine ,@rest))
 
 (defun alien-typep (object type)
   #!+sb-doc
