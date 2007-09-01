@@ -125,7 +125,7 @@
 (funcall (compile nil '(lambda () (tan (tan (round 0))))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :ppc :darwin :mips (and :x86 :netbsd)))
+            :fails-on '(or :ppc :darwin (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1
                   (ignore-errors
