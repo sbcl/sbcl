@@ -143,8 +143,11 @@
 
 
 ;;;; Storage allocation:
-(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size)
+(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code
+                                  size dynamic-extent-p
+                                  &key (lowtag other-pointer-lowtag))
                                  &body body)
+  #!+sb-doc
   "Do stuff to allocate an other-pointer object of fixed Size with a single
    word header having the specified Type-Code.  The result is placed in
    Result-TN, Flag-Tn must be wired to NL4-OFFSET, and Temp-TN is a non-
@@ -152,12 +155,28 @@
    placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   (unless body
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
-  (once-only ((result-tn result-tn) (temp-tn temp-tn) (size size))
-    `(pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
-       (inst or ,result-tn alloc-tn other-pointer-lowtag)
-       (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
-       (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
-       ,@body)))
+  (once-only ((result-tn result-tn) (flag-tn flag-tn) (temp-tn temp-tn)
+              (type-code type-code) (size size)
+              (dynamic-extent-p dynamic-extent-p)
+              (lowtag lowtag))
+    `(if ,dynamic-extent-p
+         (pseudo-atomic (,flag-tn)
+           (align-csp ,temp-tn)
+           (inst or ,result-tn csp-tn ,lowtag)
+           (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+           (inst addu csp-tn (pad-data-block ,size))
+           (storew ,temp-tn ,result-tn 0 ,lowtag)
+           ,@body)
+         (pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
+           ;; The pseudo-atomic bit in alloc-tn is set.  If the lowtag also
+           ;; has a 1 bit in the same position, we're all set.  Otherwise,
+           ;; we need to subtract the pseudo-atomic bit.
+           (inst or ,result-tn alloc-tn ,lowtag)
+           (unless (logbitp (1- n-lowtag-bits) ,lowtag)
+                   (inst sub ,result-tn 1))
+           (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+           (storew ,temp-tn ,result-tn 0 ,lowtag)
+           ,@body))))
 
 (defun align-csp (temp)
   ;; is used for stack allocation of dynamic-extent objects

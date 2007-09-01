@@ -118,7 +118,7 @@
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :argument))
   (:generator 37
-    (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size)
+    (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size nil)
       (inst li temp (make-fixup "undefined_tramp" :foreign))
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
@@ -153,12 +153,11 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:info stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (with-fixed-allocation (result pa-flag temp value-cell-header-widetag value-cell-size)
+    (with-fixed-allocation (result pa-flag temp value-cell-header-widetag
+                            value-cell-size stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
-
 
 ;;;; Automatic allocators for primitive objects.
 

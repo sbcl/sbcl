@@ -78,7 +78,7 @@
   (:variant-vars double-p size type data)
   (:note "float to pointer coercion")
   (:generator 13
-    (with-fixed-allocation (y pa-flag ndescr type size)
+    (with-fixed-allocation (y pa-flag ndescr type size nil)
       (if double-p
           (str-double x y (- (* data n-word-bytes) other-pointer-lowtag))
           (inst swc1 x y (- (* data n-word-bytes) other-pointer-lowtag))))))
@@ -259,7 +259,7 @@
   (:note "complex single float to pointer coercion")
   (:generator 13
     (with-fixed-allocation (y pa-flag ndescr complex-single-float-widetag
-                              complex-single-float-size)
+                              complex-single-float-size nil)
       (let ((real-tn (complex-single-reg-real-tn x)))
         (inst swc1 real-tn y (- (* complex-single-float-real-slot
                                    n-word-bytes)
@@ -279,7 +279,7 @@
   (:note "complex double float to pointer coercion")
   (:generator 13
     (with-fixed-allocation (y pa-flag ndescr complex-double-float-widetag
-                              complex-double-float-size)
+                              complex-double-float-size nil)
       (let ((real-tn (complex-double-reg-real-tn x)))
         (str-double real-tn y (- (* complex-double-float-real-slot
                                     n-word-bytes)

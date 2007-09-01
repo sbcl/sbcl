@@ -210,7 +210,7 @@
       (inst sll y x 2)
 
       (with-fixed-allocation
-          (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+          (y pa-flag temp bignum-widetag (1+ bignum-digits-offset) nil)
         (storew x y bignum-digits-offset other-pointer-lowtag))
       (inst b done)
       (inst nop)

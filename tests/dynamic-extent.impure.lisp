@@ -130,7 +130,7 @@
 
 (defun-with-dx dx-value-cell (x)
   ;; Not implemented everywhere, yet.
-  #+(or x86 x86-64)
+  #+(or x86 x86-64 mips)
   (let ((cell x))
     (declare (dynamic-extent cell))
     (flet ((f ()
