@@ -10,7 +10,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;;; LIST and LIST*
 (defoptimizer (list stack-allocate-result) ((&rest args))
@@ -80,7 +79,6 @@
 
 (define-vop (list* list-or-list*)
   (:variant t))
-
 
 ;;;; Special purpose inline allocators.
 

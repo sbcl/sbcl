@@ -13,21 +13,24 @@
 
 ;;;; Unary operations.
 
-(define-vop (fixnum-unop)
+(define-vop (fast-safe-arith-op)
+  (:policy :fast-safe)
+  (:effects)
+  (:affected))
+
+(define-vop (fixnum-unop fast-safe-arith-op)
   (:args (x :scs (any-reg)))
   (:results (res :scs (any-reg)))
   (:note "inline fixnum arithmetic")
   (:arg-types tagged-num)
-  (:result-types tagged-num)
-  (:policy :fast-safe))
+  (:result-types tagged-num))
 
-(define-vop (signed-unop)
+(define-vop (signed-unop fast-safe-arith-op)
   (:args (x :scs (signed-reg)))
   (:results (res :scs (signed-reg)))
   (:note "inline (signed-byte 32) arithmetic")
   (:arg-types signed-num)
-  (:result-types signed-num)
-  (:policy :fast-safe))
+  (:result-types signed-num))
 
 (define-vop (fast-negate/fixnum fixnum-unop)
   (:translate %negate)
@@ -51,45 +54,34 @@
   (:translate lognot)
   (:generator 1
     (inst nor res x zero-tn)))
-
-
 
 ;;;; Binary fixnum operations.
 
 ;;; Assume that any constant operand is the second arg...
 
-(define-vop (fast-fixnum-binop)
-  (:args (x :target r :scs (any-reg))
-         (y :target r :scs (any-reg)))
+(define-vop (fast-fixnum-binop fast-safe-arith-op)
+  (:args (x :target r :scs (any-reg zero))
+         (y :target r :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
-  (:note "inline fixnum arithmetic")
-  (:effects)
-  (:affected)
-  (:policy :fast-safe))
+  (:note "inline fixnum arithmetic"))
 
-(define-vop (fast-unsigned-binop)
-  (:args (x :target r :scs (unsigned-reg))
-         (y :target r :scs (unsigned-reg)))
+(define-vop (fast-unsigned-binop fast-safe-arith-op)
+  (:args (x :target r :scs (unsigned-reg zero))
+         (y :target r :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic")
-  (:effects)
-  (:affected)
-  (:policy :fast-safe))
+  (:note "inline (unsigned-byte 32) arithmetic"))
 
-(define-vop (fast-signed-binop)
-  (:args (x :target r :scs (signed-reg))
-         (y :target r :scs (signed-reg)))
+(define-vop (fast-signed-binop fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg zero))
+         (y :target r :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic")
-  (:effects)
-  (:affected)
-  (:policy :fast-safe))
+  (:note "inline (signed-byte 32) arithmetic"))
 
 (define-vop (fast-fixnum-c-binop fast-fixnum-binop)
   (:args (x :target r :scs (any-reg)))
