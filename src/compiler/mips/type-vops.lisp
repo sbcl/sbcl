@@ -37,15 +37,14 @@
         (inst beq temp zero-tn target))
     (inst nop)))
 
-(defun %test-lowtag (value target not-p lowtag &key skip-nop temp)
+(defun %test-lowtag (value target not-p lowtag &key temp)
   (assemble ()
     (inst and temp value lowtag-mask)
     (inst xor temp lowtag)
     (if not-p
         (inst bne temp zero-tn target)
         (inst beq temp zero-tn target))
-    (unless skip-nop
-      (inst nop))))
+    (inst nop)))
 
 (defun %test-headers (value target not-p function-p headers
                       &key (drop-through (gen-label)) temp)
