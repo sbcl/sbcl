@@ -288,8 +288,7 @@
  ;;   :hppa
  ;;      any PA-RISC CPU
  ;;   :mips
- ;;      any MIPS CPU (in little-endian mode with :little-endian -- currently
- ;;      untested)
+ ;;      any MIPS CPU (in little-endian mode with :little-endian)
  ;;
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
