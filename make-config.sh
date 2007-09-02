@@ -166,9 +166,11 @@ case "$sbcl_os" in
 
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
-        if [ $sbcl_arch = "x86" ]; then
+        case "$sbcl_arch" in
+        x86 | mips)
             printf ' :largefile' >> $ltf
-        fi
+            ;;
+        esac
 
         if [ $sbcl_arch = "x86-64" ]; then
             link_or_copy Config.x86_64-linux Config
