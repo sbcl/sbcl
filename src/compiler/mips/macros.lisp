@@ -26,7 +26,7 @@
 (defmacro move (dst src &optional (always-emit-code-p nil))
   #!+sb-doc
   "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P
-  is nil)."
+is nil)."
   (once-only ((n-dst dst)
               (n-src src))
     `(if (location= ,n-dst ,n-src)
@@ -64,7 +64,7 @@
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
   "Loads the type bits of a pointer into target independent of
-  byte-ordering issues."
+byte-ordering issues."
   (once-only ((n-target target)
               (n-source source)
               (n-offset offset))
@@ -149,10 +149,10 @@
                                  &body body)
   #!+sb-doc
   "Do stuff to allocate an other-pointer object of fixed Size with a single
-   word header having the specified Type-Code.  The result is placed in
-   Result-TN, Flag-Tn must be wired to NL4-OFFSET, and Temp-TN is a non-
-   descriptor temp (which may be randomly used by the body.)  The body is
-   placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
+word header having the specified Type-Code.  The result is placed in
+Result-TN, Flag-Tn must be wired to NL4-OFFSET, and Temp-TN is a non-
+descriptor temp (which may be randomly used by the body.)  The body is
+placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   (unless body
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (flag-tn flag-tn) (temp-tn temp-tn)
