@@ -299,6 +299,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :alien-callbacks' >> $ltf
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
     #
