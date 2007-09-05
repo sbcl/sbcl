@@ -660,7 +660,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (struct wrapped_stat
     (st-dev #!-(or mips largefile) unsigned-int
             #!+mips unsigned-long
-            #!+largefile #!-mips dev-t)
+            #!+(and largefile (not mips)) dev-t)
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink nlink-t)
@@ -668,7 +668,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (st-gid gid-t)
     (st-rdev #!-(or mips largefile) unsigned-int
              #!+mips unsigned-long
-             #!+largefile #!-mips dev-t)
+             #!+(and largefile (not mips)) dev-t)
     (st-size #!-(or darwin mips largefile) unsigned-int
              #!+(or darwin mips largefile) off-t)
     #!+(and darwin)
