@@ -147,7 +147,6 @@
               (allocation result (pad-data-block size)
                           fun-pointer-lowtag :temp-tn temp :flag-tn pa-flag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag))))
-        ;;; should this be closure-fun-slot instead of 0?
         (storew temp result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
