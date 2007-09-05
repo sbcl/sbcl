@@ -140,8 +140,8 @@
                (inst lda csp-tn alloc-size csp-tn))
               (t
                (inst bis alloc-tn fun-pointer-lowtag result)))
-        (storew temp result 0 fun-pointer-lowtag))
-      (storew function result closure-fun-slot fun-pointer-lowtag))))
+        (storew temp result 0 fun-pointer-lowtag)
+        (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

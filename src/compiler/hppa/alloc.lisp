@@ -125,8 +125,8 @@
         (inst move alloc-tn result)
         (inst dep fun-pointer-lowtag 31 3 result)
         (inst li (logior (ash (1- size) n-widetag-bits) closure-header-widetag) temp)
-        (storew temp result 0 fun-pointer-lowtag)))
-    (storew function result closure-fun-slot fun-pointer-lowtag)))
+        (storew temp result 0 fun-pointer-lowtag)
+        (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

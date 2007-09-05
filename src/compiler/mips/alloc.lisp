@@ -144,8 +144,8 @@
         (inst or result fun-pointer-lowtag)
         (inst li temp (logior (ash (1- size) n-widetag-bits)
                               closure-header-widetag))
-        (storew temp result 0 fun-pointer-lowtag))
-      (storew function result closure-fun-slot fun-pointer-lowtag))))
+        (storew temp result 0 fun-pointer-lowtag)
+        (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
