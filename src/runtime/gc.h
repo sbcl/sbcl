@@ -21,7 +21,7 @@
 #ifdef LISP_FEATURE_GENCGC
 #define PAGE_BYTES GENCGC_PAGE_SIZE
 #else
-#define PAGE_BYTES 0x1000
+#define PAGE_BYTES BACKEND_PAGE_SIZE
 #endif
 
 typedef signed long page_index_t;

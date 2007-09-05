@@ -5,7 +5,7 @@
 (setf *backend-byte-order* :big-endian)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; On Linux, the ABI specifies the page size to be 4k-65k, use the
+  ;; On Linux, the ABI specifies the page size to be 4k-64k, use the
   ;; maximum of that range. FIXME: it'd be great if somebody would
   ;; find out whether using exact multiples of the page size actually
   ;; matters in the few places where that's done, or whether we could

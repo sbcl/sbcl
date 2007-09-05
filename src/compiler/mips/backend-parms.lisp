@@ -1,11 +1,12 @@
 (in-package "SB!VM")
 
-;;; FIXME: Do I need a different one for little-endian? :spim,
-;;; perhaps?
 (def!constant +backend-fasl-file-implementation+ :mips)
 (setf *backend-register-save-penalty* 3)
 (setf *backend-byte-order*
       #!+little-endian :little-endian
       #!-little-endian :big-endian)
-;;; FIXME: Check this. Where is it used?
-(setf *backend-page-size* 4096)
+
+(progn ;eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
+  ;; maximum since mprotect() works only with page granularity.
+  (setf *backend-page-size* 65536))

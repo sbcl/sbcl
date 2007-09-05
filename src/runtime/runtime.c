@@ -332,7 +332,7 @@ main(int argc, char *argv[], char *envp[])
     }
 
     /* Align down to multiple of page_table page size */
-    dynamic_space_size = (dynamic_space_size/PAGE_BYTES) * PAGE_BYTES;
+    dynamic_space_size &= ~(PAGE_BYTES - 1);
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so

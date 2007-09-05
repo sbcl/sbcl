@@ -345,7 +345,7 @@ profiling")
 
 (defvar *alloc-region-size*
   #-gencgc
-  4096
+  (get-page-size)
   ;; This hardcoded 2 matches the one in gc_find_freeish_pages. It's not
   ;; really worth genesifying.
   #+gencgc

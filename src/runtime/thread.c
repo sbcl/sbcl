@@ -373,12 +373,19 @@ create_thread_struct(lispobj initial_function) {
     /* Give a chance for cleanup threads to run. */
     sched_yield();
 #endif
-    /* may as well allocate all the spaces at once: it saves us from
+    /* May as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
-     * succeed */
-    spaces=os_validate(0, THREAD_STRUCT_SIZE);
+     * succeed.  SPACES must be page-aligned, since the GC expects the
+     * control stack to start at a page boundary.  We can't rely on the
+     * alignment passed from os_validate, since that might assume the
+     * current (e.g. 4k) pagesize, while we calculate with the biggest
+     * (e.g. 64k) pagesize allowed by the ABI.  */
+    spaces=os_validate(0, THREAD_STRUCT_SIZE + BACKEND_PAGE_SIZE);
     if(!spaces)
          return NULL;
+    spaces = (void *)((((unsigned long)(char *)spaces)
+                       + BACKEND_PAGE_SIZE - 1)
+                      & ~(BACKEND_PAGE_SIZE - 1));
     per_thread=(union per_thread_data *)
         (spaces+
          THREAD_CONTROL_STACK_SIZE+
