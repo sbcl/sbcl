@@ -44,7 +44,7 @@
 ;;;; number.
 
 (run "cc"
-     #+(and (or linux freebsd) (or x86-64 ppc)) "-fPIC"
+     #+(and (or linux freebsd) (or x86-64 ppc mips)) "-fPIC"
      #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
      "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
@@ -55,7 +55,7 @@
 ;;;; Build the tool again, this time as a shared object, and load it
 
 (run "cc" "stack-alignment-offset.c"
-     #+(and (or linux freebsd) (or x86-64 ppc)) "-fPIC"
+     #+(and (or linux freebsd) (or x86-64 ppc mips)) "-fPIC"
      #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
      #+darwin "-bundle" #-darwin "-shared"
      "-o" "stack-alignment-offset.so")
