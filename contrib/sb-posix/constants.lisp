@@ -77,7 +77,7 @@
  (:integer SIGPROF "SIGPROF"
            #+sb-doc "profiling timer alarm (see setitimer(2))." t)
  (:integer SIGWINCH "SIGWINCH" #+sb-doc "Window size change." t)
- (:integer SIGINFO "SIGINFO" #+sb-doc "status request from keyboard." t)
+ (:integer SIGPWR "SIGPWR" #+sb-doc "Power failure." t)
  (:integer SIGUSR1 "SIGUSR1" #+sb-doc "User defined signal 1." t)
  (:integer SIGUSR2 "SIGUSR2" #+sb-doc "User defined signal 2." t)
  (:integer SIGRTMIN "SIGRTMIN" #+sb-doc "Smallest real-time signal number." t)
