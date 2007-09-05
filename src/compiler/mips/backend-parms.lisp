@@ -6,7 +6,7 @@
       #!+little-endian :little-endian
       #!-little-endian :big-endian)
 
-(progn ;eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
   ;; maximum since mprotect() works only with page granularity.
   (setf *backend-page-size* 65536))
