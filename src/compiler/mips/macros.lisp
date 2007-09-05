@@ -172,8 +172,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
            ;; has a 1 bit in the same position, we're all set.  Otherwise,
            ;; we need to subtract the pseudo-atomic bit.
            (inst or ,result-tn alloc-tn ,lowtag)
-           (unless (logbitp (1- n-lowtag-bits) ,lowtag)
-                   (inst sub ,result-tn 1))
+           (unless (logbitp 0 ,lowtag) (inst sub ,result-tn 1))
            (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body))))
