@@ -374,6 +374,11 @@
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
   (os-thread :c-type "volatile os_thread_t")
+  ;; This is the original address at which the memory was allocated,
+  ;; which may have different alignment then what we prefer to use.
+  ;; Kept here so that when the thread dies we can releast the whole
+  ;; memory we reserved.
+  (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)

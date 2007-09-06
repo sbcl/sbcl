@@ -70,7 +70,7 @@ struct freeable_stack {
     struct freeable_stack *next;
 #endif
     os_thread_t os_thread;
-    os_vm_address_t stack;
+    os_vm_address_t os_address;
 };
 
 
@@ -144,7 +144,8 @@ initial_thread_trampoline(struct thread *th)
 
 #define THREAD_STRUCT_SIZE (THREAD_CONTROL_STACK_SIZE + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE + dynamic_values_bytes + \
-                            32 * SIGSTKSZ)
+                            32 * SIGSTKSZ + \
+                            BACKEND_PAGE_SIZE)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
@@ -153,33 +154,27 @@ initial_thread_trampoline(struct thread *th)
 static void
 queue_freeable_thread_stack(struct thread *thread_to_be_cleaned_up)
 {
+     struct freeable_stack *new_freeable_stack = 0;
      if (thread_to_be_cleaned_up) {
+        /* FIXME: os_validate is mmap -- for small things like these
+         * malloc would probably perform better. */
+        new_freeable_stack = (struct freeable_stack *)
+            os_validate(0, sizeof(struct freeable_stack));
+        new_freeable_stack->next = NULL;
+        new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
+        new_freeable_stack->os_address = thread_to_be_cleaned_up->os_address;
         pthread_mutex_lock(&freeable_stack_lock);
         if (freeable_stack_queue) {
-            struct freeable_stack *new_freeable_stack = 0, *next;
+            struct freeable_stack *next;
             next = freeable_stack_queue;
             while (next->next) {
                 next = next->next;
             }
-            new_freeable_stack = (struct freeable_stack *)
-                os_validate(0, sizeof(struct freeable_stack));
-            new_freeable_stack->next = NULL;
-            new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
-            new_freeable_stack->stack = (os_vm_address_t)
-                thread_to_be_cleaned_up->control_stack_start;
             next->next = new_freeable_stack;
-            freeable_stack_count++;
         } else {
-            struct freeable_stack *new_freeable_stack = 0;
-            new_freeable_stack = (struct freeable_stack *)
-                os_validate(0, sizeof(struct freeable_stack));
-            new_freeable_stack->next = NULL;
-            new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
-            new_freeable_stack->stack = (os_vm_address_t)
-                thread_to_be_cleaned_up->control_stack_start;
             freeable_stack_queue = new_freeable_stack;
-            freeable_stack_count++;
         }
+        freeable_stack_count++;
         pthread_mutex_unlock(&freeable_stack_lock);
     }
 }
@@ -196,7 +191,7 @@ free_freeable_stacks() {
         freeable_stack_count--;
         gc_assert(pthread_join(old->os_thread, NULL) == 0);
         FSHOW((stderr, "freeing thread %x stack\n", old->os_thread));
-        os_invalidate(old->stack, THREAD_STRUCT_SIZE);
+        os_invalidate(old->os_address, THREAD_STRUCT_SIZE);
         os_invalidate((os_vm_address_t)old, sizeof(struct freeable_stack));
         pthread_mutex_unlock(&freeable_stack_lock);
     }
@@ -214,7 +209,7 @@ cleanup_thread(void *arg)
     gc_assert(pthread_join(freeable->os_thread, NULL) == 0);
     FSHOW((stderr, "/cleaner thread(%p): free stack %p\n",
            self, freeable->stack));
-    os_invalidate(freeable->stack, THREAD_STRUCT_SIZE);
+    os_invalidate(freeable->os_address, THREAD_STRUCT_SIZE);
     free(freeable);
 
     pthread_detach(self);
@@ -233,8 +228,8 @@ create_cleanup_thread(struct thread *thread_to_be_cleaned_up)
             malloc(sizeof(struct freeable_stack));
         gc_assert(freeable != NULL);
         freeable->os_thread = thread_to_be_cleaned_up->os_thread;
-        freeable->stack =
-            (os_vm_address_t) thread_to_be_cleaned_up->control_stack_start;
+        freeable->os_address =
+            (os_vm_address_t) thread_to_be_cleaned_up->os_address;
         result = pthread_create(&thread, NULL, cleanup_thread, freeable);
         gc_assert(result == 0);
         sched_yield();
@@ -250,8 +245,8 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
         new_freeable_stack = (struct freeable_stack *)
             os_validate(0, sizeof(struct freeable_stack));
         new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
-        new_freeable_stack->stack = (os_vm_address_t)
-            thread_to_be_cleaned_up->control_stack_start;
+        new_freeable_stack->os_address = (os_vm_address_t)
+            thread_to_be_cleaned_up->os_address;
     }
     new_freeable_stack = (struct freeable_stack *)
         swap_lispobjs((lispobj *)(void *)&freeable_stack,
@@ -262,7 +257,7 @@ free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
          * exists and the stack can be safely freed. This is sadly not
          * mandated by the pthread spec. */
         gc_assert(pthread_join(new_freeable_stack->os_thread, NULL) == 0);
-        os_invalidate(new_freeable_stack->stack, THREAD_STRUCT_SIZE);
+        os_invalidate(new_freeable_stack->os_address, THREAD_STRUCT_SIZE);
         os_invalidate((os_vm_address_t) new_freeable_stack,
                       sizeof(struct freeable_stack));
     }
@@ -351,7 +346,7 @@ free_thread_struct(struct thread *th)
     if (th->interrupt_data)
         os_invalidate((os_vm_address_t) th->interrupt_data,
                       (sizeof (struct interrupt_data)));
-    os_invalidate((os_vm_address_t) th->control_stack_start,
+    os_invalidate((os_vm_address_t) th->os_address,
                   THREAD_STRUCT_SIZE);
 }
 
@@ -365,6 +360,7 @@ create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
+    void *aligned_spaces=0;
 #ifdef LISP_FEATURE_SB_THREAD
     int i;
 #endif
@@ -380,14 +376,16 @@ create_thread_struct(lispobj initial_function) {
      * alignment passed from os_validate, since that might assume the
      * current (e.g. 4k) pagesize, while we calculate with the biggest
      * (e.g. 64k) pagesize allowed by the ABI.  */
-    spaces=os_validate(0, THREAD_STRUCT_SIZE + BACKEND_PAGE_SIZE);
+    spaces=os_validate(0, THREAD_STRUCT_SIZE);
     if(!spaces)
-         return NULL;
-    spaces = (void *)((((unsigned long)(char *)spaces)
-                       + BACKEND_PAGE_SIZE - 1)
-                      & ~(BACKEND_PAGE_SIZE - 1));
+        return NULL;
+    /* Aligning up is safe as THREAD_STRUCT_SIZE has BACKEND_PAGE_SIZE
+     * padding. */
+    aligned_spaces = (void *)((((unsigned long)(char *)spaces)
+                               + BACKEND_PAGE_SIZE - 1)
+                              & ~(BACKEND_PAGE_SIZE - 1));
     per_thread=(union per_thread_data *)
-        (spaces+
+        (aligned_spaces+
          THREAD_CONTROL_STACK_SIZE+
          BINDING_STACK_SIZE+
          ALIEN_STACK_SIZE);
@@ -422,7 +420,8 @@ create_thread_struct(lispobj initial_function) {
 #endif
 
     th=&per_thread->thread;
-    th->control_stack_start = spaces;
+    th->os_address = spaces;
+    th->control_stack_start = aligned_spaces;
     th->binding_stack_start=
         (lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
     th->control_stack_end = th->binding_stack_start;

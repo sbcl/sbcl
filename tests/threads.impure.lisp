@@ -18,10 +18,10 @@
 (defmacro defincf (name accessor &rest args)
   `(defun ,name (x)
      (let* ((old (,accessor x ,@args))
-	 (new (1+ old)))
+         (new (1+ old)))
     (loop until (eq old (sb-ext:compare-and-swap (,accessor x ,@args) old new))
        do (setf old (,accessor x ,@args)
-		new (1+ old)))
+                new (1+ old)))
     new)))
 
 (defstruct cas-struct (slot 0))
@@ -38,30 +38,30 @@
      (defun ,name (n)
        (declare (fixnum n))
        (let* ((x ,init)
-	      (run nil)
-	      (threads
-	       (loop repeat 10
-		     collect (sb-thread:make-thread 
-			      (lambda () 
-				(loop until run)
-				(loop repeat n do (,incf x)))))))
-	 (setf run t)
-	 (dolist (th threads) 
-	   (sb-thread:join-thread th))
-	 (assert (= (,op x) (* 10 n)))))
+              (run nil)
+              (threads
+               (loop repeat 10
+                     collect (sb-thread:make-thread
+                              (lambda ()
+                                (loop until run)
+                                (loop repeat n do (,incf x)))))))
+         (setf run t)
+         (dolist (th threads)
+           (sb-thread:join-thread th))
+         (assert (= (,op x) (* 10 n)))))
      (,name 200000)))
 
 (def-test-cas test-cas-car (cons 0 nil) incf-car car)
 (def-test-cas test-cas-cdr (cons nil 0) incf-cdr cdr)
 (def-test-cas test-cas-slot (make-cas-struct) incf-slot cas-struct-slot)
 (def-test-cas test-cas-value (let ((x '.x.))
-			       (set x 0)
-			       x)
+                               (set x 0)
+                               x)
   incf-symbol-value symbol-value)
 (def-test-cas test-cas-svref/0 (vector 0 nil) incf-svref/0 (lambda (x)
-							     (svref x 0)))
+                                                             (svref x 0)))
 (def-test-cas test-cas-svref/1 (vector nil 0) incf-svref/1 (lambda (x)
-							     (svref x 1)))
+                                                             (svref x 1)))
 (format t "~&compare-and-swap tests done~%")
 
 (use-package :test-util)
