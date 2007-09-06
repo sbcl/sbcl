@@ -282,7 +282,7 @@ cd $original_dir
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    printf ' :compare-and-swap-vop :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "darwin" ] || [ "$sbcl_os" = "win32" ]; then
         printf ' :linkage-table' >> $ltf
@@ -294,7 +294,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
-    printf ' :compare-and-swap-vop :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
