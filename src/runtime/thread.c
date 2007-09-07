@@ -383,7 +383,7 @@ create_thread_struct(lispobj initial_function) {
      * padding. */
     aligned_spaces = (void *)((((unsigned long)(char *)spaces)
                                + BACKEND_PAGE_SIZE - 1)
-                              & ~(BACKEND_PAGE_SIZE - 1));
+                              & ~(unsigned long)(BACKEND_PAGE_SIZE - 1));
     per_thread=(union per_thread_data *)
         (aligned_spaces+
          THREAD_CONTROL_STACK_SIZE+
