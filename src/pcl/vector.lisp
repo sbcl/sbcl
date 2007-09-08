@@ -159,8 +159,7 @@
   (unless (listp wrappers)
     (setq wrappers (list wrappers)))
   (let (elements)
-    (dolist (slot-names slot-name-lists
-             (make-permutation-vector (nreverse elements)))
+    (dolist (slot-names slot-name-lists)
       (when slot-names
         (let* ((wrapper (pop wrappers))
                (std-p (typep wrapper 'wrapper))
@@ -170,10 +169,12 @@
             (push (if std-p
                       (compute-pv-slot slot-name wrapper class class-slots)
                       nil)
-                  elements)))))))
-
-(defun make-permutation-vector (indexes)
-  (make-array (length indexes) :initial-contents indexes))
+                  elements)))))
+    (let* ((n (length elements))
+           (pv (make-array n)))
+      (loop for i from (1- n) downto 0
+         do (setf (svref pv i) (pop elements)))
+      pv)))
 
 (defun pv-table-lookup (pv-table pv-wrappers)
   (let* ((slot-name-lists (pv-table-slot-name-lists pv-table))
@@ -187,13 +188,12 @@
       (if hitp
           value
           (let* ((pv (compute-pv slot-name-lists pv-wrappers))
-                 (pv-cell (cons pv nil))
-                 (new-cache (fill-cache cache pv-wrappers pv-cell)))
+                 (new-cache (fill-cache cache pv-wrappers pv)))
             ;; This is safe: if another thread races us here the loser just
             ;; misses the next time as well.
             (unless (eq new-cache cache)
               (setf (pv-table-cache pv-table) new-cache))
-            pv-cell)))))
+            pv)))))
 
 (defun make-pv-type-declaration (var)
   `(type simple-vector ,var))
@@ -244,8 +244,8 @@
               (incf map-index))
             (incf param-index)))
         (when cache
-          (map-cache (lambda (wrappers pv-cell)
-                       (update-slots-in-pv wrappers (car pv-cell)
+          (map-cache (lambda (wrappers pv)
+                       (update-slots-in-pv wrappers pv
                                            cwrapper pv-size pv-map))
                      cache))))))
 
@@ -647,13 +647,13 @@
           do (when slots
                (push required-parameter pv-parameters)
                (push (slot-vector-symbol i) slot-vars)))
-    `(pv-binding1 (.pv. ,pv-table-form
+    `(pv-binding1 (,pv-table-form
                    ,(nreverse pv-parameters) ,(nreverse slot-vars))
        ,@body)))
 
-(defmacro pv-binding1 ((pv pv-table-form pv-parameters slot-vars)
+(defmacro pv-binding1 ((pv-table-form pv-parameters slot-vars)
                        &body body)
-  `(pv-env (,pv ,pv-table-form ,pv-parameters)
+  `(pv-env (,pv-table-form ,pv-parameters)
      (let (,@(mapcar (lambda (slot-var p) `(,slot-var (get-slots-or-nil ,p)))
                      slot-vars pv-parameters))
        (declare (ignorable ,@(mapcar #'identity slot-vars)))
@@ -664,18 +664,15 @@
 (define-symbol-macro pv-env-environment overridden)
 
 (defmacro pv-env (&environment env
-                  (pv pv-table-form pv-parameters)
+                  (pv-table-form pv-parameters)
                   &rest forms)
   ;; Decide which expansion to use based on the state of the PV-ENV-ENVIRONMENT
   ;; symbol-macrolet.
   (if (eq (macroexpand 'pv-env-environment env) 'default)
-      `(let ((,pv (car .pv-cell.)))
-         (declare ,(make-pv-type-declaration pv))
-         ,@forms)
+      `(locally ,@forms)
       `(let* ((.pv-table. ,pv-table-form)
-              (.pv-cell. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters))
-              (,pv (car .pv-cell.)))
-        (declare ,(make-pv-type-declaration pv))
+              (.pv. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters)))
+        (declare ,(make-pv-type-declaration '.pv.))
         ,@forms)))
 
 (defvar *non-var-declarations*
@@ -902,9 +899,9 @@
                                 ;; function name
                                 (list (cons 'fast-method (body-method-name body))))
                         ;; The lambda-list of the FMF
-                        (.pv-cell. .next-method-call. ,@fmf-lambda-list)
+                        (.pv. .next-method-call. ,@fmf-lambda-list)
                         ;; body of the function
-                        (declare (ignorable .pv-cell. .next-method-call.)
+                        (declare (ignorable .pv. .next-method-call.)
                                  (disable-package-locks pv-env-environment))
                         ,@outer-decls
                         (symbol-macrolet ((pv-env-environment default))
@@ -935,8 +932,8 @@
          (restp (cdr arg-info)))
     (setq method-function
           (lambda (method-args next-methods)
-            (let* ((pv-cell (when pv-table
-                              (get-pv-cell method-args pv-table)))
+            (let* ((pv (when pv-table
+                         (get-pv method-args pv-table)))
                    (nm (car next-methods))
                    (nms (cdr next-methods))
                    (nmc (when nm
@@ -945,7 +942,7 @@
                                          (method-function nm)
                                          nm)
                            :call-method-args (list nms)))))
-              (apply fmf pv-cell nmc method-args))))
+              (apply fmf pv nmc method-args))))
     ;; FIXME: this looks dangerous.
     (let* ((fname (%fun-name fmf)))
       (when (and fname (eq (car fname) 'fast-method))
@@ -958,7 +955,7 @@
 ;;; over the actual PV-CELL in this case.
 (defun method-function-from-fast-method-call (fmc)
   (let* ((fmf (fast-method-call-function fmc))
-         (pv-cell (fast-method-call-pv-cell fmc))
+         (pv (fast-method-call-pv fmc))
          (arg-info (fast-method-call-arg-info fmc))
          (nreq (car arg-info))
          (restp (cdr arg-info)))
@@ -971,9 +968,9 @@
                                    (method-function nm)
                                    nm)
                      :call-method-args (list nms)))))
-        (apply fmf pv-cell nmc method-args)))))
+        (apply fmf pv nmc method-args)))))
 
-(defun get-pv-cell (method-args pv-table)
+(defun get-pv (method-args pv-table)
   (let ((pv-wrappers (pv-wrappers-from-all-args pv-table method-args)))
     (when pv-wrappers
       (pv-table-lookup pv-table pv-wrappers))))

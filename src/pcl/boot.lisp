@@ -1015,7 +1015,7 @@ bootstrapping.
 
 (defstruct (fast-method-call (:copier nil))
   (function #'identity :type function)
-  pv-cell
+  pv
   next-method-call
   arg-info)
 (defstruct (constant-fast-method-call
@@ -1032,7 +1032,7 @@ bootstrapping.
 
 (defmacro invoke-fast-method-call (method-call restp &rest required-args+rest-arg)
   `(,(if restp 'apply 'funcall) (fast-method-call-function ,method-call)
-                                (fast-method-call-pv-cell ,method-call)
+                                (fast-method-call-pv ,method-call)
                                 (fast-method-call-next-method-call ,method-call)
                                 ,@required-args+rest-arg))
 
@@ -1042,7 +1042,7 @@ bootstrapping.
                                         &rest required-args)
   (macrolet ((generate-call (n)
                ``(funcall (fast-method-call-function ,method-call)
-                          (fast-method-call-pv-cell ,method-call)
+                          (fast-method-call-pv ,method-call)
                           (fast-method-call-next-method-call ,method-call)
                           ,@required-args
                           ,@(loop for x below ,n
@@ -1056,7 +1056,7 @@ bootstrapping.
        (0 ,(generate-call 0))
        (1 ,(generate-call 1))
        (t (multiple-value-call (fast-method-call-function ,method-call)
-            (values (fast-method-call-pv-cell ,method-call))
+            (values (fast-method-call-pv ,method-call))
             (values (fast-method-call-next-method-call ,method-call))
             ,@required-args
             (sb-c::%more-arg-values ,more-context 0 ,more-count))))))
@@ -1204,7 +1204,7 @@ bootstrapping.
             (nreq (car arg-info)))
        (if restp
            (apply (fast-method-call-function emf)
-                  (fast-method-call-pv-cell emf)
+                  (fast-method-call-pv emf)
                   (fast-method-call-next-method-call emf)
                   args)
            (cond ((null args)
@@ -1227,7 +1227,7 @@ bootstrapping.
                              :format-arguments nil)))
                  (t
                   (apply (fast-method-call-function emf)
-                         (fast-method-call-pv-cell emf)
+                         (fast-method-call-pv emf)
                          (fast-method-call-next-method-call emf)
                          args))))))
     (method-call

@@ -36,9 +36,9 @@
                 (let* ((pv-wrappers (when pv-table
                                       (pv-wrappers-from-all-wrappers
                                        pv-table wrappers)))
-                       (pv-cell (when (and pv-table pv-wrappers)
-                                  (pv-table-lookup pv-table pv-wrappers))))
-                  (values mf t fmf pv-cell))
+                       (pv (when (and pv-table pv-wrappers)
+                             (pv-table-lookup pv-table pv-wrappers))))
+                  (values mf t fmf pv))
                 (values
                  (or mf (if (listp method)
                             (bug "early method with no method-function")
@@ -120,7 +120,7 @@
 
 (defun make-emf-from-method
     (method cm-args &optional gf fmf-p method-alist wrappers)
-  (multiple-value-bind (mf real-mf-p fmf pv-cell)
+  (multiple-value-bind (mf real-mf-p fmf pv)
       (get-method-function method method-alist wrappers)
     (if fmf
         (let* ((next-methods (car cm-args))
@@ -132,10 +132,10 @@
                (default (cons nil nil))
                (value (method-plist-value method :constant-value default)))
           (if (eq value default)
-              (make-fast-method-call :function fmf :pv-cell pv-cell
+              (make-fast-method-call :function fmf :pv pv
                                      :next-method-call next :arg-info arg-info)
               (make-constant-fast-method-call
-               :function fmf :pv-cell pv-cell :next-method-call next
+               :function fmf :pv pv :next-method-call next
                :arg-info arg-info :value value)))
         (if real-mf-p
             (flet ((frob-cm-arg (arg)
@@ -232,8 +232,8 @@
                     (long-method-combination-args-lambda-list combin))))))
       (cond
         (error-p
-         `(lambda (.pv-cell. .next-method-call. &rest .args.)
-           (declare (ignore .pv-cell. .next-method-call.))
+         `(lambda (.pv. .next-method-call. &rest .args.)
+           (declare (ignore .pv. .next-method-call.))
            (declare (ignorable .args.))
            (flet ((%no-primary-method (gf args)
                     (apply #'no-primary-method gf args))
@@ -251,14 +251,14 @@
                                         .dfun-more-count.)))
                              `(list ,@required))))
            `(lambda ,ll
-             (declare (ignore .pv-cell. .next-method-call.))
+             (declare (ignore .pv. .next-method-call.))
              (let ((.gf-args. ,gf-args))
                (declare (ignorable .gf-args.))
                ,@check-applicable-keywords
                ,effective-method))))
         (t
          `(lambda ,ll
-           (declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
+           (declare (ignore ,@(if error-p ll '(.pv. .next-method-call.))))
            ,@check-applicable-keywords
            ,effective-method))))))
 

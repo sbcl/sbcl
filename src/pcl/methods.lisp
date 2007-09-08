@@ -1360,7 +1360,7 @@
           (get-fun1 `(lambda
                       ,arglist
                       ,@(unless function-p
-                          `((declare (ignore .pv-cell. .next-method-call.))))
+                          `((declare (ignore .pv. .next-method-call.))))
                       (locally (declare #.*optimize-speed*)
                                (let ((emf ,net))
                                  ,(make-emf-call nargs applyp 'emf))))
