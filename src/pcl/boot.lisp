@@ -617,7 +617,6 @@ bootstrapping.
                         parameters
                         specializers))
                (slots (mapcar #'list required-parameters))
-               (calls (list nil))
                (class-declarations
                 `(declare
                   ;; These declarations seem to be used by PCL to pass
@@ -692,29 +691,24 @@ bootstrapping.
               (walk-method-lambda method-lambda
                                   required-parameters
                                   env
-                                  slots
-                                  calls)
+                                  slots)
             (multiple-value-bind (walked-lambda-body
                                   walked-declarations
                                   walked-documentation)
                 (parse-body (cddr walked-lambda))
               (declare (ignore walked-documentation))
               (when (some #'cdr slots)
-                (multiple-value-bind (slot-name-lists call-list)
-                    (slot-name-lists-from-slots slots calls)
+                (let ((slot-name-lists (slot-name-lists-from-slots slots)))
                   (setq plist
                         `(,@(when slot-name-lists
                                   `(:slot-name-lists ,slot-name-lists))
-                            ,@(when call-list
-                                    `(:call-list ,call-list))
                             ,@plist))
                   (setq walked-lambda-body
                         `((pv-binding (,required-parameters
                                        ,slot-name-lists
                                        (load-time-value
                                         (intern-pv-table
-                                         :slot-name-lists ',slot-name-lists
-                                         :call-list ',call-list)))
+                                         :slot-name-lists ',slot-name-lists)))
                             ,@walked-lambda-body)))))
               (when (and (memq '&key lambda-list)
                          (not (memq '&allow-other-keys lambda-list)))
@@ -1439,7 +1433,7 @@ bootstrapping.
         when (eq key keyword)
           return tail))
 
-(defun walk-method-lambda (method-lambda required-parameters env slots calls)
+(defun walk-method-lambda (method-lambda required-parameters env slots)
   (let (;; flag indicating that CALL-NEXT-METHOD should be in the
         ;; method definition
         (call-next-method-p nil)
@@ -1619,11 +1613,10 @@ bootstrapping.
           (set-fun-name mff fast-name))))
     (when plist
       (let ((plist plist))
-        (let ((snl (getf plist :slot-name-lists))
-              (cl (getf plist :call-list)))
-          (when (or snl cl)
+        (let ((snl (getf plist :slot-name-lists)))
+          (when snl
             (setf (method-plist-value method :pv-table)
-                  (intern-pv-table :slot-name-lists snl :call-list cl))))))))
+                  (intern-pv-table :slot-name-lists snl))))))))
 
 (defun analyze-lambda-list (lambda-list)
   (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?

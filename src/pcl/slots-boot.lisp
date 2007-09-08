@@ -459,8 +459,7 @@
   (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)
-                       (pv-binding1 (.pv. .calls.
-                                          (bug "Please report this")
+                       (pv-binding1 (.pv. (bug "Please report this")
                                           (instance) (instance-slots))
                          (instance-read-internal
                           .pv. instance-slots 0
@@ -489,16 +488,14 @@
                         (make-method-function
                          (lambda (nv instance)
                            (funcall check-fun nv instance)
-                           (pv-binding1 (.pv. .calls.
-                                              (bug "Please report this")
+                           (pv-binding1 (.pv. (bug "Please report this")
                                               (instance) (instance-slots))
                              (instance-write-internal
                               .pv. instance-slots 0 nv
                               (setf (slot-value instance slot-name) nv)))))
                         (make-method-function
                          (lambda (nv instance)
-                           (pv-binding1 (.pv. .calls.
-                                              (bug "Please report this")
+                           (pv-binding1 (.pv. (bug "Please report this")
                                               (instance) (instance-slots))
                              (instance-write-internal
                               .pv. instance-slots 0 nv
@@ -512,8 +509,7 @@
   (let* ((initargs (copy-tree
                     (make-method-function
                      (lambda (instance)
-                       (pv-binding1 (.pv. .calls.
-                                          (bug "Please report this")
+                       (pv-binding1 (.pv. (bug "Please report this")
                                           (instance) (instance-slots))
                           (instance-boundp-internal
                            .pv. instance-slots 0
