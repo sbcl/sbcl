@@ -152,6 +152,9 @@
     (remhash owrapper *previous-nwrappers*)
     (setf (gethash nwrapper *previous-nwrappers*) new-previous)))
 
+;;; FIXME: This is not a good name: part of the constract here is that
+;;; we return the valid wrapper, which is not obvious from the name
+;;; (or the names of our callees.)
 (defun check-wrapper-validity (instance)
   (let* ((owrapper (wrapper-of instance))
          (state (layout-invalid owrapper)))
@@ -188,11 +191,11 @@
   (when (invalid-wrapper-p (layout-of instance))
     (check-wrapper-validity instance)))
 
-(defun check-obsolete-instance/wrapper-of (instance)
+(defun valid-wrapper-of (instance)
   (let ((wrapper (wrapper-of instance)))
-    (when (invalid-wrapper-p wrapper)
-      (check-wrapper-validity instance))
-    wrapper))
+    (if (invalid-wrapper-p wrapper)
+	(check-wrapper-validity instance)
+	wrapper)))
 
 ;;;  NIL: means nothing so far, no actual arg info has NILs in the
 ;;;  metatype.

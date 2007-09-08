@@ -923,25 +923,17 @@
   (pv-table-lookup pv-table (pv-wrappers-from-pv-args pv-parameters)))
 
 (defun pv-wrappers-from-pv-args (&rest args)
-  (let (wrappers)
-    (dolist (arg args (if (cdr wrappers) (nreverse wrappers) (car wrappers)))
-      (let ((wrapper (wrapper-of arg)))
-        (push (if (invalid-wrapper-p wrapper)
-                  (check-wrapper-validity wrapper)
-                  wrapper)
-              wrappers)))))
+  (loop for arg in args
+        collect (valid-wrapper-of arg)))
 
 (defun pv-wrappers-from-all-args (pv-table args)
   (loop for snl in (pv-table-slot-name-lists pv-table) and arg in args
         when snl
-          collect (wrapper-of arg) into wrappers
-        finally (return (if (cdr wrappers) wrappers (car wrappers)))))
+        collect (valid-wrapper-of arg)))
 
 ;;; Return the subset of WRAPPERS which is used in the cache
 ;;; of PV-TABLE.
 (defun pv-wrappers-from-all-wrappers (pv-table wrappers)
   (loop for snl in (pv-table-slot-name-lists pv-table) and w in wrappers
         when snl
-          collect w into result
-        finally (return (if (cdr result) result (car result)))))
-
+        collect w))

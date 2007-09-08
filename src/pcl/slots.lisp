@@ -97,7 +97,7 @@
 
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
-  (let* ((wrapper (check-obsolete-instance/wrapper-of object))
+  (let* ((wrapper (valid-wrapper-of object))
          (cell (find-slot-cell wrapper slot-name))
          (location (car cell))
          (value
@@ -128,7 +128,7 @@
       form))
 
 (defun set-slot-value (object slot-name new-value)
-  (let* ((wrapper (check-obsolete-instance/wrapper-of object))
+  (let* ((wrapper (valid-wrapper-of object))
          (cell (find-slot-cell wrapper slot-name))
          (location (car cell))
          (type-check-function (cadr cell)))
@@ -171,7 +171,7 @@
       form))
 
 (defun slot-boundp (object slot-name)
-  (let* ((wrapper (check-obsolete-instance/wrapper-of object))
+  (let* ((wrapper (valid-wrapper-of object))
          (cell (find-slot-cell wrapper slot-name))
          (location (car cell))
          (value
@@ -201,7 +201,7 @@
       form))
 
 (defun slot-makunbound (object slot-name)
-  (let* ((wrapper (check-obsolete-instance/wrapper-of object))
+  (let* ((wrapper (valid-wrapper-of object))
          (cell (find-slot-cell wrapper slot-name))
          (location (car cell)))
     (cond ((fixnump location)
