@@ -45,28 +45,12 @@
          (when (eq ,slot-name sn) (return-from loop pos))
          (incf pos)))))
 
+(declaim (inline make-pv-table))
 (defstruct (pv-table (:predicate pv-tablep)
-                     (:constructor make-pv-table-internal
-                                   (slot-name-lists))
                      (:copier nil))
   (cache nil :type (or cache null))
   (pv-size 0 :type fixnum)
   (slot-name-lists nil :type list))
-
-#-sb-fluid (declaim (sb-ext:freeze-type pv-table))
-
-;;; FIXME: The comment below seem to indicate that this was intended
-;;; to be actually used, however, it isn't anymore, and was commented
-;;; out at 0.9.13.47. Also removed was code in MAKE-PV-TABLE that
-;;; pushed each new PV-TABLE onto this list. --NS 2006-06-18
-;;;
-;;;   help new slot-value-using-class methods affect fast iv access
-;;;
-;;;  (defvar *all-pv-table-list* nil)
-
-(declaim (inline make-pv-table))
-(defun make-pv-table (&key slot-name-lists)
-  (make-pv-table-internal slot-name-lists))
 
 (defun make-pv-table-type-declaration (var)
   `(type pv-table ,var))
