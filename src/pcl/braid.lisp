@@ -219,6 +219,8 @@
                      name class slots
                      standard-effective-slot-definition-wrapper t))
 
+              (setf (layout-slot-table wrapper) (make-slot-table class slots t))
+
               (case meta
                 ((standard-class funcallable-standard-class)
                  (!bootstrap-initialize-class
@@ -310,7 +312,10 @@
                                  slot-class))
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots)
-      (setf (layout-slot-table wrapper) (make-slot-table class slots)))
+      (setf (layout-slot-table wrapper)
+            (make-slot-table class slots
+                             (member metaclass-name
+                                     '(standard-class funcallable-standard-class)))))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't

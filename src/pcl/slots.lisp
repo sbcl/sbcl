@@ -107,13 +107,13 @@
                      (funcallable-standard-instance-access object location)))
                 ((consp location)
                  (cdr location))
-                ((eq t location)
-                 (return-from slot-value
-                   (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))))
                 ((not cell)
                  (return-from slot-value
                    (values (slot-missing (wrapper-class* wrapper) object slot-name
                                          'slot-value))))
+                ((not location)
+                 (return-from slot-value
+                   (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (if (eq +slot-unbound+ value)
@@ -141,11 +141,11 @@
                      new-value)))
           ((consp location)
            (setf (cdr location) new-value))
-          ((eq t location)
-           (setf (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))
-                 new-value))
           ((not cell)
            (slot-missing (wrapper-class* wrapper) object slot-name 'setf new-value))
+          ((not location)
+           (setf (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))
+                 new-value))
           (t
            (bug "Bogus slot-cell in SET-SLOT-VALUE: ~S" cell))))
   new-value)
@@ -181,14 +181,14 @@
                      (funcallable-standard-instance-access object location)))
                 ((consp location)
                  (cdr location))
-                ((eq t location)
-                 (return-from slot-boundp
-                   (slot-boundp-using-class (wrapper-class* wrapper) object (cddr cell))))
                 ((not cell)
                  (return-from slot-boundp
                    (and (slot-missing (wrapper-class* wrapper) object slot-name
                                       'slot-boundp)
                         t)))
+                ((not location)
+                 (return-from slot-boundp
+                   (slot-boundp-using-class (wrapper-class* wrapper) object (cddr cell))))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (not (eq +slot-unbound+ value))))
@@ -211,10 +211,10 @@
                      +slot-unbound+)))
           ((consp location)
            (setf (cdr location) +slot-unbound+))
-          ((eq t location)
-           (slot-makunbound-using-class (wrapper-class* wrapper) object (cddr cell)))
           ((not cell)
            (slot-missing (wrapper-class* wrapper) object slot-name 'slot-makunbound))
+          ((not location)
+           (slot-makunbound-using-class (wrapper-class* wrapper) object (cddr cell)))
           (t
            (bug "Bogus slot-cell in SLOT-MAKUNBOUND: ~S" cell))))
   object)

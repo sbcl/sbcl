@@ -530,7 +530,7 @@
 ;;; chains made out of plists keyed by the slot names. This fixes
 ;;; gives O(1) performance, and avoid the GF calls.
 ;;;
-;;; MAKE-SLOT-VECTOR constructs the hashed vector out of a list of
+;;; MAKE-SLOT-TABLE constructs the hashed vector out of a list of
 ;;; effective slot definitions and the class they pertain to, and
 ;;; FIND-SLOT-DEFINITION knows how to look up slots in that vector.
 ;;;
@@ -578,25 +578,27 @@
         (when (eq key slot-name)
           (return (car plist)))))))
 
-(defun make-slot-table (class slots)
+(defun make-slot-table (class slots &optional bootstrap)
   (let* ((n (+ (length slots) 2))
          (vector (make-array n :initial-element nil))
          (save-slot-location-p
-          (when (eq 'complete *boot-state*)
-            (let ((metaclass (class-of class)))
-              (or (eq metaclass *the-class-standard-class*)
-                  (eq metaclass *the-class-funcallable-standard-class*)))))
-         (save-type-check-function-p (and save-slot-location-p (safe-p class))))
+          (or bootstrap
+              (when (eq 'complete *boot-state*)
+                (let ((metaclass (class-of class)))
+                  (or (eq metaclass *the-class-standard-class*)
+                      (eq metaclass *the-class-funcallable-standard-class*))))))
+         (save-type-check-function-p
+          (unless bootstrap
+            (and save-slot-location-p (safe-p class)))))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
              (let ((index (rem (sxhash name) n)))
                (setf (svref vector index)
-                     (list* name (list* (if save-slot-location-p
-                                            (slot-definition-location slot)
-                                            ;; T tells SLOT-VALUE & SET-SLOT-VALUE
-                                            ;; that this is a non-standard class.
-                                            t)
+                     (list* name (list* (when save-slot-location-p
+                                          (if bootstrap
+                                              (early-slot-definition-location slot)
+                                              (slot-definition-location slot)))
                                         (when save-type-check-function-p
                                           (slot-definition-type-check-function slot))
                                         slot)

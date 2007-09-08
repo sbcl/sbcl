@@ -37,14 +37,6 @@
 ;;;; to each such (GF . ARGS) tuple inside a method body, and use this
 ;;;; to cache effective method functions.
 
-(defmacro instance-slot-index (wrapper slot-name)
-  `(let ((pos 0))
-     (declare (fixnum pos))
-     (block loop
-       (dolist (sn (wrapper-instance-slots-layout ,wrapper))
-         (when (eq ,slot-name sn) (return-from loop pos))
-         (incf pos)))))
-
 (declaim (inline make-pv-table))
 (defstruct (pv-table (:predicate pv-tablep)
                      (:copier nil))
@@ -106,20 +98,9 @@
         (and slotd
              (slot-accessor-std-p slotd type)))))
 
-(defun compute-pv-slot (slot-name wrapper class class-slots)
-  (if (symbolp slot-name)
-      (when (optimize-slot-value-by-class-p class slot-name 'all)
-        (or (instance-slot-index wrapper slot-name)
-            (assq slot-name class-slots)))
-      (when (consp slot-name)
-        (case (first slot-name)
-          ((reader writer)
-           (when (eq *boot-state* 'complete)
-             (let ((gf (gdefinition (second slot-name))))
-               (when (generic-function-p gf)
-                 (accessor-values1 gf (first slot-name) class)))))
-          (t (bug "Don't know how to deal with ~S in ~S"
-                  slot-name 'compute-pv-slots))))))
+(defun compute-pv-slot (slot-name wrapper class)
+  (when (optimize-slot-value-by-class-p class slot-name 'all)
+    (car (find-slot-cell wrapper slot-name))))
 
 (defun compute-pv (slot-name-lists wrappers)
   (unless (listp wrappers)
@@ -129,11 +110,10 @@
       (when slot-names
         (let* ((wrapper (pop wrappers))
                (std-p (typep wrapper 'wrapper))
-               (class (wrapper-class* wrapper))
-               (class-slots (and std-p (wrapper-class-slots wrapper))))
+               (class (wrapper-class* wrapper)))
           (dolist (slot-name (cdr slot-names))
             (push (if std-p
-                      (compute-pv-slot slot-name wrapper class class-slots)
+                      (compute-pv-slot slot-name wrapper class)
                       nil)
                   elements)))))
     (let* ((n (length elements))
@@ -180,13 +160,12 @@
 (defun update-all-pv-table-caches (class slot-names)
   (let* ((cwrapper (class-wrapper class))
          (std-p (typep cwrapper 'wrapper))
-         (class-slots (and std-p (wrapper-class-slots cwrapper)))
          (new-values
           (mapcar
            (lambda (slot-name)
              (cons slot-name
                    (if std-p
-                       (compute-pv-slot slot-name cwrapper class class-slots)
+                       (compute-pv-slot slot-name cwrapper class)
                        nil)))
            slot-names))
          (pv-tables nil))
