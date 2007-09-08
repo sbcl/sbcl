@@ -13,6 +13,36 @@
 
 (in-package "SB-THREAD") ; this is white-box testing, really
 
+(use-package :test-util)
+(use-package "ASSERTOID")
+
+(setf sb-unix::*on-dangerous-select* :error)
+
+(defun wait-for-threads (threads)
+  (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
+  (assert (not (some #'sb-thread:thread-alive-p threads))))
+
+(assert (eql 1 (length (list-all-threads))))
+
+(assert (eq *current-thread*
+            (find (thread-name *current-thread*) (list-all-threads)
+                  :key #'thread-name :test #'equal)))
+
+(assert (thread-alive-p *current-thread*))
+
+(let ((a 0))
+  (interrupt-thread *current-thread* (lambda () (setq a 1)))
+  (assert (eql a 1)))
+
+(let ((spinlock (make-spinlock)))
+  (with-spinlock (spinlock)))
+
+(let ((mutex (make-mutex)))
+  (with-mutex (mutex)
+    mutex))
+
+#-sb-thread (sb-ext:quit :unix-status 104)
+
 ;;; compare-and-swap
 
 (defmacro defincf (name accessor &rest args)
@@ -63,36 +93,6 @@
 (def-test-cas test-cas-svref/1 (vector nil 0) incf-svref/1 (lambda (x)
                                                              (svref x 1)))
 (format t "~&compare-and-swap tests done~%")
-
-(use-package :test-util)
-(use-package "ASSERTOID")
-
-(setf sb-unix::*on-dangerous-select* :error)
-
-(defun wait-for-threads (threads)
-  (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
-  (assert (not (some #'sb-thread:thread-alive-p threads))))
-
-(assert (eql 1 (length (list-all-threads))))
-
-(assert (eq *current-thread*
-            (find (thread-name *current-thread*) (list-all-threads)
-                  :key #'thread-name :test #'equal)))
-
-(assert (thread-alive-p *current-thread*))
-
-(let ((a 0))
-  (interrupt-thread *current-thread* (lambda () (setq a 1)))
-  (assert (eql a 1)))
-
-(let ((spinlock (make-spinlock)))
-  (with-spinlock (spinlock)))
-
-(let ((mutex (make-mutex)))
-  (with-mutex (mutex)
-    mutex))
-
-#-sb-thread (sb-ext:quit :unix-status 104)
 
 (let ((old-threads (list-all-threads))
       (thread (make-thread (lambda ()
