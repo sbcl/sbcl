@@ -1,3 +1,7 @@
+ifeq ($(TEXI2PDF),)
+  TEXI2PDF:=texi2dvi -p
+endif
+
 .PHONY: top clean html all
 
 all: sbcl-internals.pdf sbcl-internals.info
@@ -22,7 +26,7 @@ info: top
 	epstopdf $< > $@
 
 sbcl-internals.pdf: top $(patsubst %.dot,%.pdf,$(wildcard *.dot)) *.texinfo
-	texi2pdf sbcl-internals.texinfo
+	$(TEXI2PDF) sbcl-internals.texinfo
 
 sbcl-internals.info: top $(patsubst %.dot,%.txt,$(wildcard *.dot)) *.texinfo
 

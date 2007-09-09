@@ -30,7 +30,7 @@ ifeq ($(MAKEINFO),)
 endif
 
 ifeq ($(TEXI2PDF),)
-  TEXI2PDF:=texi2pdf
+  TEXI2PDF:=texi2dvi -p
 endif
 
 ifeq ($(DVIPS),)
@@ -73,7 +73,7 @@ ps: $(PSFILES)
 pdf: $(PDFFILES)
 
 %.pdf: %.texinfo $(DOCFILES) docstrings
-	texi2pdf $(I_FLAGS) $<
+	$(TEXI2PDF) $(I_FLAGS) $<
 
 # info docfiles
 .PHONY: info

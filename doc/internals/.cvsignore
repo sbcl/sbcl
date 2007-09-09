@@ -1,6 +1,8 @@
 *.aux
 *.cp
+*.cps
 *.fn
+*.fns
 *.info
 *.ky
 *.log
@@ -8,5 +10,6 @@
 *.pg
 *.toc
 *.tp
+*.txt
 *.vr
 *.include
