@@ -1523,11 +1523,17 @@ size_weak_pointer(lispobj *where)
 
 void scan_weak_pointers(void)
 {
-    struct weak_pointer *wp;
-    for (wp = weak_pointers; wp != NULL; wp=wp->next) {
+    struct weak_pointer *wp, *next_wp;
+    for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
         lispobj value = wp->value;
         lispobj *first_pointer;
         gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
+
+        next_wp = wp->next;
+        wp->next = NULL;
+        if (next_wp == wp) /* gencgc uses a ref to self for end of list */
+            next_wp = NULL;
+
         if (!(is_lisp_pointer(value) && from_space_p(value)))
             continue;
 

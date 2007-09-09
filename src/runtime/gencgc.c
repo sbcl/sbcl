@@ -2050,29 +2050,21 @@ size_lutex(lispobj *where)
 static long
 scav_weak_pointer(lispobj *where, lispobj object)
 {
-    struct weak_pointer *wp = weak_pointers;
-    /* Push the weak pointer onto the list of weak pointers.
-     * Do I have to watch for duplicates? Originally this was
-     * part of trans_weak_pointer but that didn't work in the
-     * case where the WP was in a promoted region.
+    /* Since we overwrite the 'next' field, we have to make
+     * sure not to do so for pointers already in the list.
+     * Instead of searching the list of weak_pointers each
+     * time, we ensure that next is always NULL when the weak
+     * pointer isn't in the list, and not NULL otherwise.
+     * Since we can't use NULL to denote end of list, we
+     * use a pointer back to the same weak_pointer.
      */
+    struct weak_pointer * wp = (struct weak_pointer*)where;
 
-    /* Check whether it's already in the list. */
-    while (wp != NULL) {
-        if (wp == (struct weak_pointer*)where) {
-            break;
-        }
-        wp = wp->next;
-    }
-    if (wp == NULL) {
-        /* Add it to the start of the list. */
-        wp = (struct weak_pointer*)where;
-        if (wp->next != weak_pointers) {
-            wp->next = weak_pointers;
-        } else {
-            /*SHOW("avoided write to weak pointer");*/
-        }
+    if (NULL == wp->next) {
+        wp->next = weak_pointers;
         weak_pointers = wp;
+        if (NULL == wp->next)
+            wp->next = wp;
     }
 
     /* Do not let GC scavenge the value slot of the weak pointer.
