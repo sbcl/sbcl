@@ -55,9 +55,6 @@
 ;;; used.
 (defvar *pv-tables* (make-hash-table :test 'equal))
 
-;;; Indexes PV-TABLES by indivisual slot names used.
-(defvar *pv-tables-by-slots* (make-hash-table :test 'equal))
-
 ;;; ...and one lock to rule them. Spinlock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
 ;;; -- and mostly this is already under the *big-compiler-lock*.
@@ -65,32 +62,23 @@
   (sb-thread::make-spinlock :name "pv table index lock"))
 
 (defun intern-pv-table (&key slot-name-lists)
-  (let ((new-p nil))
-    (flet ((intern-slot-names (slot-names)
-             (or (gethash slot-names *slot-name-lists*)
-                 (setf (gethash slot-names *slot-name-lists*) slot-names)))
-           (%intern-pv-table (snl)
-             (or (gethash snl *pv-tables*)
-                 (setf (gethash snl *pv-tables*)
-                       (progn
-                         (setq new-p t)
-                         (make-pv-table :slot-name-lists snl))))))
-      (sb-thread::with-spinlock (*pv-lock*)
-        (let ((pv-table
-               (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists))))
-          (when new-p
-            (let ((pv-index 0))
-              (dolist (slot-name-list slot-name-lists)
-                (dolist (slot-name (cdr slot-name-list))
-                  (pushnew pv-table (gethash slot-name *pv-tables-by-slots*))
-                  (incf pv-index)))
-              (setf (pv-table-pv-size pv-table) pv-index)))
-          pv-table)))))
-
-(defun map-pv-table-references-of (slot-name function)
-  (dolist (table (sb-thread::with-spinlock (*pv-lock*)
-                   (gethash slot-name *pv-tables-by-slots*)))
-    (funcall function table)))
+  (flet ((intern-slot-names (slot-names)
+           ;; FIXME: NIL at the head of the list is a remnant from
+           ;; old purged code, that hasn't been quite cleaned up yet.
+           ;; ...but as long as we assume it is there, we may as well
+           ;; assert it.
+           (aver (not (car slot-names)))
+           (or (gethash slot-names *slot-name-lists*)
+               (setf (gethash slot-names *slot-name-lists*) slot-names)))
+         (%intern-pv-table (snl)
+           (or (gethash snl *pv-tables*)
+               (setf (gethash snl *pv-tables*)
+                     (make-pv-table :slot-name-lists snl
+                                    :pv-size (reduce #'+ snl
+                                                     :key (lambda (slots)
+                                                            (length (cdr slots)))))))))
+    (sb-thread::with-spinlock (*pv-lock*)
+      (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
 (defun optimize-slot-value-by-class-p (class slot-name type)
   (or (not (eq *boot-state* 'complete))
@@ -143,73 +131,6 @@
 
 (defun make-pv-type-declaration (var)
   `(type simple-vector ,var))
-
-(defvar *pv-table-cache-update-info* nil)
-
-(defun update-pv-table-cache-info (class)
-  (let ((slot-names-for-pv-table-update nil)
-        (new-icui nil))
-    (dolist (icu *pv-table-cache-update-info*)
-      (if (eq (car icu) class)
-          (pushnew (cdr icu) slot-names-for-pv-table-update)
-          (push icu new-icui)))
-    (setq *pv-table-cache-update-info* new-icui)
-    (when slot-names-for-pv-table-update
-      (update-all-pv-table-caches class slot-names-for-pv-table-update))))
-
-(defun update-all-pv-table-caches (class slot-names)
-  (let* ((cwrapper (class-wrapper class))
-         (std-p (typep cwrapper 'wrapper))
-         (new-values
-          (mapcar
-           (lambda (slot-name)
-             (cons slot-name
-                   (if std-p
-                       (compute-pv-slot slot-name cwrapper class)
-                       nil)))
-           slot-names))
-         (pv-tables nil))
-    (dolist (slot-name slot-names)
-      (map-pv-table-references-of
-       slot-name
-       (lambda (pv-table)
-         (pushnew pv-table pv-tables))))
-    (dolist (pv-table pv-tables)
-      (let* ((cache (pv-table-cache pv-table))
-             (slot-name-lists (pv-table-slot-name-lists pv-table))
-             (pv-size (pv-table-pv-size pv-table))
-             (pv-map (make-array pv-size :initial-element nil)))
-        (let ((map-index 0) (param-index 0))
-          (dolist (slot-name-list slot-name-lists)
-            (dolist (slot-name (cdr slot-name-list))
-              (let ((a (assoc slot-name new-values)))
-                (setf (svref pv-map map-index)
-                      (and a (cons param-index (cdr a)))))
-              (incf map-index))
-            (incf param-index)))
-        (when cache
-          (map-cache (lambda (wrappers pv)
-                       (update-slots-in-pv wrappers pv
-                                           cwrapper pv-size pv-map))
-                     cache))))))
-
-(defun update-slots-in-pv (wrappers pv cwrapper pv-size pv-map)
-  (if (atom wrappers)
-      (when (eq cwrapper wrappers)
-        (dotimes-fixnum (i pv-size)
-          (let ((map (svref pv-map i)))
-            (when map
-              (aver (= (car map) 0))
-              (setf (svref pv i) (cdr map))))))
-      (when (memq cwrapper wrappers)
-        (let ((param 0))
-          (dolist (wrapper wrappers)
-            (when (eq wrapper cwrapper)
-              (dotimes-fixnum (i pv-size)
-                (let ((map (svref pv-map i)))
-                  (when (and map (= (car map) param))
-                    (setf (svref pv i) (cdr map))))))
-            (incf param))))))
 
 (defun can-optimize-access (form required-parameters env)
   (destructuring-bind (op var-form slot-name-form &optional new-value) form
@@ -927,7 +848,8 @@
         collect (valid-wrapper-of arg)))
 
 (defun pv-wrappers-from-all-args (pv-table args)
-  (loop for snl in (pv-table-slot-name-lists pv-table) and arg in args
+  (loop for snl in (pv-table-slot-name-lists pv-table)
+        and arg in args
         when snl
         collect (valid-wrapper-of arg)))
 

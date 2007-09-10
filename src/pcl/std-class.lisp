@@ -106,9 +106,7 @@
             (get-accessor-method-function gf type class slotd)
             (get-optimized-std-accessor-method-function class slotd type))
       (setf (slot-accessor-std-p slotd type) std-p)
-      (setf (slot-accessor-function slotd type) function))
-    (when (and old-slotd (not (eq old-std-p (slot-accessor-std-p slotd 'all))))
-      (push (cons class name) *pv-table-cache-update-info*))))
+      (setf (slot-accessor-function slotd type) function))))
 
 (defmethod slot-definition-allocation ((slotd structure-slot-definition))
   :instance)
@@ -550,7 +548,7 @@
   ;; remove slot accessors but never put them back.  I've added a
   ;; REINITIALIZE-INSTANCE :AFTER (CONDITION-CLASS) method, but what
   ;; was meant to happen?  -- CSR, 2005-11-18
-  (update-pv-table-cache-info class))
+  )
 
 (defmethod direct-slot-definition-class ((class condition-class)
                                          &rest initargs)
@@ -724,7 +722,6 @@
         (setf (slot-value class 'wrapper) layout)
         (setf (layout-slot-table layout) (make-slot-table class slots))))
     (setf (slot-value class 'finalized-p) t)
-    (update-pv-table-cache-info class)
     (add-slot-accessors class direct-slots)))
 
 (defmethod direct-slot-definition-class ((class structure-class) &rest initargs)
@@ -921,7 +918,6 @@
                      :test #'string= :key #'car))))
       (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
-        (update-pv-table-cache-info class)
         (maybe-update-standard-class-locations class)))))
 
 (defun compute-class-slots (eslotds)
