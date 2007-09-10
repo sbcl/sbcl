@@ -162,11 +162,11 @@
          (unless (sset-member original in)
            (return nil)))
        (let ((info (vop-info vop)))
-         (not (and (eq (vop-info-move-args info) :local-call)
-                   (>= (or (position-in #'tn-ref-across arg (vop-args vop)
-                                        :key #'tn-ref-tn)
-                           (error "Couldn't find REF?"))
-                       (length (template-arg-types info))))))))
+         (not (or (eq (vop-info-move-args info) :local-call)
+                  (>= (or (position-in #'tn-ref-across arg (vop-args vop)
+                                       :key #'tn-ref-tn)
+                          (error "Couldn't find REF?"))
+                      (length (template-arg-types info))))))))
 
 ;;; Make use of the result of flow analysis to eliminate copies. We
 ;;; scan the VOPs in block, propagating copies and keeping our IN set

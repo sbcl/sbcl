@@ -20,10 +20,12 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
     EQUALP.
   * enhancement: DEFINE-MODIFY-MACRO lambda-list information is
     now more readable in environments like Slime which display it.
-    (thanks to Tobias C. Rittweiler)
+    (thanks to Tobias C. Rittweiler)  
   * bug fix: SB-EXT:COMPARE-AND-SWAP was non-atomic unless the compiler
     was able to infer the correct argument type for the object on which
     the CAS operation was being performed.
+  * bug fix: copy propagation interfered with parallel assignment
+    semantics in local calls. (reported by Paul Khuong)
 
 changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * minor incompatible change: SB-SYS:OUTPUT-RAW-BYTES is deprecated.

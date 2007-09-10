@@ -1448,4 +1448,18 @@
 
 (assert (default-values-bug-demo-main))
 
+;;; copy propagation bug reported by Paul Khuong
+
+(defun local-copy-prop-bug-with-move-arg (x)
+  (labels ((inner ()
+             (values 1 0)))
+    (if x
+        (inner)
+        (multiple-value-bind (a b)
+            (inner)
+          (values b a)))))
+
+(assert (equal '(0 1) (multiple-value-list (local-copy-prop-bug-with-move-arg nil))))
+(assert (equal '(1 0) (multiple-value-list (local-copy-prop-bug-with-move-arg t))))
+
 ;;; success
