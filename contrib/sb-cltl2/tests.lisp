@@ -1,5 +1,13 @@
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; The software is in the public domain and is provided with
+;;;; absolutely no warranty. See the COPYING and CREDITS files for
+;;;; more information.
+
 (defpackage :sb-cltl2-tests
   (:use :sb-cltl2 :cl :sb-rt))
+
 (in-package :sb-cltl2-tests)
 
 (rem-all-tests)
@@ -98,3 +106,145 @@
           (and (subtypep dinfo '(and warning (not style-warning)))
                (subtypep '(and warning (not style-warning)) dinfo)))))))
   t)
+
+;;;; VARIABLE-INFORMATION
+
+(defvar *foo*)
+
+(defmacro var-info (var &environment env)
+  (list 'quote (multiple-value-list (variable-information var env))))
+
+(deftest variable-info.global-special/unbound
+    (var-info *foo*)
+  (:special nil nil))
+
+(deftest variable-info.global-special/unbound/extra-decl
+    (locally (declare (special *foo*))
+      (var-info *foo*))
+  (:special nil nil))
+
+(deftest variable-info.global-special/bound
+    (let ((*foo* t))
+      (var-info *foo*))
+  (:special nil nil))
+
+(deftest variable-info.global-special/bound/extra-decl
+    (let ((*foo* t))
+      (declare (special *foo*))
+      (var-info *foo*))
+  (:special nil nil))
+
+(deftest variable-info.local-special/unbound
+    (locally (declare (special x))
+      (var-info x))
+  (:special nil nil))
+
+(deftest variable-info.local-special/bound
+    (let ((x 13))
+      (declare (special x))
+      (var-info x))
+  (:special nil nil))
+
+(deftest variable-info.local-special/shadowed
+    (let ((x 3))
+      (declare (special x))
+      x
+      (let ((x 3))
+        x
+        (var-info x)))
+  (:lexical t nil))
+
+(deftest variable-info.local-special/shadows-lexical
+    (let ((x 3))
+      (let ((x 3))
+        (declare (special x))
+        (var-info x)))
+  (:special nil nil))
+
+(deftest variable-info.lexical
+    (let ((x 8))
+      (var-info x))
+  (:lexical t nil))
+
+(deftest variable-info.ignore
+    (let ((x 8))
+      (declare (ignore x))
+      (var-info x))
+  (:lexical t ((ignore . t))))
+
+(deftest variable-info.symbol-macro/local
+    (symbol-macrolet ((x 8))
+      (var-info x))
+  (:symbol-macro t nil))
+
+(define-symbol-macro my-symbol-macro t)
+
+(deftest variable-info.symbol-macro/global
+    (var-info my-symbol-macro)
+  (:symbol-macro nil nil))
+
+(deftest variable-info.undefined
+    (var-info #:undefined)
+  (nil nil nil))
+
+;;;; FUNCTION-INFORMATION
+
+(defmacro fun-info (var &environment env)
+  (list 'quote (multiple-value-list (function-information var env))))
+
+(defun my-global-fun (x) x)
+
+(deftest function-info.global/no-ftype
+    (fun-info my-global-fun)
+  (:function nil nil))
+
+(declaim (ftype (function (cons) (values t &optional)) my-global-fun-2))
+
+(defun my-global-fun-2 (x) x)
+
+(deftest function-info.global/ftype
+    (fun-info my-global-fun-2)
+  (:function nil ((ftype function (cons) (values t &optional)))))
+
+(defmacro my-macro (x) x)
+
+(deftest function-info.macro
+    (fun-info my-macro)
+  (:macro nil nil))
+
+(deftest function-info.macrolet
+    (macrolet ((thingy () nil))
+      (fun-info thingy))
+  (:macro t nil))
+
+(deftest function-info.special-form
+    (fun-info progn)
+  (:special-form  nil nil))
+
+(deftest function-info.notinline/local
+    (flet ((x (y) y))
+      (declare (notinline x))
+      (x 1)
+      (fun-info x))
+  (:function t ((inline . notinline))))
+
+(declaim (notinline my-notinline))
+(defun my-notinline (x) x)
+
+(deftest function-info.notinline/global
+    (fun-info my-notinline)
+  (:function nil ((inline . notinline))))
+
+(declaim (inline my-inline))
+(defun my-inline (x) x)
+
+(deftest function-info.inline/global
+    (fun-info my-inline)
+  (:function nil ((inline . inline))))
+
+(deftest function-information.known-inline
+    (locally (declare (inline identity))
+      (fun-info identity))
+  (:function nil ((inline . inline)
+                  (ftype function (t) (values t &optional)))))
+

@@ -4,6 +4,8 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
     associates .lisp and .fasl files with the installed SBCL.
   * minor incompatible change: :UNIX is no longer present in *FEATURES*
     on Windows. (thanks to Luis Oliviera)
+  * new feature: SB-CLTL2 contrib module now implements
+    FUNCTION-INFORMATION. (thanks to Larry D'Anna)
   * optimization: scavenging weak pointers is now more efficient,
     requiring O(1) instead of O(N) per weak pointer to identify
     scanvenged vs. unscavenged pointers. (thanks to Paul Khuong)
