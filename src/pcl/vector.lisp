@@ -74,9 +74,9 @@
            (or (gethash snl *pv-tables*)
                (setf (gethash snl *pv-tables*)
                      (make-pv-table :slot-name-lists snl
-                                    :pv-size (reduce #'+ snl
-                                                     :key (lambda (slots)
-                                                            (length (cdr slots)))))))))
+                                    :pv-size (* 2 (reduce #'+ snl
+                                                          :key (lambda (slots)
+                                                                 (length (cdr slots))))))))))
     (sb-thread::with-spinlock (*pv-lock*)
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
@@ -86,9 +86,13 @@
         (and slotd
              (slot-accessor-std-p slotd type)))))
 
-(defun compute-pv-slot (slot-name wrapper class)
+(defun compute-slot-location-for-pv (slot-name wrapper class)
   (when (optimize-slot-value-by-class-p class slot-name 'all)
     (car (find-slot-cell wrapper slot-name))))
+
+(defun compute-slot-typecheckfun-for-pv (slot-name wrapper class)
+  (when (optimize-slot-value-by-class-p class slot-name 'all)
+    (cadr (find-slot-cell wrapper slot-name))))
 
 (defun compute-pv (slot-name-lists wrappers)
   (unless (listp wrappers)
@@ -100,9 +104,11 @@
                (std-p (typep wrapper 'wrapper))
                (class (wrapper-class* wrapper)))
           (dolist (slot-name (cdr slot-names))
-            (push (if std-p
-                      (compute-pv-slot slot-name wrapper class)
-                      nil)
+            (push (when std-p
+                    (compute-slot-location-for-pv slot-name wrapper class))
+                  elements)
+            (push (when std-p
+                    (compute-slot-typecheckfun-for-pv slot-name wrapper class))
                   elements)))))
     (let* ((n (length elements))
            (pv (make-array n)))
@@ -208,21 +214,19 @@
     (if sparameter
         (let ((optimized-form
                (optimize-instance-access slots :write sparameter
-                                         slot-name new-value)))
+                                         slot-name new-value (safe-code-p env))))
              ;; See OPTIMIZE-SLOT-VALUE
              `(optimized-set-slot-value ,form ,(car sparameter) ,optimized-form))
            `(accessor-set-slot-value ,@(cdr form)))))
 
 (defmacro optimized-set-slot-value (form parameter-name optimized-form
                                     &environment env)
-  (cond ((safe-code-p env)
-         ;; Don't optimize slot value setting in safe code, since the
-         ;; optimized version will fail to catch some type errors
-         ;; (for example when a subclass declares a tighter type for
-         ;; the slot than a superclass).
-         `(safe-set-slot-value ,@(cdr form)))
-        ((parameter-modified-p parameter-name env)
-         `(accessor-set-slot-value ,@(cdr form)))
+  (cond ((parameter-modified-p parameter-name env)
+         ;; ACCESSOR-SET-SLOT-VALUE doesn't do type-checking,
+         ;; so we need to use SAFE-SET-SLOT-VALUE.
+         (if (safe-code-p env)
+             `(safe-set-slot-value ,@(cdr form)))
+             `(accessor-set-slot-value ,@(cdr form)))
         (t
          optimized-form)))
 
@@ -248,7 +252,7 @@
 ;;; the position of an entry in the alist corresponds to the
 ;;; argument's position in the lambda list.
 (defun optimize-instance-access (slots read/write sparameter slot-name
-                                 new-value)
+                                 new-value &optional safep)
   (let ((class (if (consp sparameter) (cdr sparameter) *the-class-t*))
         (parameter (if (consp sparameter) (car sparameter) sparameter)))
     (if (and (eq *boot-state* 'complete)
@@ -281,7 +285,7 @@
             (:write
              `(let ((.new-value. ,new-value))
                 (instance-write ,pv-offset-form ,parameter ,position
-                                ',slot-name ',class .new-value.)))
+                                ',slot-name ',class .new-value. ,safep)))
             (:boundp
              `(instance-boundp ,pv-offset-form ,parameter ,position
                                ',slot-name ',class)))))))
@@ -354,30 +358,47 @@
              :class :instance))))
 
 (defmacro instance-write-internal (pv slots pv-offset new-value default
-                                      &optional kind)
+                                   &optional kind safep)
   (unless (member kind '(nil :instance :class))
     (error "illegal kind argument to ~S: ~S" 'instance-write-internal kind))
-  (let* ((index (gensym)))
+  (let* ((index (gensym))
+         (new-value-form
+          (if safep
+              `(let ((.typecheckfun. (svref ,pv (1+ ,pv-offset))))
+                 (declare (type (or function null) .typecheckfun.))
+                 (if .typecheckfun.
+                     (funcall .typecheckfun. ,new-value)
+                     ,new-value))
+              new-value)))
     `(locally (declare #.*optimize-speed*)
-       (let ((,index (svref ,pv ,pv-offset)))
+       (let ((.good-new-value. ,new-value-form)
+             (,index (svref ,pv ,pv-offset)))
          (typecase ,index
            ,@(when (or (null kind) (eq kind :instance))
                    `((fixnum (and ,slots
                                   (setf (clos-slots-ref ,slots ,index)
-                                        ,new-value)))))
+                                        .good-new-value.)))))
            ,@(when (or (null kind) (eq kind :class))
-                   `((cons (setf (cdr ,index) ,new-value))))
+                   `((cons (setf (cdr ,index) .good-new-value.))))
            (t ,default))))))
 
-(defmacro instance-write (pv-offset parameter position slot-name class
-                          new-value)
+(defmacro instance-write (pv-offset parameter position slot-name class new-value
+                          &optional check-type-p)
   (if (skip-fast-slot-access-p class slot-name 'writer)
-      `(accessor-set-slot-value ,parameter ,slot-name ,new-value)
-      `(instance-write-internal .pv. ,(slot-vector-symbol position)
+      (if check-type-p
+          ;; FIXME: We don't want this here. If it's _possible_ the fast path
+          ;; is applicable, we wan to use it as well.
+          `(safe-set-slot-value ,parameter ,slot-name ,new-value)
+          `(accessor-set-slot-value ,parameter ,slot-name ,new-value))
+      `(instance-write-internal
+        .pv. ,(slot-vector-symbol position)
         ,pv-offset ,new-value
-        (accessor-set-slot-value ,parameter ,slot-name ,new-value)
+        ;; KLUDGE: .GOOD-NEW-VALUE. is type-checked by the time this form
+        ;; is executed (if it is executed).
+        (accessor-set-slot-value ,parameter ,slot-name .good-new-value.)
         ,(if (generate-fast-class-slot-access-p class slot-name)
-             :class :instance))))
+             :class :instance)
+        ,check-type-p)))
 
 (defmacro instance-boundp-internal (pv slots pv-offset default
                                     &optional kind)
@@ -437,7 +458,9 @@
       (dolist (slot-entry (cdr parameter-entry))
         (incf pv-offset)
         (dolist (form (cdr slot-entry))
-          (setf (cadr form) pv-offset))))
+          (setf (cadr form) pv-offset))
+        ;; Count one more for the slot we use for typecheckfun.
+        (incf pv-offset)))
     sorted-slots))
 
 (defun symbol-pkg-name (sym)
@@ -520,7 +543,8 @@
   ;; Decide which expansion to use based on the state of the PV-ENV-ENVIRONMENT
   ;; symbol-macrolet.
   (if (eq (macroexpand 'pv-env-environment env) 'default)
-      `(locally ,@forms)
+      `(locally (declare (simple-vector .pv.))
+         ,@forms)
       `(let* ((.pv-table. ,pv-table-form)
               (.pv. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters)))
         (declare ,(make-pv-type-declaration '.pv.))

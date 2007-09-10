@@ -9,6 +9,9 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * optimization: scavenging weak pointers is now more efficient,
     requiring O(1) instead of O(N) per weak pointer to identify
     scanvenged vs. unscavenged pointers. (thanks to Paul Khuong)
+  * optimization: typechecking (SETF SLOT-VALUE) is now ~5x faster in
+    method bodies using constant slot-names when the first argument is
+    a specializer parameter for the method.
   * optimization: SLOT-VALUE &co are now ~50% faster for variable slot
     names, when the class of the instance is a direct instance
     STANDARD-CLASS or FUNCALLABLE-STANDARD-CLASS (making them only 3x
