@@ -205,20 +205,22 @@
                       (slot-definition-class slotd)
                       (safe-p (slot-definition-class slotd))))
          (writer-fun (etypecase location
-                       (fixnum (if fsc-p
-                                   (lambda (nv instance)
-                                     (check-obsolete-instance instance)
-                                     (setf (clos-slots-ref (fsc-instance-slots instance)
-                                                           location)
-                                           nv))
-                                   (lambda (nv instance)
-                                     (check-obsolete-instance instance)
-                                     (setf (clos-slots-ref (std-instance-slots instance)
-                                                           location)
-                                           nv))))
-                       (cons (lambda (nv instance)
-                               (check-obsolete-instance instance)
-                               (setf (cdr location) nv)))
+                       (fixnum
+                        (if fsc-p
+                            (lambda (nv instance)
+                              (check-obsolete-instance instance)
+                              (setf (clos-slots-ref (fsc-instance-slots instance)
+                                                    location)
+                                    nv))
+                            (lambda (nv instance)
+                              (check-obsolete-instance instance)
+                              (setf (clos-slots-ref (std-instance-slots instance)
+                                                    location)
+                                    nv))))
+                       (cons
+                        (lambda (nv instance)
+                          (check-obsolete-instance instance)
+                          (setf (cdr location) nv)))
                        (null
                         (lambda (nv instance)
                           (declare (ignore nv instance))
@@ -226,21 +228,18 @@
                            slotd
                            '(setf slot-value-using-class))))))
          (checking-fun (lambda (new-value instance)
-                         (check-obsolete-instance instance)
-                         ;; If the SLOTD had a TYPE-CHECK-FUNCTION, call it.
-                         (let* (;; Note that this CLASS is not neccessarily
-                                ;; the SLOT-DEFINITION-CLASS of the
-                                ;; SLOTD passed to M-O-S-W-M-F, since it's
-                                ;; e.g. possible for a subclass to define
-                                ;; a slot of the same name but with no
-                                ;; accessors. So we need to fetch the SLOTD
-                                ;; when CHECKING-FUN is called, instead of
-                                ;; just closing over it.
-                                (class (class-of instance))
-                                (slotd (find-slot-definition class slot-name))
+                         ;; If we have a TYPE-CHECK-FUNCTION, call it.
+                         (let* (;; Note that the class of INSTANCE here is not
+                                ;; neccessarily the SLOT-DEFINITION-CLASS of
+                                ;; the SLOTD passed to M-O-S-W-M-F, since it's
+                                ;; e.g. possible for a subclass to define a
+                                ;; slot of the same name but with no accessors.
+                                ;; So we need to fetch the right type check function
+                                ;; from the wrapper instead of just closing over it.
+                                (wrapper (valid-wrapper-of instance))
                                 (type-check-function
-                                 (when slotd
-                                   (slot-definition-type-check-function slotd))))
+                                 (cadr (find-slot-cell wrapper slot-name))))
+                           (declare (type (or function null) type-check-function))
                            (when type-check-function
                              (funcall type-check-function new-value)))
                          ;; Then call the real writer.
