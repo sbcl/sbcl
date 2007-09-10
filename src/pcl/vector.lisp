@@ -247,10 +247,7 @@
 ;;; of a required parameter to the function. The alist is in order, so
 ;;; the position of an entry in the alist corresponds to the
 ;;; argument's position in the lambda list.
-(defun optimize-instance-access (slots
-                                 read/write
-                                 sparameter
-                                 slot-name
+(defun optimize-instance-access (slots read/write sparameter slot-name
                                  new-value)
   (let ((class (if (consp sparameter) (cdr sparameter) *the-class-t*))
         (parameter (if (consp sparameter) (car sparameter) sparameter)))
@@ -320,36 +317,33 @@
                 (not (slot-accessor-std-p slotd type)))))))
 
 (defmacro instance-read-internal (pv slots pv-offset default &optional kind)
-  (unless (member kind '(nil :instance :class :default))
+  (unless (member kind '(nil :instance :class))
     (error "illegal kind argument to ~S: ~S" 'instance-read-internal kind))
-  (if (eq kind :default)
-      default
-      (let* ((index (gensym))
-             (value index))
-        `(locally (declare #.*optimize-speed*)
-          (let ((,index (svref ,pv ,pv-offset)))
-            (setq ,value (typecase ,index
-                           ;; FIXME: the line marked by KLUDGE below
-                           ;; (and the analogous spot in
-                           ;; INSTANCE-WRITE-INTERNAL) is there purely
-                           ;; to suppress a type mismatch warning that
-                           ;; propagates through to user code.
-                           ;; Presumably SLOTS at this point can never
-                           ;; actually be NIL, but the compiler seems
-                           ;; to think it could, so we put this here
-                           ;; to shut it up.  (see also mail Rudi
-                           ;; Schlatte sbcl-devel 2003-09-21) -- CSR,
-                           ;; 2003-11-30
-                           ,@(when (or (null kind) (eq kind :instance))
-                               `((fixnum
-                                  (and ,slots ; KLUDGE
-                                   (clos-slots-ref ,slots ,index)))))
-                           ,@(when (or (null kind) (eq kind :class))
-                               `((cons (cdr ,index))))
-                           (t +slot-unbound+)))
-            (if (eq ,value +slot-unbound+)
-                ,default
-                ,value))))))
+  (let* ((index (gensym))
+         (value index))
+    `(locally (declare #.*optimize-speed*)
+       (let ((,index (svref ,pv ,pv-offset)))
+         (setq ,value (typecase ,index
+                        ;; FIXME: the line marked by KLUDGE below (and
+                        ;; the analogous spot in
+                        ;; INSTANCE-WRITE-INTERNAL) is there purely to
+                        ;; suppress a type mismatch warning that
+                        ;; propagates through to user code.
+                        ;; Presumably SLOTS at this point can never
+                        ;; actually be NIL, but the compiler seems to
+                        ;; think it could, so we put this here to shut
+                        ;; it up.  (see also mail Rudi Schlatte
+                        ;; sbcl-devel 2003-09-21) -- CSR, 2003-11-30
+                        ,@(when (or (null kind) (eq kind :instance))
+                                `((fixnum
+                                   (and ,slots ; KLUDGE
+                                        (clos-slots-ref ,slots ,index)))))
+                        ,@(when (or (null kind) (eq kind :class))
+                                `((cons (cdr ,index))))
+                        (t +slot-unbound+)))
+         (if (eq ,value +slot-unbound+)
+             ,default
+             ,value)))))
 
 (defmacro instance-read (pv-offset parameter position slot-name class)
   (if (skip-fast-slot-access-p class slot-name 'reader)
@@ -361,27 +355,21 @@
 
 (defmacro instance-write-internal (pv slots pv-offset new-value default
                                       &optional kind)
-  (unless (member kind '(nil :instance :class :default))
+  (unless (member kind '(nil :instance :class))
     (error "illegal kind argument to ~S: ~S" 'instance-write-internal kind))
-  (if (eq kind :default)
-      default
-      (let* ((index (gensym)))
-        `(locally (declare #.*optimize-speed*)
-          (let ((,index (svref ,pv ,pv-offset)))
-            (typecase ,index
-              ,@(when (or (null kind) (eq kind :instance))
-                  `((fixnum (and ,slots
-                             (setf (clos-slots-ref ,slots ,index)
-                                   ,new-value)))))
-              ,@(when (or (null kind) (eq kind :class))
-                  `((cons (setf (cdr ,index) ,new-value))))
-              (t ,default)))))))
+  (let* ((index (gensym)))
+    `(locally (declare #.*optimize-speed*)
+       (let ((,index (svref ,pv ,pv-offset)))
+         (typecase ,index
+           ,@(when (or (null kind) (eq kind :instance))
+                   `((fixnum (and ,slots
+                                  (setf (clos-slots-ref ,slots ,index)
+                                        ,new-value)))))
+           ,@(when (or (null kind) (eq kind :class))
+                   `((cons (setf (cdr ,index) ,new-value))))
+           (t ,default))))))
 
-(defmacro instance-write (pv-offset
-                          parameter
-                          position
-                          slot-name
-                          class
+(defmacro instance-write (pv-offset parameter position slot-name class
                           new-value)
   (if (skip-fast-slot-access-p class slot-name 'writer)
       `(accessor-set-slot-value ,parameter ,slot-name ,new-value)
@@ -392,22 +380,20 @@
              :class :instance))))
 
 (defmacro instance-boundp-internal (pv slots pv-offset default
-                                       &optional kind)
-  (unless (member kind '(nil :instance :class :default))
+                                    &optional kind)
+  (unless (member kind '(nil :instance :class))
     (error "illegal kind argument to ~S: ~S" 'instance-boundp-internal kind))
-  (if (eq kind :default)
-      default
-      (let* ((index (gensym)))
-        `(locally (declare #.*optimize-speed*)
-          (let ((,index (svref ,pv ,pv-offset)))
-            (typecase ,index
-              ,@(when (or (null kind) (eq kind :instance))
-                  `((fixnum (not (and ,slots
-                                      (eq (clos-slots-ref ,slots ,index)
-                                          +slot-unbound+))))))
-              ,@(when (or (null kind) (eq kind :class))
-                  `((cons (not (eq (cdr ,index) +slot-unbound+)))))
-              (t ,default)))))))
+  (let* ((index (gensym)))
+    `(locally (declare #.*optimize-speed*)
+       (let ((,index (svref ,pv ,pv-offset)))
+         (typecase ,index
+           ,@(when (or (null kind) (eq kind :instance))
+                   `((fixnum (not (and ,slots
+                                       (eq (clos-slots-ref ,slots ,index)
+                                           +slot-unbound+))))))
+           ,@(when (or (null kind) (eq kind :class))
+                   `((cons (not (eq (cdr ,index) +slot-unbound+)))))
+           (t ,default))))))
 
 (defmacro instance-boundp (pv-offset parameter position slot-name class)
   (if (skip-fast-slot-access-p class slot-name 'boundp)
