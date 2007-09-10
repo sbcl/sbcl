@@ -10,7 +10,7 @@ The interface described here is experimental: incompatible changes in
 future SBCL releases are possible, even expected: the concept of
 ``implementation packages'' and the associated operators may be renamed;
 more operations (such as naming restarts or catch tags) may be added to
-the the list of operations violating package locks.
+the list of operations violating package locks.
 
 @menu
 * Package Lock Concepts::       

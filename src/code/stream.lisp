@@ -1227,8 +1227,8 @@
   ;; Global location in the stream
   (index 0 :type index)
   ;; Index cache: when we move backwards we save the greater of this
-  ;; and index here, so the the greater of index and this is always
-  ;; the end of the stream.
+  ;; and index here, so the greater of index and this is always the
+  ;; end of the stream.
   (index-cache 0 :type index)
   ;; Requested element type
   (element-type 'character))

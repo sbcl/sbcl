@@ -117,7 +117,7 @@
 ;;;   (VALUES ENCAPSULATION-FUN READ-STATS-FUN CLEAR-STATS-FUN).
 ;;;
 ;;; ENCAPSULATION-FUN is a plug-in replacement for ENCAPSULATED-FUN,
-;;; which updates statistics whenver it's called.
+;;; which updates statistics whenever it's called.
 ;;;
 ;;; READ-STATS-FUN returns the statistics:
 ;;;   (VALUES COUNT TIME CONSING PROFILE).

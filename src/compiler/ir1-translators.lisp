@@ -705,7 +705,7 @@ form to reference any of the previous VARS."
   #!+sb-doc
   "LOCALLY declaration* form*
 
-Sequentially evaluate the FORMS in a lexical environment where the the
+Sequentially evaluate the FORMS in a lexical environment where the
 DECLARATIONS have effect. If LOCALLY is a top level form, then the FORMS are
 also processed as top level forms."
   (ir1-translate-locally body start next result))

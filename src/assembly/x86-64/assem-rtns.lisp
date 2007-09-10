@@ -130,7 +130,7 @@
   (move ecx esi)
   (inst sub ecx rsp-tn)
 
-  ;; Check for all the args fitting the the registers.
+  ;; Check for all the args fitting the registers.
   (inst cmp ecx (fixnumize 3))
   (inst jmp :le REGISTER-ARGS)
 

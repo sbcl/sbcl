@@ -121,8 +121,8 @@ int arch_os_thread_cleanup(struct thread *thread) {
     int n = thread->tls_cookie;
     struct ssd delete = { n, 0, 0, 0, 0};
 
-    /* Set the %%fs register back to 0 and free the the ldt
-     * by setting it to NULL.
+    /* Set the %%fs register back to 0 and free the ldt by setting it
+     * to NULL.
      */
     FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
 

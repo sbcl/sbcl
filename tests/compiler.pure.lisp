@@ -1947,7 +1947,7 @@
                                              (bit #*1001101001001
                                                   (min 12 (max 0 lv3))))))))))))
 
-;;; MISC.624: erronous AVER in x86's %LOGBITP VOPs
+;;; MISC.624: erroneous AVER in x86's %LOGBITP VOPs
 (assert (eql 0
              (funcall
               (compile

@@ -311,7 +311,7 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # to bandage across the break in source compatibility between
     # versions 2.3.1 and 2.3.2
     #
-    # FIXME: integrate to grovel-features., maypahps
+    # FIXME: integrate to grovel-features, mayhaps
     printf ' :gencgc :stack-allocatable-closures :linkage-table' >> $ltf
     $GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)

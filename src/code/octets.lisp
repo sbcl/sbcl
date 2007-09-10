@@ -603,7 +603,7 @@ one-past-the-end"
                             ;; two-byte sequence `"initial (length 3)"
                             ;; "non-continuation"' -- `#xef #x32')
                             ;; signal only part of that sequence as
-                            ;; erronous.
+                            ;; erroneous.
                             (loop for i from 1 below (min len remaining-bytes)
                                   always (valid-secondary-p i))
                             (enough-bytes-left-p len)))
