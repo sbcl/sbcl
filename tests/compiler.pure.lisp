@@ -774,6 +774,35 @@
                          (declare (type (integer 4303063 101130078) a))
                          (mask-field (byte 18 2) (ash a 77))))
               57132532)))
+;;; rewrite the test case to get the unsigned-byte 32/64
+;;; implementation even after implementing some modular arithmetic
+;;; with signed-byte 30:
+(assert (= 0 (funcall
+              (compile nil
+                       '(lambda (a)
+                         (declare (type (integer 4303063 101130078) a))
+                         (mask-field (byte 30 2) (ash a 77))))
+              57132532)))
+(assert (= 0 (funcall
+              (compile nil
+                       '(lambda (a)
+                         (declare (type (integer 4303063 101130078) a))
+                         (mask-field (byte 64 2) (ash a 77))))
+              57132532)))
+;;; and a similar test case for the signed masking extension (not the
+;;; final interface, so change the call when necessary):
+(assert (= 0 (funcall
+              (compile nil
+                       '(lambda (a)
+                         (declare (type (integer 4303063 101130078) a))
+                         (sb-c::mask-signed-field 30 (ash a 77))))
+              57132532)))
+(assert (= 0 (funcall
+              (compile nil
+                       '(lambda (a)
+                         (declare (type (integer 4303063 101130078) a))
+                         (sb-c::mask-signed-field 61 (ash a 77))))
+              57132532)))
 
 ;;; MISC.101 and MISC.103: FLUSH-DEST did not mark the USE's block for
 ;;; type check regeneration

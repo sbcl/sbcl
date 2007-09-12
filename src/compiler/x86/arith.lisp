@@ -604,17 +604,20 @@
            (inst lea result (make-ea :dword :index number :scale 8)))
           (t
            (move result number)
-           (cond ((plusp amount)
-                  ;; We don't have to worry about overflow because of the
-                  ;; result type restriction.
-                  (inst shl result amount))
-                 (t
-                  ;; If the amount is greater than 31, only shift by 31. We
-                  ;; have to do this because the shift instructions only look
-                  ;; at the low five bits of the result.
-                  (inst sar result (min 31 (- amount)))
-                  ;; Fixnum correction.
-                  (inst and result (lognot fixnum-tag-mask))))))))
+           (cond ((< -32 amount 32)
+                  ;; this code is used both in ASH and ASH-SMOD30, so
+                  ;; be careful
+                  (if (plusp amount)
+                      (inst shl result amount)
+                      (progn
+                        (inst sar result (- amount))
+                        (inst and result (lognot fixnum-tag-mask)))))
+                 ((plusp amount)
+                  (if (sc-is result any-reg)
+                      (inst xor result result)
+                      (inst mov result 0)))
+                 (t (inst sar result 31)
+                    (inst and result (lognot fixnum-tag-mask))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)
