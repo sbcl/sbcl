@@ -600,19 +600,20 @@
            (inst lea result (make-ea :qword :index number :scale 8)))
           (t
            (move result number)
-           (cond ((plusp amount)
-                  ;; We don't have to worry about overflow because of the
-                  ;; result type restriction.
-                  (inst shl result amount))
-                 (t
-                  ;; Since the shift instructions take the shift amount
-                  ;; modulo 64 we must special case amounts of 64 and more.
-                  ;; Because fixnums have only 61 bits, the result is 0 or
-                  ;; -1 for all amounts of 60 or more, so use this as the
-                  ;; limit instead.
-                  (inst sar result (min (- n-word-bits n-fixnum-tag-bits 1)
-                                        (- amount)))
-                  (inst and result (lognot fixnum-tag-mask))))))))
+           (cond ((< -64 amount 64)
+                  ;; this code is used both in ASH and ASH-SMOD61, so
+                  ;; be careful
+                  (if (plusp amount)
+                      (inst shl result amount)
+                      (progn
+                        (inst sar result (- amount))
+                        (inst and result (lognot fixnum-tag-mask)))))
+                 ((plusp amount)
+                  (if (sc-is result any-reg)
+                      (inst xor result result)
+                      (inst mov result 0)))
+                 (t (inst sar result 63)
+                    (inst and result (lognot fixnum-tag-mask))))))))
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
   (:translate ash)

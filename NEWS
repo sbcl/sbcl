@@ -30,7 +30,8 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * bug fix: copy propagation interfered with parallel assignment
     semantics in local calls. (reported by Paul Khuong)
   * bug fix: the signed modular fixnum shift compiled to wrong code on
-    x86.  (spotted by a slight modification to some of PFD's tests)
+    x86 and x86-64.  (spotted by a slight modification to some of
+    PFD's random tests)
 
 changes in sbcl-1.0.9 relative to sbcl-1.0.8:
   * minor incompatible change: SB-SYS:OUTPUT-RAW-BYTES is deprecated.
