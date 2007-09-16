@@ -49,8 +49,10 @@
          :stream stream
          :context context))
 
-(defun %reader-error (stream control &rest args)
-  (error 'reader-error
+;;; If The Gods didn't intend for us to use multiple namespaces, why
+;;; did They specify them?
+(defun simple-reader-error (stream control &rest args)
+  (error 'simple-reader-error
          :stream stream
          :format-control control
          :format-arguments args))
@@ -105,7 +107,7 @@
 
 (defun undefined-macro-char (stream char)
   (unless *read-suppress*
-    (%reader-error stream "undefined read-macro character ~S" char)))
+    (simple-reader-error stream "undefined read-macro character ~S" char)))
 
 ;;; The character attribute table is a CHAR-CODE-LIMIT vector of integers.
 
@@ -568,7 +570,7 @@ variables to allow for nested and thread safe reading."
               (cond ((token-delimiterp nextchar)
                      (cond ((eq listtail thelist)
                             (unless *read-suppress*
-                              (%reader-error
+                              (simple-reader-error
                                stream
                                "Nothing appears before . in list.")))
                            ((whitespace[2]p nextchar)
@@ -593,7 +595,7 @@ variables to allow for nested and thread safe reading."
         ((char= char #\) )
          (if *read-suppress*
              (return-from read-after-dot nil)
-             (%reader-error stream "Nothing appears after . in list.")))
+             (simple-reader-error stream "Nothing appears after . in list.")))
       ;; See whether there's something there.
       (setq lastobj (read-maybe-nothing stream char))
       (when lastobj (return t)))
@@ -605,7 +607,8 @@ variables to allow for nested and thread safe reading."
       ;; Try reading virtual whitespace.
       (if (and (read-maybe-nothing stream lastchar)
                (not *read-suppress*))
-          (%reader-error stream "More than one object follows . in list.")))))
+          (simple-reader-error stream
+                               "More than one object follows . in list.")))))
 
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
@@ -633,7 +636,7 @@ variables to allow for nested and thread safe reading."
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
-  (%reader-error stream "unmatched close parenthesis"))
+  (simple-reader-error stream "unmatched close parenthesis"))
 
 ;;; Read from the stream up to the next delimiter. Leave the resulting
 ;;; token in *READ-BUFFER*, and return two values:
@@ -705,7 +708,7 @@ variables to allow for nested and thread safe reading."
        ((< att +char-attr-constituent+) att)
        (t (setf att (get-constituent-trait ,char))
           (if (= att +char-attr-invalid+)
-              (%reader-error stream "invalid constituent")
+              (simple-reader-error stream "invalid constituent")
               att)))))
 
 ;;; Return the character class for CHAR, which might be part of a
@@ -723,7 +726,7 @@ variables to allow for nested and thread safe reading."
             ((digit-char-p ,char *read-base*) +char-attr-constituent-digit+)
             ((= att +char-attr-constituent-digit+) +char-attr-constituent+)
             ((= att +char-attr-invalid+)
-             (%reader-error stream "invalid constituent"))
+             (simple-reader-error stream "invalid constituent"))
             (t att))))))
 
 ;;; Return the character class for a char which might be part of a
@@ -754,7 +757,7 @@ variables to allow for nested and thread safe reading."
                      +char-attr-constituent-digit+)
                  +char-attr-constituent-decimal-digit+))
             ((= att +char-attr-invalid+)
-             (%reader-error stream "invalid constituent"))
+             (simple-reader-error stream "invalid constituent"))
             (t att))))))
 
 ;;;; token fetching
@@ -853,7 +856,8 @@ variables to allow for nested and thread safe reading."
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-package-delimiter+ (go COLON))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
-        (#.+char-attr-invalid+ (%reader-error stream "invalid constituent"))
+        (#.+char-attr-invalid+ (simple-reader-error stream
+                                                    "invalid constituent"))
         ;; can't have eof, whitespace, or terminating macro as first char!
         (t (go SYMBOL)))
      SIGN ; saw "sign"
@@ -984,11 +988,12 @@ variables to allow for nested and thread safe reading."
      FRONTDOT ; saw "dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
-      (unless char (%reader-error stream "dot context error"))
+      (unless char (simple-reader-error stream "dot context error"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
         (#.+char-attr-constituent-dot+ (go DOTS))
-        (#.+char-attr-delimiter+  (%reader-error stream "dot context error"))
+        (#.+char-attr-delimiter+  (simple-reader-error stream
+                                                       "dot context error"))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+ (go COLON))
@@ -1057,12 +1062,12 @@ variables to allow for nested and thread safe reading."
      DOTS ; saw "dot {dot}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
-      (unless char (%reader-error stream "too many dots"))
+      (unless char (simple-reader-error stream "too many dots"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-dot+ (go DOTS))
         (#.+char-attr-delimiter+
          (unread-char char stream)
-         (%reader-error stream "too many dots"))
+         (simple-reader-error stream "too many dots"))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+ (go COLON))
@@ -1134,8 +1139,9 @@ variables to allow for nested and thread safe reading."
       COLON
       (casify-read-buffer escapes)
       (unless (zerop colons)
-        (%reader-error stream "too many colons in ~S"
-                      (read-buffer-to-string)))
+        (simple-reader-error stream
+                             "too many colons in ~S"
+                             (read-buffer-to-string)))
       (setq colons 1)
       (setq package-designator
             (if (plusp *ouch-ptr*)
@@ -1155,9 +1161,9 @@ variables to allow for nested and thread safe reading."
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
-         (%reader-error stream
-                        "illegal terminating character after a colon: ~S"
-                        char))
+         (simple-reader-error stream
+                              "illegal terminating character after a colon: ~S"
+                              char))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+ (go INTERN))
@@ -1170,15 +1176,15 @@ variables to allow for nested and thread safe reading."
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
-         (%reader-error stream
-                        "illegal terminating character after a colon: ~S"
-                        char))
+         (simple-reader-error stream
+                              "illegal terminating character after a colon: ~S"
+                              char))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+
-         (%reader-error stream
-                        "too many colons after ~S name"
-                        package-designator))
+         (simple-reader-error stream
+                              "too many colons after ~S name"
+                              package-designator))
         (t (go SYMBOL)))
       RETURN-SYMBOL
       (casify-read-buffer escapes)
@@ -1186,7 +1192,7 @@ variables to allow for nested and thread safe reading."
                        (find-package package-designator)
                        (sane-package))))
         (unless found
-          (error 'reader-package-error :stream stream
+          (error 'simple-reader-package-error :stream stream
                  :format-arguments (list package-designator)
                  :format-control "package ~S not found"))
 
@@ -1197,7 +1203,7 @@ variables to allow for nested and thread safe reading."
               (when (eq test :external) (return symbol))
               (let ((name (read-buffer-to-string)))
                 (with-simple-restart (continue "Use symbol anyway.")
-                  (error 'reader-package-error :stream stream
+                  (error 'simple-reader-package-error :stream stream
                          :format-arguments (list name (package-name found))
                          :format-control
                          (if test
@@ -1426,7 +1432,9 @@ variables to allow for nested and thread safe reading."
   (declare (ignore ignore))
   (if *read-suppress*
       (values)
-      (%reader-error stream "no dispatch function defined for ~S" sub-char)))
+      (simple-reader-error stream
+                           "no dispatch function defined for ~S"
+                           sub-char)))
 
 (defun make-dispatch-macro-character (char &optional
                                            (non-terminating-p nil)
@@ -1498,7 +1506,8 @@ variables to allow for nested and thread safe reading."
           (funcall (the function
                      (gethash sub-char (cdr dpair) #'dispatch-char-error))
                    stream sub-char (if numargp numarg nil))
-          (%reader-error stream "no dispatch table for dispatch char")))))
+          (simple-reader-error stream
+                               "no dispatch table for dispatch char")))))
 
 ;;;; READ-FROM-STRING
 

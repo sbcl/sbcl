@@ -473,7 +473,7 @@ The source locations are stored in SOURCE-MAP."
               (cond ((sb-impl::token-delimiterp nextchar)
                      (cond ((eq listtail thelist)
                             (unless *read-suppress*
-                              (sb-impl::%reader-error
+                              (sb-int:simple-reader-error
                                stream
                                "Nothing appears before . in list.")))
                            ((sb-impl::whitespace[2]p nextchar)

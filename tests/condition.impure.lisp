@@ -69,4 +69,46 @@
                 :test (lambda (c) (typep c 'picky-condition))
                 'it))))
 
-;;; success
+;;; In sbcl-1.0.9, a condition derived from CL:STREAM-ERROR (or
+;;; CL:READER-ERROR or or CL:PARSE-ERROR) didn't inherit a usable
+;;; PRINT-OBJECT method --- the PRINT-OBJECT code implicitly assumed
+;;; that CL:STREAM-ERROR was like a SIMPLE-CONDITION, with args and
+;;; format control, which seems to be a preANSIism.
+;;;
+;;; (The spec for DEFINE-CONDITION says that if :REPORT is not
+;;; supplied, "information about how to report this type of condition
+;;; is inherited from the PARENT-TYPE." The spec doesn't explicitly
+;;; forbid the inherited printer from trying to read slots which
+;;; aren't portably specified for the condition, but it doesn't seem
+;;; reasonable for the inherited printer to do so. It does seem
+;;; reasonable for app code to derive a new condition from
+;;; CL:READER-ERROR (perhaps for an error in a readmacro) or
+;;; CL:PARSE-ERROR (perhaps for an error in an operator
+;;; READ-MY-FAVORITE-DATA-STRUCTURE) or CL:STREAM-ERROR (dunno why
+;;; offhand, but perhaps for some Gray-stream-ish reason), not define
+;;; a :REPORT method for its new condition, and expect to inherit from
+;;; the application's printer all the cruft required for describing
+;;; the location of the error in the input.)
+(define-condition my-stream-error-1-0-9 (stream-error) ())
+(define-condition parse-foo-error-1-0-9 (parse-error) ())
+(define-condition read-bar-error-1-0-9 (reader-error) ())
+(let (;; instances created initializing all the slots specified in
+      ;; ANSI CL
+      (parse-foo-error-1-0-9 (make-condition 'parse-foo-error-1-0-9
+                                             :stream *standard-input*))
+      (read-foo-error-1-0-9 (make-condition 'read-bar-error-1-0-9
+                                            :stream *standard-input*))
+      (my-stream-error-1-0-9 (make-condition 'my-stream-error-1-0-9
+                                             :stream *standard-input*)))
+  ;; should be printable
+  (dolist (c (list
+              ;; but not yet, o lord (should be fixed soon by WHN, in
+              ;; one or more commits ca. 1.0.9.55+, #+NILed out 'til
+              ;; then)
+              #+nil my-stream-error-1-0-9
+              #+nil parse-foo-error-1-0-9
+              ;; fixed, hallelujah
+              read-foo-error-1-0-9))
+    ;; escaped or not
+    (dolist (*print-escape* '(nil t))
+      (write c :stream (make-string-output-stream)))))

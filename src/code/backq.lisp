@@ -56,9 +56,9 @@
     (multiple-value-bind (flag thing)
         (backquotify stream (read stream t nil t))
       (when (eq flag *bq-at-flag*)
-        (%reader-error stream ",@ after backquote in ~S" thing))
+        (simple-reader-error stream ",@ after backquote in ~S" thing))
       (when (eq flag *bq-dot-flag*)
-        (%reader-error stream ",. after backquote in ~S" thing))
+        (simple-reader-error stream ",. after backquote in ~S" thing))
       (backquotify-1 flag thing))))
 
 (/show0 "backq.lisp 64")
@@ -68,7 +68,7 @@
   (unless (> *backquote-count* 0)
     (when *read-suppress*
       (return-from comma-macro nil))
-    (%reader-error stream "comma not inside a backquote"))
+    (simple-reader-error stream "comma not inside a backquote"))
   (let ((c (read-char stream))
         (*backquote-count* (1- *backquote-count*)))
     (cond ((char= c #\@)
@@ -108,9 +108,9 @@
              (multiple-value-bind (dflag d) (backquotify stream (cdr code))
                (when (eq dflag *bq-at-flag*)
                  ;; Get the errors later.
-                 (%reader-error stream ",@ after dot in ~S" code))
+                 (simple-reader-error stream ",@ after dot in ~S" code))
                (when (eq dflag *bq-dot-flag*)
-                 (%reader-error stream ",. after dot in ~S" code))
+                 (simple-reader-error stream ",. after dot in ~S" code))
                (cond
                 ((eq aflag *bq-at-flag*)
                  (if (null dflag)
@@ -251,9 +251,9 @@
 ;;; Since our backquote is installed on the host lisp, and since
 ;;; developers make mistakes with backquotes and commas too, let's
 ;;; ensure that we can report errors rather than get an undefined
-;;; function condition on %READER-ERROR.
+;;; function condition on SIMPLE-READER-ERROR.
 #+sb-xc-host ; proper definition happens for the target
-(defun %reader-error (stream format-string &rest format-args)
+(defun simple-reader-error (stream format-string &rest format-args)
   (bug "READER-ERROR on stream ~S: ~?" stream format-string format-args))
 
 (/show0 "done with backq.lisp")

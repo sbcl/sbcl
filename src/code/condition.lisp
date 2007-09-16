@@ -718,51 +718,71 @@
            (*print-array* nil))
        (format stream "~S cannot be printed readably." obj)))))
 
-(define-condition reader-error (parse-error stream-error)
-  ((format-control
-    :reader reader-error-format-control
-    :initarg :format-control)
-   (format-arguments
-    :reader reader-error-format-arguments
-    :initarg :format-arguments
-    :initform '()))
-  (:report
-   (lambda (condition stream)
-     (let* ((error-stream (stream-error-stream condition))
-            (pos (file-position-or-nil-for-error error-stream)))
-       (let (lineno colno)
-         (when (and pos
-                    (< pos sb!xc:array-dimension-limit)
-                    ;; KLUDGE: lseek() (which is what FILE-POSITION
-                    ;; reduces to on file-streams) is undefined on
-                    ;; "some devices", which in practice means that it
-                    ;; can claim to succeed on /dev/stdin on Darwin
-                    ;; and Solaris.  This is obviously bad news,
-                    ;; because the READ-SEQUENCE below will then
-                    ;; block, not complete, and the report will never
-                    ;; be printed.  As a workaround, we exclude
-                    ;; interactive streams from this attempt to report
-                    ;; positions.  -- CSR, 2003-08-21
-                    (not (interactive-stream-p error-stream))
-                    (file-position error-stream :start))
-           (let ((string
-                  (make-string pos
-                               :element-type (stream-element-type
-                                              error-stream))))
-             (when (= pos (read-sequence string error-stream))
-               (setq lineno (1+ (count #\Newline string))
-                     colno (- pos
-                              (or (position #\Newline string :from-end t) -1)
-                              1))))
-           (file-position-or-nil-for-error error-stream pos))
-         (pprint-logical-block (stream nil)
-           (format stream
-                   "READER-ERROR ~@[at ~W ~]~
+(define-condition reader-error (parse-error stream-error) ()
+  (:report (lambda (condition stream)
+             (%report-reader-error condition stream))))
+
+;;; a READER-ERROR whose REPORTing is controlled by FORMAT-CONTROL and
+;;; FORMAT-ARGS (the usual case for READER-ERRORs signalled from
+;;; within SBCL itself)
+;;;
+;;; (Inheriting CL:SIMPLE-CONDITION here isn't quite consistent with
+;;; the letter of the ANSI spec: this is not a condition signalled by
+;;; SIGNAL when a format-control is supplied by the function's first
+;;; argument. It seems to me (WHN) to be basically in the spirit of
+;;; the spec, but if not, it'd be straightforward to do our own
+;;; DEFINE-CONDITION SB-INT:SIMPLISTIC-CONDITION with
+;;; FORMAT-CONTROL and FORMAT-ARGS slots, and use that condition in
+;;; place of CL:SIMPLE-CONDITION here.)
+(define-condition simple-reader-error (reader-error simple-condition)
+  ()
+  (:report (lambda (condition stream)
+             (%report-reader-error condition stream :simple t))))
+
+;;; base REPORTing of a READER-ERROR
+;;;
+;;; When SIMPLE, we expect and use SIMPLE-CONDITION-ish FORMAT-CONTROL
+;;; and FORMAT-ARGS slots.
+(defun %report-reader-error (condition stream &key simple)
+  (let* ((error-stream (stream-error-stream condition))
+         (pos (file-position-or-nil-for-error error-stream)))
+    (let (lineno colno)
+      (when (and pos
+                 (< pos sb!xc:array-dimension-limit)
+                 ;; KLUDGE: lseek() (which is what FILE-POSITION
+                 ;; reduces to on file-streams) is undefined on
+                 ;; "some devices", which in practice means that it
+                 ;; can claim to succeed on /dev/stdin on Darwin
+                 ;; and Solaris.  This is obviously bad news,
+                 ;; because the READ-SEQUENCE below will then
+                 ;; block, not complete, and the report will never
+                 ;; be printed.  As a workaround, we exclude
+                 ;; interactive streams from this attempt to report
+                 ;; positions.  -- CSR, 2003-08-21
+                 (not (interactive-stream-p error-stream))
+                 (file-position error-stream :start))
+        (let ((string
+               (make-string pos
+                            :element-type (stream-element-type
+                                           error-stream))))
+          (when (= pos (read-sequence string error-stream))
+            (setq lineno (1+ (count #\Newline string))
+                  colno (- pos
+                           (or (position #\Newline string :from-end t) -1)
+                           1))))
+        (file-position-or-nil-for-error error-stream pos))
+      (pprint-logical-block (stream nil)
+        (format stream
+                "~S ~@[at ~W ~]~
                     ~@[(line ~W~]~@[, column ~W) ~]~
-                    on ~S:~2I~_~?"
-                   pos lineno colno error-stream
-                   (reader-error-format-control condition)
-                   (reader-error-format-arguments condition))))))))
+                    on ~S"
+                (class-name (class-of condition))
+                pos lineno colno error-stream)
+        (when simple
+          (format stream ":~2I~_")
+          (format stream
+                  (simple-condition-format-control condition)
+                  (simple-condition-format-arguments condition)))))))
 
 ;;;; special SBCL extension conditions
 
@@ -819,7 +839,6 @@
 ;;; unFBOUNDPness meant they were running on an system which didn't
 ;;; support the extension.)
 (define-condition unsupported-operator (simple-error) ())
-
 
 ;;; (:ansi-cl :function remove)
 ;;; (:ansi-cl :section (a b c))
@@ -1126,7 +1145,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 
-(define-condition reader-package-error (reader-error) ())
+(define-condition simple-reader-package-error (simple-reader-error) ())
 
 (define-condition reader-eof-error (end-of-file)
   ((context :reader reader-eof-error-context :initarg :context))
@@ -1137,15 +1156,16 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
              (stream-error-stream condition)
              (reader-eof-error-context condition)))))
 
-(define-condition reader-impossible-number-error (reader-error)
+(define-condition reader-impossible-number-error (simple-reader-error)
   ((error :reader reader-impossible-number-error-error :initarg :error))
   (:report
    (lambda (condition stream)
      (let ((error-stream (stream-error-stream condition)))
-       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
+       (format stream
+               "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
                (file-position-or-nil-for-error error-stream) error-stream
-               (reader-error-format-control condition)
-               (reader-error-format-arguments condition)
+               (simple-condition-format-control condition)
+               (simple-condition-format-arguments condition)
                (reader-impossible-number-error-error condition))))))
 
 (define-condition timeout (serious-condition)

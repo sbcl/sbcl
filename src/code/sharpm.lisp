@@ -25,15 +25,16 @@
                        (type-error
                         (error)
                         (declare (ignore error))
-                        (%reader-error stream "improper list in #(): ~S"
-                                       list)))))
+                        (simple-reader-error stream
+                                             "improper list in #(): ~S"
+                                             list)))))
     (declare (list list)
              (fixnum listlength))
     (cond (*read-suppress* nil)
           ((zerop *backquote-count*)
            (if length
                (cond ((> listlength (the fixnum length))
-                      (%reader-error
+                      (simple-reader-error
                        stream
                        "vector longer than specified length: #~S~S"
                        length list))
@@ -53,9 +54,10 @@
     (declare (simple-string bstring))
     (cond (*read-suppress* nil)
           (escape-appearedp
-           (%reader-error stream "An escape character appeared after #*"))
+           (simple-reader-error stream
+                                "An escape character appeared after #*."))
           ((and numarg (zerop (length bstring)) (not (zerop numarg)))
-           (%reader-error
+           (simple-reader-error
             stream
             "You have to give a little bit for non-zero #* bit-vectors."))
           ((or (null numarg) (>= (the fixnum numarg) (length bstring)))
@@ -74,31 +76,34 @@
                      (cond ((char= char #\0) 0)
                            ((char= char #\1) 1)
                            (t
-                            (%reader-error
+                            (simple-reader-error
                              stream
                              "illegal element given for bit-vector: ~S"
                              char)))))
              bvec))
           (t
-           (%reader-error stream
-                         "Bit vector is longer than specified length #~A*~A"
-                         numarg bstring)))))
+           (simple-reader-error
+            stream
+            "Bit vector is longer than specified length #~A*~A"
+            numarg
+            bstring)))))
 
 (defun sharp-A (stream ignore dimensions)
   (declare (ignore ignore))
   (when *read-suppress*
     (read stream t nil t)
     (return-from sharp-A nil))
-  (unless dimensions (%reader-error stream "no dimensions argument to #A"))
+  (unless dimensions (simple-reader-error stream
+                                          "no dimensions argument to #A"))
   (collect ((dims))
     (let* ((contents (read stream t nil t))
            (seq contents))
       (dotimes (axis dimensions
                      (make-array (dims) :initial-contents contents))
         (unless (typep seq 'sequence)
-          (%reader-error stream
-                         "#~WA axis ~W is not a sequence:~%  ~S"
-                         dimensions axis seq))
+          (simple-reader-error stream
+                               "#~WA axis ~W is not a sequence:~%  ~S"
+                               dimensions axis seq))
         (let ((len (length seq)))
           (dims len)
           (unless (or (= axis (1- dimensions))
@@ -119,32 +124,34 @@
     (return-from sharp-S nil))
   (let ((body (if (char= (read-char stream t) #\( )
                   (read-list stream nil)
-                  (%reader-error stream "non-list following #S"))))
+                  (simple-reader-error stream "non-list following #S"))))
     (unless (listp body)
-      (%reader-error stream "non-list following #S: ~S" body))
+      (simple-reader-error stream "non-list following #S: ~S" body))
     (unless (symbolp (car body))
-      (%reader-error stream "Structure type is not a symbol: ~S" (car body)))
+      (simple-reader-error stream
+                           "Structure type is not a symbol: ~S"
+                           (car body)))
     (let ((classoid (find-classoid (car body) nil)))
       (unless (typep classoid 'structure-classoid)
-        (%reader-error stream "~S is not a defined structure type."
-                       (car body)))
-      (let ((def-con (dd-default-constructor
-                      (layout-info
-                       (classoid-layout classoid)))))
-        (unless def-con
-          (%reader-error
-           stream "The ~S structure does not have a default constructor."
+        (simple-reader-error stream
+                             "~S is not a defined structure type."
+                             (car body)))
+      (let ((default-constructor (dd-default-constructor
+                                  (layout-info (classoid-layout classoid)))))
+        (unless default-constructor
+          (simple-reader-error
+           stream
+           "The ~S structure does not have a default constructor."
            (car body)))
         (when (and (atom (rest body))
                    (not (null (rest body))))
-          (%reader-error
-           stream "improper list for #S: ~S." body))
-        (apply (fdefinition def-con)
+          (simple-reader-error stream "improper list for #S: ~S." body))
+        (apply (fdefinition default-constructor)
                (loop for tail on (rest body) by #'cddr
                      with slot-name = (and (consp tail) (car tail))
                      do (progn
                           (when (null (cdr tail))
-                            (%reader-error
+                            (simple-reader-error
                              stream
                              "the arglist for the ~S constructor in #S ~
                               has an odd length: ~S."
@@ -152,13 +159,13 @@
                           (when (or (atom (cdr tail))
                                     (and (atom (cddr tail))
                                          (not (null (cddr tail)))))
-                            (%reader-error
+                            (simple-reader-error
                              stream
                              "the arglist for the ~S constructor in #S ~
                               is improper: ~S."
                              (car body) (rest body)))
                           (when (not (typep (car tail) 'string-designator))
-                            (%reader-error
+                            (simple-reader-error
                              stream
                              "a slot name in #S is not a string ~
                               designator: ~S."
@@ -186,7 +193,9 @@
     (when *read-suppress* (return-from sharp-C nil))
     (if (and (listp cnum) (= (length cnum) 2))
         (complex (car cnum) (cadr cnum))
-        (%reader-error stream "illegal complex number format: #C~S" cnum))))
+        (simple-reader-error stream
+                             "illegal complex number format: #C~S"
+                             cnum))))
 
 (defun sharp-O (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
@@ -197,18 +206,18 @@
          (read-extended-token stream)
          nil)
         ((not radix)
-         (%reader-error stream "radix missing in #R"))
+         (simple-reader-error stream "radix missing in #R"))
         ((not (<= 2 radix 36))
-         (%reader-error stream "illegal radix for #R: ~D." radix))
+         (simple-reader-error stream "illegal radix for #R: ~D." radix))
         (t
          (let ((res (let ((*read-base* radix))
                       (read stream t nil t))))
            (unless (typep res 'rational)
-             (%reader-error stream
-                            "#~A (base ~D.) value is not a rational: ~S."
-                            sub-char
-                            radix
-                            res))
+             (simple-reader-error stream
+                                  "#~A (base ~D.) value is not a rational: ~S."
+                                  sub-char
+                                  radix
+                                  res))
            res))))
 
 (defun sharp-X (stream sub-char numarg)
@@ -286,15 +295,15 @@
   (declare (ignore ignore))
   (when *read-suppress* (return-from sharp-equal (values)))
   (unless label
-    (%reader-error stream "missing label for #=" label))
+    (simple-reader-error stream "missing label for #=" label))
   (when (or (assoc label *sharp-sharp-alist*)
             (assoc label *sharp-equal-alist*))
-    (%reader-error stream "multiply defined label: #~D=" label))
+    (simple-reader-error stream "multiply defined label: #~D=" label))
   (let* ((tag (gensym))
          (*sharp-sharp-alist* (acons label tag *sharp-sharp-alist*))
          (obj (read stream t nil t)))
     (when (eq obj tag)
-      (%reader-error stream
+      (simple-reader-error stream
                      "must tag something more than just #~D#"
                      label))
     (push (list label tag obj) *sharp-equal-alist*)
@@ -305,7 +314,7 @@
   (declare (ignore ignore))
   (when *read-suppress* (return-from sharp-sharp nil))
   (unless label
-    (%reader-error stream "missing label for ##" label))
+    (simple-reader-error stream "missing label for ##" label))
 
   (let ((entry (assoc label *sharp-equal-alist*)))
     (if entry
@@ -317,7 +326,9 @@
               ;; "2.4.8.16 Sharpsign Sharpsign".)
               (pair (assoc label *sharp-sharp-alist*)))
           (unless pair
-            (%reader-error stream "reference to undefined label #~D#" label))
+            (simple-reader-error stream
+                                 "reference to undefined label #~D#"
+                                 label))
           (cdr pair)))))
 
 ;;;; conditional compilation: the #+ and #- readmacros
@@ -357,8 +368,9 @@
            (char charstring 0))
           ((name-char charstring))
           (t
-           (%reader-error stream "unrecognized character name: ~S"
-                          charstring)))))
+           (simple-reader-error stream
+                                "unrecognized character name: ~S"
+                                charstring)))))
 
 (defun sharp-vertical-bar (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
@@ -412,9 +424,8 @@
     (cond
      (*read-suppress* nil)
      (colon
-      (%reader-error stream
-                     "The symbol following #: contains a package marker: ~S"
-                     token))
+      (simple-reader-error
+       stream "The symbol following #: contains a package marker: ~S" token))
      (t
       (make-symbol token)))))
 
@@ -427,12 +438,12 @@
   (let ((token (read stream t nil t)))
     (unless *read-suppress*
       (unless *read-eval*
-        (%reader-error stream "can't read #. while *READ-EVAL* is NIL"))
+        (simple-reader-error stream "can't read #. while *READ-EVAL* is NIL"))
       (eval token))))
 
 (defun sharp-illegal (stream sub-char ignore)
   (declare (ignore ignore))
-  (%reader-error stream "illegal sharp macro character: ~S" sub-char))
+  (simple-reader-error stream "illegal sharp macro character: ~S" sub-char))
 
 ;;; for cold init: Install SHARPM stuff in the current *READTABLE*.
 (defun !sharpm-cold-init ()
