@@ -779,8 +779,7 @@
                 (class-name (class-of condition))
                 pos lineno colno error-stream)
         (when simple
-          (format stream ":~2I~_")
-          (format stream
+          (format stream ":~2I~_~?"
                   (simple-condition-format-control condition)
                   (simple-condition-format-arguments condition)))))))
 

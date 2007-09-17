@@ -238,3 +238,10 @@
 (let ((*readtable* (copy-readtable)))
   (set-syntax-from-char #\7 #\Space)
   (assert (string= (format nil "~7D" 1) "      1")))
+
+(let ((symbol (find-symbol "DOES-NOT-EXIST" "CL-USER")))
+  (assert (null symbol))
+  (handler-case
+      (read-from-string "CL-USER:DOES-NOT-EXIST")
+    (reader-error (c)
+      (princ c))))
