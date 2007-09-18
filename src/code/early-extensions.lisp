@@ -924,16 +924,19 @@
 ;;; handle arbitrary combinations of atoms using NOT, AND, OR.
 (defun featurep (x)
   (if (consp x)
-    (case (car x)
-      ((:not not)
-       (if (cddr x)
-         (error "too many subexpressions in feature expression: ~S" x)
-         (not (featurep (cadr x)))))
-      ((:and and) (every #'featurep (cdr x)))
-      ((:or or) (some #'featurep (cdr x)))
-      (t
-       (error "unknown operator in feature expression: ~S." x)))
-    (not (null (memq x *features*)))))
+      (case (car x)
+        ((:not not)
+         (cond
+           ((cddr x)
+            (error "too many subexpressions in feature expression: ~S" x))
+           ((null (cdr x))
+            (error "too few subexpressions in feature expression: ~S" x))
+           (t (not (featurep (cadr x))))))
+        ((:and and) (every #'featurep (cdr x)))
+        ((:or or) (some #'featurep (cdr x)))
+        (t
+         (error "unknown operator in feature expression: ~S." x)))
+      (not (null (memq x *features*)))))
 
 ;;;; utilities for two-VALUES predicates
 
