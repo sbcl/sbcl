@@ -91,6 +91,9 @@ pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef LOCK_CREATE_THREAD
 static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
+#ifdef LISP_FEATURE_GCC_TLS
+__thread struct thread *current_thread;
+#endif
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)

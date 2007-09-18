@@ -41,7 +41,7 @@ extern size_t dynamic_space_size;
 #endif
 extern char **ENVIRON;
 
-#if defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
 extern pthread_key_t specials;
 #endif
 

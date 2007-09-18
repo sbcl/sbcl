@@ -89,7 +89,11 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = thread;
+#else
     pthread_setspecific(specials,thread);
+#endif
 #endif
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER

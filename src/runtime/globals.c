@@ -52,7 +52,7 @@ boolean stop_the_world=0;
  * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
 lispobj *current_dynamic_space;
 
-#if defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
 pthread_key_t specials=0;
 #endif
 
@@ -71,7 +71,7 @@ void globals_init(void)
     foreign_function_call_active = 1;
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
     pthread_key_create(&specials,0);
 #endif
 }

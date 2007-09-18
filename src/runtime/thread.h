@@ -109,6 +109,10 @@ os_context_t *get_interrupt_context_for_thread(struct thread *th)
         [fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th)-1)];
 }
 
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_GCC_TLS)
+extern __thread struct thread *current_thread;
+#endif
+
 /* This is clearly per-arch and possibly even per-OS code, but we can't
  * put it somewhere sensible like x86-linux-os.c because it needs too
  * much stuff like struct thread and all_threads to be defined, which
@@ -127,8 +131,13 @@ static inline struct thread *arch_os_get_current_thread(void)
         sel.rpl = USER_PRIV;
         sel.ti = SEL_LDT;
         __asm__ __volatile__ ("movw %w0, %%fs" : : "r"(sel));
-#elif defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_TLS)
+#elif defined(LISP_FEATURE_FREEBSD)
+#ifdef LISP_FEATURE_GCC_TLS
+        struct thread *th = current_thread;
+#else
         struct thread *th = pthread_getspecific(specials);
+#endif
+#ifdef LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_TLS
         unsigned int sel = LSEL(th->tls_cookie, SEL_UPL);
         unsigned int fs = rfs();
 
@@ -136,6 +145,7 @@ static inline struct thread *arch_os_get_current_thread(void)
          * causes privilege checking and it takes long time. */
         if (fs != sel)
             load_fs(sel);
+#endif
         return th;
 #endif
         __asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
@@ -143,7 +153,11 @@ static inline struct thread *arch_os_get_current_thread(void)
     }
     return me;
 #else
+#ifdef LISP_FEATURE_GCC_TLS
+    return current_thread;
+#else
     return pthread_getspecific(specials);
+#endif
 #endif /* x86 */
 #else
      return all_threads;

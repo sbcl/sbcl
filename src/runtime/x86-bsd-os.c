@@ -169,7 +169,11 @@ int arch_os_thread_init(struct thread *thread) {
     load_fs(sel);
 
     thread->tls_cookie=n;
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = thread;
+#else
     pthread_setspecific(specials,thread);
+#endif
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -207,6 +211,14 @@ int arch_os_thread_cleanup(struct thread *thread) {
 #endif /* !LISP_FEATURE_DARWIN */
 
 #if defined(LISP_FEATURE_FREEBSD)
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+void
+os_restore_tls_segment_register(os_context_t *context)
+{
+    load_fs(context->uc_mcontext.mc_fs);
+}
+#endif
+
 void
 os_restore_fp_control(os_context_t *context)
 {
@@ -216,6 +228,12 @@ os_restore_fp_control(os_context_t *context)
 #if defined(__FreeBSD_version) && __FreeBSD_version >= 500040
     struct envxmm *ex = (struct envxmm*)(&context->uc_mcontext.mc_fpstate);
     asm ("fldcw %0" : : "m" (ex->en_cw));
+#endif
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+    /* Calling this function here may not be good idea.  Or rename
+     * function name os_restore_fp_control to os_restore_context or
+     * so, to match the behavior?  */
+    os_restore_tls_segment_register(context);
 #endif
 }
 #endif
