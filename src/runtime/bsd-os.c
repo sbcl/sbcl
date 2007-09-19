@@ -59,6 +59,9 @@ static void netbsd_init();
 
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#include <sys/umtx.h>
+#endif
 
 static void freebsd_init();
 #endif /* __FreeBSD__ */
@@ -392,6 +395,43 @@ static void freebsd_init()
     }
 #endif /* LISP_FEATURE_X86 */
 }
+
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+int
+futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
+{
+    struct timespec timeout;
+    int ret;
+
+again:
+    if (sec < 0)
+        ret = umtx_wait((void *)lock_word, oldval, NULL);
+    else {
+        timeout.tv_sec = sec;
+        timeout.tv_nsec = usec * 1000;
+        ret = umtx_wait((void *)lock_word, oldval, &timeout);
+    }
+
+    switch (ret) {
+    case 0:
+        return 0;
+    case ETIMEDOUT:
+        return 1;
+    case EINTR:
+        /* spurious wakeup from interrupt */
+        goto again;
+    default:
+        /* EWOULDBLOCK and others, need to check the lock */
+        return -1;
+    }
+}
+
+int
+futex_wake(int *lock_word, int n)
+{
+    return umtx_wake((void *)lock_word, n);
+}
+#endif
 #endif /* __FreeBSD__ */
 
 #ifdef LISP_FEATURE_DARWIN
