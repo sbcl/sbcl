@@ -1192,9 +1192,6 @@ undoably_install_low_level_interrupt_handler (int signal,
         | (sigaction_nodefer_works ? SA_NODEFER : 0);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if((signal==SIG_MEMORY_FAULT)
-#ifdef SIG_MEMORY_FAULT2
-       || (signal==SIG_MEMORY_FAULT2)
-#endif
 #ifdef SIG_INTERRUPT_THREAD
        || (signal==SIG_INTERRUPT_THREAD)
 #endif

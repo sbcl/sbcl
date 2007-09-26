@@ -242,13 +242,6 @@ os_install_interrupt_handlers(void)
                                                  (__siginfohandler_t *)
 #endif
                                                  memory_fault_handler);
-#ifdef SIG_MEMORY_FAULT2
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
-#ifdef LISP_FEATURE_FREEBSD
-                                                 (__siginfohandler_t *)
-#endif
-                                                 memory_fault_handler);
-#endif
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -289,10 +282,6 @@ os_install_interrupt_handlers(void)
     SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
-#ifdef SIG_MEMORY_FAULT2
-    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT2,
-                                                 sigsegv_handler);
-#endif
 }
 
 #endif /* defined GENCGC */
@@ -375,8 +364,19 @@ _socket(int domain, int type, int protocol)
 #endif /* __NetBSD__ */
 
 #ifdef __FreeBSD__
+extern int getosreldate(void);
+
+int sig_memory_fault;
+
 static void freebsd_init()
 {
+    /* Memory fault signal on FreeBSD was changed from SIGBUS to
+     * SIGSEGV. */
+    if (getosreldate() < 700004)
+        sig_memory_fault = SIGBUS;
+    else
+        sig_memory_fault = SIGSEGV;
+
     /* Quote from sbcl-devel (NIIMI Satoshi): "Some OSes, like FreeBSD
      * 4.x with GENERIC kernel, does not enable SSE support even on
      * SSE capable CPUs". Detect this situation and skip the
@@ -440,8 +440,6 @@ futex_wake(int *lock_word, int n)
 #ifndef KERN_PROC_PATHNAME
 #define KERN_PROC_PATHNAME 12
 #endif
-
-extern int getosreldate(void);
 
 char *
 os_get_runtime_executable_path()
