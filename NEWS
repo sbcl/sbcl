@@ -1,4 +1,14 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.11 relative to sbcl-1.0.10:
+  * enhancement: CONS can now stack-allocate on x86 and
+    x86-64. (Earlier LIST and LIST* supported stack-allocation, but
+    CONS did not.)
+  * enhancement: nested lists can now be stack allocated on
+    platforms providing stack allocation support.
+  * enhancement: dynamic-extent support has been extended to support
+    cases where there are multiple possible sources for the stack
+    allocated value.
+
 changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * minor incompatible change: the MSI installer on Windows no longer
     associates .lisp and .fasl files with the installed SBCL.
@@ -21,11 +31,6 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * optimization: UNION and NUNION are now O(N+M) for large
     inputs as long as the :TEST function is one of EQ, EQL, EQUAL, or
     EQUALP.
-  * enhancement: CONS can now stack-allocate on x86 and
-    x86-64. (Earlier LIST and LIST* supported stack-allocation, but
-    CONS did not:)
-  * enhancement: nested lists can now be stack allocated on
-    platforms providing stack allocation support.
   * enhancement: DEFINE-MODIFY-MACRO lambda-list information is
     now more readable in environments like Slime which display it.
     (thanks to Tobias C. Rittweiler)  

@@ -160,6 +160,16 @@
     (true dx)
     nil))
 
+;;; multiple uses for dx lvar
+
+(defun-with-dx multiple-dx-uses ()
+  (let ((dx (if (true t)
+                (list 1 2 3)
+                (list 2 3 4))))
+    (declare (dynamic-extent dx))
+    (true dx)
+    nil))
+
 ;;; with-spinlock should use DX and not cons
 
 (defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
@@ -201,6 +211,7 @@
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (nested-dx-conses))
   (assert-no-consing (nested-dx-lists))
+  (assert-no-consing (multiple-dx-uses))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread

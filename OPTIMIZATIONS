@@ -162,15 +162,6 @@ through TYPEP UNBOXED-ARRAY, within the compiler itself.
 rather than either constant-folding or manipulating NIL-VALUE or
 NULL-TN directly.
 --------------------------------------------------------------------------------
-#19
-  (let ((dx (if (foo)
-                (list x)
-                (list y z))))
-    (declare (dynamic-extent dx))
-    ...)
-
-DX is not allocated on stack.
---------------------------------------------------------------------------------
 #20
 (defun-with-dx foo (x)
   (flet ((make (x)

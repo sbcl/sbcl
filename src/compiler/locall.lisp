@@ -45,20 +45,21 @@
 
 
 (defun handle-nested-dynamic-extent-lvars (arg)
-  (let ((use (lvar-uses arg)))
+  (let ((uses (lvar-uses arg)))
     ;; Stack analysis wants DX value generators to end their
     ;; blocks. Uses of mupltiple used LVARs already end their blocks,
     ;; so we just need to process used-once LVARs.
-    (when (node-p use)
-      (node-ends-block use))
+    (when (node-p uses)
+      (node-ends-block uses)
+      (setf uses (list uses)))
     ;; If the function result is DX, so are its arguments... This
     ;; assumes that all our DX functions do not store their arguments
     ;; anywhere -- just use, and maybe return.
-    (if (basic-combination-p use)
-        (cons arg (funcall (lambda (lists)
-                             (reduce #'append lists))
-                         (mapcar #'handle-nested-dynamic-extent-lvars (basic-combination-args use))))
-        (list arg))))
+    (cons arg
+          (loop for use in uses
+                when (basic-combination-p use)
+                nconc (loop for a in (basic-combination-args use)
+                            append (handle-nested-dynamic-extent-lvars a))))))
 
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))

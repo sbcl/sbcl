@@ -335,14 +335,16 @@
                          do (etypecase what
                               (lvar
                                (let* ((lvar what)
-                                      (use (lvar-uses lvar)))
-                                 (if (and (combination-p use)
-                                          (eq (basic-combination-kind use) :known)
-                                          (awhen (fun-info-stack-allocate-result
-                                                  (basic-combination-fun-info use))
-                                            (funcall it use)))
+                                      (uses (lvar-uses lvar)))
+                                 (if (every (lambda (use)
+					      (and (combination-p use)
+						   (eq (basic-combination-kind use) :known)
+						   (awhen (fun-info-stack-allocate-result
+							   (basic-combination-fun-info use))
+						     (funcall it use))))
+					    (if (listp uses) uses (list uses)))
                                      (real-dx-lvars lvar)
-                                     (setf (lvar-dynamic-extent lvar) nil))))
+				     (setf (lvar-dynamic-extent lvar) nil))))
                               (node ; DX closure
                                (let* ((call what)
                                       (arg (first (basic-combination-args call)))
