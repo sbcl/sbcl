@@ -185,14 +185,6 @@ DX is not allocated on stack.
 Result of MAKE is not stack allocated, which means that
 stack-allocation of structures is impossible.
 --------------------------------------------------------------------------------
-#21
-(defun-with-dx foo ()
-  (let ((dx (list (list 1 2) (list 3 4))))
-    (declare (dynamic-extent dx))
-    ...))
-
-External list in DX is allocated on stack, but internal are not.
---------------------------------------------------------------------------------
 #22
 IR2 does not perform unused code flushing.
 --------------------------------------------------------------------------------

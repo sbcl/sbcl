@@ -43,21 +43,30 @@
              (setf (car args) nil)))
   (values))
 
+
+(defun handle-nested-dynamic-extent-lvars (arg)
+  (let ((use (lvar-uses arg)))
+    ;; Stack analysis wants DX value generators to end their
+    ;; blocks. Uses of mupltiple used LVARs already end their blocks,
+    ;; so we just need to process used-once LVARs.
+    (when (node-p use)
+      (node-ends-block use))
+    ;; If the function result is DX, so are its arguments... This
+    ;; assumes that all our DX functions do not store their arguments
+    ;; anywhere -- just use, and maybe return.
+    (if (basic-combination-p use)
+        (cons arg (funcall (lambda (lists)
+                             (reduce #'append lists))
+                         (mapcar #'handle-nested-dynamic-extent-lvars (basic-combination-args use))))
+        (list arg))))
+
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
         and var in (lambda-vars fun)
-        when (and arg
-                  (lambda-var-dynamic-extent var)
+        when (and arg (lambda-var-dynamic-extent var)
                   (not (lvar-dynamic-extent arg)))
-        collect arg into dx-lvars
-        and do (let ((use (lvar-uses arg)))
-                 ;; Stack analysis wants DX value generators to end
-                 ;; their blocks. Uses of mupltiple used LVARs already
-                 ;; end their blocks, so we just need to process
-                 ;; used-once LVARs.
-                 (when (node-p use)
-                   (node-ends-block use)))
+        append (handle-nested-dynamic-extent-lvars arg) into dx-lvars
         finally (when dx-lvars
                   (binding* ((before-ctran (node-prev call))
                              (nil (ensure-block-start before-ctran))

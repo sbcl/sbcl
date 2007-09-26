@@ -146,6 +146,20 @@
     (true cons)
     nil))
 
+;;; Nested DX
+
+(defun-with-dx nested-dx-lists ()
+  (let ((dx (list (list 1 2) (list 3 4))))
+    (declare (dynamic-extent dx))
+    (true dx)
+    nil))
+
+(defun-with-dx nested-dx-conses ()
+  (let ((dx (cons 1 (cons 2 (cons 3 (cons (cons t t) nil))))))
+    (declare (dynamic-extent dx))
+    (true dx)
+    nil))
+
 ;;; with-spinlock should use DX and not cons
 
 (defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
@@ -185,6 +199,8 @@
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
   (assert-no-consing (cons-on-stack 42))
+  (assert-no-consing (nested-dx-conses))
+  (assert-no-consing (nested-dx-lists))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread

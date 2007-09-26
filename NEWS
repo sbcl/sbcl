@@ -24,6 +24,8 @@ changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * enhancement: CONS can now stack-allocate on x86 and
     x86-64. (Earlier LIST and LIST* supported stack-allocation, but
     CONS did not:)
+  * enhancement: nested lists can now be stack allocated on
+    platforms providing stack allocation support.
   * enhancement: DEFINE-MODIFY-MACRO lambda-list information is
     now more readable in environments like Slime which display it.
     (thanks to Tobias C. Rittweiler)  
