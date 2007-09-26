@@ -887,4 +887,3 @@ Lend_base:
         
 	
         END()
-        

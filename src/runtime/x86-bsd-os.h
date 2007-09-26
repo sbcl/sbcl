@@ -28,6 +28,9 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 #endif
 
 #if defined LISP_FEATURE_FREEBSD
+#if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
+void os_restore_tls_segment_register(os_context_t *context);
+#endif
 #define RESTORE_FP_CONTROL_FROM_CONTEXT
 void os_restore_fp_control(os_context_t *context);
 #endif

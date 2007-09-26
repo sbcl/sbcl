@@ -156,7 +156,7 @@ int arch_os_thread_init(struct thread *thread) {
     struct segment_descriptor ldt_entry = { 0, 0, SDT_MEMRW, SEL_UPL, 1,
                                             0, 0, 1, 0, 0 };
 
-    set_data_desc_addr(&ldt_entry, (unsigned long) thread);
+    set_data_desc_addr(&ldt_entry, thread);
     set_data_desc_size(&ldt_entry, dynamic_values_bytes);
 
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union descriptor*) &ldt_entry, 1);
@@ -226,8 +226,8 @@ os_restore_fp_control(os_context_t *context)
      * On earlier systems, it is shared in a whole process.
      */
 #if defined(__FreeBSD_version) && __FreeBSD_version >= 500040
-    struct envxmm *ex = (struct envxmm*)(&context->uc_mcontext.mc_fpstate);
-    asm ("fldcw %0" : : "m" (ex->en_cw));
+    struct envxmm *ex = (struct envxmm *)(context->uc_mcontext.mc_fpstate);
+    __asm__ __volatile__ ("fldcw %0" : : "m" (ex->en_cw));
 #endif
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     /* Calling this function here may not be good idea.  Or rename

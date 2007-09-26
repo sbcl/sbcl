@@ -42,6 +42,7 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "alloc.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/fdefn.h"
@@ -1095,7 +1096,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
     }
     else {
         /* FIXME: assert free_pages_lock held */
-        thread_mutex_unlock(&free_pages_lock);
+        (void)thread_mutex_unlock(&free_pages_lock);
         funcall2(SymbolFunction(HEAP_EXHAUSTED_ERROR),
                  alloc_number(available), alloc_number(requested));
         lose("HEAP-EXHAUSTED-ERROR fell through");
@@ -4581,7 +4582,7 @@ gc_initialize_pointers(void)
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
-char *
+lispobj *
 alloc(long nbytes)
 {
     struct thread *thread=arch_os_get_current_thread();

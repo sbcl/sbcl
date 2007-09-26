@@ -177,6 +177,6 @@ lispobj debug_print(lispobj string)
     fprintf(stderr, "%s\n",
             (char *)(((struct vector *)native_pointer(string))->data));
     /* shut GCC up about not using this, because that's the point.. */
-    if (untouched);
+    (void)untouched;
     return NIL;
 }

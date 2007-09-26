@@ -204,7 +204,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     single_stepping = pc;
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    *os_context_pc_addr(context) = (char *)pc - 9;
+    *os_context_pc_addr(context) = (os_context_register_t)((char *)pc - 9);
 #endif
 }
 

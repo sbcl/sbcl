@@ -19,11 +19,11 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #ifdef _WIN32
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
-  #include <stdlib.h>
   #include <shlobj.h>
 #else
   #include <sys/times.h>
@@ -336,8 +336,8 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; signals\n");
-    defconstant("sig-dfl", SIG_DFL);
-    defconstant("sig-ign", SIG_IGN);
+    defconstant("sig-dfl", (unsigned long)SIG_DFL);
+    defconstant("sig-ign", (unsigned long)SIG_IGN);
 
     defsignal("sigalrm", SIGALRM);
     defsignal("sigbus", SIGBUS);

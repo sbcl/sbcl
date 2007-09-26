@@ -522,7 +522,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     pthread_attr_t attr;
     sigset_t newset,oldset;
     boolean r=1;
-    int retcode, initcode, sizecode, addrcode;
+    int retcode = 0, initcode;
 
     FSHOW_SIGNAL((stderr,"/create_os_thread: creating new thread\n"));
 
@@ -551,7 +551,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 #undef CONTROL_STACK_ADJUST
        (retcode = pthread_create
         (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th))) {
-        FSHOW_SIGNAL((stderr, "init, size, addr = %d, %d, %d\n", initcode, sizecode, addrcode));
+        FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
         FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
         FSHOW_SIGNAL((stderr, "wanted stack size %d, min stack size %d\n",
                       THREAD_CONTROL_STACK_SIZE-16, PTHREAD_STACK_MIN));

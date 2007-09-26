@@ -32,7 +32,7 @@
 #define ALIGNED_SIZE(n) ((n) + LOWTAG_MASK) & ~LOWTAG_MASK
 
 #ifdef LISP_FEATURE_GENCGC
-extern lispobj *alloc(int bytes);
+extern lispobj *alloc(long bytes);
 #endif
 
 static lispobj *

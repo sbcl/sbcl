@@ -16,7 +16,7 @@
 #include "runtime.h"
 
 #ifdef LISP_FEATURE_GENCGC
-extern lispobj *alloc(int bytes);
+extern lispobj *alloc(long bytes);
 #endif
 
 extern lispobj alloc_cons(lispobj car, lispobj cdr);
