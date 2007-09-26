@@ -367,8 +367,8 @@
  ;; utime(), utimes()
  #-win32
  (:type suseconds-t ; OAOOM warning: similar kludge in tools-for-build
-        #-(and darwin ppc) "suseconds_t"
-        #+(and darwin ppc) "int")
+        #+os-provides-suseconds-t "suseconds_t"
+        #-os-provides-suseconds-t "long")
 
  #-win32
  (:structure alien-utimbuf

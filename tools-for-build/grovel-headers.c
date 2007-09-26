@@ -241,11 +241,9 @@ main(int argc, char *argv[])
     DEFTYPE("off-t",   off_t);
     DEFTYPE("size-t",  size_t);
     DEFTYPE("time-t",  time_t);
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_PPC)
-    /* No idea if this is an issue with PPC versions of OS X, or just
-     * 10.3, but at any rate on some Darwin versions suseconds_t seems
-     * to be missing... Similar kludge in sb-posix. */
-    DEFTYPE("suseconds-t", int);
+#if !defined(LISP_FEATURE_OS_PROVIDES_SUSECONDS_T)
+    /* Similar kludge in sb-posix. */
+    DEFTYPE("suseconds-t", long);
 #else
     DEFTYPE("suseconds-t", suseconds_t);
 #endif
