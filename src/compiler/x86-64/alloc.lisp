@@ -11,7 +11,9 @@
 
 (in-package "SB!VM")
 
-;;;; LIST and LIST*
+;;;; CONS, LIST and LIST*
+(defoptimizer (cons stack-allocate-result) ((&rest args))
+  t)
 (defoptimizer (list stack-allocate-result) ((&rest args))
   (not (null args)))
 (defoptimizer (list* stack-allocate-result) ((&rest args))
@@ -248,13 +250,13 @@
 
 (define-vop (fixed-alloc)
   (:args)
-  (:info name words type lowtag)
+  (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
     (pseudo-atomic
-     (allocation result (pad-data-block words) node)
+     (allocation result (pad-data-block words) node stack-allocate-p)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (when type
        (storew (logior (ash (1- words) n-widetag-bits) type)

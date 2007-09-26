@@ -411,12 +411,6 @@ all three comparisons or b) eliminated the necessity of the MOV(s)
 altogether.  The former option is probably easier than the latter.
 
 --------------------------------------------------------------------------------
-#37
-
-Dynamic extent allocation doesn't currently work for one-element lists,
-since there's a source transform from (LIST X) to (CONS X NIL).
-
---------------------------------------------------------------------------------
 #38
 
 (setf (subseq s1 start1 end1) (subseq s2 start2 end1))

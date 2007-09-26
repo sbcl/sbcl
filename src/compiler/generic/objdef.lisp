@@ -241,6 +241,8 @@
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag
                                      :widetag value-cell-header-widetag
+                                     ;; FIXME: We also have an explicit VOP
+                                     ;; for this. Is this needed as well?
                                      :alloc-trans make-value-cell)
   (value :set-trans value-cell-set
          :set-known (unsafe)

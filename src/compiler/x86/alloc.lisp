@@ -11,7 +11,9 @@
 
 (in-package "SB!VM")
 
-;;;; LIST and LIST*
+;;;; CONS, LIST and LIST*
+(defoptimizer (cons stack-allocate-result) ((&rest args))
+  t)
 (defoptimizer (list stack-allocate-result) ((&rest args))
   (not (null args)))
 (defoptimizer (list* stack-allocate-result) ((&rest args))
@@ -278,7 +280,7 @@
 
 (define-vop (fixed-alloc)
   (:args)
-  (:info name words type lowtag)
+  (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -290,8 +292,10 @@
     ;; also check for (< SPEED SPACE) is because we want the space
     ;; savings that these out-of-line allocation routines bring whilst
     ;; compiling SBCL itself.  --njf, 2006-07-08
-    (if (and (= lowtag list-pointer-lowtag) (policy node (< speed 3)))
+    (if (and (not stack-allocate-p)
+             (= lowtag list-pointer-lowtag) (policy node (< speed 3)))
         (let ((dst
+               ;; FIXME: out-of-line dx-allocation
                #.(loop for offset in *dword-regs*
                     collect `(,offset
                               ',(intern (format nil "ALLOCATE-CONS-TO-~A"
@@ -302,7 +306,7 @@
           (aver (null type))
           (inst call (make-fixup dst :assembly-routine)))
         (pseudo-atomic
-         (allocation result (pad-data-block words) node)
+         (allocation result (pad-data-block words) node stack-allocate-p)
          (inst lea result (make-ea :byte :base result :disp lowtag))
          (when type
            (storew (logior (ash (1- words) n-widetag-bits) type)

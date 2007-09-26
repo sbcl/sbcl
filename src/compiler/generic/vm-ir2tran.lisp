@@ -78,15 +78,19 @@
              name slot lowtag))))
   (aver (null args)))
 
-(defun emit-fixed-alloc (node block name words type lowtag result)
-  (vop fixed-alloc node block name words type lowtag result))
+(defun emit-fixed-alloc (node block name words type lowtag result lvar)
+  (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
+    (when stack-allocate-p
+      (vop current-stack-pointer node block
+           (ir2-lvar-stack-pointer (lvar-info lvar))))
+    (vop fixed-alloc node block name words type lowtag stack-allocate-p result)))
 
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
-    (emit-fixed-alloc node block name words type lowtag result)
+    (emit-fixed-alloc node block name words type lowtag result lvar)
     (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
@@ -97,7 +101,7 @@
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
-          (emit-fixed-alloc node block name words type lowtag result))
+          (emit-fixed-alloc node block name words type lowtag result lvar))
         (vop var-alloc node block (lvar-tn node block extra) name words
              type lowtag result))
     (emit-inits node block name result lowtag inits args)

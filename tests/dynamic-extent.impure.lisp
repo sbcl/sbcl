@@ -138,6 +138,14 @@
       (declare (dynamic-extent #'f))
       (true #'f))))
 
+;;; CONS
+
+(defun-with-dx cons-on-stack (x)
+  (let ((cons (cons x x)))
+    (declare (dynamic-extent cons))
+    (true cons)
+    nil))
+
 ;;; with-spinlock should use DX and not cons
 
 (defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
@@ -176,6 +184,7 @@
   (assert-no-consing (test-let-var-subst2 17))
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
+  (assert-no-consing (cons-on-stack 42))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread

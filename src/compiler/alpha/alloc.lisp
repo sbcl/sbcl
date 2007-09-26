@@ -171,8 +171,8 @@
 
 (define-vop (fixed-alloc)
   (:args)
-  (:info name words type lowtag)
-  (:ignore name)
+  (:info name words type lowtag stack-allocate-p)
+  (:ignore name stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
