@@ -432,7 +432,7 @@
                           (member n-double doubles)
                           (or (aver (= 2 (length doubles))) t)))
             #!+long-float
-            (longp (and (member 0.0lo longs)
+            (longp (and (member 0.0l0 longs)
                         (member n-long longs)
                         (or (aver (= 2 (lenght longs))) t))))
         (if (or singlep doublep #!+long-float longp)
