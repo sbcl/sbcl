@@ -382,6 +382,13 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
+(defun use-good-for-dx-p (use)
+  (and (combination-p use)
+       (eq (combination-kind use) :known)
+       (awhen (fun-info-stack-allocate-result
+               (combination-fun-info use))
+         (funcall it use))))
+
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)
   (or (block-delete-p block)

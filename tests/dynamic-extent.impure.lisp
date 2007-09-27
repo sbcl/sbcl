@@ -160,6 +160,25 @@
     (true dx)
     nil))
 
+(defun-with-dx nested-dx-not-used (x)
+  (declare (list x))
+  (let ((l (setf (car x) (list x x x))))
+    (declare (dynamic-extent l))
+    (true l)
+    (true (length l))
+    nil))
+
+(defun-with-dx nested-evil-dx-used (x)
+  (declare (list x))
+  (let ((l (list x x x)))
+    (declare (dynamic-extent l))
+    (unwind-protect
+         (progn
+           (setf (car x) l)
+           (true l))
+      (setf (car x) nil))
+    nil))
+
 ;;; multiple uses for dx lvar
 
 (defun-with-dx multiple-dx-uses ()
@@ -196,6 +215,18 @@
       (funcall thunk))
     (assert (< (- (get-bytes-consed) before) times))))
 
+(defmacro assert-consing (form &optional times)
+  `(%assert-consing (lambda () ,form) ,times))
+(defun %assert-consing (thunk &optional times)
+  (let ((before (get-bytes-consed))
+        (times (or times 10000)))
+    (declare (type (integer 1 *) times))
+    (dotimes (i times)
+      (funcall thunk))
+    (assert (not (< (- (get-bytes-consed) before) times)))))
+
+(defvar *a-cons* (cons nil nil))
+
 #+(or x86 x86-64 alpha ppc sparc mips)
 (progn
   (assert-no-consing (dxclosure 42))
@@ -211,6 +242,8 @@
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (nested-dx-conses))
   (assert-no-consing (nested-dx-lists))
+  (assert-consing (nested-dx-not-used *a-cons*))
+  (assert-no-consing (nested-evil-dx-used *a-cons*))
   (assert-no-consing (multiple-dx-uses))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
