@@ -27,3 +27,41 @@
 (assert (null glob))
 (assert (equal (let ((glob nil)) (push 'foo glob) glob) '(foo)))
 (assert (null glob))
+
+
+
+;;; CLHS 3.1.2.1.1 specifies that symbol macro expansion must also
+;;; go through *MACROEXPAND-HOOK*. (2007-09-22, -TCR.)
+
+(define-symbol-macro .foo. 'foobar)
+
+(let* ((expanded-p nil)
+      (*macroexpand-hook* #'(lambda (fn form env)
+                              (when (eq form '.foo.)
+                                (setq expanded-p t))
+                              (funcall fn form env))))
+  (multiple-value-bind (expansion flag) (macroexpand '.foo.)
+    (assert (equal expansion '(quote foobar)))
+    (assert flag)
+    (assert expanded-p)))
+
+(let ((sb-ext::*evaluator-mode* :interpret))
+  (let* ((expanded-p nil)
+         (*macroexpand-hook* #'(lambda (fn form env)
+                                 (when (eq form '.foo.)
+                                   (setq expanded-p t))
+                                 (funcall fn form env))))
+    (eval '.foo.)
+    (assert expanded-p)))
+
+(let* ((expanded-p nil)
+       (*macroexpand-hook* #'(lambda (fn form env)
+                               (when (eq form '/foo/)
+                                 (setq expanded-p t))
+                               (funcall fn form env))))
+  (compile nil '(lambda ()
+                 (symbol-macrolet ((/foo/ 'foobar))
+                   (macrolet ((expand (symbol &environment env)
+                                (macroexpand symbol env)))
+                     (expand /foo/)))))
+  (assert expanded-p))

@@ -53,17 +53,25 @@
                        t)
                (values form nil))))
         ((symbolp form)
-         (let* ((venv (when env (sb!c::lexenv-vars env)))
-                (local-def (cdr (assoc form venv))))
-           (cond ((and (consp local-def)
-                       (eq (car local-def) 'macro))
-                  (values (cdr local-def) t))
-                 (local-def
-                  (values form nil))
-                 ((eq (info :variable :kind form) :macro)
-                  (values (info :variable :macro-expansion form) t))
-                 (t
-                  (values form nil)))))
+         (flet ((perform-symbol-expansion (symbol expansion)
+                  ;; CLHS 3.1.2.1.1 specifies that symbol-macros are expanded
+                  ;; via the macroexpand hook, too.
+                  (funcall sb!xc:*macroexpand-hook*
+                           (constantly expansion)
+                           symbol
+                           env)))
+           (let* ((venv (when env (sb!c::lexenv-vars env)))
+                  (local-def (cdr (assoc form venv))))
+             (cond ((and (consp local-def)
+                         (eq (car local-def) 'macro))
+                    (values (perform-symbol-expansion form (cdr local-def)) t))
+                   (local-def
+                    (values form nil))
+                   ((eq (info :variable :kind form) :macro)
+                    (let ((expansion (info :variable :macro-expansion form)))
+                      (values (perform-symbol-expansion form expansion) t)))
+                   (t
+                    (values form nil))))))
         (t
          (values form nil))))
 
