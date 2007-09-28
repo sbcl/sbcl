@@ -1843,6 +1843,19 @@ WORKAROUND:
     1: (SB-KERNEL:FDEFINITION-OBJECT 13 NIL)
   as the second frame.
 
-
-
-
+417: Toplevel NIL expressions mess up unreachable code reporting.
+	In sbcl-1.0.10.7, COMPILE-FILE on the file
+		nil
+		(defmethod frob ((package package) stream)
+		  (if (string= (package-name package) "FOO")
+		      (pprint-logical-block (stream nil))
+		      (print-unreadable-object (package stream))))
+	causes complaints like
+		; in: SOME SB-C::STRANGE SB-C::PLACE
+		;     (SB-C::UNABLE SB-C::TO SB-C::LOCATE SB-C::SOURCE)
+		; 
+		; note: deleting unreachable code
+		; 
+		; note: deleting unreachable code
+	Deleting the toplevel NIL, or even replacing it with 3,
+	causes the system not to complain.
