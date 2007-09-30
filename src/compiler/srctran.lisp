@@ -145,7 +145,7 @@
 (define-source-transform last (x) `(sb!impl::last1 ,x))
 (define-source-transform gethash (&rest args)
   (case (length args)
-   (2 `(sb!impl::gethash2 ,@args))
+   (2 `(sb!impl::gethash3 ,@args nil))
    (3 `(sb!impl::gethash3 ,@args))
    (t (values nil t))))
 (define-source-transform get (&rest args)

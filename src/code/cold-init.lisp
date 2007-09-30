@@ -104,7 +104,8 @@
         *current-error-depth* 0
         *cold-init-complete-p* nil
         *type-system-initialized* nil
-        sb!vm:*alloc-signal* nil)
+        sb!vm:*alloc-signal* nil
+        sb!kernel::*gc-epoch* (cons nil nil))
 
   ;; I'm not sure where eval is first called, so I put this first.
   #!+sb-eval

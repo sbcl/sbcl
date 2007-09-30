@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.11 relative to sbcl-1.0.10:
+  * incompatible change: hash-table accessor functions are no longer
+    automatically protected by locks. Concurrent accesses on the same hash-table
+    from multiple threads can give inconsistent results or even corrupt the
+    hash-table completely. Multi-threaded applications should do their own
+    locking at the correct granularity. In the current implementation it is
+    still safe to have multiple readers access the same table, but it's not
+    guaranteed that this property will be maintained in future releases.
   * enhancement: CONS can now stack-allocate on x86 and
     x86-64. (Earlier LIST and LIST* supported stack-allocation, but
     CONS did not.)

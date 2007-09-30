@@ -1685,66 +1685,14 @@ scav_hash_table_entries (struct hash_table *hash_table)
             /* Scavenge the key and value. */
             scavenge(&kv_vector[2*i],2);
 
-            /* Rehashing of EQ based keys. */
-            if ((!hash_vector) ||
-                (hash_vector[i] == MAGIC_HASH_VECTOR_VALUE)) {
-#ifndef LISP_FEATURE_GENCGC
-                /* For GENCGC scav_hash_table_entries only rehashes
-                 * the entries whose keys were moved. Cheneygc always
-                 * moves the objects so here we let the lisp side know
-                 * that rehashing is needed for the whole table. */
-                *(kv_vector - 2) = (subtype_VectorMustRehash<<N_WIDETAG_BITS) |
-                    SIMPLE_VECTOR_WIDETAG;
-#else
-                unsigned long old_index = EQ_HASH(old_key)%length;
+            /* If an EQ-based key has moved, mark the hash-table for
+             * rehashing. */
+            if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {
                 lispobj new_key = kv_vector[2*i];
-                unsigned long new_index = EQ_HASH(new_key)%length;
-                /* Check whether the key has moved. */
-                if ((old_index != new_index) &&
-                    (new_key != empty_symbol)) {
-                    gc_assert(kv_vector[2*i+1] != empty_symbol);
 
-                    /*FSHOW((stderr,
-                      "* EQ key %d moved from %x to %x; index %d to %d\n",
-                      i, old_key, new_key, old_index, new_index));*/
-
-                    /* Unlink the key from the old_index chain. */
-                    if (!index_vector[old_index]) {
-                        /* It's not here, must be on the
-                         * needing_rehash chain. */
-                    } else if (index_vector[old_index] == i) {
-                        /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
-                        index_vector[old_index] = next_vector[i];
-                        /* Link it into the needing rehash chain. */
-                        next_vector[i] =
-                            fixnum_value(hash_table->needing_rehash);
-                        hash_table->needing_rehash = make_fixnum(i);
-                        /*SHOW("P2");*/
-                    } else {
-                        unsigned long prior = index_vector[old_index];
-                        unsigned long next = next_vector[prior];
-
-                        /*FSHOW((stderr, "/P3a %d %d\n", prior, next));*/
-
-                        while (next != 0) {
-                            /*FSHOW((stderr, "/P3b %d %d\n", prior, next));*/
-                            if (next == i) {
-                                /* Unlink it. */
-                                next_vector[prior] = next_vector[next];
-                                /* Link it into the needing rehash
-                                 * chain. */
-                                next_vector[next] =
-                                    fixnum_value(hash_table->needing_rehash);
-                                hash_table->needing_rehash = make_fixnum(next);
-                                /*SHOW("/P3");*/
-                                break;
-                            }
-                            prior = next;
-                            next = next_vector[next];
-                        }
-                    }
+                if (old_key != new_key && new_key != empty_symbol) {
+                    hash_table->needs_rehash_p = T;
                 }
-#endif
             }
         }
     }
@@ -1770,7 +1718,13 @@ scav_vector (lispobj *where, lispobj object)
     /* Scavenge element 0, which may be a hash-table structure. */
     scavenge(where+2, 1);
     if (!is_lisp_pointer(where[2])) {
-        lose("no pointer at %x in hash table\n", where[2]);
+        /* This'll happen when REHASH clears the header of old-kv-vector
+         * and fills it with zero, but some other thread simulatenously
+         * sets the header in %%PUTHASH.
+         */
+        fprintf(stderr, "Warning: no pointer at %x in hash table: this indicates non-fatal corruption caused by concurrent access to a hash-table from multiple threads. Any accesses to hash-tables shared between threads should be protected by locks.\n", &where[2]);
+        // We've scavenged three words.
+        return 3;
     }
     hash_table = (struct hash_table *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
@@ -1885,13 +1839,6 @@ scan_weak_hash_table (struct hash_table *hash_table)
         scan_weak_hash_table_chain(hash_table, &index_vector[i],
                                    kv_vector, index_vector, next_vector,
                                    hash_vector, empty_symbol, weakness);
-    }
-    {
-        lispobj first = fixnum_value(hash_table->needing_rehash);
-        scan_weak_hash_table_chain(hash_table, &first,
-                                   kv_vector, index_vector, next_vector,
-                                   hash_vector, empty_symbol, weakness);
-        hash_table->needing_rehash = make_fixnum(first);
     }
 }
 

@@ -14,25 +14,45 @@
 
 ;;;; utilities
 
-;;; Without the locking the next vector can get cyclic causing
-;;; looping in a WITHOUT-GCING form, SHRINK-VECTOR can corrupt memory
-;;; and who knows what else.
-;;;
-;;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
-(defmacro with-spinlock-and-without-gcing ((spinlock) block &body body)
-  #!-sb-thread
-  (declare (ignore spinlock))
-  `(without-gcing
-     (unwind-protect
-          (progn
-            #!+sb-thread
-            (sb!thread::get-spinlock ,spinlock)
-            (block ,block ,@body))
-       #!+sb-thread
-       (sb!thread::release-spinlock ,spinlock))))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))
+
+;;; Code for detecting concurrent accesses to the same table from
+;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
+;;; feature is enabled. The main reason for the existence of this code
+;;; is to detect thread-unsafe uses of hash-tables in sbcl itself,
+;;; where debugging anythign can be impossible after an important
+;;; internal hash-table has been corrupted. It's plausible that this
+;;; could be useful for some user code too, but the runtime cost is
+;;; really too high to enable it by default.
+(defmacro with-concurrent-access-check (hash-table &body body)
+  (declare (ignorable hash-table))
+  #!-sb-hash-table-debug
+  `(progn ,@body)
+  #!+sb-hash-table-debug
+  (once-only ((hash-table hash-table))
+    `(progn
+       (flet ((body-fun ()
+                ,@body)
+              (error-fun ()
+                ;; Don't signal more errors for this table.
+                (setf (hash-table-concurrent-access-error ,hash-table) nil)
+                (error "Concurrent access to ~A" ,hash-table)))
+         (if (hash-table-concurrent-access-error ,hash-table)
+             (let ((thread (hash-table-accessing-thread ,hash-table)))
+               (unwind-protect
+                    (progn
+                      (when (and thread
+                                 (not (eql thread sb!thread::*current-thread*)))
+                        (error-fun))
+                      (setf (hash-table-accessing-thread ,hash-table)
+                            sb!thread::*current-thread*)
+                      (body-fun))
+                 (unless (eql (hash-table-accessing-thread ,hash-table)
+                              sb!thread::*current-thread*)
+                   (error-fun))
+                 (setf (hash-table-accessing-thread ,hash-table) thread)))
+             (body-fun))))))
 
 (deftype hash ()
   `(integer 0 ,max-hash))
@@ -84,17 +104,24 @@
     (t
      (eq-hash key))))
 
-(defun almost-primify (num)
+(defun ceil-power-of-two (num)
   (declare (type index num))
-  #!+sb-doc
-  "Return an almost prime number greater than or equal to NUM."
-  (if (= (rem num 2) 0)
-      (setq num (+ 1 num)))
-  (if (= (rem num 3) 0)
-      (setq num (+ 2 num)))
-  (if (= (rem num 7) 0)
-      (setq num (+ 4 num)))
-  num)
+  (ash 1 (integer-length num)))
+
+(declaim (inline index-for-hashing))
+(defun index-for-hashing (index length)
+  (declare (type index index length))
+  ;; We're using power of two tables which obviously are very
+  ;; sensitive to the exact values of the low bits in the hash
+  ;; value. Do a little shuffling of the value to mix the high bits in
+  ;; there too.
+  (logand (1- length)
+          (+ (logxor #b11100101010001011010100111
+                     index)
+             (ash index -6)
+             (ash index -15)
+             (ash index -23))))
+
 
 ;;;; user-defined hash table tests
 
@@ -193,7 +220,7 @@
            ;; Note that this has not yet been audited for
            ;; correctness. It just seems to work. -- CSR, 2002-11-02
            (scaled-size (truncate (/ (float size+1) rehash-threshold)))
-           (length (almost-primify (max scaled-size
+           (length (ceil-power-of-two (max scaled-size
                                         (1+ +min-hash-table-size+))))
            (index-vector (make-array length
                                      :element-type
@@ -232,7 +259,6 @@
         (setf (aref next-vector i) (1+ i)))
       (setf (aref next-vector size) 0)
       (setf (hash-table-next-free-kv table) 1)
-      (setf (hash-table-needing-rehash table) 0)
       (setf (aref kv-vector 0) table)
       table)))
 
@@ -266,6 +292,13 @@
 (setf (fdocumentation 'hash-table-weakness 'function)
       "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
 :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE.")
+
+;;; Called when we detect circular chains in a hash-table.
+(defun signal-corrupt-hash-table (hash-table)
+  (error "Corrupt NEXT-chain in ~A. This is probably caused by ~
+multiple threads accessing the same hash-table without locking."
+         hash-table))
+
 
 ;;;; accessing functions
 
@@ -273,17 +306,19 @@
 ;;; rehash-size.
 (defun rehash (table)
   (declare (type hash-table table))
+  (aver *gc-inhibit*)
   (let* ((old-kv-vector (hash-table-table table))
          (old-next-vector (hash-table-next-vector table))
          (old-hash-vector (hash-table-hash-vector table))
          (old-size (length old-next-vector))
          (new-size
+          (ceil-power-of-two
           (let ((rehash-size (hash-table-rehash-size table)))
             (etypecase rehash-size
               (fixnum
                (+ rehash-size old-size))
               (float
-               (the index (truncate (* rehash-size old-size)))))))
+                (the index (truncate (* rehash-size old-size))))))))
          (new-kv-vector (make-array (* 2 new-size)
                                     :initial-element +empty-ht-slot+))
          (new-next-vector
@@ -295,10 +330,7 @@
             (make-array new-size
                         :element-type '(unsigned-byte #.sb!vm:n-word-bits)
                         :initial-element +magic-hash-vector-value+)))
-         (old-index-vector (hash-table-index-vector table))
-         (new-length (almost-primify
-                      (truncate (/ (float new-size)
-                                   (hash-table-rehash-threshold table)))))
+         (new-length new-size)
          (new-index-vector
           (make-array new-length
                       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
@@ -329,7 +361,6 @@
         (setf (aref new-hash-vector i) (aref old-hash-vector i))))
 
     (setf (hash-table-next-free-kv table) 0)
-    (setf (hash-table-needing-rehash table) 0)
     ;; Rehash all the entries; last to first so that after the pushes
     ;; the chains are first to last.
     (do ((i (1- new-size) (1- i)))
@@ -348,7 +379,7 @@
                             +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
                (let* ((hashing (aref new-hash-vector i))
-                      (index (rem hashing new-length))
+                      (index (index-for-hashing hashing new-length))
                       (next (aref new-index-vector index)))
                  (declare (type index index)
                           (type hash hashing))
@@ -361,7 +392,7 @@
                (set-header-data new-kv-vector
                                 sb!vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
-                      (index (rem hashing new-length))
+                      (index (index-for-hashing hashing new-length))
                       (next (aref new-index-vector index)))
                  (declare (type index index)
                           (type hash hashing))
@@ -372,18 +403,18 @@
     (setf (hash-table-index-vector table) new-index-vector)
     (setf (hash-table-next-vector table) new-next-vector)
     (setf (hash-table-hash-vector table) new-hash-vector)
-    ;; Shrink the old vectors to 0 size to help the conservative GC.
-    (%shrink-vector old-kv-vector 0)
-    (%shrink-vector old-index-vector 0)
-    (%shrink-vector old-next-vector 0)
-    (when old-hash-vector
-      (%shrink-vector old-hash-vector 0))
-    (setf (hash-table-rehash-trigger table) new-size))
+    ;; Fill the old kv-vector with 0 to help the conservative GC. Even
+    ;; if nothing else were zeroed, it's important to clear the
+    ;; special first cells in old-kv-vector.
+    (fill old-kv-vector 0)
+    (setf (hash-table-rehash-trigger table) new-size)
+    (setf (hash-table-needs-rehash-p table) nil))
   (values))
 
 ;;; Use the same size as before, re-using the vectors.
 (defun rehash-without-growing (table)
   (declare (type hash-table table))
+  (aver *gc-inhibit*)
   (let* ((kv-vector (hash-table-table table))
          (next-vector (hash-table-next-vector table))
          (hash-vector (hash-table-hash-vector table))
@@ -400,7 +431,6 @@
 
     ;; Rehash all the entries.
     (setf (hash-table-next-free-kv table) 0)
-    (setf (hash-table-needing-rehash table) 0)
     (dotimes (i size)
       (setf (aref next-vector i) 0))
     (dotimes (i length)
@@ -419,7 +449,7 @@
                                         +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
                (let* ((hashing (aref hash-vector i))
-                      (index (rem hashing length))
+                      (index (index-for-hashing hashing length))
                       (next (aref index-vector index)))
                  (declare (type index index))
                  ;; Push this slot into the next chain.
@@ -430,32 +460,71 @@
                ;; Enable GC tricks.
                (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
-                      (index (rem hashing length))
+                      (index (index-for-hashing hashing length))
                       (next (aref index-vector index)))
                  (declare (type index index)
                           (type hash hashing))
                  ;; Push this slot into the next chain.
                  (setf (aref next-vector i) next)
                  (setf (aref index-vector index) i)))))))
+  ;; Clear the rehash bit only at the very end, otherwise another thread
+  ;; might see a partially rehashed table as a normal one.
+  (setf (hash-table-needs-rehash-p table) nil)
   (values))
 
-(defun flush-needing-rehash (table)
-  (let* ((kv-vector (hash-table-table table))
-         (index-vector (hash-table-index-vector table))
-         (next-vector (hash-table-next-vector table))
-         (length (length index-vector)))
-    (do ((next (hash-table-needing-rehash table)))
-        ((zerop next))
-      (declare (type index/2 next))
-      (let* ((key (aref kv-vector (* 2 next)))
-             (hashing (pointer-hash key))
-             (index (rem hashing length))
-             (temp (aref next-vector next)))
-        (setf (aref next-vector next) (aref index-vector index))
-        (setf (aref index-vector index) next)
-        (setf next temp))))
-  (setf (hash-table-needing-rehash table) 0)
-  (values))
+(declaim (inline maybe-rehash))
+(defun maybe-rehash (hash-table ensure-free-slot-p)
+  (when (hash-table-weakness hash-table)
+    (aver *gc-inhibit*))
+  (flet ((rehash-p ()
+           (and ensure-free-slot-p
+                (zerop (hash-table-next-free-kv hash-table))))
+         (rehash-without-growing-p ()
+           (hash-table-needs-rehash-p hash-table)))
+    (cond ((rehash-p)
+           ;; Use recursive spinlocks since for weak tables the
+           ;; spinlock has already been acquired. GC must be inhibited
+           ;; to prevent the GC from seeing a rehash in progress.
+           (sb!thread::with-recursive-system-spinlock
+               ((hash-table-spinlock hash-table) :without-gcing t)
+             ;; Repeat the condition inside the lock to ensure that if
+             ;; two reader threads enter MAYBE-REHASH at the same time
+             ;; only one rehash is performed.
+             (when (rehash-p)
+               (rehash hash-table))))
+          ((rehash-without-growing-p)
+           (sb!thread::with-recursive-system-spinlock
+               ((hash-table-spinlock hash-table) :without-gcing t)
+             (when (rehash-without-growing-p)
+               (without-gcing
+                 (rehash-without-growing hash-table))))))))
+
+(declaim (inline update-hash-table-cache))
+(defun update-hash-table-cache (hash-table index)
+  (unless (hash-table-weakness hash-table)
+    (setf (hash-table-cache hash-table) index)))
+
+(defmacro with-hash-table-locks ((hash-table inline &rest pin-objects)
+                                 &body body)
+  `(with-concurrent-access-check ,hash-table
+     ;; Inhibit GC for the duration of BODY if the GC might mutate the
+     ;; HASH-TABLE in some way (currently true only if the table is
+     ;; weak). We also need to lock the table to ensure that two
+     ;; concurrent writers can't create a cyclical vector that would
+     ;; cause scav_weak_hash_table_chain to loop.
+     ;;
+     ;; Otherwise we can avoid the 2x-3x overhead, and just pin the key.
+     (if (hash-table-weakness ,hash-table)
+         (sb!thread::with-recursive-system-spinlock
+             ((hash-table-spinlock hash-table) :without-gcing t)
+           ,@body)
+         (with-pinned-objects ,pin-objects
+           (locally
+               ;; Inline the implementation function on the fast path
+               ;; only. (On the slow path it'll just bloat the
+               ;; generated code with no benefit).
+               (declare (inline ,@inline))
+             ,@body)))))
 
 (defun gethash (key hash-table &optional default)
   #!+sb-doc
@@ -466,40 +535,50 @@
            (values t (member t nil)))
   (gethash3 key hash-table default))
 
-(defun gethash2 (key hash-table)
-  #!+sb-doc
-  "Two argument version of GETHASH"
+(declaim (maybe-inline %gethash3))
+(defun %gethash3 (key hash-table default)
   (declare (type hash-table hash-table)
+           (optimize speed)
            (values t (member t nil)))
-  (gethash3 key hash-table nil))
-
-(defun gethash3 (key hash-table default)
-  #!+sb-doc
-  "Three argument version of GETHASH"
-  (declare (type hash-table hash-table)
-           (values t (member t nil)))
-  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
-    gethash3
-    (cond ((= (get-header-data (hash-table-table hash-table))
-              sb!vm:vector-must-rehash-subtype)
-           (rehash-without-growing hash-table))
-          ((not (zerop (hash-table-needing-rehash hash-table)))
-           (flush-needing-rehash hash-table)))
-
-    ;; First check the cache.  Use EQ here for speed.
+  (tagbody
+   start
+     (let ((start-epoch sb!kernel::*gc-epoch*))
+       (macrolet ((result (value foundp)
+                    ;; When the table has multiple concurrent readers,
+                    ;; it's possible that there was a GC after this
+                    ;; thread called MAYBE-REHASH from %GETHASH3, and
+                    ;; some other thread then rehashed the table. If
+                    ;; this happens, we might not find the key even if
+                    ;; it's in the table. To protect against this,
+                    ;; redo the lookup if the GC epoch counter has changed.
+                    ;; -- JES,  2007-09-30
+                    `(if (and (not ,foundp)
+                              (not (eql start-epoch sb!kernel::*gc-epoch*)))
+                         (go start)
+                         (return-from %gethash3 (values ,value ,foundp))))
+                  (overflow ()
+                    ;; The next-vector chain is circular. This is caused
+                    ;; caused by thread-unsafe mutations of the table.
+                    `(signal-corrupt-hash-table hash-table)))
+         (maybe-rehash hash-table nil)
+         ;; Note that it's OK for a GC + a REHASH-WITHOUT-GROWING to
+         ;; be triggered by another thread after this point, since the
+         ;; GC epoch check will catch it.
     (let ((cache (hash-table-cache hash-table))
           (table (hash-table-table hash-table)))
-
-      (if (and cache (< cache (length table)) (eq (aref table cache) key))
-          (values (aref table (1+ cache)) t)
-
+           ;; First check the cache.  Use EQ here for speed.
+           (if (and cache
+                    (< cache (length table))
+                    (eq (aref table cache) key))
+               (let ((value (aref table (1+ cache))))
+                 (result value t))
           ;; Search for key in the hash table.
           (multiple-value-bind (hashing eq-based)
               (funcall (hash-table-hash-fun hash-table) key)
             (declare (type hash hashing))
             (let* ((index-vector (hash-table-index-vector hash-table))
                    (length (length index-vector))
-                   (index (rem hashing length))
+                        (index (index-for-hashing hashing length))
                    (next (aref index-vector index))
                    (next-vector (hash-table-next-vector hash-table))
                    (hash-vector (hash-table-hash-vector hash-table))
@@ -507,58 +586,55 @@
               (declare (type index index))
               ;; Search next-vector chain for a matching key.
               (if (or eq-based (not hash-vector))
-                  (do ((next next (aref next-vector next)))
-                      ((zerop next) (values default nil))
-                    (declare (type index/2 next))
+                       (do ((next next (aref next-vector next))
+                            (i 0 (1+ i)))
+                           ((zerop next) (result default nil))
+                         (declare (type index/2 next i))
+                         (when (> i length)
+                           (overflow))
                     (when (eq key (aref table (* 2 next)))
-                      (setf (hash-table-cache hash-table) (* 2 next))
-                      (return (values (aref table (1+ (* 2 next))) t))))
-                  (do ((next next (aref next-vector next)))
-                      ((zerop next) (values default nil))
-                    (declare (type index/2 next))
+                           (update-hash-table-cache hash-table (* 2 next))
+                           (let ((value (aref table (1+ (* 2 next)))))
+                             (result value t))))
+                       (do ((next next (aref next-vector next))
+                            (i 0 (1+ i)))
+                           ((zerop next) (result default nil))
+                         (declare (type index/2 next i))
+                         (when (> i length)
+                           (overflow))
                     (when (and (= hashing (aref hash-vector next))
-                               (funcall test-fun key (aref table (* 2 next))))
+                                    (funcall test-fun key
+                                             (aref table (* 2 next))))
                       ;; Found.
-                      (setf (hash-table-cache hash-table) (* 2 next))
-                      (return (values (aref table (1+ (* 2 next))) t)))))))))))
+                           (update-hash-table-cache hash-table (* 2 next))
+                           (let ((value (aref table (1+ (* 2 next)))))
+                             (result value t)))))))))))))
+
+(defun gethash3 (key hash-table default)
+  "Three argument version of GETHASH"
+  (declare (type hash-table hash-table))
+  (with-hash-table-locks (hash-table (%gethash3) key)
+    (%gethash3 key hash-table default)))
 
 ;;; so people can call #'(SETF GETHASH)
 (defun (setf gethash) (new-value key table &optional default)
   (declare (ignore default))
   (%puthash key table new-value))
 
-(defun %puthash (key hash-table value)
-  (declare (type hash-table hash-table))
-  (aver (hash-table-index-vector hash-table))
-  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
-    %puthash
+(declaim (maybe-inline %%puthash))
+(defun %%puthash (key hash-table value)
+  (declare (optimize speed))
     ;; We need to rehash here so that a current key can be found if it
     ;; exists. Check that there is room for one more entry. May not be
     ;; needed if the key is already present.
-    (cond ((zerop (hash-table-next-free-kv hash-table))
-           (rehash hash-table))
-          ((= (get-header-data (hash-table-table hash-table))
-              sb!vm:vector-must-rehash-subtype)
-           (rehash-without-growing hash-table))
-          ((not (zerop (hash-table-needing-rehash hash-table)))
-           (flush-needing-rehash hash-table)))
-
-    (let ((cache (hash-table-cache hash-table))
-          (kv-vector (hash-table-table hash-table)))
-
-      ;; Check the cache
-      (if (and cache (< cache (length kv-vector))
-               (eq (aref kv-vector cache) key))
-          ;; If cached, just store here
-          (setf (aref kv-vector (1+ cache)) value)
-
+  (maybe-rehash hash-table t)
           ;; Search for key in the hash table.
           (multiple-value-bind (hashing eq-based)
               (funcall (hash-table-hash-fun hash-table) key)
             (declare (type hash hashing))
             (let* ((index-vector (hash-table-index-vector hash-table))
                    (length (length index-vector))
-                   (index (rem hashing length))
+           (index (index-for-hashing hashing length))
                    (next (aref index-vector index))
                    (kv-vector (hash-table-table hash-table))
                    (next-vector (hash-table-next-vector hash-table))
@@ -571,29 +647,33 @@
                      (when eq-based
                        (set-header-data kv-vector
                                         sb!vm:vector-valid-hashing-subtype))
-
                      ;; Search next-vector chain for a matching key.
-                     (do ((next next (aref next-vector next)))
+             (do ((next next (aref next-vector next))
+                  (i 0 (1+ i)))
                          ((zerop next))
-                       (declare (type index/2 next))
+               (declare (type index/2 next i))
+               (when (> i length)
+                 (signal-corrupt-hash-table hash-table))
                        (when (eq key (aref kv-vector (* 2 next)))
                          ;; Found, just replace the value.
-                         (setf (hash-table-cache hash-table) (* 2 next))
+                 (update-hash-table-cache hash-table (* 2 next))
                          (setf (aref kv-vector (1+ (* 2 next))) value)
-                         (return-from %puthash value))))
+                 (return-from %%puthash value))))
                     (t
                      ;; Search next-vector chain for a matching key.
-                     (do ((next next (aref next-vector next)))
+             (do ((next next (aref next-vector next))
+                  (i 0 (1+ i)))
                          ((zerop next))
-                       (declare (type index/2 next))
+               (declare (type index/2 next i))
+               (when (> i length)
+                 (signal-corrupt-hash-table hash-table))
                        (when (and (= hashing (aref hash-vector next))
                                   (funcall test-fun key
                                            (aref kv-vector (* 2 next))))
                          ;; Found, just replace the value.
-                         (setf (hash-table-cache hash-table) (* 2 next))
+                 (update-hash-table-cache hash-table (* 2 next))
                          (setf (aref kv-vector (1+ (* 2 next))) value)
-                         (return-from %puthash value)))))
-
+                 (return-from %%puthash value)))))
               ;; Pop a KV slot off the free list
               (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
                 (declare (type index/2 free-kv-slot))
@@ -602,49 +682,53 @@
                 (setf (hash-table-next-free-kv hash-table)
                       (aref next-vector free-kv-slot))
                 (incf (hash-table-number-entries hash-table))
-
-                (setf (hash-table-cache hash-table) (* 2 free-kv-slot))
+        (update-hash-table-cache hash-table (* 2 free-kv-slot))
                 (setf (aref kv-vector (* 2 free-kv-slot)) key)
                 (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
-
                 ;; Setup the hash-vector if necessary.
                 (when hash-vector
                   (if (not eq-based)
                       (setf (aref hash-vector free-kv-slot) hashing)
                       (aver (= (aref hash-vector free-kv-slot)
                                +magic-hash-vector-value+))))
-
                 ;; Push this slot into the next chain.
                 (setf (aref next-vector free-kv-slot) next)
-                (setf (aref index-vector index) free-kv-slot)))))))
-  value)
+        (setf (aref index-vector index) free-kv-slot)))
+    value))
 
-(defun remhash (key hash-table)
-  #!+sb-doc
-  "Remove the entry in HASH-TABLE associated with KEY. Return T if there
-   was such an entry, or NIL if not."
-  (declare (type hash-table hash-table)
-           (values (member t nil)))
-  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
-    remhash
+(defun %puthash (key hash-table value)
+  (declare (type hash-table hash-table))
+  (aver (hash-table-index-vector hash-table))
+  (let ((cache (hash-table-cache hash-table))
+        (kv-vector (hash-table-table hash-table)))
+    ;; Check the cache
+    (if (and cache
+             (< cache (length kv-vector))
+             (eq (aref kv-vector cache) key))
+        ;; If cached, just store here
+        (setf (aref kv-vector (1+ cache)) value)
+        ;; Otherwise do things the hard way
+        (with-hash-table-locks (hash-table (%%puthash) key)
+          (%%puthash key hash-table value)))))
+
+(declaim (maybe-inline %remhash))
+(defun %remhash (key hash-table)
     ;; We need to rehash here so that a current key can be found if it
     ;; exists.
-    (cond ((= (get-header-data (hash-table-table hash-table))
-              sb!vm:vector-must-rehash-subtype)
-           (rehash-without-growing hash-table))
-          ((not (zerop (hash-table-needing-rehash hash-table)))
-           (flush-needing-rehash hash-table)))
-
-    ;; For now, just clear the cache
-    (setf (hash-table-cache hash-table) nil)
-
+  ;;
+  ;; Note that if a GC happens after MAYBE-REHASH returns and another
+  ;; thread the accesses the table (triggering a rehash), we might not
+  ;; find the key even if it is in the table. But that's ok, since the
+  ;; only concurrent case that we safely allow is multiple readers
+  ;; with no writers.
+  (maybe-rehash hash-table nil)
     ;; Search for key in the hash table.
     (multiple-value-bind (hashing eq-based)
         (funcall (hash-table-hash-fun hash-table) key)
       (declare (type hash hashing))
       (let* ((index-vector (hash-table-index-vector hash-table))
              (length (length index-vector))
-             (index (rem hashing length))
+           (index (index-for-hashing hashing length))
              (next (aref index-vector index))
              (table (hash-table-table hash-table))
              (next-vector (hash-table-next-vector hash-table))
@@ -680,29 +764,44 @@
                 ((or eq-based (not hash-vector))
                  ;; EQ based
                  (do ((prior next next)
+                    (i 0 (1+ i))
                       (next (aref next-vector next) (aref next-vector next)))
                      ((zerop next) nil)
                    (declare (type index next))
+                 (when (> i length)
+                   (signal-corrupt-hash-table hash-table))
                    (when (eq key (aref table (* 2 next)))
-                     (return-from remhash (clear-slot next-vector prior next)))))
+                   (return-from %remhash (clear-slot next-vector prior next)))))
                 (t
                  ;; not EQ based
                  (do ((prior next next)
+                    (i 0 (1+ i))
                       (next (aref next-vector next) (aref next-vector next)))
                      ((zerop next) nil)
                    (declare (type index/2 next))
+                 (when (> i length)
+                   (signal-corrupt-hash-table hash-table))
                    (when (and (= hashing (aref hash-vector next))
                               (funcall test-fun key (aref table (* 2 next))))
-                     (return-from remhash
-                       (clear-slot next-vector prior next)))))))))))
+                   (return-from %remhash
+                     (clear-slot next-vector prior next))))))))))
+
+(defun remhash (key hash-table)
+  #!+sb-doc
+  "Remove the entry in HASH-TABLE associated with KEY. Return T if there
+   was such an entry, or NIL if not."
+  (declare (type hash-table hash-table)
+           (values (member t nil)))
+  ;; For now, just clear the cache
+  (setf (hash-table-cache hash-table) nil)
+  (with-hash-table-locks (hash-table (%remhash) key)
+    (%remhash key hash-table)))
 
 (defun clrhash (hash-table)
   #!+sb-doc
   "This removes all the entries from HASH-TABLE and returns the hash table
    itself."
-  (declare (optimize speed))
-  (with-spinlock-and-without-gcing ((hash-table-spinlock hash-table))
-    clrhash
+  (with-hash-table-locks (hash-table nil)
     (let* ((kv-vector (hash-table-table hash-table))
            (next-vector (hash-table-next-vector hash-table))
            (hash-vector (hash-table-hash-vector hash-table))
@@ -720,15 +819,15 @@
         (setf (aref next-vector i) (1+ i)))
       (setf (aref next-vector (1- size)) 0)
       (setf (hash-table-next-free-kv hash-table) 1)
-      (setf (hash-table-needing-rehash hash-table) 0)
       ;; Clear the index-vector.
       (fill index-vector 0)
       ;; Clear the hash-vector.
       (when hash-vector
         (fill hash-vector +magic-hash-vector-value+)))
     (setf (hash-table-cache hash-table) nil)
-    (setf (hash-table-number-entries hash-table) 0))
-  hash-table)
+    (setf (hash-table-number-entries hash-table) 0)
+    hash-table))
+
 
 ;;;; MAPHASH
 
@@ -810,3 +909,5 @@ the key and value of the entry. Return NIL."
   (declare (ignore environment))
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
           `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
+
+

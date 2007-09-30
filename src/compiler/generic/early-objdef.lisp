@@ -222,5 +222,4 @@
 (defenum (:prefix vector- :suffix -subtype)
   normal
   unused
-  valid-hashing
-  must-rehash)
+  valid-hashing)

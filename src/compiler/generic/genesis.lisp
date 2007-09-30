@@ -2729,7 +2729,6 @@ core and return a descriptor to it."
                   (symbol-value c)
                   nil)
             constants))
-
     (setf constants
           (sort constants
                 (lambda (const1 const2)

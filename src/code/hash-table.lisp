@@ -46,10 +46,6 @@
   ;; the docstring of MAKE-HASH-TABLE.
   (weakness nil :type (member nil :key :value :key-or-value :key-and-value)
             :read-only t)
-  ;; Index into the next-vector, chaining together buckets that need
-  ;; to be rehashed because their hashing is EQ based and the key has
-  ;; been moved by the garbage collector.
-  (needing-rehash 0 :type index)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
@@ -61,8 +57,8 @@
   (index-vector (missing-arg)
                 :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV vector, and is used to chain together
-  ;; the hash buckets, the free list, and the values needing rehash, a
-  ;; slot will only ever be in one of these lists.
+  ;; the hash buckets and the free list. A slot will only ever be in
+  ;; one of these lists.
   (next-vector (missing-arg)
                :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV table, and can be used to store the
@@ -73,8 +69,18 @@
   ;; respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte
                                                  #.sb!vm:n-word-bits) (*))))
-  ;; This lock is acquired by %PUTHASH, REMHASH, CLRHASH and GETHASH.
-  (spinlock (sb!thread::make-spinlock)))
+  ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH for tables with :LOCK-P T
+  (spinlock (sb!thread::make-spinlock) :type sb!thread::spinlock)
+  ;; The GC will set this to T if it moves an EQ-based key. This used
+  ;; to be signaled by a bit in the header of the kv vector, but that
+  ;; implementation caused some concurrency issues when we stopped
+  ;; inhibiting GC during hash-table lookup.
+  (needs-rehash-p nil :type (member nil t))
+  ;; For detecting concurrent accesses.
+  #!+sb-hash-table-debug
+  (concurrent-access-error t :type (member nil t))
+  #!+sb-hash-table-debug
+  (accessing-thread nil))
 
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
 ;; is bigger than any possible nonEQ hash value, and thus indicates an
@@ -112,7 +118,7 @@ and third values are the key and the value of the next object."
                          (let ((key (aref kv-vector (* 2 index)))
                                (value (aref kv-vector (1+ (* 2 index)))))
                            (incf index)
-                           (unless (and (eq key +empty-ht-slot+)
+                           (unless (or (eq key +empty-ht-slot+)
                                         (eq value +empty-ht-slot+))
                              (return (values t key value))))))))
                 #',function))))
