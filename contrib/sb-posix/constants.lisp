@@ -214,6 +214,15 @@
 
  ;; mode_t
  (:type mode-t "mode_t")
+ (:integer s-ifmt "S_IFMT" nil t)
+ (:integer s-ififo "S_IFIFO" nil t)
+ (:integer s-ifchr "S_IFCHR" nil t)
+ (:integer s-ifdir "S_IFDIR" nil t)
+ (:integer s-ifblk "S_IFBLK" nil t)
+ (:integer s-ifreg "S_IFREG" nil t)
+ (:integer s-iflnk "S_IFLNK" nil t)
+ (:integer s-ifsock "S_IFSOCK" nil t)
+ (:integer s-ifwht "S_IFWHT" nil t)
  (:integer s-isuid "S_ISUID" nil t)
  (:integer s-isgid "S_ISGID" nil t)
  (:integer s-isvtx "S_ISVTX" nil t)
