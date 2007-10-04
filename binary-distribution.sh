@@ -20,6 +20,6 @@ tar -cf $b-binary.tar \
     $b/contrib/vanilla-module.mk \
     `for dir in $b/contrib/*; do
          if test -d $dir && test -f $dir/test-passed; then
-             echo $dir
+             find $dir -not -type d -not -name '.cvsignore' -not -path '*/CVS*' -print
          fi
      done`
