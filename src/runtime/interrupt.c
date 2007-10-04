@@ -276,7 +276,7 @@ fake_foreign_function_call(os_context_t *context)
         (lispobj *)(unsigned long)
             (*os_context_register_addr(context, reg_ALLOC));
     /* fprintf(stderr,"dynamic_space_free_pointer: %p\n", dynamic_space_free_pointer); */
-#if defined(LISP_FEATURE_ALPHA)
+#if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_MIPS)
     if ((long)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x\n", context);
     }
@@ -442,7 +442,7 @@ interrupt_handle_pending(os_context_t *context)
          * that had to be executed or because pseudo atomic triggered
          * twice for a single interrupt. For the interested reader,
          * that may happen if an interrupt hits after the interrupted
-         * flag is cleared but before pseduo-atomic is set and a
+         * flag is cleared but before pseudo-atomic is set and a
          * pseudo atomic is interrupted in that interrupt. */
         if (data->pending_handler) {
 
