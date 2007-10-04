@@ -5,12 +5,13 @@
 SBCL comes with a number of modules that are not part of the core
 system.  These are loaded via @code{(require :@var{modulename})}
 (@pxref{Customization Hooks for Users}).  This section contains
-documentation (or pointers to documentation) for the contributed
+documentation (or pointers to documentation) for some of the contributed
 modules.
 
 @menu
 * sb-aclrepl::
 * sb-grovel::
+* sb-posix::
 * sb-md5::
 * sb-rotate-byte::
 * sb-cover::
@@ -21,6 +22,9 @@ modules.
 
 @page
 @include sb-grovel/sb-grovel.texinfo
+
+@page
+@include sb-posix/sb-posix.texinfo
 
 @page
 @include sb-md5/sb-md5.texinfo

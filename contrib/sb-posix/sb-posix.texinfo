@@ -1,0 +1,168 @@
+@node sb-posix
+@section sb-posix
+@cindex Operating System Interface
+@cindex System Calls
+@cindex Posix
+
+Sb-posix is the supported interface for calling out to the operating
+system.@footnote{The functionality contained in the package
+@code{SB-UNIX} is for SBCL internal use only; its contents are likely to
+change from version to version.}
+
+The scope of this interface is "operating system calls on a typical
+Unixlike platform".  This is section 2 of the Unix manual, plus section
+3 calls that are (a) typically found in libc, but (b) not part of the C
+standard.  For example, we intend to provide support for
+@code{opendir()} and @code{readdir()}, but not for @code{printf()}.
+That said, if your favourite system call is not included yet, you are
+encouraged to submit a patch to the SBCL mailing list.
+
+Some facilities are omitted where they offer absolutely no additional
+use over some portable function, or would be actively dangerous to the
+consistency of Lisp.  Not all functions are available on all
+platforms.  [TBD: unavailable functions should (a) not exist, or (b)
+exist but signal some kind of "not available on this platform" error]
+
+The general intent is for a low-level interface.  There are three
+reasons for this: it's easier to write a high-level interface given a
+low-level one than vice versa, there are fewer philosophical
+disagreements about what it should look like, and the work of
+implementing it is easily parallelisable - and in fact, can be
+attempted on an as-needed basis by the various people who want it.
+
+@subsection Lisp names for system calls
+
+All symbols are in the @code{SB-POSIX} package.  This package contains a
+Lisp function for each supported Unix system call or function, and a
+variable or constant for each supported Unix constant.  A symbol name is
+derived from the C binding's name, by (a) uppercasing, then (b) removing
+leading underscores (@code{#\_}) then replacing remaining underscore
+characters with the hyphen (@code{#\-}). The requirement to uppercase is
+so that in a standard upcasing reader the user may write
+@code{posix:creat} instead of @code{posix:|creat|} as would otherise be
+required.
+
+No other changes to "Lispify" symbol names are made, so @code{creat()}
+becomes @code{CREAT}, not @code{CREATE}.
+
+The user is encouraged not to @code{(USE-PACKAGE :SB-POSIX)} but instead
+to use the @code{SB-POSIX:} prefix on all references, as some of our
+symbols have the same name as CL symbols (@code{OPEN}, @code{CLOSE},
+@code{SIGNAL} etc).
+
+@quotation
+Rationale: We use similar names to the C bindings so that unix manual
+pages can be used for documentation.  To avoid name clashes with CL or
+other functions, the approaches considered were (a) prefix the names of
+clashing symbols with "POSIX-" or similar, (b) prefix @emph{all} symbols with
+"POSIX-", (c) use the packaging system to resolve ambiguities.  (a) was
+rejected as the set of symbols we may potentially clash with is not
+fixed (for example, if new symbols are added to @code{SB-EXT}) so
+symbols might have to be renamed over the lifetime of SB-POSIX, which is
+not good.  The choice between (b) and (c) was made on the grounds that
+@code{POSIX-OPEN} is about as much typing as @code{SB-POSIX:OPEN}
+anyway, and symbol munging is, the author feels, slightly tacky, when
+there's a package system available to do it more cleanly.
+@end quotation
+
+@subsection Types
+
+Generally, marshalling between Lisp and C data types is done using
+SBCL's FFI. @xref{Foreign Function Interface}.
+
+Some functions accept objects such as filenames or file
+descriptors. In the C binding to POSIX these are represented as
+strings and small integers respectively. For the Lisp programmer's
+convenience we introduce designators such that CL pathnames or open
+streams can be passed to these functions.
+
+@subsubsection File-descriptors
+
+A file-descriptor is a non-negative small integer.  
+
+A file-stream is a designator for a file-descriptor: the stream's file
+descriptor is extracted.  Note that mixing io operations on a stream 
+with operations directly on its descriptor may produce unexpected
+results if the stream is buffered.
+
+@subsubsection Filenames
+
+A filename is a string.  
+
+A pathname is a designator for a filename: the filename is computed
+using the same mechanism that SBCL uses to map pathnames to OS filenames
+internally.
+
+@subsubsection Type conversion functions
+
+For each of these types there is a function of the same name that
+converts any valid designator for the type into an object of said type.
+
+@lisp
+(with-open-file (o "/tmp/foo" :direction :output) 
+  (sb-posix:file-descriptor o)) 
+=> 4
+@end lisp
+
+@subsection Function parameters
+
+The calling convention is modelled after that of CMUCL's @code{UNIX}
+package: in particular, it's like the C interface except that:
+
+@enumerate a
+@item
+Length arguments are omitted or optional where the sensible value
+is obvious.  For example, @code{read} would be defined this way:
+
+@lisp
+(read fd buffer &optional (length (length buffer))) => bytes-read
+@end lisp
+
+@item
+Where C simulates "out" parameters using pointers (for instance, in
+@code{pipe()} or @code{socketpair()}) these may be optional or omitted
+in the Lisp interface: if not provided, appropriate objects will be
+allocated and returned (using multiple return values if necessary).
+
+@item
+Some functions accept objects such as filenames or file descriptors.
+Wherever these are specified as such in the C bindings, the Lisp
+interface accepts designators for them as specified in the 'Types'
+section above.
+@end enumerate
+
+@quotation
+Rationale: Keeping exact 1:1 correspondence with C conventions is less
+important here, as the function argument list can easily be accessed to
+find out exactly what the arguments are.  Designators are primarily a
+convenience feature.
+@end quotation
+
+@subsection Function return values
+
+The return value is usually the same as for the C binding, except in
+error cases: where the C function is defined as returning some sentinel
+value and setting @code{errno} on error, we instead signal an error of
+type @code{SYSCALL-ERROR}.  The actual error value (@code{errno}) is
+stored in this condition and can be accessed with @code{SYSCALL-ERRNO}.
+[TBD: some interface to @code{strerror}, to get the user-readable
+translation of the error number]
+
+We do not automatically translate the returned value into "Lispy"
+objects -- for example, @code{SB-POSIX:OPEN} returns a small integer,
+not a stream.  Exception: boolean-returning functions (or, more
+commonly, macros) do not return a C integer, but instead a lisp boolean
+[ or maybe "true"/"false" in CLtS parlance ]; the rationale behind this
+exception is that there is nothing that can be meaningfully done with
+the boolean except test for truth or falsity -- it cannot be passed
+meaningfully to other POSIX functions.
+
+@quotation
+Rationale: This is an interface to POSIX, not a high-level interface
+that uses POSIX, and many people using it will actually want to mess
+with the file descriptors directly.  People needing Lispy interfaces can
+implement them atop this - or indeed, use the existing COMMON-LISP
+package, which already has many high-level constructs built on top of
+the operating system ;-)
+@end quotation
+
