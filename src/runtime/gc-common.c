@@ -1722,7 +1722,12 @@ scav_vector (lispobj *where, lispobj object)
          * and fills it with zero, but some other thread simulatenously
          * sets the header in %%PUTHASH.
          */
-        fprintf(stderr, "Warning: no pointer at %x in hash table: this indicates non-fatal corruption caused by concurrent access to a hash-table from multiple threads. Any accesses to hash-tables shared between threads should be protected by locks.\n", &where[2]);
+        fprintf(stderr,
+                "Warning: no pointer at %lx in hash table: this indicates "
+                "non-fatal corruption caused by concurrent access to a "
+                "hash-table from multiple threads. Any accesses to "
+                "hash-tables shared between threads should be protected "
+                "by locks.\n", (unsigned long)&where[2]);
         // We've scavenged three words.
         return 3;
     }
