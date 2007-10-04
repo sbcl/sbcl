@@ -297,6 +297,20 @@
   ;; number of times the call was sampled
   (count 1 :type sb-int:index))
 
+(defvar *sample-interval* 0.01
+  "Default number of seconds between samples.")
+(declaim (type number *sample-interval*))
+
+(defvar *alloc-interval* 4
+  "Default number of allocation region openings between samples.")
+(declaim (type number *alloc-interval*))
+
+(defvar *max-samples* 50000
+  "Default number of traces taken. This variable is somewhat misnamed:
+each trace may actually consist of an arbitrary number of samples, depending
+on the depth of the call stack.")
+(declaim (type sb-int:index *max-samples*))
+
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples)
   ;; When this vector fills up, we allocate a new one and copy over
@@ -339,10 +353,6 @@
 profiling")
 (declaim (type (member :cpu :alloc) *sampling-mode*))
 
-(defvar *sample-interval* 0.01
-  "Default number of seconds between samples.")
-(declaim (number *sample-interval*))
-
 (defvar *alloc-region-size*
   #-gencgc
   (get-page-size)
@@ -350,17 +360,7 @@ profiling")
   ;; really worth genesifying.
   #+gencgc
   (* 2 sb-vm:gencgc-page-size))
-(declaim (number *alloc-region-size*))
-
-(defvar *alloc-interval* 4
-  "Default number of allocation region openings between samples.")
-(declaim (number *alloc-interval*))
-
-(defvar *max-samples* 50000
-  "Default number of traces taken. This variable is somewhat misnamed:
-each trace may actually consist of an arbitrary number of samples, depending
-on the depth of the call stack.")
-(declaim (type sb-int:index *max-samples*))
+(declaim (type number *alloc-region-size*))
 
 (defvar *samples* nil)
 (declaim (type (or null samples) *samples*))
