@@ -473,3 +473,10 @@ multiple_value_return:
 	b	multiple_value_return
 	EXPORT(fun_end_breakpoint_end)
 	END(fun_end_breakpoint_guts)
+
+
+	.align  3 /* minimum alignment for a lisp object */
+        LEAF(do_pending_interrupt)
+	break	0x0, trap_PendingInterrupt
+	jr	reg_LIP
+	END(do_pending_interrupt)
