@@ -275,7 +275,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
                                              #!+largefile "lseek_largefile"
                                              (function off-t int off-t int))
                  fd offset whence)))
-    (if (minusp result )
+    (if (minusp result)
         (values nil (get-errno))
       (values result 0))))
 
