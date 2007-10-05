@@ -5,7 +5,7 @@
 SBCL supports a fairly low-level threading interface that maps onto
 the host operating system's concept of threads or lightweight
 processes.  This means that threads may take advantage of hardware
-multiprocessing on machines that have more than one CPU, but it does 
+multiprocessing on machines that have more than one CPU, but it does
 not allow Lisp control of the scheduler.  This is found in the
 SB-THREAD package.
 
@@ -14,12 +14,13 @@ x86 or x86-64 architecture, or SunOS (Solaris) on the x86.  Support for
 threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 
 @menu
-* Threading basics::            
-* Special Variables::           
-* Mutex Support::               
-* Waitqueue/condition variables::  
-* Sessions/Debugging::          
-* Implementation (Linux x86)::  
+* Threading basics::
+* Special Variables::
+* Mutex Support::
+* Semaphores::
+* Waitqueue/condition variables::
+* Sessions/Debugging::
+* Implementation (Linux x86)::
 @end menu
 
 @node Threading basics
@@ -110,6 +111,20 @@ if you want a bounded wait.
 @include macro-sb-thread-with-mutex.texinfo
 @include macro-sb-thread-with-recursive-lock.texinfo
 
+@node Semaphores
+@comment  node-name,  next,  previous,  up
+@section Semaphores
+
+escribed here should be considered
+experimental, subject to API changes without notice.
+
+@include struct-sb-thread-semaphore.texinfo
+@include fun-sb-thread-make-semaphore.texinfo
+@include fun-sb-thread-semaphore-count.texinfo
+@include fun-sb-thread-semaphore-name.texinfo
+@include fun-sb-thread-signal-semaphore.texinfo
+@include fun-sb-thread-wait-on-semaphore.texinfo
+
 @node Waitqueue/condition variables
 @comment  node-name,  next,  previous,  up
 @section Waitqueue/condition variables
@@ -125,29 +140,29 @@ when you weren't expecting it to.
 There are three components:
 
 @itemize
-@item 
+@item
 the condition itself (not represented in code)
 
-@item 
+@item
 the condition variable (a.k.a waitqueue) which proxies for it
 
-@item 
-a lock to hold while testing the condition 
+@item
+a lock to hold while testing the condition
 @end itemize
 
 Important stuff to be aware of:
 
 @itemize
-@item 
+@item
 when calling condition-wait, you must hold the mutex. condition-wait
 will drop the mutex while it waits, and obtain it again before
 returning for whatever reason;
 
-@item 
+@item
 likewise, you must be holding the mutex around calls to
 condition-notify;
 
-@item 
+@item
 a process may return from condition-wait in several circumstances: it
 is not guaranteed that the underlying condition has become true. You
 must check that the resource is ready for whatever you want to do to
@@ -169,7 +184,7 @@ it.
       (unless *buffer* (return))
       (let ((head (car *buffer*)))
         (setf *buffer* (cdr *buffer*))
-        (format t "reader ~A woke, read ~A~%" 
+        (format t "reader ~A woke, read ~A~%"
                 *current-thread* head))))))
 
 (defun writer ()
@@ -177,14 +192,14 @@ it.
    (sleep (random 5))
    (with-mutex (*buffer-lock*)
      (let ((el (intern
-                (string (code-char 
+                (string (code-char
                          (+ (char-code #\A) (random 26)))))))
        (setf *buffer* (cons el *buffer*)))
      (condition-notify *buffer-queue*))))
 
 (make-thread #'writer)
 (make-thread #'reader)
-(make-thread #'reader)       
+(make-thread #'reader)
 @end lisp
 
 @include struct-sb-thread-waitqueue.texinfo
@@ -205,7 +220,7 @@ view has its own collection of foreground/background/stopped threads.
 A thread which wishes to create a new session can use
 @code{sb-thread:with-new-session} to remove itself from the current
 session (which it shares with its parent and siblings) and create a
-fresh one.  
+fresh one.
 # See also @code{sb-thread:make-listener-thread}.
 
 Within a single session, threads arbitrate between themselves for the

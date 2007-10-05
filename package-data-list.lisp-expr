@@ -1696,7 +1696,15 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "WAITQUEUE" "MAKE-WAITQUEUE" "WAITQUEUE-NAME"
                "CONDITION-WAIT" "CONDITION-NOTIFY" "CONDITION-BROADCAST"
                "MAKE-LISTENER-THREAD"
-               "RELEASE-FOREGROUND" "WITH-NEW-SESSION"))
+               "RELEASE-FOREGROUND"
+               "WITH-NEW-SESSION"
+               ;; Semaphores
+               "MAKE-SEMAPHORE"
+               "SEMAPHORE"
+               "SEMAPHORE-NAME"
+               "SEMAPHORE-COUNT"
+               "SIGNAL-SEMAPHORE"
+               "WAIT-ON-SEMAPHORE"))
 
    #s(sb-cold:package-data
       :name "SB!LOOP"

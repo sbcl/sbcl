@@ -398,41 +398,48 @@ time we reacquire MUTEX and return to the caller."
 
 ;;;; semaphores
 
-(defstruct (semaphore (:constructor %make-semaphore))
+(defstruct (semaphore (:constructor %make-semaphore (name %count)))
   #!+sb-doc
-  "Semaphore type."
+  "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
+should be considered an implementation detail, and may change in the
+future."
   (name nil :type (or null simple-string))
-  (count 0 :type (integer 0))
+  (%count 0 :type (integer 0))
   (mutex (make-mutex))
   (queue (make-waitqueue)))
 
+(setf (fdocumentation 'semaphore-name 'function)
+      "The name of the semaphore INSTANCE. Setfable.")
+
+(declaim (inline semaphore-count))
+(defun semaphore-count (instance)
+  "Returns the current count of the semaphore INSTANCE."
+  (semaphore-%count instance))
+
 (defun make-semaphore (&key name (count 0))
   #!+sb-doc
-  "Create a semaphore with the supplied COUNT."
-  (%make-semaphore :name name :count count))
+  "Create a semaphore with the supplied COUNT and NAME."
+  (%make-semaphore name count))
 
-(setf (fdocumentation 'semaphore-name 'function)
-      "The name of the semaphore. Setfable.")
-
-(defun wait-on-semaphore (sem)
+(defun wait-on-semaphore (semaphore)
   #!+sb-doc
-  "Decrement the count of SEM if the count would not be negative. Else
-block until the semaphore can be decremented."
+  "Decrement the count of SEMAPHORE if the count would not be
+negative. Else blocks until the semaphore can be decremented."
   ;; a more direct implementation based directly on futexes should be
   ;; possible
-  (with-mutex ((semaphore-mutex sem))
-    (loop until (> (semaphore-count sem) 0)
-          do (condition-wait (semaphore-queue sem) (semaphore-mutex sem))
-          finally (decf (semaphore-count sem)))))
+  (with-mutex ((semaphore-mutex semaphore))
+    (loop until (> (semaphore-%count semaphore) 0)
+          do (condition-wait (semaphore-queue semaphore) (semaphore-mutex semaphore))
+          finally (decf (semaphore-%count semaphore)))))
 
-(defun signal-semaphore (sem &optional (n 1))
+(defun signal-semaphore (semaphore &optional (n 1))
   #!+sb-doc
-  "Increment the count of SEM by N. If there are threads waiting on
-this semaphore, then N of them is woken up."
-  (declare (type (and fixnum (integer 1)) n))
-  (with-mutex ((semaphore-mutex sem))
-    (when (= n (incf (semaphore-count sem) n))
-      (condition-notify (semaphore-queue sem) n))))
+  "Increment the count of SEMAPHORE by N. If there are threads waiting
+on this semaphore, then N of them is woken up."
+  (declare (type (integer 1) n))
+  (with-mutex ((semaphore-mutex semaphore))
+    (when (= n (incf (semaphore-%count semaphore) n))
+      (condition-notify (semaphore-queue semaphore) n))))
 
 ;;;; job control, independent listeners
 
