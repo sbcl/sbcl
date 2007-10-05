@@ -251,6 +251,19 @@
     (logand mode sb-posix::s-iwoth))
   0)
 
+;; Test that stat can take a second argument.
+(deftest stat.5
+    (let* ((stat-1 (sb-posix:stat "/"))
+           (inode-1 (sb-posix:stat-ino stat-1))
+           (stat-2 (sb-posix:stat "/bin/sh"
+                                   stat-1))
+           (inode-2 (sb-posix:stat-ino stat-2)))
+      (values
+       (eq stat-1 stat-2)
+       (/= inode-1 inode-2)))
+  t
+  t)
+
 ;;; FIXME: add tests for carrying a stat structure around in the
 ;;; optional argument to SB-POSIX:STAT
 

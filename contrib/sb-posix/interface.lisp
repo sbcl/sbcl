@@ -5,6 +5,7 @@
   (let ((to-protocol (intern (format nil "ALIEN-TO-~A" name)))
         (to-alien (intern (format nil "~A-TO-ALIEN" name))))
     `(progn
+      (export ',name :sb-posix)
       (defclass ,name ,superclasses
         ,(loop for slotd in slots
                collect (ldiff slotd (member :array-length slotd)))
@@ -272,6 +273,7 @@
 (progn
   (export 'readlink :sb-posix)
   (defun readlink (pathspec)
+    "Returns the resolved target of a symbolic link as a string."
     (flet ((%readlink (path buf length)
              (alien-funcall
               (extern-alien "readlink" (function int c-string (* t) int))
@@ -286,6 +288,7 @@
 (progn
   (export 'getcwd :sb-posix)
   (defun getcwd ()
+    "Returns the process's current working directory as a string."
     (flet ((%getcwd (buffer size)
              (alien-funcall
               (extern-alien #-win32 "getcwd"
@@ -362,15 +365,28 @@
 (export (defun getpagesize () 4096))
 
 ;;; passwd database
+;; The docstrings are copied from the descriptions in SUSv3,
+;; where present.
 #-win32
 (define-protocol-class passwd alien-passwd ()
-  ((name :initarg :name :accessor passwd-name)
-   (passwd :initarg :passwd :accessor passwd-passwd)
-   (uid :initarg :uid :accessor passwd-uid)
-   (gid :initarg :gid :accessor passwd-gid)
-   (gecos :initarg :gecos :accessor passwd-gecos)
-   (dir :initarg :dir :accessor passwd-dir)
-   (shell :initarg :shell :accessor passwd-shell)))
+  ((name :initarg :name :accessor passwd-name
+         :documentation "User's login name.")
+   ;; Note: SUSv3 doesn't require this member.
+   (passwd :initarg :passwd :accessor passwd-passwd
+           :documentation "The account's encrypted password.")
+   (uid :initarg :uid :accessor passwd-uid
+        :documentation "Numerical user ID.")
+   (gid :initarg :gid :accessor passwd-gid
+        :documentation "Numerical group ID.")
+   ;; Note: SUSv3 doesn't require this member.
+   (gecos :initarg :gecos :accessor passwd-gecos
+          :documentation "User's name or comment field.")
+   (dir :initarg :dir :accessor passwd-dir
+        :documentation "Initial working directory.")
+   (shell :initarg :shell :accessor passwd-shell
+          :documentation "Program to use as shell."))
+  (:documentation "Instances of this class represent entries in
+                   the system's user database."))
 
 (defmacro define-pw-call (name arg type)
   #-win32
@@ -390,20 +406,38 @@
 
 #-win32
 (define-protocol-class timeval alien-timeval ()
-  ((sec :initarg :tv-sec :accessor timeval-sec)
-   (usec :initarg :tv-usec :accessor timeval-usec)))
+  ((sec :initarg :tv-sec :accessor timeval-sec
+        :documentation "Seconds.")
+   (usec :initarg :tv-usec :accessor timeval-usec
+         :documentation "Microseconds."))
+  (:documentation "Instances of this class represent time values."))
 
 (define-protocol-class stat alien-stat ()
-  ((mode :initarg :mode :accessor stat-mode)
-   (ino :initarg :ino :accessor stat-ino)
-   (dev :initarg :dev :accessor stat-dev)
-   (nlink :initarg :nlink :accessor stat-nlink)
-   (uid :initarg :uid :accessor stat-uid)
-   (gid :initarg :gid :accessor stat-gid)
-   (size :initarg :size :accessor stat-size)
-   (atime :initarg :atime :accessor stat-atime)
-   (mtime :initarg :mtime :accessor stat-mtime)
-   (ctime :initarg :ctime :accessor stat-ctime)))
+  ((mode :initarg :mode :reader stat-mode
+         :documentation "Mode of file.")
+   (ino :initarg :ino :reader stat-ino
+        :documentation "File serial number.")
+   (dev :initarg :dev :reader stat-dev
+        :documentation "Device ID of device containing file.")
+   (nlink :initarg :nlink :reader stat-nlink
+          :documentation "Number of hard links to the file.")
+   (uid :initarg :uid :reader stat-uid
+        :documentation "User ID of file.")
+   (gid :initarg :gid :reader stat-gid
+        :documentation "Group ID of file.")
+   (size :initarg :size :reader stat-size
+         :documentation "For regular files, the file size in
+                         bytes.  For symbolic links, the length
+                         in bytes of the filename contained in
+                         the symbolic link.")
+   (atime :initarg :atime :reader stat-atime
+          :documentation "Time of last access.")
+   (mtime :initarg :mtime :reader stat-mtime
+          :documentation "Time of last data modification.")
+   (ctime :initarg :ctime :reader stat-ctime
+          :documentation "Time of last status change"))
+  (:documentation "Instances of this class represent Posix file
+                   metadata."))
 
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
@@ -412,7 +446,7 @@
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg &optional stat)
-        (declare (type (or null (sb-alien:alien (* alien-stat))) stat))
+        (declare (type (or null stat) stat))
         (with-alien-stat a-stat ()
           (let ((r (alien-funcall
                     (extern-alien ,(real-c-name (list name :options :largefile)) ,type)
@@ -470,11 +504,18 @@
 
 #-win32
 (define-protocol-class termios alien-termios ()
-  ((iflag :initarg :iflag :accessor sb-posix:termios-iflag)
-   (oflag :initarg :oflag :accessor sb-posix:termios-oflag)
-   (cflag :initarg :cflag :accessor sb-posix:termios-cflag)
-   (lflag :initarg :lflag :accessor sb-posix:termios-lflag)
-   (cc :initarg :cc :accessor sb-posix:termios-cc :array-length nccs)))
+  ((iflag :initarg :iflag :accessor sb-posix:termios-iflag
+          :documentation "Input modes.")
+   (oflag :initarg :oflag :accessor sb-posix:termios-oflag
+          :documentation "Output modes.")
+   (cflag :initarg :cflag :accessor sb-posix:termios-cflag
+          :documentation "Control modes.")
+   (lflag :initarg :lflag :accessor sb-posix:termios-lflag
+          :documentation "Local modes.")
+   (cc :initarg :cc :accessor sb-posix:termios-cc :array-length nccs
+       :documentation "Control characters"))
+  (:documentation "Instances of this class represent I/O
+                   characteristics of the terminal."))
 
 #-win32
 (progn

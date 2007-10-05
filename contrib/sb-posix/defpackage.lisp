@@ -13,7 +13,7 @@
            #:stat-mode #:stat-ino #:stat-dev #:stat-nlink #:stat-uid
            #:stat-gid #:stat-size #:stat-atime #:stat-mtime #:stat-ctime
            #:termios-iflag #:termios-oflag #:termios-cflag
-           #:termios-lflag #:termios-cc))
+           #:termios-lflag #:termios-cc #:timeval-sec #:timeval-usec))
 
 #+win32
 (load-shared-object "msvcrt.dll")

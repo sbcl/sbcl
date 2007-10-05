@@ -1,5 +1,10 @@
 -*- Text -*-
 
+Note: this file's description of a POSIX binding for Common Lisp does
+not necessarily describe the state of the sb-posix module.  If you're
+looking for a description sb-posix, look at sb-posix.texinfo in this
+directory.
+
 * Scope
 
 The scope of this interface is "operating system calls on a typical
