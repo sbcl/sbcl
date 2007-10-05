@@ -215,38 +215,48 @@ in future versions."
 (setf (fdocumentation 'make-mutex 'function)
       "Create a mutex."
       (fdocumentation 'mutex-name 'function)
-      "The name of the mutex. Setfable."
-      (fdocumentation 'mutex-value 'function)
-      "The value of the mutex. NIL if the mutex is free. Setfable.")
+      "The name of the mutex. Setfable.")
 
 #!+(and sb-thread (not sb-lutex))
-(define-structure-slot-addressor mutex-value-address
+(progn
+  (define-structure-slot-addressor mutex-state-address
       :structure mutex
-      :slot value)
+      :slot state)
+  ;; Important: current code assumes these are fixnums or other
+  ;; lisp objects that don't need pinning.
+  (defconstant +lock-free+ 0)
+  (defconstant +lock-taken+ 1)
+  (defconstant +lock-contested+ 2))
 
-(defun get-mutex (mutex &optional (new-value *current-thread*) (waitp t))
+(defun get-mutex (mutex &optional (new-owner *current-thread*) (waitp t))
   #!+sb-doc
-  "Acquire MUTEX, setting it to NEW-VALUE or some suitable default value if
-NIL. If WAITP is non-NIL and the mutex is in use, sleep until it is available."
+  "Acquire MUTEX for NEW-OWNER, which must be a thread or NIL. If
+NEW-OWNER is NIL, it defaults to the current thread. If WAITP is
+non-NIL and the mutex is in use, sleep until it is available.
+
+Note: using GET-MUTEX to assign a MUTEX to another thread then the
+current one is not recommended, and liable to be deprecated.
+
+GET-MUTEX is not interrupt safe. The correct way to call it is:
+
+ (WITHOUT-INTERRUPTS
+   ...
+   (ALLOW-WITH-INTERRUPTS (GET-MUTEX ...))
+   ...)
+
+WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding the
+call while the mutex is in an inconsistent state while
+ALLOW-WITH-INTERRUPTS allows the call to be interrupted from sleep.
+
+It is recommended that you use WITH-MUTEX instead of calling GET-MUTEX
+directly."
   (declare (type mutex mutex) (optimize (speed 3)))
-  (/show0 "Entering GET-MUTEX")
-  (unless new-value
-    (setq new-value *current-thread*))
-  #!-sb-thread
-  (let ((old (mutex-value mutex)))
-    (when (and old waitp)
-      (error "In unithread mode, mutex ~S was requested with WAITP ~S and ~
-              new-value ~S, but has already been acquired (with value ~S)."
-             mutex waitp new-value old))
-    (setf (mutex-value mutex) new-value)
-    t)
+  (unless new-owner
+    (setq new-owner *current-thread*))
+  (when (eql new-owner (mutex-%owner mutex))
+    (error "Recursive lock attempt ~S." mutex))
   #!+sb-thread
   (progn
-    (when (eql new-value (mutex-value mutex))
-      (warn "recursive lock attempt ~S~%" mutex)
-      (format *debug-io* "Thread: ~A~%" *current-thread*)
-      (sb!debug:backtrace most-positive-fixnum *debug-io*)
-      (force-output *debug-io*))
     ;; FIXME: Lutexes do not currently support deadlines, as at least
     ;; on Darwin pthread_foo_timedbar functions are not supported:
     ;; this means that we probably need to use the Carbon multiprocessing
@@ -255,42 +265,80 @@ NIL. If WAITP is non-NIL and the mutex is in use, sleep until it is available."
     ;; FIXME: This is definitely not interrupt safe: what happens if
     ;; we get hit (1) during the lutex calls (ok, they may be safe,
     ;; but has that been checked?) (2) after the lutex call, but
-    ;; before setting the mutex value.
+    ;; before setting the mutex owner.
     #!+sb-lutex
     (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
                    (if waitp
                        (with-interrupts (%lutex-lock lutex))
                        (%lutex-trylock lutex))))
-      (setf (mutex-value mutex) new-value))
+      (setf (mutex-%owner mutex) new-owner)
+      t)
     #!-sb-lutex
-    (let (old)
-      (when (and (setf old (sb!ext:compare-and-swap (mutex-value mutex) nil new-value))
-                 waitp)
-        (loop while old
-              do (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
-                   (when (= 1 (with-pinned-objects (mutex old)
-                                (futex-wait (mutex-value-address mutex)
-                                            (get-lisp-obj-address old)
-                                            (or to-sec -1)
-                                            (or to-usec 0))))
-                     (signal-deadline)))
-              (setf old (sb!ext:compare-and-swap (mutex-value mutex) nil new-value))))
-      (not old))))
+    (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
+                                        +lock-free+
+                                        +lock-taken+)))
+      (unless (or (eql +lock-free+ old) (not waitp))
+        (tagbody
+         :retry
+           (when (or (eql +lock-contested+ old)
+                     (not (eql +lock-free+
+                               (sb!ext:compare-and-swap (mutex-state mutex)
+                                                        +lock-taken+
+                                                        +lock-contested+))))
+             ;; Wait on the contested lock.
+             (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+               (when (= 1 (with-pinned-objects (mutex)
+                            (futex-wait (mutex-state-address mutex)
+                                        (get-lisp-obj-address +lock-contested+)
+                                        (or to-sec -1)
+                                        (or to-usec 0))))
+                 (signal-deadline))))
+           (setf old (sb!ext:compare-and-swap (mutex-state mutex)
+                                              +lock-free+
+                                              +lock-contested+))
+           ;; Did we get it?
+           (unless (eql +lock-free+ old)
+             (go :retry))))
+      (cond ((eql +lock-free+ old)
+             (let ((prev (sb!ext:compare-and-swap (mutex-%owner mutex)
+                                                  nil new-owner)))
+               (when prev
+                 (bug "Old owner in free mutex: ~S" prev))
+               t))
+            (waitp
+             (bug "Failed to acquire lock with WAITP."))))))
 
 (defun release-mutex (mutex)
   #!+sb-doc
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
-this mutex."
+this mutex.
+
+RELEASE-MUTEX is not interrupt safe: interrupts should be disabled
+around calls to it.
+
+Signals a WARNING is current thread is not the current owner of the
+mutex."
   (declare (type mutex mutex))
-  (/show0 "Entering RELEASE-MUTEX")
-  (setf (mutex-value mutex) nil)
+  ;; Order matters: set owner to NIL before releasing state.
+  (let* ((self *current-thread*)
+         (old-owner (sb!ext:compare-and-swap (mutex-%owner mutex) self nil)))
+    (unless  (eql self old-owner)
+      (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner)
+      (setf (mutex-%owner mutex) nil)))
   #!+sb-thread
   (progn
     #!+sb-lutex
     (with-lutex-address (lutex (mutex-lutex mutex))
       (%lutex-unlock lutex))
     #!-sb-lutex
-    (futex-wake (mutex-value-address mutex) 1)))
+    (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
+                                        +lock-taken+ +lock-free+)))
+      (when (eql old +lock-contested+)
+        (sb!ext:compare-and-swap (mutex-state mutex)
+                                 +lock-contested+ +lock-free+)
+        (with-pinned-objects (mutex)
+          (futex-wake (mutex-state-address mutex) 1))))
+    nil))
 
 ;;;; waitqueues/condition variables
 
@@ -326,16 +374,16 @@ time we reacquire MUTEX and return to the caller."
   (assert mutex)
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
-  (let ((value (mutex-value mutex)))
+  (let ((owner (mutex-%owner mutex)))
     (/show0 "CONDITION-WAITing")
     #!+sb-lutex
     (progn
       ;; FIXME: This doesn't look interrupt safe!
-      (setf (mutex-value mutex) nil)
+      (setf (mutex-%owner mutex) nil)
       (with-lutex-address (queue-lutex-address (waitqueue-lutex queue))
         (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
           (%lutex-wait queue-lutex-address mutex-lutex-address)))
-      (setf (mutex-value mutex) value))
+      (setf (mutex-%owner mutex) owner))
     #!-sb-lutex
     (unwind-protect
          (let ((me *current-thread*))
@@ -360,7 +408,7 @@ time we reacquire MUTEX and return to the caller."
       ;; before returning.  Ideally, in the case of an unhandled signal,
       ;; we should do them before entering the debugger, but this is
       ;; better than nothing.
-      (get-mutex mutex value))))
+      (get-mutex mutex owner))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc

@@ -198,7 +198,7 @@ run in any thread.")
 
 (defun sub-gc (&key (gen 0))
   (unless (eq sb!thread:*current-thread*
-              (sb!thread::mutex-value *already-in-gc*))
+              (sb!thread:mutex-value *already-in-gc*))
     ;; With gencgc, unless *GC-PENDING* every allocation in this
     ;; function triggers another gc, potentially exceeding maximum
     ;; interrupt nesting. If *GC-INHIBIT* is not true, however,

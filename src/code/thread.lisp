@@ -15,9 +15,29 @@
   #!+sb-doc
   "Mutex type."
   (name nil :type (or null simple-string))
-  (value nil)
+  (%owner nil :type (or null thread))
+  #!+(and (not sb-lutex) sb-thread)
+  (state 0 :type fixnum)
   #!+(and sb-lutex sb-thread)
   (lutex (make-lutex)))
+
+;;; FIXME: We probably want to rename the accessor MUTEX-OWNER.
+(defun mutex-value (mutex)
+  "Current owner of the mutex, NIL if the mutex is free."
+  (mutex-%owner mutex))
+
+(defsetf mutex-value set-mutex-value)
+
+(declaim (inline set-mutex-value))
+(defun set-mutex-value (mutex value)
+  (declare (ignore mutex value))
+  (error "~S is no longer supported." '(setf mutex-value)))
+
+(define-compiler-macro set-mutex-value (&whole form mutex value)
+  (declare (ignore mutex value))
+  (warn "~S is no longer supported, and will signal an error at runtime."
+        '(setf mutex-value))
+  form)
 
 (def!struct spinlock
   #!+sb-doc
@@ -203,7 +223,7 @@ provided the default value is used for the mutex."
 
   (defun call-with-recursive-lock (function mutex)
     (declare (function function))
-    (dx-let ((inner-lock-p (eq (mutex-value mutex) *current-thread*))
+    (dx-let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
              (got-it nil))
       (without-interrupts
         (unwind-protect

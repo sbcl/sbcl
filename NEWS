@@ -7,6 +7,8 @@ changes in sbcl-1.0.11 relative to sbcl-1.0.10:
     locking at the correct granularity. In the current implementation it is
     still safe to have multiple readers access the same table, but it's not
     guaranteed that this property will be maintained in future releases.
+  * minor incompatible change: (SETF MUTEX-VALUE) is not longer supported,
+    and will signal an error at runtime.
   * enhancement: SB-THREAD package now exports a semaphore interface.
   * enhancement: CONS can now stack-allocate on x86 and
     x86-64. (Earlier LIST and LIST* supported stack-allocation, but
@@ -16,6 +18,8 @@ changes in sbcl-1.0.11 relative to sbcl-1.0.10:
   * enhancement: dynamic-extent support has been extended to support
     cases where there are multiple possible sources for the stack
     allocated value.
+  * optimization: RELEASE-MUTEX no longer needs to perform a syscall
+    if the mutex is uncontested on Linux.
   * bug fix: symbol-macro expansion now uses the *MACROEXPAND-HOOK*
     as specified by the CLHS. (thanks to Tobias Rittweiler)
 

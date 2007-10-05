@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 75)
+(def!constant +fasl-file-version+ 76)
 ;;; (description of versions before 0.9.0.1 deleted in 0.9.17)
 ;;; 56: (2005-05-22) Something between 0.9.0.1 and 0.9.0.14. My money is
 ;;;     on 0.9.0.6 (MORE CASE CONSISTENCY).
@@ -105,6 +105,7 @@
 ;;; 73: (2007-04-13) Changed a hash function
 ;;; 74: (2007-06-05) UNWIND-TO-FRAME-AND-CALL
 ;;; 75: (2007-08-06) FD-STREAM layout changes
+;;; 76: (2007-05-10) MUTEX layout changes
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
