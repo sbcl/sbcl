@@ -34,6 +34,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
+#include "genesis/hash-table.h"
 #include "gencgc.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
@@ -717,8 +718,9 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case SIMPLE_VECTOR_WIDETAG:
                   if (HeaderValue(thing) == subtype_VectorValidHashing) {
-                    *addr = (subtype_VectorMustRehash << N_WIDETAG_BITS) |
-                        SIMPLE_VECTOR_WIDETAG;
+                    struct hash_table *hash_table =
+                        (struct hash_table *)native_pointer(((lispobj *)thing)[2]);
+                    hash_table->needs_rehash_p = T;
                   }
                 count = 2;
                 break;
