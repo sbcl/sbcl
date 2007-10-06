@@ -466,6 +466,18 @@
   (not (sb-posix:getpwnam "root"))
   nil)
 
+#-win32
+(deftest grent.1
+  ;; make sure that we found something
+  (not (sb-posix:getgrgid 0))
+  nil)
+
+#-win32
+(deftest grent.2
+  ;; make sure that we found something
+  (not (sb-posix:getgrnam "wheel"))
+  nil)
+
 #+nil
 ;; Requires root or special group + plus a sensible thing on the port
 (deftest cfget/setispeed.1

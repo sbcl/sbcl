@@ -404,6 +404,30 @@
 (define-pw-call "getpwnam" login-name (function (* alien-passwd) c-string))
 (define-pw-call "getpwuid" uid (function (* alien-passwd) uid-t))
 
+;;; group database
+#-win32
+(define-protocol-class group alien-group ()
+  ((name :initarg :name :accessor group-name)
+   (passwd :initarg :passwd :accessor group-passwd)
+   (gid :initarg :gid :accessor group-gid)))
+
+(defmacro define-gr-call (name arg type)
+  #-win32
+  ;; FIXME: this isn't the documented way of doing this, surely?
+  (let ((lisp-name (intern (string-upcase name) :sb-posix)))
+    `(progn
+      (export ',lisp-name :sb-posix)
+      (declaim (inline ,lisp-name))
+      (defun ,lisp-name (,arg)
+        (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
+          (if (null r)
+              r
+              (alien-to-group r)))))))
+
+(define-gr-call "getgrnam" login-name (function (* alien-group) c-string))
+(define-gr-call "getgrgid" gid (function (* alien-group) gid-t))
+
+
 #-win32
 (define-protocol-class timeval alien-timeval ()
   ((sec :initarg :tv-sec :accessor timeval-sec

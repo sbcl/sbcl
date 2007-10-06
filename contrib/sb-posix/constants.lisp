@@ -21,6 +21,7 @@
  "errno.h"
  "dirent.h" "signal.h"
  #-win32 "pwd.h"
+ #-win32 "grp.h"
  "unistd.h"
  #-win32 "termios.h"
  #-win32 "syslog.h")
@@ -289,6 +290,14 @@
               ;; OS X manpages say this exists.  they lie!
               #+nil
               (:integer fields "int" "pw_fields")))
+
+ ;; group database
+ #-win32
+ (:structure alien-group
+             ("struct group"
+              (c-string-pointer name "char *" "gr_name")
+              (c-string-pointer passwd "char *" "gr_passwd")
+              (gid-t gid "gid_t" "gr_gid")))
 
  (:structure alien-stat
              ("struct stat"
