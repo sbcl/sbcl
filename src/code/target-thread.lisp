@@ -250,7 +250,8 @@ ALLOW-WITH-INTERRUPTS allows the call to be interrupted from sleep.
 
 It is recommended that you use WITH-MUTEX instead of calling GET-MUTEX
 directly."
-  (declare (type mutex mutex) (optimize (speed 3)))
+  (declare (type mutex mutex) (optimize (speed 3))
+           #!-sb-thread (ignore waitp))
   (unless new-owner
     (setq new-owner *current-thread*))
   (when (eql new-owner (mutex-%owner mutex))
