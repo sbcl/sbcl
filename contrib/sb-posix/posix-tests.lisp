@@ -467,6 +467,14 @@
   nil)
 
 #-win32
+(deftest pwent.non-existing
+    ;; make sure that we get something sensible, not an error
+    (handler-case (progn (sb-posix:getpwnam "almost-certainly-does-not-exist")
+                         nil)
+      (t (cond) t))
+  nil)
+
+#-win32
 (deftest grent.1
   ;; make sure that we found something
   (not (sb-posix:getgrgid 0))
@@ -476,6 +484,14 @@
 (deftest grent.2
   ;; make sure that we found something
   (not (sb-posix:getgrnam "wheel"))
+  nil)
+
+#-win32
+(deftest grent.non-existing
+    ;; make sure that we get something sensible, not an error
+    (handler-case (progn (sb-posix:getgrnam "almost-certainly-does-not-exist")
+                         nil)
+      (t (cond) t))
   nil)
 
 #+nil

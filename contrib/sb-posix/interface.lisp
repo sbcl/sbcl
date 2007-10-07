@@ -397,8 +397,8 @@
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg)
         (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
-          (if (null r)
-              r
+          (if (null-alien r)
+              nil
               (alien-to-passwd r)))))))
 
 (define-pw-call "getpwnam" login-name (function (* alien-passwd) c-string))
@@ -420,8 +420,8 @@
       (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg)
         (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
-          (if (null r)
-              r
+          (if (null-alien r)
+              nil
               (alien-to-group r)))))))
 
 (define-gr-call "getgrnam" login-name (function (* alien-group) c-string))
