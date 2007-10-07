@@ -483,7 +483,7 @@
 #-win32
 (deftest grent.2
   ;; make sure that we found something
-  (not (sb-posix:getgrnam "wheel"))
+  (not (sb-posix:getgrnam "sys"))
   nil)
 
 #-win32
