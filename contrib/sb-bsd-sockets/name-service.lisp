@@ -35,7 +35,7 @@
                           (#.sockint::af-inet
                            ;; CLH: Work around x86-64 darwin bug here.
                            ;; The length is reported as 8, when it should be 4.
-                           ;; FIXME: this is rumored to be fix in 10.5
+                           ;; FIXME: this is rumored to be fixed in 10.5
                            #+(and darwin x86-64)
                            (progn
                              (assert (or (= length 4) (= length 8)))
@@ -125,6 +125,7 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
   (assert (= (length address) 4))
   (sockint::with-sockaddr-in sockaddr ()
     (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
+      #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
       (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
       (dotimes (i 4)
         (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)

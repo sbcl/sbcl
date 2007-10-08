@@ -130,6 +130,7 @@
  (:structure in-addr ("struct in_addr"
                       ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
  (:structure sockaddr-in ("struct sockaddr_in"
+                          #+darwin ((unsigned 8) len "__uint8_t" "sin_len")
                           (integer family "sa_family_t" "sin_family")
                           ;; These two could be in-port-t and
                           ;; in-addr-t, but then we'd throw away the
