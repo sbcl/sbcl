@@ -5,6 +5,7 @@
 
 #include <mach/mach_init.h>
 #include <mach/task.h>
+#include <AvailabilityMacros.h>
 
 /* man pages claim that the third argument is a sigcontext struct,
    but ucontext_t is defined, matches sigcontext where sensible,
@@ -16,7 +17,7 @@
 #if defined(LISP_FEATURE_X86)
 #include <sys/ucontext.h>
 #include <sys/_types.h>
-#if __DARWIN_UNIX03
+#ifdef MAC_OS_X_VERSION_10_5
 typedef struct __darwin_ucontext os_context_t;
 #else
 typedef struct ucontext os_context_t;
