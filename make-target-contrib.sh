@@ -26,8 +26,11 @@ find_gnumake
 . ./sbcl-pwd.sh
 sbcl_pwd
 
-SBCL_HOME=$SBCL_PWD/contrib
+SBCL_HOME="$SBCL_PWD/contrib"
 export SBCL_HOME
+if [ "$OSTYPE" = "cygwin" ] ; then
+    SBCL_PWD=`echo $SBCL_PWD | sed s/\ /\\\\\\\\\ /g`
+fi
 
 SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core --disable-debugger --no-sysinit --no-userinit"
 SBCL_BUILDING_CONTRIB=1

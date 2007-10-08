@@ -139,7 +139,7 @@ for d in src/compiler src/assembly; do
         echo "missing sbcl_arch directory $PWD/$sbcl_arch"
         exit 1
     fi
-    cd $original_dir
+    cd "$original_dir"
 done
 
 echo //setting up symlink src/compiler/assembly
@@ -147,7 +147,7 @@ remove_dir_safely src/compiler/assembly
 original_dir=`pwd`
 cd src/compiler
 link_or_copy ../assembly assembly
-cd $original_dir
+cd "$original_dir"
 
 echo //setting up OS-dependent information
 original_dir=`pwd`
@@ -256,7 +256,7 @@ case "$sbcl_os" in
         exit 1
         ;;
 esac
-cd $original_dir
+cd "$original_dir"
 
 # FIXME: Things like :c-stack-grows-..., etc, should be
 # *derived-target-features* or equivalent, so that there was a nicer
