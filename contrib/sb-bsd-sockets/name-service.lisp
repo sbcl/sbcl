@@ -35,6 +35,7 @@
                           (#.sockint::af-inet
                            ;; CLH: Work around x86-64 darwin bug here.
                            ;; The length is reported as 8, when it should be 4.
+                           ;; FIXME: this is rumored to be fix in 10.5
                            #+(and darwin x86-64)
                            (progn
                              (assert (or (= length 4) (= length 8)))

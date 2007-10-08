@@ -117,8 +117,8 @@ ldso_stub__ ## fct ## $lazy_ptr:                @\\
 #define LDSO_STUBIFY(fct)                       \\
 .text                           ;               \\
         .align 4 ;                              \\
-.globl ldso_stub___ ## fct ;                    \\
-ldso_stub___ ## fct: ;                          \\
+.globl _ldso_stub___ ## fct ;                    \\
+_ldso_stub___ ## fct: ;                          \\
         jmp L ## fct ## $stub ;                 \\
         .section __IMPORT,__jump_table,symbol_stubs,self_modifying_code+pure_instructions,5 ;   \\
 L ## fct ## $stub: ;                    \\
@@ -134,8 +134,8 @@ L ## fct ## $stub: ;                    \\
 #!+(and darwin x86-64) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 4 ;                              \\
-.globl ldso_stub___ ## fct ;                    \\
-ldso_stub___ ## fct: ;                          \\
+.globl _ldso_stub___ ## fct ;                    \\
+_ldso_stub___ ## fct: ;                          \\
         jmp _ ## fct ;                          \\
 .L ## fct ## e1: ;                            "
 

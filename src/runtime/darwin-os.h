@@ -16,7 +16,12 @@
 #if defined(LISP_FEATURE_X86)
 #include <sys/ucontext.h>
 #include <sys/_types.h>
+#if __DARWIN_UNIX03
+typedef struct __darwin_ucontext os_context_t;
+#else
 typedef struct ucontext os_context_t;
+#endif
+
 
 #else
 #include <ucontext.h>

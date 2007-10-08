@@ -45,7 +45,13 @@
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "udp"))
-      ((or socket-type-not-supported-error protocol-not-supported-error) (c)
+      ;; CLH FIXME! some versions of darwin just return a socket error
+      ;; here, not socket-type-not-supported-error or
+      ;; protocol-not-supported-error.
+      ((or #+darwin socket-error
+        socket-type-not-supported-error
+        protocol-not-supported-error)
+          (c)
         (declare (ignorable c)) t)
       (:no-error nil))
   t)
@@ -54,7 +60,14 @@
     ;; same again with keywords
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol :udp)
-      ((or protocol-not-supported-error socket-type-not-supported-error) (c)
+      ;; CLH FIXME! some versions of darwin just return a socket error
+      ;; here, not socket-type-not-supported-error or
+      ;; protocol-not-supported-error.
+      ((or
+        #+darwin socket-error
+        protocol-not-supported-error
+        socket-type-not-supported-error)
+          (c)
         (declare (ignorable c)) t)
       (:no-error nil))
   t)

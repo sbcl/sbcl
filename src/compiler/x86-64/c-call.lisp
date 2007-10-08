@@ -150,6 +150,10 @@
               (lambda-vars arg)
               (cond ((and (alien-integer-type-p type)
                           (> (sb!alien::alien-integer-type-bits type) 64))
+                     ;; CLH: FIXME! This should really be
+                     ;; #xffffffffffffffff. nyef says: "Passing
+                     ;; 128-bit integers to ALIEN functions on x86-64
+                     ;; believed to be broken."
                      (new-args `(logand ,arg #xffffffff))
                      (new-args `(ash ,arg -64))
                      (new-arg-types (parse-alien-type '(unsigned 64) env))

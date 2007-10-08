@@ -25,6 +25,38 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#if __DARWIN_UNIX03
+#include <sys/_structs.h>
+#endif
+
+#if __DARWIN_UNIX03
+
+typedef struct __darwin_ucontext darwin_ucontext;
+typedef struct __darwin_mcontext64 darwin_mcontext;
+
+#define rip __rip
+#define rsp __rsp
+#define rbp __rbp
+#define rax __rax
+#define rbx __rbx
+#define rcx __rcx
+#define rdx __rdx
+#define rsi __rsi
+#define rdi __rdi
+#define r8 __r8
+#define r9 __r9
+#define faultvaddr __faultvaddr
+#define ss __ss
+#define es __es
+#define fs __fs
+
+#else
+
+typedef struct ucontext darwin_ucontext;
+typedef struct mcontext darwin_mcontext;
+
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t mach_exception_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -47,7 +79,7 @@ extern boolean_t exc_server();
 /* This executes in the faulting thread as part of the signal
  * emulation.  It is passed a context with the uc_mcontext field
  * pointing to a valid block of memory. */
-void build_fake_signal_context(struct ucontext *context,
+void build_fake_signal_context(darwin_ucontext *context,
                                x86_thread_state64_t *thread_state,
                                x86_float_state64_t *float_state) {
     pthread_sigmask(0, NULL, &context->uc_sigmask);
@@ -59,7 +91,7 @@ void build_fake_signal_context(struct ucontext *context,
  * emulation.  It is effectively the inverse operation from above. */
 void update_thread_state_from_context(x86_thread_state64_t *thread_state,
                                       x86_float_state64_t *float_state,
-                                      struct ucontext *context) {
+                                      darwin_ucontext  *context) {
     *thread_state = context->uc_mcontext->ss;
     *float_state = context->uc_mcontext->fs;
     pthread_sigmask(SIG_SETMASK, &context->uc_sigmask, NULL);
@@ -184,11 +216,11 @@ void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
      * context (and regs just for symmetry).
      */
 
-    struct ucontext *context;
-    struct mcontext *regs;
+    darwin_ucontext  *context;
+    darwin_mcontext *regs;
 
-    context = (struct ucontext*) os_validate(0, sizeof(struct ucontext));
-    regs = (struct mcontext*) os_validate(0, sizeof(struct mcontext));
+    context = (darwin_ucontext *) os_validate(0, sizeof(darwin_ucontext));
+    regs = (darwin_mcontext*) os_validate(0, sizeof(darwin_mcontext));
     context->uc_mcontext = regs;
 
     /* when BSD signals are fired, they mask they signals in sa_mask
@@ -207,8 +239,8 @@ void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
 
     update_thread_state_from_context(thread_state, float_state, context);
 
-    os_invalidate((os_vm_address_t)context, sizeof(struct ucontext));
-    os_invalidate((os_vm_address_t)regs, sizeof(struct mcontext));
+    os_invalidate((os_vm_address_t)context, sizeof(darwin_ucontext));
+    os_invalidate((os_vm_address_t)regs, sizeof(darwin_mcontext));
 
     /* Trap to restore the signal context. */
     asm volatile ("mov %0, %%rax; mov %1, %%rbx; .quad 0xffffffffffff0b0f"

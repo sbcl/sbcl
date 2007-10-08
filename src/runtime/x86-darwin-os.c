@@ -130,39 +130,39 @@ extern boolean_t exc_server();
 /* This executes in the faulting thread as part of the signal
  * emulation.  It is passed a context with the uc_mcontext field
  * pointing to a valid block of memory. */
-void build_fake_signal_context(struct ucontext *context,
+void build_fake_signal_context(os_context_t *context,
                                x86_thread_state32_t *thread_state,
                                x86_float_state32_t *float_state) {
     pthread_sigmask(0, NULL, &context->uc_sigmask);
-    context->uc_mcontext->ss = *thread_state;
-    context->uc_mcontext->fs = *float_state;
+    context->uc_mcontext->SS = *thread_state;
+    context->uc_mcontext->FS = *float_state;
 }
 
 /* This executes in the faulting thread as part of the signal
  * emulation.  It is effectively the inverse operation from above. */
 void update_thread_state_from_context(x86_thread_state32_t *thread_state,
                                       x86_float_state32_t *float_state,
-                                      struct ucontext *context) {
-    *thread_state = context->uc_mcontext->ss;
-    *float_state = context->uc_mcontext->fs;
+                                      os_context_t *context) {
+    *thread_state = context->uc_mcontext->SS;
+    *float_state = context->uc_mcontext->FS;
     pthread_sigmask(SIG_SETMASK, &context->uc_sigmask, NULL);
 }
 
 /* Modify a context to push new data on its stack. */
-void push_context(u32 data, x86_thread_state32_t *context)
+void push_context(u32 data, x86_thread_state32_t *thread_state)
 {
     u32 *stack_pointer;
 
-    stack_pointer = (u32*) context->esp;
+    stack_pointer = (u32*) thread_state->ESP;
     *(--stack_pointer) = data;
-    context->esp = (unsigned int) stack_pointer;
+    thread_state->ESP = (unsigned int) stack_pointer;
 }
 
-void align_context_stack(x86_thread_state32_t *context)
+void align_context_stack(x86_thread_state32_t *thread_state)
 {
     /* 16byte align the stack (provided that the stack is, as it
      * should be, 4byte aligned. */
-    while (context->esp & 15) push_context(0, context);
+    while (thread_state->ESP & 15) push_context(0, thread_state);
 }
 
 /* Stack allocation starts with a context that has a mod-4 ESP value
@@ -172,29 +172,29 @@ void align_context_stack(x86_thread_state32_t *context)
  * EBP, pops EBP, and returns. */
 asm("_stack_allocation_recover: movl %ebp, %esp; popl %ebp; ret;");
 
-void open_stack_allocation(x86_thread_state32_t *context)
+void open_stack_allocation(x86_thread_state32_t *thread_state)
 {
     void stack_allocation_recover(void);
 
-    push_context(context->eip, context);
-    push_context(context->ebp, context);
-    context->ebp = context->esp;
-    context->eip = (unsigned int) stack_allocation_recover;
+    push_context(thread_state->EIP, thread_state);
+    push_context(thread_state->EBP, thread_state);
+    thread_state->EBP = thread_state->ESP;
+    thread_state->EIP = (unsigned int) stack_allocation_recover;
 
-    align_context_stack(context);
+    align_context_stack(thread_state);
 }
 
 /* Stack allocation of data starts with a context with a mod-16 ESP
  * value and reserves some space on it by manipulating the ESP
  * register. */
-void *stack_allocate(x86_thread_state32_t *context, size_t size)
+void *stack_allocate(x86_thread_state32_t *thread_state, size_t size)
 {
     /* round up size to 16byte multiple */
     size = (size + 15) & -16;
 
-    context->esp = ((u32)context->esp) - size;
+    thread_state->ESP = ((u32)thread_state->ESP) - size;
 
-    return (void *)context->esp;
+    return (void *)thread_state->ESP;
 }
 
 /* Arranging to invoke a C function is tricky, as we have to assume
@@ -202,7 +202,7 @@ void *stack_allocate(x86_thread_state32_t *context, size_t size)
  * alignment requirements.  The simplest way to arrange this,
  * actually, is to open a new stack allocation.
  * WARNING!!! THIS DOES NOT PRESERVE REGISTERS! */
-void call_c_function_in_context(x86_thread_state32_t *context,
+void call_c_function_in_context(x86_thread_state32_t *thread_state,
                                 void *function,
                                 int nargs,
                                 ...)
@@ -212,25 +212,25 @@ void call_c_function_in_context(x86_thread_state32_t *context,
     u32 *stack_pointer;
 
     /* Set up to restore stack on exit. */
-    open_stack_allocation(context);
+    open_stack_allocation(thread_state);
 
     /* Have to keep stack 16byte aligned on x86/darwin. */
     for (i = (3 & -nargs); i; i--) {
-        push_context(0, context);
+        push_context(0, thread_state);
     }
 
-    context->esp = ((u32)context->esp) - nargs * 4;
-    stack_pointer = (u32 *)context->esp;
+    thread_state->ESP = ((u32)thread_state->ESP) - nargs * 4;
+    stack_pointer = (u32 *)thread_state->ESP;
 
     va_start(ap, nargs);
     for (i = 0; i < nargs; i++) {
-        //push_context(va_arg(ap, u32), context);
+        //push_context(va_arg(ap, u32), thread_state);
         stack_pointer[i] = va_arg(ap, u32);
     }
     va_end(ap);
 
-    push_context(context->eip, context);
-    context->eip = (unsigned int) function;
+    push_context(thread_state->EIP, thread_state);
+    thread_state->EIP = (unsigned int) function;
 }
 
 void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
@@ -253,11 +253,19 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
      * context (and regs just for symmetry).
      */
 
-    struct ucontext *context;
+    os_context_t *context;
+#if __DARWIN_UNIX03
+    struct __darwin_mcontext32 *regs;
+#else
     struct mcontext *regs;
+#endif
 
-    context = (struct ucontext*) os_validate(0, sizeof(struct ucontext));
+    context = (os_context_t*) os_validate(0, sizeof(os_context_t));
+#if __DARWIN_UNIX03
+    regs = (struct __darwin_mcontext32*) os_validate(0, sizeof(struct __darwin_mcontext32));
+#else
     regs = (struct mcontext*) os_validate(0, sizeof(struct mcontext));
+#endif
     context->uc_mcontext = regs;
 
     /* when BSD signals are fired, they mask they signals in sa_mask
@@ -276,8 +284,12 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
 
     update_thread_state_from_context(thread_state, float_state, context);
 
-    os_invalidate((os_vm_address_t)context, sizeof(struct ucontext));
+    os_invalidate((os_vm_address_t)context, sizeof(os_context_t));
+#if __DARWIN_UNIX03
+    os_invalidate((os_vm_address_t)regs, sizeof(struct __darwin_mcontext32));
+#else
     os_invalidate((os_vm_address_t)regs, sizeof(struct mcontext));
+#endif
 
     /* Trap to restore the signal context. */
     asm volatile ("movl %0, %%eax; movl %1, %%ebx; .long 0xffff0b0f"
@@ -337,26 +349,30 @@ void call_handler_on_thread(mach_port_t thread,
 }
 
 #if defined DUMP_CONTEXT
-void dump_context(x86_thread_state32_t *context)
+void dump_context(x86_thread_state32_t *thread_state)
 {
     int i;
     u32 *stack_pointer;
 
     printf("eax: %08lx  ecx: %08lx  edx: %08lx  ebx: %08lx\n",
-           context->eax, context->ecx, context->edx, context->ebx);
+           thread_state->EAX, thread_state->ECX, thread_state->EDX, thread_state->EAX);
     printf("esp: %08lx  ebp: %08lx  esi: %08lx  edi: %08lx\n",
-           context->esp, context->ebp, context->esi, context->edi);
+           thread_state->ESP, thread_state->EBP, thread_state->ESI, thread_state->EDI);
     printf("eip: %08lx  eflags: %08lx\n",
-           context->eip, context->eflags);
+           thread_state->EIP, thread_state->EFLAGS);
     printf("cs: %04hx  ds: %04hx  es: %04hx  "
            "ss: %04hx  fs: %04hx  gs: %04hx\n",
-           context->cs, context->ds, context->es,
-           context->ss, context->fs, context->gs);
+           thread_state->CS,
+           thread_state->DS,
+           thread_state->ES,
+           thread_state->SS,
+           thread_state->FS,
+           thread_state->GS);
 
-    stack_pointer = (u32 *)context->esp;
+    stack_pointer = (u32 *)thread_state->ESP;
     for (i = 0; i < 48; i+=4) {
         printf("%08x:  %08x %08x %08x %08x\n",
-               context->esp + (i * 4),
+               thread_state->ESP + (i * 4),
                stack_pointer[i],
                stack_pointer[i+1],
                stack_pointer[i+2],
@@ -469,7 +485,7 @@ catch_exception_raise(mach_port_t exception_port,
             break;
         }
         /* Check if UD2 instruction */
-        if (*(unsigned short *)thread_state.eip != 0x0b0f) {
+        if (*(unsigned short *)thread_state.EIP != 0x0b0f) {
             /* KLUDGE: There are two ways we could get here:
              * 1) We're executing data and we've hit some truly
              *    illegal opcode, of which there are a few, see
@@ -485,26 +501,26 @@ catch_exception_raise(mach_port_t exception_port,
              */
             static mach_port_t last_thread;
             static unsigned int last_eip;
-            if (last_thread == thread && last_eip == thread_state.eip)
+            if (last_thread == thread && last_eip == thread_state.EIP)
                 ret = KERN_INVALID_RIGHT;
             else
                 ret = KERN_SUCCESS;
             last_thread = thread;
-            last_eip = thread_state.eip;
+            last_eip = thread_state.EIP;
             break;
         }
         /* Skip the trap code */
-        thread_state.eip += 2;
+        thread_state.EIP += 2;
         /* Return from handler? */
-        if (*(unsigned short *)thread_state.eip == 0xffff) {
+        if (*(unsigned short *)thread_state.EIP == 0xffff) {
             if ((ret = thread_set_state(thread,
                                         x86_THREAD_STATE32,
-                                        (thread_state_t)thread_state.eax,
+                                        (thread_state_t)thread_state.EAX,
                                         x86_THREAD_STATE32_COUNT)) != KERN_SUCCESS)
                 lose("thread_set_state (x86_THREAD_STATE32) failed %d\n", ret);
             if ((ret = thread_set_state(thread,
                                         x86_FLOAT_STATE32,
-                                        (thread_state_t)thread_state.ebx,
+                                        (thread_state_t)thread_state.EBX,
                                         x86_FLOAT_STATE32_COUNT)) != KERN_SUCCESS)
                 lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
             break;
