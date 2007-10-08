@@ -1,6 +1,7 @@
 *.d
 *.o
 *.fasl
+*.FASL
 *.lisp-temp
 *.tmp
 *~
@@ -16,6 +17,7 @@ src/runtime/Config
 src/runtime/genesis
 src/runtime/ldso-stubs.S
 src/runtime/sbcl
+src/runtime/sbcl.exe
 src/runtime/sbcl.h
 src/runtime/sbcl.nm
 src/runtime/target-arch-os.h
@@ -24,6 +26,7 @@ src/runtime/target-lispregs.h
 src/runtime/target-os.h
 tests/test-status.lisp-expr
 tools-for-build/grovel-headers
+tools-for-build/grovel-headers.exe
 contrib/*/test-passed
 contrib/*/foo.c
 contrib/*/a.out
