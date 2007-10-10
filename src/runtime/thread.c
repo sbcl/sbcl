@@ -235,7 +235,6 @@ create_cleanup_thread(struct thread *thread_to_be_cleaned_up)
             (os_vm_address_t) thread_to_be_cleaned_up->os_address;
         result = pthread_create(&thread, NULL, cleanup_thread, freeable);
         gc_assert(result == 0);
-        sched_yield();
     }
 }
 
@@ -368,10 +367,6 @@ create_thread_struct(lispobj initial_function) {
     int i;
 #endif
 
-#ifdef CREATE_CLEANUP_THREAD
-    /* Give a chance for cleanup threads to run. */
-    sched_yield();
-#endif
     /* May as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed.  SPACES must be page-aligned, since the GC expects the
