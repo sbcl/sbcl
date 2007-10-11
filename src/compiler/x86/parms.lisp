@@ -152,6 +152,13 @@
 ;;;     FYI, this can be looked at with the "pmap" program, and if you
 ;;;     set the top-down mmap allocation option in the kernel (not yet
 ;;;     the default), all bets are totally off!
+;;;   * For FreeBSD, the requirement of user and kernel space are
+;;;     getting larger, and users tend to extend them.
+;;;     If MAXDSIZ is extended from 512MB to 1GB, we can't use up to
+;;;     around 0x50000000.
+;;;     And if KVA_PAGES is extended from 1GB to 1.5GB, we can't use
+;;;     down to around 0xA0000000.
+;;;     So we use 0x58000000--0x98000000 for dynamic space.
 
 #!+win32
 (progn
@@ -204,8 +211,8 @@
   (def!constant static-space-start        #x01100000)
   (def!constant static-space-end          #x011ff000)
 
-  (def!constant dynamic-space-start       #x60000000)
-  (def!constant dynamic-space-end         #xA0000000)
+  (def!constant dynamic-space-start       #x58000000)
+  (def!constant dynamic-space-end         #x98000000)
 
   (def!constant linkage-table-space-start #x01200000)
   (def!constant linkage-table-space-end   #x012ff000))
