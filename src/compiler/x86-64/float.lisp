@@ -552,34 +552,61 @@
              (inst jmp :e target)
              (emit-label not-lab))))))
 
-;; XXX all of these probably have bad NaN behaviour
 (define-vop (<double-float double-float-compare)
   (:translate <)
   (:info target not-p)
-  (:generator 2
+  (:generator 3
     (inst comisd x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (cond (not-p
+           (inst jmp :p target)
+           (inst jmp :nc target))
+          (t
+           (let ((not-lab (gen-label)))
+             (inst jmp :p not-lab)
+             (inst jmp :c target)
+             (emit-label not-lab))))))
 
 (define-vop (<single-float single-float-compare)
   (:translate <)
   (:info target not-p)
-  (:generator 2
+  (:generator 3
     (inst comiss x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (cond (not-p
+           (inst jmp :p target)
+           (inst jmp :nc target))
+          (t
+           (let ((not-lab (gen-label)))
+             (inst jmp :p not-lab)
+             (inst jmp :c target)
+             (emit-label not-lab))))))
 
 (define-vop (>double-float double-float-compare)
   (:translate >)
   (:info target not-p)
-  (:generator 2
+  (:generator 3
     (inst comisd x y)
-    (inst jmp (if not-p :na :a) target)))
+    (cond (not-p
+           (inst jmp :p target)
+           (inst jmp :na target))
+          (t
+           (let ((not-lab (gen-label)))
+             (inst jmp :p not-lab)
+             (inst jmp :a target)
+             (emit-label not-lab))))))
 
 (define-vop (>single-float single-float-compare)
   (:translate >)
   (:info target not-p)
-  (:generator 2
+  (:generator 3
     (inst comiss x y)
-    (inst jmp (if not-p :na :a) target)))
+    (cond (not-p
+           (inst jmp :p target)
+           (inst jmp :na target))
+          (t
+           (let ((not-lab (gen-label)))
+             (inst jmp :p not-lab)
+             (inst jmp :a target)
+             (emit-label not-lab))))))
 
 
 

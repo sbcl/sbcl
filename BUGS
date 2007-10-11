@@ -1788,11 +1788,6 @@ WORKAROUND:
   implementation of read circularity, using a symbol as a marker for
   the previously-referenced object.
 
-411: NAN issues on x86-64
-  Test :NAN-COMPARISONS in float.pure.lisp fails on x86-64, and has been
-  disabled on those platforms. Since x86 does not exhibit any problems
-  the problem is probably with the new FP implementation.
-
 413: type-errors in ROOM
 
   (defvar *a* (make-array (expt 2 27)))
