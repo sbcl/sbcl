@@ -231,4 +231,14 @@
   (make-instance 'a :slot1 (lambda () 1))
   (make-instance 'b :slot1 (lambda () 1)))
 
-
+(with-test (:name :alternate-metaclass/standard-instance-structure-protocol)
+  (defclass my-alt-metaclass (standard-class) ())
+  (defmethod sb-mop:validate-superclass ((class my-alt-metaclass) superclass)
+    t)
+  (defclass my-alt-metaclass-instance-class ()
+    ((slot :type fixnum :initarg :slot))
+    (:metaclass my-alt-metaclass))
+  (defun make-my-instance (class)
+    (make-instance class :slot :not-a-fixnum))
+  (assert (raises-error? (make-my-instance 'my-alt-metaclass-instance-class)
+                         type-error)))

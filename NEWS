@@ -23,6 +23,11 @@ changes in sbcl-1.0.11 relative to sbcl-1.0.10:
   * bug fix: symbol-macro expansion now uses the *MACROEXPAND-HOOK*
     as specified by the CLHS. (thanks to Tobias Rittweiler)
   * bug fix: NaN comparison now works on x86-64.
+  * bug fix: CLOSE :ABORT T on a stream with pending output now
+    works.
+  * bug fix: instances of non-standard metaclasses using standard
+    instance structure protocol sometimes missed the slot type checks
+    in safe code.
 
 changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * minor incompatible change: the MSI installer on Windows no longer

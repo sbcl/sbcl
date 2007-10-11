@@ -588,7 +588,7 @@
                       (eq metaclass *the-class-funcallable-standard-class*))))))
          (save-type-check-function-p
           (unless bootstrap
-            (and save-slot-location-p (safe-p class)))))
+            (and (eq 'complete *boot-state*) (safe-p class)))))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
