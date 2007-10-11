@@ -117,7 +117,7 @@
   (let ((ibuf (fd-stream-ibuf fd-stream))
         (obuf (fd-stream-obuf fd-stream))
         (queue (loop for item in (fd-stream-output-queue fd-stream)
-                       when (bufferp item)
+                       when (buffer-p item)
                        collect (reset-buffer item))))
     (when ibuf
       (push (reset-buffer ibuf) queue))
