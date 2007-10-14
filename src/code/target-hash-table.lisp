@@ -481,6 +481,7 @@ multiple threads accessing the same hash-table without locking."
                 (zerop (hash-table-next-free-kv hash-table))))
          (rehash-without-growing-p ()
            (hash-table-needs-rehash-p hash-table)))
+    (declare (inline rehash-p rehash-without-growing-p))
     (cond ((rehash-p)
            ;; Use recursive spinlocks since for weak tables the
            ;; spinlock has already been acquired. GC must be inhibited
