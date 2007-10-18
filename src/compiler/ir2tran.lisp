@@ -1181,8 +1181,9 @@
                (ir2-physenv-return-pc env))
 
     #!+unwind-to-frame-and-call-vop
-    (when (and (policy fun (>= insert-debug-catch 2))
-               (lambda-return fun))
+    (when (and (lambda-allow-instrumenting fun)
+               (lambda-return fun)
+               (policy fun (>= insert-debug-catch 2)))
       (vop sb!vm::bind-sentinel node block))
 
     (let ((lab (gen-label)))
@@ -1211,7 +1212,8 @@
          (return-pc (ir2-physenv-return-pc env))
          (returns (tail-set-info (lambda-tail-set fun))))
     #!+unwind-to-frame-and-call-vop
-    (when (policy fun (>= insert-debug-catch 2))
+    (when (and (lambda-allow-instrumenting fun)
+               (policy fun (>= insert-debug-catch 2)))
       (vop sb!vm::unbind-sentinel node block))
     (cond
      ((and (eq (return-info-kind returns) :fixed)

@@ -962,7 +962,8 @@
   (call-lexenv nil :type (or lexenv null))
   ;; list of embedded lambdas
   (children nil :type list)
-  (parent nil :type (or clambda null)))
+  (parent nil :type (or clambda null))
+  (allow-instrumenting *allow-instrumenting* :type boolean))
 (defprinter (clambda :conc-name lambda- :identity t)
   %source-name
   %debug-name

@@ -843,12 +843,6 @@
              (:inline t)
              (:no-chance nil)
              ((nil :maybe-inline) (policy call (zerop space))))
-           ;; FIXME & KLUDGE: This LET-CONVERSION check was added as a
-           ;; half-assed workaround for the bug for which the test
-           ;; case :HIGH-DEBUG-KNOWN-FUNCTION-INLINING checks in
-           ;; compiler.pure.lisp. The _real_ culprit seems to be
-           ;; the insertion of BIND/UNBIND-SENTINEL vops.
-           (policy call (plusp let-conversion))
            (defined-fun-p leaf)
            (defined-fun-inline-expansion leaf)
            (let ((fun (defined-fun-functional leaf)))

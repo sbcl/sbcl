@@ -28,6 +28,7 @@ changes in sbcl-1.0.11 relative to sbcl-1.0.10:
   * bug fix: instances of non-standard metaclasses using standard
     instance structure protocol sometimes missed the slot type checks
     in safe code.
+  * bug fix: known functions can be inlined in high-debug code.
 
 changes in sbcl-1.0.10 relative to sbcl-1.0.9:
   * minor incompatible change: the MSI installer on Windows no longer
