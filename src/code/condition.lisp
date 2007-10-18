@@ -1287,15 +1287,16 @@ the values returned by the form as a list. No associated restarts."))
    CONTROL-ERROR if none exists."
   (invoke-restart (find-restart-or-control-error 'muffle-warning condition)))
 
+(defun try-restart (name condition &rest arguments)
+  (let ((restart (find-restart name condition)))
+    (when restart
+      (apply #'invoke-restart restart arguments))))
+
 (macrolet ((define-nil-returning-restart (name args doc)
              #!-sb-doc (declare (ignore doc))
              `(defun ,name (,@args &optional condition)
                 #!+sb-doc ,doc
-                ;; FIXME: Perhaps this shared logic should be pulled out into
-                ;; FLET MAYBE-INVOKE-RESTART? See whether it shrinks code..
-                (let ((restart (find-restart ',name condition)))
-                  (when restart
-                    (invoke-restart restart ,@args))))))
+                (try-restart ',name condition ,@args))))
   (define-nil-returning-restart continue ()
     "Transfer control to a restart named CONTINUE, or return NIL if none exists.")
   (define-nil-returning-restart store-value (value)
