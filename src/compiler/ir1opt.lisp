@@ -57,7 +57,8 @@
                      (values-type-union (node-derived-type (first current))
                                         res))
                 (current (rest uses) (rest current)))
-               ((null current) res)))
+               ((or (null current) (eq res *wild-type*))
+                res)))
           (t
            (node-derived-type (lvar-uses lvar))))))
 
