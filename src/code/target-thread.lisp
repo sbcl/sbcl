@@ -683,6 +683,7 @@ around and can be retrieved by JOIN-THREAD."
                   (*restart-clusters* nil)
                   (*handler-clusters* nil)
                   (*condition-restarts* nil)
+                  (sb!impl::*deadline* nil)
                   (sb!impl::*step-out* nil)
                   ;; internal printer variables
                   (sb!impl::*previous-case* nil)

@@ -9,8 +9,35 @@
 
 
 (assert-timeout
- (sb-impl::with-deadline (:seconds 1)
-   (run-program "sleep" '("5") :search t :wait t)))
+ (sb-sys:with-deadline (:seconds 1)
+   (run-program "sleep" '("3") :search t :wait t)))
+
+(let ((n 0)
+      (final nil))
+  (handler-case
+      (handler-bind ((sb-sys:deadline-timeout (lambda (c)
+                                                (when (< n 2)
+                                                  (incf n)
+                                                  (sb-sys:defer-deadline 0.1 c)))))
+        (sb-sys:with-deadline (:seconds 1)
+          (run-program "sleep" '("2") :search t :wait t)))
+    (sb-sys:deadline-timeout (c)
+      (setf final c)))
+  (assert (= n 2))
+  (assert final))
+
+(let ((n 0)
+      (final nil))
+  (handler-case
+      (handler-bind ((sb-sys:deadline-timeout (lambda (c)
+                                                (incf n)
+                                                (sb-sys:defer-deadline 0.1 c))))
+        (sb-sys:with-deadline (:seconds 1)
+          (run-program "sleep" '("2") :search t :wait t)))
+    (sb-sys:deadline-timeout (c)
+      (setf final c)))
+  (assert (plusp n))
+  (assert (not final)))
 
 #+(and sb-thread (not sb-lutex))
 (progn

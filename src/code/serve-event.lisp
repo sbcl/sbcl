@@ -146,17 +146,18 @@
   "Wait until FD is usable for DIRECTION. DIRECTION should be either :INPUT or
 :OUTPUT. TIMEOUT, if supplied, is the number of seconds to wait before giving
 up."
-  (let (usable)
-    (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
-        (decode-timeout timeout)
-      (declare (type (or integer null) to-sec to-usec))
-      (with-fd-handler (fd direction (lambda (fd)
-                                       (declare (ignore fd))
-                                       (setf usable t)))
-        (loop
+  (prog (usable)
+   :restart
+     (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
+         (decode-timeout timeout)
+       (declare (type (or integer null) to-sec to-usec))
+       (with-fd-handler (fd direction (lambda (fd)
+                                        (declare (ignore fd))
+                                        (setf usable t)))
+         (loop
            (sub-serve-event to-sec to-usec signalp)
            (when usable
-             (return t))
+             (return-from wait-until-fd-usable t))
            (when to-sec
              (multiple-value-bind (sec usec)
                  (decode-internal-time (get-internal-real-time))
@@ -168,8 +169,10 @@ up."
                       (setf to-usec (- stop-usec usec)))))
              (when (or (minusp to-sec) (minusp to-usec))
                (if signalp
-                   (signal-deadline)
-                   (return nil)))))))))
+                   (progn
+                     (signal-deadline)
+                     (go :restart))
+                   (return-from wait-until-fd-usable nil)))))))))
 
 ;;; Wait for up to timeout seconds for an event to happen. Make sure all
 ;;; pending events are processed before returning.
