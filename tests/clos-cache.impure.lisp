@@ -65,7 +65,7 @@
 
 (defun test-loop ()
   (note "/~S waiting for permission to run" sb-thread:*current-thread*)
-  (loop until *run-cache-test*)
+  (loop until *run-cache-test* do (sb-thread:thread-yield))
   (note "/~S joining the thundering herd" sb-thread:*current-thread*)
   (handler-case
       (loop repeat 1024 do (test-cache))

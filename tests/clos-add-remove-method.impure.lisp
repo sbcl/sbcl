@@ -77,12 +77,12 @@
 (defvar *run* nil)
 
 (defun remove-methods (list)
-  (loop until *run*)
+  (loop until *run* do (sb-thread:thread-yield))
   (dolist (method list)
     (remove-method #'foo method)))
 
 (defun add-methods (list)
-  (loop until *run*)
+  (loop until *run* do (sb-thread:thread-yield))
   (dolist (method list)
     (add-method #'foo method)))
 

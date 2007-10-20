@@ -729,3 +729,13 @@ void gc_start_the_world()
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
 #endif
+
+int
+thread_yield()
+{
+#ifdef LISP_FEATURE_SB_THREAD
+    return sched_yield();
+#else
+    return 0;
+#endif
+}

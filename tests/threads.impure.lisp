@@ -73,7 +73,8 @@
                (loop repeat 10
                      collect (sb-thread:make-thread
                               (lambda ()
-                                (loop until run)
+                                (loop until run
+                                   do (sb-thread:thread-yield))
                                 (loop repeat n do (,incf x)))))))
          (setf run t)
          (dolist (th threads)

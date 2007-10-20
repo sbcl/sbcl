@@ -43,6 +43,7 @@ threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 @include fun-sb-thread-interrupt-thread-error-thread.texinfo
 @include fun-sb-thread-interrupt-thread.texinfo
 @include fun-sb-thread-terminate-thread.texinfo
+@include fun-sb-thread-thread-yield.texinfo
 
 @node Special Variables
 @comment  node-name,  next,  previous,  up

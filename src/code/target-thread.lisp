@@ -844,6 +844,12 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
              (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
                                         sb!vm::thread-next-slot)))))))
 
+(define-alien-routine "thread_yield" int)
+
+#!+sb-doc
+(setf (fdocumentation 'thread-yield 'function)
+      "Yield the processor to other threads.")
+
 #!+sb-thread
 (defun symbol-value-in-thread (symbol thread-sap)
   (let* ((index (sb!vm::symbol-tls-index symbol))
