@@ -434,6 +434,25 @@ catch_exception_raise(mach_port_t exception_port,
             ret = KERN_INVALID_RIGHT;
             break;
         }
+        addr = (void*)code_vector[1];
+        /* Undefined alien */
+        if (os_trunc_to_page(addr) == undefined_alien_address) {
+            handler = undefined_alien_handler;
+            break;
+        }
+        /* At stack guard */
+        if (os_trunc_to_page(addr) == CONTROL_STACK_GUARD_PAGE(th)) {
+            protect_control_stack_guard_page_thread(0, th);
+            protect_control_stack_return_guard_page_thread(1, th);
+            handler = control_stack_exhausted_handler;
+            break;
+        }
+        /* Return from stack guard */
+        if (os_trunc_to_page(addr) == CONTROL_STACK_RETURN_GUARD_PAGE(th)) {
+            protect_control_stack_guard_page_thread(1, th);
+            protect_control_stack_return_guard_page_thread(0, th);
+            break;
+        }
         /* Get vm_region info */
         region_addr = (vm_address_t)code_vector[1];
         info_count = VM_REGION_BASIC_INFO_COUNT;
@@ -453,25 +472,6 @@ catch_exception_raise(mach_port_t exception_port,
            * Grep for "not marked as write-protected" in gencgc.c
            */
             ret = KERN_SUCCESS;
-            break;
-        }
-        addr = (void*)code_vector[1];
-        /* At stack guard */
-        if (os_trunc_to_page(addr) == CONTROL_STACK_GUARD_PAGE(th)) {
-            protect_control_stack_guard_page_thread(0, th);
-            protect_control_stack_return_guard_page_thread(1, th);
-            handler = control_stack_exhausted_handler;
-            break;
-        }
-        /* Return from stack guard */
-        if (os_trunc_to_page(addr) == CONTROL_STACK_RETURN_GUARD_PAGE(th)) {
-            protect_control_stack_guard_page_thread(1, th);
-            protect_control_stack_return_guard_page_thread(0, th);
-            break;
-        }
-        /* Undefined alien */
-        if (os_trunc_to_page(addr) == undefined_alien_address) {
-            handler = undefined_alien_handler;
             break;
         }
         /* Regular memory fault */
