@@ -21,7 +21,7 @@ rm -rf customize-target-features.lisp
 # could use, perhaps referring to SourceForge anoncvs, what'd be the
 # point? I'd expect a comfortable majority of those who want to do
 # CVS operations would be inclined to start with "cvs co" anyway.)
-find . \( -type d -a -name CVS \) -print | xargs rm -r
+find . \( -type d -a -name CVS \) -print0 | xargs -0 rm -r
 
 # Fall through to ordinary cleanup.
 sh clean.sh

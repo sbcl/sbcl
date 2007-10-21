@@ -30,7 +30,7 @@ for d in tools-for-build; do
     # is misleading when this script does lotso other operations too.
     # -- WHN
     $GNUMAKE -I ../src/runtime -s clean
-    cd $original_pwd > /dev/null
+    cd "$original_pwd" > /dev/null
 done
 ( cd ./doc ; sh ./clean.sh )
 
@@ -113,4 +113,4 @@ find . \( \
         -name 'tags' -o \
         -name 'test-passed' -o \
         -name 'ldso-stubs.S' -o \
-        -name 'local-target-features.lisp-expr' \) -print | xargs rm -f
+        -name 'local-target-features.lisp-expr' \) -print0 | xargs -0 rm -f
