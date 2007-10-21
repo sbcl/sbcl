@@ -384,14 +384,16 @@ static void freebsd_init()
      * x86-assem.S.
      */
 #ifdef LISP_FEATURE_X86
-    size_t len;
-    int instruction_sse;
+    {
+        size_t len;
+        int instruction_sse;
 
-    len = sizeof(instruction_sse);
-    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len, NULL, 0) == 0
-        && instruction_sse != 0) {
-        /* Use the SSE detector */
-        fast_bzero_pointer = fast_bzero_detect;
+        len = sizeof(instruction_sse);
+        if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len,
+                         NULL, 0) == 0 && instruction_sse != 0) {
+            /* Use the SSE detector */
+            fast_bzero_pointer = fast_bzero_detect;
+        }
     }
 #endif /* LISP_FEATURE_X86 */
 }
