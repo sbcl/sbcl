@@ -113,4 +113,4 @@ find . \( \
         -name 'tags' -o \
         -name 'test-passed' -o \
         -name 'ldso-stubs.S' -o \
-        -name 'local-target-features.lisp-expr' \) -print0 | xargs -0 rm -f
+        -name 'local-target-features.lisp-expr' \) -print | xargs rm -f
