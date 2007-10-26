@@ -102,13 +102,9 @@
                                              :stream *standard-input*)))
   ;; should be printable
   (dolist (c (list
-              ;; but not yet, o lord (should be fixed soon by WHN, in
-              ;; one or more commits ca. 1.0.9.55+, #+NILed out 'til
-              ;; then)
-              #+nil my-stream-error-1-0-9
-              #+nil parse-foo-error-1-0-9
-              ;; fixed, hallelujah
+              my-stream-error-1-0-9
+              parse-foo-error-1-0-9
               read-foo-error-1-0-9))
-    ;; escaped or not
+    ;; whether escaped or not
     (dolist (*print-escape* '(nil t))
       (write c :stream (make-string-output-stream)))))

@@ -619,9 +619,6 @@
 
 (define-condition simple-error (simple-condition error) ())
 
-;;; not specified by ANSI, but too useful not to have around.
-(define-condition simple-style-warning (simple-condition style-warning) ())
-
 (define-condition storage-condition (serious-condition) ())
 
 (define-condition type-error (error)
@@ -634,6 +631,8 @@
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
+;;; not specified by ANSI, but too useful not to have around.
+(define-condition simple-style-warning (simple-condition style-warning) ())
 (define-condition simple-type-error (simple-condition type-error) ())
 
 (define-condition program-error (error) ())
@@ -815,7 +814,8 @@
               <http://sbcl.sourceforge.net/>.~:@>"
              '((fmakunbound 'compile))))))
 
-(define-condition simple-storage-condition (storage-condition simple-condition) ())
+(define-condition simple-storage-condition (storage-condition simple-condition)
+  ())
 
 ;;; a condition for use in stubs for operations which aren't supported
 ;;; on some platforms
