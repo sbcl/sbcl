@@ -29,3 +29,36 @@
 
 (defpackage :PACKAGE-DESIGNATOR-2
   (:import-from #.(find-package :cl) "+"))
+
+(defpackage "EXAMPLE-INDIRECT"
+  (:import-from "CL" "+"))
+
+(defpackage "EXAMPLE-PACKAGE"
+  (:shadow "CAR")
+  (:shadowing-import-from "CL" "CAAR")
+  (:use)
+  (:import-from "CL" "CDR")
+  (:import-from "EXAMPLE-INDIRECT" "+")
+  (:export "CAR" "CDR" "EXAMPLE"))
+
+(flet ((check-symbol (name expected-status expected-home-name)
+         (multiple-value-bind (symbol status)
+             (find-symbol name "EXAMPLE-PACKAGE")
+           (let ((home (symbol-package symbol))
+                 (expected-home (find-package expected-home-name)))
+             (assert (eql home expected-home))
+             (assert (eql status expected-status))))))
+  (check-symbol "CAR" :external "EXAMPLE-PACKAGE")
+  (check-symbol "CDR" :external "CL")
+  (check-symbol "EXAMPLE" :external "EXAMPLE-PACKAGE")
+  (check-symbol "CAAR" :internal "CL")
+  (check-symbol "+" :internal "CL")
+  (check-symbol "CDDR" nil "CL"))
+
+(defpackage "TEST-ORIGINAL" (:nicknames "A-NICKNAME"))
+
+(assert (raises-error? (defpackage "A-NICKNAME")))
+
+(assert (eql (find-package "A-NICKNAME")
+             (find-package "TEST-ORIGINAL")))
+

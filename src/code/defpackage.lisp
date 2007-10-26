@@ -183,6 +183,111 @@
 (defun stringify-package-designators (package-designators)
   (mapcar #'stringify-package-designator package-designators))
 
+(defun import-list-symbols (import-list)
+  (let ((symbols nil))
+    (dolist (import import-list symbols)
+      (destructuring-bind (package-name &rest symbol-names)
+          import
+        (let ((package (find-undeleted-package-or-lose package-name)))
+          (mapcar (lambda (name)
+                    (push (find-or-make-symbol name package) symbols))
+                  symbol-names))))))
+
+(defun use-list-packages (package package-designators)
+  (cond ((listp package-designators)
+         (mapcar #'find-undeleted-package-or-lose package-designators))
+        (package
+         ;; :default for an existing package means preserve the
+         ;; existing use list
+         (package-use-list package))
+        (t
+         ;; :default for a new package is the *default-package-use-list*
+         '#.*default-package-use-list*)))
+
+(defun update-package (package nicknames source-location
+                       shadows shadowing-imports
+                       use
+                       imports interns
+                       exports
+                       implement lock doc-string)
+  (declare #!-sb-package-locks
+           (ignore implement lock))
+  (enter-new-nicknames package nicknames)
+  ;; 1. :shadow and :shadowing-import-from
+  ;;
+  ;; shadows is a list of strings, shadowing-imports is a list of symbols.
+  (shadow shadows package)
+  (shadowing-import shadowing-imports package)
+  ;; 2. :use
+  ;;
+  ;; use is a list of package objects.
+  (use-package use package)
+  ;; 3. :import-from and :intern
+  ;;
+  ;; imports is a list of symbols. interns is a list of strings.
+  (import imports package)
+  (dolist (intern interns)
+    (intern intern package))
+  ;; 4. :export
+  ;;
+  ;; exports is a list of strings
+  (export (mapcar (lambda (symbol-name) (intern symbol-name package))
+                  exports)
+          package)
+  ;; Everything was created: update metadata
+  (sb!c:with-source-location (source-location)
+    (setf (package-source-location package) source-location))
+  (setf (package-doc-string package) doc-string)
+  #!+sb-package-locks
+  (progn
+    ;; Handle packages this is an implementation package of
+    (dolist (p implement)
+      (add-implementation-package package p))
+    ;; Handle lock
+    (setf (package-lock package) lock))
+  package)
+
+(defun update-package-with-variance (package name nicknames source-location
+                                     shadows shadowing-imports
+                                     use
+                                     imports interns
+                                     exports
+                                     implement lock doc-string)
+  (let ((old-exports nil)
+        (old-shadows (package-%shadowing-symbols package))
+        (old-use (package-use-list package))
+        (no-longer-used nil))
+    (unless (string= (the string (package-name package)) name)
+      (error 'simple-package-error
+             :package name
+             :format-control "~A is a nickname for the package ~A"
+             :format-arguments (list name (package-name name))))
+    (do-external-symbols (symbol package)
+      (push symbol old-exports))
+    (setf old-shadows (set-difference old-shadows (append shadows
+                                                          shadowing-imports)
+                                      :test #'string=))
+    (setf no-longer-used (set-difference old-use use))
+    (setf use (set-difference use old-use))
+    (setf old-exports (set-difference old-exports exports :test #'string=))
+    (when old-shadows
+      (warn 'package-at-variance
+            :format-control "~A also shadows the following symbols:~%  ~S"
+            :format-arguments (list name old-shadows)))
+    (when no-longer-used
+      (dolist (unused-package no-longer-used)
+        (unuse-package unused-package package))
+      (warn 'package-at-variance
+            :format-control "~A used to use the following packages:~%  ~S"
+            :format-arguments (list name no-longer-used)))
+    (when old-exports
+      (warn 'package-at-variance
+            :format-control "~A also exports the following symbols:~%  ~S"
+            :format-arguments (list name old-exports)))
+    (update-package package nicknames source-location
+                    shadows shadowing-imports
+                    use imports interns exports
+                    implement lock doc-string)))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
                     use imports interns exports implement lock doc-string
@@ -194,80 +299,25 @@
            (type (or simple-string null) doc-string)
            #!-sb-package-locks
            (ignore implement lock))
-  (let ((package (or (find-package name)
-                     (progn
-                       (when (eq use :default)
-                         (setf use '#.*default-package-use-list*))
-                       (make-package name
+  (let* ((existing-package (find-package name))
+         (use (use-list-packages existing-package use))
+         (shadowing-imports (import-list-symbols shadowing-imports))
+         (imports (import-list-symbols imports)))
+    (if existing-package
+        (update-package-with-variance existing-package name
+                                      nicknames source-location
+                                      shadows shadowing-imports
+                                      use imports interns exports
+                                      implement lock doc-string)
+        (let ((package (make-package name
                                      :use nil
                                      :internal-symbols (or size 10)
-                                     :external-symbols (length exports))))))
-    (sb!c:with-source-location (source-location)
-      (setf (package-source-location package) source-location))
-    (unless (string= (the string (package-name package)) name)
-      (error 'simple-package-error
-             :package name
-             :format-control "~A is a nickname for the package ~A"
-             :format-arguments (list name (package-name name))))
-    (enter-new-nicknames package nicknames)
-    ;; Handle shadows and shadowing-imports.
-    (let ((old-shadows (package-%shadowing-symbols package)))
-      (shadow shadows package)
-      (dolist (sym-name shadows)
-        (setf old-shadows (remove (find-symbol sym-name package) old-shadows)))
-      (dolist (simports-from shadowing-imports)
-        (let ((other-package (find-undeleted-package-or-lose
-                              (car simports-from))))
-          (dolist (sym-name (cdr simports-from))
-            (let ((sym (find-or-make-symbol sym-name other-package)))
-              (shadowing-import sym package)
-              (setf old-shadows (remove sym old-shadows))))))
-      (when old-shadows
-        (warn 'package-at-variance
-              :format-control "~A also shadows the following symbols:~%  ~S"
-              :format-arguments (list name old-shadows))))
-    ;; Handle USE.
-    (unless (eq use :default)
-      (let ((old-use-list (package-use-list package))
-            (new-use-list (mapcar #'find-undeleted-package-or-lose use)))
-        (use-package (set-difference new-use-list old-use-list) package)
-        (let ((laterize (set-difference old-use-list new-use-list)))
-          (when laterize
-            (unuse-package laterize package)
-            (warn 'package-at-variance
-                  :format-control "~A used to use the following packages:~%  ~S"
-                  :format-arguments (list name laterize))))))
-    ;; Handle IMPORT and INTERN.
-    (dolist (sym-name interns)
-      (intern sym-name package))
-    (dolist (imports-from imports)
-      (let ((other-package (find-undeleted-package-or-lose (car
-                                                            imports-from))))
-        (dolist (sym-name (cdr imports-from))
-          (import (list (find-or-make-symbol sym-name other-package))
-                  package))))
-    ;; Handle exports.
-    (let ((old-exports nil)
-          (exports (mapcar (lambda (sym-name) (intern sym-name package))
-                           exports)))
-      (do-external-symbols (sym package)
-        (push sym old-exports))
-      (export exports package)
-      (let ((diff (set-difference old-exports exports)))
-        (when diff
-          (warn 'package-at-variance
-                :format-control "~A also exports the following symbols:~%  ~S"
-                :format-arguments (list name diff)))))
-    #!+sb-package-locks
-    (progn
-      ;; Handle packages this is an implementation package of
-      (dolist (p implement)
-        (add-implementation-package package p))
-      ;; Handle lock
-      (setf (package-lock package) lock))
-    ;; Handle documentation.
-    (setf (package-doc-string package) doc-string)
-    package))
+                                     :external-symbols (length exports))))
+          (update-package package
+                          nicknames source-location
+                          shadows shadowing-imports
+                          use imports interns exports
+                          implement lock doc-string)))))
 
 (defun find-or-make-symbol (name package)
   (multiple-value-bind (symbol how) (find-symbol name package)
