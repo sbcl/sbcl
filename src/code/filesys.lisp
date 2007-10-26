@@ -572,7 +572,7 @@ otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
 (defun sbcl-homedir-pathname ()
   (let ((sbcl-home (posix-getenv "SBCL_HOME")))
     ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
-    (when sbcl-home
+    (when (and sbcl-home (not (string= sbcl-home "")))
       (parse-native-namestring
        (ensure-trailing-slash sbcl-home)))))
 
@@ -587,8 +587,7 @@ system."
   (let ((env-home (posix-getenv "HOME")))
     (parse-native-namestring
      (ensure-trailing-slash
-      (if (and env-home
-               (not (equal env-home "")))
+      (if (and env-home (not (string= env-home "")))
           env-home
           #!-win32
           (sb!unix:uid-homedir (sb!unix:unix-getuid))

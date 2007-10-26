@@ -1191,7 +1191,7 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
 
   (defun contrib-sysdef-search (system)
     (let ((home (sb-ext:posix-getenv "SBCL_HOME")))
-      (when home
+      (when (and home (not (string= home "")))
         (let* ((name (coerce-name system))
                (home (truename home))
                (contrib (merge-pathnames
@@ -1205,7 +1205,7 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
 
   (pushnew
    '(let ((home (sb-ext:posix-getenv "SBCL_HOME")))
-      (when home
+      (when (and home (not (string= home "")))
         (merge-pathnames "site-systems/" (truename home))))
    *central-registry*)
 

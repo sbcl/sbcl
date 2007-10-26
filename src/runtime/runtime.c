@@ -194,7 +194,7 @@ search_for_core ()
     char *stem = "/sbcl.core";
     char *core;
 
-    if(!sbcl_home) sbcl_home = SBCL_HOME;
+    if (!(sbcl_home && *sbcl_home)) sbcl_home = SBCL_HOME;
     lookhere = (char *) calloc(strlen(sbcl_home) +
                                strlen(stem) +
                                1,
@@ -234,6 +234,7 @@ main(int argc, char *argv[], char *envp[])
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
+    const char *sbcl_home = getenv("SBCL_HOME");
 
     interrupt_init();
     block_blockable_signals();
@@ -361,8 +362,9 @@ main(int argc, char *argv[], char *envp[])
        }
     }
 
-    /* Make sure that SBCL_HOME is set, unless loading an embedded core. */
-    if (!getenv("SBCL_HOME") && embedded_core_offset == 0) {
+    /* Make sure that SBCL_HOME is set and not the empty string,
+       unless loading an embedded core. */
+    if (!(sbcl_home && *sbcl_home) && embedded_core_offset == 0) {
         char *envstring, *copied_core, *dir;
         char *stem = "SBCL_HOME=";
         copied_core = copied_string(core);

@@ -187,7 +187,8 @@ code:
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
     (unless (do-not-grovel component)
-      (let* ((cc (or (sb-ext:posix-getenv "CC")
+      (let* ((cc (or (and (string/= (sb-ext:posix-getenv "CC") "")
+                          (sb-ext:posix-getenv "CC"))
                      ;; It might be nice to include a CONTINUE or
                      ;; USE-VALUE restart here, but ASDF seems to insist
                      ;; on handling the errors itself.
