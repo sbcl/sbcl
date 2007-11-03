@@ -254,14 +254,14 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
      */
 
     os_context_t *context;
-#if __DARWIN_UNIX03
+#if MAC_OS_X_VERSION_10_5
     struct __darwin_mcontext32 *regs;
 #else
     struct mcontext *regs;
 #endif
 
     context = (os_context_t*) os_validate(0, sizeof(os_context_t));
-#if __DARWIN_UNIX03
+#if MAC_OS_X_VERSION_10_5
     regs = (struct __darwin_mcontext32*) os_validate(0, sizeof(struct __darwin_mcontext32));
 #else
     regs = (struct mcontext*) os_validate(0, sizeof(struct mcontext));
@@ -285,7 +285,7 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
     update_thread_state_from_context(thread_state, float_state, context);
 
     os_invalidate((os_vm_address_t)context, sizeof(os_context_t));
-#if __DARWIN_UNIX03
+#if MAC_OS_X_VERSION_10_5
     os_invalidate((os_vm_address_t)regs, sizeof(struct __darwin_mcontext32));
 #else
     os_invalidate((os_vm_address_t)regs, sizeof(struct mcontext));

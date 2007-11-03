@@ -20,10 +20,10 @@ void set_data_desc_addr(data_desc_t* desc, void* addr);
 
 /* As of XCode 3.0, the field names for the thread state have changed
  * and now are prepended with __. Use some #define hackery to deal
- * with this. __DARWIN_UNIX03 seems to be a good test to see if we
- * need the new style field names.
+ * with this. MAC_OS_X_VERSION_10_5 seems to be a good test to see if
+ * we need the new style field names.
  */
-#if __DARWIN_UNIX03
+#if MAC_OS_X_VERSION_10_5
 
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->__ss.__##stem
 #define EIP __eip
@@ -63,7 +63,7 @@ void set_data_desc_addr(data_desc_t* desc, void* addr);
 #define SS ss
 #define GS gs
 
-#endif /* __DARWIN_UNIX03 */
+#endif /* MAC_OS_X_VERSION_10_5 */
 
 
 
