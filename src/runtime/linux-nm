@@ -6,4 +6,4 @@
 # " A " is a global absolute symbol, that is a symbol with a fixed
 # assembly time value (which is used for offset calculations).
 
-nm -p "$@" | grep -v " [abcdgIiNnrstUuvw?-] "
+nm -p "$@" | GREP_OPTIONS='' grep -v " [abcdgIiNnrstUuvw?-] "
