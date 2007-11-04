@@ -10,6 +10,7 @@ output
 obj
 local-target-features.lisp-expr
 customize-target-features.lisp
+whitespace-stamp
 src/assembly/target
 src/compiler/assembly
 src/compiler/target
