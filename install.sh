@@ -112,7 +112,8 @@ for info in doc/manual/*.info
 do
   cp $info "$BUILD_ROOT$INFO_DIR"/ \
       && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir" \
-      && ( install-info "$BUILD_ROOT$INFO_DIR"/`basename $info` "$BUILD_ROOT$INFO_DIR"/dir > /dev/null 2>&1 \
+      && ( install-info --info-dir="$BUILD_ROOT$INFO_DIR" \
+        "$BUILD_ROOT$INFO_DIR"/`basename $info` > /dev/null 2>&1 \
            || echo -n " (could not add to system catalog)" ) \
       && echo
 done
