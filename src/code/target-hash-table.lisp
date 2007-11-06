@@ -497,8 +497,7 @@ multiple threads accessing the same hash-table without locking."
            (sb!thread::with-recursive-system-spinlock
                ((hash-table-spinlock hash-table) :without-gcing t)
              (when (rehash-without-growing-p)
-               (without-gcing
-                 (rehash-without-growing hash-table))))))))
+               (rehash-without-growing hash-table)))))))
 
 (declaim (inline update-hash-table-cache))
 (defun update-hash-table-cache (hash-table index)
