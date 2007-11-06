@@ -840,8 +840,12 @@ multiple threads accessing the same hash-table without locking."
 (declaim (inline maphash))
 (defun maphash (function-designator hash-table)
   #!+sb-doc
-  "For each entry in HASH-TABLE, call the designated two-argument function on
-the key and value of the entry. Return NIL."
+  "For each entry in HASH-TABLE, call the designated two-argument
+function on the key and value of the entry. Return NIL.
+
+Consequences are undefined if HASH-TABLE is mutated during the call to
+MAPHASH, except for changing or removing elements corresponding to the
+current key."
   ;; This essentially duplicates WITH-HASH-TABLE-ITERATOR, so
   ;; any changes here should be reflected there as well.
   (let ((fun (%coerce-callable-to-fun function-designator))

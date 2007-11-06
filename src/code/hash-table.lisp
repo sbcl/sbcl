@@ -95,11 +95,16 @@
   #!+sb-doc
   "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body)
 
-Provides a method of manually looping over the elements of a hash-table.
-FUNCTION is bound to a generator-macro that, within the scope of the
-invocation, returns one or three values. The first value tells whether any
-objects remain in the hash table. When the first value is non-NIL, the second
-and third values are the key and the value of the next object."
+Provides a method of manually looping over the elements of a
+hash-table. FUNCTION is bound to a generator-macro that, within the
+scope of the invocation, returns one or three values. The first value
+tells whether any objects remain in the hash table. When the first
+value is non-NIL, the second and third values are the key and the
+value of the next object.
+
+Consequences are undefined if HASH-TABLE is mutated during execution
+of BODY, except for changing or removing elements corresponding to the
+current key."
   ;; This essentially duplicates MAPHASH, so any changes here should
   ;; be reflected there as well.
   (let ((n-function (gensym "WITH-HASH-TABLE-ITERATOR-")))
