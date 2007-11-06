@@ -531,18 +531,20 @@
 ;;; helper for alien stuff.
 (def!macro with-pinned-objects ((&rest objects) &body body)
   "Arrange with the garbage collector that the pages occupied by
-OBJECTS will not be moved in memory for the duration of BODY.
-Useful for e.g. foreign calls where another thread may trigger
-garbage collection"
-  `(multiple-value-prog1
-       (progn
-         ,@(loop for p in objects
-                 collect `(push-word-on-c-stack
-                           (int-sap (sb!kernel:get-lisp-obj-address ,p))))
-         ,@body)
-     ;; If the body returned normally, we should restore the stack pointer
-     ;; for the benefit of any following code in the same function.  If
-     ;; there's a non-local exit in the body, sp is garbage anyway and
-     ;; will get set appropriately from {a, the} frame pointer before it's
-     ;; next needed
-     (pop-words-from-c-stack ,(length objects))))
+OBJECTS will not be moved in memory for the duration of BODY. Useful
+for e.g. foreign calls where another thread may trigger garbage
+collection"
+  (if objects
+      `(multiple-value-prog1
+           (progn
+             ,@(loop for p in objects
+                     collect `(push-word-on-c-stack
+                               (int-sap (sb!kernel:get-lisp-obj-address ,p))))
+             ,@body)
+         ;; If the body returned normally, we should restore the stack pointer
+         ;; for the benefit of any following code in the same function.  If
+         ;; there's a non-local exit in the body, sp is garbage anyway and
+         ;; will get set appropriately from {a, the} frame pointer before it's
+         ;; next needed
+         (pop-words-from-c-stack ,(length objects)))
+      `(progn ,@body)))
