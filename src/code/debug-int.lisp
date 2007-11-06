@@ -320,8 +320,6 @@
                                  (%function nil)))
             (:copier nil))
   %name)
-
-(defvar *ir1-lambda-debug-fun* (make-hash-table :test 'eq))
 
 ;;;; DEBUG-BLOCKs
 
@@ -356,8 +354,6 @@
                                  (:copier nil))
   ;; code-location information for the block
   (code-locations nil :type simple-vector))
-
-(defvar *ir1-block-debug-block* (make-hash-table :test 'eq))
 
 ;;;; breakpoints
 
