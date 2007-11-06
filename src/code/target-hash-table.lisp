@@ -221,7 +221,7 @@
            ;; correctness. It just seems to work. -- CSR, 2002-11-02
            (scaled-size (truncate (/ (float size+1) rehash-threshold)))
            (length (ceil-power-of-two (max scaled-size
-                                        (1+ +min-hash-table-size+))))
+                                           (1+ +min-hash-table-size+))))
            (index-vector (make-array length
                                      :element-type
                                      '(unsigned-byte #.sb!vm:n-word-bits)
@@ -313,11 +313,11 @@ multiple threads accessing the same hash-table without locking."
          (old-size (length old-next-vector))
          (new-size
           (ceil-power-of-two
-          (let ((rehash-size (hash-table-rehash-size table)))
-            (etypecase rehash-size
-              (fixnum
-               (+ rehash-size old-size))
-              (float
+           (let ((rehash-size (hash-table-rehash-size table)))
+             (etypecase rehash-size
+               (fixnum
+                (+ rehash-size old-size))
+               (float
                 (the index (truncate (* rehash-size old-size))))))))
          (new-kv-vector (make-array (* 2 new-size)
                                     :initial-element +empty-ht-slot+))
@@ -565,35 +565,35 @@ multiple threads accessing the same hash-table without locking."
          ;; Note that it's OK for a GC + a REHASH-WITHOUT-GROWING to
          ;; be triggered by another thread after this point, since the
          ;; GC epoch check will catch it.
-    (let ((cache (hash-table-cache hash-table))
-          (table (hash-table-table hash-table)))
+         (let ((cache (hash-table-cache hash-table))
+               (table (hash-table-table hash-table)))
            ;; First check the cache.  Use EQ here for speed.
            (if (and cache
                     (< cache (length table))
                     (eq (aref table cache) key))
                (let ((value (aref table (1+ cache))))
                  (result value t))
-          ;; Search for key in the hash table.
-          (multiple-value-bind (hashing eq-based)
-              (funcall (hash-table-hash-fun hash-table) key)
-            (declare (type hash hashing))
-            (let* ((index-vector (hash-table-index-vector hash-table))
-                   (length (length index-vector))
+               ;; Search for key in the hash table.
+               (multiple-value-bind (hashing eq-based)
+                   (funcall (hash-table-hash-fun hash-table) key)
+                 (declare (type hash hashing))
+                 (let* ((index-vector (hash-table-index-vector hash-table))
+                        (length (length index-vector))
                         (index (index-for-hashing hashing length))
-                   (next (aref index-vector index))
-                   (next-vector (hash-table-next-vector hash-table))
-                   (hash-vector (hash-table-hash-vector hash-table))
-                   (test-fun (hash-table-test-fun hash-table)))
-              (declare (type index index))
-              ;; Search next-vector chain for a matching key.
-              (if (or eq-based (not hash-vector))
+                        (next (aref index-vector index))
+                        (next-vector (hash-table-next-vector hash-table))
+                        (hash-vector (hash-table-hash-vector hash-table))
+                        (test-fun (hash-table-test-fun hash-table)))
+                   (declare (type index index))
+                   ;; Search next-vector chain for a matching key.
+                   (if (or eq-based (not hash-vector))
                        (do ((next next (aref next-vector next))
                             (i 0 (1+ i)))
                            ((zerop next) (result default nil))
                          (declare (type index/2 next i))
                          (when (> i length)
                            (overflow))
-                    (when (eq key (aref table (* 2 next)))
+                         (when (eq key (aref table (* 2 next)))
                            (update-hash-table-cache hash-table (* 2 next))
                            (let ((value (aref table (1+ (* 2 next)))))
                              (result value t))))
@@ -603,10 +603,10 @@ multiple threads accessing the same hash-table without locking."
                          (declare (type index/2 next i))
                          (when (> i length)
                            (overflow))
-                    (when (and (= hashing (aref hash-vector next))
+                         (when (and (= hashing (aref hash-vector next))
                                     (funcall test-fun key
                                              (aref table (* 2 next))))
-                      ;; Found.
+                           ;; Found.
                            (update-hash-table-cache hash-table (* 2 next))
                            (let ((value (aref table (1+ (* 2 next)))))
                              (result value t)))))))))))))
@@ -625,75 +625,75 @@ multiple threads accessing the same hash-table without locking."
 (declaim (maybe-inline %%puthash))
 (defun %%puthash (key hash-table value)
   (declare (optimize speed))
-    ;; We need to rehash here so that a current key can be found if it
-    ;; exists. Check that there is room for one more entry. May not be
-    ;; needed if the key is already present.
+  ;; We need to rehash here so that a current key can be found if it
+  ;; exists. Check that there is room for one more entry. May not be
+  ;; needed if the key is already present.
   (maybe-rehash hash-table t)
-          ;; Search for key in the hash table.
-          (multiple-value-bind (hashing eq-based)
-              (funcall (hash-table-hash-fun hash-table) key)
-            (declare (type hash hashing))
-            (let* ((index-vector (hash-table-index-vector hash-table))
-                   (length (length index-vector))
+  ;; Search for key in the hash table.
+  (multiple-value-bind (hashing eq-based)
+      (funcall (hash-table-hash-fun hash-table) key)
+    (declare (type hash hashing))
+    (let* ((index-vector (hash-table-index-vector hash-table))
+           (length (length index-vector))
            (index (index-for-hashing hashing length))
-                   (next (aref index-vector index))
-                   (kv-vector (hash-table-table hash-table))
-                   (next-vector (hash-table-next-vector hash-table))
-                   (hash-vector (hash-table-hash-vector hash-table))
-                   (test-fun (hash-table-test-fun hash-table)))
-              (declare (type index index next))
-              (when (hash-table-weakness hash-table)
-                (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
-              (cond ((or eq-based (not hash-vector))
-                     (when eq-based
-                       (set-header-data kv-vector
-                                        sb!vm:vector-valid-hashing-subtype))
-                     ;; Search next-vector chain for a matching key.
+           (next (aref index-vector index))
+           (kv-vector (hash-table-table hash-table))
+           (next-vector (hash-table-next-vector hash-table))
+           (hash-vector (hash-table-hash-vector hash-table))
+           (test-fun (hash-table-test-fun hash-table)))
+      (declare (type index index next))
+      (when (hash-table-weakness hash-table)
+        (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
+      (cond ((or eq-based (not hash-vector))
+             (when eq-based
+               (set-header-data kv-vector
+                                sb!vm:vector-valid-hashing-subtype))
+             ;; Search next-vector chain for a matching key.
              (do ((next next (aref next-vector next))
                   (i 0 (1+ i)))
-                         ((zerop next))
+                 ((zerop next))
                (declare (type index/2 next i))
                (when (> i length)
                  (signal-corrupt-hash-table hash-table))
-                       (when (eq key (aref kv-vector (* 2 next)))
-                         ;; Found, just replace the value.
+               (when (eq key (aref kv-vector (* 2 next)))
+                 ;; Found, just replace the value.
                  (update-hash-table-cache hash-table (* 2 next))
-                         (setf (aref kv-vector (1+ (* 2 next))) value)
+                 (setf (aref kv-vector (1+ (* 2 next))) value)
                  (return-from %%puthash value))))
-                    (t
-                     ;; Search next-vector chain for a matching key.
+            (t
+             ;; Search next-vector chain for a matching key.
              (do ((next next (aref next-vector next))
                   (i 0 (1+ i)))
-                         ((zerop next))
+                 ((zerop next))
                (declare (type index/2 next i))
                (when (> i length)
                  (signal-corrupt-hash-table hash-table))
-                       (when (and (= hashing (aref hash-vector next))
-                                  (funcall test-fun key
-                                           (aref kv-vector (* 2 next))))
-                         ;; Found, just replace the value.
+               (when (and (= hashing (aref hash-vector next))
+                          (funcall test-fun key
+                                   (aref kv-vector (* 2 next))))
+                 ;; Found, just replace the value.
                  (update-hash-table-cache hash-table (* 2 next))
-                         (setf (aref kv-vector (1+ (* 2 next))) value)
+                 (setf (aref kv-vector (1+ (* 2 next))) value)
                  (return-from %%puthash value)))))
-              ;; Pop a KV slot off the free list
-              (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
-                (declare (type index/2 free-kv-slot))
-                ;; Double-check for overflow.
-                (aver (not (zerop free-kv-slot)))
-                (setf (hash-table-next-free-kv hash-table)
-                      (aref next-vector free-kv-slot))
-                (incf (hash-table-number-entries hash-table))
+      ;; Pop a KV slot off the free list
+      (let ((free-kv-slot (hash-table-next-free-kv hash-table)))
+        (declare (type index/2 free-kv-slot))
+        ;; Double-check for overflow.
+        (aver (not (zerop free-kv-slot)))
+        (setf (hash-table-next-free-kv hash-table)
+              (aref next-vector free-kv-slot))
+        (incf (hash-table-number-entries hash-table))
         (update-hash-table-cache hash-table (* 2 free-kv-slot))
-                (setf (aref kv-vector (* 2 free-kv-slot)) key)
-                (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
-                ;; Setup the hash-vector if necessary.
-                (when hash-vector
-                  (if (not eq-based)
-                      (setf (aref hash-vector free-kv-slot) hashing)
-                      (aver (= (aref hash-vector free-kv-slot)
-                               +magic-hash-vector-value+))))
-                ;; Push this slot into the next chain.
-                (setf (aref next-vector free-kv-slot) next)
+        (setf (aref kv-vector (* 2 free-kv-slot)) key)
+        (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
+        ;; Setup the hash-vector if necessary.
+        (when hash-vector
+          (if (not eq-based)
+              (setf (aref hash-vector free-kv-slot) hashing)
+              (aver (= (aref hash-vector free-kv-slot)
+                       +magic-hash-vector-value+))))
+        ;; Push this slot into the next chain.
+        (setf (aref next-vector free-kv-slot) next)
         (setf (aref index-vector index) free-kv-slot)))
     value))
 
@@ -714,8 +714,8 @@ multiple threads accessing the same hash-table without locking."
 
 (declaim (maybe-inline %remhash))
 (defun %remhash (key hash-table)
-    ;; We need to rehash here so that a current key can be found if it
-    ;; exists.
+  ;; We need to rehash here so that a current key can be found if it
+  ;; exists.
   ;;
   ;; Note that if a GC happens after MAYBE-REHASH returns and another
   ;; thread the accesses the table (triggering a rehash), we might not
@@ -723,67 +723,67 @@ multiple threads accessing the same hash-table without locking."
   ;; only concurrent case that we safely allow is multiple readers
   ;; with no writers.
   (maybe-rehash hash-table nil)
-    ;; Search for key in the hash table.
-    (multiple-value-bind (hashing eq-based)
-        (funcall (hash-table-hash-fun hash-table) key)
-      (declare (type hash hashing))
-      (let* ((index-vector (hash-table-index-vector hash-table))
-             (length (length index-vector))
+  ;; Search for key in the hash table.
+  (multiple-value-bind (hashing eq-based)
+      (funcall (hash-table-hash-fun hash-table) key)
+    (declare (type hash hashing))
+    (let* ((index-vector (hash-table-index-vector hash-table))
+           (length (length index-vector))
            (index (index-for-hashing hashing length))
-             (next (aref index-vector index))
-             (table (hash-table-table hash-table))
-             (next-vector (hash-table-next-vector hash-table))
-             (hash-vector (hash-table-hash-vector hash-table))
-             (test-fun (hash-table-test-fun hash-table)))
-        (declare (type index index)
-                 (type index/2 next))
-        (flet ((clear-slot (chain-vector prior-slot-location slot-location)
-                 (declare (type index/2 slot-location))
-                 ;; Mark slot as empty.
-                 (setf (aref table (* 2 slot-location)) +empty-ht-slot+
-                       (aref table (1+ (* 2 slot-location))) +empty-ht-slot+)
-                 ;; Update the prior pointer in the chain to skip this.
-                 (setf (aref chain-vector prior-slot-location)
-                       (aref next-vector slot-location))
-                 ;; Push KV slot onto free chain.
-                 (setf (aref next-vector slot-location)
-                       (hash-table-next-free-kv hash-table))
-                 (setf (hash-table-next-free-kv hash-table) slot-location)
-                 (when hash-vector
-                   (setf (aref hash-vector slot-location)
-                         +magic-hash-vector-value+))
-                 (decf (hash-table-number-entries hash-table))
-                 t))
-          (cond ((zerop next)
-                 nil)
-                ((if (or eq-based (not hash-vector))
-                     (eq key (aref table (* 2 next)))
-                     (and (= hashing (aref hash-vector next))
-                          (funcall test-fun key (aref table (* 2 next)))))
-                 (clear-slot index-vector index next))
-                ;; Search next-vector chain for a matching key.
-                ((or eq-based (not hash-vector))
-                 ;; EQ based
-                 (do ((prior next next)
+           (next (aref index-vector index))
+           (table (hash-table-table hash-table))
+           (next-vector (hash-table-next-vector hash-table))
+           (hash-vector (hash-table-hash-vector hash-table))
+           (test-fun (hash-table-test-fun hash-table)))
+      (declare (type index index)
+               (type index/2 next))
+      (flet ((clear-slot (chain-vector prior-slot-location slot-location)
+               (declare (type index/2 slot-location))
+               ;; Mark slot as empty.
+               (setf (aref table (* 2 slot-location)) +empty-ht-slot+
+                     (aref table (1+ (* 2 slot-location))) +empty-ht-slot+)
+               ;; Update the prior pointer in the chain to skip this.
+               (setf (aref chain-vector prior-slot-location)
+                     (aref next-vector slot-location))
+               ;; Push KV slot onto free chain.
+               (setf (aref next-vector slot-location)
+                     (hash-table-next-free-kv hash-table))
+               (setf (hash-table-next-free-kv hash-table) slot-location)
+               (when hash-vector
+                 (setf (aref hash-vector slot-location)
+                       +magic-hash-vector-value+))
+               (decf (hash-table-number-entries hash-table))
+               t))
+        (cond ((zerop next)
+               nil)
+              ((if (or eq-based (not hash-vector))
+                   (eq key (aref table (* 2 next)))
+                   (and (= hashing (aref hash-vector next))
+                        (funcall test-fun key (aref table (* 2 next)))))
+               (clear-slot index-vector index next))
+              ;; Search next-vector chain for a matching key.
+              ((or eq-based (not hash-vector))
+               ;; EQ based
+               (do ((prior next next)
                     (i 0 (1+ i))
-                      (next (aref next-vector next) (aref next-vector next)))
-                     ((zerop next) nil)
-                   (declare (type index next))
+                    (next (aref next-vector next) (aref next-vector next)))
+                   ((zerop next) nil)
+                 (declare (type index next))
                  (when (> i length)
                    (signal-corrupt-hash-table hash-table))
-                   (when (eq key (aref table (* 2 next)))
+                 (when (eq key (aref table (* 2 next)))
                    (return-from %remhash (clear-slot next-vector prior next)))))
-                (t
-                 ;; not EQ based
-                 (do ((prior next next)
+              (t
+               ;; not EQ based
+               (do ((prior next next)
                     (i 0 (1+ i))
-                      (next (aref next-vector next) (aref next-vector next)))
-                     ((zerop next) nil)
-                   (declare (type index/2 next))
+                    (next (aref next-vector next) (aref next-vector next)))
+                   ((zerop next) nil)
+                 (declare (type index/2 next))
                  (when (> i length)
                    (signal-corrupt-hash-table hash-table))
-                   (when (and (= hashing (aref hash-vector next))
-                              (funcall test-fun key (aref table (* 2 next))))
+                 (when (and (= hashing (aref hash-vector next))
+                            (funcall test-fun key (aref table (* 2 next))))
                    (return-from %remhash
                      (clear-slot next-vector prior next))))))))))
 
