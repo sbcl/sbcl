@@ -2639,13 +2639,6 @@ register."
 ;;; Given the DEFUN, 3 gets you the LET, 1 gets you the bindings, 0
 ;;; gets the first binding, and 1 gets the AREF form.
 
-;;; temporary buffer used to build form-number => source-path translation in
-;;; FORM-NUMBER-TRANSLATIONS
-(defvar *form-number-temp* (make-array 10 :fill-pointer 0 :adjustable t))
-
-;;; table used to detect CAR circularities in FORM-NUMBER-TRANSLATIONS
-(defvar *form-number-circularity-table* (make-hash-table :test 'eq))
-
 ;;; This returns a table mapping form numbers to source-paths. A
 ;;; source-path indicates a descent into the TOPLEVEL-FORM form,
 ;;; going directly to the subform corressponding to the form number.
@@ -2654,32 +2647,32 @@ register."
 ;;; NODE-SOURCE-PATH; that is, the first element is the form number and
 ;;; the last is the TOPLEVEL-FORM number.
 (defun form-number-translations (form tlf-number)
-  (clrhash *form-number-circularity-table*)
-  (setf (fill-pointer *form-number-temp*) 0)
-  (sub-translate-form-numbers form (list tlf-number))
-  (coerce *form-number-temp* 'simple-vector))
-(defun sub-translate-form-numbers (form path)
-  (unless (gethash form *form-number-circularity-table*)
-    (setf (gethash form *form-number-circularity-table*) t)
-    (vector-push-extend (cons (fill-pointer *form-number-temp*) path)
-                        *form-number-temp*)
-    (let ((pos 0)
-          (subform form)
-          (trail form))
-      (declare (fixnum pos))
-      (macrolet ((frob ()
-                   '(progn
-                      (when (atom subform) (return))
-                      (let ((fm (car subform)))
-                        (when (consp fm)
-                          (sub-translate-form-numbers fm (cons pos path)))
-                        (incf pos))
-                      (setq subform (cdr subform))
-                      (when (eq subform trail) (return)))))
-        (loop
-          (frob)
-          (frob)
-          (setq trail (cdr trail)))))))
+  (let ((seen nil)
+        (translations (make-array 12 :fill-pointer 0 :adjustable t)))
+    (labels ((translate1 (form path)
+               (unless (member form seen)
+                 (push form seen)
+                 (vector-push-extend (cons (fill-pointer translations) path)
+                                     translations)
+                 (let ((pos 0)
+                       (subform form)
+                       (trail form))
+                   (declare (fixnum pos))
+                   (macrolet ((frob ()
+                                '(progn
+                                  (when (atom subform) (return))
+                                  (let ((fm (car subform)))
+                                    (when (consp fm)
+                                      (translate1 fm (cons pos path)))
+                                    (incf pos))
+                                  (setq subform (cdr subform))
+                                  (when (eq subform trail) (return)))))
+                     (loop
+                       (frob)
+                       (frob)
+                       (setq trail (cdr trail))))))))
+      (translate1 form (list tlf-number)))
+    (coerce translations 'simple-vector)))
 
 ;;; FORM is a top level form, and path is a source-path into it. This
 ;;; returns the form indicated by the source-path. Context is the
