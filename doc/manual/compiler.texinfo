@@ -1098,7 +1098,7 @@ a more efficient calling convention that forbids redefinition.
 
 By default SBCL implements @code{eval} by calling the native code
 compiler. SBCL also includes an interpreter for use in special cases
-where using the compiler is undesireable, for example due to compilation
+where using the compiler is undesirable, for example due to compilation
 overhead. Unlike in some other Lisp implementations, in SBCL interpreted
 code is not safer or more debuggable than compiled code.
 

@@ -116,7 +116,7 @@ if you want a bounded wait.
 @comment  node-name,  next,  previous,  up
 @section Semaphores
 
-escribed here should be considered
+described here should be considered
 experimental, subject to API changes without notice.
 
 @include struct-sb-thread-semaphore.texinfo

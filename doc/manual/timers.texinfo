@@ -4,7 +4,7 @@
 
 SBCL supports a system-wide scheduler implemented on top of
 @code{setitimer} that also works with threads but does not require a
-separate schduler thread.
+separate scheduler thread.
 
 @menu
 @end menu

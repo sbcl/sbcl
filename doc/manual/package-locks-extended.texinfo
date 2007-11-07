@@ -149,7 +149,7 @@ runtime, and code compiled with packages locked may or may not signal
 spurious package-lock-violations at runtime even if the packages are
 unlocked.
 
-In practice all this means that package-locks have a neglible
+In practice all this means that package-locks have a negligible
 performance penalty in compiled code as long as they are not violated.
 
 @node Operations Violating Package Locks
@@ -313,7 +313,7 @@ Syntax: @code{(sb-ext:enable-package-locks symbol*)}
 
 Re-enables package locks affecting the named symbols during compilation
 in the lexical scope of the declaration. Enabling locks that were not
-first disabled with @code{sb-ext:disable-package-locks} declararion, or
+first disabled with @code{sb-ext:disable-package-locks} declaration, or
 enabling locks that are already enabled has no effect.
 @end deftp
 

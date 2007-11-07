@@ -64,7 +64,7 @@ use of extensions to the Lisp language.
 
 SBCL, like CMUCL before it, relies primarily on the automatic
 conversion and direct manipulation approaches. The @code{SB-ALIEN}
-package provices a facility wherein foreign values of simple scalar
+package provides a facility wherein foreign values of simple scalar
 types are automatically converted and complex types are directly
 manipulated in their foreign representation.  Additionally the
 lower-level System Area Pointers (or @acronym{SAP}s) can be used where
@@ -462,7 +462,7 @@ argument, but it does refer to the same foreign data bits.
 
 The @code{sb-alien:sap-alien} function converts @var{sap} (a system
 area pointer) to a foreign value with the specified
-@var{type}. @var{type} is not evaluated.  </para>
+@var{type}. @var{type} is not evaluated.
 
 The @var{type} must be some foreign pointer, array, or record type.
 @end defun
