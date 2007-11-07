@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.12 relative to sbcl-1.0.11:
+  * bug fix: sb-posix should now compile again under Windows, enabling
+    slime to work again.
+
 changes in sbcl-1.0.11 relative to sbcl-1.0.10:
   * incompatible change: hash-table accessor functions are no longer
     automatically protected by locks. Concurrent accesses on the same hash-table

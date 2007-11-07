@@ -252,6 +252,7 @@
   0)
 
 ;; Test that stat can take a second argument.
+#-win32
 (deftest stat.5
     (let* ((stat-1 (sb-posix:stat "/"))
            (inode-1 (sb-posix:stat-ino stat-1))
@@ -261,6 +262,19 @@
       (values
        (eq stat-1 stat-2)
        (/= inode-1 inode-2)))
+  t
+  t)
+
+#+win32
+(deftest stat.5
+    (let* ((stat-1 (sb-posix:stat "/"))
+           (mode-1 (sb-posix:stat-mode stat-1))
+           (stat-2 (sb-posix:stat "C:\\CONFIG.SYS"
+                                   stat-1))
+           (mode-2 (sb-posix:stat-mode stat-2)))
+      (values
+       (eq stat-1 stat-2)
+       (/= mode-1 mode-2)))
   t
   t)
 
