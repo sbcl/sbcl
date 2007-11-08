@@ -377,8 +377,8 @@
 
 ;;; not really an old-fashioned function, but what the calling
 ;;; convention should've been: like NTH, but with the same argument
-;;; order as in all the other dereferencing functions, with the
-;;; collection first and the index second
+;;; order as in all the other indexed dereferencing functions, with
+;;; the collection first and the index second
 (declaim (inline nth-but-with-sane-arg-order))
 (declaim (ftype (function (list index) t) nth-but-with-sane-arg-order))
 (defun nth-but-with-sane-arg-order (list index)
@@ -395,11 +395,12 @@
 
 ;;;; miscellaneous iteration extensions
 
-;;; "the ultimate iteration macro"
+;;; like Scheme's named LET
 ;;;
-;;; note for Schemers: This seems to be identical to Scheme's "named LET".
+;;; (CMU CL called this ITERATE, and commented it as "the ultimate
+;;; iteration macro...". I (WHN) found the old name insufficiently
+;;; specific to remind me what the macro means, so I renamed it.)
 (defmacro named-let (name binds &body body)
-  #!+sb-doc
   (dolist (x binds)
     (unless (proper-list-of-length-p x 2)
       (error "malformed NAMED-LET variable spec: ~S" x)))
