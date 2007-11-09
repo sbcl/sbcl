@@ -1817,7 +1817,9 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
                     old_value - displacement;
         }
     } else {
-        fprintf(stderr, "widetag of fixup vector is %d\n", widetag_of(fixups_vector->header));
+        /* This used to just print a note to stderr, but a bogus fixup seems to
+         * indicate real heap corruption, so a hard hailure is in order. */
+        lose("fixup vector %p has a bad widetag: %d\n", fixups_vector, widetag_of(fixups_vector->header));
     }
 
     /* Check for possible errors. */
