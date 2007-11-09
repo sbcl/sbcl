@@ -293,11 +293,9 @@
                        :if-exists :supersede
                        :element-type 'sb!assem:assembly-unit))
          (res (make-fasl-output :stream stream)))
-
     ;; Begin the header with the constant machine-readable (and
     ;; semi-human-readable) string which is used to identify fasl files.
     (fasl-write-string *fasl-header-string-start-string* stream)
-
     ;; The constant string which begins the header is followed by
     ;; arbitrary human-readable text, terminated by a special
     ;; character code.
@@ -311,14 +309,13 @@
                   at ~A~%  ~
                   on ~A~%  ~
                   using ~A version ~A~%"
-         where
+                 where
                  (format-universal-time nil (get-universal-time))
                  (machine-instance)
                  (sb!xc:lisp-implementation-type)
                  (sb!xc:lisp-implementation-version))))
      stream)
     (dump-byte +fasl-header-string-stop-char-code+ res)
-
     ;; Finish the header by outputting fasl file implementation,
     ;; version, and key *FEATURES*.
     (flet ((dump-counted-string (string)
@@ -332,8 +329,8 @@
                (dump-byte (char-code (aref string i)) res))))
       (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
       (dump-word +fasl-file-version+ res)
+      (dump-counted-string (sb!xc:lisp-implementation-version))
       (dump-counted-string *features-affecting-fasl-format*))
-
     res))
 
 ;;; Close the specified FASL-OUTPUT, aborting the write if ABORT-P.

@@ -234,14 +234,12 @@
              (invalid-fasl-expected condition)))))
 
 (define-condition invalid-fasl-version (invalid-fasl)
-  ((variant :reader invalid-fasl-variant :initarg :variant)
-   (version :reader invalid-fasl-version :initarg :version))
+  ((version :reader invalid-fasl-version :initarg :version))
   (:report
    (lambda (condition stream)
-     (format stream "~@<~S is in ~A fasl file format version ~W, ~
-                    but this version of SBCL uses format version ~W.~:@>"
+     (format stream "~@<~S is a fasl file compiled with SBCL ~W, and ~
+                      can't be loaded into SBCL ~W.~:@>"
              (invalid-fasl-stream condition)
-             (invalid-fasl-variant condition)
              (invalid-fasl-version condition)
              (invalid-fasl-expected condition)))))
 
@@ -284,10 +282,8 @@
 ;;; or NIL if EOF was hit before anything was read. Signal an error if
 ;;; we encounter garbage.
 (defun check-fasl-header (stream)
-
   (let ((byte (read-byte stream nil)))
     (when byte
-
       ;; Read and validate constant string prefix in fasl header.
       (let* ((fhsss *fasl-header-string-start-string*)
              (fhsss-length (length fhsss)))
@@ -309,7 +305,6 @@
                    :byte-nr count
                    :byte byte
                    :expected (char-code (schar fhsss count))))))
-
       ;; Read and validate version-specific compatibility stuff.
       (flet ((string-from-stream ()
                (let* ((length (read-unsigned-byte-32-arg))
@@ -318,27 +313,25 @@
                  result)))
         ;; Read and validate implementation and version.
         (let* ((implementation (keywordicate (string-from-stream)))
-               ;; FIXME: The logic above to read a keyword from the fasl file
-               ;; could probably be shared with the read-a-keyword fop.
-               (version (read-word-arg)))
-          (flet ((check-version (variant
-                                 possible-implementation
-                                 needed-version)
-                   (when (string= possible-implementation implementation)
-                     (or (= version needed-version)
-                         (error 'invalid-fasl-version
-                                ;; :error :wrong-version
-                                :stream stream
-                                :variant variant
-                                :version version
-                                :expected needed-version)))))
-            (or (check-version "native code"
-                               +backend-fasl-file-implementation+
-                               +fasl-file-version+)
-                (error 'invalid-fasl-implementation
-                       :stream stream
-                       :implementation implementation
-                       :expected +backend-fasl-file-implementation+))))
+               (fasl-version (read-word-arg))
+               (sbcl-version (if (<= fasl-version 76)
+                                 "1.0.11.18"
+                                 (string-from-stream)))
+               (expected-version (sb!xc:lisp-implementation-version))
+               (expected-implementation +backend-fasl-file-implementation+))
+          (cond ((string/= expected-implementation implementation)
+                 (error 'invalid-fasl-implementation
+                        :stream stream
+                        :implementation implementation
+                        :expected expected-implementation))
+                ((string/= expected-version sbcl-version)
+                 (restart-case
+                     (error 'invalid-fasl-version
+                            :stream stream
+                            :version sbcl-version
+                            :expected expected-version)
+                   (continue ()
+                     :report "Load the fasl file anyway")))))
         ;; Read and validate *FEATURES* which affect binary compatibility.
         (let ((faff-in-this-file (string-from-stream)))
           (unless (string= faff-in-this-file *features-affecting-fasl-format*)
