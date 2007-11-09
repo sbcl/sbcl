@@ -1520,10 +1520,10 @@
 
 ;;;; ALIEN and call-out-to-C stuff
 
-;;; 'unsafe' attribute because we store the arg on the stack, which is in
-;;; some sense 'passing it upwards'
-(defknown sb!vm::push-word-on-c-stack (system-area-pointer) (values) (unsafe))
-(defknown sb!vm::pop-words-from-c-stack (index) (values) ())
+;; Used by WITH-PINNED-OBJECTS
+#!+(or x86 x86-64)
+(defknown sb!vm::touch-object (t) (values)
+    (unsafe always-translatable))
 
 #!+linkage-table
 (defknown foreign-symbol-dataref-sap (simple-string)

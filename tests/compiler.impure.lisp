@@ -1462,4 +1462,53 @@
 (assert (equal '(0 1) (multiple-value-list (local-copy-prop-bug-with-move-arg nil))))
 (assert (equal '(1 0) (multiple-value-list (local-copy-prop-bug-with-move-arg t))))
 
+;;;; with-pinned-objects & unwind-protect, using all non-tail conventions
+
+(defun wpo-quux () (list 1 2 3))
+(defvar *wpo-quux* #'wpo-quux)
+
+(defun wpo-call ()
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (values (funcall *wpo-quux*)))))
+(assert (equal '(1 2 3) (wpo-call)))
+
+(defun wpo-multiple-call ()
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (funcall *wpo-quux*))))
+(assert (equal '(1 2 3) (wpo-multiple-call)))
+
+(defun wpo-call-named ()
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (values (wpo-quux)))))
+(assert (equal '(1 2 3) (wpo-call-named)))
+
+(defun wpo-multiple-call-named ()
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (wpo-quux))))
+(assert (equal '(1 2 3) (wpo-multiple-call-named)))
+
+(defun wpo-call-variable (&rest args)
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (values (apply *wpo-quux* args)))))
+(assert (equal '(1 2 3) (wpo-call-variable)))
+
+(defun wpo-multiple-call-variable (&rest args)
+  (unwind-protect
+       (sb-sys:with-pinned-objects (*wpo-quux*)
+         (apply #'wpo-quux args))))
+(assert (equal '(1 2 3) (wpo-multiple-call-named)))
+
+(defun wpo-multiple-call-local ()
+  (flet ((quux ()
+           (wpo-quux)))
+    (unwind-protect
+         (sb-sys:with-pinned-objects (*wpo-quux*)
+           (quux)))))
+(assert (equal '(1 2 3) (wpo-multiple-call-local)))
+
 ;;; success

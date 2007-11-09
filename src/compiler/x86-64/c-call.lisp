@@ -335,27 +335,16 @@
                                     (- other-pointer-lowtag)))
               delta)))))
 
-;;; these are not strictly part of the c-call convention, but are
-;;; needed for the WITH-PRESERVED-POINTERS macro used for "locking
-;;; down" lisp objects so that GC won't move them while foreign
-;;; functions go to work.
-
-(define-vop (push-word-on-c-stack)
-    (:translate push-word-on-c-stack)
-  (:args (val :scs (sap-reg)))
+;;; not strictly part of the c-call convention, but needed for the
+;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so
+;;; that GC won't move them while foreign functions go to work.
+(define-vop (touch-object)
+  (:translate touch-object)
+  (:args (object :scs (descriptor-reg)))
+  (:ignore object)
   (:policy :fast-safe)
-  (:arg-types system-area-pointer)
-  (:generator 2
-    (inst push val)))
-
-(define-vop (pop-words-from-c-stack)
-    (:translate pop-words-from-c-stack)
-  (:args)
-  (:arg-types (:constant (unsigned-byte 60)))
-  (:info number)
-  (:policy :fast-safe)
-  (:generator 2
-    (inst add rsp-tn (fixnumize number))))
+  (:arg-types t)
+  (:generator 0))
 
 ;;; Callbacks
 

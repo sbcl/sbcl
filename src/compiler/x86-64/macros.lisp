@@ -529,22 +529,30 @@
          (move result value)))))
 
 ;;; helper for alien stuff.
+
 (def!macro with-pinned-objects ((&rest objects) &body body)
   "Arrange with the garbage collector that the pages occupied by
-OBJECTS will not be moved in memory for the duration of BODY. Useful
-for e.g. foreign calls where another thread may trigger garbage
-collection"
+OBJECTS will not be moved in memory for the duration of BODY.
+Useful for e.g. foreign calls where another thread may trigger
+collection."
   (if objects
-      `(multiple-value-prog1
-           (progn
-             ,@(loop for p in objects
-                     collect `(push-word-on-c-stack
-                               (int-sap (sb!kernel:get-lisp-obj-address ,p))))
-             ,@body)
-         ;; If the body returned normally, we should restore the stack pointer
-         ;; for the benefit of any following code in the same function.  If
-         ;; there's a non-local exit in the body, sp is garbage anyway and
-         ;; will get set appropriately from {a, the} frame pointer before it's
-         ;; next needed
-         (pop-words-from-c-stack ,(length objects)))
+      (let ((pins (make-gensym-list (length objects)))
+            (wpo (block-gensym "WPO")))
+        ;; BODY is stuffed in a function to preserve the lexical
+        ;; environment.
+        `(flet ((,wpo () (progn ,@body)))
+           ;; PINS are dx-allocated in case the compiler for some
+           ;; unfathomable reason decides to allocate value-cells
+           ;; for them -- since we have DX value-cells on x86oid
+           ;; platforms this still forces them on the stack.
+           (dx-let ,(mapcar #'list pins objects)
+             (multiple-value-prog1 (,wpo)
+               ;; TOUCH-OBJECT has a VOP with an empty body: compiler
+               ;; thinks we're using the argument and doesn't flush
+               ;; the variable, but we don't have to pay any extra
+               ;; beyond that -- and MULTIPLE-VALUE-PROG1 keeps them
+               ;; live till the body has finished. *whew*
+               ,@(mapcar (lambda (pin)
+                           `(touch-object ,pin))
+                         pins)))))
       `(progn ,@body)))
