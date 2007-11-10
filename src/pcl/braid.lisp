@@ -711,11 +711,18 @@
 ;;; :BEFORE method, it would seem that going through
 ;;; NO-APPLICABLE-METHOD is prohibited, as in fact there is an
 ;;; applicable method.  -- CSR, 2002-11-15
+(define-condition no-primary-method (reference-condition error)
+  ((generic-function :initarg :generic-function :reader no-primary-method-generic-function)
+   (args :initarg :args :reader no-primary-method-args))
+  (:report
+   (lambda (c s)
+     (format s "~@<There is no primary method for the generic function ~2I~_~S~
+                ~I~_when called with arguments ~2I~_~S.~:>"
+             (no-primary-method-generic-function c)
+             (no-primary-method-args c))))
+  (:default-initargs :references (list '(:ansi-cl :section (7 6 6 2)))))
 (defmethod no-primary-method (generic-function &rest args)
-  (error "~@<There is no primary method for the generic function ~2I~_~S~
-          ~I~_when called with arguments ~2I~_~S.~:>"
-         generic-function
-         args))
+  (error 'no-primary-method :generic-function generic-function :args args))
 
 (defmethod invalid-qualifiers ((gf generic-function)
                                combin
