@@ -971,14 +971,15 @@
            (when (and (classoid-subclasses classoid)
                       (not (eq layout old-layout)))
              (collect ((subs))
-                      (dohash (classoid layout (classoid-subclasses classoid))
-                        (declare (ignore layout))
-                        (undefine-structure classoid)
-                        (subs (classoid-proper-name classoid)))
-                      (when (subs)
-                        (warn "removing old subclasses of ~S:~%  ~S"
-                              (classoid-name classoid)
-                              (subs))))))
+               (dohash ((classoid layout) (classoid-subclasses classoid)
+                        :locked t)
+                 (declare (ignore layout))
+                 (undefine-structure classoid)
+                 (subs (classoid-proper-name classoid)))
+               (when (subs)
+                 (warn "removing old subclasses of ~S:~%  ~S"
+                       (classoid-name classoid)
+                       (subs))))))
           (t
            (unless (eq (classoid-layout classoid) layout)
              (register-layout layout :invalidate nil))

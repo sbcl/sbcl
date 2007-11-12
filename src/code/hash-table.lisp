@@ -69,13 +69,16 @@
   ;; respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte
                                                  #.sb!vm:n-word-bits) (*))))
-  ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH for tables with :LOCK-P T
-  (spinlock (sb!thread::make-spinlock) :type sb!thread::spinlock)
+  ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
+  (spinlock (sb!thread::make-spinlock :name "hash-table lock")
+            :type sb!thread::spinlock :read-only t)
   ;; The GC will set this to T if it moves an EQ-based key. This used
   ;; to be signaled by a bit in the header of the kv vector, but that
   ;; implementation caused some concurrency issues when we stopped
   ;; inhibiting GC during hash-table lookup.
   (needs-rehash-p nil :type (member nil t))
+  ;; Has user requested synchronization?
+  (synchronized-p nil :type (member nil t) :read-only t)
   ;; For detecting concurrent accesses.
   #!+sb-hash-table-debug
   (concurrent-access-error t :type (member nil t))
@@ -90,21 +93,22 @@
 ;; the generational garbage collector needs to know it.
 (defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
 
-
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc
   "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body)
 
-Provides a method of manually looping over the elements of a
-hash-table. FUNCTION is bound to a generator-macro that, within the
-scope of the invocation, returns one or three values. The first value
-tells whether any objects remain in the hash table. When the first
-value is non-NIL, the second and third values are the key and the
-value of the next object.
+Provides a method of manually looping over the elements of a hash-table.
+FUNCTION is bound to a generator-macro that, within the scope of the
+invocation, returns one or three values. The first value tells whether any
+objects remain in the hash table. When the first value is non-NIL, the second
+and third values are the key and the value of the next object.
 
 Consequences are undefined if HASH-TABLE is mutated during execution
 of BODY, except for changing or removing elements corresponding to the
-current key."
+current key. The applies to all threads, not just the curren one --
+even for synchronized hash-tables. If the table may be mutated by
+another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
+to protect the WITH-HASH-TABLE-ITERATOR for."
   ;; This essentially duplicates MAPHASH, so any changes here should
   ;; be reflected there as well.
   (let ((n-function (gensym "WITH-HASH-TABLE-ITERATOR-")))
@@ -129,3 +133,17 @@ current key."
                 #',function))))
       (macrolet ((,function () '(funcall ,n-function)))
         ,@body))))
+
+(defmacro-mundanely with-locked-hash-table ((hash-table) &body body)
+  #!+sb-doc
+  "Limits concurrent accesses to HASH-TABLE for the duration of BODY.
+If HASH-TABLE is synchronized, BODY will execute with exclusive
+ownership of the table. If HASH-TABLE is not synchronized, BODY will
+execute with other WITH-LOCKED-HASH-TABLE bodies excluded -- exclusion
+of hash-table accesses not surrounded by WITH-LOCKED-HASH-TABLE is
+unspecified."
+  ;; Needless to say, this also excludes some internal bits, but
+  ;; getting there is too much detail when "unspecified" says what
+  ;; is important -- unpredictable, but harmless.
+  `(sb!thread::with-recursive-spinlock ((hash-table-spinlock ,hash-table))
+     ,@body))

@@ -234,7 +234,7 @@
              (setf (classoid-state class) :sealed)
              (let ((subclasses (classoid-subclasses class)))
                (when subclasses
-                 (dohash (subclass layout subclasses)
+                 (dohash ((subclass layout) subclasses :locked t)
                    (declare (ignore layout))
                    (setf (classoid-state subclass) :sealed))))))))
       (optimize

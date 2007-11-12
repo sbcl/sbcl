@@ -37,9 +37,10 @@ comments from CMU CL:
   "Return a hash-table containing only the entries in Table1 whose key is not
    also a key in Table2." (declare (type hash-table table1 table2))
   (let ((res (make-hash-table-like table1)))
-    (dohash (k v table1)
-      (unless (nth-value 1 (gethash k table2))
-        (setf (gethash k res) v)))
+    (with-locked-hash-table (table2)
+      (dohash ((k v) table1 :locked t)
+        (unless (nth-value 1 (gethash k table2))
+          (setf (gethash k res) v))))
     res))
 
 (defun hash-list (table)
@@ -47,7 +48,7 @@ comments from CMU CL:
   "Return a list of the values in Table."
   (declare (type hash-table table))
   (collect ((res))
-    (dohash (k v table)
+    (dohash ((k v) table)
       (declare (ignore k))
       (res v))
     (res)))
@@ -83,7 +84,7 @@ comments from CMU CL:
         (format-universal-time s (get-universal-time))
         (terpri s)
         (format s "~S ~S ~S~%" test reader writer)
-        (dohash (k v table)
+        (dohash ((k v) table :locked t)
           (prin1 k s)
           (write-char #\space s)
           (funcall writer v s)
@@ -162,7 +163,7 @@ comments from CMU CL:
 (defun clear-vop-counts (&optional (spaces '(:dynamic)))
   #!+sb-doc
   "Clear all dynamic VOP counts for code objects in the specified spaces."
-  (dohash (k v *backend-template-names*)
+  (dohash ((k v) *backend-template-names* :locked t)
     (declare (ignore v))
     (remprop k 'vop-stats))
 
@@ -202,7 +203,7 @@ comments from CMU CL:
          space))))
 
   (let ((counts (make-hash-table :test 'equal)))
-    (dohash (k v *backend-template-names*)
+    (dohash ((k v) *backend-template-names* :locked t)
       (declare (ignore v))
       (let ((stats (get k 'vop-stats)))
         (when stats
@@ -244,7 +245,7 @@ comments from CMU CL:
   "Return a hash-table mapping string VOP names to the cost recorded in the
    generator for all VOPs which are also the names of assembly routines."
   (let ((res (make-hash-table :test 'equal)))
-     (dohash (name v *assembler-routines*)
+     (dohash ((name v) *assembler-routines* :locked t)
        (declare (ignore v))
        (let ((vop (gethash name *backend-template-names*)))
          (when vop
@@ -309,7 +310,7 @@ comments from CMU CL:
 ;;; the class that NAME would be placed in.
 (defun find-matches (table pattern)
   (collect ((res))
-    (dohash (key value table)
+    (dohash ((key value) table :locked t)
       (declare (ignore value))
       (when (matches-pattern key pattern) (res key)))
     (res)))
@@ -325,7 +326,7 @@ comments from CMU CL:
 ;;; matches no class.
 (defun classify-costs (table classes)
   (let ((res (make-hash-table-like table)))
-    (dohash (key value table)
+    (dohash ((key value) table :locked t)
       (let ((class (dolist (class classes nil)
                      (when (matches-pattern key (rest class))
                        (return (first class))))))
@@ -344,7 +345,7 @@ comments from CMU CL:
 (defun cost-summary (table)
   (let ((total-count 0d0)
         (total-cost 0d0))
-    (dohash (k v table)
+    (dohash ((k v) table :locked t)
       (declare (ignore k))
       (incf total-count (vop-stats-count v))
       (incf total-cost (vop-stats-cost v)))
@@ -354,7 +355,7 @@ comments from CMU CL:
 ;;; according to the Costs table. Any VOPs in the list IGNORE are ignored.
 (defun compensate-costs (table costs &optional ignore)
   (let ((res (make-hash-table-like table)))
-    (dohash (key value table)
+    (dohash ((key value) table :locked t)
       (unless (or (string= key "COUNT-ME")
                   (member key ignore :test #'string=))
         (let ((cost (gethash key costs)))
@@ -374,7 +375,7 @@ comments from CMU CL:
 (defun compare-stats (original compared)
   (declare (type hash-table original compared))
   (let ((res (make-hash-table-like original)))
-    (dohash (k cv compared)
+    (dohash ((k cv) compared :locked t)
       (let ((ov (gethash k original)))
         (when ov
           (let ((norm-cnt (/ (vop-stats-count ov) (vop-stats-count cv))))
@@ -392,7 +393,7 @@ comments from CMU CL:
    combined results."
   (let ((res (make-hash-table-like (first tables))))
     (dolist (table tables)
-      (dohash (k v table)
+      (dohash ((k v) table :locked t)
         (let ((found (or (gethash k res)
                          (setf (gethash k res) (%make-vop-stats k)))))
           (incf (vop-stats-count found) (vop-stats-count v))

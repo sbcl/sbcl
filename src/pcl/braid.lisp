@@ -672,24 +672,24 @@
 (!bootstrap-class-predicates nil)
 (!bootstrap-built-in-classes)
 
-(dohash (name x *find-class*)
-        (let* ((class (find-class-from-cell name x))
-               (layout (class-wrapper class))
-               (lclass (layout-classoid layout))
-               (lclass-pcl-class (classoid-pcl-class lclass))
-               (olclass (find-classoid name nil)))
-          (if lclass-pcl-class
-              (aver (eq class lclass-pcl-class))
-              (setf (classoid-pcl-class lclass) class))
+(dohash ((name x) *find-class*)
+  (let* ((class (find-class-from-cell name x))
+         (layout (class-wrapper class))
+         (lclass (layout-classoid layout))
+         (lclass-pcl-class (classoid-pcl-class lclass))
+         (olclass (find-classoid name nil)))
+    (if lclass-pcl-class
+        (aver (eq class lclass-pcl-class))
+        (setf (classoid-pcl-class lclass) class))
 
-          (update-lisp-class-layout class layout)
+    (update-lisp-class-layout class layout)
 
-          (cond (olclass
-                 (aver (eq lclass olclass)))
-                (t
-                 (setf (find-classoid name) lclass)))
+    (cond (olclass
+           (aver (eq lclass olclass)))
+          (t
+           (setf (find-classoid name) lclass)))
 
-          (set-class-type-translation class name)))
+    (set-class-type-translation class name)))
 
 (setq *boot-state* 'braid)
 

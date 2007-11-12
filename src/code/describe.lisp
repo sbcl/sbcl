@@ -95,7 +95,7 @@
               count (zerop count))
       (let ((n 0))
         (declare (type index n))
-        (dohash (k v x)
+        (dohash ((k v) x :locked t)
           (unless (zerop n)
             (write-char #\space s))
           (incf n)

@@ -309,13 +309,14 @@
       `(unprofile-all)))
 
 (defun unprofile-all ()
-  (dohash (name profile-info *profiled-fun-name->info*)
+  (dohash ((name profile-info) *profiled-fun-name->info*
+           :locked t)
     (declare (ignore profile-info))
     (unprofile-1-fun name)))
 
 (defun reset ()
   "Reset the counters for all profiled functions."
-  (dohash (name profile-info *profiled-fun-name->info*)
+  (dohash ((name profile-info) *profiled-fun-name->info* :locked t)
     (declare (ignore name))
     (funcall (profile-info-clear-stats-fun profile-info))))
 
@@ -358,7 +359,7 @@ Lisp process."
           (compute-overhead)))
   (let ((time-info-list ())
         (no-call-name-list ()))
-    (dohash (name pinfo *profiled-fun-name->info*)
+    (dohash ((name pinfo) *profiled-fun-name->info* :locked t)
       (unless (eq (fdefinition name)
                   (profile-info-encapsulation-fun pinfo))
         (warn "Function ~S has been redefined, so times may be inaccurate.~@

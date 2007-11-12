@@ -669,6 +669,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "HASH-TABLE-WEAKNESS" "MAKE-WEAK-POINTER"
                "WEAK-POINTER" "WEAK-POINTER-P" "WEAK-POINTER-VALUE"
 
+               ;; Hash table locking
+               "HASH-TABLE-SYNCHRONIZED-P"
+               "WITH-LOCKED-HASH-TABLE"
+
                ;; If the user knows we're doing IEEE, he might reasonably
                ;; want to do this stuff.
                "FLOAT-DENORMALIZED-P"

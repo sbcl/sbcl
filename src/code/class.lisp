@@ -472,7 +472,7 @@
     (when classoid-layout
       (modify-classoid classoid)
       (when subclasses
-        (dohash (subclass subclass-layout subclasses)
+        (dohash ((subclass subclass-layout) subclasses :locked t)
           (modify-classoid subclass)
           (when invalidate
             (invalidate-layout subclass-layout))))
@@ -595,7 +595,7 @@
                   (when (zerop count)
                     (push successor free-objs))))))
        (cond ((endp free-objs)
-              (dohash (obj info obj-info)
+              (dohash ((obj info) obj-info)
                 (unless (zerop (first info))
                   (error "Topological sort failed due to constraint on ~S."
                          obj)))
@@ -858,7 +858,7 @@ NIL is returned when no such class exists."
         (o-sub (classoid-subclasses other)))
     (if (and s-sub o-sub)
         (collect ((res *empty-type* type-union))
-          (dohash (subclass layout s-sub)
+          (dohash ((subclass layout) s-sub :locked t)
             (declare (ignore layout))
             (when (gethash subclass o-sub)
               (res (specifier-type subclass))))
@@ -1474,7 +1474,7 @@ NIL is returned when no such class exists."
 ;;; late in the build-order.lisp-expr sequence, and be put in
 ;;; !COLD-INIT-FORMS there?
 (defun !class-finalize ()
-  (dohash (name layout *forward-referenced-layouts*)
+  (dohash ((name layout) *forward-referenced-layouts*)
     (let ((class (find-classoid name nil)))
       (cond ((not class)
              (setf (layout-classoid layout) (make-undefined-classoid name)))

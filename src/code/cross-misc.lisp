@@ -35,6 +35,10 @@
                 `(progn ,@body)))
      ,@forms))
 
+(defmacro with-locked-hash-table ((table) &body body)
+  (declare (ignore table))
+  `(progn ,@body))
+
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
 ;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a

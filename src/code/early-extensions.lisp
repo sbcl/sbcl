@@ -434,17 +434,24 @@
             (tagbody
                ,@forms)))))))
 
-;;; Iterate over the entries in a HASH-TABLE.
-(defmacro dohash ((key-var value-var table &optional result) &body body)
+;;; Iterate over the entries in a HASH-TABLE, first obtaining the lock
+;;; if the table is a synchronized table.
+(defmacro dohash (((key-var value-var) table &key result locked) &body body)
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (let ((gen (gensym))
-          (n-more (gensym)))
-      `(with-hash-table-iterator (,gen ,table)
-         (loop
-          (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
-            ,@decls
-            (unless ,n-more (return ,result))
-            ,@forms))))))
+    (let* ((gen (gensym))
+           (n-more (gensym))
+           (n-table (gensym))
+           (iter-form `(with-hash-table-iterator (,gen ,n-table)
+                         (loop
+                           (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
+                             ,@decls
+                             (unless ,n-more (return ,result))
+                             ,@forms)))))
+      `(let ((,n-table ,table))
+         ,(if locked
+              `(with-locked-hash-table (,n-table)
+                 ,iter-form)
+              iter-form)))))
 
 ;;;; hash cache utility
 

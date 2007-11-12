@@ -146,7 +146,8 @@
                         (size +min-hash-table-size+)
                         (rehash-size 1.5)
                         (rehash-threshold 1)
-                        (weakness nil))
+                        (weakness nil)
+                        (synchronized))
   #!+sb-doc
   "Create and return a new hash table. The keywords are as follows:
      :TEST -- Indicates what kind of test to use.
@@ -160,7 +161,7 @@
        forcing a rehash. Can be any positive number <=1, with density
        approaching zero as the threshold approaches 0. Density 1 means an
        average of one entry per bucket.
-     :WEAKNESS -- IF NIL (the default) it is a normal non-weak hash table.
+     :WEAKNESS -- If NIL (the default) it is a normal non-weak hash table.
        If one of :KEY, :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE it is a weak
        hash table.
        Depending on the type of weakness the lack of references to the
@@ -171,7 +172,15 @@
        is :KEY-AND-VALUE and either the key or the value would otherwise be
        garbage the entry can be removed. If WEAKNESS is :KEY-OR-VALUE and
        both the key and the value would otherwise be garbage the entry can
-       be removed."
+       be removed.
+     :SYNCHRONIZED -- If NIL (the default), the hash-table may have
+       multiple concurrent readers, but results are undefined if a
+       thread writes to the hash-table concurrently with another
+       reader or writer. If T, all concurrent accesses are safe, but
+       note that CLHS 3.6 (Traversal Rules and Side Effects) remains
+       in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE. This keyword
+       argument is experimental, and may change incompatibly or be
+       removed in the future."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
   (multiple-value-bind (test test-fun hash-fun)
@@ -251,7 +260,7 @@
                                  :element-type '(unsigned-byte
                                                  #.sb!vm:n-word-bits)
                                  :initial-element +magic-hash-vector-value+))
-                   :spinlock (sb!thread::make-spinlock))))
+                   :synchronized-p synchronized)))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))
@@ -504,33 +513,33 @@ multiple threads accessing the same hash-table without locking."
   (unless (hash-table-weakness hash-table)
     (setf (hash-table-cache hash-table) index)))
 
-(defmacro with-hash-table-locks ((hash-table inline &rest pin-objects)
+(defmacro with-hash-table-locks ((hash-table
+                                  &key inline pin
+                                  (synchronized `(hash-table-synchronized-p ,hash-table)))
                                  &body body)
-  `(with-concurrent-access-check ,hash-table
-     ;; Inhibit GC for the duration of BODY if the GC might mutate the
-     ;; HASH-TABLE in some way (currently true only if the table is
-     ;; weak). We also need to lock the table to ensure that two
-     ;; concurrent writers can't create a cyclical vector that would
-     ;; cause scav_weak_hash_table_chain to loop.
-     ;;
-     ;; Otherwise we can avoid the 2x-3x overhead, and just pin the key.
-     (if (hash-table-weakness ,hash-table)
-         (sb!thread::with-recursive-system-spinlock
-             ((hash-table-spinlock hash-table) :without-gcing t)
-           ,@body)
-         (with-pinned-objects ,pin-objects
-           (locally
-               ;; Inline the implementation function on the fast path
-               ;; only. (On the slow path it'll just bloat the
-               ;; generated code with no benefit).
-               (declare (inline ,@inline))
-             ,@body)))))
+  (with-unique-names (body-fun)
+    `(with-concurrent-access-check ,hash-table
+       (flet ((,body-fun ()
+                (locally (declare (inline ,@inline))
+                  ,@body)))
+         (if (hash-table-weakness ,hash-table)
+             (sb!thread::with-recursive-system-spinlock
+                 ((hash-table-spinlock ,hash-table) :without-gcing t)
+               (,body-fun))
+             (with-pinned-objects ,pin
+               (if ,synchronized
+                   ;; We use a "system" spinlock here because it is very
+                   ;; slightly faster, as it doesn't re-enable interrupts.
+                   (sb!thread::with-recursive-system-spinlock
+                       ((hash-table-spinlock ,hash-table))
+                     (,body-fun))
+                   (,body-fun))))))))
 
 (defun gethash (key hash-table &optional default)
   #!+sb-doc
-  "Finds the entry in HASH-TABLE whose key is KEY and returns the associated
-   value and T as multiple values, or returns DEFAULT and NIL if there is no
-   such entry. Entries can be added using SETF."
+  "Finds the entry in HASH-TABLE whose key is KEY and returns the
+associated value and T as multiple values, or returns DEFAULT and NIL
+if there is no such entry. Entries can be added using SETF."
   (declare (type hash-table hash-table)
            (values t (member t nil)))
   (gethash3 key hash-table default))
@@ -613,7 +622,7 @@ multiple threads accessing the same hash-table without locking."
 (defun gethash3 (key hash-table default)
   "Three argument version of GETHASH"
   (declare (type hash-table hash-table))
-  (with-hash-table-locks (hash-table (%gethash3) key)
+  (with-hash-table-locks (hash-table :inline (%gethash3) :pin (key))
     (%gethash3 key hash-table default)))
 
 ;;; so people can call #'(SETF GETHASH)
@@ -699,7 +708,8 @@ multiple threads accessing the same hash-table without locking."
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
   (aver (hash-table-index-vector hash-table))
-  (let ((cache (hash-table-cache hash-table))
+  (macrolet ((put-it (lockedp)
+               `(let ((cache (hash-table-cache hash-table))
         (kv-vector (hash-table-table hash-table)))
     ;; Check the cache
     (if (and cache
@@ -708,8 +718,16 @@ multiple threads accessing the same hash-table without locking."
         ;; If cached, just store here
         (setf (aref kv-vector (1+ cache)) value)
         ;; Otherwise do things the hard way
-        (with-hash-table-locks (hash-table (%%puthash) key)
-          (%%puthash key hash-table value)))))
+                      ,(if lockedp
+                           '(%%puthash key hash-table value)
+                           '(with-hash-table-locks
+                             (hash-table :inline (%%puthash) :pin (key)
+                              :synchronized nil)
+                             (%%puthash key hash-table value)))))))
+    (if (hash-table-synchronized-p hash-table)
+        (with-hash-table-locks (hash-table :pin (key) :synchronized t)
+          (put-it t))
+        (put-it nil))))
 
 (declaim (maybe-inline %remhash))
 (defun %remhash (key hash-table)
@@ -788,20 +806,20 @@ multiple threads accessing the same hash-table without locking."
 
 (defun remhash (key hash-table)
   #!+sb-doc
-  "Remove the entry in HASH-TABLE associated with KEY. Return T if there
-   was such an entry, or NIL if not."
+  "Remove the entry in HASH-TABLE associated with KEY. Return T if
+there was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
            (values (member t nil)))
+  (with-hash-table-locks (hash-table :inline (%remhash) :pin (key))
   ;; For now, just clear the cache
   (setf (hash-table-cache hash-table) nil)
-  (with-hash-table-locks (hash-table (%remhash) key)
     (%remhash key hash-table)))
 
 (defun clrhash (hash-table)
   #!+sb-doc
-  "This removes all the entries from HASH-TABLE and returns the hash table
-   itself."
-  (with-hash-table-locks (hash-table nil)
+  "This removes all the entries from HASH-TABLE and returns the hash
+table itself."
+  (with-hash-table-locks (hash-table)
     (let* ((kv-vector (hash-table-table hash-table))
            (next-vector (hash-table-next-vector hash-table))
            (hash-vector (hash-table-hash-vector hash-table))
@@ -840,12 +858,15 @@ multiple threads accessing the same hash-table without locking."
 (declaim (inline maphash))
 (defun maphash (function-designator hash-table)
   #!+sb-doc
-  "For each entry in HASH-TABLE, call the designated two-argument
-function on the key and value of the entry. Return NIL.
+  "For each entry in HASH-TABLE, call the designated two-argument function on
+the key and value of the entry. Return NIL.
 
 Consequences are undefined if HASH-TABLE is mutated during the call to
 MAPHASH, except for changing or removing elements corresponding to the
-current key."
+current key. The applies to all threads, not just the current one --
+even for synchronized hash-tables. If the table may be mutated by
+another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
+to protect the MAPHASH call."
   ;; This essentially duplicates WITH-HASH-TABLE-ITERATOR, so
   ;; any changes here should be reflected there as well.
   (let ((fun (%coerce-callable-to-fun function-designator))

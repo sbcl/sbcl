@@ -233,7 +233,7 @@
                (let ((subs (classoid-subclasses class)))
                  (/noshow subs)
                  (when subs
-                   (dohash (sub v subs)
+                   (dohash ((sub v) subs)
                      (declare (ignore v))
                      (/noshow sub)
                      (when (member class (direct-supers sub))
