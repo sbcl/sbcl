@@ -129,13 +129,12 @@ if the symbol isn't found."
     (when (<= sb!vm:linkage-table-space-start
               addr
               sb!vm:linkage-table-space-end)
-      (maphash (lambda (name-and-datap info)
-                 (let ((table-addr (linkage-info-address info)))
-                   (when (<= table-addr
-                             addr
-                             (+ table-addr sb!vm:linkage-table-entry-size))
-                     (return-from sap-foreign-symbol (car name-and-datap)))))
-               *linkage-info*))
+      (dohash ((name-and-datap info) *linkage-info* :locked t)
+        (let ((table-addr (linkage-info-address info)))
+          (when (<= table-addr
+                    addr
+                    (+ table-addr sb!vm:linkage-table-entry-size))
+            (return-from sap-foreign-symbol (car name-and-datap))))))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info
                                (filename c-string)

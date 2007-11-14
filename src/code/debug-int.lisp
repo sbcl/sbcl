@@ -300,15 +300,19 @@
 ;;; duplicate COMPILED-DEBUG-FUN structures.
 (defvar *compiled-debug-funs* (make-hash-table :test 'eq))
 
-;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN
-;;; and its component. This maps the latter to the former in
-;;; *COMPILED-DEBUG-FUNS*. If there already is a
-;;; COMPILED-DEBUG-FUN, then this returns it from
-;;; *COMPILED-DEBUG-FUNS*.
+;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN and its
+;;; component. This maps the latter to the former in
+;;; *COMPILED-DEBUG-FUNS*. If there already is a COMPILED-DEBUG-FUN,
+;;; then this returns it from *COMPILED-DEBUG-FUNS*.
+;;;
+;;; FIXME: It seems this table can potentially grow without bounds,
+;;; and retains roots to functions that might otherwise be collected.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
-  (or (gethash compiler-debug-fun *compiled-debug-funs*)
-      (setf (gethash compiler-debug-fun *compiled-debug-funs*)
-            (%make-compiled-debug-fun compiler-debug-fun component))))
+  (let ((table *compiled-debug-funs*))
+    (with-locked-hash-table (table)
+      (or (gethash compiler-debug-fun table)
+          (setf (gethash compiler-debug-fun table)
+                (%make-compiled-debug-fun compiler-debug-fun component))))))
 
 (defstruct (bogus-debug-fun
             (:include debug-fun)
@@ -2861,7 +2865,7 @@ register."
 ;;; This maps bogus-lra-components to cookies, so that
 ;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the
 ;;; breakpoint hook.
-(defvar *fun-end-cookies* (make-hash-table :test 'eq))
+(defvar *fun-end-cookies* (make-hash-table :test 'eq :synchronized t))
 
 ;;; This returns a hook function for the start helper breakpoint
 ;;; associated with a :FUN-END breakpoint. The returned function
@@ -3113,7 +3117,7 @@ register."
 ;;;; breakpoint handlers (layer between C and exported interface)
 
 ;;; This maps components to a mapping of offsets to BREAKPOINT-DATAs.
-(defvar *component-breakpoint-offsets* (make-hash-table :test 'eq))
+(defvar *component-breakpoint-offsets* (make-hash-table :test 'eq :synchronized t))
 
 ;;; This returns the BREAKPOINT-DATA object associated with component cross
 ;;; offset. If none exists, this makes one, installs it, and returns it.
@@ -3135,6 +3139,8 @@ register."
 ;;; We use this when there are no longer any active breakpoints
 ;;; corresponding to DATA.
 (defun delete-breakpoint-data (data)
+  ;; Again, this looks brittle. Is there no danger of being interrupted
+  ;; here?
   (let* ((component (breakpoint-data-component data))
          (offsets (delete (breakpoint-data-offset data)
                           (gethash component *component-breakpoint-offsets*)
@@ -3238,6 +3244,8 @@ register."
 ;;; [old C code] or HANDLE-FUN-END-BREAKPOINT calls this directly
 ;;; [new C code].
 (defun handle-fun-end-breakpoint-aux (breakpoints data signal-context)
+  ;; FIXME: This looks brittle: what if we are interrupted somewhere
+  ;; here? ...or do we have interrupts disabled here?
   (delete-breakpoint-data data)
   (let* ((scp
           (locally

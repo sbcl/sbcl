@@ -14,8 +14,8 @@
 ;;; Used to serialize modifications to *linkage-info*,
 ;;; *shared-objects* and the linkage-table proper. Calls thru
 ;;; linkage-table are unaffected.
-(defvar *foreign-lock*
-  (sb!thread:make-mutex :name "foreign definition lock"))
+(defvar *shared-objects-lock*
+  (sb!thread:make-mutex :name "shared object list lock"))
 
 (define-unsupported-fun load-foreign
     "Unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT."
@@ -79,15 +79,17 @@ expected if user or library-code has called dlopen on FILE.
 References to foreign symbols in loaded shared objects do not survive
 intact through SB-EXT:SAVE-LISP-AND-DIE on all platforms. See
 SB-EXT:SAVE-LISP-AND-DIE for details."
-  (sb!thread:with-mutex (*foreign-lock*)
-    (let* ((filename (or (unix-namestring file) file))
-           (old (find filename *shared-objects* :key #'shared-object-file :test #'equal))
-           (obj (or old (make-shared-object :file filename))))
-      (unless old
-        (dlopen-or-lose obj))
-      (setf *shared-objects* (append (remove obj *shared-objects*)
-                                     (list obj)))
-      (pathname filename))))
+  ;; FIXME: 1. This is copy-paste from foreign-load.lisp.
+  ;; FIXME: 2. Once windows gets threads, this is going to need a lock.
+  ;; FIXME: 3. No linkage table on windows?
+  (let* ((filename (or (unix-namestring file) file))
+         (old (find filename *shared-objects* :key #'shared-object-file :test #'equal))
+         (obj (or old (make-shared-object :file filename))))
+    (unless old
+      (dlopen-or-lose obj))
+    (setf *shared-objects* (append (remove obj *shared-objects*)
+                                   (list obj)))
+    (pathname filename)))
 
 (defun try-reopen-shared-object (obj)
   (declare (type shared-object obj))

@@ -101,7 +101,9 @@
 ;;; cold-load time.
 (defvar *forward-referenced-layouts*)
 (!cold-init-forms
-  (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
+  (setq *forward-referenced-layouts* (make-hash-table :test 'equal
+                                                      #-sb-xc-host #-sb-xc-host
+                                                      :synchronized t))
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
                  (dolist (x *!initial-layouts*)
@@ -495,7 +497,9 @@
       (let* ((super (layout-classoid super-layout))
              (subclasses (or (classoid-subclasses super)
                              (setf (classoid-subclasses super)
-                                   (make-hash-table :test 'eq)))))
+                                   (make-hash-table :test 'eq
+                                                    #-sb-xc-host #-sb-xc-host
+                                                    :synchronized t)))))
         (when (and (eq (classoid-state super) :sealed)
                    (not (gethash classoid subclasses)))
           (warn "unsealing sealed class ~S in order to subclass it"

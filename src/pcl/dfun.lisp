@@ -1643,12 +1643,21 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     root)))
     nil))
 
-;;; FIXME: Needs a lock.
+;;; Not synchronized, as all the uses we have for it are multiple ones
+;;; and need WITH-LOCKED-HASH-TABLE in any case.
+;;;
+;;; FIXME: Is it really more efficient to store this stuff in a global
+;;; table instead of having a slot in each method?
+;;;
+;;; FIXME: This table also seems to contain early methods, which should
+;;; presumably be dropped during the bootstrap.
 (defvar *effective-method-cache* (make-hash-table :test 'eq))
 
 (defun flush-effective-method-cache (generic-function)
-  (dolist (method (generic-function-methods generic-function))
-    (remhash method *effective-method-cache*)))
+  (let ((cache *effective-method-cache*))
+    (with-locked-hash-table (cache)
+      (dolist (method (generic-function-methods generic-function))
+        (remhash method cache)))))
 
 (defun get-secondary-dispatch-function (gf methods types
                                         &optional method-alist wrappers)
@@ -1675,9 +1684,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             (lambda (&rest args)
               (apply #'no-applicable-method gf args))))
       (let* ((key (car methods))
-             (ht-value (or (gethash key *effective-method-cache*)
-                           (setf (gethash key *effective-method-cache*)
-                                 (cons nil nil)))))
+             (ht *effective-method-cache*)
+             (ht-value (with-locked-hash-table (ht)
+                         (or (gethash key ht)
+                             (setf (gethash key ht) (cons nil nil))))))
         (if (and (null (cdr methods)) all-applicable-p ; the most common case
                  (null method-alist-p) wrappers-p (not function-p))
             (or (car ht-value)

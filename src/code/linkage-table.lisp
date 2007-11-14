@@ -19,7 +19,7 @@
 
 (in-package "SB!IMPL")
 
-(defvar *foreign-lock*) ; initialized in foreign-load.lisp
+(defvar *shared-object-lock*) ; initialized in foreign-load.lisp
 
 (define-alien-routine arch-write-linkage-table-jmp void
   (table-address system-area-pointer)
@@ -29,7 +29,7 @@
   (table-address system-area-pointer)
   (real-address system-area-pointer))
 
-(defvar *linkage-info* (make-hash-table :test 'equal))
+(defvar *linkage-info* (make-hash-table :test 'equal :synchronized t))
 
 (defstruct linkage-info datap address)
 
@@ -62,7 +62,7 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (/show0 "ensure-foreign-symbol-linkage")
-  (sb!thread:with-mutex (*foreign-lock*)
+  (with-locked-hash-table (*linkage-info*)
     (let ((info (or (gethash (cons name datap) *linkage-info*)
                     (link-foreign-symbol name datap))))
       (linkage-info-address info))))
@@ -70,16 +70,17 @@
 ;;; Update the linkage-table. Called during initialization after all
 ;;; shared libraries have been reopened, and after a previously loaded
 ;;; shared object is reloaded.
+;;;
+;;; FIXME: Should figure out how to write only those entries that need
+;;; updating.
 (defun update-linkage-table ()
-  ;; Doesn't take care of its own locking -- callers are responsible
-  (maphash (lambda (name-and-datap info)
-             (let* ((name (car name-and-datap))
-                    (datap (cdr name-and-datap))
-                    (table-address (linkage-info-address info))
-                    (real-address
-                     (ensure-dynamic-foreign-symbol-address name datap)))
-               (aver (and table-address real-address))
-               (write-linkage-table-entry table-address
-                                          real-address
-                                          datap)))
-           *linkage-info*))
+  (dohash ((name-and-datap info) *linkage-info* :locked t)
+    (let* ((name (car name-and-datap))
+           (datap (cdr name-and-datap))
+           (table-address (linkage-info-address info))
+           (real-address
+            (ensure-dynamic-foreign-symbol-address name datap)))
+      (aver (and table-address real-address))
+      (write-linkage-table-entry table-address
+                                 real-address
+                                 datap))))
