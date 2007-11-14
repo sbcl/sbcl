@@ -46,7 +46,8 @@
 ;;; core image
 (defconstant +package-hashtable-image-load-factor+ 0.5)
 
-;;; All destructive package modifications are serialized on this lock.
+;;; All destructive package modifications are serialized on this lock,
+;;; plus iterations on *PACKAGE-NAMES*.
 (defvar *package-lock*)
 
 (!cold-init-forms
@@ -690,10 +691,11 @@ implementation it is ~S." *default-package-use-list*)
   #!+sb-doc
   "Return a list of all existing packages."
   (let ((res ()))
-    (maphash (lambda (k v)
-               (declare (ignore k))
-               (pushnew v res))
-             *package-names*)
+    (with-packages ()
+      (maphash (lambda (k v)
+                 (declare (ignore k))
+                 (pushnew v res))
+               *package-names*))
     res))
 
 (defun intern (name &optional (package (sane-package)))
@@ -1300,11 +1302,12 @@ PACKAGE."
   "Return a list of all symbols in the system having the specified name."
   (let ((string (string string-or-symbol))
         (res ()))
-    (maphash (lambda (k v)
-               (declare (ignore k))
-               (multiple-value-bind (s w) (find-symbol string v)
-                 (when w (pushnew s res))))
-             *package-names*)
+    (with-packages ()
+      (maphash (lambda (k v)
+                 (declare (ignore k))
+                 (multiple-value-bind (s w) (find-symbol string v)
+                   (when w (pushnew s res))))
+               *package-names*))
     res))
 
 ;;;; APROPOS and APROPOS-LIST

@@ -46,7 +46,8 @@
   (make-hash-table
    ;; EQL testing isn't good enough for generalized function names
    ;; like (SETF FOO).
-   :test 'equal))
+   :test 'equal
+   :synchronized t))
 (defstruct (profile-info (:copier nil))
   (name              (missing-arg) :read-only t)
   (encapsulated-fun  (missing-arg) :type function :read-only t)

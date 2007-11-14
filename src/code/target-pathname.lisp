@@ -111,7 +111,7 @@
 
 ;;; Hash table searching maps a logical pathname's host to its
 ;;; physical pathname translation.
-(defvar *logical-hosts* (make-hash-table :test 'equal))
+(defvar *logical-hosts* (make-hash-table :test 'equal :synchronized t))
 
 ;;;; patterns
 
@@ -1338,11 +1338,12 @@ PARSE-NAMESTRING."
 ;;; a new one if necessary.
 (defun intern-logical-host (thing)
   (declare (values logical-host))
-  (or (find-logical-host thing nil)
-      (let* ((name (logical-word-or-lose thing))
-             (new (make-logical-host :name name)))
-        (setf (gethash name *logical-hosts*) new)
-        new)))
+  (with-locked-hash-table (*logical-hosts*)
+    (or (find-logical-host thing nil)
+        (let* ((name (logical-word-or-lose thing))
+               (new (make-logical-host :name name)))
+          (setf (gethash name *logical-hosts*) new)
+          new))))
 
 ;;;; logical pathname parsing
 

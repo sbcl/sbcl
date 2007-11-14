@@ -37,7 +37,7 @@
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
 ;;; entry for a closure is the shared function entry object.
-(defvar *traced-funs* (make-hash-table :test 'eq))
+(defvar *traced-funs* (make-hash-table :test 'eq :synchronized t))
 
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
