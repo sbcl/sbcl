@@ -47,6 +47,8 @@
 
 #include "genesis/config.h"
 
+#include "wrap.h"
+
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
 
@@ -248,6 +250,10 @@ main(int argc, char *argv[])
     DEFTYPE("suseconds-t", suseconds_t);
 #endif
     DEFTYPE("uid-t",   uid_t);
+/* Types in src/runtime/wrap.h */
+    DEFTYPE("ffi-dev-t", ffi_dev_t);
+    DEFTYPE("ffi-off-t", ffi_off_t);
+    DEFTYPE("ffi-blksize-t", ffi_blksize_t);
     printf("\n");
 
     printf(";;; fcntl.h (or unistd.h on OpenBSD and NetBSD)\n");

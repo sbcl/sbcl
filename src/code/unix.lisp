@@ -656,25 +656,21 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; st_size is a long, not an off-t, because off-t is a 64-bit
 ;;; quantity on Alpha. And FIXME: "No one would want a file length
 ;;; longer than 32 bits anyway, right?":-|
+;;;
+;;; The comment about alien and 64-bit quantities has not been kept in
+;;; sync with the comment now in wrap.h (formerly wrap.c), but it's
+;;; not clear whether either comment is correct.  -- RMK 2007-11-14.
 (define-alien-type nil
   (struct wrapped_stat
-    (st-dev #!-(or mips largefile) unsigned-int
-            #!+mips unsigned-long
-            #!+(and largefile (not mips)) dev-t)
+    (st-dev ffi-dev-t)
     (st-ino ino-t)
     (st-mode mode-t)
     (st-nlink nlink-t)
     (st-uid uid-t)
     (st-gid gid-t)
-    (st-rdev #!-(or mips largefile) unsigned-int
-             #!+mips unsigned-long
-             #!+(and largefile (not mips)) dev-t)
-    (st-size #!-(or darwin mips largefile) unsigned-int
-             #!+(or darwin mips largefile) off-t)
-    #!+(and darwin)
-    (st-blksize unsigned-int)
-    #!-(and darwin)
-    (st-blksize unsigned-long)
+    (st-rdev ffi-dev-t)
+    (st-size ffi-off-t)
+    (st-blksize ffi-blksize-t)
     (st-blocks unsigned-long)
     (st-atime time-t)
     (st-mtime time-t)
