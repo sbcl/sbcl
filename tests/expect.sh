@@ -83,6 +83,25 @@ EOF
     fi
 }
 
+expect_aborted_compile ()
+{
+    $SBCL <<EOF
+        (let* ((lisp "$1")
+               (fasl (compile-file-pathname lisp)))
+          (multiple-value-bind (pathname warnings-p failure-p)
+              (compile-file "$1" :print t)
+            (assert (not pathname))
+            (assert failure-p)
+            (assert warnings-p)
+            (assert (not (probe-file fasl))))
+          (sb-ext:quit :unix-status 52))
+EOF
+    if [ $? != 52 ]; then
+        echo abort-compile $1 test failed: $?
+        exit 1
+    fi
+}
+
 fail_on_compiler_note ()
 {
     $SBCL <<EOF

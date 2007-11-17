@@ -5,6 +5,8 @@ changes in sbcl-1.0.12 relative to sbcl-1.0.11:
     concurrent accesses (but not iteration.) See also:
     SB-EXT:WITH-LOCKED-HASH-TABLE, and
     SB-EXT:HASH-TABLE-SYNCHRONIZED-P.
+  * bug fix: if file compilation is aborted, the partial fasl is now
+    deleted, and COMPILE-FILE returns NIL as the primary value.
   * bug fix: number of thread safety issues relating to SBCL's internal
     hash-table usage have been fixed.
   * bug fix: SB-SYS:WITH-PINNED-OBJECTS could cause garbage values to

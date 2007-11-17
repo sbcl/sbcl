@@ -1482,7 +1482,7 @@
               (invoke-restart it))))))))
 
 ;;; Read all forms from INFO and compile them, with output to OBJECT.
-;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
+;;; Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
   (let ((*package* (sane-package))
@@ -1503,7 +1503,7 @@
         (*compiler-error-bailout*
          (lambda ()
            (compiler-mumble "~2&; fatal error, aborting compilation~%")
-           (return-from sub-compile-file (values nil t t))))
+           (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
         (*last-source-context* nil)
         (*last-original-source* nil)
@@ -1557,7 +1557,7 @@
                  "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
                  condition))
        (finish-output *error-output*)
-       (values nil t t)))))
+       (values t t t)))))
 
 ;;; Return a pathname for the named file. The file must exist.
 (defun verify-source-file (pathname-designator)
@@ -1666,7 +1666,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 |#
   (let* ((fasl-output nil)
          (output-file-name nil)
-         (compile-won nil)
+         (abort-p nil)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
          (input-pathname (verify-source-file input-file))
@@ -1697,31 +1697,34 @@ SPEED and COMPILATION-SPEED optimization values, and the
 
           (when sb!xc:*compile-verbose*
             (print-compile-start-note source-info))
-          (let ((*compile-object* fasl-output)
-                dummy)
-            (multiple-value-setq (dummy warnings-p failure-p)
-              (sub-compile-file source-info)))
-          (setq compile-won t))
+
+          (let ((*compile-object* fasl-output))
+            (setf (values abort-p warnings-p failure-p)
+                  (sub-compile-file source-info))))
 
       (close-source-info source-info)
 
       (when fasl-output
-        (close-fasl-output fasl-output (not compile-won))
+        (close-fasl-output fasl-output abort-p)
         (setq output-file-name
               (pathname (fasl-output-stream fasl-output)))
-        (when (and compile-won sb!xc:*compile-verbose*)
+        (when (and (not abort-p) sb!xc:*compile-verbose*)
           (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
       (when sb!xc:*compile-verbose*
-        (print-compile-end-note source-info compile-won))
+        (print-compile-end-note source-info (not abort-p)))
 
       (when *compiler-trace-output*
         (close *compiler-trace-output*)))
 
-    (values (if output-file
-                ;; Hack around filesystem race condition...
-                (or (probe-file output-file-name) output-file-name)
-                nil)
+    ;; CLHS says that the first value is NIL if the "file could not
+    ;; be created". We interpret this to mean "a valid fasl could not
+    ;; be created" -- which can happen if the compilation is aborted
+    ;; before the whole file has been processed, due to eg. a reader
+    ;; error.
+    (values (when (and (not abort-p) output-file)
+              ;; Hack around filesystem race condition...
+              (or (probe-file output-file-name) output-file-name))
             warnings-p
             failure-p)))
 

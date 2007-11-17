@@ -372,8 +372,14 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(defun something (x) x)
+...
+(defun something-more (x) x)
+EOF
+expect_aborted_compile $tmpfilename
+
 rm $tmpfilename
-rm $compiled_tmpfilename
 
 # success
 exit 104
