@@ -250,10 +250,15 @@ main(int argc, char *argv[])
     DEFTYPE("suseconds-t", suseconds_t);
 #endif
     DEFTYPE("uid-t",   uid_t);
-/* Types in src/runtime/wrap.h */
-    DEFTYPE("ffi-dev-t", ffi_dev_t);
-    DEFTYPE("ffi-off-t", ffi_off_t);
-    DEFTYPE("ffi-blksize-t", ffi_blksize_t);
+    printf(";; Types in src/runtime/wrap.h. See that file for explantion.\n");
+    printf(";; Don't use these types for anything other than the stat wrapper.\n");
+    DEFTYPE("wst-dev-t", wst_dev_t);
+    DEFTYPE("wst-off-t", wst_off_t);
+    DEFTYPE("wst-blksize-t", wst_blksize_t);
+    DEFTYPE("wst-blkcnt-t", wst_blkcnt_t);
+    DEFTYPE("wst-nlink-t", wst_nlink_t);
+    DEFTYPE("wst-uid-t", wst_uid_t);
+    DEFTYPE("wst-gid-t", wst_gid_t);
     printf("\n");
 
     printf(";;; fcntl.h (or unistd.h on OpenBSD and NetBSD)\n");
@@ -411,6 +416,6 @@ main(int argc, char *argv[])
     defconstant("fpe-fltsub", -1);
 #endif
 
-#endif // _WIN32
+#endif // !WIN32
     return 0;
 }

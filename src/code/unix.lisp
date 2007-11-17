@@ -107,11 +107,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 #!+win32
 (progn
-  (defconstant espipe 29)
-  ;; For stat-wrapper hack (different-type or non-existing win32 fields).
-  (define-alien-type nlink-t short)
-  (define-alien-type uid-t short)
-  (define-alien-type gid-t short))
+  (defconstant espipe 29))
 
 ;;;; hacking the Unix environment
 
@@ -662,16 +658,16 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; not clear whether either comment is correct.  -- RMK 2007-11-14.
 (define-alien-type nil
   (struct wrapped_stat
-    (st-dev ffi-dev-t)
+    (st-dev wst-dev-t)
     (st-ino ino-t)
     (st-mode mode-t)
-    (st-nlink nlink-t)
-    (st-uid uid-t)
-    (st-gid gid-t)
-    (st-rdev ffi-dev-t)
-    (st-size ffi-off-t)
-    (st-blksize ffi-blksize-t)
-    (st-blocks unsigned-long)
+    (st-nlink wst-nlink-t)
+    (st-uid wst-uid-t)
+    (st-gid wst-gid-t)
+    (st-rdev wst-dev-t)
+    (st-size wst-off-t)
+    (st-blksize wst-blksize-t)
+    (st-blocks wst-blkcnt-t)
     (st-atime time-t)
     (st-mtime time-t)
     (st-ctime time-t)))
