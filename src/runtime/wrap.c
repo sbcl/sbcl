@@ -39,6 +39,10 @@
 #endif
 #include <stdio.h>
 
+#if defined(LISP_FEATURE_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #include "runtime.h"
 #include "util.h"
 #include "wrap.h"
@@ -307,7 +311,6 @@ wrapped_environ()
 }
 
 #ifdef LISP_FEATURE_WIN32
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <time.h>
 /*

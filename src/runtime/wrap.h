@@ -4,7 +4,8 @@
  * src/tools-for-build/grovel-headers.c can grovel the sizes of
  * things.
  */
-
+#ifndef _SBCL_WRAP_H_
+#define _SBCL_WRAP_H_
 
 /* As of 0.6.12, the FFI can't handle 64-bit values. For now, we use
  * these munged-to-32-bits values for might-be-64-bit slots of
@@ -32,7 +33,6 @@
  * employed. */
 
 #include "sbcl.h"
-#include "runtime.h"
 
 /* We use an extra layer of aliasing because Linux/MIPS struct stat
    doesn't use dev_t. This type is not defined on the Lisp side. */
@@ -46,8 +46,10 @@ typedef dev_t aliased_dev_t;
 typedef aliased_dev_t wst_dev_t;
 typedef off_t wst_off_t;
 #else
-typedef u32 wst_dev_t; /* since Linux dev_t can be 64 bits */
-typedef u32 wst_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
+/* These wrappers shouldn't exist, and since pulling in runtime.h caused
+ * problems on Win32, we don't use the u32 typedef. */
+typedef unsigned int wst_dev_t; /* since Linux dev_t can be 64 bits */
+typedef unsigned int wst_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 #endif
 
 #ifdef LISP_FEATURE_OS_PROVIDES_BLKSIZE_T
@@ -94,3 +96,5 @@ struct stat_wrapper {
     time_t        wrapped_st_mtime;       /* time_t of last modification */
     time_t        wrapped_st_ctime;       /* time_t of last change */
 };
+
+#endif /* _SBCL_WRAP_H_ */
