@@ -2520,15 +2520,6 @@
       (vector-search sequence2 sequence1)
       (apply #'sb!sequence:search sequence1 sequence2 args))))
 
-(sb!xc:defmacro string-dispatch ((&rest types) var &body body)
-  (let ((fun (gensym "STRING-DISPATCH-FUN-")))
-    `(flet ((,fun (,var)
-              ,@body))
-       (declare (inline ,fun))
-       (etypecase ,var
-         ,@(loop for type in types
-                 collect `(,type (,fun (the ,type ,var))))))))
-
 ;;; FIXME: this was originally in array.lisp; it might be better to
 ;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in
 ;;; a new early-seq.lisp file.

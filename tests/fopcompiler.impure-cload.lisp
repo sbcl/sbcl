@@ -92,5 +92,5 @@
 (symbol-macrolet ((foo 1))
   (let* ((x (bar (foo)))
          (y (bar (x foo))))
-    (bar (y x foo)))))
+    (bar (y x foo))))
 

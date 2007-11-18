@@ -588,60 +588,71 @@
 ;;; you tweak it, make sure that you compare the disassembly, if not the
 ;;; performance of, the functions implementing string streams
 ;;; (e.g. SB!IMPL::STRING-OUCH).
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-replace-transform (saetp sequence-type1 sequence-type2)
+    `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                            (,sequence-type1 ,sequence-type2 &rest t)
+                            ,sequence-type1
+                            :node node)
+       ,(cond
+         ((and saetp (valid-bit-bash-saetp-p saetp)) nil)
+         ;; If the sequence types are different, SEQ1 and SEQ2 must
+         ;; be distinct arrays, and we can open code the copy loop.
+         ((not (eql sequence-type1 sequence-type2)) nil)
+         ;; If we're not bit-bashing, only allow cases where we
+         ;; can determine the order of copying up front.  (There
+         ;; are actually more cases we can handle if we know the
+         ;; amount that we're copying, but this handles the
+         ;; common cases.)
+         (t '(unless (= (constant-value-or-lose start1 0)
+                      (constant-value-or-lose start2 0))
+              (give-up-ir1-transform))))
+       `(let* ((len1 (length seq1))
+               (len2 (length seq2))
+               (end1 (or end1 len1))
+               (end2 (or end2 len2))
+               (replace-len1 (- end1 start1))
+               (replace-len2 (- end2 start2)))
+          ,(unless (policy node (= safety 0))
+             `(progn
+                 (unless (<= 0 start1 end1 len1)
+                   (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
+                 (unless (<= 0 start2 end2 len2)
+                   (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
+          ,',(cond
+              ((and saetp (valid-bit-bash-saetp-p saetp))
+               (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
+                      (bash-function (intern (format nil "UB~D-BASH-COPY"
+                                                     n-element-bits)
+                                             (find-package "SB!KERNEL"))))
+                 `(funcall (function ,bash-function) seq2 start2
+                           seq1 start1 (min replace-len1 replace-len2))))
+              (t
+               ;; We can expand the loop inline here because we
+               ;; would have given up the transform (see above)
+               ;; if we didn't have constant matching start
+               ;; indices.
+               '(do ((i start1 (1+ i))
+                     (j start2 (1+ j))
+                     (end (+ start1
+                             (min replace-len1 replace-len2))))
+                 ((>= i end))
+                 (declare (optimize (insert-array-bounds-checks 0)))
+                 (setf (aref seq1 i) (aref seq2 j)))))
+          seq1))))
+
 (macrolet
     ((define-replace-transforms ()
        (loop for saetp across sb!vm:*specialized-array-element-type-properties*
              for sequence-type = `(simple-array ,(sb!vm:saetp-specifier saetp) (*))
              unless (= (sb!vm:saetp-typecode saetp) sb!vm::simple-array-nil-widetag)
-             collect
-            `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                                    (,sequence-type ,sequence-type &rest t)
-                                    ,sequence-type
-                                    :node node)
-               ,(cond
-                 ((valid-bit-bash-saetp-p saetp) nil)
-                 ;; If we're not bit-bashing, only allow cases where we
-                 ;; can determine the order of copying up front.  (There
-                 ;; are actually more cases we can handle if we know the
-                 ;; amount that we're copying, but this handles the
-                 ;; common cases.)
-                 (t '(unless (= (constant-value-or-lose start1 0)
-                              (constant-value-or-lose start2 0))
-                      (give-up-ir1-transform))))
-               `(let* ((len1 (length seq1))
-                       (len2 (length seq2))
-                       (end1 (or end1 len1))
-                       (end2 (or end2 len2))
-                       (replace-len1 (- end1 start1))
-                       (replace-len2 (- end2 start2)))
-                  ,(unless (policy node (= safety 0))
-                           `(progn
-                              (unless (<= 0 start1 end1 len1)
-                                (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
-                              (unless (<= 0 start2 end2 len2)
-                                (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
-                  ,',(cond
-                      ((valid-bit-bash-saetp-p saetp)
-                       (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
-                              (bash-function (intern (format nil "UB~D-BASH-COPY" n-element-bits)
-                                                     (find-package "SB!KERNEL"))))
-                         `(funcall (function ,bash-function) seq2 start2
-                                   seq1 start1 (min replace-len1 replace-len2))))
-                      (t
-                       ;; We can expand the loop inline here because we
-                       ;; would have given up the transform (see above)
-                       ;; if we didn't have constant matching start
-                       ;; indices.
-                       '(do ((i start1 (1+ i))
-                             (end (+ start1
-                                     (min replace-len1 replace-len2))))
-                         ((>= i end))
-                         (declare (optimize (insert-array-bounds-checks 0)))
-                         (setf (aref seq1 i) (aref seq2 i)))))
-                  seq1))
+             collect (make-replace-transform saetp sequence-type sequence-type)
              into forms
-             finally (return `(progn ,@forms)))))
-  (define-replace-transforms))
+             finally (return `(progn ,@forms))))
+     (define-one-transform (sequence-type1 sequence-type2)
+       (make-replace-transform nil sequence-type1 sequence-type2)))
+  (define-one-transform simple-base-string (simple-array character (*)))
+  (define-one-transform (simple-array character (*)) simple-base-string))
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
@@ -854,52 +865,67 @@
                      (return nil)))
              (return index2)))))))
 
-;;; FIXME: It seems as though it should be possible to make a DEFUN
-;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to
-;;; CTYPE before calling %CONCATENATE) which is comparably efficient,
-;;; at least once DYNAMIC-EXTENT works.
-;;;
-;;; FIXME: currently KLUDGEed because of bug 188
-;;;
-;;; FIXME: disabled for sb-unicode: probably want it back
-#!-sb-unicode
-(deftransform concatenate ((rtype &rest sequences)
-                           (t &rest (or simple-base-string
-                                        (simple-array nil (*))))
-                           simple-base-string
-                           :policy (< safety 3))
-  (loop for rest-seqs on sequences
-        for n-seq = (gensym "N-SEQ")
-        for n-length = (gensym "N-LENGTH")
-        for start = 0 then next-start
-        for next-start = (gensym "NEXT-START")
-        collect n-seq into args
-        collect `(,n-length (length ,n-seq)) into lets
-        collect n-length into all-lengths
-        collect next-start into starts
-        collect `(if (and (typep ,n-seq '(simple-array nil (*)))
-                          (> ,n-length 0))
-                     (error 'nil-array-accessed-error)
-                     (#.(let* ((i (position 'character sb!kernel::*specialized-array-element-types*))
-                               (saetp (aref sb!vm:*specialized-array-element-type-properties* i))
-                               (n-bits (sb!vm:saetp-n-bits saetp)))
-                          (intern (format nil "UB~D-BASH-COPY" n-bits)
-                                  "SB!KERNEL"))
-                        ,n-seq 0 res ,start ,n-length))
-                into forms
-        collect `(setq ,next-start (+ ,start ,n-length)) into forms
-        finally
-        (return
-          `(lambda (rtype ,@args)
-             (declare (ignore rtype))
-             (let* (,@lets
-                    (res (make-string (the index (+ ,@all-lengths))
-                                      :element-type 'base-char)))
-               (declare (type index ,@all-lengths))
-               (let (,@(mapcar (lambda (name) `(,name 0)) starts))
-                 (declare (type index ,@starts))
-                 ,@forms)
-               res)))))
+
+;;; Open-code CONCATENATE for strings. It would be possible to extend
+;;; this transform to non-strings, but I chose to just do the case that
+;;; should cover 95% of CONCATENATE performance complaints for now.
+;;;   -- JES, 2007-11-17
+(deftransform concatenate ((result-type &rest lvars)
+                           (symbol &rest sequence)
+                           *
+                           :policy (> speed space))
+  (unless (constant-lvar-p result-type)
+    (give-up-ir1-transform))
+  (let* ((element-type (let ((type (lvar-value result-type)))
+                         ;; Only handle the simple result type cases. If
+                         ;; somebody does (CONCATENATE '(STRING 6) ...)
+                         ;; their code won't be optimized, but nobody does
+                         ;; that in practice.
+                         (case type
+                           ((string simple-string) 'character)
+                           ((base-string simple-base-string) 'base-char)
+                           (t (give-up-ir1-transform)))))
+         (vars (loop for x in lvars collect (gensym)))
+         (lvar-values (loop for lvar in lvars
+                            collect (when (constant-lvar-p lvar)
+                                      (lvar-value lvar))))
+         (lengths
+          (loop for value in lvar-values
+                for var in vars
+                collect (if value
+                            (length value)
+                            `(sb!impl::string-dispatch ((simple-array * (*))
+                                                        sequence)
+                                 ,var
+                               (declare (muffle-conditions compiler-note))
+                               (length ,var))))))
+    `(apply
+      (lambda ,vars
+        (declare (ignorable ,@vars))
+        (let* ((.length. (+ ,@lengths))
+               (.pos. 0)
+               (.string. (make-string .length. :element-type ',element-type)))
+          (declare (type index .length. .pos.)
+                   (muffle-conditions compiler-note))
+          ,@(loop for value in lvar-values
+                  for var in vars
+                  collect (if (stringp value)
+                              ;; Fold the array reads for constant arguments
+                              `(progn
+                                 ,@(loop for c across value
+                                         collect `(setf (aref .string.
+                                                              .pos.) ,c)
+                                         collect `(incf .pos.)))
+                              `(sb!impl::string-dispatch
+                                   (#!+sb-unicode
+                                    (simple-array character (*))
+                                    (simple-array base-char (*))
+                                    t)
+                                   ,var
+                                 (replace .string. ,var :start1 .pos.)
+                                 (incf .pos. (length ,var)))))
+          .string.))
+      lvars)))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 

@@ -134,6 +134,20 @@
         (gensym (format nil "~A[~S]" name block-name))
         (gensym name))))
 
+
+;;; Compile a version of BODY for all TYPES, and dispatch to the
+;;; correct one based on the value of VAR. This was originally used
+;;; only for strings, hence the name. Renaming it to something more
+;;; generic might not be a bad idea.
+(defmacro string-dispatch ((&rest types) var &body body)
+  (let ((fun (gensym "STRING-DISPATCH-FUN-")))
+    `(flet ((,fun (,var)
+              ,@body))
+       (declare (inline ,fun))
+       (etypecase ,var
+         ,@(loop for type in types
+                 collect `(,type (,fun (the ,type ,var))))))))
+
 ;;; Automate an idiom often found in macros:
 ;;;   (LET ((FOO (GENSYM "FOO"))
 ;;;         (MAX-INDEX (GENSYM "MAX-INDEX-")))
