@@ -141,7 +141,19 @@ native_pointer(lispobj obj)
 #define make_fixnum(n) ((lispobj)((n)<<N_FIXNUM_TAG_BITS))
 #define fixnum_value(n) (((long)n)>>N_FIXNUM_TAG_BITS)
 
-/* Too bad ANSI C doesn't define "bool" as C++ does.. */
+#if defined(LISP_FEATURE_WIN32)
+/* KLUDGE: Avoid double definition of boolean by rpcndr.h included via
+ * shlobj.h.
+ *
+ * FIXME: We should probably arrange to use the rpcndr.h boolean on Windows,
+ * or get rid of our own boolean type.  If the boolean type is only used in
+ * the runtime, and never passed to Lisp, then it doesn't matter which one
+ * we use.
+ */
+#define boolean rpcndr_boolean
+#include <shlobj.h>
+#undef boolean
+#endif
 typedef int boolean;
 
 /* This only works for static symbols. */

@@ -51,16 +51,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* KLUDGE: Avoid double definition of boolean by rpcndr.h included via
- * shlobj.h.
- *
- * FIXME: We should probably arrange to use the rpcndr.h boolean on Windows,
- * or get rid of our own boolean type.
- */
-#define boolean rpcndr_boolean
-#include <shlobj.h>
-#undef boolean
-
 #include <math.h>
 #include <float.h>
 
