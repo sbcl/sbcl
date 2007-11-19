@@ -145,7 +145,7 @@
     (values
      ;; ENCAPSULATION-FUN
      (lambda (&more arg-context arg-count)
-       (declare (optimize speed safety))
+       (declare (optimize speed safety sb-c::stack-allocate-dynamic-extent))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
          (unprofile-all) ; to avoid further recursion
@@ -158,8 +158,8 @@
        (let ((dticks 0)
              (dconsing 0)
              (inner-enclosed-profiles 0))
-         (declare (type unsigned-byte dticks dconsing))
-         (declare (type unsigned-byte inner-enclosed-profiles))
+         (declare (type unsigned-byte dticks dconsing inner-enclosed-profiles)
+                  (dynamic-extent dticks dconsing inner-enclosed-profiles))
          (aver (typep dticks 'unsigned-byte))
          (aver (typep dconsing 'unsigned-byte))
          (aver (typep inner-enclosed-profiles 'unsigned-byte))

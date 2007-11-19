@@ -6,7 +6,9 @@ changes in sbcl-1.0.12 relative to sbcl-1.0.11:
     SB-EXT:WITH-LOCKED-HASH-TABLE, and
     SB-EXT:HASH-TABLE-SYNCHRONIZED-P.
   * optimization: CONCATENATE on strings is an order of magnitue faster
-    in code compiled with (> SPEED SPACE)
+    in code compiled with (> SPEED SPACE).
+  * bug fix: SB-PROFILE will no longer report extra consing for nested
+    calls to profiled functions.
   * bug fix: if file compilation is aborted, the partial fasl is now
     deleted, and COMPILE-FILE returns NIL as the primary value.
   * bug fix: number of thread safety issues relating to SBCL's internal
