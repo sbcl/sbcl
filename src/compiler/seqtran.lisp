@@ -651,6 +651,7 @@
              finally (return `(progn ,@forms))))
      (define-one-transform (sequence-type1 sequence-type2)
        (make-replace-transform nil sequence-type1 sequence-type2)))
+  (define-replace-transforms)
   (define-one-transform simple-base-string (simple-array character (*)))
   (define-one-transform (simple-array character (*)) simple-base-string))
 
