@@ -278,8 +278,7 @@
                                 ;; Don't bother testing again until we
                                 ;; get past that allocation offset
                                 (setf skip-tests-until-addr
-                                      (+ (logandc2 addr page-mask)
-                                         (the fixnum bytes-used)))
+                                      (+ (logandc2 addr page-mask) bytes-used))
                                 ;; And then continue with the scheduled
                                 ;; mapping
                                 (return-from maybe-skip-page))
@@ -354,8 +353,8 @@
 ;;; Return a list of 3-lists (bytes object type-name) for the objects
 ;;; allocated in Space.
 (defun type-breakdown (space)
-  (let ((sizes (make-array 256 :initial-element 0 :element-type 'fixnum))
-        (counts (make-array 256 :initial-element 0 :element-type 'fixnum)))
+  (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits)))
+        (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits))))
     (map-allocated-objects
      (lambda (obj type size)
        (declare (fixnum size) (optimize (speed 3)) (ignore obj))
@@ -398,7 +397,7 @@
       (maphash (lambda (k v)
                  (declare (ignore k))
                  (let ((sum 0))
-                   (declare (fixnum sum))
+                   (declare (unsigned-byte sum))
                    (dolist (space-total v)
                      (incf sum (first (cdr space-total))))
                    (summary-totals (cons sum v))))
@@ -407,13 +406,13 @@
       (format t "~2&Summary of spaces: ~(~{~A ~}~)~%" spaces)
       (let ((summary-total-bytes 0)
             (summary-total-objects 0))
-        (declare (fixnum summary-total-bytes summary-total-objects))
+        (declare (unsigned-byte summary-total-bytes summary-total-objects))
         (dolist (space-totals
                  (mapcar #'cdr (sort (summary-totals) #'> :key #'car)))
           (let ((total-objects 0)
                 (total-bytes 0)
                 name)
-            (declare (fixnum total-objects total-bytes))
+            (declare (unsigned-byte total-objects total-bytes))
             (collect ((spaces))
               (dolist (space-total space-totals)
                 (let ((total (cdr space-total)))
@@ -445,8 +444,8 @@
                            0))
          (reported-bytes 0)
          (reported-objects 0))
-    (declare (fixnum total-objects total-bytes cutoff-point reported-objects
-                     reported-bytes))
+    (declare (unsigned-byte total-objects total-bytes cutoff-point reported-objects
+                            reported-bytes))
     (loop for (bytes objects name) in types do
       (when (<= bytes cutoff-point)
         (format t "  ~10:D bytes for ~9:D other object~2:*~P.~%"
@@ -593,7 +592,7 @@
   (let ((totals (make-hash-table :test 'eq))
         (total-objects 0)
         (total-bytes 0))
-    (declare (fixnum total-objects total-bytes))
+    (declare (unsigned-byte total-objects total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
        (declare (fixnum size) (optimize (speed 3)))
@@ -618,7 +617,7 @@
       (let ((sorted (sort (totals-list) #'> :key #'cddr))
             (printed-bytes 0)
             (printed-objects 0))
-        (declare (fixnum printed-bytes printed-objects))
+        (declare (unsigned-byte printed-bytes printed-objects))
         (dolist (what (if top-n
                           (subseq sorted 0 (min (length sorted) top-n))
                           sorted))

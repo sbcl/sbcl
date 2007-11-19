@@ -9,6 +9,8 @@ changes in sbcl-1.0.12 relative to sbcl-1.0.11:
     in code compiled with (> SPEED SPACE).
   * bug fix: SB-PROFILE will no longer report extra consing for nested
     calls to profiled functions.
+  * bug fix: ROOM implementation had bogus fixnum declarations which
+    could cause type-errors when calling ROOM on large images.
   * bug fix: if file compilation is aborted, the partial fasl is now
     deleted, and COMPILE-FILE returns NIL as the primary value.
   * bug fix: number of thread safety issues relating to SBCL's internal
