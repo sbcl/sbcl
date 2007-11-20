@@ -1150,7 +1150,7 @@
   (declare (list path))
 
   (catch 'process-toplevel-form-error-abort
-    (let* ((path (or (gethash form *source-paths*) (cons form path)))
+    (let* ((path (or (get-source-path form) (cons form path)))
            (*compiler-error-bailout*
             (lambda (&optional condition)
               (convert-and-maybe-compile

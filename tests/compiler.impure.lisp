@@ -1511,4 +1511,10 @@
            (quux)))))
 (assert (equal '(1 2 3) (wpo-multiple-call-local)))
 
+;;; bug 417: toplevel NIL confusing source path logic
+(handler-case
+    (delete-file (compile-file "bug-417.lisp"))
+  (sb-ext:code-deletion-note (e)
+    (error e)))
+
 ;;; success

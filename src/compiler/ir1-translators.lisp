@@ -74,7 +74,7 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
   (if (policy *lexenv* (= store-coverage-data 0))
       nil
       (labels ((sub (form)
-                 (or (gethash form *source-paths*)
+                 (or (get-source-path form)
                      (and (consp form)
                           (some #'sub form)))))
         (or (sub form)))))

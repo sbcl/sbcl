@@ -14,14 +14,39 @@
 
 (declaim (special *compiler-error-bailout*))
 
+;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
+;;; form number to associate with a source path. This should be bound
+;;; to an initial value of 0 before the processing of each truly
+;;; top level form.
+(declaim (type index *current-form-number*))
+(defvar *current-form-number*)
+
 ;;; *SOURCE-PATHS* is a hashtable from source code forms to the path
 ;;; taken through the source to reach the form. This provides a way to
 ;;; keep track of the location of original source forms, even when
 ;;; macroexpansions and other arbitary permutations of the code
 ;;; happen. This table is initialized by calling FIND-SOURCE-PATHS on
 ;;; the original source.
+;;;
+;;; It is fairly useless to store symbols, characters, or fixnums in
+;;; this table, as 42 is EQ to 42 no matter where in the source it
+;;; appears. GET-SOURCE-PATH and NOTE-SOURCE-PATH functions should be
+;;; always used to access this table.
 (declaim (hash-table *source-paths*))
 (defvar *source-paths*)
+
+(declaim (inline source-form-hash-path-p))
+(defun source-form-has-path-p (form)
+  (not (typep form '(or symbol fixnum character))))
+
+(defun get-source-path (form)
+  (when (source-form-has-path-p form)
+    (gethash form *source-paths*)))
+
+(defun note-source-path (form &rest arguments)
+  (when (source-form-has-path-p form)
+    (setf (gethash form *source-paths*)
+          (apply #'list* 'original-source-start *current-form-number* arguments))))
 
 ;;; *CURRENT-COMPONENT* is the COMPONENT structure which we link
 ;;; blocks into as we generate them. This just serves to glue the
@@ -410,13 +435,6 @@
             (functional-kind res) :toplevel)
       res)))
 
-;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
-;;; form number to associate with a source path. This should be bound
-;;; to an initial value of 0 before the processing of each truly
-;;; top level form.
-(declaim (type index *current-form-number*))
-(defvar *current-form-number*)
-
 ;;; This function is called on freshly read forms to record the
 ;;; initial location of each form (and subform.) Form is the form to
 ;;; find the paths in, and TLF-NUM is the top level form number of the
@@ -430,9 +448,8 @@
     (sub-find-source-paths form (list tlf-num)))
   (values))
 (defun sub-find-source-paths (form path)
-  (unless (gethash form *source-paths*)
-    (setf (gethash form *source-paths*)
-          (list* 'original-source-start *current-form-number* path))
+  (unless (get-source-path form)
+    (note-source-path form path)
     (incf *current-form-number*)
     (let ((pos 0)
           (subform form)
@@ -448,11 +465,7 @@
                             ;; Otherwise store the containing form. It's
                             ;; not perfect, but better than nothing.
                             (unless (zerop pos)
-                              (setf (gethash subform *source-paths*)
-                                    (list* 'original-source-start
-                                           *current-form-number*
-                                           pos
-                                           path))))
+                              (note-source-path subform pos path)))
                         (incf pos))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
@@ -494,7 +507,7 @@
   ;; namespace.
   (defun ir1-convert (start next result form)
     (ir1-error-bailout (start next result form)
-      (let* ((*current-path* (or (gethash form *source-paths*)
+      (let* ((*current-path* (or (get-source-path form)
                                  (cons form *current-path*)))
              (start (instrument-coverage start nil form)))
         (cond ((atom form)
@@ -871,8 +884,8 @@
 ;;; EQness of the conses.
 (defun maybe-instrument-progn-like (start forms form)
   (or (when (and *allow-instrumenting*
-                 (not (gethash form *source-paths*)))
-        (let ((*current-path* (gethash forms *source-paths*)))
+                 (not (get-source-path form)))
+        (let ((*current-path* (get-source-path forms)))
           (when *current-path*
             (instrument-coverage start nil form))))
       start))
