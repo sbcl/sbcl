@@ -284,6 +284,7 @@
 (deftransform %check-vector-sequence-bounds ((vector start end)
                                              (vector * *) *
                                              :node node)
+  ;; FIXME: Should this not be INSERT-ARRAY-BOUNDS-CHECKS?
   (if (policy node (< safety speed))
       '(or end (length vector))
       '(let ((length (length vector)))
@@ -800,6 +801,10 @@
                                                     'start)
                                            'result 0 'size element-type)
            result)))))
+
+(deftransform subseq ((seq start &optional end)
+                      (list t &optional t))
+  `(list-subseq* seq start end))
 
 (deftransform copy-seq ((seq) ((or (simple-unboxed-array (*)) simple-vector)) *)
   (let ((array-type (lvar-type seq)))

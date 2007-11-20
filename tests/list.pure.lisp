@@ -229,3 +229,10 @@
                                :b '((:a . 1) (:b . 2))))))
   (assert (equal '(3 4 5) (funcall (compile nil '(lambda (i l) (member i l)))
                                    3 '(1 2 3 4 5)))))
+
+;;; bad bounding index pair to SUBSEQ on a list
+(let ((list (list 0 1 2 3 4 5)))
+  (multiple-value-bind (res err) (ignore-errors (subseq list 4 2))
+    (assert (not res))
+    (assert (typep err 'sb-kernel:bounding-indices-bad-error))))
+

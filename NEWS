@@ -7,6 +7,9 @@ changes in sbcl-1.0.12 relative to sbcl-1.0.11:
     SB-EXT:HASH-TABLE-SYNCHRONIZED-P.
   * optimization: CONCATENATE on strings is an order of magnitue faster
     in code compiled with (> SPEED SPACE).
+  * optimization: SUBSEQ is ~50% faster on lists.
+  * bug fix: SUBSEQ on a list will now correctly signal an error if if
+    END is smaller then START.
   * bug fix: SB-PROFILE will no longer report extra consing for nested
     calls to profiled functions.
   * bug fix: ROOM implementation had bogus fixnum declarations which

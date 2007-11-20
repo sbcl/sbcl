@@ -368,24 +368,54 @@
     (setf (aref copy new-index)
           (aref sequence old-index))))
 
-(defun list-subseq* (sequence start &optional end)
-  (declare (type list sequence))
-  ;; the INDEX declaration isn't actually mandatory, but it's true for
-  ;; all practical purposes.
-  (declare (type index start))
-  (declare (type (or null index) end))
-  (do ((list sequence (cdr list))
-       (index 0 (1+ index))
-       (result nil))
-      (nil)
-    (cond
-      ((null list) (if (or (and end (> end index))
-                           (< index start))
-                       (signal-bounding-indices-bad-error sequence start end)
-                       (return (nreverse result))))
-      ((< index start) nil)
-      ((and end (= index end)) (return (nreverse result)))
-      (t (push (car list) result)))))
+(defun list-subseq* (sequence start end)
+  (declare (type list sequence)
+           (type unsigned-byte start)
+           (type (or null unsigned-byte) end))
+  (flet ((oops ()
+           (signal-bounding-indices-bad-error sequence start end)))
+    (let ((pointer sequence))
+      (unless (zerop start)
+        ;; If START > 0 the list cannot be empty. So CDR down to
+        ;; it START-1 times, check that we still have something, then
+        ;; CDR the final time.
+        ;;
+        ;; If START was zero, the list may be empty if END is NIL or
+        ;; also zero.
+        (when (> start 1)
+          (setf pointer (nthcdr (1- start) pointer)))
+        (if pointer
+            (pop pointer)
+            (oops)))
+      (if end
+          (let ((n (- end start)))
+            (declare (integer n))
+            (when (minusp n)
+              (oops))
+            (when (plusp n)
+              (let* ((head (list nil))
+                     (tail head))
+                (macrolet ((pop-one ()
+                             `(let ((tmp (list (pop pointer))))
+                                (setf (cdr tail) tmp
+                                      tail tmp))))
+                  ;; Bignum case
+                  (loop until (fixnump n)
+                        do (pop-one)
+                           (decf n))
+                  ;; Fixnum case, but leave last element, so we should
+                  ;; still have something left in the sequence.
+                  (let ((m (1- n)))
+                    (declare (fixnum m))
+                    (loop repeat m
+                          do (pop-one)))
+                  (unless pointer
+                    (oops))
+                  ;; OK, pop the last one.
+                  (pop-one)
+                  (cdr head)))))
+            (loop while pointer
+                  collect (pop pointer))))))
 
 (defun subseq (sequence start &optional end)
   #!+sb-doc

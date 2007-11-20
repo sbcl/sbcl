@@ -1854,3 +1854,11 @@ WORKAROUND:
 		; note: deleting unreachable code
 	Deleting the toplevel NIL, or even replacing it with 3,
 	causes the system not to complain.
+
+418: SUBSEQ on lists doesn't support bignum indexes
+
+ LIST-SUBSEQ* now has all the works necessary to support bignum indexes,
+ but it needs to be verified that changing the DEFKNOWN doesn't kill
+ performance elsewhere.
+
+ Other generic sequence functions have this problem as well.
