@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.13 relative to sbcl-1.0.12:
+  * bug fix: more bogus fixnum declarations in ROOM implementation
+    have been fixed.
+
 changes in sbcl-1.0.12 relative to sbcl-1.0.11:
   * new feature: MAKE-HASH-TABLE now experimentally accepts a
     :SYNCHRONIZED argument, which makes the hash-table safe for

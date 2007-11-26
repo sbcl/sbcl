@@ -186,8 +186,7 @@
 ;;; platforms with 64-bit word size.
 #!-sb-fluid (declaim (inline round-to-dualword))
 (defun round-to-dualword (size)
-  (declare (fixnum size))
-  (logand (the fixnum (+ size lowtag-mask)) (lognot lowtag-mask)))
+  (logand (the word (+ size lowtag-mask)) (lognot lowtag-mask)))
 
 ;;; Return the total size of a vector in bytes, including any pad.
 #!-sb-fluid (declaim (inline vector-total-size))
@@ -342,10 +341,14 @@
                                    (round-to-dualword
                                     (* (the fixnum (%code-code-size obj))
                                        n-word-bytes)))))))
-                  (declare (fixnum size))
                   (funcall fun obj header-widetag size)
-                  (aver (zerop (logand size lowtag-mask)))
-                  (setq current (sap+ current size))))))))))))
+                  (macrolet ((frob ()
+                               `(progn
+                                  (aver (zerop (logand size lowtag-mask)))
+                                  (setq current (sap+ current size)))))
+                    (etypecase size
+                      (fixnum (frob))
+                      (word (frob))))))))))))))
 
 
 ;;;; MEMORY-USAGE
@@ -357,7 +360,7 @@
         (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.sb!vm:n-word-bits))))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (speed 3)) (ignore obj))
+       (declare (word size) (optimize (speed 3)) (ignore obj))
        (incf (aref sizes type) size)
        (incf (aref counts type)))
      space)
@@ -496,12 +499,13 @@
              (type unsigned-byte total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size))
        (when (eql type code-header-widetag)
-         (incf total-bytes size)
          (let ((words (truly-the fixnum (%code-code-size obj)))
                (sap (truly-the system-area-pointer
-                               (%primitive code-instructions obj))))
+                               (%primitive code-instructions obj)))
+               (size size))
+           (declare (fixnum size))
+           (incf total-bytes size)
            (incf code-words words)
            (dotimes (i words)
              (when (zerop (sap-ref-word sap (* i n-word-bytes)))
@@ -525,11 +529,11 @@
       (declare (inline map-allocated-objects))
       (map-allocated-objects
        (lambda (obj type size)
-         (declare (fixnum size))
          (case type
            (#.code-header-widetag
-            (let ((inst-words (truly-the fixnum (%code-code-size obj))))
-              (declare (type fixnum inst-words))
+            (let ((inst-words (truly-the fixnum (%code-code-size obj)))
+                  (size size))
+              (declare (type fixnum size inst-words))
               (incf non-descriptor-bytes (* inst-words n-word-bytes))
               (incf descriptor-words
                     (- (truncate size n-word-bytes) inst-words))))
@@ -547,7 +551,7 @@
              #.simple-array-unsigned-byte-32-widetag
              #.simple-array-signed-byte-8-widetag
              #.simple-array-signed-byte-16-widetag
-             ; #.simple-array-signed-byte-30-widetag
+             ;; #.simple-array-signed-byte-30-widetag
              #.simple-array-signed-byte-32-widetag
              #.simple-array-single-float-widetag
              #.simple-array-double-float-widetag
@@ -573,7 +577,7 @@
              #.sap-widetag
              #.weak-pointer-widetag
              #.instance-header-widetag)
-            (incf descriptor-words (truncate size n-word-bytes)))
+            (incf descriptor-words (truncate (the fixnum size) n-word-bytes)))
            (t
             (error "bogus widetag: ~W" type))))
        space))
@@ -595,12 +599,14 @@
     (declare (unsigned-byte total-objects total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (fixnum size) (optimize (speed 3)))
+       (declare (optimize (speed 3)))
        (when (eql type instance-header-widetag)
          (incf total-objects)
-         (incf total-bytes size)
          (let* ((classoid (layout-classoid (%instance-ref obj 0)))
-                (found (gethash classoid totals)))
+                (found (gethash classoid totals))
+                (size size))
+           (declare (fixnum size))
+           (incf total-bytes size)
            (cond (found
                   (incf (the fixnum (car found)))
                   (incf (the fixnum (cdr found)) size))
