@@ -87,12 +87,14 @@
         (min-type type)
         (found-super nil))
     (dolist (x *backend-type-predicates*)
-      (let ((stype (car x)))
-        (when (and (csubtypep type stype)
-                   (not (union-type-p stype)))
+      (let* ((stype (car x))
+             (samep (type= stype type)))
+        (when (or samep
+                  (and (csubtypep type stype)
+                       (not (union-type-p stype))))
           (let ((stype-cost (type-test-cost stype)))
             (when (or (< stype-cost min-cost)
-                      (type= stype type))
+                      samep)
               ;; If the supertype is equal in cost to the type, we
               ;; prefer the supertype. This produces a closer
               ;; approximation of the right thing in the presence of
@@ -100,9 +102,14 @@
               (setq found-super t
                     min-type stype
                     min-cost stype-cost))))))
+    ;; This used to return the *UNIVERSAL-TYPE* if no supertype was found,
+    ;; but that's too liberal: it's far too easy for the user to create
+    ;; a union type (which are excluded above), and then trick the compiler
+    ;; into trusting the union type... and finally ending up corrupting the
+    ;; heap once a bad object sneaks past the missing type check.
     (if found-super
         min-type
-        *universal-type*)))
+        type)))
 
 (defun weaken-values-type (type)
   (declare (type ctype type))

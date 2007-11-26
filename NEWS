@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
+  * bug fix: too liberal weakening of union-type checks when SPEED >
+    SAFETY.
   * bug fix: more bogus fixnum declarations in ROOM implementation
     have been fixed.
 

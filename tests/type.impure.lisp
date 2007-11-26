@@ -558,4 +558,27 @@
              (not sb-eval:interpreted-function))
            nil))
 
+;;; weakening of union type checks
+(defun weaken-union-1 (x)
+  (declare (optimize speed))
+  (car x))
+(multiple-value-bind (res err)
+    (ignore-errors (weaken-union-1 "askdjhasdkj"))
+  (assert (not res))
+  (assert (typep err 'type-error)))
+(defun weaken-union-2 (x)
+  (declare (optimize speed)
+           (type (or cons fixnum) x))
+  (etypecase x
+    (fixnum x)
+    (cons
+     (setf (car x) 3)
+     x)))
+(multiple-value-bind (res err)
+    (ignore-errors (weaken-union-2 "asdkahsdkhj"))
+  (assert (not res))
+  (assert (typep err 'type-error))
+  (assert (or (equal '(or cons fixnum) (type-error-expected-type err))
+              (equal '(or fixnum cons) (type-error-expected-type err)))))
+
 ;;; success
