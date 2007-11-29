@@ -47,15 +47,16 @@
   `(let* ((,string (if (stringp ,string) ,string (string ,string))))
      (with-array-data ((,string ,string)
                        (,start ,start)
-                       (,end
-                        (%check-vector-sequence-bounds ,string ,start ,end)))
+                       (,end ,end)
+                       :check-fill-pointer t)
        ,@forms)))
 ;;; WITH-STRING is like WITH-ONE-STRING, but doesn't parse keywords.
 (sb!xc:defmacro with-string (string &rest forms)
   `(let ((,string (if (stringp ,string) ,string (string ,string))))
      (with-array-data ((,string ,string)
                        (start)
-                       (end (length (the vector ,string))))
+                       (end)
+                       :check-fill-pointer t)
        ,@forms)))
 ;;; WITH-TWO-STRINGS is used to set up string comparison operations. The
 ;;; keywords are parsed, and the strings are hacked into SIMPLE-STRINGs.
@@ -65,12 +66,12 @@
          (,string2 (if (stringp ,string2) ,string2 (string ,string2))))
      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
                        (,start1 ,start1)
-                       (,end1 (%check-vector-sequence-bounds
-                               ,string1 ,start1 ,end1)))
+                       (,end1 ,end1)
+                       :check-fill-pointer t)
        (with-array-data ((,string2 ,string2)
                          (,start2 ,start2)
-                         (,end2 (%check-vector-sequence-bounds
-                                 ,string2 ,start2 ,end2)))
+                         (,end2 ,end2)
+                         :check-fill-pointer t)
          ,@forms))))
 ) ; EVAL-WHEN
 

@@ -284,13 +284,12 @@
 (deftransform %check-vector-sequence-bounds ((vector start end)
                                              (vector * *) *
                                              :node node)
-  ;; FIXME: Should this not be INSERT-ARRAY-BOUNDS-CHECKS?
-  (if (policy node (< safety speed))
+  (if (policy node (= 0 insert-array-bounds-checks))
       '(or end (length vector))
       '(let ((length (length vector)))
-        (if (<= 0 start (or end length) length)
-            (or end length)
-            (sb!impl::signal-bounding-indices-bad-error vector start end)))))
+	 (if (<= 0 start (or end length) length)
+	     (or end length)
+	     (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
 (defun specialized-list-seek-function-name (function-name key-functions)
   (or (find-symbol (with-output-to-string (s)
@@ -418,7 +417,8 @@
     (values
      `(with-array-data ((data seq)
                         (start start)
-                        (end end))
+                        (end end)
+                        :check-fill-pointer t)
        (declare (type (simple-array ,element-type 1) data))
        (declare (type fixnum start end))
        (do ((i start (1+ i)))
@@ -1048,13 +1048,12 @@
                                                             end-arg
                                                             element
                                                             done-p-expr)
-  (with-unique-names (offset block index n-sequence sequence n-end end)
-    `(let ((,n-sequence ,sequence-arg)
-           (,n-end ,end-arg))
+  (with-unique-names (offset block index n-sequence sequence end)
+    `(let* ((,n-sequence ,sequence-arg))
        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
                          (,start ,start)
-                         (,end (%check-vector-sequence-bounds
-                                ,n-sequence ,start ,n-end)))
+                         (,end ,end-arg)
+                         :check-fill-pointer t)
          (block ,block
            (macrolet ((maybe-return ()
                         ;; WITH-ARRAY-DATA has already performed bounds
@@ -1062,10 +1061,10 @@
                         ;; in the inner loop.
                         '(let ((,element (locally (declare (optimize (insert-array-bounds-checks 0)))
                                            (aref ,sequence ,index))))
-                           (when ,done-p-expr
-                             (return-from ,block
-                               (values ,element
-                                       (- ,index ,offset)))))))
+                          (when ,done-p-expr
+                            (return-from ,block
+                              (values ,element
+                                      (- ,index ,offset)))))))
              (if ,from-end
                  (loop for ,index
                        ;; (If we aren't fastidious about declaring that
@@ -1076,7 +1075,7 @@
                        from (1- ,end) downto ,start do
                        (maybe-return))
                  (loop for ,index of-type index from ,start below ,end do
-                       (maybe-return))))
+                          (maybe-return))))
            (values nil nil))))))
 
 (def!macro %find-position-vector-macro (item sequence
@@ -1142,7 +1141,7 @@
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-vector-macro item sequence
-                                from-end start end key test))
+    from-end start end key test))
 
 ;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
 ;;; POSITION-IF, etc.

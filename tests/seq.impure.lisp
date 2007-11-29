@@ -377,15 +377,18 @@
   (svref x 0))
 (assert (raises-error? (svrefalike #*0) type-error))
 
-;;; checks for uniform bounding index handling under SAFETY 3 code.
+;;; checks for uniform bounding index handling.
+;;;
+;;; This used to be SAFETY 3 only, but bypassing these checks with
+;;; above-zero speed when SPEED > SAFETY is not The SBCL Way.
 ;;;
 ;;; KLUDGE: not all in one big form because that causes SBCL to spend
 ;;; an absolute age trying to compile it.
 (defmacro sequence-bounding-indices-test (&body body)
   `(progn
-    (locally
+     (locally
     ;; See Issues 332 [and 333(!)] in the CLHS
-    (declare (optimize (safety 3)))
+    (declare (optimize (speed 3) (safety 1)))
     (let ((string (make-array 10
                               :fill-pointer 5
                               :initial-element #\a
@@ -401,7 +404,7 @@
           ,@(cdr body))))
     (locally
       ;; See Issues 332 [and 333(!)] in the CLHS
-      (declare (optimize (safety 3)))
+      (declare (optimize (speed 3) (safety 1)))
       (let ((string (make-array 10
                                 :fill-pointer 5
                                 :initial-element #\a

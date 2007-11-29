@@ -65,7 +65,7 @@
     (aref heap 0)))
 
 (defun heap-extract (heap i &key (key #'identity) (test #'>=))
-  (when (< (length heap) i)
+  (unless (> (length heap) i)
     (error "Heap underflow"))
   (prog1
       (aref heap i)

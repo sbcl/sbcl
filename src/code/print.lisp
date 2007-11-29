@@ -908,7 +908,8 @@
                ;; this for now. [noted by anonymous long ago] -- WHN 19991130
                `(or (char= ,char #\\)
                  (char= ,char #\"))))
-    (with-array-data ((data string) (start) (end (length string)))
+    (with-array-data ((data string) (start) (end)
+                      :check-fill-pointer t)
       (do ((index start (1+ index)))
           ((>= index end))
         (let ((char (schar data index)))

@@ -1521,7 +1521,8 @@ variables to allow for nested and thread safe reading."
   (declare (string string))
   (with-array-data ((string string :offset-var offset)
                     (start start)
-                    (end (%check-vector-sequence-bounds string start end)))
+                    (end end)
+                    :check-fill-pointer t)
     (let ((stream (make-string-input-stream string start end)))
       (values (if preserve-whitespace
                   (read-preserving-whitespace stream eof-error-p eof-value)
@@ -1542,7 +1543,8 @@ variables to allow for nested and thread safe reading."
                        :format-arguments (list string))))
     (with-array-data ((string string :offset-var offset)
                       (start start)
-                      (end (%check-vector-sequence-bounds string start end)))
+                      (end end)
+                      :check-fill-pointer t)
       (let ((index (do ((i start (1+ i)))
                        ((= i end)
                         (if junk-allowed

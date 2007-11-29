@@ -525,7 +525,10 @@ in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
       #+sbcl
       ;; respect the fill pointer
       (let ((end (or end (length sequence))))
-        (sb-kernel:with-array-data ((data sequence) (real-start start) (real-end end))
+        (sb-kernel:with-array-data ((data sequence)
+                                    (real-start start)
+                                    (real-end end)
+                                    :check-fill-pointer t)
           (declare (ignore real-end))
           (update-md5-state state data :start real-start
                             :end (+ real-start (- end start)))))

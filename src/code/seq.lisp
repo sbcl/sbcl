@@ -2132,8 +2132,8 @@
                (frob sequence-arg from-end)
                (with-array-data ((sequence sequence-arg :offset-var offset)
                                  (start start)
-                                 (end (%check-vector-sequence-bounds
-                                       sequence-arg start end)))
+                                 (end end)
+                                 :check-fill-pointer t)
                  (multiple-value-bind (f p)
                      (macrolet ((frob2 () '(if from-end
                                             (frob sequence t)

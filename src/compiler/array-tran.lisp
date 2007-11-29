@@ -136,13 +136,17 @@
 
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
-(defoptimizer (%with-array-data derive-type) ((array start end))
+(defun derive-%with-array-data/mumble-type (array)
   (let ((atype (lvar-type array)))
     (when (array-type-p atype)
       (specifier-type
        `(simple-array ,(type-specifier
-                       (array-type-specialized-element-type atype))
-                     (*))))))
+                        (array-type-specialized-element-type atype))
+                      (*))))))
+(defoptimizer (%with-array-data derive-type) ((array start end))
+  (derive-%with-array-data/mumble-type array))
+(defoptimizer (%with-array-data/fp derive-type) ((array start end))
+  (derive-%with-array-data/mumble-type array))
 
 (defoptimizer (array-row-major-index derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
@@ -560,9 +564,26 @@
          (give-up-ir1-transform))
         (t
          (let ((dim (lvar-value dimension)))
+           ;; FIXME: Can SPEED > SAFETY weaken this check to INTEGER?
            `(the (integer 0 (,dim)) index)))))
 
 ;;;; WITH-ARRAY-DATA
+
+(defun bounding-index-error (array start end)
+  (let ((size (array-total-size array)))
+    (error 'bounding-indices-bad-error
+           :datum (cons start end)
+           :expected-type `(cons (integer 0 ,size)
+                                 (integer ,start ,size))
+           :object array)))
+
+(defun bounding-index-error/fp (array start end)
+  (let ((size (length array)))
+    (error 'bounding-indices-bad-error
+           :datum (cons start end)
+           :expected-type `(cons (integer 0 ,size)
+                                 (integer ,start ,size))
+           :object array)))
 
 ;;; This checks to see whether the array is simple and the start and
 ;;; end are in bounds. If so, it proceeds with those values.
@@ -589,29 +610,39 @@
 (def!macro with-array-data (((data-var array &key offset-var)
                              (start-var &optional (svalue 0))
                              (end-var &optional (evalue nil))
-                             &key force-inline)
-                            &body forms)
+                             &key force-inline check-fill-pointer)
+                            &body forms
+                            &environment env)
   (once-only ((n-array array)
               (n-svalue `(the index ,svalue))
               (n-evalue `(the (or index null) ,evalue)))
-    `(multiple-value-bind (,data-var
-                           ,start-var
-                           ,end-var
-                           ,@(when offset-var `(,offset-var)))
-         (if (not (array-header-p ,n-array))
-             (let ((,n-array ,n-array))
-               (declare (type (simple-array * (*)) ,n-array))
-               ,(once-only ((n-len `(length ,n-array))
-                            (n-end `(or ,n-evalue ,n-len)))
-                  `(if (<= ,n-svalue ,n-end ,n-len)
-                       ;; success
-                       (values ,n-array ,n-svalue ,n-end 0)
-                       (failed-%with-array-data ,n-array
-                                                ,n-svalue
-                                                ,n-evalue))))
-             (,(if force-inline '%with-array-data-macro '%with-array-data)
-              ,n-array ,n-svalue ,n-evalue))
-       ,@forms)))
+    (let ((check-bounds (policy env (= 0 insert-array-bounds-checks))))
+      `(multiple-value-bind (,data-var
+                             ,start-var
+                             ,end-var
+                             ,@(when offset-var `(,offset-var)))
+           (if (not (array-header-p ,n-array))
+               (let ((,n-array ,n-array))
+                 (declare (type (simple-array * (*)) ,n-array))
+                 ,(once-only ((n-len (if check-fill-pointer
+                                         `(length ,n-array)
+                                         `(array-total-size ,n-array)))
+                              (n-end `(or ,n-evalue ,n-len)))
+                             (if check-bounds
+                                 `(values ,n-array ,n-svalue ,n-end 0)
+                                 `(if (<= ,n-svalue ,n-end ,n-len)
+                                      (values ,n-array ,n-svalue ,n-end 0)
+                                      ,(if check-fill-pointer
+                                           `(bounding-index-error/fp ,n-array ,n-svalue ,n-evalue)
+                                           `(bounding-index-error ,n-array ,n-svalue ,n-evalue))))))
+               ,(if force-inline
+                    `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
+                                             :check-bounds ,check-bounds
+                                             :check-fill-pointer ,check-fill-pointer)
+                    (if check-fill-pointer
+                        `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue)
+                        `(%with-array-data ,n-array ,n-svalue ,n-evalue))))
+         ,@forms))))
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.
@@ -620,30 +651,18 @@
                                    end
                                    &key
                                    (element-type '*)
-                                   unsafe?
-                                   fail-inline?)
+                                   check-bounds
+                                   check-fill-pointer)
   (with-unique-names (size defaulted-end data cumulative-offset)
-    `(let* ((,size (array-total-size ,array))
-            (,defaulted-end
-              (cond (,end
-                     (unless (or ,unsafe? (<= ,end ,size))
-                       ,(if fail-inline?
-                            `(error 'bounding-indices-bad-error
-                              :datum (cons ,start ,end)
-                              :expected-type `(cons (integer 0 ,',size)
-                                                    (integer ,',start ,',size))
-                              :object ,array)
-                            `(failed-%with-array-data ,array ,start ,end)))
-                     ,end)
-                    (t ,size))))
-       (unless (or ,unsafe? (<= ,start ,defaulted-end))
-         ,(if fail-inline?
-              `(error 'bounding-indices-bad-error
-                :datum (cons ,start ,end)
-                :expected-type `(cons (integer 0 ,',size)
-                                      (integer ,',start ,',size))
-                :object ,array)
-              `(failed-%with-array-data ,array ,start ,end)))
+    `(let* ((,size ,(if check-fill-pointer
+                        `(length ,array)
+                        `(array-total-size ,array)))
+            (,defaulted-end (or ,end ,size)))
+       ,@(when check-bounds
+               `((unless (<= ,start ,defaulted-end ,size)
+                   ,(if check-fill-pointer
+                        `(bounding-index-error/fp ,array ,start ,end)
+                        `(bounding-index-error ,array ,start ,end)))))
        (do ((,data ,array (%array-data-vector ,data))
             (,cumulative-offset 0
                                 (+ ,cumulative-offset
@@ -655,34 +674,47 @@
                     (the index ,cumulative-offset)))
          (declare (type index ,cumulative-offset))))))
 
-(deftransform %with-array-data ((array start end)
-                                ;; It might very well be reasonable to
-                                ;; allow general ARRAY here, I just
-                                ;; haven't tried to understand the
-                                ;; performance issues involved. --
-                                ;; WHN, and also CSR 2002-05-26
-                                ((or vector simple-array) index (or index null))
-                                *
-                                :node node
-                                :policy (> speed space))
-  "inline non-SIMPLE-vector-handling logic"
+(defun transform-%with-array-data/muble (array node check-fill-pointer)
   (let ((element-type (upgraded-element-type-specifier-or-give-up array))
         (type (lvar-type array)))
     (if (and (array-type-p type)
              (listp (array-type-dimensions type))
              (not (null (cdr (array-type-dimensions type)))))
-        ;; If it's a simple multidimensional array, then just return its
-        ;; data vector directly rather than going through
-        ;; %WITH-ARRAY-DATA-MACRO.  SBCL doesn't generally generate code
-        ;; that would use this currently, but we have encouraged users
-        ;; to use WITH-ARRAY-DATA and we may use it ourselves at some
-        ;; point in the future for optimized libraries or similar.
+        ;; If it's a simple multidimensional array, then just return
+        ;; its data vector directly rather than going through
+        ;; %WITH-ARRAY-DATA-MACRO. SBCL doesn't generally generate
+        ;; code that would use this currently, but we have encouraged
+        ;; users to use WITH-ARRAY-DATA and we may use it ourselves at
+        ;; some point in the future for optimized libraries or
+        ;; similar.
+        ;;
+        ;; FIXME: The return values here don't seem sane, and
+        ;; bounds-checks are elided!
         `(let ((data (truly-the (simple-array ,element-type (*))
                                 (%array-data-vector array))))
            (values data 0 (length data) 0))
         `(%with-array-data-macro array start end
-                                 :unsafe? ,(policy node (= safety 0))
+                                 :check-fill-pointer ,check-fill-pointer
+                                 :check-bounds ,(policy node (< 0 insert-array-bounds-checks))
                                  :element-type ,element-type))))
+
+;; It might very well be reasonable to allow general ARRAY here, I
+;; just haven't tried to understand the performance issues involved.
+;; -- WHN, and also CSR 2002-05-26
+(deftransform %with-array-data ((array start end)
+                                ((or vector simple-array) index (or index null) t)
+                                *
+                                :node node
+                                :policy (> speed space))
+  "inline non-SIMPLE-vector-handling logic"
+  (transform-%with-array-data/muble array node nil))
+(deftransform %with-array-data/fp ((array start end)
+                                ((or vector simple-array) index (or index null) t)
+                                *
+                                :node node
+                                :policy (> speed space))
+  "inline non-SIMPLE-vector-handling logic"
+  (transform-%with-array-data/muble array node t))
 
 ;;;; array accessors
 

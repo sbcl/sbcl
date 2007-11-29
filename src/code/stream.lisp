@@ -572,12 +572,11 @@
   (declare (type string string))
   (declare (type ansi-stream stream))
   (declare (type index start end))
-  (if (array-header-p string)
-      (with-array-data ((data string) (offset-start start)
-                        (offset-end end))
-        (funcall (ansi-stream-sout stream)
-                 stream data offset-start offset-end))
-      (funcall (ansi-stream-sout stream) stream string start end))
+  (with-array-data ((data string) (offset-start start)
+                    (offset-end end)
+                    :check-fill-pointer t)
+    (funcall (ansi-stream-sout stream)
+             stream data offset-start offset-end))
   string)
 
 (defun %write-string (string stream start end)
@@ -1181,8 +1180,8 @@
   (declare (type string string)
            (type index start)
            (type (or index null) end))
-  (let* ((string (coerce string '(simple-array character (*))))
-         (end (%check-vector-sequence-bounds string start end)))
+  (let* ((string (coerce string '(simple-array character (*)))))
+    ;; FIXME: Why WITH-ARRAY-DATA, since the array is already simple?
     (with-array-data ((string string) (start start) (end end))
       (internal-make-string-input-stream
        string ;; now simple
@@ -1969,7 +1968,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                (return i))
              (setf (first rem) el)))))
       (vector
-       (with-array-data ((data seq) (offset-start start) (offset-end end))
+       (with-array-data ((data seq) (offset-start start) (offset-end end)
+                         :check-fill-pointer t)
          (if (compatible-vector-and-stream-element-types-p data stream)
              (let* ((numbytes (- end start))
                     (bytes-read (read-n-bytes stream data offset-start
@@ -2036,7 +2036,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
       (string
        (%write-string seq stream start end))
       (vector
-       (with-array-data ((data seq) (offset-start start) (offset-end end))
+       (with-array-data ((data seq) (offset-start start) (offset-end end)
+                         :check-fill-pointer t)
          (labels
              ((output-seq-in-loop ()
                 (let ((write-function

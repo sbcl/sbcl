@@ -46,8 +46,11 @@
            (fixnum index))
   (%check-bound array bound index))
 
+(defun %with-array-data/fp (array start end)
+  (%with-array-data-macro array start end :check-bounds t :check-fill-pointer t))
+
 (defun %with-array-data (array start end)
-  (%with-array-data-macro array start end :fail-inline? t))
+  (%with-array-data-macro array start end :check-bounds t :check-fill-pointer nil))
 
 (defun %data-vector-and-index (array index)
   (if (array-header-p array)
@@ -55,14 +58,6 @@
           (%with-array-data array index nil)
         (values vector index))
       (values array index)))
-
-;;; It'd waste space to expand copies of error handling in every
-;;; inline %WITH-ARRAY-DATA, so we have them call this function
-;;; instead. This is just a wrapper which is known never to return.
-(defun failed-%with-array-data (array start end)
-  (declare (notinline %with-array-data))
-  (%with-array-data array start end)
-  (bug "called FAILED-%WITH-ARRAY-DATA with valid array parameters?"))
 
 ;;;; MAKE-ARRAY
 (eval-when (:compile-toplevel :execute)

@@ -150,6 +150,10 @@
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
+(defun sb!kernel:%with-array-data/fp (array start end)
+  (assert (typep array '(simple-array * (*))))
+  (values array start end 0))
+
 (defun sb!kernel:signed-byte-32-p (number)
   (typep number '(signed-byte 32)))
 
