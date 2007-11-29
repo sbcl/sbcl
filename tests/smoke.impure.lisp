@@ -72,10 +72,4 @@
   (assert (equal (funcall fn 1) '(1)))
   (assert (equal (funcall fn 1 2 3) '(1 2 3))))
 
-;; ROOM used to bail out when there were object with bignum bytes in
-;; them. Test by Sidney Markowitz.
-(defparameter *large-array*
- (make-array (- (truncate most-positive-fixnum 4) 2)))
-(room)
-
 ;;; success
