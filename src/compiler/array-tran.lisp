@@ -569,22 +569,6 @@
 
 ;;;; WITH-ARRAY-DATA
 
-(defun bounding-index-error (array start end)
-  (let ((size (array-total-size array)))
-    (error 'bounding-indices-bad-error
-           :datum (cons start end)
-           :expected-type `(cons (integer 0 ,size)
-                                 (integer ,start ,size))
-           :object array)))
-
-(defun bounding-index-error/fp (array start end)
-  (let ((size (length array)))
-    (error 'bounding-indices-bad-error
-           :datum (cons start end)
-           :expected-type `(cons (integer 0 ,size)
-                                 (integer ,start ,size))
-           :object array)))
-
 ;;; This checks to see whether the array is simple and the start and
 ;;; end are in bounds. If so, it proceeds with those values.
 ;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
@@ -633,8 +617,8 @@
                                  `(if (<= ,n-svalue ,n-end ,n-len)
                                       (values ,n-array ,n-svalue ,n-end 0)
                                       ,(if check-fill-pointer
-                                           `(bounding-index-error/fp ,n-array ,n-svalue ,n-evalue)
-                                           `(bounding-index-error ,n-array ,n-svalue ,n-evalue))))))
+                                           `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
+                                           `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue))))))
                ,(if force-inline
                     `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
                                              :check-bounds ,check-bounds
@@ -661,8 +645,8 @@
        ,@(when check-bounds
                `((unless (<= ,start ,defaulted-end ,size)
                    ,(if check-fill-pointer
-                        `(bounding-index-error/fp ,array ,start ,end)
-                        `(bounding-index-error ,array ,start ,end)))))
+                        `(sequence-bounding-indices-bad-error ,array ,start ,end)
+                        `(array-bounding-indices-bad-error ,array ,start ,end)))))
        (do ((,data ,array (%array-data-vector ,data))
             (,cumulative-offset 0
                                 (+ ,cumulative-offset

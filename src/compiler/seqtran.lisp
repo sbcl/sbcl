@@ -289,7 +289,7 @@
       '(let ((length (length vector)))
          (if (<= 0 start (or end length) length)
              (or end length)
-             (sb!impl::signal-bounding-indices-bad-error vector start end)))))
+             (sequence-bounding-indices-bad-error vector start end)))))
 
 (defun specialized-list-seek-function-name (function-name key-functions)
   (or (find-symbol (with-output-to-string (s)
@@ -617,9 +617,9 @@
           ,(unless (policy node (= safety 0))
              `(progn
                  (unless (<= 0 start1 end1 len1)
-                   (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
+                   (sequence-bounding-indices-bad-error seq1 start1 end1))
                  (unless (<= 0 start2 end2 len2)
-                   (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
+                   (sequence-bounding-indices-bad-error seq2 start2 end2))))
           ,',(cond
               ((and saetp (valid-bit-bash-saetp-p saetp))
                (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
@@ -793,7 +793,7 @@
          ,(unless (policy node (= safety 0))
                   '(progn
                     (unless (<= 0 start end length)
-                      (sb!impl::signal-bounding-indices-bad-error seq start end))))
+                      (sequence-bounding-indices-bad-error seq start end))))
          (let* ((size (- end start))
                 (result (make-array size :element-type ',element-type)))
            ,(maybe-expand-copy-loop-inline 'seq (if (constant-lvar-p start)
@@ -837,7 +837,7 @@
         (check-bounds-p (policy node (plusp insert-array-bounds-checks))))
     `(block search
        (flet ((oops (vector start end)
-                (bounding-index-error vector start end)))
+                (sequence-bounding-indices-bad-error vector start end)))
          (let* ((len1 (length pattern))
                 (len2 (length text))
                 (end1 (or end1 len1))
@@ -997,7 +997,7 @@
                    (declare (type index index))
                    (dolist (i sequence
                             (if (and end (> end index))
-                                (sb!impl::signal-bounding-indices-bad-error
+                                (sequence-bounding-indices-bad-error
                                  sequence start end)
                                 (values find position)))
                      (let ((key-i (funcall key i)))

@@ -1459,8 +1459,8 @@
 (defknown %set-symbol-package (symbol t) t (unsafe))
 (defknown %coerce-name-to-fun ((or symbol cons)) function (flushable))
 (defknown %coerce-callable-to-fun (callable) function (flushable))
-(defknown bounding-index-error (t t t) nil)
-(defknown bounding-index-error/fp (t t t) nil)
+(defknown array-bounding-indices-bad-error (t t t) nil)
+(defknown sequence-bounding-indices-bad-error (t t t) nil)
 (defknown %find-position
   (t sequence t index sequence-end function function)
   (values t (or index null))

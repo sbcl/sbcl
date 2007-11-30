@@ -837,6 +837,10 @@ possibly temporariliy, because it might be used internally."
                "SIMPLE-STYLE-WARNING"
                "TRY-RESTART"
 
+               ;; error-signalling facilities
+               "ARRAY-BOUNDING-INDICES-BAD-ERROR"
+               "SEQUENCE-BOUNDING-INDICES-BAD-ERROR"
+
                "SPECIAL-FORM-FUNCTION"
                "STYLE-WARN" "SIMPLE-COMPILER-NOTE"
 

@@ -41,8 +41,7 @@
                      nil
                      (if (<= 0 ,start ,length)
                          ,start
-                         (signal-bounding-indices-bad-error ,sequence
-                                                            ,start ,end))
+                         (sequence-bounding-indices-bad-error ,sequence ,start ,end))
                      index)
                   `(,end
                     nil
@@ -55,8 +54,7 @@
                         ;; FIXME: defend against non-number non-NIL
                         ;; stuff?
                         ,end
-                        (signal-bounding-indices-bad-error ,sequence
-                                                           ,start ,end))
+                        (sequence-bounding-indices-bad-error ,sequence ,start ,end))
                     (or null index)))))
               '((start end length sequence)
                 (start1 end1 length1 sequence1)
@@ -220,13 +218,21 @@
                               ;; This seems silly, is there something better?
                               '(integer 0 (0))))))
 
-(defun signal-bounding-indices-bad-error (sequence start end)
-  (let ((length (length sequence)))
+(defun sequence-bounding-indices-bad-error (sequence start end)
+  (let ((size (length sequence)))
     (error 'bounding-indices-bad-error
            :datum (cons start end)
-           :expected-type `(cons (integer 0 ,length)
-                                 (or null (integer ,start ,length)))
+           :expected-type `(cons (integer 0 ,size)
+                                 (integer ,start ,size))
            :object sequence)))
+
+(defun array-bounding-indices-bad-error (array start end)
+  (let ((size (array-total-size array)))
+    (error 'bounding-indices-bad-error
+           :datum (cons start end)
+           :expected-type `(cons (integer 0 ,size)
+                                 (integer ,start ,size))
+           :object array)))
 
 (defun elt (sequence index)
   #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
@@ -359,7 +365,7 @@
   (when (null end)
     (setf end (length sequence)))
   (unless (<= 0 start end (length sequence))
-    (signal-bounding-indices-bad-error sequence start end))
+    (sequence-bounding-indices-bad-error sequence start end))
   (do ((old-index start (1+ old-index))
        (new-index 0 (1+ new-index))
        (copy (%make-sequence-like sequence (- end start))))
@@ -373,7 +379,7 @@
            (type unsigned-byte start)
            (type (or null unsigned-byte) end))
   (flet ((oops ()
-           (signal-bounding-indices-bad-error sequence start end)))
+           (sequence-bounding-indices-bad-error sequence start end)))
     (let ((pointer sequence))
       (unless (zerop start)
         ;; If START > 0 the list cannot be empty. So CDR down to
