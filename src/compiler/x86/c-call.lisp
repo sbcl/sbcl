@@ -333,7 +333,7 @@
 ;;; that GC won't move them while foreign functions go to work.
 (define-vop (touch-object)
   (:translate touch-object)
-  (:args (object :scs (descriptor-reg)))
+  (:args (object))
   (:ignore object)
   (:policy :fast-safe)
   (:arg-types t)

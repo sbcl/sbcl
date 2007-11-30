@@ -2316,3 +2316,10 @@
                      t)
                    t
                    (error "~a" y)))))
+
+;;; Compiling W-P-O when the pinned objects are known to be fixnums
+;;; or characters.
+(compile nil '(lambda (x y)
+               (declare (fixnum y) (character x))
+               (sb-sys:with-pinned-objects (x y)
+                 (some-random-function))))
