@@ -110,9 +110,11 @@ name of a directory in POSIX filename syntax into a pathname
 @end lisp
 
 @noindent
-returns a pathname that denotes a file in the directory, it's necessary
-to append a forward slash to the POSIX filename.  Otherwise, the last
-directory name will be parsed as a filename.
+returns a pathname that denotes a file in the directory, supply a true
+@code{AS-DIRECTORY} argument to @code{SB-EXT:PARSE-NATIVE-NAMESTRING}.
+Likewise, if it is necessary to supply the name of a directory to a
+POSIX function in non-directory syntax, supply a true @code{AS-FILE}
+argument to @code{SB-EXT:NATIVE-NAMESTRING}.
 
 @node Type conversion functions
 @subsubsection Type conversion functions

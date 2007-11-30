@@ -427,5 +427,34 @@
 
 ;;; enough-namestring relative to root
 (assert (equal "foo" (enough-namestring "/foo" "/")))
+
+;;; Check the handling of NIL, :UNSPECIFIC, the empty string, and
+;;; non-NIL strings in NATIVE-NAMESTRING implementations.  Revised by
+;;; RMK 2007-11-28, attempting to preserve the apparent intended
+;;; denotation of SBCL's then-current pathname implementation.
+(assert (equal
+         (loop with components = (list nil :unspecific "" "a")
+               for name in components
+               appending (loop for type in components
+                               as pathname = (make-pathname
+                                              #+win32 "C"
+                                              :directory '(:absolute "tmp")
+                                              :name name :type type)
+                               collect (ignore-errors
+                                         (sb-ext:native-namestring pathname))))
+         #-win32
+            #|type  NIL       :UNSPECIFIC   ""        "a"         |#
+#|name       |#
+#|NIL        |#   '("/tmp/"   "/tmp/"       NIL       NIL
+#|:UNSPECIFIC|#     "/tmp/"   "/tmp/"       NIL       NIL
+#|""         |#     "/tmp/"   "/tmp/"       "/tmp/."  "/tmp/.a"
+#|"a"        |#     "/tmp/a"  "/tmp/a"      "/tmp/a." "/tmp/a.a")
 
+         #+win32
+            #|type  NIL           :UNSPECIFIC   ""            "a"     |#
+#|name       |#                   
+#|NIL        |#   '("C:\\tmp\\"   "C:\\tmp\\"   NIL           NIL
+#|:UNSPECIFIC|#     "C:\\tmp\\"   "C:\\tmp\\"   NIL           NIL
+#|""         |#     "C:\\tmp\\"   "C:\\tmp\\"   "C:\\tmp\\."  "C:\\tmp\\.a"
+#|"a"        |#     "C:\\tmp\\a"  "C:\\tmp\\a"  "C:\\tmp\\a." "C:\\tmp\\a.a")))
 ;;;; success

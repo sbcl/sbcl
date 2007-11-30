@@ -843,7 +843,8 @@ a host-structure or string."
                     thing))
            (values name nil)))))))
 
-(defun %parse-native-namestring (namestr host defaults start end junk-allowed)
+(defun %parse-native-namestring (namestr host defaults start end junk-allowed
+                                 as-directory)
   (declare (type (or host null) host)
            (type string namestr)
            (type index start)
@@ -859,12 +860,13 @@ a host-structure or string."
        (multiple-value-bind (new-host device directory file type version)
            (cond
              (host
-              (funcall (host-parse-native host) namestr start end))
+              (funcall (host-parse-native host) namestr start end as-directory))
              ((pathname-host defaults)
               (funcall (host-parse-native (pathname-host defaults))
                        namestr
                        start
-                       end))
+                       end
+                       as-directory))
              ;; I don't think we should ever get here, as the default
              ;; host will always have a non-null HOST, given that we
              ;; can't create a new pathname without going through
@@ -888,13 +890,17 @@ a host-structure or string."
                                 &optional
                                 host
                                 (defaults *default-pathname-defaults*)
-                                &key (start 0) end junk-allowed)
+                                &key (start 0) end junk-allowed
+                                as-directory)
   #!+sb-doc
   "Convert THING into a pathname, using the native conventions
-appropriate for the pathname host HOST, or if not specified the host
-of DEFAULTS.  If THING is a string, the parse is bounded by START and
-END, and error behaviour is controlled by JUNK-ALLOWED, as with
-PARSE-NAMESTRING."
+appropriate for the pathname host HOST, or if not specified the
+host of DEFAULTS.  If THING is a string, the parse is bounded by
+START and END, and error behaviour is controlled by JUNK-ALLOWED,
+as with PARSE-NAMESTRING.  For file systems whose native
+conventions allow directories to be indicated as files, if
+AS-DIRECTORY is true, return a pathname denoting THING as a
+directory."
   (declare (type pathname-designator thing defaults)
            (type (or list host string (member :unspecific)) host)
            (type index start)
@@ -914,10 +920,11 @@ PARSE-NAMESTRING."
       (etypecase thing
         (simple-string
          (%parse-native-namestring
-          thing found-host defaults start end junk-allowed))
+          thing found-host defaults start end junk-allowed as-directory))
         (string
          (%parse-native-namestring (coerce thing 'simple-string)
-                                   found-host defaults start end junk-allowed))
+                                   found-host defaults start end junk-allowed
+                                   as-directory))
         (pathname
          (let ((defaulted-host (or found-host (%pathname-host defaults))))
            (declare (type host defaulted-host))
@@ -946,9 +953,14 @@ PARSE-NAMESTRING."
                   host:~%  ~S" pathname))
         (funcall (host-unparse host) pathname)))))
 
-(defun native-namestring (pathname)
+(defun native-namestring (pathname &key as-file)
   #!+sb-doc
-  "Construct the full native (name)string form of PATHNAME."
+  "Construct the full native (name)string form of PATHNAME.  For
+file systems whose native conventions allow directories to be
+indicated as files, if AS-FILE is true and the name, type, and
+version components of PATHNAME are all NIL or :UNSPECIFIC,
+construct a string that names the directory according to the file
+system's syntax for files."
   (declare (type pathname-designator pathname))
   (with-native-pathname (pathname pathname)
     (when pathname
@@ -956,7 +968,7 @@ PARSE-NAMESTRING."
         (unless host
           (error "can't determine the native namestring for pathnames with no ~
                   host:~%  ~S" pathname))
-        (funcall (host-unparse-native host) pathname)))))
+        (funcall (host-unparse-native host) pathname as-file)))))
 
 (defun host-namestring (pathname)
   #!+sb-doc

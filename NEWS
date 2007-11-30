@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
+  * SB-EXT:NATIVE-NAMESTRING takes a new keyword AS-FILE, forcing
+    unparsing of directory pathnames as files. Analogously,
+    SB-EXT:PARSE-NATIVE-NAMESTRING takes an AS-DIRECTORY, forcing a
+    filename to parse into a directory pathname.
   * bug fix: some sequence functions elided bounds checking when
     SPEED > SAFETY.
   * bug fix: too liberal weakening of union-type checks when SPEED >

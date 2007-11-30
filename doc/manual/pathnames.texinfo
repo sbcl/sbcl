@@ -107,7 +107,48 @@ namestring, if possible.  Some Lisp pathname concepts (such as the
 @code{:back} directory component) have no direct equivalents in most
 Operating Systems; the behaviour of @code{native-namestring} is
 unspecified if an inappropriate pathname designator is passed to it.
+Additionally, note that conversion from pathname to native filename
+and back to pathname should not be expected to preserve equivalence
+under @code{equal}.
 
 @include fun-sb-ext-parse-native-namestring.texinfo
 @include fun-sb-ext-native-pathname.texinfo
 @include fun-sb-ext-native-namestring.texinfo
+
+Because some file systems permit the names of directories to be
+expressed in multiple ways, it is occasionally necessary to parse a
+native file name ``as a directory name'' or to produce a native file
+name that names a directory ``as a file''.  For these cases,
+@code{parse-native-namestring} accepts the keyword argument
+@code{as-directory} to force a filename to parse as a directory, and
+@code{native-namestring} accepts the keyword argument @code{as-file}
+to force a pathname to unparse as a file.  For example,
+
+@lisp
+; On Unix, the directory "/tmp/" can be denoted by "/tmp/" or "/tmp".
+; Under the default rules for native filenames, these parse and
+; unparse differently.
+(defvar *p*)
+(setf *p* (parse-native-namestring "/tmp/")) @result{} #P"/tmp/"
+(pathname-name *p*) @result{} NIL
+(pathname-directory *p*) @result{} (:ABSOLUTE "tmp")
+(native-namestring *p*) @result{} "/tmp/"
+
+(setf *p* (parse-native-namestring "/tmp")) @result{} #P"/tmp"
+(pathname-name *p*) @result{} "tmp"
+(pathname-directory *p*) @result{} (:ABSOLUTE)
+(native-namestring *p*) @result{} "/tmp"
+
+; A non-NIL AS-DIRECTORY argument to PARSE-NATIVE-NAMESTRING forces
+; both the second string to parse the way the first does.
+(setf *p* (parse-native-namestring "/tmp"
+                                   nil *default-pathname-defaults*
+                                   :as-directory t)) @result{} #P"/tmp/"
+(pathname-name *p*) @result{} NIL
+(pathname-directory *p*) @result{} (:ABSOLUTE "tmp")
+
+; A non-NIL AS-FILE argument to NATIVE-NAMESTRING forces the pathname
+; parsed from the first string to unparse as the second string.
+(setf *p* (parse-native-namestring "/tmp/")) @result{} #P"/tmp/"
+(native-namestring *p* :as-file t) @result{} "/tmp"
+@end lisp

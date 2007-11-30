@@ -85,7 +85,7 @@
               type
               version))))
 
-(defun parse-native-unix-namestring (namestring start end)
+(defun parse-native-unix-namestring (namestring start end as-directory)
   (declare (type simple-string namestring)
            (type index start end))
   (setf namestring (coerce namestring 'simple-string))
@@ -96,22 +96,27 @@
                              collect (if (and (string= piece "..") rest)
                                          :up
                                          piece)))
+           (directory (if (and as-directory
+                               (string/= "" (car (last components))))
+                          components
+                          (butlast components)))
            (name-and-type
-            (let* ((end (first (last components)))
-                   (dot (position #\. end :from-end t)))
-              ;; FIXME: can we get this dot-interpretation knowledge
-              ;; from existing code?  EXTRACT-NAME-TYPE-AND-VERSION
-              ;; does slightly more work than that.
-              (cond
-                ((string= end "")
-                 (list nil nil))
-                ((and dot (> dot 0))
-                 (list (subseq end 0 dot) (subseq end (1+ dot))))
-                (t
-                 (list end nil))))))
+            (unless as-directory
+              (let* ((end (first (last components)))
+                     (dot (position #\. end :from-end t)))
+                ;; FIXME: can we get this dot-interpretation knowledge
+                ;; from existing code?  EXTRACT-NAME-TYPE-AND-VERSION
+                ;; does slightly more work than that.
+                (cond
+                  ((string= end "")
+                   (list nil nil))
+                  ((and dot (> dot 0))
+                   (list (subseq end 0 dot) (subseq end (1+ dot))))
+                  (t
+                   (list end nil)))))))
       (values nil
               nil
-              (cons (if absolute :absolute :relative) (butlast components))
+              (cons (if absolute :absolute :relative) directory)
               (first name-and-type)
               (second name-and-type)
               nil))))
@@ -238,32 +243,48 @@
                (unparse-unix-directory pathname)
                (unparse-unix-file pathname)))
 
-(defun unparse-native-unix-namestring (pathname)
+(defun unparse-native-unix-namestring (pathname as-file)
   (declare (type pathname pathname))
-  (let ((directory (pathname-directory pathname))
-        (name (pathname-name pathname))
-        (type (pathname-type pathname)))
+  (let* ((directory (pathname-directory pathname))
+         (name (pathname-name pathname))
+         (name-present-p (typep name '(not (member nil :unspecific))))
+         (name-string (if name-present-p name ""))
+         (type (pathname-type pathname))
+         (type-present-p (typep type '(not (member nil :unspecific))))
+         (type-string (if type-present-p type "")))
+    (when name-present-p
+      (setf as-file nil))
     (coerce
      (with-output-to-string (s)
        (when directory
          (ecase (car directory)
            (:absolute (write-char #\/ s))
            (:relative)))
-       (dolist (piece (cdr directory))
-         (typecase piece
-           ((member :up) (write-string ".." s))
-           (string (write-string piece s))
-           (t (error "ungood piece in NATIVE-NAMESTRING: ~S" piece)))
-         (write-char #\/ s))
-       (when name
-         (unless (stringp name)
-           (error "non-STRING name in NATIVE-NAMESTRING: ~S" name))
-         (write-string name s)
-         (when type
-           (unless (stringp type)
-             (error "non-STRING type in NATIVE-NAMESTRING: ~S" name))
-           (write-char #\. s)
-           (write-string type s))))
+       (loop for (piece . subdirs) on (cdr directory)
+          do (typecase piece
+               ((member :up) (write-string ".." s))
+               (string (write-string piece s))
+               (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
+                         piece)))
+          if (or subdirs (stringp name))
+          do (write-char #\/ s)
+          else
+          do (unless as-file
+               (write-char #\/ s)))
+       (if name-present-p
+           (progn
+             (unless (stringp name-string) ;some kind of wild field
+               (error "ungood name component in NATIVE-NAMESTRING: ~S" name))
+             (write-string name-string s)
+             (when type-present-p
+               (unless (stringp type-string) ;some kind of wild field
+                 (error "ungood type component in NATIVE-NAMESTRING: ~S" type))
+               (write-char #\. s)
+               (write-string type-string s)))
+           (when type-present-p ; type without a name
+             (error
+              "type component without a name component in NATIVE-NAMESTRING: ~S"
+              type))))
      'simple-string)))
 
 (defun unparse-unix-enough (pathname defaults)
