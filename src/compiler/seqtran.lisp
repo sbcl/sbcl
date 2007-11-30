@@ -287,9 +287,9 @@
   (if (policy node (= 0 insert-array-bounds-checks))
       '(or end (length vector))
       '(let ((length (length vector)))
-	 (if (<= 0 start (or end length) length)
-	     (or end length)
-	     (sb!impl::signal-bounding-indices-bad-error vector start end)))))
+         (if (<= 0 start (or end length) length)
+             (or end length)
+             (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
 (defun specialized-list-seek-function-name (function-name key-functions)
   (or (find-symbol (with-output-to-string (s)
@@ -825,6 +825,7 @@
                                from-end)
                       (vector vector &rest t)
                       *
+                      :node node
                       :policy (> speed (max space safety)))
   "open code"
   (let ((from-end (when (lvar-p from-end)
@@ -832,44 +833,55 @@
                       (give-up-ir1-transform ":FROM-END is not constant."))
                     (lvar-value from-end)))
         (keyp (lvar-p key))
-        (testp (lvar-p test)))
+        (testp (lvar-p test))
+        (check-bounds-p (policy node (plusp insert-array-bounds-checks))))
     `(block search
-       (let ((end1 (or end1 (length pattern)))
-             (end2 (or end2 (length text)))
-             ,@(when keyp
-                     '((key (coerce key 'function))))
-             ,@(when testp
-                     '((test (coerce test 'function)))))
-         (declare (type index start1 start2 end1 end2))
-         (do (,(if from-end
-                   '(index2 (- end2 (- end1 start1)) (1- index2))
-                   '(index2 start2 (1+ index2))))
-             (,(if from-end
-                   '(< index2 start2)
-                   '(>= index2 end2))
-              nil)
-           ;; INDEX2 is FIXNUM, not an INDEX, as right before the loop
-           ;; terminates is hits -1 when :FROM-END is true and :START2
-           ;; is 0.
-           (declare (type fixnum index2))
-           (when (do ((index1 start1 (1+ index1))
-                      (index2 index2 (1+ index2)))
-                     ((>= index1 end1) t)
-                   (declare (type index index1 index2))
-                   ,@(unless from-end
-                             '((when (= index2 end2)
-                                 (return-from search nil))))
-                   (unless (,@(if testp
-                                  '(funcall test)
-                                  '(eql))
-                              ,(if keyp
-                                   '(funcall key (aref pattern index1))
-                                   '(aref pattern index1))
-                              ,(if keyp
-                                   '(funcall key (aref text index2))
-                                   '(aref text index2)))
-                     (return nil)))
-             (return index2)))))))
+       (flet ((oops (vector start end)
+                (bounding-index-error vector start end)))
+         (let* ((len1 (length pattern))
+                (len2 (length text))
+                (end1 (or end1 len1))
+                (end2 (or end2 len2))
+               ,@(when keyp
+                       '((key (coerce key 'function))))
+               ,@(when testp
+                       '((test (coerce test 'function)))))
+          (declare (type index start1 start2 end1 end2))
+          ,@(when check-bounds-p
+             `((unless (<= start1 end1 len1)
+                 (oops pattern start1 end1))
+               (unless (<= start2 end2 len2)
+                 (oops pattern start2 end2))))
+          (do (,(if from-end
+                    '(index2 (- end2 (- end1 start1)) (1- index2))
+                    '(index2 start2 (1+ index2))))
+              (,(if from-end
+                    '(< index2 start2)
+                    '(>= index2 end2))
+               nil)
+            ;; INDEX2 is FIXNUM, not an INDEX, as right before the loop
+            ;; terminates is hits -1 when :FROM-END is true and :START2
+            ;; is 0.
+            (declare (type fixnum index2))
+            (when (do ((index1 start1 (1+ index1))
+                       (index2 index2 (1+ index2)))
+                      ((>= index1 end1) t)
+                    (declare (type index index1 index2)
+                             (optimize (insert-array-bounds-checks 0)))
+                    ,@(unless from-end
+                              '((when (= index2 end2)
+                                  (return-from search nil))))
+                    (unless (,@(if testp
+                                   '(funcall test)
+                                   '(eql))
+                               ,(if keyp
+                                    '(funcall key (aref pattern index1))
+                                    '(aref pattern index1))
+                               ,(if keyp
+                                    '(funcall key (aref text index2))
+                                    '(aref text index2)))
+                      (return nil)))
+              (return index2))))))))
 
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend

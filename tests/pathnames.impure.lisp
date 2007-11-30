@@ -452,7 +452,7 @@
 
          #+win32
             #|type  NIL           :UNSPECIFIC   ""            "a"     |#
-#|name       |#                   
+#|name       |#
 #|NIL        |#   '("C:\\tmp\\"   "C:\\tmp\\"   NIL           NIL
 #|:UNSPECIFIC|#     "C:\\tmp\\"   "C:\\tmp\\"   NIL           NIL
 #|""         |#     "C:\\tmp\\"   "C:\\tmp\\"   "C:\\tmp\\."  "C:\\tmp\\.a"
