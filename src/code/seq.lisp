@@ -380,14 +380,16 @@
                     (end end)
                     :check-fill-pointer t
                     :force-inline t)
-    (let ((copy (%make-sequence-like sequence (- end start))))
+    (let* ((copy (%make-sequence-like sequence (- end start)))
+           (setter (!find-data-vector-setter copy))
+           (reffer (!find-data-vector-reffer data)))
       (declare (optimize (speed 3) (safety 0)))
       (do ((old-index start (1+ old-index))
            (new-index 0 (1+ new-index)))
           ((= old-index end) copy)
         (declare (index old-index new-index))
-        (setf (aref copy new-index)
-              (aref data old-index))))))
+        (funcall setter copy new-index
+                 (funcall reffer data old-index))))))
 
 (defun list-subseq* (sequence start end)
   (declare (type list sequence)
