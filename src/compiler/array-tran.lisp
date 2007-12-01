@@ -600,7 +600,7 @@
   (once-only ((n-array array)
               (n-svalue `(the index ,svalue))
               (n-evalue `(the (or index null) ,evalue)))
-    (let ((check-bounds (policy env (= 0 insert-array-bounds-checks))))
+    (let ((check-bounds (policy env (plusp insert-array-bounds-checks))))
       `(multiple-value-bind (,data-var
                              ,start-var
                              ,end-var
@@ -613,12 +613,12 @@
                                          `(array-total-size ,n-array)))
                               (n-end `(or ,n-evalue ,n-len)))
                              (if check-bounds
-                                 `(values ,n-array ,n-svalue ,n-end 0)
-                                 `(if (<= ,n-svalue ,n-end ,n-len)
+                                 `(if (<= 0 ,n-svalue ,n-end ,n-len)
                                       (values ,n-array ,n-svalue ,n-end 0)
                                       ,(if check-fill-pointer
                                            `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
-                                           `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue))))))
+                                           `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
+                                 `(values ,n-array ,n-svalue ,n-end 0))))
                ,(if force-inline
                     `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
                                              :check-bounds ,check-bounds
@@ -660,8 +660,10 @@
 
 (defun transform-%with-array-data/muble (array node check-fill-pointer)
   (let ((element-type (upgraded-element-type-specifier-or-give-up array))
-        (type (lvar-type array)))
+        (type (lvar-type array))
+        (check-bounds (policy node (plusp insert-array-bounds-checks))))
     (if (and (array-type-p type)
+             (not (array-type-complexp type))
              (listp (array-type-dimensions type))
              (not (null (cdr (array-type-dimensions type)))))
         ;; If it's a simple multidimensional array, then just return
@@ -671,15 +673,20 @@
         ;; users to use WITH-ARRAY-DATA and we may use it ourselves at
         ;; some point in the future for optimized libraries or
         ;; similar.
-        ;;
-        ;; FIXME: The return values here don't seem sane, and
-        ;; bounds-checks are elided!
-        `(let ((data (truly-the (simple-array ,element-type (*))
-                                (%array-data-vector array))))
-           (values data 0 (length data) 0))
+        (if check-bounds
+            `(let* ((data (truly-the (simple-array ,element-type (*))
+                                     (%array-data-vector array)))
+                    (len (length data))
+                    (real-end (or end len)))
+               (unless (<= 0 start data-end lend)
+                 (sequence-bounding-indices-bad-error array start end))
+               (values data 0 real-end 0))
+            `(let ((data (truly-the (simple-array ,element-type (*))
+                                    (%array-data-vector array))))
+               (values data 0 (or end (length data)) 0)))
         `(%with-array-data-macro array start end
                                  :check-fill-pointer ,check-fill-pointer
-                                 :check-bounds ,(policy node (< 0 insert-array-bounds-checks))
+                                 :check-bounds ,check-bounds
                                  :element-type ,element-type))))
 
 ;; It might very well be reasonable to allow general ARRAY here, I
