@@ -805,6 +805,8 @@
                                                        'start)
                                               'result 0 'size element-type)
               result))))
+      ((csubtypep type (specifier-type 'string))
+       '(string-subseq* seq start end))
       (t
        '(vector-subseq* seq start end)))))
 
