@@ -187,3 +187,10 @@
   (assert (string= c "abcde"))
   (assert (string= d "beacd"))
   (assert (string= e "abced")))
+
+;;; COPY-SEQ "should be prepared to signal an error if sequence is not
+;;; a proper sequence".
+(locally (declare (optimize safety))
+  (multiple-value-bind (seq err) (ignore-errors (copy-seq '(1 2 3 . 4)))
+    (assert (not seq))
+    (assert (typep err 'type-error))))

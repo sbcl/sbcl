@@ -312,22 +312,26 @@
 
 ;;;; list copying functions
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb!xc:defmacro !copy-list-macro (list &key check-proper-list)
+    ;; Unless CHECK-PROPER-LIST is true, the list is copied correctly
+    ;; even if the list is not terminated by NIL. The new list is built
+    ;; by CDR'ing SPLICE which is always at the tail of the new list.
+    `(when ,list
+       (let ((copy (list (car ,list))))
+         (do ((orig (cdr ,list) (cdr orig))
+              (splice copy (cdr (rplacd splice (cons (car orig) nil)))))
+             (,@(if check-proper-list
+                    '((endp orig))
+                    '((atom orig)
+                      (unless (null orig)
+                        (rplacd splice orig))))
+              copy))))))
+
 (defun copy-list (list)
   #!+sb-doc
-  "Return a new list which is EQUAL to LIST."
-  ;; The list is copied correctly even if the list is not terminated
-  ;; by NIL. The new list is built by CDR'ing SPLICE which is always
-  ;; at the tail of the new list.
-  (if (atom list)
-      list
-      (let ((result (list (car list))))
-        (do ((x (cdr list) (cdr x))
-             (splice result
-                     (cdr (rplacd splice (cons (car x) '())))))
-            ((atom x)
-             (unless (null x)
-               (rplacd splice x))))
-        result)))
+  "Return a new list which is EQUAL to LIST. LIST may be improper."
+  (!copy-list-macro list))
 
 (defun copy-alist (alist)
   #!+sb-doc

@@ -818,15 +818,25 @@
                       ((and sequence (not vector) (not list)) t &optional t))
   '(sb!sequence:subseq seq start end))
 
-(deftransform copy-seq ((seq) ((or (simple-unboxed-array (*)) simple-vector)) *)
-  (let ((array-type (lvar-type seq)))
-    (unless (array-type-p array-type)
-      (give-up-ir1-transform))
-    (let ((element-type (type-specifier (array-type-specialized-element-type array-type))))
-      `(let* ((length (length seq))
-              (result (make-array length :element-type ',element-type)))
-         ,(maybe-expand-copy-loop-inline 'seq 0 'result 0 'length element-type)
-         result))))
+(deftransform copy-seq ((seq) (vector))
+  (let ((type (lvar-type seq)))
+    (cond ((and (array-type-p type)
+                (csubtypep type (specifier-type '(or (simple-unboxed-array (*)) simple-vector))))
+           (let ((element-type (type-specifier (array-type-specialized-element-type type))))
+             `(let* ((length (length seq))
+                     (result (make-array length :element-type ',element-type)))
+                ,(maybe-expand-copy-loop-inline 'seq 0 'result 0 'length element-type)
+                result)))
+          ((csubtypep type (specifier-type 'string))
+           '(string-subseq* seq 0 nil))
+          (t
+           '(vector-subseq* seq 0 nil)))))
+
+(deftransform copy-seq ((seq) (list))
+  '(list-copy-seq* seq))
+
+(deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
+  '(sb!sequence:copy-seq seq))
 
 ;;; FIXME: it really should be possible to take advantage of the
 ;;; macros used in code/seq.lisp here to avoid duplication of code,

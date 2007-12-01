@@ -451,44 +451,15 @@
 
 ;;;; COPY-SEQ
 
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro vector-copy-seq (sequence)
-  `(let ((length (length (the vector ,sequence))))
-     (declare (fixnum length))
-     (do ((index 0 (1+ index))
-          (copy (%make-sequence-like ,sequence length)))
-         ((= index length) copy)
-       (declare (fixnum index))
-       (setf (aref copy index) (aref ,sequence index)))))
-
-(sb!xc:defmacro list-copy-seq (list)
-  `(if (atom ,list) '()
-       (let ((result (cons (car ,list) '()) ))
-         (do ((x (cdr ,list) (cdr x))
-              (splice result
-                      (cdr (rplacd splice (cons (car x) '() ))) ))
-             ((atom x) (unless (null x)
-                               (rplacd splice x))
-                       result)))))
-
-) ; EVAL-WHEN
-
 (defun copy-seq (sequence)
   #!+sb-doc "Return a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
   (seq-dispatch sequence
     (list-copy-seq* sequence)
-    (vector-copy-seq* sequence)
+    (vector-subseq* sequence 0 nil)
     (sb!sequence:copy-seq sequence)))
 
-;;; internal frobs
-
 (defun list-copy-seq* (sequence)
-  (list-copy-seq sequence))
-
-(defun vector-copy-seq* (sequence)
-  (declare (type vector sequence))
-  (vector-copy-seq sequence))
+  (!copy-list-macro sequence :check-proper-list t))
 
 ;;;; FILL
 
