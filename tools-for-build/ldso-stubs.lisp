@@ -97,8 +97,8 @@ ldso_stub__ ## fct: ;                           \\
 #!+(and darwin ppc) "
 #define LDSO_STUBIFY(fct)                       @\\
 .text                                           @\\
-.globl  ldso_stub___ ## fct                     @\\
-ldso_stub___ ## fct:                            @\\
+.globl  _ldso_stub___ ## fct                     @\\
+_ldso_stub___ ## fct:                            @\\
         b ldso_stub__ ## fct ## stub            @\\
 .symbol_stub ldso_stub__ ## fct ## stub:        @\\
 .indirect_symbol _ ## fct                       @\\

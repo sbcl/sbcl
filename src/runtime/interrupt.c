@@ -693,10 +693,6 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
     if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         interrupt_handle_now(signal, info, context);
-
-#ifdef LISP_FEATURE_DARWIN
-    DARWIN_FIX_CONTEXT(context);
-#endif
 }
 
 static void
@@ -723,10 +719,6 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     if(!maybe_defer_handler(low_level_interrupt_handle_now,data,
                             signal,info,context))
         low_level_interrupt_handle_now(signal, info, context);
-
-#ifdef LISP_FEATURE_DARWIN
-    DARWIN_FIX_CONTEXT(context);
-#endif
 }
 #endif
 
@@ -813,9 +805,6 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     os_restore_fp_control(context);
 #endif
     interrupt_handle_now(signal, info, context);
-#ifdef LISP_FEATURE_DARWIN
-    DARWIN_FIX_CONTEXT(context);
-#endif
 }
 
 /* manipulate the signal context and stack such that when the handler

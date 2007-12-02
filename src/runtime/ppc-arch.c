@@ -446,9 +446,6 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
     if (allocation_trap_p(context)) {
         handle_allocation_trap(context);
         arch_skip_instruction(context);
-#ifdef LISP_FEATURE_DARWIN
-        DARWIN_FIX_CONTEXT(context);
-#endif
         return;
     }
 #endif
@@ -457,25 +454,14 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0x1f;
         handle_trap(context,trap);
-
-#ifdef LISP_FEATURE_DARWIN
-        DARWIN_FIX_CONTEXT(context);
-#endif
         return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
         interrupt_internal_error(context, 0);
-#ifdef LISP_FEATURE_DARWIN
-        DARWIN_FIX_CONTEXT(context);
-#endif
         return;
     }
 
     interrupt_handle_now(signal, (siginfo_t *)code, context);
-#ifdef LISP_FEATURE_DARWIN
-    /* Work around G5 bug */
-    DARWIN_FIX_CONTEXT(context);
-#endif
 }
 
 

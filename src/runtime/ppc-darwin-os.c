@@ -38,78 +38,78 @@ int arch_os_thread_cleanup(struct thread *thread) {
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
-    ppc_saved_state_t *state = &context->uc_mcontext->ss;
+    ppc_ss_struct_t *state = &context->uc_mcontext->PPC_DARWIN_REGIFY(ss);
     switch(offset) {
     case 0:
-        return (os_context_register_t *) &state->r0;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r0);
     case 1:
-        return (os_context_register_t *) &state->r1;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r1);
     case 2:
-        return (os_context_register_t *) &state->r2;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r2);
     case 3:
-        return (os_context_register_t *) &state->r3;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r3);
     case 4:
-        return (os_context_register_t *) &state->r4;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r4);
     case 5:
-        return (os_context_register_t *) &state->r5;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r5);
     case 6:
-        return (os_context_register_t *) &state->r6;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r6);
     case 7:
-        return (os_context_register_t *) &state->r7;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r7);
     case 8:
-        return (os_context_register_t *) &state->r8;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r8);
     case 9:
-        return (os_context_register_t *) &state->r9;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r9);
     case 10:
-        return (os_context_register_t *) &state->r10;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r10);
     case 11:
-        return (os_context_register_t *) &state->r11;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r11);
     case 12:
-        return (os_context_register_t *) &state->r12;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r12);
     case 13:
-        return (os_context_register_t *) &state->r13;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r13);
     case 14:
-        return (os_context_register_t *) &state->r14;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r14);
     case 15:
-        return (os_context_register_t *) &state->r15;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r15);
     case 16:
-        return (os_context_register_t *) &state->r16;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r16);
     case 17:
-        return (os_context_register_t *) &state->r17;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r17);
     case 18:
-        return (os_context_register_t *) &state->r18;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r18);
     case 19:
-        return (os_context_register_t *) &state->r19;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r19);
     case 20:
-        return (os_context_register_t *) &state->r20;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r20);
     case 21:
-        return (os_context_register_t *) &state->r21;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r21);
     case 22:
-        return (os_context_register_t *) &state->r22;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r22);
     case 23:
-        return (os_context_register_t *) &state->r23;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r23);
     case 24:
-        return (os_context_register_t *) &state->r24;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r24);
     case 25:
-        return (os_context_register_t *) &state->r25;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r25);
     case 26:
-        return (os_context_register_t *) &state->r26;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r26);
     case 27:
-        return (os_context_register_t *) &state->r27;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r27);
     case 28:
-        return (os_context_register_t *) &state->r28;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r28);
     case 29:
-        return (os_context_register_t *) &state->r29;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r29);
     case 30:
-        return (os_context_register_t *) &state->r30;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r30);
     case 31:
-        return (os_context_register_t *) &state->r31;
+        return (os_context_register_t *) &state->PPC_DARWIN_REGIFY(r31);
     case 41:
         /* PT_DAR */
-        return (os_context_register_t *) &context->uc_mcontext->es.dar;
+        return (os_context_register_t *) &context->uc_mcontext->PPC_DARWIN_REGIFY(es).PPC_DARWIN_REGIFY(dar);
     case 42:
         /* PT_DSISR */
-        return (os_context_register_t *) &context->uc_mcontext->es.dsisr;
+        return (os_context_register_t *) &context->uc_mcontext->PPC_DARWIN_REGIFY(es).PPC_DARWIN_REGIFY(dsisr);
     default:
         lose("bad offset to os_context_register_addr");
     }
@@ -118,13 +118,13 @@ os_context_register_addr(os_context_t *context, int offset)
 os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
-    return (os_context_register_t *) &context->uc_mcontext->ss.lr;
+    return (os_context_register_t *) &context->uc_mcontext->PPC_DARWIN_REGIFY(ss).PPC_DARWIN_REGIFY(lr);
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
-    return &context->uc_mcontext->ss.srr0;
+  return &context->uc_mcontext->PPC_DARWIN_REGIFY(ss).PPC_DARWIN_REGIFY(srr0);
 }
 
 void

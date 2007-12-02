@@ -16,8 +16,6 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 void set_data_desc_size(data_desc_t* desc, unsigned long size);
 void set_data_desc_addr(data_desc_t* desc, void* addr);
 
-#define DARWIN_FIX_CONTEXT(context)
-
 /* As of XCode 3.0, the field names for the thread state have changed
  * and now are prepended with __. Use some #define hackery to deal
  * with this. MAC_OS_X_VERSION_10_5 seems to be a good test to see if

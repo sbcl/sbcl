@@ -214,10 +214,6 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
             if (!maybe_gc(context)) {
                 interrupt_handle_now(signal, siginfo, context);
             }
-#if defined(LISP_FEATURE_DARWIN)
-            /* Work around G5 bug; fix courtesy gbyers */
-            DARWIN_FIX_CONTEXT(context);
-#endif
 #endif
         }
 }
@@ -272,8 +268,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     if (!cheneygc_handle_wp_violation(context, addr))
         if (!handle_guard_page_triggered(context, addr))
             interrupt_handle_now(signal, info, context);
-    /* Work around G5 bug; fix courtesy gbyers */
-    DARWIN_FIX_CONTEXT(context);
 }
 
 void
