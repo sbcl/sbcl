@@ -408,29 +408,44 @@
                 (rplacd splice (cdr x))))
            (t (setq splice x)))))
 
-(deftransform fill ((seq item &key (start 0) (end (length seq)))
-                    (vector t &key (:start t) (:end index))
+(deftransform fill ((seq item &key (start 0) (end nil))
+                    (list t &key (:start t) (:end t)))
+  '(list-fill* seq item start end))
+
+(deftransform fill ((seq item &key (start 0) (end nil))
+                    (vector t &key (:start t) (:end t))
                     *
-                    :policy (> speed space))
-  "open code"
-  (let ((element-type (upgraded-element-type-specifier-or-give-up seq)))
-    (values
-     `(with-array-data ((data seq)
-                        (start start)
-                        (end end)
-                        :check-fill-pointer t)
-       (declare (type (simple-array ,element-type 1) data))
-       (declare (type fixnum start end))
-       (do ((i start (1+ i)))
-           ((= i end) seq)
-         (declare (type index i))
-         ;; WITH-ARRAY-DATA did our range checks once and for all, so
-         ;; it'd be wasteful to check again on every AREF...
-         (declare (optimize (safety 0)))
-         (setf (aref data i) item)))
-     ;; ... though we still need to check that the new element can fit
-     ;; into the vector in safe code. -- CSR, 2002-07-05
-     `((declare (type ,element-type item))))))
+                    :node node)
+  (let ((type (lvar-type seq))
+        (element-type (type-specifier (extract-upgraded-element-type seq))))
+    (cond ((and (neq '* element-type) (policy node (> speed space)))
+           (values
+            `(with-array-data ((data seq)
+                               (start start)
+                               (end end)
+                               :check-fill-pointer t)
+               (declare (type (simple-array ,element-type 1) data))
+               (declare (type index start end))
+               ;; WITH-ARRAY-DATA did our range checks once and for all, so
+               ;; it'd be wasteful to check again on every AREF...
+               (declare (optimize (safety 0) (speed 3)))
+               (do ((i start (1+ i)))
+                   ((= i end) seq)
+                 (declare (type index i))
+                 (setf (aref data i) item)))
+            ;; ... though we still need to check that the new element can fit
+            ;; into the vector in safe code. -- CSR, 2002-07-05
+            `((declare (type ,element-type item)))))
+          ((csubtypep type (specifier-type 'string))
+           '(string-fill* seq item start end))
+          (t
+           '(vector-fill* seq item start end)))))
+
+(deftransform fill ((seq item &key (start 0) (end nil))
+                    ((and sequence (not vector) (not list)) t &key (:start t) (:end t)))
+  `(sb!sequence:fill seq item
+                     :start start
+                     :end (%check-generic-sequence-bounds seq start end)))
 
 ;;;; utilities
 

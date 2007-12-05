@@ -29,13 +29,6 @@
 
 ;;; %CHECK-VECTOR-SEQUENCE-BOUNDS is used to verify that the START and
 ;;; END arguments are valid bounding indices.
-;;;
-;;; FIXME: This causes a certain amount of double checking that could
-;;; be avoided, as if the string passes this (more stringent) test it
-;;; will automatically pass the tests in WITH-ARRAY-DATA.  Fixing this
-;;; would necessitate rearranging the transforms (maybe converting to
-;;; strings in the unasterisked versions and using this in the
-;;; transforms conditional on SAFETY>SPEED,SPACE).
 (defun %check-vector-sequence-bounds (vector start end)
   (%check-vector-sequence-bounds vector start end))
 

@@ -20,6 +20,12 @@
 
 ;;;; utilities
 
+(defun %check-generic-sequence-bounds (seq start end)
+  (let ((length (sb!sequence:length seq)))
+    (if (<= 0 start (or end length) length)
+        (or end length)
+        (sequence-bounding-indices-bad-error seq start end))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defparameter *sequence-keyword-info*
@@ -463,43 +469,82 @@
 
 ;;;; FILL
 
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro vector-fill (sequence item start end)
-  `(do ((index ,start (1+ index)))
-       ((= index (the fixnum ,end)) ,sequence)
-     (declare (fixnum index))
-     (setf (aref ,sequence index) ,item)))
-
-(sb!xc:defmacro list-fill (sequence item start end)
-  `(do ((current (nthcdr ,start ,sequence) (cdr current))
-        (index ,start (1+ index)))
-       ((or (atom current) (and end (= index (the fixnum ,end))))
-        sequence)
-     (declare (fixnum index))
-     (rplaca current ,item)))
-
-) ; EVAL-WHEN
-
-;;; The support routines for FILL are used by compiler transforms, so we
-;;; worry about dealing with END being supplied or defaulting to NIL
-;;; at this level.
-
 (defun list-fill* (sequence item start end)
-  (declare (list sequence))
-  (list-fill sequence item start end))
+  (declare (type list sequence)
+           (type unsigned-byte start)
+           (type (or null unsigned-byte) end))
+  (flet ((oops ()
+           (sequence-bounding-indices-bad-error sequence start end)))
+    (let ((pointer sequence))
+      (unless (zerop start)
+        ;; If START > 0 the list cannot be empty. So CDR down to it
+        ;; START-1 times, check that we still have something, then CDR
+        ;; the final time.
+        ;;
+        ;; If START was zero, the list may be empty if END is NIL or
+        ;; also zero.
+        (unless (= start 1)
+          (setf pointer (nthcdr (1- start) pointer)))
+        (if pointer
+            (pop pointer)
+            (oops))
+        (if end
+            (let ((n (- end start)))
+              (declare (integer n))
+              (when (minusp n)
+                (oops))
+              (when (plusp n)
+                (loop repeat n
+                      do (rplaca pointer item))))
+            (loop while pointer
+                  do (setf pointer (cdr (rplaca pointer item)))))))))
 
 (defun vector-fill* (sequence item start end)
-  (declare (vector sequence))
-  (when (null end) (setq end (length sequence)))
-  (vector-fill sequence item start end))
+  (with-array-data ((data sequence)
+                    (start start)
+                    (end end)
+                    :force-inline t
+                    :check-fill-pointer t)
+    (let ((setter (!find-data-vector-setter data)))
+      (declare (optimize (speed 3) (safety 0)))
+      (do ((index start (1+ index)))
+          ((= index end) sequence)
+        (declare (index index))
+        (funcall setter data index item)))))
 
-(define-sequence-traverser fill (sequence item &rest args &key start end)
-  #!+sb-doc "Replace the specified elements of SEQUENCE with ITEM."
+(defun string-fill* (sequence item start end)
+  (declare (string sequence))
+  (with-array-data ((data sequence)
+                    (start start)
+                    (end end)
+                    :force-inline t
+                    :check-fill-pointer t)
+    (macrolet ((frob ()
+                 `(locally (declare (optimize (safety 0) (speed 3)))
+                    (do ((i start (1+ i)))
+                        ((= i end) sequence)
+                     (declare (index i))
+                     (setf (aref data i) item)))))
+      (etypecase data
+        #!+sb-unicode
+        ((simple-array character (*))
+         (let ((item (locally (declare (optimize (safety 3)))
+                       (the character item))))
+           (frob)))
+        ((simple-array base-char (*))
+         (let ((item (locally (declare (optimize (safety 3)))
+                       (the base-char item))))
+           (frob)))))))
+
+(defun fill (sequence item &key (start 0) end)
+  #!+sb-doc
+  "Replace the specified elements of SEQUENCE with ITEM."
   (seq-dispatch sequence
-    (list-fill* sequence item start end)
-    (vector-fill* sequence item start end)
-    (apply #'sb!sequence:fill sequence item args)))
+   (list-fill* sequence item start end)
+   (vector-fill* sequence item start end)
+   (sb!sequence:fill sequence item
+                     :start start
+                     :end (%check-generic-sequence-bounds sequence start end))))
 
 ;;;; REPLACE
 
