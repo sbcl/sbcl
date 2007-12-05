@@ -285,3 +285,49 @@
   (assert (= (file-position stream) 42))
   (assert (file-position stream 50))
   (assert (= (file-position stream) 50)))
+
+;;; Using gray streams as parts of two-way-, concatenate-, and synonym-streams.
+
+(defvar *gray-binary-data*
+  (let ((vector (make-array 1024 :element-type '(unsigned-byte 8) :fill-pointer 0)))
+    (dotimes (i (length vector))      
+      (setf (aref vector i) (random 256)))
+    vector))
+
+(defun vector-hop-or-eof (vector)
+  (let ((pos (fill-pointer vector)))
+    (if (< pos (array-total-size vector))
+        (prog1
+            (aref vector pos)
+          (incf (fill-pointer vector)))
+        :eof)))
+
+(defclass part-of-composite-stream (fundamental-binary-input-stream)
+  ())
+
+(defmethod stream-read-byte ((stream part-of-composite-stream))
+  (vector-hop-or-eof *gray-binary-data*))
+
+(defmethod stream-element-type ((stream part-of-composite-stream))
+  '(unsigned-byte 8))
+
+(defvar *part-of-composite* (make-instance 'part-of-composite-stream))
+
+(defun test-composite-reads (&rest streams)
+  (dolist (stream streams)
+    (setf (fill-pointer *gray-binary-data*) 0)
+    (let ((binary-buffer (make-array 1024 :element-type '(unsigned-byte 8))))
+      (assert (eql 1024 (read-sequence binary-buffer stream)))
+      (dotimes (i 1024)
+        (unless (eql (aref *gray-binary-data* i)
+                     (aref binary-buffer i))
+          (error "wanted ~S at ~S, got ~S (~S)" 
+                 (aref *gray-binary-data* i)
+                 i 
+                 (aref binary-buffer i)
+                 stream))))))
+
+(test-composite-reads
+ (make-two-way-stream *part-of-composite* *standard-output*)
+ (make-concatenated-stream *part-of-composite*)
+ (make-synonym-stream '*part-of-composite*))

@@ -424,7 +424,17 @@
 ;;; some cases, but it wasn't being used in SBCL, so it was dropped.
 ;;; If we ever need it, it could be added later as a new variant N-BIN
 ;;; method (perhaps N-BIN-ASAP?) or something.
+#!-sb-fluid (declaim (inline read-n-bytes))
 (defun read-n-bytes (stream buffer start numbytes &optional (eof-error-p t))
+  (if (ansi-stream-p stream)
+      (ansi-stream-read-n-bytes stream buffer start numbytes eof-error-p)
+      ;; We don't need to worry about element-type size here is that
+      ;; callers are supposed to have checked everything is kosher.
+      (let* ((end (+ start numbytes))
+             (read-end (stream-read-sequence stream buffer start end)))
+        (eof-or-lose stream (and eof-error-p (< read-end end)) (- read-end start)))))
+
+(defun ansi-stream-read-n-bytes (stream buffer start numbytes eof-error-p)
   (declare (type ansi-stream stream)
            (type index numbytes start)
            (type (or (simple-array * (*)) system-area-pointer) buffer))

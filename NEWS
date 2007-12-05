@@ -7,6 +7,8 @@ changes in sbcl-1.0.13 relative to sbcl-1.0.12:
   * optimizations: COPY-SEQ, FILL, and SUBSEQ are 30-80% faster for
     strings and vectors whose element-type or simplicity is not fully
     known at compile-time.
+  * bug fix: READ-SEQUENCE on composite stream wrapping a Gray stream
+    with STREAM-ELEMENT-TYPE (UNSIGNED-BYTE 8) signalled an error.
   * bug fix: COPY-SEQ on lists did not signal a type-error on improper
     lists in safe code.
   * bug fix: some sequence functions elided bounds checking when
