@@ -272,66 +272,68 @@
 
 ;;;; opening and closing fasl files
 
-;;; A utility function to write strings to (unsigned-byte 8) streams.
-;;; We restrict this to ASCII (with the averrance) because of
-;;; ambiguity of higher bytes: Unicode, some ISO-8859-x, or what? This
-;;; could be revisited in the event of doing funky things with stream
-;;; encodings -- CSR, 2002-04-25
-(defun fasl-write-string (string stream)
-  (loop for char across string
-        do (let ((code (char-code char)))
-             (aver (<= 0 code 127))
-             (write-byte code stream))))
-
 ;;; Open a fasl file, write its header, and return a FASL-OUTPUT
 ;;; object for dumping to it. Some human-readable information about
 ;;; the source code is given by the string WHERE.
 (defun open-fasl-output (name where)
   (declare (type pathname name))
-  (let* ((stream (open name
-                       :direction :output
-                       :if-exists :supersede
-                       :element-type 'sb!assem:assembly-unit))
-         (res (make-fasl-output :stream stream)))
-    ;; Begin the header with the constant machine-readable (and
-    ;; semi-human-readable) string which is used to identify fasl files.
-    (fasl-write-string *fasl-header-string-start-string* stream)
-    ;; The constant string which begins the header is followed by
-    ;; arbitrary human-readable text, terminated by a special
-    ;; character code.
-    (fasl-write-string
-     (with-standard-io-syntax
-       (let ((*print-readably* nil)
-             (*print-pretty* nil))
-         (format nil
-                 "~%  ~
-                  compiled from ~S~%  ~
-                  at ~A~%  ~
-                  on ~A~%  ~
-                  using ~A version ~A~%"
-                 where
-                 (format-universal-time nil (get-universal-time))
-                 (machine-instance)
-                 (sb!xc:lisp-implementation-type)
-                 (sb!xc:lisp-implementation-version))))
-     stream)
-    (dump-byte +fasl-header-string-stop-char-code+ res)
-    ;; Finish the header by outputting fasl file implementation,
-    ;; version, and key *FEATURES*.
-    (flet ((dump-counted-string (string)
-             ;; The count is dumped as a 32-bit unsigned-byte even on 64-bit
-             ;; platforms. This ensures that a x86-64 SBCL can gracefully
-             ;; detect an error when trying to read a x86 fasl, instead
-             ;; of choking on a ridiculously long counted string.
-             ;;  -- JES, 2005-12-30
-             (dump-unsigned-byte-32 (length string) res)
-             (dotimes (i (length string))
-               (dump-byte (char-code (aref string i)) res))))
-      (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
-      (dump-word +fasl-file-version+ res)
-      (dump-counted-string (sb!xc:lisp-implementation-version))
-      (dump-counted-string *features-affecting-fasl-format*))
-    res))
+  (flet ((fasl-write-string (string stream)
+           ;; SB-EXT:STRING-TO-OCTETS is not available while cross-compiling
+           #+sb-xc-host
+           (loop for char across string
+                 do (let ((code (char-code char)))
+                      (unless (<= 0 code 127)
+                        (setf char #\?))
+                      (write-byte code stream)))
+           ;; UTF-8 is safe to use, because +FASL-HEADER-STRING-STOP-CHAR-CODE+
+           ;; may not appear in UTF-8 encoded bytes
+           #-sb-xc-host
+           (write-sequence (string-to-octets string :external-format :utf-8)
+                           stream)))
+    (let* ((stream (open name
+                         :direction :output
+                         :if-exists :supersede
+                         :element-type 'sb!assem:assembly-unit))
+           (res (make-fasl-output :stream stream)))
+      ;; Begin the header with the constant machine-readable (and
+      ;; semi-human-readable) string which is used to identify fasl files.
+      (fasl-write-string *fasl-header-string-start-string* stream)
+      ;; The constant string which begins the header is followed by
+      ;; arbitrary human-readable text, terminated by
+      ;; +FASL-HEADER-STRING-STOP-CHAR-CODE+.
+      (fasl-write-string
+       (with-standard-io-syntax
+         (let ((*print-readably* nil)
+               (*print-pretty* nil))
+           (format nil
+                   "~%  ~
+                    compiled from ~S~%  ~
+                    at ~A~%  ~
+                    on ~A~%  ~
+                    using ~A version ~A~%"
+                   where
+                   (format-universal-time nil (get-universal-time))
+                   (machine-instance)
+                   (sb!xc:lisp-implementation-type)
+                   (sb!xc:lisp-implementation-version))))
+       stream)
+      (dump-byte +fasl-header-string-stop-char-code+ res)
+      ;; Finish the header by outputting fasl file implementation,
+      ;; version, and key *FEATURES*.
+      (flet ((dump-counted-string (string)
+               ;; The count is dumped as a 32-bit unsigned-byte even on 64-bit
+               ;; platforms. This ensures that a x86-64 SBCL can gracefully
+               ;; detect an error when trying to read a x86 fasl, instead
+               ;; of choking on a ridiculously long counted string.
+               ;;  -- JES, 2005-12-30
+               (dump-unsigned-byte-32 (length string) res)
+               (dotimes (i (length string))
+                 (dump-byte (char-code (aref string i)) res))))
+        (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
+        (dump-word +fasl-file-version+ res)
+        (dump-counted-string (sb!xc:lisp-implementation-version))
+        (dump-counted-string *features-affecting-fasl-format*))
+      res)))
 
 ;;; Close the specified FASL-OUTPUT, aborting the write if ABORT-P.
 (defun close-fasl-output (fasl-output abort-p)
