@@ -60,7 +60,7 @@
                ((or (null current) (eq res *wild-type*))
                 res)))
           (t
-           (node-derived-type (lvar-uses lvar))))))
+           (node-derived-type uses)))))
 
 ;;; Return the derived type for LVAR's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
@@ -182,7 +182,7 @@
                      (lambda-var-p (ref-leaf node)))
             (let ((type (single-value-type int)))
               (when (and (member-type-p type)
-                         (null (rest (member-type-members type))))
+                         (eql 1 (member-type-size type)))
                 (change-ref-leaf node (find-constant
                                        (first (member-type-members type)))))))
           (reoptimize-lvar lvar)))))
@@ -1444,8 +1444,8 @@
                                                 *policy*)))
                  (setf (cast-type-to-check cast) *wild-type*)
                  (substitute-lvar-uses value arg
-                                     ;; FIXME
-                                     t)
+                                       ;; FIXME
+                                       t)
                  (%delete-lvar-use ref)
                  (add-lvar-use cast lvar)))))
       (setf (node-derived-type ref) *wild-type*)
@@ -1550,7 +1550,6 @@
 ;;; right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
-
   (unless (or (functional-entry-fun fun)
               (lambda-optional-dispatch fun))
     (let* ((vars (lambda-vars fun))

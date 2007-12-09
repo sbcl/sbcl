@@ -1264,3 +1264,28 @@ to :INTERPRET, an interpreter will be used.")
                                           bindings)))
        ,@forms)))
 
+(in-package "SB!KERNEL")
+
+(defun fp-zero-p (x)
+  (typecase x
+    (single-float (zerop x))
+    (double-float (zerop x))
+    #!+long-float
+    (long-float (zerop x))
+    (t nil)))
+
+(defun neg-fp-zero (x)
+  (etypecase x
+    (single-float
+     (if (eql x 0.0f0)
+         (make-unportable-float :single-float-negative-zero)
+         0.0f0))
+    (double-float
+     (if (eql x 0.0d0)
+         (make-unportable-float :double-float-negative-zero)
+         0.0d0))
+    #!+long-float
+    (long-float
+     (if (eql x 0.0l0)
+         (make-unportable-float :long-float-negative-zero)
+         0.0l0))))

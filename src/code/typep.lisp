@@ -105,7 +105,8 @@
                              (specifier-type (array-element-type
                                               object)))))))
     (member-type
-     (if (member object (member-type-members type)) t))
+     (when (member-type-member-p object type)
+       t))
     (classoid
      #+sb-xc-host (ctypep object type)
      #-sb-xc-host (classoid-typep (layout-of object) type object))

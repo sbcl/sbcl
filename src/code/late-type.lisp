@@ -1882,8 +1882,9 @@
                            (mapcar #'do-complex (union-type-types ctype))))
                    ((typep ctype 'member-type)
                     (apply #'type-union
-                           (mapcar (lambda (x) (do-complex (ctype-of x)))
-                                   (member-type-members ctype))))
+                           (mapcar-member-type-members
+                            (lambda (x) (do-complex (ctype-of x)))
+                            ctype)))
                    ((and (typep ctype 'intersection-type)
                          ;; FIXME: This is very much a
                          ;; not-quite-worst-effort, but we are required to do
@@ -2528,39 +2529,28 @@ used for a COMPLEX component.~:@>"
 (!define-type-class member)
 
 (!define-type-method (member :negate) (type)
-  (let ((members (member-type-members type)))
-    (if (some #'floatp members)
-        (let (floats)
-          (dolist (pair `((0.0f0 . ,(load-time-value (make-unportable-float :single-float-negative-zero)))
-                          (0.0d0 . ,(load-time-value (make-unportable-float :double-float-negative-zero)))
-                          #!+long-float
-                          (0.0l0 . ,(load-time-value (make-unportable-float :long-float-negative-zero)))))
-            (when (member (car pair) members)
-              (aver (not (member (cdr pair) members)))
-              (push (cdr pair) floats)
-              (setf members (remove (car pair) members)))
-            (when (member (cdr pair) members)
-              (aver (not (member (car pair) members)))
-              (push (car pair) floats)
-              (setf members (remove (cdr pair) members))))
-          (apply #'type-intersection
-                 (if (null members)
-                     *universal-type*
+  (let ((xset (member-type-xset type))
+        (fp-zeroes (member-type-fp-zeroes type)))
+    (if fp-zeroes
+        ;; Hairy case, which needs to do a bit of float type
+        ;; canonicalization.
+        (apply #'type-intersection
+               (if (xset-empty-p xset)
+                   *universal-type*
+                   (make-negation-type
+                    :type (make-member-type :xset xset)))
+               (mapcar
+                (lambda (x)
+                  (let* ((opposite (neg-fp-zero x))
+                         (type (ctype-of opposite)))
+                    (type-union
                      (make-negation-type
-                      :type (make-member-type :members members)))
-                 (mapcar
-                  (lambda (x)
-                    (let ((type (ctype-of x)))
-                      (type-union
-                       (make-negation-type
-                        :type (modified-numeric-type type
-                                                     :low nil :high nil))
-                       (modified-numeric-type type
-                                              :low nil :high (list x))
-                       (make-member-type :members (list x))
-                       (modified-numeric-type type
-                                              :low (list x) :high nil))))
-                  floats)))
+                      :type (modified-numeric-type type :low nil :high nil))
+                     (modified-numeric-type type :low nil :high (list opposite))
+                     (make-member-type :members (list opposite))
+                     (modified-numeric-type type :low (list opposite) :high nil))))
+                fp-zeroes))
+        ;; Easy case
         (make-negation-type :type type))))
 
 (!define-type-method (member :unparse) (type)
@@ -2571,13 +2561,23 @@ used for a COMPLEX component.~:@>"
       (t `(member ,@members)))))
 
 (!define-type-method (member :simple-subtypep) (type1 type2)
-  (values (subsetp (member-type-members type1) (member-type-members type2))
-          t))
+   (values (and (xset-subset-p (member-type-xset type1)
+                                 (member-type-xset type2))
+                (subsetp (member-type-fp-zeroes type1)
+                         (member-type-fp-zeroes type2)))
+           t))
 
 (!define-type-method (member :complex-subtypep-arg1) (type1 type2)
-  (every/type (swapped-args-fun #'ctypep)
-              type2
-              (member-type-members type1)))
+  (block punt
+    (mapc-member-type-members
+     (lambda (elt)
+       (multiple-value-bind (ok surep) (ctypep elt type2)
+         (unless surep
+           (return-from punt (values nil nil)))
+         (unless ok
+           (return-from punt (values nil t)))))
+     type1)
+    (values t t)))
 
 ;;; We punt if the odd type is enumerable and intersects with the
 ;;; MEMBER type. If not enumerable, then it is definitely not a
@@ -2589,46 +2589,48 @@ used for a COMPLEX component.~:@>"
         (t (values nil t))))
 
 (!define-type-method (member :simple-intersection2) (type1 type2)
-  (let ((mem1 (member-type-members type1))
-        (mem2 (member-type-members type2)))
-    (cond ((subsetp mem1 mem2) type1)
-          ((subsetp mem2 mem1) type2)
-          (t
-           (let ((res (intersection mem1 mem2)))
-             (if res
-                 (make-member-type :members res)
-                 *empty-type*))))))
+  (make-member-type :xset (xset-intersection (member-type-xset type1)
+                                             (member-type-xset type2))
+                    :fp-zeroes (intersection (member-type-fp-zeroes type1)
+                                             (member-type-fp-zeroes type2))))
 
 (!define-type-method (member :complex-intersection2) (type1 type2)
   (block punt
-    (collect ((members))
-      (let ((mem2 (member-type-members type2)))
-        (dolist (member mem2)
-          (multiple-value-bind (val win) (ctypep member type1)
-            (unless win
-              (return-from punt nil))
-            (when val (members member))))
-        (cond ((subsetp mem2 (members)) type2)
-              ((null (members)) *empty-type*)
-              (t
-               (make-member-type :members (members))))))))
+    (let ((xset (alloc-xset))
+          (fp-zeroes nil))
+      (mapc-member-type-members
+       (lambda (member)
+         (multiple-value-bind (ok sure) (ctypep member type1)
+           (unless sure
+             (return-from punt nil))
+           (when ok
+             (if (fp-zero-p member)
+                 (pushnew member fp-zeroes)
+                 (add-to-xset member xset)))))
+       type2)
+      (if (and (xset-empty-p xset) (not fp-zeroes))
+          *empty-type*
+          (make-member-type :xset xset :fp-zeroes fp-zeroes)))))
 
 ;;; We don't need a :COMPLEX-UNION2, since the only interesting case is
 ;;; a union type, and the member/union interaction is handled by the
 ;;; union type method.
 (!define-type-method (member :simple-union2) (type1 type2)
-  (let ((mem1 (member-type-members type1))
-        (mem2 (member-type-members type2)))
-    (cond ((subsetp mem1 mem2) type2)
-          ((subsetp mem2 mem1) type1)
-          (t
-           (make-member-type :members (union mem1 mem2))))))
+  (make-member-type :xset (xset-union (member-type-xset type1)
+                                      (member-type-xset type2))
+                    :fp-zeroes (union (member-type-fp-zeroes type1)
+                                      (member-type-fp-zeroes type2))))
 
 (!define-type-method (member :simple-=) (type1 type2)
-  (let ((mem1 (member-type-members type1))
-        (mem2 (member-type-members type2)))
-    (values (and (subsetp mem1 mem2)
-                 (subsetp mem2 mem1))
+  (let ((xset1 (member-type-xset type1))
+        (xset2 (member-type-xset type2))
+        (l1 (member-type-fp-zeroes type1))
+        (l2 (member-type-fp-zeroes type2)))
+    (values (and (eql (xset-count xset1) (xset-count xset2))
+                 (xset-subset-p xset1 xset2)
+                 (xset-subset-p xset2 xset1)
+                 (subsetp l1 l2)
+                 (subsetp l2 l1))
             t)))
 
 (!define-type-method (member :complex-=) (type1 type2)
@@ -3281,14 +3283,20 @@ used for a COMPLEX component.~:@>"
     (collect ((res))
       (dolist (x-type x-types)
         (if (member-type-p x-type)
-            (collect ((members))
-              (dolist (mem (member-type-members x-type))
-                (multiple-value-bind (val win) (ctypep mem y)
-                  (unless win (return-from type-difference nil))
-                  (unless val
-                    (members mem))))
-              (when (members)
-                (res (make-member-type :members (members)))))
+            (let ((xset (alloc-xset))
+                  (fp-zeroes nil))
+              (mapc-member-type-members
+               (lambda (elt)
+                 (multiple-value-bind (ok sure) (ctypep elt y)
+                   (unless sure
+                     (return-from type-difference nil))
+                   (unless ok
+                     (if (fp-zero-p elt)
+                         (pushnew elt fp-zeroes)
+                         (add-to-xset elt xset)))))
+               x-type)
+              (unless (and (xset-empty-p xset) (not fp-zeroes))
+                (res (make-member-type :xset xset :fp-zeroes fp-zeroes))))
             (dolist (y-type y-types (res x-type))
               (multiple-value-bind (val win) (csubtypep x-type y-type)
                 (unless win (return-from type-difference nil))
@@ -3297,13 +3305,14 @@ used for a COMPLEX component.~:@>"
                   (return-from type-difference nil))))))
       (let ((y-mem (find-if #'member-type-p y-types)))
         (when y-mem
-          (let ((members (member-type-members y-mem)))
-            (dolist (x-type x-types)
-              (unless (member-type-p x-type)
-                (dolist (member members)
-                  (multiple-value-bind (val win) (ctypep member x-type)
-                    (when (or (not win) val)
-                      (return-from type-difference nil)))))))))
+          (dolist (x-type x-types)
+            (unless (member-type-p x-type)
+              (mapc-member-type-members
+               (lambda (member)
+                 (multiple-value-bind (ok sure) (ctypep member x-type)
+                   (when (or (not sure) ok)
+                     (return-from type-difference nil))))
+               y-mem)))))
       (apply #'type-union (res)))))
 
 (!def-type-translator array (&optional (element-type '*)

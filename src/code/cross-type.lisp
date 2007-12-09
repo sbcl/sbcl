@@ -356,7 +356,7 @@
   ;; call TYPE=, that in turn may call CTYPEP). Until then, pick a few
   ;; cherries off.
   (cond ((member-type-p ctype)
-         (if (member obj (member-type-members ctype))
+         (if (member-type-member-p obj ctype)
              (values t t)
              (values nil t)))
         ((union-type-p ctype)

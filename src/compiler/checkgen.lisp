@@ -59,7 +59,7 @@
         (compound-type
          (reduce #'+ (compound-type-types type) :key 'type-test-cost))
         (member-type
-         (* (length (member-type-members type))
+         (* (member-type-size type)
             (fun-guessed-cost 'eq)))
         (numeric-type
          (* (if (numeric-type-complexp type) 2 1)

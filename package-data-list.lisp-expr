@@ -789,6 +789,23 @@ possibly temporariliy, because it might be used internally."
       :export (;; lambda list keyword extensions
                "&MORE"
 
+               ;; utilities for floating point zero handling
+               "FP-ZERO-P"
+               "NEG-FP-ZERO"
+
+               ;; generic set implementation
+               "ADD-TO-XSET"
+               "ALLOC-XSET"
+               "MAP-XSET"
+               "XSET"
+               "XSET-COUNT"
+               "XSET-EMPTY-P"
+               "XSET-INTERSECTION"
+               "XSET-MEMBER-P"
+               "XSET-MEMBERS"
+               "XSET-SUBSET-P"
+               "XSET-UNION"
+
                ;; communication between the runtime and Lisp
                "*CORE-STRING*"
 
@@ -1355,8 +1372,10 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "MAKE-SINGLE-FLOAT" "MAKE-SPECIALIZABLE-ARRAY"
                "MAKE-UNPORTABLE-FLOAT" "%MAKE-INSTANCE"
                "MAKE-SHORT-VALUES-TYPE" "MAKE-SINGLE-VALUE-TYPE"
-               "MAKE-VALUE-CELL" "MAKE-VALUES-TYPE" "MEMBER-TYPE"
-               "MEMBER-TYPE-MEMBERS" "MEMBER-TYPE-P" "MERGE-BITS"
+               "MAKE-VALUE-CELL" "MAKE-VALUES-TYPE"
+               "MAPC-MEMBER-TYPE-MEMBERS" "MAPCAR-MEMBER-TYPE-MEMBERS"
+               "MEMBER-TYPE" "MEMBER-TYPE-MEMBERS" "MEMBER-TYPE-P"
+               "MEMBER-TYPE-SIZE" "MERGE-BITS"
                "MODIFIED-NUMERIC-TYPE" "MUTATOR-SELF" "NAMED-TYPE"
                "NAMED-TYPE-NAME" "NAMED-TYPE-P" "NATIVE-BYTE-ORDER"
                "NEGATE" "NEGATION-TYPE" "NEGATION-TYPE-TYPE"

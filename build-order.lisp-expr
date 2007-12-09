@@ -347,7 +347,7 @@
 
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm")
-
+ ("src/code/xset")
  ;; for e.g. SPECIFIER-TYPE, needed by primtype.lisp
  ("src/code/early-type")
 

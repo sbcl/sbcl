@@ -925,11 +925,13 @@
           (if (member-type-p arg)
               ;; Run down the list of members and convert to a list of
               ;; member types.
-              (dolist (member (member-type-members arg))
-                (push (if (numberp member)
-                          (make-member-type :members (list member))
-                          *empty-type*)
-                      new-args))
+              (mapc-member-type-members
+               (lambda (member)
+                 (push (if (numberp member)
+                           (make-member-type :members (list member))
+                           *empty-type*)
+                       new-args))
+               arg)
               (push arg new-args)))
         (unless (member *empty-type* new-args)
           new-args)))))
@@ -1088,25 +1090,23 @@
 ;;; XXX This would be far simpler if the type-union methods could handle
 ;;; member/number unions.
 (defun make-canonical-union-type (type-list)
-  (let ((members '())
+  (let ((xset (alloc-xset))
+        (fp-zeroes '())
         (misc-types '()))
     (dolist (type type-list)
-      (if (member-type-p type)
-          (setf members (union members (member-type-members type)))
-          (push type misc-types)))
-    #!+long-float
-    (when (null (set-difference `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0) members))
-      (push (specifier-type '(long-float 0.0l0 0.0l0)) misc-types)
-      (setf members (set-difference members `(,(load-time-value (make-unportable-float :long-float-negative-zero)) 0.0l0))))
-    (when (null (set-difference `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0) members))
-      (push (specifier-type '(double-float 0.0d0 0.0d0)) misc-types)
-      (setf members (set-difference members `(,(load-time-value (make-unportable-float :double-float-negative-zero)) 0.0d0))))
-    (when (null (set-difference `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0) members))
-      (push (specifier-type '(single-float 0.0f0 0.0f0)) misc-types)
-      (setf members (set-difference members `(,(load-time-value (make-unportable-float :single-float-negative-zero)) 0.0f0))))
-    (if members
-        (apply #'type-union (make-member-type :members members) misc-types)
-        (apply #'type-union misc-types))))
+      (cond ((member-type-p type)
+             (mapc-member-type-members
+              (lambda (member)
+                (if (fp-zero-p member)
+                    (unless (member member fp-zeroes)
+                      (pushnew member fp-zeroes))
+                    (add-to-xset member xset)))
+              type))
+            (t
+             (push type misc-types))))
+    (if (and (xset-empty-p xset) (not fp-zeroes))
+        (apply #'type-union misc-types)
+        (apply #'type-union (make-member-type :xset xset :fp-zeroes fp-zeroes) misc-types))))
 
 ;;; Convert a member type with a single member to a numeric type.
 (defun convert-member-type (arg)
@@ -3888,17 +3888,16 @@
               ;; we're prepared to handle which is basically something
               ;; that array-element-type can return.
               (or (and (member-type-p cons-type)
-                       (null (rest (member-type-members cons-type)))
+                       (eql 1 (member-type-size cons-type))
                        (null (first (member-type-members cons-type))))
                   (let ((car-type (cons-type-car-type cons-type)))
                     (and (member-type-p car-type)
-                         (null (rest (member-type-members car-type)))
-                         (or (symbolp (first (member-type-members car-type)))
-                             (numberp (first (member-type-members car-type)))
-                             (and (listp (first (member-type-members
-                                                 car-type)))
-                                  (numberp (first (first (member-type-members
-                                                          car-type))))))
+                         (eql 1 (member-type-members car-type))
+                         (let ((elt (first (member-type-members car-type))))
+                           (or (symbolp elt)
+                               (numberp elt)
+                               (and (listp elt)
+                                    (numberp (first elt)))))
                          (good-cons-type-p (cons-type-cdr-type cons-type))))))
             (unconsify-type (good-cons-type)
               ;; Convert the "printed" respresentation of a cons
@@ -3949,10 +3948,15 @@
               ;; (DOUBLE-FLOAT 10d0 20d0) instead of just
               ;; double-float.
               (cond ((member-type-p type)
-                     (let ((members (member-type-members type)))
-                       (if (every #'coerceable-p members)
-                           (specifier-type `(or ,@members))
-                           *universal-type*)))
+                     (block punt
+                       (let (members)
+                         (mapc-member-type-members
+                          (lambda (member)
+                            (if (coerceable-p member)
+                                (push member members)
+                                (return-from punt *universal-type*)))
+                          type)
+                         (specifier-type `(or ,@members)))))
                     ((and (cons-type-p type)
                           (good-cons-type-p type))
                      (let ((c-type (unconsify-type (type-specifier type))))

@@ -392,68 +392,78 @@
                                   (class-info (type-class-or-lose 'member))
                                   (enumerable t))
                         (:copier nil)
-                        (:constructor %make-member-type (members))
+                        (:constructor %make-member-type (xset fp-zeroes))
                         #-sb-xc-host (:pure nil))
-  ;; the things in the set, with no duplications
-  (members nil :type list))
-(defun make-member-type (&key members)
-  (declare (type list members))
+  (xset (missing-arg) :type xset)
+  (fp-zeroes (missing-arg) :type list))
+(defun make-member-type (&key xset fp-zeroes members)
+  (unless xset
+    (aver (not fp-zeroes))
+    (setf xset (alloc-xset))
+    (dolist (elt members)
+      (if (fp-zero-p elt)
+          (pushnew elt fp-zeroes)
+          (add-to-xset elt xset))))
   ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
-  (let ((n-single (load-time-value
-                   (make-unportable-float :single-float-negative-zero)))
-        (n-double (load-time-value
-                   (make-unportable-float :double-float-negative-zero)))
-        #!+long-float
-        (n-long (load-time-value
-                 (make-unportable-float :long-float-negative-zero)))
-        (singles nil)
-        (doubles nil)
-        #!+long-float
-        (longs nil))
-    ;; Just a single traversal, please! MEMBERS2 starts as with MEMBERS,
-    ;; sans any zeroes -- if there are any paired zeroes then the
-    ;; unpaired ones are added back to it.
-    (let (members2)
-      (dolist (elt members)
-        (if (and (numberp elt) (zerop elt))
-            (typecase elt
-              (single-float (push elt singles))
-              (double-float (push elt doubles))
-              #!+long-float
-              (long-float   (push elt longs)))
-            (push elt members2)))
-      (let ((singlep (and (member 0.0f0 singles)
-                          (member n-single singles)
-                          (or (aver (= 2 (length singles))) t)))
-            (doublep (and (member 0.0d0 doubles)
-                          (member n-double doubles)
-                          (or (aver (= 2 (length doubles))) t)))
-            #!+long-float
-            (longp (and (member 0.0l0 longs)
-                        (member n-long longs)
-                        (or (aver (= 2 (lenght longs))) t))))
-        (if (or singlep doublep #!+long-float longp)
-            (let (union-types)
-              (if singlep
-                  (push (ctype-of 0.0f0) union-types)
-                  (setf members2 (nconc singles members2)))
-              (if doublep
-                  (push (ctype-of 0.0d0) union-types)
-                  (setf members2 (nconc doubles members2)))
-              #!+long-float
-              (if longp
-                  (push (ctype-of 0.0l0) union-types)
-                  (setf members2 (nconc longs members2)))
-              (aver (not (null union-types)))
-              (make-union-type t
-                               (if (null members2)
-                                   union-types
-                                   (cons (%make-member-type members2)
-                                         union-types))))
-            (%make-member-type members))))))
+  (let ((unpaired nil)
+        (union-types nil))
+    (do ((tail (cdr fp-zeroes) (cdr tail))
+         (zero (car fp-zeroes) (car tail)))
+        ((not zero))
+      (macrolet ((frob (c)
+                   `(let ((neg (neg-fp-zero zero)))
+                      (if (member neg tail)
+                          (push (ctype-of ,c) union-types)
+                          (push zero unpaired)))))
+        (etypecase zero
+          (single-float (frob 0.0f0))
+          (double-float (frob 0.0d0))
+          #!+long-float
+          (long-float (frob 0.0l0)))))
+    ;; The actual member-type contains the XSET (with no FP zeroes),
+    ;; and a list of unpaired zeroes.
+    (let ((member-type (unless (and (xset-empty-p xset) (not unpaired))
+                         (%make-member-type xset unpaired))))
+      (cond (union-types
+             (make-union-type t (if member-type
+                                    (cons member-type union-types)
+                                    union-types)))
+            (member-type
+             member-type)
+            (t
+             *empty-type*)))))
+
+(defun member-type-size (type)
+  (+ (length (member-type-fp-zeroes type))
+     (xset-count (member-type-xset type))))
+
+(defun member-type-member-p (x type)
+  (if (fp-zero-p x)
+      (and (member x (member-type-fp-zeroes type)) t)
+      (xset-member-p x (member-type-xset type))))
+
+(defun mapcar-member-type-members (function type)
+  (declare (function function))
+  (collect ((results))
+    (map-xset (lambda (x)
+                (results (funcall function x)))
+              (member-type-xset type))
+    (dolist (zero (member-type-fp-zeroes type))
+      (results (funcall function zero)))
+    (results)))
+
+(defun mapc-member-type-members (function type)
+  (declare (function function))
+  (map-xset function (member-type-xset type))
+  (dolist (zero (member-type-fp-zeroes type))
+    (funcall function zero)))
+
+(defun member-type-members (type)
+  (append (member-type-fp-zeroes type)
+          (xset-members (member-type-xset type))))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.

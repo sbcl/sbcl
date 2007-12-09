@@ -290,7 +290,7 @@
 
 (defvar *gray-binary-data*
   (let ((vector (make-array 1024 :element-type '(unsigned-byte 8) :fill-pointer 0)))
-    (dotimes (i (length vector))      
+    (dotimes (i (length vector))
       (setf (aref vector i) (random 256)))
     vector))
 
@@ -321,9 +321,9 @@
       (dotimes (i 1024)
         (unless (eql (aref *gray-binary-data* i)
                      (aref binary-buffer i))
-          (error "wanted ~S at ~S, got ~S (~S)" 
+          (error "wanted ~S at ~S, got ~S (~S)"
                  (aref *gray-binary-data* i)
-                 i 
+                 i
                  (aref binary-buffer i)
                  stream))))))
 

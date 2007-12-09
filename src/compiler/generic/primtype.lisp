@@ -126,7 +126,8 @@
 (!def-vm-support-routine primitive-type-of (object)
   (let ((type (ctype-of object)))
     (cond ((not (member-type-p type)) (primitive-type type))
-          ((equal (member-type-members type) '(nil))
+          ((and (eql 1 (member-type-size type))
+                (equal (member-type-members type) '(nil)))
            (primitive-type-or-lose 'list))
           (t
            *backend-t-primitive-type*))))
@@ -341,16 +342,21 @@
                  ;; Punt.
                  (t (return (any))))))))
         (member-type
-         (let* ((members (member-type-members type))
-                (res (primitive-type-of (first members))))
-           (dolist (mem (rest members) (values res nil))
-             (let ((ptype (primitive-type-of mem)))
-               (unless (eq ptype res)
-                 (let ((new-ptype (or (maybe-numeric-type-union res ptype)
-                                      (maybe-numeric-type-union ptype res))))
-                   (if new-ptype
-                       (setq res new-ptype)
-                       (return (any)))))))))
+         (let (res)
+           (block nil
+             (mapc-member-type-members
+              (lambda (member)
+                (let ((ptype (primitive-type-of member)))
+                  (if res
+                      (unless (eq ptype res)
+                        (let ((new-ptype (or (maybe-numeric-type-union res ptype)
+                                             (maybe-numeric-type-union ptype res))))
+                          (if new-ptype
+                              (setq res new-ptype)
+                              (return (any)))))
+                      (setf res ptype))))
+              type))
+           res))
         (named-type
          (ecase (named-type-name type)
            ((t *) (values *backend-t-primitive-type* t))
