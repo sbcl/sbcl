@@ -2451,7 +2451,7 @@ maybe_gc(os_context_t *context)
     /* SIG_STOP_FOR_GC needs to be enabled before we can call lisp:
      * otherwise two threads racing here may deadlock: the other will
      * wait on the GC lock, and the other cannot stop the first one... */
-    funcall0(SymbolFunction(SUB_GC));
+    funcall0(StaticSymbolFunction(SUB_GC));
     undo_fake_foreign_function_call(context);
     return 1;
 }

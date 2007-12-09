@@ -132,14 +132,24 @@ native_pointer(lispobj obj)
 }
 
 /* inverse operation: create a suitably tagged lispobj from a native
- * pointer or integer.  Needs to be a macro due to the tedious C type
- * system */
-#define make_lispobj(o,low_tag) ((lispobj)(LOW_WORD(o)|low_tag))
+ * pointer or integer.*/
+static inline lispobj
+make_lispobj(void *o, int low_tag)
+{
+    return LOW_WORD(o) | low_tag;
+}
 
-/* FIXME: There seems to be no reason that make_fixnum and fixnum_value
- * can't be implemented as (possibly inline) functions. */
-#define make_fixnum(n) ((lispobj)((n)<<N_FIXNUM_TAG_BITS))
-#define fixnum_value(n) (((long)n)>>N_FIXNUM_TAG_BITS)
+static inline lispobj
+make_fixnum(long n)
+{
+    return n << N_FIXNUM_TAG_BITS;
+}
+
+static inline long
+fixnum_value(lispobj n)
+{
+    return n >> N_FIXNUM_TAG_BITS;
+}
 
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via
@@ -155,11 +165,6 @@ native_pointer(lispobj obj)
 #undef boolean
 #endif
 typedef int boolean;
-
-/* This only works for static symbols. */
-/* FIXME: should be called StaticSymbolFunction, right? */
-#define SymbolFunction(sym) \
-    (((struct fdefn *)(native_pointer(SymbolValue(sym,0))))->fun)
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it

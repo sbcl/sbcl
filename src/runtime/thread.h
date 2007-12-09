@@ -17,6 +17,7 @@ struct alloc_region { };
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
+#include "genesis/fdefn.h"
 
 #define STATE_RUNNING (make_fixnum(1))
 #define STATE_SUSPENDED (make_fixnum(2))
@@ -100,6 +101,13 @@ SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 #else
     SetSymbolValue(tagged_symbol_pointer,val,thread) ;
 #endif
+}
+
+/* This only works for static symbols. */
+static inline lispobj
+StaticSymbolFunction(lispobj sym)
+{
+    return ((struct fdefn *)native_pointer(SymbolValue(sym, 0)))->fun;
 }
 
 static inline

@@ -1097,7 +1097,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
     else {
         /* FIXME: assert free_pages_lock held */
         (void)thread_mutex_unlock(&free_pages_lock);
-        funcall2(SymbolFunction(HEAP_EXHAUSTED_ERROR),
+        funcall2(StaticSymbolFunction(HEAP_EXHAUSTED_ERROR),
                  alloc_number(available), alloc_number(requested));
         lose("HEAP-EXHAUSTED-ERROR fell through");
     }

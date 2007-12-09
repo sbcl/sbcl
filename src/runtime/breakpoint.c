@@ -139,7 +139,7 @@ void handle_breakpoint(os_context_t *context)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
 
-    funcall3(SymbolFunction(HANDLE_BREAKPOINT),
+    funcall3(StaticSymbolFunction(HANDLE_BREAKPOINT),
              compute_offset(context, code),
              code,
              context_sap);
@@ -164,7 +164,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
 
-    funcall3(SymbolFunction(HANDLE_BREAKPOINT),
+    funcall3(StaticSymbolFunction(HANDLE_BREAKPOINT),
              compute_offset(context, code),
              code,
              context_sap);
@@ -194,7 +194,7 @@ handle_single_step_trap (os_context_t *context, int kind, int register_offset)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
 
-    funcall2(SymbolFunction(HANDLE_SINGLE_STEP_TRAP),
+    funcall2(StaticSymbolFunction(HANDLE_SINGLE_STEP_TRAP),
              make_fixnum(kind),
              make_fixnum(register_offset));
 

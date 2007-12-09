@@ -370,7 +370,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
      * confused, we have a chance to determine what's going on. */
     describe_internal_error(context);
 #endif
-    funcall2(SymbolFunction(INTERNAL_ERROR), context_sap,
+    funcall2(StaticSymbolFunction(INTERNAL_ERROR), context_sap,
              continuable ? T : NIL);
 
     undo_fake_foreign_function_call(context); /* blocks signals again */
@@ -1002,7 +1002,7 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 
     /* let the handler enable interrupts again when it sees fit */
     sigaddset_deferrable(os_context_sigmask_addr(context));
-    arrange_return_to_lisp_function(context, SymbolFunction(RUN_INTERRUPTION));
+    arrange_return_to_lisp_function(context, StaticSymbolFunction(RUN_INTERRUPTION));
 }
 
 #endif
@@ -1016,7 +1016,7 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 void
 undefined_alien_function(void)
 {
-    funcall0(SymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
+    funcall0(StaticSymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
 boolean
@@ -1036,7 +1036,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         protect_control_stack_return_guard_page(1);
 
         arrange_return_to_lisp_function
-            (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+            (context, StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
         return 1;
     }
     else if(addr >= CONTROL_STACK_RETURN_GUARD_PAGE(th) &&
@@ -1052,7 +1052,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     else if (addr >= undefined_alien_address &&
              addr < undefined_alien_address + os_vm_page_size) {
         arrange_return_to_lisp_function
-          (context, SymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
+          (context, StaticSymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
         return 1;
     }
     else return 0;
@@ -1287,7 +1287,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     * now -- some address is better then no address in this case.
     */
     current_memory_fault_address = addr;
-    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+    arrange_return_to_lisp_function(context, StaticSymbolFunction(MEMORY_FAULT_ERROR));
 }
 #endif
 
@@ -1300,7 +1300,7 @@ unhandled_trap_error(os_context_t *context)
 #ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
-    funcall1(SymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
+    funcall1(StaticSymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
     lose("UNHANDLED-TRAP-ERROR fell through");
 }
 

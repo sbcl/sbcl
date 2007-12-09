@@ -386,7 +386,7 @@ control_stack_exhausted_handler(int signal, siginfo_t *siginfo, void *void_conte
     os_context_t *context = arch_os_get_context(&void_context);
 
     arrange_return_to_lisp_function
-        (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+        (context, StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 }
 
 void
@@ -394,7 +394,7 @@ undefined_alien_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = arch_os_get_context(&void_context);
 
     arrange_return_to_lisp_function
-        (context, SymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
+        (context, StaticSymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
 }
 
 kern_return_t

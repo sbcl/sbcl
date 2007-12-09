@@ -418,7 +418,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         _clearfp();
 
         /* Call into lisp to handle things. */
-        funcall2(SymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
+        funcall2(StaticSymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
                  exception_record_sap);
 
         /* If Lisp doesn't nlx, we need to put things back. */
