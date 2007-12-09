@@ -20,7 +20,7 @@ export SOMETHING_IN_THE_ENVIRONMENT
 PATH=/some/path/that/does/not/exist:${PATH}
 export PATH
 
-${SBCL:-sbcl} <<EOF
+${SBCL:-sbcl} <<'EOF'
   ;; test that $PATH is searched
   (assert (zerop (sb-ext:process-exit-code
                   (sb-ext:run-program "true" () :search t :wait t))))
@@ -38,8 +38,26 @@ ${SBCL:-sbcl} <<EOF
                   (sb-ext:run-program "/usr/bin/env" ()
                                       :output stream
                                       :environment '("FEEFIE=foefum")))))
-    (assert (string= string "FEEFIE=foefum
+    (assert (equal string "FEEFIE=foefum
 ")))
+
+ ;; Unicode strings
+ (flet ((try (sb-impl::*default-external-format* x y)
+         (let* ((process (run-program
+                          "/bin/sh" (list "-c" (format nil "echo ~c, $SB_TEST_FOO." x))
+                          :environment (list (format nil "SB_TEST_FOO=~c" y))
+                          :output :stream
+                          :wait t))
+                (output (read-line (process-output process)))
+                (wanted (format nil "~c, ~c." x y)))
+           (unless (equal output wanted)
+             (error "wanted ~S, got ~S" wanted output))
+           (process-close process))))
+   (try :ascii #\s #\b)
+   (try :latin-1 (code-char 197) (code-char 229))
+   #+sb-unicode
+   (try :utf-8 #\GREEK_CAPITAL_LETTER_OMEGA #\GREEK_SMALL_LETTER_OMEGA))
+
   ;; The default Unix environment for the subprocess is the same as
   ;; for the parent process. (I.e., we behave like perl and lots of
   ;; other programs, but not like CMU CL.)

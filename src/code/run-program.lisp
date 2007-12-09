@@ -67,7 +67,7 @@
 (defun unix-environment-cmucl-from-sbcl (sbcl)
   (mapcan
    (lambda (string)
-     (declare (type simple-base-string string))
+     (declare (string string))
      (let ((=-pos (position #\= string :test #'equal)))
        (if =-pos
            (list
@@ -90,8 +90,8 @@
   (mapcar
    (lambda (cons)
      (destructuring-bind (key . val) cons
-       (declare (type keyword key) (type simple-base-string val))
-       (concatenate 'simple-base-string (symbol-name key) "=" val)))
+       (declare (type keyword key) (string val))
+       (concatenate 'simple-string (symbol-name key) "=" val)))
    cmucl))
 
 ;;;; Import wait3(2) from Unix.
@@ -462,53 +462,46 @@ status slot."
                               (1- ,bytes-per-word))) (1- ,bytes-per-word))))
 
 (defun string-list-to-c-strvec (string-list)
-  ;; Make a pass over STRING-LIST to calculate the amount of memory
-  ;; needed to hold the strvec.
-  (let ((string-bytes 0)
-        ;; We need an extra for the null, and an extra 'cause exect
-        ;; clobbers argv[-1].
-        (vec-bytes (* #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)
-                      (+ (length string-list) 2))))
-    (declare (fixnum string-bytes vec-bytes))
-    (dolist (s string-list)
-      (enforce-type s simple-string)
-      (incf string-bytes (round-bytes-to-words (1+ (length s)))))
-    ;; Now allocate the memory and fill it in.
-    (let* ((total-bytes (+ string-bytes vec-bytes))
-           (vec-sap (sb-sys:allocate-system-memory total-bytes))
-           (string-sap (sap+ vec-sap vec-bytes))
-           (i #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)))
-      (declare (type (and unsigned-byte fixnum) total-bytes i)
-               (type sb-sys:system-area-pointer vec-sap string-sap))
-      (dolist (s string-list)
-        (declare (simple-string s))
-        (let ((n (length s)))
-          ;; Blast the string into place.
-          (sb-kernel:copy-ub8-to-system-area (the simple-base-string
-                                               ;; FIXME
-                                               (coerce s 'simple-base-string))
-                                             0
-                                             string-sap 0
-                                             (1+ n))
-          ;; Blast the pointer to the string into place.
-          (setf (sap-ref-sap vec-sap i) string-sap)
-          (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
-          (incf i #.(/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits))))
-      ;; Blast in the last null pointer.
-      (setf (sap-ref-sap vec-sap i) (int-sap 0))
-      (values vec-sap (sap+ vec-sap #.(/ sb-vm:n-machine-word-bits
-                                         sb-vm:n-byte-bits))
-              total-bytes))))
+  (let* ((bytes-per-word (/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits))
+         ;; We need an extra for the null, and an extra 'cause exect
+         ;; clobbers argv[-1].
+         (vec-bytes (* bytes-per-word (+ (length string-list) 2)))
+         (octet-vector-list (mapcar (lambda (s)
+                                      (string-to-octets s :null-terminate t))
+                                    string-list))
+         (string-bytes (reduce #'+ octet-vector-list
+                               :key (lambda (s)
+                                      (round-bytes-to-words (length s)))))
+         (total-bytes (+ string-bytes vec-bytes))
+         ;; Memory to hold the vector of pointers and all the strings.
+         (vec-sap (sb-sys:allocate-system-memory total-bytes))
+         (string-sap (sap+ vec-sap vec-bytes))
+         ;; Index starts from [1]!
+         (vec-index-offset bytes-per-word))
+    (declare (index string-bytes vec-bytes total-bytes)
+             (sb-sys:system-area-pointer vec-sap string-sap))
+    (dolist (octets octet-vector-list)
+      (declare (type (simple-array (unsigned-byte 8) (*)) octets))
+      (let ((size (length octets)))
+        ;; Copy string.
+        (sb-kernel:copy-ub8-to-system-area octets 0 string-sap 0 size)
+        ;; Put the pointer in the vector.
+        (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
+        ;; Advance string-sap for the next string.
+        (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ size))))
+        (incf vec-index-offset bytes-per-word)))
+    ;; Final null pointer.
+    (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
+    (values vec-sap (sap+ vec-sap bytes-per-word) total-bytes)))
 
 (defmacro with-c-strvec ((var str-list) &body body)
   (with-unique-names (sap size)
-    `(multiple-value-bind
-      (,sap ,var ,size)
-      (string-list-to-c-strvec ,str-list)
-      (unwind-protect
-           (progn
-             ,@body)
-        (sb-sys:deallocate-system-memory ,sap ,size)))))
+    `(multiple-value-bind (,sap ,var ,size)
+         (string-list-to-c-strvec ,str-list)
+       (unwind-protect
+            (progn
+              ,@body)
+         (sb-sys:deallocate-system-memory ,sap ,size)))))
 
 #-win32
 (sb-alien:define-alien-routine spawn sb-alien:int
@@ -625,6 +618,9 @@ standard arguments that can be passed to a Unix program. For no
 arguments, use NIL (which means that just the name of the program is
 passed as arg 0).
 
+The program arguments and the environment are encoded using the
+default external format for streams.
+
 RUN-PROGRAM will return a PROCESS structure. See the CMU Common Lisp
 Users Manual for details about the PROCESS structure.
 
@@ -644,7 +640,7 @@ Users Manual for details about the PROCESS structure.
    The &KEY arguments have the following meanings:
 
    :ENVIRONMENT
-      a list of SIMPLE-BASE-STRINGs describing the new Unix environment
+      a list of STRINGs describing the new Unix environment
       (as in \"man environ\"). The default is to copy the environment of
       the current process.
    :ENV
@@ -785,6 +781,9 @@ Users Manual for details about the PROCESS structure.
 argument. ARGS are the standard arguments that can be passed to a
 program. For no arguments, use NIL (which means that just the name of
 the program is passed as arg 0).
+
+The program arguments will be encoded using the default external
+format for streams.
 
 RUN-PROGRAM will return a PROCESS structure. See the CMU
 Common Lisp Users Manual for details about the PROCESS structure.
