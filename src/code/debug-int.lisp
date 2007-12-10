@@ -2023,19 +2023,19 @@ register."
        ;; pointer
        #!+(or x86 x86-64)
        (not (zerop (valid-lisp-pointer-p (int-sap val))))
-      ;; FIXME: There is no fundamental reason not to use the above
-      ;; function on other platforms as well, but I didn't have
-      ;; others available while doing this. --NS 2007-06-21
-      #!-(or x86 x86-64)
-      (and (logbitp 0 val)
-           (or (< sb!vm:read-only-space-start val
-                  (* sb!vm:*read-only-space-free-pointer*
-                     sb!vm:n-word-bytes))
-               (< sb!vm:static-space-start val
-                  (* sb!vm:*static-space-free-pointer*
-                     sb!vm:n-word-bytes))
-               (< (current-dynamic-space-start) val
-                  (sap-int (dynamic-space-free-pointer))))))
+       ;; FIXME: There is no fundamental reason not to use the above
+       ;; function on other platforms as well, but I didn't have
+       ;; others available while doing this. --NS 2007-06-21
+       #!-(or x86 x86-64)
+       (and (logbitp 0 val)
+            (or (< sb!vm:read-only-space-start val
+                   (* sb!vm:*read-only-space-free-pointer*
+                      sb!vm:n-word-bytes))
+                (< sb!vm:static-space-start val
+                   (* sb!vm:*static-space-free-pointer*
+                      sb!vm:n-word-bytes))
+                (< (current-dynamic-space-start) val
+                   (sap-int (dynamic-space-free-pointer))))))
       (values (%make-lisp-obj val) t)
       (if errorp
           (error "~S is not a valid argument to ~S"
