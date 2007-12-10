@@ -261,7 +261,9 @@
                (unparse-win32-file pathname)))
 
 (defun unparse-native-win32-namestring (pathname as-file)
-  (declare (type pathname pathname))
+  (declare (type pathname pathname)
+           ;; Windows doesn't like directory names with trailing slashes.
+           (ignore as-file))
   (let* ((device (pathname-device pathname))
          (directory (pathname-directory pathname))
          (name (pathname-name pathname))
@@ -289,7 +291,7 @@
               (string (write-string piece s))
               (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
                         piece)))
-            (when (or directory (not as-file))
+            (when (or directory name)
               (write-char #\\ s)))
           (when directory
             (go :subdir))
