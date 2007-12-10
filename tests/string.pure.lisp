@@ -87,3 +87,35 @@
                                 :start1 a))
                     9)
            9))
+
+;; String trimming.
+
+(flet ((make-test (string left right both)
+         (macrolet ((check (fun wanted)
+                      `(let ((result (,fun " " string)))
+                         (assert (equal result ,wanted))
+                         (when (equal string ,wanted)
+                           ;; Check that the original string is
+                           ;; returned when no changes are needed. Not
+                           ;; required by the spec, but a desireable
+                           ;; feature for performance.
+                           (assert (eql result string))))))
+           ;; Check the functional implementations
+           (locally
+               (declare (notinline string-left-trim string-right-trim
+                                   string-trim))
+             (check string-left-trim left)
+             (check string-right-trim right)
+             (check string-trim both))
+           ;; Check the transforms
+           (locally
+               (declare (type simple-string string))
+             (check string-left-trim left)
+             (check string-right-trim right)
+             (check string-trim both)))))
+  (make-test "x " "x " "x" "x")
+  (make-test " x" "x" " x" "x")
+  (make-test " x " "x " " x" "x")
+  (make-test " x x " "x x " " x x" "x x"))
+
+

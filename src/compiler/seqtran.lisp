@@ -1275,3 +1275,43 @@
                     (effective-find-position-key key))))))
   (define-find-position-if-not find-if-not 0)
   (define-find-position-if-not position-if-not 1))
+
+(macrolet ((define-trimmer-transform (fun-name leftp rightp)
+             `(deftransform ,fun-name ((char-bag string)
+                                       (t simple-string))
+                (let ((find-expr
+                       (if (constant-lvar-p char-bag)
+                           ;; If the bag is constant, use MEMBER
+                           ;; instead of FIND, since we have a
+                           ;; deftransform for MEMBER that can
+                           ;; open-code all of the comparisons when
+                           ;; the list is constant. -- JES, 2007-12-10
+                           `(not (member (schar string index)
+                                         ',(coerce (lvar-value char-bag) 'list)
+                                         :test #'char=))
+                           '(not (find (schar string index) char-bag :test #'char=)))))
+                  `(flet ((char-not-in-bag (index)
+                            ,find-expr))
+                     (let* ((end (length string))
+                            (left-end (if ,',leftp
+                                          (do ((index 0 (1+ index)))
+                                              ((or (= index (the fixnum end))
+                                                   (char-not-in-bag index))
+                                               index)
+                                            (declare (fixnum index)))
+                                          0))
+                            (right-end (if ,',rightp
+                                           (do ((index (1- end) (1- index)))
+                                               ((or (< index left-end)
+                                                    (char-not-in-bag index))
+                                                (1+ index))
+                                             (declare (fixnum index)))
+                                           end)))
+                       (if (and (eql left-end 0)
+                                (eql right-end (length string)))
+                           string
+                           (subseq string left-end right-end))))))))
+  (define-trimmer-transform string-left-trim t nil)
+  (define-trimmer-transform string-right-trim nil t)
+  (define-trimmer-transform string-trim t t))
+

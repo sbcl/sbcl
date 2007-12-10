@@ -404,36 +404,36 @@ new string COUNT long filled with the fill character."
   (%capitalize string start end))
 ) ; FLET
 
-(defun string-left-trim (char-bag string)
+(defun generic-string-trim (char-bag string left-p right-p)
   (with-string string
-    (do ((index start (1+ index)))
-        ((or (= index (the fixnum end))
-             (not (find (schar string index) char-bag :test #'char=)))
-         (subseq (the simple-string string) index end))
-      (declare (fixnum index)))))
+    (let* ((left-end (if left-p
+                         (do ((index start (1+ index)))
+                             ((or (= index (the fixnum end))
+                                  (not (find (schar string index)
+                                             char-bag
+                                             :test #'char=)))
+                              index)
+                           (declare (fixnum index)))
+                         0))
+           (right-end (if right-p
+                          (do ((index (1- (the fixnum end)) (1- index)))
+                              ((or (< index left-end)
+                                   (not (find (schar string index)
+                                              char-bag
+                                              :test #'char=)))
+                               (1+ index))
+                            (declare (fixnum index)))
+                          (length string))))
+      (if (and (eql left-end 0)
+               (eql right-end (length string)))
+          string
+          (subseq (the simple-string string) left-end right-end)))))
+
+(defun string-left-trim (char-bag string)
+  (generic-string-trim char-bag string t nil))
 
 (defun string-right-trim (char-bag string)
-  (with-string string
-    (do ((index (1- (the fixnum end)) (1- index)))
-        ((or (< index start)
-             (not (find (schar string index) char-bag :test #'char=)))
-         (subseq (the simple-string string) start (1+ index)))
-      (declare (fixnum index)))))
+  (generic-string-trim char-bag string nil t))
 
 (defun string-trim (char-bag string)
-  (with-string string
-    (let* ((left-end (do ((index start (1+ index)))
-                         ((or (= index (the fixnum end))
-                              (not (find (schar string index)
-                                         char-bag
-                                         :test #'char=)))
-                          index)
-                       (declare (fixnum index))))
-           (right-end (do ((index (1- (the fixnum end)) (1- index)))
-                          ((or (< index left-end)
-                               (not (find (schar string index)
-                                          char-bag
-                                          :test #'char=)))
-                           (1+ index))
-                        (declare (fixnum index)))))
-      (subseq (the simple-string string) left-end right-end))))
+  (generic-string-trim char-bag string t t))
