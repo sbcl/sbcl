@@ -372,6 +372,7 @@
 (defun char= (character &rest more-characters)
   #!+sb-doc
   "Return T if all of the arguments are the same character."
+  (declare (dynamic-extent more-characters))
   (dolist (c more-characters t)
     (declare (type character c))
     (unless (eq c character) (return nil))))
@@ -379,6 +380,7 @@
 (defun char/= (character &rest more-characters)
   #!+sb-doc
   "Return T if no two of the arguments are the same character."
+  (declare (dynamic-extent more-characters))
   (do* ((head character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -390,6 +392,7 @@
 (defun char< (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly increasing alphabetic order."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -400,6 +403,7 @@
 (defun char> (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly decreasing alphabetic order."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -410,6 +414,7 @@
 (defun char<= (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly non-decreasing alphabetic order."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -420,6 +425,7 @@
 (defun char>= (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly non-increasing alphabetic order."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -444,6 +450,7 @@
   #!+sb-doc
   "Return T if all of the arguments are the same character.
   Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do ((clist more-characters (cdr clist)))
       ((null clist) t)
     (unless (two-arg-char-equal (car clist) character)
@@ -456,6 +463,7 @@
   #!+sb-doc
   "Return T if no two of the arguments are the same character.
    Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do* ((head character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -472,6 +480,7 @@
   #!+sb-doc
   "Return T if the arguments are in strictly increasing alphabetic order.
    Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -485,6 +494,7 @@
   #!+sb-doc
   "Return T if the arguments are in strictly decreasing alphabetic order.
    Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -498,6 +508,7 @@
   #!+sb-doc
   "Return T if the arguments are in strictly non-decreasing alphabetic order.
    Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
@@ -511,6 +522,7 @@
   #!+sb-doc
   "Return T if the arguments are in strictly non-increasing alphabetic order.
    Font, bits, and case are ignored."
+  (declare (dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
        ((null list) t)
