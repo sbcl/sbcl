@@ -237,54 +237,100 @@
 
 ;;;; input functions
 
+(defun ansi-stream-read-line-from-frc-buffer (stream eof-error-p eof-value)
+  (prepare-for-fast-read-char stream
+    (declare (ignore %frc-method%))
+    (let ((chunks-total-length 0)
+          (chunks nil))
+      (declare (type index chunks-total-length)
+               (list chunks))
+      (labels ((refill-buffer ()
+                 (prog1
+                     (fast-read-char-refill stream nil nil)
+                   (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
+               (newline-position ()
+                 (position #\Newline (the (simple-array character (*))
+                                       %frc-buffer%)
+                           :test #'char=
+                           :start %frc-index%))
+               (make-and-return-result-string (pos)
+                 (let* ((len (+ (- (or pos %frc-index%)
+                                   %frc-index%)
+                                chunks-total-length))
+                        (res (make-string len))
+                        (start 0))
+                   (declare (type index start))
+                   (when chunks
+                     (dolist (chunk (nreverse chunks))
+                       (declare (type (simple-array character) chunk))
+                       (replace res chunk :start1 start)
+                       (incf start (length chunk))))
+                   (unless (null pos)
+                     (replace res %frc-buffer%
+                              :start1 start
+                              :start2 %frc-index% :end2 pos)
+                     (setf %frc-index% (1+ pos)))
+                   (done-with-fast-read-char)
+                   (return-from ansi-stream-read-line-from-frc-buffer res)))
+               (add-chunk ()
+                 (let* ((end (length %frc-buffer%))
+                        (len (- end %frc-index%))
+                        (chunk (make-string len)))
+                   (replace chunk %frc-buffer% :start2 %frc-index% :end2 end)
+                   (push chunk chunks)
+                   (incf chunks-total-length len)
+                   (when (refill-buffer)
+                     (make-and-return-result-string nil)))))
+        (declare (inline make-and-return-result-string))
+        (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
+                   (refill-buffer))
+          ;; EOF had been reached before we read anything
+          ;; at all. Return the EOF value or signal the error.
+          (done-with-fast-read-char)
+          (return-from ansi-stream-read-line-from-frc-buffer
+            (values (eof-or-lose stream eof-error-p eof-value) t)))
+        (loop
+           (let ((pos (newline-position)))
+             (if pos
+                 (make-and-return-result-string pos)
+                 (add-chunk))))))))
+
 #!-sb-fluid (declaim (inline ansi-stream-read-line))
 (defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
   (declare (ignore recursive-p))
-  (prepare-for-fast-read-char stream
-    ;; Check whether the FAST-READ-CHAR buffer contains a newline. If it
-    ;; does, we can do things quickly by just copying the line from the
-    ;; buffer instead of doing repeated calls to FAST-READ-CHAR.
-    (when %frc-buffer%
-      (locally
-          ;; For %FIND-POSITION transform
-          (declare (optimize (speed 2)))
-        (let ((pos (position #\Newline %frc-buffer%
-                             :test #'char=
-                             :start %frc-index%)))
-          (when pos
-            (let* ((len (- pos %frc-index%))
-                   (res (make-string len)))
-              (replace res %frc-buffer% :start2 %frc-index% :end2 pos)
-              (setf %frc-index% (1+ pos))
-              (done-with-fast-read-char)
-              (return-from ansi-stream-read-line res))))))
-    (let ((res (make-string 80))
-          (len 80)
-          (index 0))
-      (loop
-         (let ((ch (fast-read-char nil nil)))
-           (cond (ch
-                  (when (char= ch #\newline)
-                    (done-with-fast-read-char)
-                    (return (values (%shrink-vector res index) nil)))
-                  (when (= index len)
-                    (setq len (* len 2))
-                    (let ((new (make-string len)))
-                      (replace new res)
-                      (setq res new)))
-                  (setf (schar res index) ch)
-                  (incf index))
-                 ((zerop index)
-                  (done-with-fast-read-char)
-                  (return (values (eof-or-lose stream
-                                               eof-error-p
-                                               eof-value)
-                                  t)))
-                 ;; Since FAST-READ-CHAR already hit the eof char, we
-                 ;; shouldn't do another READ-CHAR.
-                 (t
-                  (done-with-fast-read-char)
-                  (return (values (%shrink-vector res index) t)))))))))
+  (if (ansi-stream-cin-buffer stream)
+      ;; Stream has a fast-read-char buffer. Copy large chunks directly
+      ;; out of the buffer.
+      (ansi-stream-read-line-from-frc-buffer stream eof-error-p eof-value)
+      ;; Slow path, character by character.
+      (prepare-for-fast-read-char stream
+        (let ((res (make-string 80))
+              (len 80)
+              (index 0))
+          (loop
+             (let ((ch (fast-read-char nil nil)))
+               (cond (ch
+                      (when (char= ch #\newline)
+                        (done-with-fast-read-char)
+                        (return (values (%shrink-vector res index) nil)))
+                      (when (= index len)
+                        (setq len (* len 2))
+                        (let ((new (make-string len)))
+                          (replace new res)
+                          (setq res new)))
+                      (setf (schar res index) ch)
+                      (incf index))
+                     ((zerop index)
+                      (done-with-fast-read-char)
+                      (return (values (eof-or-lose stream
+                                                   eof-error-p
+                                                   eof-value)
+                                      t)))
+                     ;; Since FAST-READ-CHAR already hit the eof char, we
+                     ;; shouldn't do another READ-CHAR.
+                     (t
+                      (done-with-fast-read-char)
+                      (return (values (%shrink-vector res index) t))))))))))
 
 (defun read-line (&optional (stream *standard-input*) (eof-error-p t) eof-value
                             recursive-p)
@@ -487,7 +533,8 @@
 
 ;;; This function is called by the FAST-READ-CHAR expansion to refill
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
-;;; and hence must be an N-BIN method.
+;;; and hence must be an N-BIN method. It's also called by other stream
+;;; functions which directly peek into the frc buffer.
 (defun fast-read-char-refill (stream eof-error-p eof-value)
   (let* ((ibuf (ansi-stream-cin-buffer stream))
          (count (funcall (ansi-stream-n-bin stream)
@@ -500,9 +547,27 @@
          (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
     (cond ((zerop count)
-           (setf (ansi-stream-in-index stream)
-                 +ansi-stream-in-buffer-length+)
-           (funcall (ansi-stream-in stream) stream eof-error-p eof-value))
+           ;; An empty count does not necessarily mean that we reached
+           ;; the EOF, it's also possible that it's e.g. due to a
+           ;; invalid octet sequence in a multibyte stream. To handle
+           ;; the resyncing case correctly we need to call the
+           ;; single-character reading function and check whether an
+           ;; EOF was really reached. If not, we can just fill the
+           ;; buffer by one character, and hope that the next refill
+           ;; will not need to resync.
+           (let* ((value (funcall (ansi-stream-in stream) stream nil :eof))
+                  (index (1- +ansi-stream-in-buffer-length+)))
+             (case value
+               ((:eof)
+                ;; Mark buffer as empty.
+                (setf (ansi-stream-in-index stream)
+                      +ansi-stream-in-buffer-length+)
+                ;; EOF. Redo the read, this time with the real eof parameters.
+                (values t (funcall (ansi-stream-in stream)
+                                   stream eof-error-p eof-value)))
+               (otherwise
+                (setf (aref ibuf index) value)
+                (values nil (setf (ansi-stream-in-index stream) index))))))
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
              (#.(let* ((n-character-array-bits
@@ -516,8 +581,8 @@
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
                 count))
-           (setf (ansi-stream-in-index stream) (1+ start))
-           (aref ibuf start)))))
+           (values nil
+                   (setf (ansi-stream-in-index stream) start))))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.
@@ -1980,33 +2045,82 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
       (vector
        (with-array-data ((data seq) (offset-start start) (offset-end end)
                          :check-fill-pointer t)
-         (if (compatible-vector-and-stream-element-types-p data stream)
-             (let* ((numbytes (- end start))
-                    (bytes-read (read-n-bytes stream data offset-start
-                                              numbytes nil)))
-               (if (< bytes-read numbytes)
-                   (+ start bytes-read)
-                   end))
-             (let ((read-function
-                    (if (subtypep (stream-element-type stream) 'character)
-                        ;; If the stream-element-type is CHARACTER,
-                        ;; this might be a bivalent stream. If the
-                        ;; sequence is a specialized unsigned-byte
-                        ;; vector, try to read use binary IO. It'll
-                        ;; signal an error if stream is an pure
-                        ;; character stream.
-                        (if (subtypep (array-element-type data)
-                                      'unsigned-byte)
-                            #'ansi-stream-read-byte
-                            #'ansi-stream-read-char)
-                        #'ansi-stream-read-byte)))
-               (do ((i offset-start (1+ i)))
-                   ((>= i offset-end) end)
-                 (declare (type index i))
-                 (let ((el (funcall read-function stream nil :eof nil)))
-                   (when (eq el :eof)
-                     (return (+ start (- i offset-start))))
-                   (setf (aref data i) el))))))))))
+         (cond ((compatible-vector-and-stream-element-types-p data stream)
+                (let* ((numbytes (- end start))
+                       (bytes-read (read-n-bytes stream data offset-start
+                                                 numbytes nil)))
+                  (if (< bytes-read numbytes)
+                      (+ start bytes-read)
+                      end)))
+               ((and (ansi-stream-cin-buffer stream)
+                     (typep seq 'simple-string))
+                (ansi-stream-read-string-from-frc-buffer seq stream
+                                                         start %end))
+               (t
+                (let ((read-function
+                       (if (subtypep (stream-element-type stream) 'character)
+                           ;; If the stream-element-type is CHARACTER,
+                           ;; this might be a bivalent stream. If the
+                           ;; sequence is a specialized unsigned-byte
+                           ;; vector, try to read use binary IO. It'll
+                           ;; signal an error if stream is an pure
+                           ;; character stream.
+                           (if (subtypep (array-element-type data)
+                                         'unsigned-byte)
+                               #'ansi-stream-read-byte
+                               #'ansi-stream-read-char)
+                           #'ansi-stream-read-byte)))
+                  (do ((i offset-start (1+ i)))
+                      ((>= i offset-end) end)
+                    (declare (type index i))
+                    (let ((el (funcall read-function stream nil :eof nil)))
+                      (when (eq el :eof)
+                        (return (+ start (- i offset-start))))
+                      (setf (aref data i) el)))))))))))
+
+(defun ansi-stream-read-string-from-frc-buffer (seq stream start %end)
+  (declare (type simple-string seq)
+           (type ansi-stream stream)
+           (type index start)
+           (type (or null index) %end))
+  (let ((needed (- (or %end (length seq))
+                   start))
+        (read 0))
+    (prepare-for-fast-read-char stream
+      (declare (ignore %frc-method%))
+      (unless %frc-buffer%
+        (return-from ansi-stream-read-string-from-frc-buffer nil))
+      (labels ((refill-buffer ()
+                 (prog1
+                     (fast-read-char-refill stream nil nil)
+                   (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
+               (add-chunk ()
+                 (let* ((end (length %frc-buffer%))
+                        (len (min (- end %frc-index%)
+                                  (- needed read))))
+                   (declare (type index end len read needed))
+                   (string-dispatch (simple-base-string
+                                     (simple-array character (*)))
+                       seq
+                     (replace seq %frc-buffer%
+                              :start1 (+ start read)
+                              :end1 (+ start read len)
+                              :start2 %frc-index%
+                              :end2 (+ %frc-index% len)))
+                   (incf read len)
+                   (when (or (eql needed read)
+                             (refill-buffer))
+                     (done-with-fast-read-char)
+                     (return-from ansi-stream-read-string-from-frc-buffer
+                       read)))))
+        (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
+                   (refill-buffer))
+          ;; EOF had been reached before we read anything
+          ;; at all. Return the EOF value or signal the error.
+          (done-with-fast-read-char)
+          (return-from ansi-stream-read-string-from-frc-buffer 0))
+        (loop (add-chunk))))))
+
 
 ;;;; WRITE-SEQUENCE
 

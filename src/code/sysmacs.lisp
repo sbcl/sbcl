@@ -166,14 +166,19 @@ maintained."
 ;;; within the scope of a PREPARE-FOR-FAST-READ-CHAR.
 (defmacro fast-read-char (&optional (eof-error-p t) (eof-value ()))
   `(cond
-    ((not %frc-buffer%)
-     (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-    ((= %frc-index% +ansi-stream-in-buffer-length+)
-     (prog1 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
-            (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
-    (t
-     (prog1 (aref %frc-buffer% %frc-index%)
-            (incf %frc-index%)))))
+     ((not %frc-buffer%)
+      (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
+     ((= %frc-index% +ansi-stream-in-buffer-length+)
+      (multiple-value-bind (eof-p index-or-value)
+          (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
+        (if eof-p
+            index-or-value
+            (progn
+              (setq %frc-index% (1+ index-or-value))
+              (aref %frc-buffer% index-or-value)))))
+     (t
+      (prog1 (aref %frc-buffer% %frc-index%)
+        (incf %frc-index%)))))
 
 ;;;; And these for the fasloader...
 
