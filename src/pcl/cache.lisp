@@ -159,6 +159,7 @@
 ;;; Compute the starting index of the next cache line in the cache vector.
 (declaim (inline next-cache-index))
 (defun next-cache-index (mask index line-size)
+  (declare (type (unsigned-byte #.sb-vm:n-word-bits) index line-size mask))
   (logand mask (+ index line-size)))
 
 ;;; Returns the hash-value for layout, or executes ELSE if the layout
@@ -231,6 +232,7 @@
 ;;; Returns two values: a boolean indicating a hit or a miss, and a secondary
 ;;; value that is the value that was stored in the cache if any.
 (defun probe-cache (cache layouts)
+  (declare (optimize speed))
   (unless (consp layouts)
     (setf layouts (list layouts)))
   (let ((vector (cache-vector cache))
@@ -238,8 +240,9 @@
         (line-size (cache-line-size cache))
         (mask (cache-mask cache)))
     (flet ((probe-line (base)
+             (declare (optimize (sb-c::type-check 0)))
              (tagbody
-                (loop for offset from 0 below key-count
+                (loop for offset of-type index from 0 below key-count
                       for layout in layouts do
                       (unless (eq layout (svref vector (+ base offset)))
                         ;; missed
@@ -251,10 +254,11 @@
                   (return-from probe-cache (values t value)))
               :miss
                 (return-from probe-line (next-cache-index mask base line-size)))))
+      (declare (ftype (function (index) (values index &optional)) probe-line))
       (let ((index (compute-cache-index cache layouts)))
         (when index
-          (loop repeat (1+ (cache-depth cache)) do
-                (setf index (probe-line index)))))))
+          (loop repeat (1+ (cache-depth cache))
+                do (setf index (probe-line index)))))))
   (values nil nil))
 
 ;;; Tries to write LAYOUTS and VALUE at the cache line starting at
@@ -288,8 +292,7 @@
 ;;; true on success and false on failure, meaning the cache is too
 ;;; full.
 (defun try-update-cache (cache layouts value)
-  (let ((vector (cache-vector cache))
-        (index (or (compute-cache-index cache layouts)
+  (let ((index (or (compute-cache-index cache layouts)
                    ;; At least one of the layouts was invalid: just
                    ;; pretend we updated the cache, and let the next
                    ;; read pick up the mess.
@@ -324,6 +327,7 @@
 (defun copy-and-expand-cache (cache layouts value)
   (let ((copy (%copy-cache cache))
         (length (length (cache-vector cache))))
+    (declare (index length))
     (when (< length +cache-vector-max-length+)
       (setf length (* 2 length)))
     (tagbody
@@ -417,8 +421,7 @@
          (fun (if (functionp function)
                   function
                   (fdefinition function)))
-         (index 0)
-         (key nil))
+         (index 0))
     (tagbody
      :map
        (let ((layouts
@@ -449,7 +452,6 @@
          (mask (cache-mask cache))
          (size (/ (length vector) line-size))
          (index 0)
-         (elt nil)
          (depth 0))
     (tagbody
      :copy
