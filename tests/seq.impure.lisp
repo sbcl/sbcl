@@ -1083,5 +1083,21 @@
 
 (delete-duplicates (vector #\a #\b #\c #\a)
                    :test-not (lambda (a b) (not (char-equal a b))))
+
+;;; FILL on lists
+(let ((l (list 1 2 3)))
+  (fill l 0 :start 1 :end 2)
+  (assert (equal l '(1 0 3)))
+  (fill l 'x :start 2 :end 3)
+  (assert (equal l '(1 0 x)))
+  (fill l 'y :start 1)
+  (assert (equal l '(1 y y)))
+  (fill l 'z :end 2)
+  (assert (equal l '(z z y)))
+  (fill l 1)
+  (assert (equal l '(1 1 1)))
+  (assert (raises-error? (fill l 0 :start 4)))
+  (assert (raises-error? (fill l 0 :end 4)))
+  (assert (raises-error? (fill l 0 :start 2 :end 1))))
 
 ;;; success

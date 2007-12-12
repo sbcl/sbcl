@@ -487,17 +487,17 @@
           (setf pointer (nthcdr (1- start) pointer)))
         (if pointer
             (pop pointer)
-            (oops))
-        (if end
-            (let ((n (- end start)))
-              (declare (integer n))
-              (when (minusp n)
-                (oops))
-              (when (plusp n)
-                (loop repeat n
-                      do (rplaca pointer item))))
-            (loop while pointer
-                  do (setf pointer (cdr (rplaca pointer item)))))))))
+            (oops)))
+      (if end
+          (let ((n (- end start)))
+            (declare (integer n))
+            (when (minusp n)
+              (oops))
+            (when (plusp n)
+              (loop repeat n
+                    do (setf pointer (cdr (rplaca pointer item))))))
+          (loop while pointer
+                do (setf pointer (cdr (rplaca pointer item))))))))
 
 (defun vector-fill* (sequence item start end)
   (with-array-data ((data sequence)
