@@ -2178,8 +2178,9 @@
                                             (frob sequence t)
                                             (frob sequence nil))))
                        (typecase sequence
-                         (simple-vector (frob2))
-                         (simple-base-string (frob2))
+                         #!+sb-unicode
+                         ((simple-array character (*)) (frob2))
+                         ((simple-array base-char (*)) (frob2))
                          (t (vector*-frob sequence))))
                    (declare (type (or index null) p))
                    (values f (and p (the index (- p offset)))))))))
