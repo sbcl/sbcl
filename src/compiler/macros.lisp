@@ -559,17 +559,17 @@
 
 ;;; Iterate over the uses of LVAR, binding NODE to each one
 ;;; successively.
-;;;
-;;; XXX Could change it not to replicate the code someday perhaps...
 (defmacro do-uses ((node-var lvar &optional result) &body body)
   (with-unique-names (uses)
     `(let ((,uses (lvar-uses ,lvar)))
-       (if (listp ,uses)
-           (dolist (,node-var ,uses ,result)
-             ,@body)
-           (block nil
-             (let ((,node-var ,uses))
-               ,@body))))))
+       (block nil
+         (flet ((do-1-use (,node-var)
+                  ,@body))
+           (if (listp ,uses)
+               (dolist (node ,uses)
+                 (do-1-use node))
+               (do-1-use ,uses)))
+         ,result))))
 
 ;;; Iterate over the nodes in BLOCK, binding NODE-VAR to the each node
 ;;; and LVAR-VAR to the node's LVAR. The only keyword option is
