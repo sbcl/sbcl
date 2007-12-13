@@ -782,7 +782,8 @@ Users Manual for details about the PROCESS structure."#-win32"
                                       input cookie
                                       :direction :input
                                       :if-does-not-exist if-input-does-not-exist
-                                      :external-format :default)
+                                      :external-format :default
+                                      :wait wait)
                (with-fd-and-stream-for ((stdout output-stream) :output
                                         output cookie
                                         :direction :output
@@ -906,6 +907,12 @@ Users Manual for details about the PROCESS structure."#-win32"
                            (replace buf buf :start2 decode-end :end2 read-end))
                          (decf read-end decode-end))))))))))))
 
+;;; FIXME: something very like this is done in SB-POSIX to treat
+;;; streams as file descriptor designators; maybe we can combine these
+;;; two?  Additionally, as we have a couple of user-defined streams
+;;; libraries, maybe we should have a generic function for doing this,
+;;; so user-defined streams can play nicely with RUN-PROGRAM (and
+;;; maybe also with SB-POSIX)?
 (defun get-stream-fd-and-external-format (stream direction)
   (typecase stream
     (sb-sys:fd-stream
@@ -929,11 +936,15 @@ Users Manual for details about the PROCESS structure."#-win32"
 (defun get-descriptor-for (object
                            cookie
                            &rest keys
-                           &key direction external-format
+                           &key direction (external-format :default) wait
                            &allow-other-keys)
-  ;; Someday somebody should review our use of the temporary file: are
-  ;; we doing something that's liable to run afoul of disk quotas or
-  ;; to choke on small /tmp file systems?
+  (declare (ignore wait)) ;This is explained below.
+  ;; Our use of a temporary file dates back to very old CMUCLs, and
+  ;; was probably only ever intended for use with STRING-STREAMs,
+  ;; which are ordinarily smallish.  However, as we've got
+  ;; user-defined stream classes, we can end up trying to copy
+  ;; arbitrarily much data into the temp file, and so are liable to
+  ;; run afoul of disk quotas or to choke on small /tmp file systems.
   (flet ((make-temp-fd ()
            (multiple-value-bind (fd name/errno)
                (sb-unix:unix-mkstemp "/tmp/.run-program-XXXXXX")
@@ -1006,64 +1017,75 @@ Users Manual for details about the PROCESS structure."#-win32"
                       (error "couldn't duplicate file descriptor: ~A"
                              (strerror errno)))))))
           ((streamp object)
-           ;; XXX: what is the correct way to compare external formats?
            (ecase direction
              (:input
-              (or
-               ;; If we can get an fd for the stream and the
-               ;; stream's external format is the default, let the
-               ;; child process use the fd for its descriptor.
-               ;; Otherwise, we copy data from the stream into a
-               ;; temp file, and give the temp file's descriptor to
-               ;; the child.
-               (multiple-value-bind (fd stream format)
-                   (get-stream-fd-and-external-format object :input)
-                 (when  (and fd format
-                             (eq (find-external-format
-                                  *default-external-format*)
-                                 (find-external-format format)))
-                   (values fd stream)))
-               (let ((fd (make-temp-fd))
-                     (newline (string #\Newline)))
-                 (loop
-                    (multiple-value-bind
-                          (line no-cr)
-                        (read-line object nil nil)
-                      (unless line
-                        (return))
-                      (let ((vector
-                             (string-to-octets
-                              line :external-format external-format)))
-                        (sb-unix:unix-write
-                         fd vector 0 (length vector)))
-                      (if no-cr
-                          (return)
-                          (sb-unix:unix-write fd newline 0 1))))
-                 (sb-unix:unix-lseek fd 0 sb-unix:l_set)
-                 (push fd *close-in-parent*)
-                 (values fd nil))))
+              (block nil
+                ;; If we can get an fd for the stream, let the child
+                ;; process use the fd for its descriptor.  Otherwise,
+                ;; we copy data from the stream into a temp file, and
+                ;; give the temp file's descriptor to the
+                ;; child.
+                (multiple-value-bind (fd stream format)
+                    (get-stream-fd-and-external-format object :input)
+                  (declare (ignore format))
+                  (when fd
+                    (return (values fd stream))))
+                ;; FIXME: if we can't get the file descriptor, since
+                ;; the stream might be interactive or otherwise
+                ;; block-y, we can't know whether we can copy the
+                ;; stream's data to a temp file, so if RUN-PROGRAM was
+                ;; called with :WAIT NIL, we should probably error.
+                ;; However, STRING-STREAMs aren't fd-streams, but
+                ;; they're not prone to blocking; any user-defined
+                ;; streams that "read" from some in-memory data will
+                ;; probably be similar to STRING-STREAMs.  So maybe we
+                ;; should add a STREAM-INTERACTIVE-P generic function
+                ;; for problems like this?  Anyway, the machinery is
+                ;; here, if you feel like filling in the details.
+                #|
+                (when (and (null wait) #<some undetermined criterion>)
+                  (error "~@<don't know how to get an fd for ~A, and so ~
+                             can't ensure that copying its data to the ~
+                             child process won't hang~:>" object))
+                |#
+                (let ((fd (make-temp-fd))
+                      (newline (string #\Newline)))
+                  (loop
+                     (multiple-value-bind
+                           (line no-cr)
+                         (read-line object nil nil)
+                       (unless line
+                         (return))
+                       (let ((vector (string-to-octets line)))
+                         (sb-unix:unix-write
+                          fd vector 0 (length vector)))
+                       (if no-cr
+                           (return)
+                           (sb-unix:unix-write fd newline 0 1))))
+                  (sb-unix:unix-lseek fd 0 sb-unix:l_set)
+                  (push fd *close-in-parent*)
+                  (return (values fd nil)))))
              (:output
-              (or
-               ;; Similar to the :input trick above, except we
-               ;; arrange to copy data from the stream.  This is
-               ;; only slightly less sleazy than the input case,
-               ;; since we don't buffer to a file, but I think we
-               ;; may still lose if there's data in the stream
-               ;; buffer.
-               (multiple-value-bind (fd stream format)
-                   (get-stream-fd-and-external-format object :output)
-                 (when (and fd format (eq (find-external-format
-                                           *default-external-format*)
-                                          (find-external-format format)))
-                   (values fd stream)))
-               (multiple-value-bind (read-fd write-fd)
-                   (sb-unix:unix-pipe)
-                 (unless read-fd
-                   (error "couldn't create pipe: ~S" (strerror write-fd)))
-                 (copy-descriptor-to-stream
-                  read-fd object cookie external-format)
-                 (push read-fd *close-on-error*)
-                 (push write-fd *close-in-parent*)
-                 (values write-fd nil))))))
+              (block nil
+                ;; Similar to the :input trick above, except we
+                ;; arrange to copy data from the stream.  This is
+                ;; slightly saner than the input case, since we don't
+                ;; buffer to a file, but I think we may still lose if
+                ;; there's unflushed data in the stream buffer and we
+                ;; give the file descriptor to the child.
+                (multiple-value-bind (fd stream format)
+                    (get-stream-fd-and-external-format object :output)
+                  (declare (ignore format))
+                  (when fd
+                    (return (values fd stream))))
+                (multiple-value-bind (read-fd write-fd)
+                    (sb-unix:unix-pipe)
+                  (unless read-fd
+                    (error "couldn't create pipe: ~S" (strerror write-fd)))
+                  (copy-descriptor-to-stream read-fd object cookie
+                                             external-format)
+                  (push read-fd *close-on-error*)
+                  (push write-fd *close-in-parent*)
+                  (return (values write-fd nil)))))))
           (t
            (error "invalid option to RUN-PROGRAM: ~S" object)))))
