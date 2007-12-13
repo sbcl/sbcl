@@ -177,6 +177,23 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (declare (type unix-fd fd))
   (void-syscall ("close" int) fd))
 
+;;;; stdlib.h
+
+;;; There are good reasons to implement some OPEN options with an
+;;; mkstemp(3) followed by a fchmod(2) followed by a rename(2), but we
+;;; don't do that yet.  Instead, this function is used only to make a
+;;; temporary file for RUN-PROGRAM.  sb_mkstemp() is a wrapper that
+;;; lives in src/runtime/wrap.c.
+(defun unix-mkstemp (template-string)
+  (let ((template-buffer (string-to-octets template-string)))
+    (with-pinned-objects (template-buffer)
+      (let ((fd (alien-funcall (extern-alien "sb_mkstemp"
+                                             (function int (* char)))
+                               (vector-sap template-buffer))))
+        (if (minusp fd)
+            (values nil (get-errno))
+            (values fd (octets-to-string template-buffer)))))))
+
 ;;;; timebits.h
 
 ;; A time value that is accurate to the nearest
@@ -726,6 +743,17 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
              (%extract-stat-results (addr buf))
              fd (addr buf))))
+
+;;; RUN-PROGRAM creates temporary files with mkstemp, but SUSv3
+;;; doesn't specify the mode of a newly created file under mkstemp,
+;;; and C libraries may vary, so we fix the mode ourselves.
+;;; Eventually some OPEN actions should probably be implemented with
+;;; mkstemp(3)/chmod(2)/rename(2) as well.
+#!-win32
+(defun unix-chmod (path mode)
+  (declare (type unix-pathname path)
+           (type unix-file-mode mode))
+  (void-syscall ("chmod" c-string int) path mode))
 
 ;;;; time.h
 

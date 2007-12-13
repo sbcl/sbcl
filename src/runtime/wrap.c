@@ -41,6 +41,8 @@
 
 #if defined(LISP_FEATURE_WIN32)
 #define WIN32_LEAN_AND_MEAN
+#include <fcntl.h>
+#include <errno.h>
 #endif
 
 #include "runtime.h"
@@ -242,6 +244,30 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
         copy_to_stat_wrapper(buf, &real_buf);
     return ret;
 }
+
+/* A wrapper for mkstemp(3), which seems not to exist on Windows. */
+int sb_mkstemp (char *template) {
+#ifdef LISP_FEATURE_WIN32
+  int fd;
+  char buf[MAX_PATH];
+
+  while (1) {
+    strcpy((char*)&buf, template);
+    if (_mktemp((char*)&buf)) {
+      if ((fd=open((char*)&buf, O_CREAT|O_EXCL|O_RDWR, S_IRUSR|S_IWUSR))!=-1) {
+        strcpy(template, (char*)&buf);
+        return (fd);
+      } else
+        if (errno != EEXIST)
+          return (-1);
+    } else
+      return (-1);
+  }
+#else
+  return(mkstemp(template));
+#endif
+}
+
 
 /*
  * getpwuid() stuff

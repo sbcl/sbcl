@@ -382,7 +382,8 @@ status slot."
 ;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
 (defvar *close-in-parent* nil)
 
-;;; list of handlers installed by RUN-PROGRAM
+;;; list of handlers installed by RUN-PROGRAM.  FIXME: nothing seems
+;;; to set this.
 #-win32
 (defvar *handlers-installed* nil)
 
@@ -504,7 +505,7 @@ status slot."
          (sb-sys:deallocate-system-memory ,sap ,size)))))
 
 #-win32
-(sb-alien:define-alien-routine spawn sb-alien:int
+(sb-alien:define-alien-routine ("spawn" %spawn) sb-alien:int
   (program sb-alien:c-string)
   (argv (* sb-alien:c-string))
   (envp (* sb-alien:c-string))
@@ -514,7 +515,7 @@ status slot."
   (stderr sb-alien:int))
 
 #+win32
-(sb-alien:define-alien-routine spawn sb-win32::handle
+(sb-alien:define-alien-routine ("spawn" %spawn) sb-win32::handle
   (program sb-alien:c-string)
   (argv (* sb-alien:c-string))
   (stdin sb-alien:int)
@@ -522,6 +523,15 @@ status slot."
   (stderr sb-alien:int)
   (wait sb-alien:int))
 
+(defun spawn (program argv stdin stdout stderr envp pty-name wait)
+  #+win32 (declare (ignore envp pty-name))
+  #+win32 (%spawn program argv stdin stdout stderr (if wait 1 0))
+  #-win32 (declare (ignore wait))
+  #-win32 (%spawn program argv envp pty-name stdin stdout stderr))
+
+;;; FIXME: why are we duplicating standard library stuff and not using
+;;; execvp(3)?  We can extend our internal spawn() routine to take a
+;;; flag to say whether to search...
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
 (defun unix-filename-is-executable-p (unix-filename)
   (let ((filename (coerce unix-filename 'string)))
@@ -592,18 +602,17 @@ colon-separated list of pathnames SEARCH-PATH"
 ;;;
 ;;; RUN-PROGRAM returns a PROCESS structure for the process if
 ;;; the fork worked, and NIL if it did not.
-
-#-win32
 (defun run-program (program args
                     &key
-                    (env nil env-p)
-                    (environment (if env-p
-                                     (unix-environment-sbcl-from-cmucl env)
-                                     (posix-environ))
-                                 environment-p)
+                    #-win32 (env nil env-p)
+                    #-win32 (environment
+                             (if env-p
+                                 (unix-environment-sbcl-from-cmucl env)
+                                 (posix-environ))
+                             environment-p)
                     (wait t)
                     search
-                    pty
+                    #-win32 pty
                     input
                     if-input-does-not-exist
                     output
@@ -612,17 +621,20 @@ colon-separated list of pathnames SEARCH-PATH"
                     (if-error-exists :error)
                     status-hook)
   #+sb-doc
-  "RUN-PROGRAM creates a new Unix process running the Unix program
-found in the file specified by the PROGRAM argument. ARGS are the
-standard arguments that can be passed to a Unix program. For no
-arguments, use NIL (which means that just the name of the program is
-passed as arg 0).
+  #.(concatenate
+     'string
+     ;; The Texinfoizer is sensitive to whitespace, so mind the
+     ;; placement of the #-win32 pseudosplicings.
+     "RUN-PROGRAM creates a new process specified by the PROGRAM
+argument. ARGS are the standard arguments that can be passed to a
+program. For no arguments, use NIL (which means that just the
+name of the program is passed as arg 0).
 
 The program arguments and the environment are encoded using the
 default external format for streams.
 
 RUN-PROGRAM will return a PROCESS structure. See the CMU Common Lisp
-Users Manual for details about the PROCESS structure.
+Users Manual for details about the PROCESS structure."#-win32"
 
    Notes about Unix environments (as in the :ENVIRONMENT and :ENV args):
 
@@ -635,34 +647,35 @@ Users Manual for details about the PROCESS structure.
      else, is a mother lode of security problems. If you are contemplating
      doing this, read about it first. (The Perl community has a lot of good
      documentation about this and other security issues in script-like
-     programs.)
+     programs.)""
 
    The &KEY arguments have the following meanings:
-
+"#-win32"
    :ENVIRONMENT
       a list of STRINGs describing the new Unix environment
       (as in \"man environ\"). The default is to copy the environment of
       the current process.
    :ENV
       an alternative lossy representation of the new Unix environment,
-      for compatibility with CMU CL
+      for compatibility with CMU CL""
    :SEARCH
       Look for PROGRAM in each of the directories along the $PATH
       environment variable.  Otherwise an absolute pathname is required.
       (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
    :WAIT
       If non-NIL (default), wait until the created process finishes.  If
-      NIL, continue running Lisp until the program finishes.
+      NIL, continue running Lisp until the program finishes."#-win32"
    :PTY
       Either T, NIL, or a stream.  Unless NIL, the subprocess is established
       under a PTY.  If :pty is a stream, all output to this pty is sent to
       this stream, otherwise the PROCESS-PTY slot is filled in with a stream
-      connected to pty that can read output and write input.
+      connected to pty that can read output and write input.""
    :INPUT
       Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-      input for the current process is inherited.  If NIL, /dev/null
+      input for the current process is inherited.  If NIL, "
+      #-win32"/dev/null"#+win32"nul""
       is used.  If a pathname, the file so specified is used.  If a stream,
-      all the input is read from that stream and send to the subprocess.  If
+      all the input is read from that stream and sent to the subprocess.  If
       :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
       its output to the process. Defaults to NIL.
    :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
@@ -672,7 +685,8 @@ Users Manual for details about the PROCESS structure.
          NIL (the default) to return NIL from RUN-PROGRAM
    :OUTPUT
       Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-      output for the current process is inherited.  If NIL, /dev/null
+      output for the current process is inherited.  If NIL, "
+      #-win32"/dev/null"#+win32"nul""
       is used.  If a pathname, the file so specified is used.  If a stream,
       all the output from the process is written to this stream. If
       :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
@@ -689,406 +703,367 @@ Users Manual for details about the PROCESS structure.
       same place as normal output.
    :STATUS-HOOK
       This is a function the system calls whenever the status of the
-      process changes.  The function takes the process as an argument."
+      process changes.  The function takes the process as an argument.")
+  #-win32
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Make sure that the interrupt handler is installed.
+  #-win32
   (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
-  (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
-        ;; communicate cleanup info.
-        *close-on-error*
-        *close-in-parent*
-        *handlers-installed*
-        ;; Establish PROC at this level so that we can return it.
-        proc
-        ;; It's friendly to allow the caller to pass any string
-        ;; designator, but internally we'd like SIMPLE-STRINGs.
-        (simple-args (mapcar (lambda (x) (coerce x 'simple-string)) args)))
-    (unwind-protect
-         (let ((pfile
-                (if search
-                    (find-executable-in-search-path program)
-                    (unix-namestring program)))
-               (cookie (list 0)))
-           (unless pfile
-             (error "no such program: ~S" program))
-           (unless (unix-filename-is-executable-p pfile)
-             (error "not executable: ~S" program))
-           (multiple-value-bind (stdin input-stream)
-               (get-descriptor-for input cookie
-                                   :direction :input
-                                   :if-does-not-exist if-input-does-not-exist)
-             (multiple-value-bind (stdout output-stream)
-                 (get-descriptor-for output cookie
-                                     :direction :output
-                                     :if-exists if-output-exists)
-               (multiple-value-bind (stderr error-stream)
-                   (if (eq error :output)
-                       (values stdout output-stream)
-                       (get-descriptor-for error cookie
-                                           :direction :output
-                                           :if-exists if-error-exists))
-                 (multiple-value-bind (pty-name pty-stream)
-                     (open-pty pty cookie)
-                   ;; Make sure we are not notified about the child
-                   ;; death before we have installed the PROCESS
-                   ;; structure in *ACTIVE-PROCESSES*.
-                   (with-active-processes-lock ()
-                    (with-c-strvec (args-vec simple-args)
-                      (with-c-strvec (environment-vec environment)
-                        (let ((child-pid
-                               (without-gcing
-                                (spawn pfile args-vec environment-vec pty-name
-                                       stdin stdout stderr))))
-                          (when (< child-pid 0)
-                            (error "couldn't fork child process: ~A"
-                                   (strerror)))
-                          (setf proc (make-process :pid child-pid
-                                                   :%status :running
-                                                   :pty pty-stream
-                                                   :input input-stream
-                                                   :output output-stream
-                                                   :error error-stream
-                                                   :status-hook status-hook
-                                                   :cookie cookie))
-                          (push proc *active-processes*))))))))))
-      (dolist (fd *close-in-parent*)
-        (sb-unix:unix-close fd))
-      (unless proc
-        (dolist (fd *close-on-error*)
+  (labels (;; It's friendly to allow the caller to pass any string
+           ;; designator, but internally we'd like SIMPLE-STRINGs.
+           ;;
+           ;; Huh?  We let users pass in symbols and characters for
+           ;; the arguments, but call NAMESTRING on the program
+           ;; name... -- RMK
+           (simplify-args (args)
+             (loop for arg in args
+                   as escaped-arg = (escape-arg arg)
+                   collect (coerce escaped-arg 'simple-string)))
+           (escape-arg (arg)
+             #-win32 arg
+             ;; Apparently any spaces or double quotes in the arguments
+             ;; need to be escaped on win32.
+             #+win32 (if (position-if
+                          (lambda (c) (find c '(#\" #\Space))) arg)
+                         (write-to-string arg)
+                         arg)))
+    (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
+          ;; communicate cleanup info.
+          *close-on-error*
+          *close-in-parent*
+          ;; Some other binding used only on non-Win32.  FIXME:
+          ;; nothing seems to set this.
+          #-win32 *handlers-installed*
+          ;; Establish PROC at this level so that we can return it.
+          proc
+          ;; It's friendly to allow the caller to pass any string
+          ;; designator, but internally we'd like SIMPLE-STRINGs.
+          (simple-args (simplify-args args))
+          ;; See the comment above about execlp(3).
+          (pfile (if search
+                     (find-executable-in-search-path program)
+                     (unix-namestring program)))
+          ;; Gag.
+          (cookie (list 0)))
+      (unless pfile
+        (error "no such program: ~S" program))
+      (unless (unix-filename-is-executable-p pfile)
+        (error "not executable: ~S" program))
+      (unwind-protect
+           (macrolet ((with-fd-and-stream-for (((fd stream) which &rest args)
+                                               &body body)
+                        `(multiple-value-bind (,fd ,stream)
+                             ,(ecase which
+                                ((:input :output)
+                                 `(get-descriptor-for ,@args))
+                                (:error
+                                 `(if (eq ,(first args) :output)
+                                      ;; kludge: we expand into
+                                      ;; hard-coded symbols here.
+                                      (values stdout output-stream)
+                                      (get-descriptor-for ,@args))))
+                           ,@body))
+                      (with-open-pty (((pty-name pty-stream) (pty cookie)) &body body)
+                        #+win32 `(declare (ignore ,pty ,cookie))
+                        #+win32 `(let (,pty-name ,pty-stream) ,@body)
+                        #-win32 `(multiple-value-bind (,pty-name ,pty-stream)
+                                     (open-pty ,pty ,cookie)
+                                   ,@body))
+                      (with-args-vec ((vec args) &body body)
+                        `(with-c-strvec (,vec ,args)
+                           ,@body))
+                      (with-environment-vec ((vec env) &body body)
+                        #+win32 `(let (,vec) ,@body)
+                        #-win32 `(with-c-strvec (,vec ,env) ,@body)))
+             (with-fd-and-stream-for ((stdin input-stream) :input
+                                      input cookie
+                                      :direction :input
+                                      :if-does-not-exist if-input-does-not-exist
+                                      :external-format :default)
+               (with-fd-and-stream-for ((stdout output-stream) :output
+                                        output cookie
+                                        :direction :output
+                                        :if-exists if-output-exists
+                                        :external-format :default)
+                 (with-fd-and-stream-for ((stderr error-stream)  :error
+                                          error cookie
+                                          :direction :output
+                                          :if-exists if-error-exists
+                                          :external-format :default)
+                   (with-open-pty ((pty-name pty-stream) (pty cookie))
+                     ;; Make sure we are not notified about the child
+                     ;; death before we have installed the PROCESS
+                     ;; structure in *ACTIVE-PROCESSES*.
+                     (with-active-processes-lock ()
+                       (with-args-vec (args-vec simple-args)
+                         (with-environment-vec (environment-vec environment)
+                           (let ((child
+                                  (without-gcing
+                                    (spawn pfile args-vec
+                                           stdin stdout stderr
+                                           environment-vec pty-name wait))))
+                             (when (minusp child)
+                               (error "couldn't fork child process: ~A"
+                                      (strerror)))
+                             (setf proc (apply
+                                         #'make-process
+                                         :pid child
+                                         :input input-stream
+                                         :output output-stream
+                                         :error error-stream
+                                         :status-hook status-hook
+                                         :cookie cookie
+                                         #-win32 (list :pty pty-stream
+                                                       :%status :running)
+                                         #+win32 (if wait
+                                                     (list :%status :exited
+                                                           :exit-code child)
+                                                     (list :%status :running))))
+                             (push proc *active-processes*))))))))))
+        (dolist (fd *close-in-parent*)
           (sb-unix:unix-close fd))
-        (dolist (handler *handlers-installed*)
-          (sb-sys:remove-fd-handler handler))))
-    (when (and wait proc)
-      (process-wait proc))
-    proc))
-
-#+win32
-(defun run-program (program args
-                    &key
-                    (wait t)
-                    search
-                    input
-                    if-input-does-not-exist
-                    output
-                    (if-output-exists :error)
-                    (error :output)
-                    (if-error-exists :error)
-                    status-hook)
-  "RUN-PROGRAM creates a new process specified by the PROGRAM
-argument. ARGS are the standard arguments that can be passed to a
-program. For no arguments, use NIL (which means that just the name of
-the program is passed as arg 0).
-
-The program arguments will be encoded using the default external
-format for streams.
-
-RUN-PROGRAM will return a PROCESS structure. See the CMU
-Common Lisp Users Manual for details about the PROCESS structure.
-
-   The &KEY arguments have the following meanings:
-     :SEARCH
-        Look for PROGRAM in each of the directories along the $PATH
-        environment variable.  Otherwise an absolute pathname is required.
-        (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
-     :WAIT
-        If non-NIL (default), wait until the created process finishes.  If
-        NIL, continue running Lisp until the program finishes.
-     :INPUT
-        Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        input for the current process is inherited.  If NIL, nul
-        is used.  If a pathname, the file so specified is used.  If a stream,
-        all the input is read from that stream and send to the subprocess.  If
-        :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
-        its output to the process. Defaults to NIL.
-     :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
-        can be one of:
-           :ERROR to generate an error
-           :CREATE to create an empty file
-           NIL (the default) to return NIL from RUN-PROGRAM
-     :OUTPUT
-        Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-        output for the current process is inherited.  If NIL, nul
-        is used.  If a pathname, the file so specified is used.  If a stream,
-        all the output from the process is written to this stream. If
-        :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
-        be read to get the output. Defaults to NIL.
-     :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
-        can be one of:
-           :ERROR (the default) to generate an error
-           :SUPERSEDE to supersede the file with output from the program
-           :APPEND to append output from the program to the file
-           NIL to return NIL from RUN-PROGRAM, without doing anything
-     :ERROR and :IF-ERROR-EXISTS
-        Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
-        specified as :OUTPUT in which case all error output is routed to the
-        same place as normal output.
-     :STATUS-HOOK
-        This is a function the system calls whenever the status of the
-        process changes.  The function takes the process as an argument."
-  ;; Prepend the program to the argument list.
-  (push (namestring program) args)
-  (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
-        ;; communicate cleanup info.
-        *close-on-error*
-        *close-in-parent*
-        ;; Establish PROC at this level so that we can return it.
-        proc
-        ;; It's friendly to allow the caller to pass any string
-        ;; designator, but internally we'd like SIMPLE-STRINGs.
-        (simple-args
-          (mapcar
-            (lambda (x)
-              (coerce
-                ;; Apparently any spaces or double quotes in the arguments
-                ;; need to be escaped on win32.
-                (if (position-if (lambda (c) (find c '(#\" #\Space))) x)
-                    (write-to-string x)
-                    x)
-                'simple-string))
-            args)))
-    (unwind-protect
-         (let ((pfile
-                (if search
-                    (find-executable-in-search-path program)
-                    (unix-namestring program)))
-               (cookie (list 0)))
-           (unless pfile
-             (error "No such program: ~S" program))
-           (unless (unix-filename-is-executable-p pfile)
-             (error "Not an executable: ~S" program))
-           (multiple-value-bind (stdin input-stream)
-               (get-descriptor-for input cookie
-                                   :direction :input
-                                   :if-does-not-exist if-input-does-not-exist)
-             (multiple-value-bind (stdout output-stream)
-                 (get-descriptor-for output cookie
-                                     :direction :output
-                                     :if-exists if-output-exists)
-               (multiple-value-bind (stderr error-stream)
-                   (if (eq error :output)
-                       (values stdout output-stream)
-                       (get-descriptor-for error cookie
-                                           :direction :output
-                                           :if-exists if-error-exists))
-                    (with-c-strvec (args-vec simple-args)
-                          (let ((handle (without-gcing
-                                         (spawn pfile args-vec
-                                                stdin stdout stderr
-                                                (if wait 1 0)))))
-                            (when (= handle -1)
-                              (error "Couldn't spawn program: ~A" (strerror)))
-                            (setf proc
-                                  (if wait
-                                      (make-process :pid handle
-                                                    :%status :exited
-                                                    :input input-stream
-                                                    :output output-stream
-                                                    :error error-stream
-                                                    :status-hook status-hook
-                                                    :cookie cookie
-                                                    :exit-code handle)
-                                      (make-process :pid handle
-                                                    :%status :running
-                                                    :input input-stream
-                                                    :output output-stream
-                                                    :error error-stream
-                                                    :status-hook status-hook
-                                                    :cookie cookie)))
-                            (push proc *active-processes*)))))))
-      (dolist (fd *close-in-parent*)
-        (sb-unix:unix-close fd)))
-    (unless proc
-      (dolist (fd *close-on-error*)
-        (sb-unix:unix-close fd)))
-
-    proc))
+        (unless proc
+          (dolist (fd *close-on-error*)
+            (sb-unix:unix-close fd))
+          ;; FIXME: nothing seems to set this.
+          #-win32
+          (dolist (handler *handlers-installed*)
+            (sb-sys:remove-fd-handler handler))))
+      (when (and wait proc)
+        (process-wait proc))
+      proc)))
 
 ;;; Install a handler for any input that shows up on the file
 ;;; descriptor. The handler reads the data and writes it to the
 ;;; stream.
-(defun copy-descriptor-to-stream (descriptor stream cookie)
+(defun copy-descriptor-to-stream (descriptor stream cookie external-format)
   (incf (car cookie))
-  (let ((string (make-string 256 :element-type 'base-char))
-        handler)
+  (let* (handler
+         (buf (make-array 256 :element-type '(unsigned-byte 8)))
+         (read-end 0))
     (setf handler
           (sb-sys:add-fd-handler
            descriptor
-           :input (lambda (fd)
-                    (declare (ignore fd))
-                    (loop
-                     (unless handler
-                       (return))
-                     (multiple-value-bind
-                         (result readable/errno)
-                         (sb-unix:unix-select (1+ descriptor)
-                                              (ash 1 descriptor)
-                                              0 0 0)
-                       (cond ((null result)
-                              (error "~@<couldn't select on sub-process: ~
+           :input
+           (lambda (fd)
+             (declare (ignore fd))
+             (loop
+                (unless handler
+                  (return))
+                (multiple-value-bind
+                      (result readable/errno)
+                    (sb-unix:unix-select (1+ descriptor)
+                                         (ash 1 descriptor)
+                                         0 0 0)
+                  (cond ((null result)
+                         (error "~@<couldn't select on sub-process: ~
                                            ~2I~_~A~:>"
-                                     (strerror readable/errno)))
-                             ((zerop result)
-                              (return))))
-                     (sb-alien:with-alien ((buf (sb-alien:array
-                                                 sb-alien:char
-                                                 256)))
-                       (multiple-value-bind
-                           (count errno)
-                           (sb-unix:unix-read descriptor
-                                              (alien-sap buf)
-                                              256)
-                           (cond (#-win32(or (and (null count)
-                                                  (eql errno sb-unix:eio))
-                                             (eql count 0))
-                                         #+win32(<= count 0)
-                                (sb-sys:remove-fd-handler handler)
-                                (setf handler nil)
-                                (decf (car cookie))
-                                (sb-unix:unix-close descriptor)
-                                (return))
-                               ((null count)
-                                (sb-sys:remove-fd-handler handler)
-                                (setf handler nil)
-                                (decf (car cookie))
-                                (error
-                                 "~@<couldn't read input from sub-process: ~
+                                (strerror readable/errno)))
+                        ((zerop result)
+                         (return))))
+                (multiple-value-bind (count errno)
+                    (with-pinned-objects (buf)
+                      (sb-unix:unix-read descriptor
+                                         (sap+ (vector-sap buf) read-end)
+                                         (- (length buf) read-end)))
+                  (cond
+                    ((and #-win32 (or (and (null count)
+                                           (eql errno sb-unix:eio))
+                                      (eql count 0))
+                          #+win32 (<= count 0))
+                     (sb-sys:remove-fd-handler handler)
+                     (setf handler nil)
+                     (decf (car cookie))
+                     (sb-unix:unix-close descriptor)
+                     (return))
+                    ((null count)
+                     (sb-sys:remove-fd-handler handler)
+                     (setf handler nil)
+                     (decf (car cookie))
+                     (error
+                      "~@<couldn't read input from sub-process: ~
                                      ~2I~_~A~:>"
-                                 (strerror errno)))
-                               (t
-                                (sb-kernel:copy-ub8-from-system-area
-                                 (alien-sap buf) 0
-                                 string 0
-                                 count)
-                                (write-string string stream
-                                              :end count)))))))))))
+                      (strerror errno)))
+                    (t
+                     (incf read-end count)
+                     (let* ((decode-end (length buf))
+                            (string (handler-case
+                                        (octets-to-string
+                                         buf :end read-end
+                                         :external-format external-format)
+                                      (end-of-input-in-character (e)
+                                        (setf decode-end
+                                              (octet-decoding-error-start e))
+                                        (octets-to-string
+                                         buf :end decode-end
+                                         :external-format external-format)))))
+                       (unless (zerop (length string))
+                         (write-string string stream)
+                         (when (/= decode-end (length buf))
+                           (replace buf buf :start2 decode-end :end2 read-end))
+                         (decf read-end decode-end))))))))))))
 
-(defun get-stream-fd (stream direction)
+(defun get-stream-fd-and-external-format (stream direction)
   (typecase stream
     (sb-sys:fd-stream
-     (values (sb-sys:fd-stream-fd stream) nil))
+     (values (sb-sys:fd-stream-fd stream) nil (stream-external-format stream)))
     (synonym-stream
-     (get-stream-fd (symbol-value (synonym-stream-symbol stream)) direction))
+     (get-stream-fd-and-external-format
+      (symbol-value (synonym-stream-symbol stream)) direction))
     (two-way-stream
      (ecase direction
        (:input
-        (get-stream-fd (two-way-stream-input-stream stream) direction))
+        (get-stream-fd-and-external-format
+         (two-way-stream-input-stream stream) direction))
        (:output
-        (get-stream-fd (two-way-stream-output-stream stream) direction))))))
+        (get-stream-fd-and-external-format
+         (two-way-stream-output-stream stream) direction))))))
 
+
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created
 ;;; stream as the second value.
 (defun get-descriptor-for (object
                            cookie
                            &rest keys
-                           &key direction
+                           &key direction external-format
                            &allow-other-keys)
-  (cond ((eq object t)
-         ;; No new descriptor is needed.
-         (values -1 nil))
-        ((eq object nil)
-         ;; Use /dev/null.
-         (multiple-value-bind
-               (fd errno)
-             (sb-unix:unix-open #-win32 #.(coerce "/dev/null" 'base-string)
-                                #+win32 #.(coerce "nul" 'base-string)
-                                (case direction
-                                  (:input sb-unix:o_rdonly)
-                                  (:output sb-unix:o_wronly)
-                                  (t sb-unix:o_rdwr))
-                                #o666)
-           (unless fd
-             (error #-win32 "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
-                    #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
-                    (strerror errno)))
-           (push fd *close-in-parent*)
-           (values fd nil)))
-        ((eq object :stream)
-         (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
-           (unless read-fd
-             (error "couldn't create pipe: ~A" (strerror write-fd)))
-           (case direction
-             (:input
-              (push read-fd *close-in-parent*)
-              (push write-fd *close-on-error*)
-              (let ((stream (sb-sys:make-fd-stream write-fd :output t
-                                                   :element-type :default)))
-                (values read-fd stream)))
-             (:output
-              (push read-fd *close-on-error*)
-              (push write-fd *close-in-parent*)
-              (let ((stream (sb-sys:make-fd-stream read-fd :input t
-                                                   :element-type :default)))
-                (values write-fd stream)))
-             (t
-              (sb-unix:unix-close read-fd)
-              (sb-unix:unix-close write-fd)
-              (error "Direction must be either :INPUT or :OUTPUT, not ~S."
-                     direction)))))
-        ((or (pathnamep object) (stringp object))
-         (with-open-stream (file (apply #'open object keys))
+  ;; Someday somebody should review our use of the temporary file: are
+  ;; we doing something that's liable to run afoul of disk quotas or
+  ;; to choke on small /tmp file systems?
+  (flet ((make-temp-fd ()
+           (multiple-value-bind (fd name/errno)
+               (sb-unix:unix-mkstemp "/tmp/.run-program-XXXXXX")
+             (unless fd
+               (error "could not open a temporary file: ~A"
+                      (strerror name/errno)))
+             #-win32 #|FIXME: should say (logior s_irusr s_iwusr)|#
+             (unless (sb-unix:unix-chmod name/errno #o600)
+               (sb-unix:unix-close fd)
+               (error "failed to chmod the temporary file?!"))
+             (unless (sb-unix:unix-unlink name/errno)
+               (sb-unix:unix-close fd)
+               (error "failed to unlink ~A" name/errno))
+             fd)))
+    (cond ((eq object t)
+           ;; No new descriptor is needed.
+           (values -1 nil))
+          ((eq object nil)
+           ;; Use /dev/null.
            (multiple-value-bind
                  (fd errno)
-               (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
-             (cond (fd
-                    (push fd *close-in-parent*)
-                    (values fd nil))
-                   (t
-                    (error "couldn't duplicate file descriptor: ~A"
-                           (strerror errno)))))))
-        ((streamp object)
-         (ecase direction
-           (:input
-            (or (get-stream-fd object :input)
-                ;; FIXME: We could use a better way of setting up
-                ;; temporary files
-                (dotimes (count
-                           256
-                          (error "could not open a temporary file in /tmp"))
-                  (let* ((name (coerce (format nil "/tmp/.run-program-~D" count)
-                                       'base-string))
-                         (fd (sb-unix:unix-open name
-                                                (logior sb-unix:o_rdwr
-                                                        sb-unix:o_creat
-                                                        sb-unix:o_excl)
-                                                #o666)))
-                    (sb-unix:unix-unlink name)
-                    (when fd
-                      (let ((newline (string #\Newline)))
-                        (loop
-                           (multiple-value-bind
-                                 (line no-cr)
-                               (read-line object nil nil)
-                             (unless line
-                               (return))
-                             (sb-unix:unix-write
-                              fd
-                              ;; FIXME: this really should be
-                              ;; (STRING-TO-OCTETS :EXTERNAL-FORMAT ...).
-                              ;; RUN-PROGRAM should take an
-                              ;; external-format argument, which should
-                              ;; be passed down to here.  Something
-                              ;; similar should happen on :OUTPUT, too.
-                              (map '(vector (unsigned-byte 8)) #'char-code line)
-                              0 (length line))
-                             (if no-cr
-                                 (return)
-                                 (sb-unix:unix-write fd newline 0 1)))))
-                      (sb-unix:unix-lseek fd 0 sb-unix:l_set)
+               (sb-unix:unix-open #-win32 #.(coerce "/dev/null" 'base-string)
+                                  #+win32 #.(coerce "nul" 'base-string)
+                                  (case direction
+                                    (:input sb-unix:o_rdonly)
+                                    (:output sb-unix:o_wronly)
+                                    (t sb-unix:o_rdwr))
+                                  #o666)
+             (unless fd
+               (error #-win32 "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
+                      #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
+                      (strerror errno)))
+             (push fd *close-in-parent*)
+             (values fd nil)))
+          ((eq object :stream)
+           (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
+             (unless read-fd
+               (error "couldn't create pipe: ~A" (strerror write-fd)))
+             (case direction
+               (:input
+                (push read-fd *close-in-parent*)
+                (push write-fd *close-on-error*)
+                (let ((stream (sb-sys:make-fd-stream write-fd :output t
+                                                     :element-type :default
+                                                     :external-format
+                                                     external-format)))
+                  (values read-fd stream)))
+               (:output
+                (push read-fd *close-on-error*)
+                (push write-fd *close-in-parent*)
+                (let ((stream (sb-sys:make-fd-stream read-fd :input t
+                                                     :element-type :default
+                                                     :external-format
+                                                     external-format)))
+                  (values write-fd stream)))
+               (t
+                (sb-unix:unix-close read-fd)
+                (sb-unix:unix-close write-fd)
+                (error "Direction must be either :INPUT or :OUTPUT, not ~S."
+                       direction)))))
+          ((or (pathnamep object) (stringp object))
+           (with-open-stream (file (apply #'open object keys))
+             (multiple-value-bind
+                   (fd errno)
+                 (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
+               (cond (fd
                       (push fd *close-in-parent*)
-                      (return (values fd nil)))))))
-           (:output
-            (or (get-stream-fd object :output)
-                (multiple-value-bind (read-fd write-fd)
-                    (sb-unix:unix-pipe)
-                  (unless read-fd
-                    (error "couldn't create pipe: ~S" (strerror write-fd)))
-                  (copy-descriptor-to-stream read-fd object cookie)
-                  (push read-fd *close-on-error*)
-                  (push write-fd *close-in-parent*)
-                  (values write-fd nil))))))
-        (t
-         (error "invalid option to RUN-PROGRAM: ~S" object))))
+                      (values fd nil))
+                     (t
+                      (error "couldn't duplicate file descriptor: ~A"
+                             (strerror errno)))))))
+          ((streamp object)
+           ;; XXX: what is the correct way to compare external formats?
+           (ecase direction
+             (:input
+              (or
+               ;; If we can get an fd for the stream and the
+               ;; stream's external format is the default, let the
+               ;; child process use the fd for its descriptor.
+               ;; Otherwise, we copy data from the stream into a
+               ;; temp file, and give the temp file's descriptor to
+               ;; the child.
+               (multiple-value-bind (fd stream format)
+                   (get-stream-fd-and-external-format object :input)
+                 (when  (and fd format
+                             (eq (find-external-format
+                                  *default-external-format*)
+                                 (find-external-format format)))
+                   (values fd stream)))
+               (let ((fd (make-temp-fd))
+                     (newline (string #\Newline)))
+                 (loop
+                    (multiple-value-bind
+                          (line no-cr)
+                        (read-line object nil nil)
+                      (unless line
+                        (return))
+                      (let ((vector
+                             (string-to-octets
+                              line :external-format external-format)))
+                        (sb-unix:unix-write
+                         fd vector 0 (length vector)))
+                      (if no-cr
+                          (return)
+                          (sb-unix:unix-write fd newline 0 1))))
+                 (sb-unix:unix-lseek fd 0 sb-unix:l_set)
+                 (push fd *close-in-parent*)
+                 (values fd nil))))
+             (:output
+              (or
+               ;; Similar to the :input trick above, except we
+               ;; arrange to copy data from the stream.  This is
+               ;; only slightly less sleazy than the input case,
+               ;; since we don't buffer to a file, but I think we
+               ;; may still lose if there's data in the stream
+               ;; buffer.
+               (multiple-value-bind (fd stream format)
+                   (get-stream-fd-and-external-format object :output)
+                 (when (and fd format (eq (find-external-format
+                                           *default-external-format*)
+                                          (find-external-format format)))
+                   (values fd stream)))
+               (multiple-value-bind (read-fd write-fd)
+                   (sb-unix:unix-pipe)
+                 (unless read-fd
+                   (error "couldn't create pipe: ~S" (strerror write-fd)))
+                 (copy-descriptor-to-stream
+                  read-fd object cookie external-format)
+                 (push read-fd *close-on-error*)
+                 (push write-fd *close-in-parent*)
+                 (values write-fd nil))))))
+          (t
+           (error "invalid option to RUN-PROGRAM: ~S" object)))))
