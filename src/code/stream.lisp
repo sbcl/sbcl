@@ -2108,6 +2108,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                               :start2 %frc-index%
                               :end2 (+ %frc-index% len)))
                    (incf read len)
+                   (incf %frc-index% len)
                    (when (or (eql needed read)
                              (refill-buffer))
                      (done-with-fast-read-char)

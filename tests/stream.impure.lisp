@@ -442,4 +442,29 @@
       (when (probe-file test)
         (delete-file test)))))
 
+;;; read-sequence misreported the amount read and lost position
+(let ((string (make-array (* 3 sb-impl::+ansi-stream-in-buffer-length+)
+                          :element-type 'character)))
+  (dotimes (i (length string))
+    (setf (char string i) (code-char (mod i char-code-limit))))
+  (with-open-file (f "read-sequence-character-test-data.tmp"
+                     :if-exists :supersede
+                     :direction :output
+                     :external-format :utf-8)
+    (write-sequence string f))
+  (let ((copy
+         (with-open-file (f "read-sequence-character-test-data.tmp"
+                            :if-does-not-exist :error
+                            :direction :input
+                            :external-format :utf-8)
+           (let ((buffer (make-array 128 :element-type 'character))
+                 (total 0))
+             (with-output-to-string (datum)
+               (loop for n-read = (read-sequence buffer f)
+                     do (write-sequence buffer datum :start 0 :end n-read)
+                        (assert (<= (incf total n-read) (length string)))
+                     while (and (= n-read 128))))))))
+    (assert (equal copy string)))
+  (delete-file "read-sequence-character-test-data.tmp"))
+
 ;;; success
