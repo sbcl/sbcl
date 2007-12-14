@@ -21,8 +21,10 @@ echo //entering foreign.test.sh
 # and non-linkage-table platforms fail this
 PUNT=104
 
-testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
+testfiledir=sbcl-foreign-test-$$
+testfilestem=`pwd`/$testfiledir/sbcl-foreign-test
 
+mkdir $testfiledir 
 ## Make some shared object files to test with.
 
 build_so() {
@@ -327,7 +329,7 @@ fi
 
 echo missing .so ok
 
-rm -f $testfilestem.* $testfilestem-*
+rm -r $testfiledir 
 
 # success convention for script
 exit 104
