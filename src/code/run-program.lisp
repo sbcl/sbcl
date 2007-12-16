@@ -879,6 +879,10 @@ Users Manual for details about the PROCESS structure."#-win32"
                      (setf handler nil)
                      (decf (car cookie))
                      (sb-unix:unix-close descriptor)
+                     (unless (zerop read-end)
+                       ;; Should this be an END-OF-FILE?
+                       (error "~@<non-empty buffer when EOF reached ~
+                               while reading from child: ~S~:>" buf))
                      (return))
                     ((null count)
                      (sb-sys:remove-fd-handler handler)
@@ -890,7 +894,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                       (strerror errno)))
                     (t
                      (incf read-end count)
-                     (let* ((decode-end (length buf))
+                     (let* ((decode-end read-end)
                             (string (handler-case
                                         (octets-to-string
                                          buf :end read-end

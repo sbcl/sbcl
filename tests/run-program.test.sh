@@ -82,6 +82,26 @@ ${SBCL:-sbcl} <<'EOF'
                                         :input i :output stream)))))
     (assert (= (length string) 6))
     (assert (string= string "abcdef")))
+
+  ;;; Test the bookkeeping involved in decoding the child's output:
+
+  ;; repeated short, properly-encoded reads exposed one bug.  (But
+  ;; note: this test will be inconclusive if the child's stderr is
+  ;; fully buffered.)
+  (let ((str (with-output-to-string (s)
+               (run-program "/bin/sh"
+                            '("-c" "(echo Foo; sleep 2s; echo Bar)>&2")
+                            :output s :search t :error :output :wait t))))
+    (assert (string= str (format nil "Foo~%Bar~%"))))
+
+  ;; end of file in the middle of a UTF-8 character
+  (typep (nth-value 1 (ignore-errors
+                       (let ((sb-impl::*default-external-format* :utf-8))
+                         (with-output-to-string (s)
+                           (run-program "printf" '("\\316")
+                                        :output s :search t :wait t)))))
+         'error)
+
   ;; success convention for this Lisp program run as part of a larger script
   (sb-ext:quit :unix-status 52)))
 EOF
