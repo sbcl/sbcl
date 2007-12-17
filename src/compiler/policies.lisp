@@ -12,15 +12,13 @@
 (in-package "SB!C")
 
 (define-optimization-quality type-check
+    ;; FIXME: grepping the tree for "policy.*safety" yields some
+    ;; places which might want to use this instead -- or
+    ;; some other derived policy.
     (cond ((= safety 0) 0)
-          ;; FIXME: It is duplicated in PROBABLE-TYPE-CHECK-P and in
-          ;; some other places.
-          ((and (<= speed safety)
-                (<= space safety)
-                (<= compilation-speed safety))
-           3)
-          (t 2))
-  ("no" "maybe" "fast" "full"))
+          ((and (< safety 2) (< safety speed)) 2)
+          (t 3))
+  ("no" "maybe" "weak" "full"))
 
 (define-optimization-quality check-tag-existence
     (cond ((= safety 0) 0)

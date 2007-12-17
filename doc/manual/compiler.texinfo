@@ -515,14 +515,16 @@ selectable via @code{optimize} declarations.
 All declarations are considered assertions to be checked at runtime,
 and all type checks are precise.
 
-Used when @code{(>= safety (max speed space compilation-speed)}. The
+Used when @code{(and (< 0 safety) (or (>= safety 2) (>= safety speed)))}. The
 default compilation policy provides full type checks.
 
 @item Weak Type Checks
 Any or all type declarations may be believed without runtime
-assertions, and assertions that are done may be imprecise.
+assertions, and assertions that are done may be imprecise. It should
+be noted that it is relatively easy to corrupt the heap when weak type
+checks are used, and type-errors are introduced into the program.
 
-Used when @code{(< 0 safety (max speed space compilation-speed)}.
+Used when @code{(and (< safety 2) (< safety speed))}
 
 @item No Type Checks
 All declarations are believed without assertions. Also disables

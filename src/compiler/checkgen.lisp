@@ -160,17 +160,6 @@
 ;;; for a :HAIRY check with that test negated. Otherwise, we try to do
 ;;; a simple test, and if that is impossible, we do a hairy test with
 ;;; non-negated types. If true, FORCE-HAIRY forces a hairy type check.
-;;;
-;;; When doing a non-negated check, we call MAYBE-WEAKEN-CHECK to
-;;; weaken the test to a convenient supertype (conditional on policy.)
-;;; If SPEED is 3, or DEBUG-INFO is not particularly important (DEBUG
-;;; <= 1), then we allow weakened checks to be simple, resulting in
-;;; less informative error messages, but saving space and possibly
-;;; time.
-;;;
-;;; FIXME: I don't quite understand this, but it looks as though
-;;; that means type checks are weakened when SPEED=3 regardless of
-;;; the SAFETY level, which is not the right thing to do.
 (defun maybe-negate-check (lvar types original-types force-hairy n-required)
   (declare (type lvar lvar) (list types original-types))
   (let ((ptypes (values-type-out (lvar-derived-type lvar) (length types))))
@@ -320,51 +309,45 @@
                           (cast-type-to-check cast)))))
 
 ;;; Return true if CAST's value is an lvar whose type the back end is
-;;; likely to want to check. Since we don't know what template the
-;;; back end is going to choose to implement the continuation's DEST,
-;;; we use a heuristic. We always return T unless:
-;;;  -- nobody uses the value, or
-;;;  -- safety is totally unimportant, or
-;;;  -- the lvar is an argument to an unknown function, or
-;;;  -- the lvar is an argument to a known function that has
+;;; likely to be able to check (see GENERATE-TYPE-CHECKS). Since we
+;;; don't know what template the back end is going to choose to
+;;; implement the continuation's DEST, we use a heuristic.
+;;;
+;;; We always return T unless nobody uses the value (the backend
+;;; cannot check unused LVAR chains).
+;;;
+;;; The logic used to be more complex, but most of the cases that used
+;;; to be checked here are now dealt with differently . FIXME: but
+;;; here's one we used to do, don't anymore, but could still benefit
+;;; from, if we reimplemented it (elsewhere):
+;;;
+;;;  -- If the lvar is an argument to a known function that has
 ;;;     no IR2-CONVERT method or :FAST-SAFE templates that are
-;;;     compatible with the call's type.
+;;;     compatible with the call's type: return NIL.
+;;;
+;;; The code used to look like something like this:
+;;;   ...
+;;;   (:known
+;;;    (let ((info (basic-combination-fun-info dest)))
+;;;      (if (fun-info-ir2-convert info)
+;;;          t
+;;;          (dolist (template (fun-info-templates info) nil)
+;;;            (when (eq (template-ltn-policy template)
+;;;                      :fast-safe)
+;;;              (multiple-value-bind (val win)
+;;;                  (valid-fun-use dest (template-type template))
+;;;                (when (or val (not win)) (return t)))))))))))))
+;;;
+;;; ADP says: It is still interesting. When we have a :SAFE template
+;;; and the type assertion is derived from the destination function
+;;; type, the check is unneccessary. We cannot return NIL here (the
+;;; whole function has changed its meaning, and here NIL *forces*
+;;; hairy check), but the functionality is interesting.
 (defun probable-type-check-p (cast)
   (declare (type cast cast))
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar))))
     (cond ((not dest) nil)
-          (t t))
-    #+nil
-    (cond ((or (not dest)
-               (policy dest (zerop safety)))
-           nil)
-          ((basic-combination-p dest)
-           (let ((kind (basic-combination-kind dest)))
-             (cond
-               ((eq cont (basic-combination-fun dest)) t)
-               (t
-                (ecase kind
-                  (:local t)
-                  (:full
-                   (and (combination-p dest)
-                        (not (values-subtypep ; explicit THE
-                              (continuation-externally-checkable-type cont)
-                              (continuation-type-to-check cont)))))
-                  ;; :ERROR means that we have an invalid syntax of
-                  ;; the call and the callee will detect it before
-                  ;; thinking about types.
-                  (:error nil)
-                  (:known
-                   (let ((info (basic-combination-fun-info dest)))
-                     (if (fun-info-ir2-convert info)
-                         t
-                         (dolist (template (fun-info-templates info) nil)
-                           (when (eq (template-ltn-policy template)
-                                     :fast-safe)
-                             (multiple-value-bind (val win)
-                                 (valid-fun-use dest (template-type template))
-                               (when (or val (not win)) (return t)))))))))))))
           (t t))))
 
 ;;; Return a lambda form that we can convert to do a hairy type check

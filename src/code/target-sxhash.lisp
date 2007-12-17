@@ -250,12 +250,13 @@
                   '(let ((result 572539))
                      (declare (type fixnum result))
                      (mixf result (length key))
-                     (dotimes (i (length key))
+                    (when (plusp depthoid)
+                      (decf depthoid)
+                      (dotimes (i (length key))
                        (declare (type fixnum i))
                        (mixf result
-                             (psxhash (aref key i)
-                                      (- depthoid 1 i))))
-                     result))
+                             (psxhash (aref key i) depthoid))))
+                    result))
                 (make-dispatch (types)
                   `(typecase key
                      ,@(loop for type in types
@@ -274,10 +275,11 @@
        (declare (type fixnum result))
        (dotimes (i (array-rank key))
          (mixf result (array-dimension key i)))
-       (dotimes (i (array-total-size key))
-         (mixf result
-               (psxhash (row-major-aref key i)
-                        (- depthoid 1 i))))
+       (when (plusp depthoid)
+         (decf depthoid)
+         (dotimes (i (array-total-size key))
+          (mixf result
+                (psxhash (row-major-aref key i) depthoid))))
        result))))
 
 (defun structure-object-psxhash (key depthoid)

@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
+  * minor incompatible change: compiler policy re. weakening type
+    checks has changed: now type checks are weakened on if SAFETY < 2
+    and SAFETY < SPEED.
   * SB-EXT:NATIVE-NAMESTRING takes a new keyword AS-FILE, forcing
     unparsing of directory pathnames as files. Analogously,
     SB-EXT:PARSE-NATIVE-NAMESTRING takes an AS-DIRECTORY, forcing a
