@@ -27,7 +27,7 @@
 
 ;;;; LOAD-AS-SOURCE
 
-;;; Load a text file.
+;;; Load a text file.  (Note that load-as-fasl is in another file.)
 (defun load-as-source (stream verbose print)
   (maybe-announce-load stream verbose)
   (do ((sexpr (read stream nil *eof-object*)
@@ -52,167 +52,189 @@
              (invalid-fasl-expected condition)
              (invalid-fasl-fhsss condition)))))
 
-;;; a helper function for LOAD: Load the stuff in a file when we have
-;;; the name.
-;;;
-;;; FIXME: with the addition of the EXTERNAL-FORMAT argument, this
-;;; interface has become truly sucky.
-(defun internal-load (pathname truename if-does-not-exist verbose print
-                      &optional contents external-format)
-  (declare (type (member nil :error) if-does-not-exist))
-  (unless truename
-    (if if-does-not-exist
-        (error 'simple-file-error
-               :pathname pathname
-               :format-control "~S does not exist."
-               :format-arguments (list (namestring pathname)))
-        (return-from internal-load nil)))
+;; Pretty well any way of doing LOAD will expose race conditions: for
+;; example, a file might get deleted or renamed after we open it but
+;; before we find its truename.  It seems useful to say that
+;; detectible ways the file system can fail to be static are good
+;; enough reason to stop loading, but to stop in a way that
+;; distinguishes errors that occur mid-way through LOAD from the
+;; initial failure to OPEN the file, so that handlers can try do
+;; defaulting only when the file didn't exist at the start of LOAD,
+;; while allowing race conditions to get through.
+(define-condition load-race-condition (error)
+  ((pathname :reader load-race-condition-pathname :initarg :pathname))
+  (:report (lambda (condition stream)
+             (format stream "~@<File~S was deleted or renamed during LOAD.~:>"
+                     (load-race-condition-pathname condition)))))
 
-  (let ((*load-truename* truename)
-        (*load-pathname* (merge-pathnames pathname)))
-    (case contents
-      (:source
-       (with-open-file (stream truename
-                               :direction :input
-                               :if-does-not-exist if-does-not-exist
-                               :external-format external-format)
-         (load-as-source stream verbose print)))
-      (:binary
-       (with-open-file (stream truename
-                               :direction :input
-                               :if-does-not-exist if-does-not-exist
-                               :element-type '(unsigned-byte 8))
-         (load-as-fasl stream verbose print)))
-      (t
-       (let* ((fhsss *fasl-header-string-start-string*)
-              (first-line (make-array (length fhsss)
-                                      :element-type '(unsigned-byte 8)))
-              (read-length
-               (with-open-file (stream truename
-                                       :direction :input
-                                       :element-type '(unsigned-byte 8))
-                 (read-sequence first-line stream))))
-         (cond
-           ((and (= read-length (length fhsss))
-                 (do ((i 0 (1+ i)))
-                     ((= i read-length) t)
-                   (when (/= (char-code (aref fhsss i)) (aref first-line i))
-                     (return))))
-            (internal-load pathname truename if-does-not-exist verbose print
-                           :binary))
-           (t
-            (when (string= (pathname-type truename) *fasl-file-type*)
+(defmacro resignal-race-condition (&body body)
+  `(handler-case (progn ,@body)
+     (file-error (error)
+       (error 'load-race-condition :pathname (file-error-pathname error)))))
+
+;;; The following comment preceded the pre 1.0.12.36 definition of
+;;; LOAD; it may no longer be accurate:
+
+;; FIXME: Daniel Barlow's ilsb.tar ILISP-for-SBCL patches contain an
+;; implementation of "DEFUN SOURCE-FILE" which claims, in a comment,
+;; that CMU CL does not correctly record source file information when
+;; LOADing a non-compiled file. Check whether this bug exists in SBCL
+;; and fix it if so.
+
+;;; This is our real LOAD.  The LOAD below is just a wrapper that does
+;;; some defaulting in case the user asks us to load a file that
+;;; doesn't exist at the time we start.
+(defun %load (pathspec &key (verbose *load-verbose*) (print *load-print*)
+             (if-does-not-exist t) (external-format :default))
+  (when (streamp pathspec)
+    (let* (;; Bindings required by ANSI.
+           (*readtable* *readtable*)
+           (*package* (sane-package))
+           ;; FIXME: we should probably document the circumstances
+           ;; where *LOAD-PATHNAME* and *LOAD-TRUENAME* aren't
+           ;; pathnames during LOAD.  ANSI makes no exceptions here.
+           (*load-pathname* (handler-case (pathname pathspec)
+                              ;; FIXME: it should probably be a type
+                              ;; error to try to get a pathname for a
+                              ;; stream that doesn't have one, but I
+                              ;; don't know if we guarantee that.
+                              (error () nil)))
+           (*load-truename* (when *load-pathname*
+                              (handler-case (truename *load-pathname*)
+                                (file-error () nil))))
+           ;; Bindings used internally.
+           (*load-depth* (1+ *load-depth*))
+           ;; KLUDGE: I can't find in the ANSI spec where it says
+           ;; that DECLAIM/PROCLAIM of optimization policy should
+           ;; have file scope. CMU CL did this, and it seems
+           ;; reasonable, but it might not be right; after all,
+           ;; things like (PROCLAIM '(TYPE ..)) don't have file
+           ;; scope, and I can't find anything under PROCLAIM or
+           ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
+           ;; behavior. Hmm. -- WHN 2001-04-06
+           (sb!c::*policy* sb!c::*policy*))
+      (return-from %load
+        (if (equal (stream-element-type pathspec) '(unsigned-byte 8))
+            (load-as-fasl pathspec verbose print)
+            (load-as-source pathspec verbose print)))))
+  ;; If we're here, PATHSPEC isn't a stream, so must be some other
+  ;; kind of pathname designator.
+  (with-open-file (stream pathspec
+                          :element-type '(unsigned-byte 8)
+                          :if-does-not-exist
+                          (if if-does-not-exist :error nil))
+    (unless stream
+      (return-from %load nil))
+    (let* ((header-line (make-array
+                         (length *fasl-header-string-start-string*)
+                         :element-type '(unsigned-byte 8))))
+      (read-sequence header-line stream)
+      (if (mismatch header-line *fasl-header-string-start-string*
+                    :test #'(lambda (code char) (= code (char-code char))))
+          (let ((truename (resignal-race-condition (probe-file stream))))
+            (when (and truename
+                       (string= (pathname-type truename) *fasl-file-type*))
               (error 'fasl-header-missing
                      :stream (namestring truename)
-                     :fhsss first-line
-                     :expected fhsss))
-            (internal-load pathname truename if-does-not-exist verbose print
-                           :source external-format))))))))
+                     :fhsss header-line
+                     :expected *fasl-header-string-start-string*)))
+          (progn
+            (file-position stream :start)
+            (return-from %load
+              (%load stream :verbose verbose :print print))))))
+  (resignal-race-condition
+    (with-open-file (stream pathspec
+                            :external-format
+                            external-format)
+      (%load stream :verbose verbose :print print))))
 
-;;; a helper function for INTERNAL-LOAD-DEFAULT-TYPE: Try the default
-;;; file type TYPE and return (VALUES PATHNAME TRUENAME) for a match,
-;;; or (VALUES PATHNAME NIL) if the file doesn't exist.
-;;;
-;;; This is analogous to CMU CL's TRY-DEFAULT-TYPES, but we only try a
-;;; single type. By avoiding CMU CL's generality here, we avoid having
-;;; to worry about some annoying ambiguities. (E.g. what if the
-;;; possible types are ".lisp" and ".cl", and both "foo.lisp" and
-;;; "foo.cl" exist?)
-(defun try-default-type (pathname type)
-  (let ((pn (translate-logical-pathname (make-pathname :type type :defaults pathname))))
-    (values pn (probe-file pn))))
-
-;;; a helper function for LOAD: Handle the case of INTERNAL-LOAD where
-;;; the file does not exist.
-(defun internal-load-default-type
-    (pathname if-does-not-exist verbose print external-format)
-  (declare (type (member nil :error) if-does-not-exist))
-  (multiple-value-bind (src-pn src-tn)
-      (try-default-type pathname *load-source-default-type*)
-    (multiple-value-bind (obj-pn obj-tn)
-        (try-default-type pathname *fasl-file-type*)
-      (cond
-       ((and obj-tn
-             src-tn
-             (> (file-write-date src-tn) (file-write-date obj-tn)))
-        (restart-case
-         (error "The object file ~A is~@
-                 older than the presumed source:~%  ~A."
-                (namestring obj-tn)
-                (namestring src-tn))
-         (source () :report "load source file"
-           (internal-load src-pn src-tn if-does-not-exist verbose print
-                          :source external-format))
-         (object () :report "load object file"
-            (internal-load src-pn obj-tn if-does-not-exist verbose print
-                           :binary))))
-       (obj-tn
-        (internal-load obj-pn obj-tn if-does-not-exist verbose print :binary))
-       (src-pn
-        (internal-load src-pn src-tn if-does-not-exist
-                       verbose print :source external-format))
-       (t
-        (internal-load pathname nil if-does-not-exist
-                       verbose print nil external-format))))))
-
-;;; This function mainly sets up special bindings and then calls
-;;; sub-functions. We conditionally bind the switches with PROGV so
-;;; that people can set them in their init files and have the values
-;;; take effect. If the compiler is loaded, we make the
-;;; compiler-policy local to LOAD by binding it to itself.
-;;;
-;;; FIXME: Daniel Barlow's ilsb.tar ILISP-for-SBCL patches contain an
-;;; implementation of "DEFUN SOURCE-FILE" which claims, in a comment, that CMU
-;;; CL does not correctly record source file information when LOADing a
-;;; non-compiled file. Check whether this bug exists in SBCL and fix it if so.
-(defun load (filespec
-             &key
-             (verbose *load-verbose*)
-             (print *load-print*)
-             (if-does-not-exist t)
-             (external-format :default))
+;; Given a simple %LOAD like the above, one can implement any
+;; particular defaulting strategy with a wrapper like this one:
+(defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
+            (if-does-not-exist :error) (external-format :default))
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
-  (let ((*load-depth* (1+ *load-depth*))
-        ;; KLUDGE: I can't find in the ANSI spec where it says that
-        ;; DECLAIM/PROCLAIM of optimization policy should have file
-        ;; scope. CMU CL did this, and it seems reasonable, but it
-        ;; might not be right; after all, things like (PROCLAIM '(TYPE
-        ;; ..)) don't have file scope, and I can't find anything under
-        ;; PROCLAIM or COMPILE-FILE or LOAD or OPTIMIZE which
-        ;; justifies this behavior. Hmm. -- WHN 2001-04-06
-        (sb!c::*policy* sb!c::*policy*)
-        ;; The ANSI spec for LOAD says "LOAD binds *READTABLE* and
-        ;; *PACKAGE* to the values they held before loading the file."
-        (*package* (sane-package))
-        (*readtable* *readtable*)
-        ;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST
-        ;; argument of (MEMBER :ERROR NIL) type. ANSI constrains us to
-        ;; accept a generalized boolean argument value for this
-        ;; externally-visible function, but the internal functions
-        ;; still use the old convention.
-        (internal-if-does-not-exist (if if-does-not-exist :error nil)))
-    ;; FIXME: This VALUES wrapper is inherited from CMU CL. Once SBCL
-    ;; gets function return type checking right, we can achieve a
-    ;; similar effect better by adding FTYPE declarations.
-    (values
-     (if (streamp filespec)
-         (if (or (equal (stream-element-type filespec)
-                        '(unsigned-byte 8)))
-             (load-as-fasl filespec verbose print)
-             (load-as-source filespec verbose print))
-         (let* ((pathname (pathname filespec))
-                (physical-pathname (translate-logical-pathname pathname))
-                (probed-file (probe-file physical-pathname)))
-           (if (or probed-file
-                   (pathname-type physical-pathname))
-               (internal-load
-                physical-pathname probed-file internal-if-does-not-exist
-                verbose print nil external-format)
-               (internal-load-default-type
-                pathname internal-if-does-not-exist
-                verbose print external-format)))))))
+  (handler-bind ((file-error
+                  #'(lambda (error)
+                      ;; This handler will run if %LOAD failed to OPEN
+                      ;; the file to look for a fasl header.
+                      (let ((pathname (file-error-pathname error)))
+                        ;; As PROBE-FILE returned NIL, the file
+                        ;; doesn't exist.  If the filename we tried to
+                        ;; open lacked a type, try loading a filename
+                        ;; determined by our defaulting.
+                        (when (null (handler-case (probe-file pathname)
+                                      (file-error (error) error)))
+                          (when (null (pathname-type pathname))
+                            (let ((default (probe-load-defaults pathname)))
+                              (when default
+                                (return-from load
+                                  (resignal-race-condition
+                                    (%load default
+                                           :verbose verbose
+                                           :print print
+                                           :external-format
+                                           external-format
+                                           :if-does-not-exist
+                                           if-does-not-exist))))))))
+                      ;; If we're here, one of three things happened:
+                      ;; (1) %LOAD errored and PROBE-FILE succeeded,
+                      ;; in which case the file must be a bad symlink,
+                      ;; unreadable, or it was created between %LOAD
+                      ;; and PROBE-FILE; (2) %LOAD errored and
+                      ;; PROBE-FILE errored, and so things are amiss
+                      ;; in the file system (albeit possibly
+                      ;; differently now than when OPEN errored); (3)
+                      ;; our defaulting did not find a file.  In any
+                      ;; of these cases, decline to handle the
+                      ;; original error or return NIL, depending on
+                      ;; IF-DOES-NOT-EXIST.
+                      (if if-does-not-exist
+                          nil
+                          (return-from load nil)))))
+    (%load pathspec :verbose verbose :print print
+           :external-format external-format)))
+
+;; This implements the defaulting SBCL seems to have inherited from
+;; CMU.  This routine does not try to perform any loading; all it does
+;; is return the pathname (not the truename) of a file to be loaded,
+;; or NIL if no such file can be found.  This routine is supposed to
+;; signal an error if a fasl's timestamp is older than its source
+;; file, but we protect against errors in PROBE-FILE, because any of
+;; the ways that we might fail to find a defaulted file are reasons
+;; not to load it, but not worth exposing to the user who didn't
+;; expicitly ask us to load a file with a made-up name (e.g., the
+;; defaulted filename might exceed filename length limits).
+(defun probe-load-defaults (pathname)
+  (destructuring-bind (defaulted-source-pathname
+                       defaulted-source-truename
+                       defaulted-fasl-pathname
+                       defaulted-fasl-truename)
+      (loop for type in (list *load-source-default-type*
+                              *fasl-file-type*)
+            as probe-pathname = (make-pathname :type type
+                                               :defaults pathname)
+            collect probe-pathname
+            collect (handler-case (probe-file probe-pathname)
+                      (file-error () nil)))
+    (cond ((and defaulted-fasl-truename
+                defaulted-source-truename
+                (> (resignal-race-condition
+                     (file-write-date defaulted-source-truename))
+                   (resignal-race-condition
+                     (file-write-date defaulted-fasl-truename))))
+           (restart-case
+               (error "The object file ~A is~@
+                       older than the presumed source:~%  ~A."
+                      defaulted-fasl-truename
+                      defaulted-source-truename)
+             (source () :report "load source file"
+                     defaulted-source-pathname)
+             (object () :report "load object file"
+                     defaulted-fasl-pathname)))
+          (defaulted-fasl-truename defaulted-fasl-pathname)
+          (defaulted-source-truename defaulted-source-pathname))))
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.
