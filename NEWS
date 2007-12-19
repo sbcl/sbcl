@@ -12,6 +12,9 @@ changes in sbcl-1.0.13 relative to sbcl-1.0.12:
     unparsing of directory pathnames as files. Analogously,
     SB-EXT:PARSE-NATIVE-NAMESTRING takes an AS-DIRECTORY, forcing a
     filename to parse into a directory pathname.
+  * enhancement: implicit generic function creation now signals a
+    specific style-warning IMPLICIT-GENERIC-FUNCTION-WARNING, which
+    users can bind handlers for and muffle around calls to LOAD.
   * enhancement: RUN-PROGRAM allows unicode arguments and environments
     to be used (using the default stream external format), and allows
     non-simple strings to be used. (thanks to Harald Hanche-Olsen)

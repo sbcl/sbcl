@@ -968,6 +968,13 @@
     (format-args-mismatch simple-style-warning)
   ())
 
+(define-condition implicit-generic-function-warning (style-warning)
+  ((name :initarg :name :reader implicit-generic-function-name))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<Implicitly creating new generic function ~S.~:@>"
+             (implicit-generic-function-name condition)))))
+
 (define-condition extension-failure (reference-condition simple-error)
   ())
 

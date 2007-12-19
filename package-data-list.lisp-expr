@@ -630,13 +630,12 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DISABLE-PACKAGE-LOCKS"
                "ENABLE-PACKAGE-LOCKS"
 
-               ;; error signalled when attempt to load an invalid fasl
-               ;; is made, so that user code can try to recompile, etc.
+               ;; Custom conditions & condition accessors for users to handle.
+               "CODE-DELETION-NOTE"
+               "COMPILER-NOTE"
+               "IMPLICIT-GENERIC-FUNCTION-NAME"
+               "IMPLICIT-GENERIC-FUNCTION-WARNING"
                "INVALID-FASL"
-
-               ;; conditions that can be handled to reduce compiler
-               ;; verbosity
-               "CODE-DELETION-NOTE" "COMPILER-NOTE"
 
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"

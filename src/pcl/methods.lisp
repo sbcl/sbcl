@@ -220,8 +220,7 @@
                               specializers lambda-list &rest other-initargs)
   (unless (and (fboundp generic-function-name)
                (typep (fdefinition generic-function-name) 'generic-function))
-    (style-warn "implicitly creating new generic function ~S"
-                generic-function-name))
+    (warn 'implicit-generic-function-warning :name generic-function-name))
   (let* ((existing-gf (find-generic-function generic-function-name nil))
          (generic-function
           (if existing-gf
