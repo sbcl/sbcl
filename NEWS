@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
+  * minor incompatible change: RUN-PROGRAM now uses execvp(3) to find
+    an executable in the search path, and does so in the child
+    process's PATH.  The function FIND-EXECUTABLE-IN-SEARCH-PATH has
+    been removed; it can be found in the CVS history, for somebody who
+    needs that search behavior (see the manual).
   * minor incompatible change: compiler policy re. weakening type
     checks has changed: now type checks are weakened on if SAFETY < 2
     and SAFETY < SPEED.

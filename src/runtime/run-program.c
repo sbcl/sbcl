@@ -54,8 +54,9 @@ int set_noecho(int fd)
     return 1;
 }
 
-int spawn(char *program, char *argv[], char *envp[], char *pty_name,
-          int stdin, int stdout, int stderr)
+extern char **environ;
+int spawn(char *program, char *argv[], int stdin, int stdout, int stderr,
+          int search, char *envp[], char *pty_name, int wait)
 {
     int pid = fork();
     int fd;
@@ -112,16 +113,14 @@ int spawn(char *program, char *argv[], char *envp[], char *pty_name,
         close(fd);
 #endif
 
+    environ = envp;
     /* Exec the program. */
-    execve(program, argv, envp);
+    if (search)
+      execvp(program, argv);
+    else
+      execv(program, argv);
 
-    /* It didn't work, so try /bin/sh. */
-    argv[0] = program;
-    argv[-1] = "sh";
-    execve("/bin/sh", argv-1, envp);
-
-    /* The exec didn't work, flame out. */
-    exit(1);
+    exit (1);
 }
 #else  /* !LISP_FEATURE_WIN32 */
 
@@ -149,6 +148,9 @@ HANDLE spawn (
     int in,
     int out,
     int err,
+    int search,
+    char *envp,
+    char *ptyname,
     int wait
     )
 {
@@ -187,7 +189,10 @@ HANDLE spawn (
     }
 
     /* Spawn process given on the command line*/
-    hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
+    if (search)
+      hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
+    else
+      hProcess = (HANDLE) spawnv ( wait_mode, program, argv );
 
     /* Now that the process is launched, replace the original
      * in/out/err handles and close the backups. */

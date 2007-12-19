@@ -504,60 +504,18 @@ status slot."
               ,@body)
          (sb-sys:deallocate-system-memory ,sap ,size)))))
 
-#-win32
-(sb-alien:define-alien-routine ("spawn" %spawn) sb-alien:int
-  (program sb-alien:c-string)
-  (argv (* sb-alien:c-string))
-  (envp (* sb-alien:c-string))
-  (pty-name sb-alien:c-string)
-  (stdin sb-alien:int)
-  (stdout sb-alien:int)
-  (stderr sb-alien:int))
-
-#+win32
-(sb-alien:define-alien-routine ("spawn" %spawn) sb-win32::handle
+(sb-alien:define-alien-routine spawn
+    #-win32 sb-alien:int
+    #+win32 sb-win32::handle
   (program sb-alien:c-string)
   (argv (* sb-alien:c-string))
   (stdin sb-alien:int)
   (stdout sb-alien:int)
   (stderr sb-alien:int)
+  (search sb-alien:int)
+  (envp (* sb-alien:c-string))
+  (pty-name sb-alien:c-string)
   (wait sb-alien:int))
-
-(defun spawn (program argv stdin stdout stderr envp pty-name wait)
-  #+win32 (declare (ignore envp pty-name))
-  #+win32 (%spawn program argv stdin stdout stderr (if wait 1 0))
-  #-win32 (declare (ignore wait))
-  #-win32 (%spawn program argv envp pty-name stdin stdout stderr))
-
-;;; FIXME: why are we duplicating standard library stuff and not using
-;;; execvp(3)?  We can extend our internal spawn() routine to take a
-;;; flag to say whether to search...
-;;; Is UNIX-FILENAME the name of a file that we can execute?
-(defun unix-filename-is-executable-p (unix-filename)
-  (let ((filename (coerce unix-filename 'string)))
-    (values (and (eq (sb-unix:unix-file-kind filename) :file)
-                 #-win32
-                 (sb-unix:unix-access filename sb-unix:x_ok)))))
-
-(defun find-executable-in-search-path (pathname &optional
-                                       (search-path (posix-getenv "PATH")))
-  #+sb-doc
-  "Find the first executable file matching PATHNAME in any of the
-colon-separated list of pathnames SEARCH-PATH"
-  (let ((program #-win32 pathname
-                 #+win32 (merge-pathnames pathname (make-pathname :type "exe"))))
-   (loop for end =  (position #-win32 #\: #+win32 #\; search-path
-                              :start (if end (1+ end) 0))
-         and start = 0 then (and end (1+ end))
-         while start
-         ;; <Krystof> the truename of a file naming a directory is the
-         ;; directory, at least until pfdietz comes along and says why
-         ;; that's noncompliant  -- CSR, c. 2003-08-10
-         for truename = (probe-file (subseq search-path start end))
-         for fullpath = (when truename
-                          (unix-namestring (merge-pathnames program truename)))
-         when (and fullpath (unix-filename-is-executable-p fullpath))
-         return fullpath)))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
@@ -659,9 +617,8 @@ Users Manual for details about the PROCESS structure."#-win32"
       an alternative lossy representation of the new Unix environment,
       for compatibility with CMU CL""
    :SEARCH
-      Look for PROGRAM in each of the directories along the $PATH
+      Look for PROGRAM in each of the directories in the child's $PATH
       environment variable.  Otherwise an absolute pathname is required.
-      (See also FIND-EXECUTABLE-IN-SEARCH-PATH)
    :WAIT
       If non-NIL (default), wait until the created process finishes.  If
       NIL, continue running Lisp until the program finishes."#-win32"
@@ -739,20 +696,15 @@ Users Manual for details about the PROCESS structure."#-win32"
           #-win32 *handlers-installed*
           ;; Establish PROC at this level so that we can return it.
           proc
-          ;; It's friendly to allow the caller to pass any string
-          ;; designator, but internally we'd like SIMPLE-STRINGs.
           (simple-args (simplify-args args))
-          ;; See the comment above about execlp(3).
-          (pfile (if search
-                     (find-executable-in-search-path program)
-                     (unix-namestring program)))
+          (progname (native-namestring program))
           ;; Gag.
           (cookie (list 0)))
-      (unless pfile
-        (error "no such program: ~S" program))
-      (unless (unix-filename-is-executable-p pfile)
-        (error "not executable: ~S" program))
       (unwind-protect
+           ;; Note: despite the WITH-* names, these macros don't
+           ;; expand into UNWIND-PROTECT forms.  They're just
+           ;; syntactic sugar to make the rest of the routine slightly
+           ;; easier to read.
            (macrolet ((with-fd-and-stream-for (((fd stream) which &rest args)
                                                &body body)
                         `(multiple-value-bind (,fd ,stream)
@@ -803,9 +755,11 @@ Users Manual for details about the PROCESS structure."#-win32"
                          (with-environment-vec (environment-vec environment)
                            (let ((child
                                   (without-gcing
-                                    (spawn pfile args-vec
+                                    (spawn progname args-vec
                                            stdin stdout stderr
-                                           environment-vec pty-name wait))))
+                                           (if search 1 0)
+                                           environment-vec pty-name
+                                           (if wait 1 0)))))
                              (when (minusp child)
                                (error "couldn't fork child process: ~A"
                                       (strerror)))

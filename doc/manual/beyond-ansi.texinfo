@@ -249,15 +249,47 @@ between classes and proper names and between lists of the form
 @comment  node-name,  next,  previous,  up
 @section Support For Unix
 
+@menu
+* Command-line arguments::
+* Querying the process environment::
+* Running external programs::
+@end menu
+
+@node Command-line arguments
+@subsection Command-line arguments
+
 The UNIX command line can be read from the variable
-@code{sb-ext:*posix-argv*}. The UNIX environment can be queried with
-the @code{sb-ext:posix-getenv} function.
+@code{sb-ext:*posix-argv*}. 
+
+@node Querying the process environment
+@subsection Querying the process environment
+
+The UNIX environment can be queried with the
+@code{sb-ext:posix-getenv} function.
 
 @include fun-sb-ext-posix-getenv.texinfo
 
+@node Running external programs
+@subsection Running external programs
+
 External programs can be run with @code{sb-ext:run-program}.
+@footnote{In SBCL versions prior to 1.0.13, @code{sb-ext:run-program}
+searched for executables in a manner somewhat incompatible with other
+languages.  As of this version, SBCL uses the system library routine
+@code{execvp(3)}, and no longer contains the function,
+@code{find-executable-in-search-path}, which implemented the old
+search.  Users who need this function may find it
+in @file{run-program.lisp} versions 1.67 and earlier in SBCL's CVS
+repository here
+@url{http://sbcl.cvs.sourceforge.net/sbcl/sbcl/src/code/run-program.lisp?view=log}. However,
+we caution such users that this search routine finds executables that
+system library routines do not.}
 
 @include fun-sb-ext-run-program.texinfo
+
+When @code{sb-ext:run-program} is called with @code{wait} equal to
+NIL, an instance of class @var{sb-ext:process} is returned.  The
+following functions are available for use with processes:
 
 @include fun-sb-ext-process-p.texinfo
 
