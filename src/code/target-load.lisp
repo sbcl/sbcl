@@ -64,7 +64,7 @@
 (define-condition load-race-condition (error)
   ((pathname :reader load-race-condition-pathname :initarg :pathname))
   (:report (lambda (condition stream)
-             (format stream "~@<File~S was deleted or renamed during LOAD.~:>"
+             (format stream "~@<File ~S was deleted or renamed during LOAD.~:>"
                      (load-race-condition-pathname condition)))))
 
 (defmacro resignal-race-condition (&body body)
@@ -85,9 +85,9 @@
 ;;; some defaulting in case the user asks us to load a file that
 ;;; doesn't exist at the time we start.
 (defun %load (pathspec &key (verbose *load-verbose*) (print *load-print*)
-             (if-does-not-exist t) (external-format :default))
+              (if-does-not-exist t) (external-format :default))
   (when (streamp pathspec)
-    (let* (;; Bindings required by ANSI.
+    (let* ( ;; Bindings required by ANSI.
            (*readtable* *readtable*)
            (*package* (sane-package))
            ;; FIXME: we should probably document the circumstances
@@ -142,11 +142,14 @@
             (file-position stream :start)
             (return-from %load
               (%load stream :verbose verbose :print print))))))
-  (resignal-race-condition
-    (with-open-file (stream pathspec
-                            :external-format
-                            external-format)
-      (%load stream :verbose verbose :print print))))
+  ;; Because we're just opening for input, we don't need
+  ;; WITH-OPEN-FILE's abort handling semantics, and we want to say
+  ;; it's an error for PATHSPEC to have existed before but not now, so
+  ;; WITH-OPEN-STREAM it is.
+  (with-open-stream (stream (resignal-race-condition
+                              (open pathspec
+                                    :external-format external-format)))
+    (%load stream :verbose verbose :print print)))
 
 ;; Given a simple %LOAD like the above, one can implement any
 ;; particular defaulting strategy with a wrapper like this one:
