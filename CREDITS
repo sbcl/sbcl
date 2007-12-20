@@ -524,7 +524,8 @@ Zach Beane:
   original timer facility on which SBCL's timers are based.
 
 James Bielman:
-  He assisted in work on the port to the Windows operating system.
+  He assisted in work on the port to the Windows operating system, and
+  was instrumental in :EXECUTABLE support for SAVE-LISP-AND-DIE.
 
 Alastair Bridgewater:
   He contributed a port of the system to the Windows operating system.
@@ -627,6 +628,11 @@ Yaroslav Kavenchuk:
   the win32 port. He also worked on external-format support for
   SB-ALIEN.
 
+Richard M Kreyter:
+  He added documentation support for CLOS slot readers and writers,
+  provided several SB-POSIX and NetBSD patches, and cleaned up
+  several of the filesystem/pathname interfaces.
+
 Frederik Kuivinen:
   He showed how to implement the DEBUG-RETURN functionality.
 
@@ -695,7 +701,9 @@ William ("Bill") Newman:
   rid of various functionality (e.g. the byte interpreter).
 
 NIIMI Satoshi:
-  He contributed a number of fixes to the FreeBSD port.
+  He contributed a number of fixes to the FreeBSD port, implemented
+  some external-formats and JOIN-THREAD, and also worked on
+  the :EXECUTABLE support.
 
 Patrik Nordebo:
   He contributed to the port of SBCL to MacOS X, finding solutions for
@@ -751,8 +759,8 @@ Julian Squires:
 Nikodemus Siivola:
   He provided build fixes, in particular to tame the SunOS toolchain,
   implemented package locks, ported the linkage-table code from CMUCL,
-  reimplemented STEP, and has fixed many (stream-related and other) bugs
-  besides.
+  reimplemented STEP, implemented the compare-and-swap interface, and
+  has fixed many bugs besides.
 
 Juho Snellman:
   He provided a number of bug fixes and performance enhancements to
@@ -766,6 +774,9 @@ Brian Spilsbury:
   stream types and operations on them.  (These versions did not end up
   in the system, but did to a large extent influence the support which
   finally did get merged.)
+
+Robert Swindells:
+  He ported SBCL to NetBSD/Sparc.
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
