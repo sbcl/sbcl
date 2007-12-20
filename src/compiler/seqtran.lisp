@@ -668,8 +668,10 @@
      (define-one-transform (sequence-type1 sequence-type2)
        (make-replace-transform nil sequence-type1 sequence-type2)))
   (define-replace-transforms)
-  (define-one-transform simple-base-string (simple-array character (*)))
-  (define-one-transform (simple-array character (*)) simple-base-string))
+  #!+sb-unicode
+  (progn
+   (define-one-transform (simple-array base-char (*)) (simple-array character (*)))
+   (define-one-transform (simple-array character (*)) (simple-array base-char (*)))))
 
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
