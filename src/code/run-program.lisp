@@ -760,7 +760,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                                            (if search 1 0)
                                            environment-vec pty-name
                                            (if wait 1 0)))))
-                             (when (minusp child)
+                             (when (= child -1)
                                (error "couldn't fork child process: ~A"
                                       (strerror)))
                              (setf proc (apply
@@ -787,6 +787,7 @@ Users Manual for details about the PROCESS structure."#-win32"
           #-win32
           (dolist (handler *handlers-installed*)
             (sb-sys:remove-fd-handler handler))))
+      #-win32
       (when (and wait proc)
         (process-wait proc))
       proc)))

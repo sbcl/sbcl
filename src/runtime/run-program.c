@@ -190,9 +190,9 @@ HANDLE spawn (
 
     /* Spawn process given on the command line*/
     if (search)
-      hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
+        hProcess = (HANDLE) spawnvp ( wait_mode, program, argv );
     else
-      hProcess = (HANDLE) spawnv ( wait_mode, program, argv );
+        hProcess = (HANDLE) spawnv ( wait_mode, program, argv );
 
     /* Now that the process is launched, replace the original
      * in/out/err handles and close the backups. */
