@@ -90,7 +90,7 @@ ${SBCL:-sbcl} <<'EOF'
   ;; fully buffered.)
   (let ((str (with-output-to-string (s)
                (run-program "/bin/sh"
-                            '("-c" "(echo Foo; sleep 2s; echo Bar)>&2")
+                            '("-c" "(echo Foo; sleep 2; echo Bar)>&2")
                             :output s :search t :error :output :wait t))))
     (assert (string= str (format nil "Foo~%Bar~%"))))
 
