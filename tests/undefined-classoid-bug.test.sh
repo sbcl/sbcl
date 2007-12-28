@@ -1,26 +1,28 @@
 # This file run a regression test for a bug in loading
 # forward-referenced layouts.
 
+. ./subr.sh
+
+use_test_subdirectory
+
 FILES='"undefined-classoid-bug-1.lisp" "undefined-classoid-bug-2.lisp"'
 FASLS='"undefined-classoid-bug-1.fasl" "undefined-classoid-bug-2.fasl"'
 
-${SBCL:-sbcl} <<EOF
+for f in $FILES; do
+    (cd "$SBCL_PWD"; cp `eval "echo $f"` "$TEST_DIRECTORY");
+done
+
+run_sbcl <<EOF
 (let ((files (list $FILES)))
   (mapc #'load files)
   (mapc #'compile-file files))
 (quit :unix-status 52)
 EOF
 
-${SBCL:-sbcl} <<EOF
+run_sbcl <<EOF
 (mapc #'load (list $FASLS))
-(quit :unix-status 52)
+(quit :unix-status $EXIT_LISP_WIN)
 EOF
+check_status_maybe_lose undefined-classoid-bug $?
 
-if [ $? != 52 ]; then
-    rm $FASLS
-    echo undefined-classoid-bug test failed: $?
-    exit 1 # Failure
-fi
-
-# success convention for script
-exit 104
+exit $EXIT_TEST_WIN

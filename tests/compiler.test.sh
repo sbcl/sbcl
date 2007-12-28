@@ -13,9 +13,9 @@
 
 . ./expect.sh
 
-base_tmpfilename="compiler-test-$$-tmp"
-tmpfilename="$base_tmpfilename.lisp"
-compiled_tmpfilename="$base_tmpfilename.fasl"
+use_test_subdirectory
+
+tmpfilename="$TEST_FILESTEM.lisp"
 
 # This should fail, as type inference should show that the call to FOO
 # will return something of the wrong type.
@@ -379,7 +379,5 @@ cat > $tmpfilename <<EOF
 EOF
 expect_aborted_compile $tmpfilename
 
-rm $tmpfilename
-
 # success
-exit 104
+exit $EXIT_TEST_WIN

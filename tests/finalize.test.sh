@@ -4,11 +4,13 @@
 # hang the test-suite, as the typical failure mode used to be SBCL
 # hanging uninterruptible in GC.
 
+. ./subr.sh
+
+use_test_subdirectory
+
 echo //entering finalize.test.sh
 
-rm -f finalize-test-passed finalize-test-failed
-
-${SBCL:-sbcl} <<EOF > /dev/null &
+run_sbcl <<EOF > /dev/null &
 (defvar *tmp* 0.0)
 (defvar *count* 0)
 
@@ -48,11 +50,11 @@ while true; do
     if [ -f finalize-test-passed ]; then
         echo "OK"
         rm finalize-test-passed
-        exit 104 # Success
+        exit $EXIT_TEST_WIN
     elif [ -f finalize-test-failed ]; then
         echo "Failed"
         rm finalize-test-failed
-        exit 1 # Failure
+        exit $EXIT_LOSE
     fi
     sleep 1
     WAITED="x$WAITED"
@@ -60,7 +62,7 @@ while true; do
         echo
         echo "timeout, killing SBCL"
         kill -9 $SBCL_PID
-        exit 1 # Failure, SBCL probably hanging in GC
+        exit $EXIT_LOSE # Failure, SBCL probably hanging in GC
     fi
 done
 

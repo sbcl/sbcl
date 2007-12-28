@@ -14,14 +14,17 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-testfile=${TMPDIR:-/tmp}/sbcl-toplevel-test-$$.tmp
+. ./subr.sh
+
+use_test_subdirectory
 
 # Until sbcl-0.pre8, all --eval arguments were parsed before any of
 # them were executed, making it impossible for --eval forms to refer
 # to packages created by --eval forms.
-${SBCL:-sbcl} --eval "(defpackage :foo)" --eval "(print 'foo::bar)" \
-  < /dev/null > $testfile
-if [ "`grep -c FOO::BAR $testfile`" != 1 ] ; then
+run_sbcl --eval "(defpackage :foo)" --eval "(print 'foo::bar)" \
+  < /dev/null > $TEST_FILESTEM
+if [ "`grep -c FOO::BAR $TEST_FILESTEM`" != 1 ] ; then
     echo failed DEFPACKAGE-then-PRINT from --eval form
-    exit 1
+    exit $EXIT_LOSE
 fi
+exit $EXIT_TEST_WIN

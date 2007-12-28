@@ -5,9 +5,9 @@
 
 sbcl_pwd() {
     if [ "$OSTYPE" = "cygwin" ] ; then
-	SBCL_PWD=`cygpath -m "$(pwd)"`
+	SBCL_PWD="`cygpath -m \"$(pwd)\"`"
     else
-	SBCL_PWD=`pwd`
+	SBCL_PWD="`pwd`"
     fi
     export SBCL_PWD
 }

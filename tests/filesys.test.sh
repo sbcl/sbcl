@@ -11,30 +11,39 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./subr.sh
+
+use_test_subdirectory
+testdir="`pwd -P`" # resolve symbolic links in the directory.
+
+set -f # disable filename expansion in the shell.
+
 # Test DIRECTORY and TRUENAME.
-testdir=`/bin/pwd`"/filesys-test-$$"
-mkdir $testdir
-echo this is a test > $testdir/test-1.tmp
-echo this is a test > $testdir/test-2.tmp
-echo this is a test > $testdir/wild\?test.tmp
-cd $testdir
-ln -s $testdir dirlinktest
+echo this is a test > test-1.tmp
+echo this is a test > test-2.tmp
+echo this is a test > wild?test.tmp
+
+ln -s "$testdir" dirlinktest
 ln -s test-1.tmp link-1
-ln -s `pwd`/test-2.tmp link-2
+ln -s "$testdir/test-2.tmp" link-2
 ln -s i-do-not-exist link-3
 ln -s link-4 link-4
 ln -s link-5 link-6
-ln -s `pwd`/link-6 link-5
-expected_truenames=\
-"'(#p\"$testdir/\"\
-   #p\"$testdir/link-3\"\
-   #p\"$testdir/link-4\"\
-   #p\"$testdir/link-5\"\
-   #p\"$testdir/link-6\"\
-   #p\"$testdir/test-1.tmp\"\
-   #p\"$testdir/test-2.tmp\"\
-   #p\"$testdir/wild\\\\?test.tmp\")"
-$SBCL <<EOF
+ln -s "$testdir/link-6" link-5
+expected_truenames=`cat<<EOF
+(list #p"$testdir/"
+      #p"$testdir/link-3"
+      #p"$testdir/link-4"
+      #p"$testdir/link-5"
+      #p"$testdir/link-6"
+      #p"$testdir/test-1.tmp"
+      #p"$testdir/test-2.tmp"
+      #p"$testdir/wild\\\\\?test.tmp")
+EOF
+`
+# FIXME: the following tests probably can't succeed at all if the
+# testdir name contains wildcard characters or quotes.
+run_sbcl <<EOF
   (in-package :cl-user)
   (let* ((directory (directory "./*.*"))
          (truenames (sort directory #'string< :key #'pathname-name)))
@@ -50,14 +59,12 @@ $SBCL <<EOF
   (assert (equal (truename "link-4")     #p"$testdir/link-4"))
   (assert (equal (truename "link-5")     #p"$testdir/link-5"))
   (assert (equal (truename "link-6")     #p"$testdir/link-6"))
-  (sb-ext:quit :unix-status 52)
+  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
-if [ $? != 52 ]; then
-    echo DIRECTORY/TRUENAME test part 1 failed, unexpected SBCL return code=$?
-    exit 1
-fi
-cd ..
-$SBCL <<EOF
+check_status_maybe_lose "DIRECTORY/TRUENAME part 1" $?
+
+cd "$SBCL_PWD"
+run_sbcl <<EOF
   (in-package :cl-user)
   (let* ((directory (directory "$testdir/*.*"))
          (truenames (sort directory #'string< :key #'pathname-name)))
@@ -71,17 +78,14 @@ $SBCL <<EOF
   (assert (equal (truename "$testdir/link-4")     #p"$testdir/link-4"))
   (assert (equal (truename "$testdir/link-5")     #p"$testdir/link-5"))
   (assert (equal (truename "$testdir/link-6")     #p"$testdir/link-6"))
-  (sb-ext:quit :unix-status 52)
+  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
-if [ $? != 52 ]; then
-    echo DIRECTORY/TRUENAME test part 2 failed, unexpected SBCL return code=$?
-    exit 1
-fi
-rm -r $testdir
+check_status_maybe_lose "DIRECTORY/TRUENAME part 2" $?
+cleanup_test_subdirectory
 
 # Test DIRECTORY on a tree structure of directories.
-mkdir $testdir
-cd $testdir
+use_test_subdirectory
+
 touch water dirt
 mkdir animal plant
 mkdir animal/vertebrate animal/invertebrate
@@ -104,7 +108,7 @@ touch animal/vertebrate/mammal/rodent/rat
 touch animal/vertebrate/mammal/ruminant/cow
 touch animal/vertebrate/snake/python
 touch plant/kingsfoil plant/pipeweed
-$SBCL <<EOF
+run_sbcl <<EOF
 (in-package :cl-user)
 (defun absolutify (pathname)
   "Convert a possibly-relative pathname to absolute."
@@ -190,14 +194,9 @@ Lisp filename syntax idiosyncrasies)."
   #+nil
   (need-match "animal/vertebrate/mammal/robot/../**/../**/*.*" nil))
 (need-matches)
-(sb-ext:quit :unix-status 52)
+(sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
-if [ $? != 52 ]; then
-    echo DIRECTORY/TRUENAME test part 1 failed, unexpected SBCL return code=$?
-    exit 1
-fi
-cd ..
-rm -r $testdir
+check_status_maybe_lose "DIRECTORY/TRUENAME part 3" $?
 
 # success convention for script
-exit 104
+exit $EXIT_TEST_WIN

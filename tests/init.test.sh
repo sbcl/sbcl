@@ -13,10 +13,13 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-tmpcore="init-test-sh-$$.core"
-rm -f $tmpcore
+. ./subr.sh
 
-$SBCL <<EOF
+use_test_subdirectory
+
+tmpcore="init-test.core"
+
+run_sbcl <<EOF
   (defun custom-userinit-pathname ()
      "$SBCL_PWD/custom-userinit.lisp")
   (defun custom-sysinit-pathname ()
@@ -29,16 +32,9 @@ if [ $? != 0 ]; then
     echo "failure saving core"
     exit 1
 fi
-$SBCL_ALLOWING_CORE --core "$tmpcore" --disable-debugger <<EOF
+run_sbcl_with_core "$tmpcore" --disable-debugger <<EOF
   (userinit-quit (sysinit-21))
 EOF
-if [ $? = 21 ]; then
-    echo "/Default userinit and sysinit loading worked, good"
-else
-    echo "failure loading user/sysinit files: $?"
-    exit 1
-fi
+check_status_maybe_lose "userinit and sysinit loading" $? 21 "(loading worked)"
 
-rm -f $tmpcore
-echo "/returning success from init.test.sh"
-exit 104
+exit $EXIT_TEST_WIN

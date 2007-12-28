@@ -13,6 +13,8 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./subr.sh
+
 # Make sure that there's at least something in the environment (for
 # one of the tests below).
 SOMETHING_IN_THE_ENVIRONMENT='yes there is'
@@ -20,7 +22,8 @@ export SOMETHING_IN_THE_ENVIRONMENT
 PATH=/some/path/that/does/not/exist:${PATH}
 export PATH
 
-${SBCL:-sbcl} <<'EOF'
+# This should probably be broken up into separate pieces.
+run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
   ;; test that $PATH is searched
   (assert (zerop (sb-ext:process-exit-code
                   (sb-ext:run-program "true" () :search t :wait t))))
@@ -103,12 +106,8 @@ ${SBCL:-sbcl} <<'EOF'
          'error)
 
   ;; success convention for this Lisp program run as part of a larger script
-  (sb-ext:quit :unix-status 52)))
+  (sb-ext:quit :unix-status *exit-ok*)))
 EOF
-if [ $? != 52 ]; then
-    echo test failed: $?
-    exit 1
-fi
+check_status_maybe_lose "run program tests" $?
 
-# success convention
-exit 104
+exit $EXIT_TEST_WIN

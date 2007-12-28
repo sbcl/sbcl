@@ -25,17 +25,18 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-# Remember where we came from so we can find local support files later.
-originalpwd=`pwd`
+. ./subr.sh
 
 # Find clocc ansi-test (or just punt, returning success).
+set +u
 if [ "$SBCL_CLOCC_ANSI_TEST" = "" ] ; then
     echo //punting clocc ansi-test because SBCL_CLOCC_ANSI_TEST is undefined
-    exit 104
+    exit $EXIT_TEST_WIN
 else
     echo //going on to run clocc ansi-test in $SBCL_CLOCC_ANSI_TEST
     cd $SBCL_CLOCC_ANSI_TEST
 fi
+set -u
 
 # The condition system is for the weak.
 tmpprefix="${TMPDIR:-/tmp}/sbcl-clocc-ansi-test-$$"
@@ -43,10 +44,10 @@ rawfilename="$tmpprefix-raw.tmp"
 bugsfilename="$tmpprefix-bugs.tmp"
 
 # Go SBCL go.
-$SBCL <<EOF >$rawfilename
+run_sbcl <<EOF >$rawfilename
 (in-package :cl-user)
 ;;; Tell ansi-test about our known bugs.
-(load "$originalpwd/clocc-ansi-test-known-bugs.lisp")
+(load "$SBCL_PWD/clocc-ansi-test-known-bugs.lisp")
 ;;; Actually run ansi-test.
 (load "tests.lisp")
 ;;; Return a special status code to show that we reached the end

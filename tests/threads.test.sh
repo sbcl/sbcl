@@ -11,10 +11,13 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./subr.sh
+use_test_subdirectory
+
 flag="condition-wait-sigcont.tmp"
 touch $flag
 
-$SBCL --load condition-wait-sigcont.lisp &
+run_sbcl --load "$SBCL_PWD/condition-wait-sigcont.lisp" &
 sb_pid=$!
 
 while [ -f $flag ]; do sleep 1; done

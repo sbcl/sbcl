@@ -13,14 +13,15 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-echo //entering room.test.sh
+. ./subr.sh
 
-${SBCL:-sbcl} --eval "(progn (dotimes (i 10) (dotimes (j 10) (room)) (gc)) (sb-ext:quit :unix-status 52))"
-if [ $? = 52 ]; then
-    true # nop
-else
-    exit 1
-fi
-
+run_sbcl <<EOF
+  (dotimes (i 10)
+    (dotimes (j 10)
+      (room))
+    #+nil (gc))
+  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+EOF
+check_status_maybe_lose "room test" $?
 # success convention for script
-exit 104
+exit $EXIT_TEST_WIN

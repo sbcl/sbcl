@@ -11,19 +11,20 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-original_pwd=`pwd`
+. ./subr.sh
+
+use_test_subdirectory
+testdir="`pwd -P`" # resolve symbolic links in the directory.
 
 # LOADing and COMPILEing files with logical pathnames
-testdir=`pwd`"/side-effectful-pathnames-test-$$"
 testfilestem="load-test"
 StudlyCapsStem="Load-Test"
-testfilename="$testdir/$testfilestem.lisp"
-mkdir $testdir
+testfilename="$testfilestem.lisp"
 cat >$testfilename <<EOF
   (in-package :cl-user)
   (defparameter *loaded* :yes)
 EOF
-$SBCL <<EOF
+run_sbcl <<EOF
   (in-package :cl-user)
   (setf (logical-pathname-translations "TEST")
         (list (list "**;*.*.*" "$testdir/**/*.*")))
@@ -43,14 +44,9 @@ $SBCL <<EOF
     (format t "compiled-file-name=~S~%" compiled-file-name)
     (format t "expected-file-name=~S~%" expected-file-name)
     (assert (string= compiled-file-name expected-file-name)))
-  (sb-ext:quit :unix-status 52)
+  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
-if [ $? != 52 ]; then
-    echo LOAD/COMPILE test failed, unexpected Lisp return code=$?
-    exit 1
-fi
-# We don't need the test directory any more.
-rm -r $testdir
+check_status_maybe_lose "LOAD/COMPILE" $?
 
 # In the flaky1 branch, Dan Barlow pointed out that
 # ENSURE-DIRECTORIES-EXIST failed for these relative pathname
@@ -58,16 +54,16 @@ rm -r $testdir
 # was removed from UNIX-STAT. Let's make sure that it works now.
 #
 # Set up an empty directory to work with.
-testdir=${TMPDIR:-/tmp}/sbcl-mkdir-test-$$
-if ! rm -rf $testdir ; then
+testdir="${TMPDIR:-/tmp}/sbcl-mkdir-test-$$"
+if ! rm -rf "$testdir" ; then
   echo "$testdir already exists and could not be deleted"
   exit 1;
 fi
-mkdir $testdir
-cd $testdir
+mkdir "$testdir"
+cd "$testdir"
 #
 # Provoke failure.
-$SBCL <<EOF
+run_sbcl <<EOF
 (let ((rel-name #p"foo/bar/")
       (abs-name (merge-pathnames #p"baz/quux/" (truename "."))))
   (and
@@ -75,26 +71,21 @@ $SBCL <<EOF
    (equalp (ensure-directories-exist rel-name) rel-name)
    (sb-ext:quit :unix-status 52)))
 EOF
-if [ $? != 52 ]; then
-    echo ENSURE-DIRECTORIES-EXIST test failed, unexpected SBCL return code=$?
-    find $testdir -print
-    exit 1
-fi
-if [ ! -d $testdir/foo/bar ] ; then
-    echo test failed: $testdir/foo/bar is not a directory
-    find $testdir -print
+check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST" $?
+if [ ! -d "$testdir/foo/bar" ] ; then
+    echo test failed: "$testdir/foo/bar" is not a directory
+    find "$testdir" -print
     exit 1
 fi;
-if [ ! -d $testdir/baz/quux ] ; then
-    echo test failed: $testdir/baz/quux is not a directory
-    find $testdir -print
+if [ ! -d "$testdir/baz/quux" ] ; then
+    echo test failed: "$testdir/baz/quux" is not a directory
+    find "$testdir" -print
     exit 1
 fi;
 #
 # We succeeded, life is good. Now we don't need the test directory
 # any more; and come back home.
-rm -r $testdir
-cd $original_pwd
+cd "$SBCL_PWD"
+rm -r "$testdir"
 
-# success convention for script
-exit 104
+exit $EXIT_TEST_WIN

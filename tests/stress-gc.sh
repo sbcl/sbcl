@@ -11,9 +11,14 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./subr.sh
+
 sbcl <<EOF
     (compile-file "./stress-gc.lisp")
     (load *)
     (time (stress-gc ${1:-100000} ${2:-3000}))
     (format t "~&test completed successfully~%")
+    (quit :unix-status $EXIT_LISP_WIN)
 EOF
+check_status_maybe_lose "stress-gc" $?
+exit $EXIT_TEST_WIN

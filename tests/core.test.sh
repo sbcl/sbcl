@@ -13,9 +13,12 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-tmpcore="core-test-sh-$$.core"
-tmpoutput="core-test-sh-$$.output.txt"
-rm -f "$tmpcore" "$tmpoutput"
+. ./subr.sh
+
+use_test_subdirectory
+
+tmpcore=$TEST_FILESTEM.core
+tmpoutput=$TEST_FILESTEM.txt
 
 # In sbcl-0.7.7 SAVE-LISP-AND-DIE didn't work at all because of
 # flakiness caused by consing/GC/purify twice-and-at-least-twice
@@ -25,23 +28,17 @@ rm -f "$tmpcore" "$tmpoutput"
 #   -- Eric Marsden, <http://tunes.org/~nef/logs/lisp/02.09.15>
 #
 # diagnosed and fixed by Dan Barlow in sbcl-0.7.7.29
-$SBCL <<EOF
+run_sbcl <<EOF
   (defun foo (x) (+ x 11))
   (save-lisp-and-die "$tmpcore")
 EOF
-$SBCL_ALLOWING_CORE --core "$tmpcore" \
---userinit /dev/null --sysinit /dev/null <<EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
   (quit :unix-status (foo 10))
 EOF
-if [ $? = 21 ]; then
-    echo "/Basic SAVE-LISP-AND-DIE worked, good."
-else
-    echo "failure in basic SAVE-LISP-AND-DIE: $?"
-    exit 1
-fi
+check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
 
 # In sbcl-0.9.8 saving cores with callbacks didn't work on gencgc platforms
-$SBCL <<EOF
+run_sbcl <<EOF
   (defun bar ()
     (format t "~&Callbacks not supported, skipping~%")
     (quit :unix-status 42))
@@ -51,26 +48,23 @@ $SBCL <<EOF
     (defun bar () (quit :unix-status (alien-funcall foo))))
   (save-lisp-and-die "$tmpcore")
 EOF
-$SBCL_ALLOWING_CORE --core "$tmpcore" \
---userinit /dev/null --sysinit /dev/null <<EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
   (bar)
 EOF
-if [ $? = 42 ]; then
-    echo "/Callbacks after SAVE-LISP-AND-DIE worked, good."
-else
-    echo "failure in basic SAVE-LISP-AND-DIE: $?"
-    exit 1
-fi
+check_status_maybe_lose "Callbacks after SAVE-LISP-AND-DIE" $? \
+    42 "(callback function ran)"
 
 # test suppression of banner in executable cores
-$SBCL <<EOF
+run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" >"$tmpoutput" \
-  --no-userinit --no-sysinit --eval '(quit :unix-status 71)'
-if [ $? != 71 ]; then
-  echo "failure in banner suppression: $?"
+./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF 
+  (quit :unix-status 71)
+EOF
+status=$?
+if [ $status != 71 ]; then
+  echo "failure in banner suppression: $status"
   exit 1
 elif [ -s "$tmpoutput" ]; then
   echo "failure in banner suppression: nonempty output:"
@@ -85,7 +79,4 @@ else
   exit 1
 fi
 
-rm -f "$tmpcore"
-rm -f "$tmpoutput"
-echo "/returning success from core.test.sh"
-exit 104
+exit $EXIT_TEST_WIN

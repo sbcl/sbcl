@@ -14,25 +14,26 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./subr.sh
+use_test_subdirectory
+
 echo //entering foreign.test.sh
 
 # simple way to make sure we're not punting by accident:
 # setting PUNT to anything other than 104 will make non-dlopen
 # and non-linkage-table platforms fail this
-PUNT=104
+PUNT=$EXIT_TEST_WIN
 
-testfiledir=sbcl-foreign-test-$$
-testfilestem=`pwd`/$testfiledir/sbcl-foreign-test
-
-mkdir $testfiledir 
 ## Make some shared object files to test with.
 
-build_so() {
+build_so() (
   echo building $1.so
-  if [ "`uname -m`" = x86_64 -o "`uname -m`" = amd64 -o \
-       "`uname -m`" = mips -o "`uname -m`" = mips64 ]; then
-    CFLAGS="$CFLAGS -fPIC"
-  fi
+  set +u
+  case "`uname -m`" in
+      x86_64|amd64|mips|mips64)
+	  CFLAGS="$CFLAGS -fPIC"
+	  ;;
+  esac
   if [ "`uname`" = Darwin ]; then
     SO_FLAGS="-bundle"
   else
@@ -40,9 +41,12 @@ build_so() {
   fi
   cc -c $1.c -o $1.o $CFLAGS
   ld $SO_FLAGS -o $1.so $1.o  
-}
+)
 
-cat > $testfilestem.c <<EOF
+# We want to bail out in case any of these Unix programs fails.
+set -e
+
+cat > $TEST_FILESTEM.c <<EOF
 int summish(int x, int y) { return 1 + x + y; }
 
 int numberish = 42;
@@ -98,30 +102,30 @@ long long return_long_long() {
 }
 EOF
 
-build_so $testfilestem
+build_so $TEST_FILESTEM
 
-echo 'int foo = 13;' > $testfilestem-b.c
-echo 'int bar() { return 42; }' >> $testfilestem-b.c
-build_so $testfilestem-b
+echo 'int foo = 13;' > $TEST_FILESTEM-b.c
+echo 'int bar() { return 42; }' >> $TEST_FILESTEM-b.c
+build_so $TEST_FILESTEM-b
 
-echo 'int foo = 42;' > $testfilestem-b2.c
-echo 'int bar() { return 13; }' >> $testfilestem-b2.c
-build_so $testfilestem-b2
+echo 'int foo = 42;' > $TEST_FILESTEM-b2.c
+echo 'int bar() { return 13; }' >> $TEST_FILESTEM-b2.c
+build_so $TEST_FILESTEM-b2
 
-echo 'int late_foo = 43;' > $testfilestem-c.c
-echo 'int late_bar() { return 14; }' >> $testfilestem-c.c
-build_so $testfilestem-c
+echo 'int late_foo = 43;' > $TEST_FILESTEM-c.c
+echo 'int late_bar() { return 14; }' >> $TEST_FILESTEM-c.c
+build_so $TEST_FILESTEM-c
 
 ## Foreign definitions & load
 
-cat > $testfilestem.base.lisp <<EOF
+cat > $TEST_FILESTEM.base.lisp <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (handler-case
         (progn
-          (load-shared-object "$testfilestem.so")
-          (load-shared-object "$testfilestem-b.so"))
+          (load-shared-object "$TEST_FILESTEM.so")
+          (load-shared-object "$TEST_FILESTEM-b.so"))
       (sb-int:unsupported-operator ()
         ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
         ;; supported on every OS. In that case, there's nothing to test,
@@ -161,6 +165,7 @@ cat > $testfilestem.base.lisp <<EOF
   ;; automagic restarts
   (setf *invoke-debugger-hook*
         (lambda (condition hook)
+          (declare (ignore hook))
           (princ condition)
           (let ((cont (find-restart 'continue condition)))
             (when cont
@@ -169,14 +174,14 @@ cat > $testfilestem.base.lisp <<EOF
           (invoke-debugger condition)))
 EOF
 
-echo "(declaim (optimize speed))" > $testfilestem.fast.lisp
-cat $testfilestem.base.lisp >> $testfilestem.fast.lisp
+echo "(declaim (optimize speed))" > $TEST_FILESTEM.fast.lisp
+cat $TEST_FILESTEM.base.lisp >> $TEST_FILESTEM.fast.lisp
 
-echo "(declaim (optimize space))" > $testfilestem.small.lisp
-cat $testfilestem.base.lisp >> $testfilestem.small.lisp
+echo "(declaim (optimize space))" > $TEST_FILESTEM.small.lisp
+cat $TEST_FILESTEM.base.lisp >> $TEST_FILESTEM.small.lisp
 
 # Test code
-cat > $testfilestem.test.lisp <<EOF
+cat > $TEST_FILESTEM.test.lisp <<EOF
   ;; FIXME: currently the start/small case fails on x86/Darwin. Moving
   ;; this NOTE definition to the base.lisp file fixes that, but obviously
   ;; it is better fo figure out what is going on instead of doing that...
@@ -214,15 +219,15 @@ cat > $testfilestem.test.lisp <<EOF
   (assert (= 13 foo))
   (assert (= 42 (bar)))
   (note "/original definitions ok")
-  (rename-file "$testfilestem-b.so" "$testfilestem-b.bak")
-  (rename-file "$testfilestem-b2.so" "$testfilestem-b.so")
-  (load-shared-object "$testfilestem-b.so")
+  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
+  (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
+  (load-shared-object "$TEST_FILESTEM-b.so")
   (note "/reloading ok")
   (assert (= 42 foo))
   (assert (= 13 (bar)))
   (note "/redefined versions ok")
-  (rename-file "$testfilestem-b.so" "$testfilestem-b2.so")
-  (rename-file "$testfilestem-b.bak" "$testfilestem-b.so")
+  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b2.so")
+  (rename-file "$TEST_FILESTEM-b.bak" "$TEST_FILESTEM-b.so")
   (note "/renamed back to originals")
 
   ;; test late resolution
@@ -237,42 +242,32 @@ cat > $testfilestem.test.lisp <<EOF
     (multiple-value-bind (val err) (ignore-errors (late-bar))
       (assert (not val))
       (assert (typep err 'undefined-alien-error)))
-    (load-shared-object "$testfilestem-c.so")
+    (load-shared-object "$TEST_FILESTEM-c.so")
     (assert (= 43 late-foo))
     (assert (= 14 (late-bar)))
     (note "/linkage table ok"))
 
-  (sb-ext:quit :unix-status 52) ; success convention for Lisp program
+  (sb-ext:quit :unix-status $EXIT_LISP_WIN) ; success convention for Lisp program
 EOF
 
+# Files are now set up; toggle errexit off, since we use a custom exit
+# convention.
+set +e
+
 test_compile() {
-    ${SBCL:-sbcl} --eval "(progn (load (compile-file #p\"$testfilestem.$1.lisp\")) (sb-ext:quit :unix-status 52))"
-    if [ $? = 52 ]; then
-        echo test compile $1 ok
-    else
-        # we can't compile the test file. something's wrong.
-        # rm $testfilestem.*
-        echo test compile $1 failed: $?
-	exit 1
-    fi
+    run_sbcl <<EOF
+(progn (load (compile-file "$TEST_FILESTEM.$1.lisp"))
+(sb-ext:quit :unix-status $EXIT_LISP_WIN))
+EOF
+    check_status_maybe_lose "compile $1" $?
 }
 
 test_compile fast
 test_compile small
 
 test_use() {
-    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --load $testfilestem.test.lisp
-    RET=$?
-    if [ $RET = 22 ]; then
-	rm $testfilestem.*
-	exit $PUNT # success -- load-shared-object not supported
-    elif [ $RET != 52 ]; then
-	rm $testfilestem.*
-	echo test use $1 failed: $?
-	exit 1
-    else
-	echo test use $1 ok
-    fi
+    run_sbcl --load $TEST_FILESTEM.$1.fasl --load $TEST_FILESTEM.test.lisp
+    check_status_maybe_lose "use $1" $? 22 "(load-shared-object not supported)"
 }
 
 test_use small
@@ -280,15 +275,13 @@ test_use fast
 
 test_save() {
     echo testing save $1 
-    ${SBCL:-sbcl} --load $testfilestem.$1.fasl --eval "#+linkage-table (save-lisp-and-die \"$testfilestem.$1.core\") #-linkage-table nil" <<EOF
-  (sb-ext:quit :unix-status 22) ; catch this
+    run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
+#+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$1.core")
+#-linkage-table nil
+(sb-ext:quit :unix-status 22) ; catch this
 EOF
-    if [ $? = 22 ]; then
-	rm $testfilestem.*
-	exit $PUNT # success -- linkage-table not available
-    else
-	echo save $1 ok
-    fi
+    check_status_maybe_lose "save $1" $? \
+	0 "(successful save)" 22 "(linkage table not available)"
 }
 
 test_save small
@@ -296,22 +289,17 @@ test_save fast
 
 test_start() {
     echo testing start $1
-    ${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.$1.core --sysinit /dev/null --userinit /dev/null --load $testfilestem.test.lisp
-    if [ $? != 52 ]; then
-	rm $testfilestem.*
-	echo test failed: $?
-	exit 1 # Failure
-    else
-	echo test start $1 ok
-    fi
+    run_sbcl_with_core $TEST_FILESTEM.$1.core \
+	--no-sysinit --no-userinit --load $TEST_FILESTEM.test.lisp
+    check_status_maybe_lose "start $1" $?
 }
 
 test_start fast
 test_start small
 
 # missing object file
-rm $testfilestem-b.so $testfilestem-b2.so
-${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.fast.core --sysinit /dev/null --userinit /dev/null <<EOF
+rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
+run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit <<EOF
   (assert (= 22 (summish 10 11)))
   (multiple-value-bind (val err) (ignore-errors (eval 'foo))
     (assert (not val))
@@ -319,17 +307,9 @@ ${SBCL_ALLOWING_CORE:-sbcl} --core $testfilestem.fast.core --sysinit /dev/null -
   (multiple-value-bind (val err) (ignore-errors (eval '(bar)))
     (assert (not val))
     (assert (typep err 'undefined-alien-error)))
-  (quit :unix-status 52)
+  (quit :unix-status $EXIT_LISP_WIN)
 EOF
-if [ $? != 52 ]; then
-    rm $testfilestem.*
-    echo test failed: $?
-    exit 1 # Failure
-fi
-
-echo missing .so ok
-
-rm -r $testfiledir 
+check_status_maybe_lose "missing-so" $?
 
 # success convention for script
-exit 104
+exit $EXIT_TEST_WIN

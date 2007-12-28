@@ -13,9 +13,9 @@
 
 . ./expect.sh
 
-base_tmpfilename="clos-test-$$-tmp"
-tmpfilename="$base_tmpfilename.lisp"
-compiled_tmpfilename="$base_tmpfilename.fasl"
+use_test_subdirectory
+
+tmpfilename="$TEST_FILESTEM.lisp"
 
 # This should fail, but didn't until sbcl-0.6.12.7, with Martin
 # Atzmueller's port of Pierre Mai's fixes.
@@ -69,8 +69,5 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
-rm $tmpfilename
-rm $compiled_tmpfilename
-
 # success
-exit 104
+exit $EXIT_TEST_WIN

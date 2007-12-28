@@ -195,7 +195,7 @@
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
   `(let ((process (sb-ext:run-program "/bin/sh"
-                                      (list (namestring ,file))
+                                      (list (native-namestring ,file))
                                       :output *error-output*)))
      (sb-ext:quit :unix-status (process-exit-code process))))
 
