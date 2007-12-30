@@ -112,10 +112,12 @@ code:
     (dolist (def definitions)
       (destructuring-bind (type lispname cname &optional doc export) def
         (case type
-          (:integer
+          ((:integer :errno)
            (as-c "#ifdef" cname)
            (printf "(cl:defconstant ~A %d \"~A\")" lispname doc
                    cname)
+           (when (eql type :errno)
+             (printf "(cl:setf (get '~A 'errno) t)" lispname))
            (as-c "#else")
            (printf "(sb-int:style-warn \"Couldn't grovel for ~A (unknown to the C compiler).\")" cname)
            (as-c "#endif"))
