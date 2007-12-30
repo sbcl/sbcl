@@ -59,38 +59,30 @@
 
 ;;; stream manipulation functions
 
-(declaim (inline ansi-stream-input-stream-p))
 (defun ansi-stream-input-stream-p (stream)
   (declare (type ansi-stream stream))
-
-  (when (synonym-stream-p stream)
-    (setf stream
-          (symbol-value (synonym-stream-symbol stream))))
-
-  (and (not (eq (ansi-stream-in stream) #'closed-flame))
+  (if (synonym-stream-p stream)
+      (input-stream-p (symbol-value (synonym-stream-symbol stream)))
+      (and (not (eq (ansi-stream-in stream) #'closed-flame))
        ;;; KLUDGE: It's probably not good to have EQ tests on function
        ;;; values like this. What if someone's redefined the function?
        ;;; Is there a better way? (Perhaps just VALID-FOR-INPUT and
        ;;; VALID-FOR-OUTPUT flags? -- WHN 19990902
-       (or (not (eq (ansi-stream-in stream) #'ill-in))
-           (not (eq (ansi-stream-bin stream) #'ill-bin)))))
+           (or (not (eq (ansi-stream-in stream) #'ill-in))
+               (not (eq (ansi-stream-bin stream) #'ill-bin))))))
 
 (defun input-stream-p (stream)
   (declare (type stream stream))
   (and (ansi-stream-p stream)
        (ansi-stream-input-stream-p stream)))
 
-(declaim (inline ansi-stream-output-stream-p))
 (defun ansi-stream-output-stream-p (stream)
   (declare (type ansi-stream stream))
-
-  (when (synonym-stream-p stream)
-    (setf stream (symbol-value
-                  (synonym-stream-symbol stream))))
-
-  (and (not (eq (ansi-stream-in stream) #'closed-flame))
-       (or (not (eq (ansi-stream-out stream) #'ill-out))
-           (not (eq (ansi-stream-bout stream) #'ill-bout)))))
+  (if (synonym-stream-p stream)
+      (output-stream-p (symbol-value (synonym-stream-symbol stream)))
+      (and (not (eq (ansi-stream-in stream) #'closed-flame))
+           (or (not (eq (ansi-stream-out stream) #'ill-out))
+               (not (eq (ansi-stream-bout stream) #'ill-bout))))))
 
 (defun output-stream-p (stream)
   (declare (type stream stream))

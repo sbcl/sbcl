@@ -467,4 +467,24 @@
     (assert (equal copy string)))
   (delete-file "read-sequence-character-test-data.tmp"))
 
+;;; ANSI-STREAM-OUTPUT-STREAM-P used to assume that a SYNONYM-STREAM's
+;;; target was an ANSI stream, but it could be a user-defined stream,
+;;; e.g., a SLIME stream.
+(defclass user-output-stream (fundamental-output-stream)
+  ())
+
+(let ((*stream* (make-instance 'user-output-stream)))
+  (declare (special *stream*))
+  (with-open-stream (stream (make-synonym-stream '*stream*))
+    (assert (output-stream-p stream))))
+
+(defclass user-input-stream (fundamental-input-stream)
+  ())
+
+(let ((*stream* (make-instance 'user-input-stream)))
+  (declare (special *stream*))
+  (with-open-stream (stream (make-synonym-stream '*stream*))
+    (assert (input-stream-p stream))))
+
+
 ;;; success
