@@ -32,6 +32,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <errno.h>
+#include <limits.h>
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
 #include <sys/wait.h>
@@ -156,6 +158,41 @@ wrapped_readlink(char *path)
     }
 }
 #endif
+
+/*
+ * realpath(3), including a wrapper for Windows.
+ */
+char * sb_realpath (char *path)
+{
+#ifndef LISP_FEATURE_WIN32
+    char *ret;
+    int errnum;
+
+    if ((ret = calloc(PATH_MAX, sizeof(char))) == NULL)
+        return NULL;
+    if (realpath(path, ret) == NULL) {
+        errnum = errno;
+        free(ret);
+        errno = errnum;
+        return NULL;
+    }
+    return(ret);
+#else
+    char *ret;
+    char *cp;
+    int errnum;
+
+    if ((ret = calloc(MAX_PATH, sizeof(char))) == NULL)
+        return NULL;
+    if (GetFullPathName(path, MAX_PATH, ret, cp) == 0) {
+        errnum = errno;
+        free(ret);
+        errno = errnum;
+        return NULL;
+    }
+    return(ret);
+#endif
+}
 
 /*
  * stat(2) stuff

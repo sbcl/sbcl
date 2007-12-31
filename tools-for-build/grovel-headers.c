@@ -308,6 +308,7 @@ main(int argc, char *argv[])
     deferrno("eintr", EINTR);
     deferrno("eio", EIO);
     deferrno("eexist", EEXIST);
+    deferrno("eloop", ELOOP);
     deferrno("espipe", ESPIPE);
     deferrno("ewouldblock", EWOULDBLOCK);
     printf("\n");

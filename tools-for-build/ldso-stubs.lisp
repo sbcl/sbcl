@@ -246,6 +246,7 @@ ldso_stub__ ## fct: ;                  \\
                    "read"
                    "readdir"
                    "readlink"
+                   "realpath"
                    "recv"
                    "rename"
                    "rmdir"

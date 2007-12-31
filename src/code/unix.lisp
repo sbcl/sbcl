@@ -463,6 +463,20 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   (declare (ignore path))
   nil)
 
+(defun unix-realpath (path)
+  (declare (type unix-pathname path))
+  (with-alien ((ptr (* char)
+                    (alien-funcall (extern-alien
+                                    "sb_realpath"
+                                    (function (* char) c-string))
+                                   path)))
+    (if (null-alien ptr)
+        (values nil (get-errno))
+        (multiple-value-prog1
+            (values (with-alien ((c-string c-string ptr)) c-string)
+                    nil)
+          (free-alien ptr)))))
+
 ;;; UNIX-UNLINK accepts a name and deletes the directory entry for that
 ;;; name and the file if this is the last link.
 (defun unix-unlink (name)
@@ -938,76 +952,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
               #!-win32
               ((eql kind s-iflnk) :link)
               (t :special))))))
-
-;;; Is the Unix pathname PATHNAME relative, instead of absolute? (E.g.
-;;; "passwd" or "etc/passwd" instead of "/etc/passwd"?)
-(defun relative-unix-pathname? (pathname)
-  (declare (type simple-string pathname))
-  (or (zerop (length pathname))
-      (char/= (schar pathname 0) #\/)))
-
-;;; Return PATHNAME with all symbolic links resolved. PATHNAME should
-;;; already be a complete absolute Unix pathname, since at least in
-;;; sbcl-0.6.12.36 we're called only from TRUENAME, and only after
-;;; paths have been converted to absolute paths, so we don't need to
-;;; try to handle any more generality than that.
-(defun unix-resolve-links (pathname)
-  (declare (type simple-string pathname))
-  ;; KLUDGE: The Win32 platform doesn't have symbolic links, so
-  ;; short-cut this computation (and the check for being an absolute
-  ;; unix pathname...)
-  #!+win32 (return-from unix-resolve-links pathname)
-  (aver (not (relative-unix-pathname? pathname)))
-  ;; KLUDGE: readlink and lstat are unreliable if given symlinks
-  ;; ending in slashes -- fix the issue here instead of waiting for
-  ;; libc to change...
-  ;;
-  ;; but be careful!  Must not strip the final slash from "/".  (This
-  ;; adjustment might be a candidate for being transferred into the C
-  ;; code in a wrap_readlink() function, too.) CSR, 2006-01-18
-  (let ((len (length pathname)))
-    (when (and (> len 1) (eql #\/ (schar pathname (1- len))))
-      (setf pathname (subseq pathname 0 (1- len)))))
-  (/noshow "entering UNIX-RESOLVE-LINKS")
-  (loop with previous-pathnames = nil do
-       (/noshow pathname previous-pathnames)
-       (let ((link (unix-readlink pathname)))
-          (/noshow link)
-          ;; Unlike the old CMU CL code, we handle a broken symlink by
-          ;; returning the link itself. That way, CL:TRUENAME on a
-          ;; broken link returns the link itself, so that CL:DIRECTORY
-          ;; can return broken links, so that even without
-          ;; Unix-specific extensions to do interesting things with
-          ;; them, at least Lisp programs can see them and, if
-          ;; necessary, delete them. (This is handy e.g. when your
-          ;; managed-by-Lisp directories are visited by Emacs, which
-          ;; creates broken links as notes to itself.)
-          (if (null link)
-              (return pathname)
-              (let ((new-pathname
-                     (simplify-namestring
-                      (if (relative-unix-pathname? link)
-                          (let* ((dir-len (1+ (position #\/
-                                                        pathname
-                                                        :from-end t)))
-                                 (dir (subseq pathname 0 dir-len)))
-                            (/noshow dir)
-                            (concatenate 'string dir link))
-                          link))))
-                (if (unix-file-kind new-pathname)
-                    (setf pathname new-pathname)
-                    (return pathname)))))
-        ;; To generalize the principle that even if portable Lisp code
-        ;; can't do anything interesting with a broken symlink, at
-        ;; least it should be able to see and delete it, when we
-        ;; detect a cyclic link, we return the link itself. (So even
-        ;; though portable Lisp code can't do anything interesting
-        ;; with a cyclic link, at least it can see it and delete it.)
-        (if (member pathname previous-pathnames :test #'string=)
-            (return pathname)
-            (push pathname previous-pathnames))))
 
-
 (defconstant micro-seconds-per-internal-time-unit
   (/ 1000000 sb!xc:internal-time-units-per-second))
 

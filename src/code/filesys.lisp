@@ -476,45 +476,183 @@
       (1 (first matches))
       (t (bug "!ENUMERATE-MATCHES returned more than one match on a non-wild pathname")))))
 
-;;;; TRUENAME and PROBE-FILE
+;;;; TRUENAME, PROBE-FILE, FILE-AUTHOR, FILE-WRITE-DATE.
 
-;;; This is only trivially different from PROBE-FILE, which is silly
-;;; but ANSI.
-(defun truename (pathname)
-  #!+sb-doc
-  "Return the pathname for the actual file described by PATHNAME.
-An error of type FILE-ERROR is signalled if no such file exists, or the
-pathname is wild.
-
-Under Unix, the TRUENAME of a broken symlink is considered to be the name of
-the broken symlink itself."
-  (let ((result (probe-file pathname)))
-    (unless result
+;;; Rewritten in 12/2007 by RMK, replacing 13+ year old CMU code that
+;;; made a mess of things in order to support search lists (which SBCL
+;;; has never had).  These are now all relatively straightforward
+;;; wrappers around stat(2) and realpath(2), with the same basic logic
+;;; in all cases.  The wrinkles to be aware of:
+;;;
+;;; * SBCL defines the truename of an existing, dangling or
+;;;   self-referring symlink to be the symlink itself.
+;;; * The old version of PROBE-FILE merged the pathspec against
+;;;   *DEFAULT-PATHNAME-DEFAULTS* twice, and so lost when *D-P-D*
+;;;   was a relative pathname.  Even if the case where *D-P-D* is a
+;;;   relative pathname is problematic, there's no particular reason
+;;;   to get that wrong, so let's try not to.
+;;; * Note that while stat(2) is probably atomic, getting the truename
+;;;   for a filename involves poking all over the place, and so is
+;;;   subject to race conditions if other programs mutate the file
+;;;   system while we're resolving symlinks.  So it's not implausible for
+;;;   realpath(3) to fail even if stat(2) succeeded.  There's nothing
+;;;   obvious we can do about this, however.
+;;; * Windows' apparent analogue of realpath(3) is called
+;;;   GetFullPathName, and it's a bit less useful than realpath(3).
+;;;   In particular, while realpath(3) errors in case the file doesn't
+;;;   exist, GetFullPathName seems to return a filename in all cases.
+;;;   As realpath(3) is not atomic anyway, we only ever call it when
+;;;   we think a file exists, so just be careful when rewriting this
+;;;   routine.
+(defun query-file-system (pathspec query-for enoent-errorp)
+  (let ((pathname (translate-logical-pathname
+                   (merge-pathnames
+                    (pathname pathspec)
+                    (sane-default-pathname-defaults)))))
+    (when (wild-pathname-p pathname)
       (error 'simple-file-error
              :pathname pathname
-             :format-control "The file ~S does not exist."
-             :format-arguments (list (namestring pathname))))
-    result))
+             :format-control "~@<can't find the ~A of wild pathname ~A~
+                              (physicalized from ~A).~:>"
+             :format-arguments (list query-for pathname pathspec)))
+    (let ((filename (native-namestring pathname :as-file t)))
+      (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
+                                    atime mtime)
+          (sb!unix:unix-stat filename)
+        (declare (ignore ino nlink gid rdev size atime))
+        (if existsp
+            (case query-for
+              (:truename (parse-native-namestring
+                          ;; Note: in case the file is stat'able, POSIX
+                          ;; realpath(3) gets us a canonical absolute
+                          ;; filename, even if the post-merge PATHNAME
+                          ;; is not absolute...
+                          (multiple-value-bind (realpath errno)
+                              (sb!unix:unix-realpath filename)
+                            (if realpath
+                                realpath
+                                (simple-file-perror "couldn't resolve ~A"
+                                                    filename errno)))
+                          (pathname-host pathname)
+                          (sane-default-pathname-defaults)
+                          ;; ... but without any trailing slash.
+                          :as-directory (eql (logand  mode sb!unix:s-ifmt)
+                                             sb!unix:s-ifdir)))
+              (:author (sb!unix:uid-username uid))
+              (:write-date (+ unix-to-universal-time mtime)))
+            (progn
+              ;; SBCL has for many years had a policy that a pathname
+              ;; that names an existing, dangling or self-referential
+              ;; symlink denotes the symlink itself.  stat(2) fails
+              ;; and sets errno to ELOOP in this case, but we must
+              ;; distinguish cases where the symlink exists from ones
+              ;; where there's a loop in the apparent containing
+              ;; directory.
+              #!-win32
+              (multiple-value-bind (linkp ignore ino mode nlink uid gid rdev
+                                          size atime mtime)
+                  (sb!unix:unix-lstat filename)
+                (declare (ignore ignore ino mode nlink gid rdev size atime))
+                (when (and (or (= errno sb!unix:enoent)
+                               (= errno sb!unix:eloop))
+                           linkp)
+                  (return-from query-file-system
+                    (case query-for
+                      (:truename
+                       ;; So here's a trick: since lstat succeded,
+                       ;; FILENAME exists, so its directory exists and
+                       ;; only the non-directory part is loopy.  So
+                       ;; let's resolve FILENAME's directory part with
+                       ;; realpath(3), in order to get a canonical
+                       ;; absolute name for the directory, and then
+                       ;; return a pathname having PATHNAME's name,
+                       ;; type, and version, but the rest from the
+                       ;; truename of the directory.  Since we turned
+                       ;; PATHNAME into FILENAME "as a file", FILENAME
+                       ;; does not end in a slash, and so we get the
+                       ;; directory part of FILENAME by reparsing
+                       ;; FILENAME and masking off its name, type, and
+                       ;; version bits.  But note not to call ourselves
+                       ;; recursively, because we don't want to
+                       ;; re-merge against *DEFAULT-PATHNAME-DEFAULTS*,
+                       ;; since PATHNAME may be a relative pathname.
+                       (merge-pathnames
+                        (parse-native-namestring
+                         (multiple-value-bind (realpath errno)
+                             (sb!unix:unix-realpath
+                              (native-namestring
+                               (make-pathname
+                                :name :unspecific
+                                :type :unspecific
+                                :version :unspecific
+                                :defaults (parse-native-namestring
+                                           filename
+                                           (pathname-host pathname)
+                                           (sane-default-pathname-defaults)))))
+                           (if realpath
+                               realpath
+                               (simple-file-perror "couldn't resolve ~A"
+                                                   filename errno)))
+                         (pathname-host pathname)
+                         (sane-default-pathname-defaults)
+                         :as-directory t)
+                        pathname))
+                      (:author (sb!unix:uid-username uid))
+                      (:write-date (+ unix-to-universal-time mtime))))))
+              ;; If we're still here, the file doesn't exist; return
+              ;; NIL or error.
+              (if (and (= errno sb!unix:enoent) (not enoent-errorp))
+                  nil
+                  (simple-file-perror
+                   (format nil "failed to find the ~A of ~~A" query-for)
+                   pathspec errno))))))))
 
-(defun probe-file (pathname)
+
+(defun probe-file (pathspec)
   #!+sb-doc
-  "Return a pathname which is the truename of the file if it exists, or NIL
-otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
-  (let* ((defaulted-pathname (merge-pathnames
-                              pathname
-                              (sane-default-pathname-defaults)))
-         (namestring (unix-namestring defaulted-pathname t)))
-    (when (and namestring (sb!unix:unix-file-kind namestring t))
-      (let ((trueishname (sb!unix:unix-resolve-links namestring)))
-        (when trueishname
-          (let* ((*ignore-wildcards* t)
-                 (name (simplify-namestring
-                        trueishname
-                        (pathname-host defaulted-pathname))))
-            (if (eq (sb!unix:unix-file-kind name) :directory)
-                ;; FIXME: this might work, but it's ugly.
-                (pathname (concatenate 'string name "/"))
-                (pathname name))))))))
+  "Return the truename of PATHSPEC if such a file exists, the
+coercion of PATHSPEC to a pathname if PATHSPEC names a symlink
+that links to itself or to a file that doesn't exist, or NIL if
+errno is set to ENOENT after trying to stat(2) the file.  An
+error of type FILE-ERROR is signaled if PATHSPEC is a wild
+pathname, or for any other circumstance where stat(2) fails."
+  (query-file-system pathspec :truename nil))
+
+
+(defun truename (pathspec)
+  #!+sb-doc
+  "If PATHSPEC is a pathname that names an existing file, return
+a pathname that denotes a canonicalized name for the file.  If
+pathspec is a stream associated with a file, return a pathname
+that denotes a canonicalized name for the file associated with
+the stream.
+
+An error of type FILE-ERROR is signalled if no such file exists
+or if the file system is such that a canonicalized file name
+cannot be determined or if the pathname is wild.
+
+Under Unix, the TRUENAME of a symlink that links to itself or to
+a file that doesn't exist is considered to be the name of the
+broken symlink itself."
+  ;; Note that eventually this routine might be different for streams
+  ;; than for other pathname designators.
+  (if (streamp pathspec)
+      (query-file-system pathspec :truename t)
+      (query-file-system pathspec :truename t)))
+
+(defun file-author (pathspec)
+  #!+sb-doc
+  "Return the author of the file specified by PATHSPEC. Signal an
+error of type FILE-ERROR if no such file exists, or if PATHSPEC
+is a wild pathname."
+  (query-file-system pathspec :write-date t))
+
+(defun file-write-date (pathspec)
+  #!+sb-doc
+  "Return the write date of the file specified by PATHSPEC.
+An error of type FILE-ERROR is signaled if no such file exists,
+or if PATHSPEC is a wild pathname."
+  (query-file-system pathspec :write-date t))
 
 ;;;; miscellaneous other operations
 
@@ -595,35 +733,6 @@ system."
           ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
           (return-from user-homedir-pathname
             (sb!win32::get-folder-pathname sb!win32::csidl_profile)))))))
-
-(defun file-write-date (file)
-  #!+sb-doc
-  "Return file's creation date, or NIL if it doesn't exist.
- An error of type file-error is signaled if file is a wild pathname"
-  (let ((name (unix-namestring file t)))
-    (when name
-      (multiple-value-bind
-            (res dev ino mode nlink uid gid rdev size atime mtime)
-          (sb!unix:unix-stat name)
-        (declare (ignore dev ino mode nlink uid gid rdev size atime))
-        (when res
-          (+ unix-to-universal-time mtime))))))
-
-(defun file-author (file)
-  #!+sb-doc
-  "Return the file author as a string, or NIL if the author cannot be
- determined. Signal an error of type FILE-ERROR if FILE doesn't exist,
- or FILE is a wild pathname."
-  (let ((name (unix-namestring (pathname file) t)))
-    (unless name
-      (error 'simple-file-error
-             :pathname file
-             :format-control "~S doesn't exist."
-             :format-arguments (list file)))
-    (multiple-value-bind (winp dev ino mode nlink uid)
-        (sb!unix:unix-stat name)
-      (declare (ignore dev ino mode nlink))
-      (and winp (sb!unix:uid-username uid)))))
 
 ;;;; DIRECTORY
 
