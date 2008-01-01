@@ -210,9 +210,16 @@
                          :sc (sc-or-lose 'dword-reg)
                          :offset (tn-offset val)))))
 
+#-sb-xc-host
 (defun sign-extend (x)
   (declare (type (signed-byte 32) x))
   (sign-extend x))
+
+#+sb-xc-host
+(defun sign-extend (x)
+  (if (logbitp 31 x)
+      (dpb x (byte 32 0) -1)
+      x))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
