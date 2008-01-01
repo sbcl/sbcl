@@ -1017,26 +1017,29 @@
                                   debug-name
                                   system-lambda)
   (destructuring-bind (decls macros symbol-macros &rest body)
-                      (if (eq (car fun) 'lambda-with-lexenv)
-                          (cdr fun)
-                          `(() () () . ,(cdr fun)))
-    (let ((*lexenv* (make-lexenv
-                     :default (process-decls decls nil nil
-                                             :lexenv (make-null-lexenv))
-                     :vars (copy-list symbol-macros)
-                     :funs (mapcar (lambda (x)
-                                     `(,(car x) .
-                                       (macro . ,(coerce (cdr x) 'function))))
-                                   macros)
-                     ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
-                     ;; rather than the definition-site lexenv, since it seems
-                     ;; like a much more common case.
-                     :handled-conditions (lexenv-handled-conditions *lexenv*)
-                     :policy (lexenv-policy *lexenv*)))
-          (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*)))
-      (ir1-convert-lambda `(lambda ,@body)
-                          :source-name source-name
-                          :debug-name debug-name))))
+      (if (eq (car fun) 'lambda-with-lexenv)
+          (cdr fun)
+          `(() () () . ,(cdr fun)))
+    (let* ((*lexenv* (make-lexenv
+                      :default (process-decls decls nil nil
+                                              :lexenv (make-null-lexenv))
+                      :vars (copy-list symbol-macros)
+                      :funs (mapcar (lambda (x)
+                                      `(,(car x) .
+                                         (macro . ,(coerce (cdr x) 'function))))
+                                    macros)
+                      ;; Inherit MUFFLE-CONDITIONS from the call-site lexenv
+                      ;; rather than the definition-site lexenv, since it seems
+                      ;; like a much more common case.
+                      :handled-conditions (lexenv-handled-conditions *lexenv*)
+                      :policy (lexenv-policy *lexenv*)))
+           (*allow-instrumenting* (and (not system-lambda)
+                                       *allow-instrumenting*))
+           (clambda (ir1-convert-lambda `(lambda ,@body)
+                                        :source-name source-name
+                                        :debug-name debug-name)))
+      (setf (functional-inline-expanded clambda) t)
+      clambda)))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the

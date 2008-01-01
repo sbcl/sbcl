@@ -309,3 +309,24 @@
 
 (test-unwind 'unwind-1 '(:unwind-1))
 (test-unwind 'unwind-2 '(:unwind-2 :unwind-1))
+
+;;; Regression in 1.0.10.47 reported by James Knight
+
+(defun inner1 (tla)
+  (zerop tla))
+
+(declaim (inline inline-fun))
+(defun inline-fun (tla)
+  (or (inner1 tla)
+      (inner1 tla)))
+
+(defun foo (predicate)
+  (funcall predicate 2))
+
+(defun test ()
+  (let ((blah (foo #'inline-fun)))
+    (inline-fun 3)))
+
+(with-test (:name (:debug-instrumentation :inline/xep))
+  (test))
+

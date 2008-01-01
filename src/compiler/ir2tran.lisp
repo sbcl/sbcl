@@ -1182,6 +1182,7 @@
 
     #!+unwind-to-frame-and-call-vop
     (when (and (lambda-allow-instrumenting fun)
+               (not (lambda-inline-expanded fun))
                (lambda-return fun)
                (policy fun (>= insert-debug-catch 2)))
       (vop sb!vm::bind-sentinel node block))
@@ -1213,6 +1214,7 @@
          (returns (tail-set-info (lambda-tail-set fun))))
     #!+unwind-to-frame-and-call-vop
     (when (and (lambda-allow-instrumenting fun)
+               (not (lambda-inline-expanded fun))
                (policy fun (>= insert-debug-catch 2)))
       (vop sb!vm::unbind-sentinel node block))
     (cond

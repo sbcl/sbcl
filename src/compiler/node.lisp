@@ -863,7 +863,9 @@
   (plist () :type list)
   ;; xref information for this functional (only used for functions with an
   ;; XEP)
-  (xref () :type list))
+  (xref () :type list)
+  ;; True if this functional was created from an inline expansion
+  (inline-expanded nil :type boolean))
 (defprinter (functional :identity t)
   %source-name
   %debug-name
