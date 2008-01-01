@@ -699,20 +699,15 @@ or if PATHSPEC is a wild pathname."
         (simple-file-perror "couldn't delete ~A" namestring err))))
   t)
 
-(defun ensure-trailing-slash (string)
-  (let ((last-char (char string (1- (length string)))))
-         (if (or (eql last-char #\/)
-                 #!+win32
-                 (eql last-char #\\))
-             string
-             (concatenate 'string string "/"))))
-
 (defun sbcl-homedir-pathname ()
   (let ((sbcl-home (posix-getenv "SBCL_HOME")))
     ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
     (when (and sbcl-home (not (string= sbcl-home "")))
-      (parse-native-namestring
-       (ensure-trailing-slash sbcl-home)))))
+      (parse-native-namestring sbcl-home
+                               #-win32 sb!impl::*unix-host*
+                               #+win32 sb!impl::*win32-host*
+                               *default-pathname-defaults*
+                               :as-directory t))))
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
@@ -724,15 +719,19 @@ system."
   (declare (ignore host))
   (let ((env-home (posix-getenv "HOME")))
     (parse-native-namestring
-     (ensure-trailing-slash
-      (if (and env-home (not (string= env-home "")))
-          env-home
-          #!-win32
-          (sb!unix:uid-homedir (sb!unix:unix-getuid))
-          #!+win32
-          ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
-          (return-from user-homedir-pathname
-            (sb!win32::get-folder-pathname sb!win32::csidl_profile)))))))
+     (if (and env-home (not (string= env-home "")))
+         env-home
+         #!-win32
+         (sb!unix:uid-homedir (sb!unix:unix-getuid))
+         #!+win32
+         ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
+         ;; What?! -- RMK, 2007-12-31
+         (return-from user-homedir-pathname
+           (sb!win32::get-folder-pathname sb!win32::csidl_profile)))
+     #-win32 sb!impl::*unix-host*
+     #+win32 sb!impl::*win32-host*
+     *default-pathname-defaults*
+     :as-directory t)))
 
 ;;;; DIRECTORY
 
@@ -765,6 +764,41 @@ system."
 ;;; case when we call it), but there are other pitfalls as well: see
 ;;; the DIRECTORY-HELPER below for some, but others include a lack of
 ;;; pattern handling.
+
+;;; The above was written by CSR, I (RMK) believe.  The argument that
+;;; motivates the interpretation is faulty, however: PATHNAME-MATCH-P
+;;; returns true for (PATHNAME-MATCH-P #P"/tmp/*/" #P"/tmp/../"), but
+;;; the latter pathname is not in the result of DIRECTORY on the
+;;; former.  Indeed, if DIRECTORY were constrained to return the
+;;; truename for every pathname for which PATHNAME-MATCH-P returned
+;;; true and which denoted a filename that named an existing file,
+;;; (DIRECTORY #P"/tmp/**/") would be required to list every file on a
+;;; Unix system, since any file can be named as though it were "below"
+;;; /tmp, given the dotdot entries.  So I think the strongest
+;;; "consistency" we can define between PATHNAME-MATCH-P and DIRECTORY
+;;; is that PATHNAME-MATCH-P returns true of everything DIRECTORY
+;;; returns, but not vice versa.
+
+;;; In any case, even if the motivation were sound, DIRECTORY on a
+;;; wild logical pathname has no portable semantics.  I see nothing in
+;;; ANSI that requires implementations to support wild physical
+;;; pathnames, and so there need not be any translation of a wild
+;;; logical pathname to a phyiscal pathname.  So a program that calls
+;;; DIRECTORY on a wild logical pathname is doing something
+;;; non-portable at best.  And if the only sensible semantics for
+;;; DIRECTORY on a wild logical pathname is something like the
+;;; following, it would be just as well if it signaled an error, since
+;;; a program can't possibly rely on the result of an intersection of
+;;; user-defined translations with a file system probe.  (Potentially
+;;; useful kinds of "pathname" that might not support wildcards could
+;;; include pathname hosts that model unqueryable namespaces like HTTP
+;;; URIs, or that model namespaces that it's not convenient to
+;;; investigate, such as the namespace of TCP ports that some network
+;;; host listens on.  I happen to think it a bad idea to try to
+;;; shoehorn such namespaces into a pathnames system, but people
+;;; sometimes claim to want pathnames for these things.)  -- RMK
+;;; 2007-12-31.
+
 (defun pathname-intersections (one two)
   (aver (logical-pathname-p one))
   (aver (logical-pathname-p two))

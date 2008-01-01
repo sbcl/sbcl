@@ -141,3 +141,17 @@
       for pathname = (native-pathname native-namestring)
       for tricky-nnn = (native-namestring pathname)
       do (assert (string= tricky-nnn native-namestring)))))
+
+;;; USER-HOMEDIR-PATHNAME and the extension SBCL-HOMEDIR-PATHNAME both
+;;; used to call PARSE-NATIVE-NAMESTRING without supplying a HOST
+;;; argument, and so would lose when *DEFAULT-PATHNAME-DEFAULTS* was a
+;;; logical pathname.
+(with-test (:name :user-homedir-pathname-robustness)
+  (let ((*default-pathname-defaults* (pathname "SYS:")))
+    (assert (not (typep (user-homedir-pathname)
+                        'logical-pathname)))))
+
+(with-test (:name :sbcl-homedir-pathname-robustness)
+  (let ((*default-pathname-defaults* (pathname "SYS:")))
+    (assert (not (typep (sb-impl::sbcl-homedir-pathname)
+                        'logical-pathname)))))
