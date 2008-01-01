@@ -489,7 +489,7 @@ status slot."
         ;; Put the pointer in the vector.
         (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
         ;; Advance string-sap for the next string.
-        (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ size))))
+        (setf string-sap (sap+ string-sap (round-bytes-to-words size)))
         (incf vec-index-offset bytes-per-word)))
     ;; Final null pointer.
     (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
