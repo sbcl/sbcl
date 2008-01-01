@@ -969,6 +969,8 @@ system."
 (/show0 "filesys.lisp 899")
 
 ;;; predicate to order pathnames by; goes by name
+;; FIXME: Does anything use this?  It's not exported, and I don't find
+;; the name anywhere else.
 (defun pathname-order (x y)
   (let ((xn (%pathname-name x))
         (yn (%pathname-name y)))
@@ -999,22 +1001,28 @@ system."
                                :device (pathname-device pathname)
                                :directory (subseq dir 0 i))))
                  (unless (probe-file newpath)
-                   (let ((namestring (coerce (namestring newpath) 'string)))
+                   (let ((namestring (coerce (native-namestring newpath)
+                                             'string)))
                      (when verbose
                        (format *standard-output*
                                "~&creating directory: ~A~%"
                                namestring))
                      (sb!unix:unix-mkdir namestring mode)
-                     (unless (probe-file namestring)
-                       (restart-case (error 'simple-file-error
-                                            :pathname pathspec
-                                            :format-control "can't create directory ~A"
-                                            :format-arguments (list namestring))
+                     (unless (probe-file newpath)
+                       (restart-case (error
+                                      'simple-file-error
+                                      :pathname pathspec
+                                      :format-control
+                                      "can't create directory ~A"
+                                      :format-arguments (list namestring))
                          (retry ()
                            :report "Retry directory creation."
-                           (ensure-directories-exist pathspec :verbose verbose :mode mode))
+                           (ensure-directories-exist
+                            pathspec
+                            :verbose verbose :mode mode))
                          (continue ()
-                           :report "Continue as if directory creation was successful."
+                           :report
+                           "Continue as if directory creation was successful."
                            nil)))
                      (setf created-p t)))))
       (values pathspec created-p))))

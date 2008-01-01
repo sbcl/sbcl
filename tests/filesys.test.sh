@@ -198,5 +198,18 @@ Lisp filename syntax idiosyncrasies)."
 EOF
 check_status_maybe_lose "DIRECTORY/TRUENAME part 3" $?
 
+# Test whether ENSURE-DIRECTORIES-EXIST can create a directory whose
+# name contains a wildcard character (it used to get itself confused
+# internally).
+run_sbcl --eval '(ensure-directories-exist "foo\\*bar/baz.txt")'
+test -d foo*bar
+check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 1" $? \
+    0 "(directory exists)"
+
+run_sbcl --eval '(ensure-directories-exist "foo\\?bar/baz.txt")'
+test -d foo?bar
+check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 2" $? \
+    0 "(directory exists)"
+
 # success convention for script
 exit $EXIT_TEST_WIN
