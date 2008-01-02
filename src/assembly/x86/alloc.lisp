@@ -11,61 +11,54 @@
 
 (in-package "SB!VM")
 
-;;;; from signed/unsigned
+;;;; Signed and unsigned bignums from word-sized integers. Argument
+;;;; and return in the same register. No VOPs, as these are only used
+;;;; as out-of-line versions: MOVE-FROM-[UN]SIGNED VOPs handle the
+;;;; fixnum cases inline.
 
-;;; KLUDGE: Why don't we want vops for this one and the next
-;;; one? -- WHN 19990916
-#+sb-assembling ; We don't want a vop for this one.
-(define-assembly-routine
-    (move-from-signed)
-    ((:temp eax unsigned-reg eax-offset)
-     (:temp ebx unsigned-reg ebx-offset))
-  (inst mov ebx eax)
-  (inst shl ebx 1)
-  (inst jmp :o bignum)
-  (inst shl ebx 1)
-  (inst jmp :o bignum)
-  (inst ret)
-  BIGNUM
+;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
+;;; these are out-of-line versions called by VOPs.
 
-  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 1))
-    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
+#+sb-assembling
+(macrolet ((def (reg)
+             (let ((tn (symbolicate reg "-TN")))
+               `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg)) ()
+                  (inst push ,tn)
+                  (with-fixed-allocation (,tn bignum-widetag (+ bignum-digits-offset 1))
+                    (popw ,tn bignum-digits-offset other-pointer-lowtag))
+                  (inst ret)))))
+  (def eax)
+  (def ebx)
+  (def ecx)
+  (def edx)
+  (def edi)
+  (def esi))
 
-  (inst ret))
+#+sb-assembling
+(macrolet ((def (reg)
+             (let ((tn (symbolicate reg "-TN")))
+               `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg)) ()
+                  (inst push ,tn)
+                  ;; Sign flag is set by the caller! Note: The inline
+                  ;; version always allocates space for two words, but
+                  ;; here we minimize garbage.
+                  (inst jmp :ns one-word-bignum)
+                  ;; Two word bignum
+                  (with-fixed-allocation (,tn bignum-widetag (+ bignum-digits-offset 2))
+                    (popw ,tn bignum-digits-offset other-pointer-lowtag))
+                  (inst ret)
+                  ONE-WORD-BIGNUM
+                  (with-fixed-allocation (,tn bignum-widetag (+ bignum-digits-offset 1))
+                    (popw ,tn bignum-digits-offset other-pointer-lowtag))
+                  (inst ret)))))
+  (def eax)
+  (def ebx)
+  (def ecx)
+  (def edx)
+  (def edi)
+  (def esi))
 
-#+sb-assembling ; We don't want a vop for this one either.
-(define-assembly-routine
-  (move-from-unsigned)
-  ((:temp eax unsigned-reg eax-offset)
-   (:temp ebx unsigned-reg ebx-offset))
-
-  (inst test eax #xe0000000)
-  (inst jmp :nz bignum)
-  ;; Fixnum
-  (inst mov ebx eax)
-  (inst shl ebx 2)
-  (inst ret)
-
-  BIGNUM
-  ;;; Note: On the mips port space for a two word bignum is always
-  ;;; allocated and the header size is set to either one or two words
-  ;;; as appropriate. On the mips port this is faster, and smaller
-  ;;; inline, but produces more garbage. The inline x86 version uses
-  ;;; the same approach, but here we save garbage and allocate the
-  ;;; smallest possible bignum.
-  (inst jmp :ns one-word-bignum)
-  (inst mov ebx eax)
-
-  ;; Two word bignum
-  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 2))
-    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
-  (inst ret)
-
-  ONE-WORD-BIGNUM
-  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 1))
-    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
-  (inst ret))
-
+;;; FIXME: This is dead, right? Can it go?
 #+sb-assembling
 (defun frob-allocation-assembly-routine (obj lowtag arg-tn)
   `(define-assembly-routine (,(intern (format nil "ALLOCATE-~A-TO-~A" obj arg-tn)))

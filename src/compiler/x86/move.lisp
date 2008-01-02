@@ -207,136 +207,61 @@
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
-;;; Result may be a bignum, so we have to check. Use a worst-case cost
-;;; to make sure people know they may be number consing.
-;;;
-;;; KLUDGE: I assume this is suppressed in favor of the "faster inline
-;;; version" below. (See also mysterious comment "we don't want a VOP
-;;; on this one" on DEFINE-ASSEMBLY-ROUTINE (MOVE-FROM-SIGNED) in
-;;; "src/assembly/x86/alloc.lisp".) -- WHN 19990916
-#+nil
-(define-vop (move-from-signed)
-  (:args (x :scs (signed-reg unsigned-reg) :target eax))
-  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
-  (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-              ebx)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-                   :from (:argument 0) :to (:result 0)) ecx)
-  (:ignore ecx)
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:note "signed word to integer coercion")
-  (:generator 20
-    (move eax x)
-    (inst call (make-fixup 'move-from-signed :assembly-routine))
-    (move y ebx)))
-;;; Faster inline version,
-;;; KLUDGE: Do we really want the faster inline version? It's sorta big.
-;;; It is nice that it doesn't use any temporaries, though. -- WHN 19990916
+;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
+;;; as the case may be. Fixnum case inline, bignum case in an assembly
+;;; routine.
 (define-vop (move-from-signed)
   (:args (x :scs (signed-reg unsigned-reg) :to :result))
   (:results (y :scs (any-reg descriptor-reg) :from :argument))
   (:note "signed word to integer coercion")
-  (:node-var node)
+  ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
      (aver (not (location= x y)))
-     (let ((bignum (gen-label))
-           (done (gen-label)))
+     (let ((done (gen-label)))
+       (inst imul y x (ash 1 n-fixnum-tag-bits))
+       (inst jmp :no done)
        (inst mov y x)
-       (inst shl y 1)
-       (inst jmp :o bignum)
-       (inst shl y 1)
-       (inst jmp :o bignum)
-       (emit-label done)
-       ;; KLUDGE: The sequence above leaves a DESCRIPTOR-REG Y in a
-       ;; non-descriptor state for a while. Does that matter? Does it
-       ;; matter in GENGC but not in GENCGC? Is this written down
-       ;; anywhere?
-       ;;   -- WHN 19990916
-       ;;
-       ;; Also, the sequence above seems rather twisty. Why not something
-       ;; more obvious along the lines of
-       ;;   inst move y x
-       ;;   inst tst x #xc0000000
-       ;;   inst jmp :nz bignum
-       ;;   inst shl y 2
-       ;;   emit-label done
-
-       (assemble (*elsewhere*)
-          (emit-label bignum)
-          (with-fixed-allocation
-              (y bignum-widetag (+ bignum-digits-offset 1) node)
-            (storew x y bignum-digits-offset other-pointer-lowtag))
-          (inst jmp done)))))
+       (inst call (make-fixup (ecase (tn-offset y)
+                                (#.eax-offset 'alloc-signed-bignum-in-eax)
+                                (#.ebx-offset 'alloc-signed-bignum-in-ebx)
+                                (#.ecx-offset 'alloc-signed-bignum-in-ecx)
+                                (#.edx-offset 'alloc-signed-bignum-in-edx)
+                                (#.esi-offset 'alloc-signed-bignum-in-esi)
+                                (#.edi-offset 'alloc-signed-bignum-in-edi))
+                              :assembly-routine))
+       (emit-label done))))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
-;;; Check for fixnum, and possibly allocate one or two word bignum
-;;; result. Use a worst-case cost to make sure people know they may be
-;;; number consing.
-#+nil
+;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
+;;; as the case may be. Fixnum case inline, bignum case in an assembly
+;;; routine.
 (define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :target eax))
-  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
-  (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-              ebx)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-                   :from (:argument 0) :to (:result 0)) ecx)
-  (:ignore ecx)
-  (:results (y :scs (any-reg descriptor-reg)))
+  (:args (x :scs (signed-reg unsigned-reg) :to :result))
+  (:results (y :scs (any-reg descriptor-reg) :from :argument))
   (:note "unsigned word to integer coercion")
-  (:generator 20
-    (move eax x)
-    (inst call (make-fixup 'move-from-unsigned :assembly-routine))
-    (move y ebx)))
-;;; Faster inline version.
-;;; KLUDGE: Do we really want the faster inline version? It seems awfully big..
-;;; If we really want speed, most likely it's only important in the non-consing
-;;; case, so how about about making the *ELSEWHERE* stuff into a subroutine? --
-;;; WHN 19990916
-(define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :to :save))
-  (:temporary (:sc unsigned-reg) alloc)
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:node-var node)
-  (:note "unsigned word to integer coercion")
+  ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
     (aver (not (location= x y)))
-    (aver (not (location= x alloc)))
-    (aver (not (location= y alloc)))
-    (let ((bignum (gen-label))
-          (done (gen-label))
-          (one-word-bignum (gen-label))
-          (L1 (gen-label)))
+    (let ((done (gen-label)))
+      ;; The assembly routines test the sign flag from this one, so if
+      ;; you change stuff here, make sure the sign flag doesn't get
+      ;; overwritten before the CALL!
       (inst test x #xe0000000)
-      (inst jmp :nz bignum)
-      ;; Fixnum.
-      (inst lea y (make-ea :dword :index x :scale 4)) ; Faster but bigger.
-      ;(inst mov y x)
-      ;(inst shl y 2)
-      (emit-label done)
-
-      (assemble (*elsewhere*)
-         (emit-label bignum)
-         ;; Note: As on the mips port, space for a two word bignum is
-         ;; always allocated and the header size is set to either one
-         ;; or two words as appropriate.
-         (inst jmp :ns one-word-bignum)
-         ;; two word bignum
-         (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
-                                  n-widetag-bits)
-                             bignum-widetag))
-         (inst jmp L1)
-         (emit-label one-word-bignum)
-         (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
-                                  n-widetag-bits)
-                             bignum-widetag))
-         (emit-label L1)
-         (pseudo-atomic
-          (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)
-          (storew y alloc)
-          (inst lea y (make-ea :byte :base alloc :disp other-pointer-lowtag))
-          (storew x y bignum-digits-offset other-pointer-lowtag))
-         (inst jmp done)))))
+      ;; Faster but bigger then SHL Y 2. The cost of doing this speculatively
+      ;; is noise compared to bignum consing if that is needed.
+      (inst lea y (make-ea :dword :index x :scale 4))
+      (inst jmp :z done)
+      (inst mov y x)
+      (inst call (make-fixup (ecase (tn-offset y)
+                               (#.eax-offset 'alloc-unsigned-bignum-in-eax)
+                               (#.ebx-offset 'alloc-unsigned-bignum-in-ebx)
+                               (#.ecx-offset 'alloc-unsigned-bignum-in-ecx)
+                               (#.edx-offset 'alloc-unsigned-bignum-in-edx)
+                               (#.edi-offset 'alloc-unsigned-bignum-in-edi)
+                               (#.esi-offset 'alloc-unsigned-bignum-in-esi))
+                             :assembly-routine))
+      (emit-label done))))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
