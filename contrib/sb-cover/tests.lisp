@@ -92,3 +92,9 @@
 ;; Complete branch coverage
 (assert (= (sb-cover::ok-of (getf sb-cover::*counts* :branch))
            (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+
+;; Check for presence of constant coalescing bugs
+
+(load (compile-file (merge-pathnames #p"test-data-3.lisp" *path*)))
+(test-2)
+

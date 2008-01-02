@@ -390,9 +390,9 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            unless (member (caar record) '(:then :else))
            collect (list mode
                          (car record)
-                         (ecase (cdr record)
-                           ((t) 1)
-                           ((nil) 2)))))
+                         (if (sb-c::code-coverage-record-marked record)
+                             1
+                             2))))
     (:branch
      (let ((hash (make-hash-table :test 'equal)))
        (dolist (record records)
@@ -400,7 +400,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            (when (member (car path) '(:then :else))
              (setf (gethash (cdr path) hash)
                    (logior (gethash (cdr path) hash 0)
-                           (ash (if (cdr record)
+                           (ash (if (sb-c::code-coverage-record-marked record)
                                     1
                                     2)
                                 (if (eql (car path) :then)

@@ -832,9 +832,18 @@
 
 ;;;; code coverage
 
+;;; Used as the CDR of the code coverage instrumentation records
+;;; (instead of NIL) to ensure that any well-behaving user code will
+;;; not have constants EQUAL to that record. This avoids problems with
+;;; the records getting coalesced with non-record conses, which then
+;;; get mutated when the instrumentation runs. Note that it's
+;;; important for multiple records for the same location to be
+;;; coalesced. -- JES, 2008-01-02
+(defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%)
+
 ;;; Check the policy for whether we should generate code coverage
 ;;; instrumentation. If not, just return the original START
-;;; ctran. Otherwise ninsert code coverage instrumentation after
+;;; ctran. Otherwise insert code coverage instrumentation after
 ;;; START, and return the new ctran.
 (defun instrument-coverage (start mode form)
   ;; We don't actually use FORM for anything, it's just convenient to
@@ -857,7 +866,7 @@
                    ;; each instrument for the same block.
                    (or (gethash path *code-coverage-records*)
                        (setf (gethash path *code-coverage-records*)
-                             (cons path nil))))
+                             (cons path +code-coverage-unmarked+))))
                   (next (make-ctran))
                   (*allow-instrumenting* nil))
               (push (ctran-block start)
@@ -900,8 +909,14 @@
   (maphash (lambda (info cc)
              (declare (ignore info))
              (dolist (cc-entry cc)
-               (setf (cdr cc-entry) nil)))
+               (setf (cdr cc-entry) +code-coverage-unmarked+)))
            *code-coverage-info*))
+
+(defun code-coverage-record-marked (record)
+  (aver (consp record))
+  (ecase (cdr record)
+    ((#.+code-coverage-unmarked+) nil)
+    ((t) t)))
 
 
 ;;;; converting combinations
