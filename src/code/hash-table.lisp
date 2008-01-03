@@ -81,9 +81,11 @@
   (synchronized-p nil :type (member nil t) :read-only t)
   ;; For detecting concurrent accesses.
   #!+sb-hash-table-debug
-  (concurrent-access-error t :type (member nil t))
+  (signal-concurrent-access t :type (member nil t))
   #!+sb-hash-table-debug
-  (accessing-thread nil))
+  (reading-thread nil)
+  #!+sb-hash-table-debug
+  (writing-thread nil))
 
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
 ;; is bigger than any possible nonEQ hash value, and thus indicates an

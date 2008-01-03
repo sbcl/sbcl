@@ -25,34 +25,54 @@
 ;;; internal hash-table has been corrupted. It's plausible that this
 ;;; could be useful for some user code too, but the runtime cost is
 ;;; really too high to enable it by default.
-(defmacro with-concurrent-access-check (hash-table &body body)
-  (declare (ignorable hash-table))
+(defmacro with-concurrent-access-check (hash-table operation &body body)
+  (declare (ignorable hash-table operation)
+           (type (member :read :write) operation))
   #!-sb-hash-table-debug
   `(progn ,@body)
   #!+sb-hash-table-debug
-  (once-only ((hash-table hash-table))
-    `(progn
-       (flet ((body-fun ()
-                ,@body)
-              (error-fun ()
-                ;; Don't signal more errors for this table.
-                (setf (hash-table-concurrent-access-error ,hash-table) nil)
-                (error "Concurrent access to ~A" ,hash-table)))
-         (if (hash-table-concurrent-access-error ,hash-table)
-             (let ((thread (hash-table-accessing-thread ,hash-table)))
+  (let ((thread-slot-accessor (if (eq operation :read)
+                                  'hash-table-reading-thread
+                                  'hash-table-writing-thread)))
+    (once-only ((hash-table hash-table))
+      `(progn
+         (flet ((body-fun ()
+                  ,@body)
+                (error-fun ()
+                  ;; Don't signal more errors for this table.
+                  (setf (hash-table-signal-concurrent-access ,hash-table) nil)
+                  (cerror "Ignore the concurrent access"
+                          "Concurrent access to ~A" ,hash-table)))
+           (declare (inline body-fun))
+           (if (hash-table-signal-concurrent-access ,hash-table)
                (unwind-protect
                     (progn
-                      (when (and thread
-                                 (not (eql thread sb!thread::*current-thread*)))
+                      (unless (and (null (hash-table-writing-thread
+                                          ,hash-table))
+                                   ,@(when (eq operation :write)
+                                           `((null (hash-table-reading-thread
+                                                    ,hash-table)))))
                         (error-fun))
-                      (setf (hash-table-accessing-thread ,hash-table)
+                      (setf (,thread-slot-accessor ,hash-table)
                             sb!thread::*current-thread*)
                       (body-fun))
-                 (unless (eql (hash-table-accessing-thread ,hash-table)
-                              sb!thread::*current-thread*)
+                 (unless (and ,@(when (eq operation :read)
+                                  `((null (hash-table-writing-thread
+                                           ,hash-table))))
+                              ,@(when (eq operation :write)
+                                  ;; no readers are allowed while writing
+                                  `((null (hash-table-reading-thread
+                                           ,hash-table))
+                                    (eq (hash-table-writing-thread
+                                         ,hash-table)
+                                        sb!thread::*current-thread*))))
                    (error-fun))
-                 (setf (hash-table-accessing-thread ,hash-table) thread)))
-             (body-fun))))))
+                 (when (eq (,thread-slot-accessor ,hash-table)
+                           sb!thread::*current-thread*)
+                   ;; this is not 100% correct here and may hide
+                   ;; concurrent access in rare circumstances.
+                   (setf (,thread-slot-accessor ,hash-table) nil)))
+               (body-fun)))))))
 
 (deftype hash ()
   `(integer 0 ,max-hash))
@@ -514,11 +534,12 @@ multiple threads accessing the same hash-table without locking."
     (setf (hash-table-cache hash-table) index)))
 
 (defmacro with-hash-table-locks ((hash-table
-                                  &key inline pin
+                                  &key (operation :write) inline pin
                                   (synchronized `(hash-table-synchronized-p ,hash-table)))
                                  &body body)
+  (declare (type (member :read :write) operation))
   (with-unique-names (body-fun)
-    `(with-concurrent-access-check ,hash-table
+    `(with-concurrent-access-check ,hash-table ,operation
        (flet ((,body-fun ()
                 (locally (declare (inline ,@inline))
                   ,@body)))
@@ -622,7 +643,8 @@ if there is no such entry. Entries can be added using SETF."
 (defun gethash3 (key hash-table default)
   "Three argument version of GETHASH"
   (declare (type hash-table hash-table))
-  (with-hash-table-locks (hash-table :inline (%gethash3) :pin (key))
+  (with-hash-table-locks (hash-table :operation :read :inline (%gethash3)
+                                     :pin (key))
     (%gethash3 key hash-table default)))
 
 ;;; so people can call #'(SETF GETHASH)
