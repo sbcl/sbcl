@@ -257,6 +257,8 @@ between classes and proper names and between lists of the form
 
 @node Command-line arguments
 @subsection Command-line arguments
+@vindex sb-ext:*posix-argv*
+@vindex *posix-argv*
 
 The UNIX command line can be read from the variable
 @code{sb-ext:*posix-argv*}. 
@@ -338,6 +340,8 @@ mechanisms as follows:
 @node Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @section Tools To Help Developers
+@findex trace
+@findex inspect
 
 SBCL provides a profiler and other extensions to the ANSI @code{trace}
 facility.  For more information, see @ref{Macro common-lisp:trace}.
@@ -350,6 +354,10 @@ the @code{inspect} prompt.
 
 @node Resolution of Name Conflicts
 @section Resolution of Name Conflicts
+@tindex sb-ext:name-conflict
+@tindex name-conflict
+@findex sb-ext:name-conflict-symbols
+@findex name-conflict-symbols
 
 The ANSI standard (section 11.1.1.2.5) requires that name conflicts in
 packages be resolvable in favour of any of the conflicting symbols.  In

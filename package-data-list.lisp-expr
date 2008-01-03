@@ -637,6 +637,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "IMPLICIT-GENERIC-FUNCTION-WARNING"
                "INVALID-FASL"
 
+               "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
+               "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
+               "RESOLVE-CONFLICT"
+
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
 
@@ -953,10 +957,6 @@ possibly temporariliy, because it might be used internally."
                "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
                "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
                "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
-
-               "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
-               "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
-               "RESOLVE-CONFLICT"
 
                ;; ..and DEFTYPEs..
                "INDEX" "LOAD/STORE-INDEX"

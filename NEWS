@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.14 relative to sbcl-1.0.13:
+  * bug fix: RESOLVE-CONFLICT (and the other name conflict machinery)
+    is now actually exported from SB-EXT as documented.  (reported by
+    Maciej Katafiasz)
+
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
   * minor incompatible change: RUN-PROGRAM now uses execvp(3) to find
     an executable in the search path, and does so in the child

@@ -309,6 +309,8 @@ files follow.
 @node Unix-style Command Line Protocol
 @comment  node-name,  next,  previous,  up
 @subsubsection Unix-style Command Line Protocol
+@vindex sb-ext:*posix-argv*
+@vindex *posix-argv*
 
 Standard Unix tools that are interpreters follow a common command line
 protocol that is necessary to work with ``shebang scripts''. SBCL
