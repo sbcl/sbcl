@@ -845,6 +845,7 @@
   (let ((fd (fd-stream-fd stream))
         (errno 0)
         (count 0))
+    (declare (dynamic-extent fd errno count))
     (tagbody
        ;; Check for blocking input before touching the stream, as if
        ;; we happen to wait we are liable to be interrupted, and the
@@ -868,49 +869,61 @@
        ;; Since the read should not block, we'll disable the
        ;; interrupts here, so that we don't accidentally unwind and
        ;; leave the stream in an inconsistent state.
-       (without-interrupts
-         ;; Check the buffer: if it is null, then someone has closed
-         ;; the stream from underneath us. This is not ment to fix
-         ;; multithreaded races, but to deal with interrupt handlers
-         ;; closing the stream.
-         (let* ((ibuf (or (fd-stream-ibuf stream) (go :closed-flame)))
-                (sap (buffer-sap ibuf))
-                (length (buffer-length ibuf))
-                (head (buffer-head ibuf))
-                (tail (buffer-tail ibuf)))
-           (declare (index length head tail))
-           (unless (zerop head)
-             (cond ((eql head tail)
-                    ;; Buffer is empty, but not at yet reset -- make it so.
-                    (setf head 0
-                          tail 0)
-                    (reset-buffer ibuf))
-                   (t
-                    ;; Buffer has things in it, but they are not at the head
-                    ;; -- move them there.
-                    (let ((n (- tail head)))
-                      (system-area-ub8-copy sap head sap 0 n)
-                      (setf head 0
-                            (buffer-head ibuf) head
-                            tail n
-                            (buffer-tail ibuf) tail)))))
-           (setf (fd-stream-listen stream) nil)
-           (setf (values count errno)
-                 (sb!unix:unix-read fd (sap+ sap tail) (- length tail)))
-           (cond ((null count)
-                  #!+win32
-                  (go :read-error)
-                  #!-win32
-                  (if (eql errno sb!unix:ewouldblock)
-                      (go :wait-for-input)
-                      (go :read-error)))
-                 ((zerop count)
-                  (setf (fd-stream-listen stream) :eof)
-                  (/show0 "THROWing EOF-INPUT-CATCHER")
-                  (throw 'eof-input-catcher nil))
-                 (t
-                  ;; Success! (Do not use INCF, for sake of other threads.)
-                  (setf (buffer-tail ibuf) (+ count tail)))))))
+
+       ;; Execute the nlx outside without-interrupts to ensure the
+       ;; resulting thunk is stack-allocatable.
+       ((lambda (return-reason)
+          (ecase return-reason
+            ((nil))             ; fast path normal cases
+            ((:wait-for-input) (go :wait-for-input))
+            ((:closed-flame)   (go :closed-flame))
+            ((:read-error)     (go :read-error))))
+        (without-interrupts
+          ;; Check the buffer: if it is null, then someone has closed
+          ;; the stream from underneath us. This is not ment to fix
+          ;; multithreaded races, but to deal with interrupt handlers
+          ;; closing the stream.
+          (block nil
+            (prog1 nil
+              (let* ((ibuf (or (fd-stream-ibuf stream) (return :closed-flame)))
+                     (sap (buffer-sap ibuf))
+                     (length (buffer-length ibuf))
+                     (head (buffer-head ibuf))
+                     (tail (buffer-tail ibuf)))
+                (declare (index length head tail)
+                         (inline sb!unix:unix-read))
+                (unless (zerop head)
+                  (cond ((eql head tail)
+                         ;; Buffer is empty, but not at yet reset -- make it so.
+                         (setf head 0
+                               tail 0)
+                         (reset-buffer ibuf))
+                        (t
+                         ;; Buffer has things in it, but they are not at the
+                         ;; head -- move them there.
+                         (let ((n (- tail head)))
+                           (system-area-ub8-copy sap head sap 0 n)
+                           (setf head 0
+                                 (buffer-head ibuf) head
+                                 tail n
+                                 (buffer-tail ibuf) tail)))))
+                (setf (fd-stream-listen stream) nil)
+                (setf (values count errno)
+                      (sb!unix:unix-read fd (sap+ sap tail) (- length tail)))
+                (cond ((null count)
+                       #!+win32
+                       (return :read-error)
+                       #!-win32
+                       (if (eql errno sb!unix:ewouldblock)
+                           (return :wait-for-input)
+                           (return :read-error)))
+                      ((zerop count)
+                       (setf (fd-stream-listen stream) :eof)
+                       (/show0 "THROWing EOF-INPUT-CATCHER")
+                       (throw 'eof-input-catcher nil))
+                      (t
+                       ;; Success! (Do not use INCF, for sake of other threads.)
+                       (setf (buffer-tail ibuf) (+ count tail))))))))))
     count))
 
 ;;; Make sure there are at least BYTES number of bytes in the input

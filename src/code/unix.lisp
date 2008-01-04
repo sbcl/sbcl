@@ -296,6 +296,10 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;; It attempts to read len bytes from the device associated with fd
 ;;; and store them into the buffer. It returns the actual number of
 ;;; bytes read.
+
+#!-sb!fluid
+(declaim (maybe-inline unix-read))
+
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) len))

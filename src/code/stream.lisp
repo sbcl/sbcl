@@ -273,7 +273,8 @@
                    (incf chunks-total-length len)
                    (when (refill-buffer)
                      (make-and-return-result-string nil)))))
-        (declare (inline make-and-return-result-string))
+        (declare (inline make-and-return-result-string
+                         refill-buffer))
         (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
                    (refill-buffer))
           ;; EOF had been reached before we read anything
@@ -2106,6 +2107,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                      (done-with-fast-read-char)
                      (return-from ansi-stream-read-string-from-frc-buffer
                        read)))))
+        (declare (inline refill-buffer))
         (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
                    (refill-buffer))
           ;; EOF had been reached before we read anything
