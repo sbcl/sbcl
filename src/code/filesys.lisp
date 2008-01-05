@@ -645,7 +645,7 @@ broken symlink itself."
   "Return the author of the file specified by PATHSPEC. Signal an
 error of type FILE-ERROR if no such file exists, or if PATHSPEC
 is a wild pathname."
-  (query-file-system pathspec :write-date t))
+  (query-file-system pathspec :author t))
 
 (defun file-write-date (pathspec)
   #!+sb-doc

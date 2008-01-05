@@ -155,3 +155,9 @@
   (let ((*default-pathname-defaults* (pathname "SYS:")))
     (assert (not (typep (sb-impl::sbcl-homedir-pathname)
                         'logical-pathname)))))
+
+(with-test (:name :file-author-stringp)
+  (assert (stringp (file-author (user-homedir-pathname)))))
+(with-test (:name :file-write-date-integerp)
+  (assert (integerp (file-write-date (user-homedir-pathname)))))
+
