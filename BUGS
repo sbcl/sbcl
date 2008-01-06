@@ -1845,3 +1845,20 @@ WORKAROUND:
  performance elsewhere.
 
  Other generic sequence functions have this problem as well.
+
+419: stack-allocated indirect closure variables are not popped
+
+    (locally (declare (optimize speed (safety 0)))
+      (defun bug419 (x)
+        (multiple-value-call #'list
+          (eval '(values 1 2 3))
+          (let ((x x))
+            (declare (dynamic-extent x))
+            (flet ((mget (y)
+                     (+ x y))
+                   (mset (z)
+                     (incf x z)))
+              (declare (dynamic-extent #'mget #'mset))
+              ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset))))))
+
+  (ASSERT (EQUAL (BUG419) '(1 2 3 4 5 6))) => failure
