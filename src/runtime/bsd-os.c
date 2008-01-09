@@ -66,6 +66,15 @@ static void netbsd_init();
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
+#ifdef __OpenBSD__
+#include <sys/types.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <dlfcn.h>
+
+static void openbsd_init();
+#endif
+
 void
 os_init(char *argv[], char *envp[])
 {
@@ -75,6 +84,8 @@ os_init(char *argv[], char *envp[])
     netbsd_init();
 #elif defined(__FreeBSD__)
     freebsd_init();
+#elif defined(__OpenBSD__)
+    openbsd_init();
 #endif
 }
 
@@ -464,7 +475,7 @@ os_get_runtime_executable_path()
         return NULL;
     return copied_string(path);
 }
-#elif defined(LISP_FEATURE_NETBSD)
+#elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
 char *
 os_get_runtime_executable_path()
 {
@@ -477,10 +488,64 @@ os_get_runtime_executable_path()
         return NULL;
     }
 }
-#else /* Not DARWIN or FREEBSD or NETBSD */
+#else /* Not DARWIN or FREEBSD or NETBSD or OPENBSD */
 char *
 os_get_runtime_executable_path()
 {
     return NULL;
 }
+#endif
+
+#ifdef __OpenBSD__
+void
+openbsd_init()
+{
+    struct rlimit rl;
+
+    /* OpenBSD, like NetBSD, counts mmap()ed space against the
+     * process's data size limit. If the soft limit is lower than the
+     * hard limit then try to yank it up, this lets users in the
+     * "staff" login class run sbcl with a default /etc/login.conf
+     */
+    getrlimit (RLIMIT_DATA, &rl);
+    if (rl.rlim_cur < rl.rlim_max) {
+        rl.rlim_cur = rl.rlim_max;
+        if (setrlimit (RLIMIT_DATA, &rl) < 0) {
+            fprintf (stderr,
+                     "RUNTIME WARNING: unable to raise process data size limit:\n\
+  %s.\n\
+The system may fail to start.\n",
+                     strerror(errno));
+        }
+    }
+
+    /* Display a (hopefully) helpful warning if it looks like we won't
+     * be able to allocate enough memory. In testing I found that on
+     * my system at least, a minimum of 25M on top of the three space
+     * sizes was needed to start SBCL. Show a warning below 32M so as
+     * to leave a little breathing room.
+     */
+    getrlimit (RLIMIT_DATA, &rl);
+    if (dynamic_space_size + READ_ONLY_SPACE_SIZE + STATIC_SPACE_SIZE +
+        LINKAGE_TABLE_SPACE_SIZE + (32*1024*1024) > rl.rlim_cur)
+        fprintf (stderr,
+                 "RUNTIME WARNING: data size resource limit may be too low,\n"
+                 "  try decreasing the dynamic space size with --dynamic-space-size\n");
+}
+
+/* OpenBSD's dlsym() relies on the gcc bulitin
+ * __builtin_return_address(0) returning an address in the
+ * executable's text segment, but when called from lisp it will return
+ * an address in the dynamic space.  Work around this by calling this
+ * wrapper function instead. Note that tail-call optimization will
+ * defeat this, disable it by saving the dlsym() return value in a
+ * volatile variable.
+*/
+void *
+os_dlsym(void *handle, const char *symbol)
+{
+    void * volatile ret = dlsym(handle, symbol);
+    return ret;
+}
+
 #endif

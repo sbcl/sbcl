@@ -159,6 +159,12 @@
 ;;;     And if KVA_PAGES is extended from 1GB to 1.5GB, we can't use
 ;;;     down to around 0xA0000000.
 ;;;     So we use 0x58000000--0x98000000 for dynamic space.
+;;;   * OpenBSD address space changes for W^X as well as malloc
+;;;     randomization made the old addresses unsafe. The only range
+;;;     that is really safe is between the end of the text segment (it
+;;;     starts at #x3C000000) and #x7C000000. However if the -Z linker
+;;;     option is used then the safe range is (probably) #x00001000 to
+;;;     #x48048000, with the text and data segments at #x08048000.
 
 #!+win32
 (progn
@@ -219,18 +225,18 @@
 
 #!+openbsd
 (progn
-  (def!constant read-only-space-start     #x10000000)
-  (def!constant read-only-space-end       #x100ff000)
+  (def!constant read-only-space-start     #x7b000000)
+  (def!constant read-only-space-end       #x7b0ff000)
 
-  (def!constant static-space-start        #x10100000)
-  (def!constant static-space-end          #x101ff000)
+  (def!constant static-space-start        #x7b100000)
+  (def!constant static-space-end          #x7b1ff000)
 
-  (def!constant dynamic-space-start       #x80000000)
-  (def!constant dynamic-space-end         #xA0000000)
+  (def!constant dynamic-space-start       #x4c000000)
+  (def!constant dynamic-space-end         #x7b0ff000)
 
   ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #x10200000)
-  (def!constant linkage-table-space-end   #x102ff000))
+  (def!constant linkage-table-space-start #x7b200000)
+  (def!constant linkage-table-space-end   #x7b2ff000))
 
 #!+netbsd
 (progn
