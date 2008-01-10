@@ -921,14 +921,10 @@ Users Manual for details about the PROCESS structure."#-win32"
   ;; run afoul of disk quotas or to choke on small /tmp file systems.
   (flet ((make-temp-fd ()
            (multiple-value-bind (fd name/errno)
-               (sb-unix:unix-mkstemp "/tmp/.run-program-XXXXXX")
+               (sb-unix:sb-mkstemp "/tmp/.run-program-XXXXXX" #o0600)
              (unless fd
                (error "could not open a temporary file: ~A"
                       (strerror name/errno)))
-             #-win32 #|FIXME: should say (logior s_irusr s_iwusr)|#
-             (unless (sb-unix:unix-chmod name/errno #o600)
-               (sb-unix:unix-close fd)
-               (error "failed to chmod the temporary file?!"))
              (unless (sb-unix:unix-unlink name/errno)
                (sb-unix:unix-close fd)
                (error "failed to unlink ~A" name/errno))

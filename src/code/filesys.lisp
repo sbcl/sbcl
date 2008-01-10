@@ -522,22 +522,24 @@
         (declare (ignore ino nlink gid rdev size atime))
         (if existsp
             (case query-for
-              (:truename (parse-native-namestring
-                          ;; Note: in case the file is stat'able, POSIX
-                          ;; realpath(3) gets us a canonical absolute
-                          ;; filename, even if the post-merge PATHNAME
-                          ;; is not absolute...
-                          (multiple-value-bind (realpath errno)
-                              (sb!unix:unix-realpath filename)
-                            (if realpath
-                                realpath
-                                (simple-file-perror "couldn't resolve ~A"
-                                                    filename errno)))
-                          (pathname-host pathname)
-                          (sane-default-pathname-defaults)
-                          ;; ... but without any trailing slash.
-                          :as-directory (eql (logand  mode sb!unix:s-ifmt)
-                                             sb!unix:s-ifdir)))
+              (:truename (nth-value
+                          0
+                          (parse-native-namestring
+                           ;; Note: in case the file is stat'able, POSIX
+                           ;; realpath(3) gets us a canonical absolute
+                           ;; filename, even if the post-merge PATHNAME
+                           ;; is not absolute...
+                           (multiple-value-bind (realpath errno)
+                               (sb!unix:unix-realpath filename)
+                             (if realpath
+                                 realpath
+                                 (simple-file-perror "couldn't resolve ~A"
+                                                     filename errno)))
+                           (pathname-host pathname)
+                           (sane-default-pathname-defaults)
+                           ;; ... but without any trailing slash.
+                           :as-directory (eql (logand  mode sb!unix:s-ifmt)
+                                              sb!unix:s-ifdir))))
               (:author (sb!unix:uid-username uid))
               (:write-date (+ unix-to-universal-time mtime)))
             (progn
@@ -577,25 +579,27 @@
                        ;; re-merge against *DEFAULT-PATHNAME-DEFAULTS*,
                        ;; since PATHNAME may be a relative pathname.
                        (merge-pathnames
-                        (parse-native-namestring
-                         (multiple-value-bind (realpath errno)
-                             (sb!unix:unix-realpath
-                              (native-namestring
-                               (make-pathname
-                                :name :unspecific
-                                :type :unspecific
-                                :version :unspecific
-                                :defaults (parse-native-namestring
-                                           filename
-                                           (pathname-host pathname)
-                                           (sane-default-pathname-defaults)))))
-                           (if realpath
-                               realpath
-                               (simple-file-perror "couldn't resolve ~A"
-                                                   filename errno)))
-                         (pathname-host pathname)
-                         (sane-default-pathname-defaults)
-                         :as-directory t)
+                        (nth-value
+                         0
+                         (parse-native-namestring
+                          (multiple-value-bind (realpath errno)
+                              (sb!unix:unix-realpath
+                               (native-namestring
+                                (make-pathname
+                                 :name :unspecific
+                                 :type :unspecific
+                                 :version :unspecific
+                                 :defaults (parse-native-namestring
+                                            filename
+                                            (pathname-host pathname)
+                                            (sane-default-pathname-defaults)))))
+                            (if realpath
+                                realpath
+                                (simple-file-perror "couldn't resolve ~A"
+                                                    filename errno)))
+                          (pathname-host pathname)
+                          (sane-default-pathname-defaults)
+                          :as-directory t))
                         pathname))
                       (:author (sb!unix:uid-username uid))
                       (:write-date (+ unix-to-universal-time mtime))))))

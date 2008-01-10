@@ -180,16 +180,22 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;;; stdlib.h
 
 ;;; There are good reasons to implement some OPEN options with an
-;;; mkstemp(3) followed by a fchmod(2) followed by a rename(2), but we
-;;; don't do that yet.  Instead, this function is used only to make a
-;;; temporary file for RUN-PROGRAM.  sb_mkstemp() is a wrapper that
-;;; lives in src/runtime/wrap.c.
-(defun unix-mkstemp (template-string)
+;;; mkstemp(3)-like routine, but we don't do that yet.  Instead, this
+;;; function is used only to make a temporary file for RUN-PROGRAM.
+;;; sb_mkstemp() is a wrapper that lives in src/runtime/wrap.c.  Since
+;;; SUSv3 mkstemp() doesn't specify the mode of the created file and
+;;; since we have to implement most of this ourselves for Windows
+;;; anyway, it seems worthwhile to depart from the mkstemp()
+;;; specification by taking a mode to use when creating the new file.
+(defun sb-mkstemp (template-string mode)
+  (declare (type string template-string)
+           (type unix-file-mode mode))
   (let ((template-buffer (string-to-octets template-string)))
     (with-pinned-objects (template-buffer)
       (let ((fd (alien-funcall (extern-alien "sb_mkstemp"
-                                             (function int (* char)))
-                               (vector-sap template-buffer))))
+                                             (function int (* char) int))
+                               (vector-sap template-buffer)
+                               mode)))
         (if (minusp fd)
             (values nil (get-errno))
             (values fd (octets-to-string template-buffer)))))))
@@ -761,17 +767,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
              (%extract-stat-results (addr buf))
              fd (addr buf))))
-
-;;; RUN-PROGRAM creates temporary files with mkstemp, but SUSv3
-;;; doesn't specify the mode of a newly created file under mkstemp,
-;;; and C libraries may vary, so we fix the mode ourselves.
-;;; Eventually some OPEN actions should probably be implemented with
-;;; mkstemp(3)/chmod(2)/rename(2) as well.
-#!-win32
-(defun unix-chmod (path mode)
-  (declare (type unix-pathname path)
-           (type unix-file-mode mode))
-  (void-syscall ("chmod" c-string int) path mode))
 
 ;;;; time.h
 

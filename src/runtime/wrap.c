@@ -34,6 +34,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <fcntl.h>
+
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
 #include <sys/wait.h>
@@ -43,7 +45,6 @@
 
 #if defined(LISP_FEATURE_WIN32)
 #define WIN32_LEAN_AND_MEAN
-#include <fcntl.h>
 #include <errno.h>
 #endif
 
@@ -282,16 +283,31 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
     return ret;
 }
 
-/* A wrapper for mkstemp(3), which seems not to exist on Windows. */
-int sb_mkstemp (char *template) {
+/* A wrapper for mkstemp(3), for two reasons: (1) mkstemp does not
+   exist on Windows; (2) by passing down a mode_t, we don't need a
+   binding to chmod in SB-UNIX, and need not concern ourselves with
+   umask issues if we want to use mkstemp to make new files in
+   OPEN. */
+int sb_mkstemp (char *template, mode_t mode) {
 #ifdef LISP_FEATURE_WIN32
+#define PATHNAME_BUFFER_SIZE MAX_PATH
+#define MKTEMP _mktemp
+#else
+#define PATHNAME_BUFFER_SIZE PATH_MAX
+#define MKTEMP mktemp
+#endif
   int fd;
-  char buf[MAX_PATH];
+  char buf[PATHNAME_BUFFER_SIZE];
 
   while (1) {
+    /* Fruit fallen from the tree: for people who like
+       microoptimizations, we might not need to copy the whole
+       template on every loop, but only the last several characters.
+       But I didn't feel like testing the boundary cases in Windows's
+       _mktemp. */
     strcpy((char*)&buf, template);
-    if (_mktemp((char*)&buf)) {
-      if ((fd=open((char*)&buf, O_CREAT|O_EXCL|O_RDWR, S_IRUSR|S_IWUSR))!=-1) {
+    if (MKTEMP((char*)&buf)) {
+      if ((fd=open((char*)&buf, O_CREAT|O_EXCL|O_RDWR, mode))!=-1) {
         strcpy(template, (char*)&buf);
         return (fd);
       } else
@@ -300,9 +316,8 @@ int sb_mkstemp (char *template) {
     } else
       return (-1);
   }
-#else
-  return(mkstemp(template));
-#endif
+#undef MKTEMP
+#undef PATHNAME_BUFFER_SIZE
 }
 
 
