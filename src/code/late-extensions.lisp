@@ -140,3 +140,13 @@ EXPERIMENTAL: Interface subject to change."
   (def %compare-and-swap-symbol-plist (symbol) symbol-plist)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
+
+(defun call-hooks (kind hooks &key (on-error :error))
+  (dolist (hook hooks)
+    (handler-case
+        (funcall hook)
+      (serious-condition (c)
+        (if (eq :warn on-error)
+            (warn "Problem running ~A hook ~S:~%  ~A" kind hook c)
+            (with-simple-restart (continue "Skip this ~A hook." kind)
+              (error "Problem running ~A hook ~S:~%  ~A" kind hook c)))))))

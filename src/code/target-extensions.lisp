@@ -35,6 +35,13 @@ order when a saved core image starts up, after the system itself has
 been initialized. Unused by SBCL itself: reserved for user and
 applications.")
 
+(defvar *exit-hooks* nil
+  #!+sb-doc
+  "This is a list of functions which are called in an unspecified
+order when SBCL process exits. Unused by SBCL itself: reserved for
+user and applications. Using (QUIT :RECKLESSLY-P T), or calling
+exit(3) directly will circumvent these hooks.")
+
 
 ;;; Binary search for simple vectors
 (defun binary-search (value seq &key (key #'identity))

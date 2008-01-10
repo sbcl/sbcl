@@ -147,9 +147,7 @@ sufficiently motivated to do lengthy fixes."
            (save-core t)))))
 
 (defun deinit ()
-  (dolist (hook *save-hooks*)
-    (with-simple-restart (continue "Skip this save hook.")
-      (funcall hook)))
+  (call-hooks "save" *save-hooks*)
   (when (rest (sb!thread:list-all-threads))
     (error "Cannot save core with multiple threads running."))
   (float-deinit)

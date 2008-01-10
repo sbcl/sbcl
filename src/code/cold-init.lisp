@@ -271,10 +271,12 @@
 
 (defun quit (&key recklessly-p (unix-status 0))
   #!+sb-doc
-  "Terminate the current Lisp. Things are cleaned up (with
-UNWIND-PROTECT and so forth) unless RECKLESSLY-P is non-NIL. On
-UNIX-like systems, UNIX-STATUS is used as the status code."
+  "Terminate the current Lisp. *EXIT-HOOKS* are pending unwind-protect
+cleanup forms are run unless RECKLESSLY-P is true. On UNIX-like
+systems, UNIX-STATUS is used as the status code."
   (declare (type (signed-byte 32) unix-status))
+  ;; FIXME: Windows is not "unix-like", but still has the same
+  ;; unix-status... maybe we should just revert to calling it :STATUS?
   (/show0 "entering QUIT")
   (if recklessly-p
       (sb!unix:unix-exit unix-status)
@@ -307,9 +309,7 @@ UNIX-like systems, UNIX-STATUS is used as the status code."
   ;; re-disable ldb again.
   (when (eq *invoke-debugger-hook* 'sb!debug::debugger-disabled-hook)
     (sb!debug::disable-debugger))
-  (dolist (hook *init-hooks*)
-    (with-simple-restart (continue "Skip this initialization hook.")
-      (funcall hook))))
+  (call-hooks "initialization" *init-hooks*))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code

@@ -3,10 +3,11 @@
 @chapter Starting and Stopping
 
 @menu
-* Starting SBCL::               
-* Stopping SBCL::               
-* Command Line Options::        
-* Initialization Files::        
+* Starting SBCL::
+* Stopping SBCL::
+* Command Line Options::
+* Initialization Files::
+* Initialization and Exit Hooks::
 @end menu
 
 @node Starting SBCL
@@ -14,9 +15,9 @@
 @section Starting SBCL
 
 @menu
-* Running from Shell::          
-* Running from Emacs::          
-* Shebang Scripts::             
+* Running from Shell::
+* Running from Emacs::
+* Shebang Scripts::
 @end menu
 
 @node Running from Shell
@@ -77,9 +78,9 @@ an example.)
 @section Stopping SBCL
 
 @menu
-* Quit::                        
+* Quit::
 * End of File::
-* Saving a Core Image::              
+* Saving a Core Image::
 * Exit on Errors::
 @end menu
 
@@ -108,9 +109,10 @@ using SBCL as part of a shell pipeline.
 
 SBCL has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
-process, and is also provided as an extension to the user.  
+process, and is also provided as an extension to the user.
 
 @include fun-sb-ext-save-lisp-and-die.texinfo
+@include var-sb-ext-star-save-hooks-star.texinfo
 
 To facilitate distribution of SBCL applications using external
 resources, the filesystem location of the SBCL core file being used is
@@ -163,8 +165,8 @@ passed on to the user program even if they was intended for the
 runtime system or the Lisp system.
 
 @menu
-* Runtime Options::             
-* Toplevel Options::            
+* Runtime Options::
+* Toplevel Options::
 @end menu
 
 @node Runtime Options
@@ -260,10 +262,10 @@ This section covers initialization files processed at startup, which
 can be used to customize the lisp environment.
 
 @menu
-* System Initialization File::  
-* User Initialization File::    
-* Initialization File Semantics::  
-* Initialization Examples::     
+* System Initialization File::
+* User Initialization File::
+* Initialization File Semantics::
+* Initialization Examples::
 @end menu
 
 @node System Initialization File
@@ -302,8 +304,8 @@ Some examples of what you may consider doing in the initialization
 files follow.
 
 @menu
-* Unix-style Command Line Protocol::  
-* Automatic Recompilation of Stale Fasls::  
+* Unix-style Command Line Protocol::
+* Automatic Recompilation of Stale Fasls::
 @end menu
 
 @node Unix-style Command Line Protocol
@@ -320,7 +322,7 @@ initialization file does the trick:
 @lisp
 ;;; If the first user-processable command-line argument is a filename,
 ;;; disable the debugger, load the file handling shebang-line and quit.
-(let ((script (and (second *posix-argv*) 
+(let ((script (and (second *posix-argv*)
                    (probe-file (second *posix-argv*)))))
    (when script
       ;; Handle shebang-line
@@ -329,7 +331,7 @@ initialization file does the trick:
                                        (declare (ignore char arg))
                                        (read-line stream)))
       ;; Disable debugger
-      (setf *invoke-debugger-hook* 
+      (setf *invoke-debugger-hook*
             (lambda (condition hook)
               (declare (ignore hook))
               ;; Uncomment to get backtraces on errors
@@ -378,8 +380,8 @@ handles recompilation automatically for ASDF-based systems.
 @lisp
 (require :asdf)
 
-;;; If a fasl was stale, try to recompile and load (once). 
-(defmethod asdf:perform :around ((o asdf:load-op) 
+;;; If a fasl was stale, try to recompile and load (once).
+(defmethod asdf:perform :around ((o asdf:load-op)
                                  (c asdf:cl-source-file))
    (handler-case (call-next-method o c)
       ;; If a fasl was stale, try to recompile and load (once).
@@ -387,3 +389,13 @@ handles recompilation automatically for ASDF-based systems.
          (asdf:perform (make-instance 'asdf:compile-op) c)
          (call-next-method))))
 @end lisp
+
+@node Initialization and Exit Hooks
+@comment  node-name,  next,  previous,  up
+@section Initialization and Exit Hooks
+
+SBCL provides hooks into the system initialization and exit.
+
+@include var-sb-ext-star-init-hooks-star.texinfo
+@include var-sb-ext-star-exit-hooks-star.texinfo
+

@@ -76,7 +76,9 @@ command-line.")
   (with-unique-names (caught)
     `(let ((,caught (catch '%end-of-the-world
                       (/show0 "inside CATCH '%END-OF-THE-WORLD")
-                      ,@body)))
+                      (unwind-protect
+                           (progn ,@body)
+                        (call-hooks "exit" *exit-hooks*)))))
       (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
       (flush-standard-output-streams)
       (sb!thread::terminate-session)

@@ -587,7 +587,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*DEBUG-PRINT-VARIABLE-ALIST*"
 
                ;; Hooks into init & save sequences
-               "*INIT-HOOKS*" "*SAVE-HOOKS*"
+               "*INIT-HOOKS*" "*SAVE-HOOKS*" "*EXIT-HOOKS*"
 
                ;; There is no one right way to report progress on
                ;; hairy compiles.
@@ -824,6 +824,9 @@ possibly temporariliy, because it might be used internally."
                ;; GENSYM variant that appends the current non-nil block
                ;; name to the string if possible
                "BLOCK-GENSYM"
+
+               ;; Calling a list of hook functions, plus error handling.
+               "CALL-HOOKS"
 
                ;; Constant form evaluation
                "CONSTANT-FORM-VALUE"

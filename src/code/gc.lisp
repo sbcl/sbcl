@@ -248,11 +248,7 @@ run in any thread.")
            ;; for finalizers and after-gc hooks.
            (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
              (run-pending-finalizers)
-             (dolist (hook *after-gc-hooks*)
-               (handler-case
-                   (funcall hook)
-                 (serious-condition (c)
-                   (warn "Error calling after-GC hook ~S:~% ~A" hook c)))))))))
+             (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
