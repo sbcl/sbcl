@@ -226,129 +226,146 @@
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
 ;;; the object, the object's type code, and the object's total size in
-;;; bytes, including any header and padding.
+;;; bytes, including any header and padding. CAREFUL makes
+;;; MAP-ALLOCATED-OBJECTS slightly more accurate, but a lot slower: it
+;;; is intended for slightly more demanding uses of heap groveling
+;;; then ROOM.
 #!-sb-fluid (declaim (maybe-inline map-allocated-objects))
-(defun map-allocated-objects (fun space)
+(defun map-allocated-objects (fun space &optional careful)
   (declare (type function fun) (type spaces space))
-  (without-gcing
-   (multiple-value-bind (start end) (space-bounds space)
-     (declare (type system-area-pointer start end))
-     (declare (optimize (speed 3)))
-     (let ((current start)
-           #!+gencgc (skip-tests-until-addr 0))
-       (labels ((maybe-finish-mapping ()
-                  (unless (sap< current end)
-                    (aver (sap= current end))
-                    (return-from map-allocated-objects)))
-                ;; GENCGC doesn't allocate linearly, which means that the
-                ;; dynamic space can contain large blocks zeros that get
-                ;; accounted as conses in ROOM (and slow down other
-                ;; applications of MAP-ALLOCATED-OBJECTS). To fix this
-                ;; check the GC page structure for the current address.
-                ;; If the page is free or the address is beyond the page-
-                ;; internal allocation offset (bytes-used) skip to the
-                ;; next page immediately.
-                (maybe-skip-page ()
-                  #!+gencgc
-                  (when (eq space :dynamic)
-                    (loop with page-mask = #.(1- sb!vm:gencgc-page-size)
-                          for addr of-type sb!vm:word = (sap-int current)
-                          while (>= addr skip-tests-until-addr)
-                          do
-                          ;; For some reason binding PAGE with LET
-                          ;; conses like mad (but gives no compiler notes...)
-                          ;; Work around the problem with SYMBOL-MACROLET
-                          ;; instead of trying to figure out the real
-                          ;; issue. -- JES, 2005-05-17
-                          (symbol-macrolet
-                              ((page (deref page-table
-                                            (find-page-index addr))))
-                            ;; Don't we have any nicer way to access C struct
-                            ;; bitfields?
-                            (let ((alloc-flag (ldb (byte 3 2)
-                                                   (slot page 'flags)))
-                                  (bytes-used (slot page 'bytes-used)))
-                              ;; If the page is not free and the current
-                              ;; pointer is still below the allocation offset
-                              ;; of the page
-                              (when (and (not (zerop alloc-flag))
-                                         (<= (logand page-mask addr)
-                                             bytes-used))
-                                ;; Don't bother testing again until we
-                                ;; get past that allocation offset
-                                (setf skip-tests-until-addr
-                                      (+ (logandc2 addr page-mask) bytes-used))
-                                ;; And then continue with the scheduled
-                                ;; mapping
-                                (return-from maybe-skip-page))
-                              ;; Move CURRENT to start of next page
-                              (setf current (int-sap (+ (logandc2 addr page-mask)
-                                                        sb!vm:gencgc-page-size)))
-                              (maybe-finish-mapping)))))))
-         (declare (inline maybe-finish-mapping maybe-skip-page))
-         (loop
-             (maybe-finish-mapping)
-             (maybe-skip-page)
-           (let* ((header (sap-ref-word current 0))
-                  (header-widetag (logand header #xFF))
-                  (info (svref *room-info* header-widetag)))
-             (cond
-               ((or (not info)
-                    (eq (room-info-kind info) :lowtag))
-                (let ((size (* cons-size n-word-bytes)))
-                  (funcall fun
-                           (%make-lisp-obj (logior (sap-int current)
-                                                  list-pointer-lowtag))
-                           list-pointer-lowtag
-                           size)
-                  (setq current (sap+ current size))))
-               ((eql header-widetag closure-header-widetag)
-                (let* ((obj (%make-lisp-obj (logior (sap-int current)
-                                                   fun-pointer-lowtag)))
-                       (size (round-to-dualword
-                              (* (the fixnum (1+ (get-closure-length obj)))
-                                 n-word-bytes))))
-                  (funcall fun obj header-widetag size)
-                  (setq current (sap+ current size))))
-               ((eq (room-info-kind info) :instance)
-                (let* ((obj (%make-lisp-obj
-                             (logior (sap-int current) instance-pointer-lowtag)))
-                       (size (round-to-dualword
-                              (* (+ (%instance-length obj) 1) n-word-bytes))))
-                  (declare (fixnum size))
-                  (funcall fun obj header-widetag size)
-                  (aver (zerop (logand size lowtag-mask)))
-                  (setq current (sap+ current size))))
-               (t
-                (let* ((obj (%make-lisp-obj
-                             (logior (sap-int current) other-pointer-lowtag)))
-                       (size (ecase (room-info-kind info)
-                               (:fixed
-                                (aver (or (eql (room-info-length info)
-                                               (1+ (get-header-data obj)))
-                                          (floatp obj)
-                                          (simple-array-nil-p obj)))
-                                (round-to-dualword
-                                 (* (room-info-length info) n-word-bytes)))
-                               ((:vector :string)
-                                (vector-total-size obj info))
-                               (:header
-                                (round-to-dualword
-                                 (* (1+ (get-header-data obj)) n-word-bytes)))
-                               (:code
-                                (+ (the fixnum
-                                     (* (get-header-data obj) n-word-bytes))
-                                   (round-to-dualword
-                                    (* (the fixnum (%code-code-size obj))
-                                       n-word-bytes)))))))
-                  (funcall fun obj header-widetag size)
-                  (macrolet ((frob ()
-                               `(progn
-                                  (aver (zerop (logand size lowtag-mask)))
-                                  (setq current (sap+ current size)))))
-                    (etypecase size
-                      (fixnum (frob))
-                      (word (frob))))))))))))))
+  (flet ((make-obj (tagged-address)
+           (if careful
+               (make-lisp-obj tagged-address nil)
+               (values (%make-lisp-obj tagged-address) t))))
+    (without-gcing
+      (multiple-value-bind (start end) (space-bounds space)
+        (declare (type system-area-pointer start end))
+        (declare (optimize (speed 3)))
+        (let ((current start)
+              #!+gencgc
+              (skip-tests-until-addr 0))
+          (labels ((maybe-finish-mapping ()
+                     (unless (sap< current end)
+                       (aver (sap= current end))
+                       (return-from map-allocated-objects)))
+                   ;; GENCGC doesn't allocate linearly, which means that the
+                   ;; dynamic space can contain large blocks zeros that get
+                   ;; accounted as conses in ROOM (and slow down other
+                   ;; applications of MAP-ALLOCATED-OBJECTS). To fix this
+                   ;; check the GC page structure for the current address.
+                   ;; If the page is free or the address is beyond the page-
+                   ;; internal allocation offset (bytes-used) skip to the
+                   ;; next page immediately.
+                   (maybe-skip-page ()
+                     #!+gencgc
+                     (when (eq space :dynamic)
+                       (loop with page-mask = #.(1- sb!vm:gencgc-page-size)
+                             for addr of-type sb!vm:word = (sap-int current)
+                             while (>= addr skip-tests-until-addr)
+                             do
+                             ;; For some reason binding PAGE with LET
+                             ;; conses like mad (but gives no compiler notes...)
+                             ;; Work around the problem with SYMBOL-MACROLET
+                             ;; instead of trying to figure out the real
+                             ;; issue. -- JES, 2005-05-17
+                             (symbol-macrolet
+                                 ((page (deref page-table
+                                               (find-page-index addr))))
+                               ;; Don't we have any nicer way to access C struct
+                               ;; bitfields?
+                               (let ((alloc-flag (ldb (byte 3 2)
+                                                      (slot page 'flags)))
+                                     (bytes-used (slot page 'bytes-used)))
+                                 ;; If the page is not free and the current
+                                 ;; pointer is still below the allocation offset
+                                 ;; of the page
+                                 (when (and (not (zerop alloc-flag))
+                                            (<= (logand page-mask addr)
+                                                bytes-used))
+                                   ;; Don't bother testing again until we
+                                   ;; get past that allocation offset
+                                   (setf skip-tests-until-addr
+                                         (+ (logandc2 addr page-mask) bytes-used))
+                                   ;; And then continue with the
+                                   ;; scheduled mapping
+                                   (return-from maybe-skip-page))
+                                 ;; Move CURRENT to start of next page.
+                                 (setf current (int-sap (+ (logandc2 addr page-mask)
+                                                           sb!vm:gencgc-page-size)))
+                                 (maybe-finish-mapping))))))
+                   (maybe-map (obj obj-tag n-obj-bytes &optional (ok t))
+                     (let ((next (typecase n-obj-bytes
+                                   (fixnum (sap+ current n-obj-bytes))
+                                   (integer (sap+ current n-obj-bytes)))))
+                       ;; If this object would take us past END, it must
+                       ;; be either bogus, or it has been allocated after
+                       ;; the call to M-A-O.
+                       (cond ((and ok next (sap<= next end))
+                              (funcall fun obj obj-tag n-obj-bytes)
+                              (setf current next))
+                             (t
+                              (setf current (sap+ current n-word-bytes)))))))
+            (declare (inline maybe-finish-mapping maybe-skip-page maybe-map))
+            (loop
+              (maybe-finish-mapping)
+              (maybe-skip-page)
+              (let* ((header (sap-ref-word current 0))
+                     (header-widetag (logand header #xFF))
+                     (info (svref *room-info* header-widetag)))
+                (cond
+                  ((or (not info)
+                       (eq (room-info-kind info) :lowtag))
+                   (multiple-value-bind (obj ok)
+                       (make-obj (logior (sap-int current) list-pointer-lowtag))
+                     (maybe-map obj
+                                list-pointer-lowtag
+                                (* cons-size n-word-bytes)
+                                ok)))
+                  ((eql header-widetag closure-header-widetag)
+                   (let* ((obj (%make-lisp-obj (logior (sap-int current)
+                                                       fun-pointer-lowtag)))
+                          (size (round-to-dualword
+                                 (* (the fixnum (1+ (get-closure-length obj)))
+                                    n-word-bytes))))
+                     (maybe-map obj header-widetag size)))
+                  ((eq (room-info-kind info) :instance)
+                   (let* ((obj (%make-lisp-obj
+                                (logior (sap-int current) instance-pointer-lowtag)))
+                          (size (round-to-dualword
+                                 (* (+ (%instance-length obj) 1) n-word-bytes))))
+                     (aver (zerop (logand size lowtag-mask)))
+                     (maybe-map obj header-widetag size)))
+                  (t
+                   (multiple-value-bind (obj ok)
+                       (make-obj (logior (sap-int current) other-pointer-lowtag))
+                     (let ((size (when ok
+                                   (ecase (room-info-kind info)
+                                     (:fixed
+                                      (aver (or (eql (room-info-length info)
+                                                     (1+ (get-header-data obj)))
+                                                (floatp obj)
+                                                (simple-array-nil-p obj)))
+                                      (round-to-dualword
+                                       (* (room-info-length info) n-word-bytes)))
+                                     ((:vector :string)
+                                      (vector-total-size obj info))
+                                     (:header
+                                      (round-to-dualword
+                                       (* (1+ (get-header-data obj)) n-word-bytes)))
+                                     (:code
+                                      (+ (the fixnum
+                                           (* (get-header-data obj) n-word-bytes))
+                                         (round-to-dualword
+                                          (* (the fixnum (%code-code-size obj))
+                                             n-word-bytes))))))))
+                       (macrolet ((frob ()
+                                    '(progn
+                                      (when size (aver (zerop (logand size lowtag-mask))))
+                                      (maybe-map obj header-widetag size))))
+                         (typecase size
+                           (fixnum (frob))
+                           (word (frob))
+                           (null (frob))))))))))))))))
 
 
 ;;;; MEMORY-USAGE
