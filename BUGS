@@ -1862,3 +1862,21 @@ WORKAROUND:
               ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset))))))
 
   (ASSERT (EQUAL (BUG419) '(1 2 3 4 5 6))) => failure
+
+420: The MISC.556 test from gcl/ansi-tests/misc.lsp fails hard.
+
+In sbcl-1.0.13 on Linux/x86, executing 
+       (FUNCALL
+        (COMPILE NIL
+                 '(LAMBDA (P1 P2)
+                    (DECLARE
+                     (OPTIMIZE (SPEED 1) (SAFETY 0) (DEBUG 0) (SPACE 0))
+                     (TYPE (MEMBER 8174.8604) P1) (TYPE (MEMBER -95195347) P2))
+                    (FLOOR P1 P2)))
+        8174.8604 -95195347)
+interactively causes
+  SB-SYS:MEMORY-FAULT-ERROR: Unhandled memory fault at #x8.
+The gcl/ansi-tests/doit.lisp program terminates prematurely shortly after
+MISC.556 by falling into gdb with
+  fatal error encountered in SBCL pid 2827: Unhandled SIGILL
+unless the MISC.556 test is commented out.

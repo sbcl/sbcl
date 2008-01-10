@@ -30,8 +30,8 @@ distribution.
 
 The recommended way to report bugs is through the @cite{sbcl-help} or
 @cite{sbcl-devel} mailing lists. For mailing list addresses,
-see @ref{SBCL Homepage}.
-
+see @ref{SBCL Homepage}; note that as a spam-reduction measure you
+must subscribe before you can post.
 
 
 

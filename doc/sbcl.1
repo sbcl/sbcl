@@ -62,9 +62,9 @@ Many people like to run SBCL, like other Lisp systems, as a subprocess
 under Emacs. The Emacs "Slime" and "ilisp" modes provide many
 convenient features, like command line editing, tab completion, and
 various kinds of coupling between Common Lisp source files and the
-interactive SBCL subprocess, but they can be somewhat fragile wrt.
-packages and readtables, in which case SBCL in the Emacs "shell" mode
-can a useful substitute.
+interactive SBCL subprocess, but they can be somewhat fragile with
+respect to packages and readtables, in which case SBCL in the Emacs
+"shell" mode can be a useful substitute.
 
 .SH OVERVIEW
 
@@ -79,7 +79,7 @@ the BUGS section below.
 SBCL also includes various non-ANSI extensions, described more fully
 in the User Manual.  Some of these are in the base system and others
 are "contrib" modules loaded on request using \f(CRREQUIRE\fR.  For
-example, to load the \f(CRSB\-BSD\-SOCKETS\fR module that providces
+example, to load the \f(CRSB\-BSD\-SOCKETS\fR module that provides
 TCP/IP connectivity,
 \f(CR
    * (require \(aqasdf)
@@ -145,8 +145,9 @@ and functions (\fIe.g.\fR \f(CRLETF\fR, \f(CRITERATE\fR, \f(CRMEMQ\fR,
 \f(CRREQUIRED\-ARGUMENT\fR), and many others.
 
 SBCL inplements multithreading, but in a completely different fashion
-from CMU CL: see the User Manual for details.  As of 0.8.5 this is
-considered beta-quality and must be explicitly enabled at build time.
+from CMU CL: see the User Manual for details. As of 1.0.13 this is
+still considered beta-quality and must be explicitly enabled at build
+time.
 
 SBCL has retained some extensions from its parent CMU CL. Many of the
 retained extensions are in these categories:
@@ -207,15 +208,6 @@ code. It also tries (almost always successfully) to follow the unusual
 but very useful principle that "declarations are assertions", \fIi.e.\fR
 type declarations should be checked at runtime unless the user
 explicitly tells the system that speed is more important than safety.
-
-The compiler reportedly produces pretty good code for modern CPU
-architectures which have lots of registers, but its code for the X86
-is marred by many extra loads and stores to stack-based temporary
-variables. Because of this, and because of the extra levels of
-indirection in Common Lisp relative to C, the performance of SBCL
-isn't going to impress people who are impressed by small constant
-factors. However, even on the X86 it tends to be faster than byte
-interpreted languages (and can be a lot faster).
 
 The compiled code uses garbage collection to automatically
 manage memory. The garbage collector implementation varies considerably
@@ -431,11 +423,12 @@ point result as a function value) is a fundamentally slow operation.
 
 To report a bug, please send mail to the mailing lists sbcl-help or
 sbcl-devel. You can find the complete mailing list addresses on the
-web pages at <\f(CRhttp://sbcl.sourceforge.net/\fR>.  (You may also
-find fancy SourceForge bug-tracking machinery there, but don't be
-fooled. As of 2002-07-25 anyway, we don't actively monitor that
-machinery, and it exists only because we haven't been able to figure
-out how to turn it off.)
+web pages at <\f(CRhttp://sbcl.sourceforge.net/\fR>; note that as a
+spam reduction measure you must subscribe to the lists before you can
+post. (You may also find fancy SourceForge bug-tracking machinery
+there, but don't be fooled. As of 2002-07-25 anyway, we don't actively
+monitor that machinery, and it exists only because we haven't been
+able to figure out how to turn it off.)
 
 As with any software bug report, it's most helpful if you can provide
 enough information to reproduce the symptoms reliably, and if you say

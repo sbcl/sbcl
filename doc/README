@@ -1,5 +1,5 @@
-SBCL is -- ahem! -- not completely documented at this point. What can
-I say? Help with documentation might not be refused.:-)
+SBCL is -- ahem! -- imperfectly documented. What can we say? Help with
+documentation might not be refused.:-)
 
 There is a Unix man page, sbcl.1.
 
