@@ -326,6 +326,7 @@ The commands are:
     (format stream "~A" (inspected-description object))
     (unless (or *skip-address-display*
                 (eq object *inspect-unbound-object-marker*)
+                (and (= sb-vm::n-word-bits 64) (typep object 'single-float))
                 (characterp object) (typep object 'fixnum))
       (write-string " at #x" stream)
       (format stream (n-word-bits-hex-format)
@@ -655,9 +656,16 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
                                  (ref32-hexstr object start))))
 
 (defmethod inspected-description ((object single-float))
-  (description-maybe-internals "single-float ~W" (list object)
-                               "[#x~A]"
-                               (ref32-hexstr object (round sb-vm::n-word-bits 8))))
+  (ecase sb-vm::n-word-bits
+    (32
+     (description-maybe-internals "single-float ~W" (list object)
+                                  "[#x~A]"
+                                  (ref32-hexstr object (round sb-vm::n-word-bits 8))))
+    (64
+     ;; on 64-bit platform, single-floats are not boxed
+     (description-maybe-internals "single-float ~W" (list object)
+                                  "[#x~8,'0X]"
+                                  (sb-kernel:get-lisp-obj-address object)))))
 
 (defmethod inspected-description ((object fixnum))
   (description-maybe-internals

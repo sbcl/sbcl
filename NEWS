@@ -8,6 +8,8 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * bug fix: RESOLVE-CONFLICT (and the other name conflict machinery)
     is now actually exported from SB-EXT as documented.  (reported by
     Maciej Katafiasz)
+  * bug fix: sb-aclrepl now correctly understands how to inspect
+    single-floats on 64-bit platforms where single-floats are not boxed.
 
 changes in sbcl-1.0.13 relative to sbcl-1.0.12:
   * minor incompatible change: RUN-PROGRAM now uses execvp(3) to find
