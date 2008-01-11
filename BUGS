@@ -1880,3 +1880,11 @@ The gcl/ansi-tests/doit.lisp program terminates prematurely shortly after
 MISC.556 by falling into gdb with
   fatal error encountered in SBCL pid 2827: Unhandled SIGILL
 unless the MISC.556 test is commented out.
+
+421: READ-CHAR-NO-HANG misbehaviour on Windows Console:
+
+  It seems that on Windows READ-CHAR-NO-HANG hangs if the user
+  has pressed a key, but not yet enter (ie. SYSREAD-MAY-BLOCK-P
+  seems to lie if the OS is buffering input for us on Console.)
+
+  reported by Elliot Slaughter on sbcl-devel 2008/1/10.
