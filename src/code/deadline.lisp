@@ -92,7 +92,8 @@ for calling this when a deadline is reached."
                (new-deadline (+ (seconds-to-internal-time new-deadline-seconds)
                                 (get-internal-real-time))))
           (setf *deadline* new-deadline
-                *deadline-seconds* new-deadline-seconds))))))
+                *deadline-seconds* new-deadline-seconds)))))
+  nil)
 
 (defun defer-deadline (seconds &optional condition)
   "Find the DEFER-DEADLINE restart associated with CONDITION, and
@@ -158,3 +159,4 @@ it will signal a timeout condition."
                      (decode-internal-time final-deadline)
                    (values to-sec to-usec stop-sec stop-usec signalp)))
                (values nil nil nil nil nil)))))))
+

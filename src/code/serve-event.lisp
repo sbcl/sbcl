@@ -200,66 +200,100 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
     (declare (ignore stop-sec stop-usec))
     (sub-serve-event to-sec to-usec signalp)))
 
+;;; When a *periodic-polling-function* is defined the server will not
+;;; block for more than the maximum event timeout and will call the
+;;; polling function if it does time out.
+(declaim (type (or null symbol function) *periodic-polling-function*))
+(defvar *periodic-polling-function* nil
+  "Either NIL, or a designator for a function callable without any
+arguments. Called when the system has been waiting for input for
+longer then *PERIODIC-POLLING-PERIOD* seconds. Shared between all
+threads, unless locally bound. EXPERIMENTAL.")
+(declaim (real *periodic-polling-period*))
+(defvar *periodic-polling-period* 0
+  "A real number designating the number of seconds to wait for input
+at maximum, before calling the *PERIODIC-POLLING-FUNCTION* \(if any.)
+Shared between all threads, unless locally bound. EXPERIMENTAL.")
+
 ;;; Takes timeout broken into seconds and microseconds.
 (defun sub-serve-event (to-sec to-usec deadlinep)
-  ;; Next, wait for something to happen.
-  (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
-                        (write-fds (sb!alien:struct sb!unix:fd-set)))
+  ;; Figure out our peridic polling needs. MORE-SEC/USEC is the amount
+  ;; of actual waiting left after we poll (assuming we are polling.)
+  (multiple-value-bind (poll more-sec more-usec)
+      (when *periodic-polling-function*
+        (multiple-value-bind (p-sec p-usec)
+            (decode-internal-time
+             (seconds-to-internal-time *periodic-polling-period*))
+          (when (or (not to-sec) (> to-sec p-sec)
+                    (and (= to-sec p-sec) (> to-usec p-usec)))
+            (multiple-value-prog1
+                (values *periodic-polling-function*
+                        (when to-sec (- to-sec p-sec))
+                        (when to-sec (- to-usec p-usec)))
+              (setf to-sec p-sec
+                    to-usec p-sec)))))
 
-      (sb!unix:fd-zero read-fds)
-      (sb!unix:fd-zero write-fds)
-      (let ((count 0))
-        (declare (type index count))
+    ;; Next, wait for something to happen.
+    (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
+                            (write-fds (sb!alien:struct sb!unix:fd-set)))
+        (sb!unix:fd-zero read-fds)
+        (sb!unix:fd-zero write-fds)
+        (let ((count 0))
+          (declare (type index count))
 
-        ;; Initialize the fd-sets for UNIX-SELECT and return the active
-        ;; descriptor count.
-        (map-descriptor-handlers
-         (lambda (handler)
-           ;; FIXME: If HANDLER-ACTIVE ever is reinstanted, it needs
-           ;; to be checked here in addition to HANDLER-BOGUS
-           (unless (handler-bogus handler)
-             (let ((fd (handler-descriptor handler)))
-               (ecase (handler-direction handler)
-                 (:input (sb!unix:fd-set fd read-fds))
-                 (:output (sb!unix:fd-set fd write-fds)))
-               (when (> fd count)
-                 (setf count fd))))))
-        (incf count)
+          ;; Initialize the fd-sets for UNIX-SELECT and return the active
+          ;; descriptor count.
+          (map-descriptor-handlers
+           (lambda (handler)
+             ;; FIXME: If HANDLER-ACTIVE ever is reinstanted, it needs
+             ;; to be checked here in addition to HANDLER-BOGUS
+             (unless (handler-bogus handler)
+               (let ((fd (handler-descriptor handler)))
+                 (ecase (handler-direction handler)
+                   (:input (sb!unix:fd-set fd read-fds))
+                   (:output (sb!unix:fd-set fd write-fds)))
+                 (when (> fd count)
+                   (setf count fd))))))
+          (incf count)
 
-      ;; Next, wait for something to happen.
-      (multiple-value-bind (value err)
-          (sb!unix:unix-fast-select count
-                                    (sb!alien:addr read-fds)
-                                    (sb!alien:addr write-fds)
-                                    nil to-sec to-usec)
-        #!+win32
-        (declare (ignore err))
-        ;; Now see what it was (if anything)
-        (cond ((not value)
-               ;; Interrupted or one of the file descriptors is bad.
-               ;; FIXME: Check for other errnos. Why do we return true
-               ;; when interrupted?
-               #!-win32
-               (if (eql err sb!unix:eintr)
-                   t
-                 (handler-descriptors-error))
-               #!+win32
-               (handler-descriptors-error))
-              ((plusp value)
-               ;; Got something. Call file descriptor handlers
-               ;; according to the readable and writable masks
-               ;; returned by select.
-               (dolist (handler
-                        (select-descriptor-handlers
-                         (lambda (handler)
-                           (let ((fd (handler-descriptor handler)))
-                             (ecase (handler-direction handler)
-                               (:input (sb!unix:fd-isset fd read-fds))
-                               (:output (sb!unix:fd-isset fd write-fds)))))))
-                 (funcall (handler-function handler)
-                          (handler-descriptor handler)))
-               t)
-              ((zerop value)
-               (when deadlinep
-                 (signal-deadline))
-               nil))))))
+          ;; Next, wait for something to happen.
+          (multiple-value-bind (value err)
+              (sb!unix:unix-fast-select count
+                                        (sb!alien:addr read-fds)
+                                        (sb!alien:addr write-fds)
+                                        nil to-sec to-usec)
+            #!+win32
+            (declare (ignore err))
+            ;; Now see what it was (if anything)
+            (cond ((not value)
+                   ;; Interrupted or one of the file descriptors is bad.
+                   ;; FIXME: Check for other errnos. Why do we return true
+                   ;; when interrupted?
+                   #!-win32
+                   (if (eql err sb!unix:eintr)
+                       t
+                       (handler-descriptors-error))
+                   #!+win32
+                   (handler-descriptors-error))
+                  ((plusp value)
+                   ;; Got something. Call file descriptor handlers
+                   ;; according to the readable and writable masks
+                   ;; returned by select.
+                   (dolist (handler
+                             (select-descriptor-handlers
+                              (lambda (handler)
+                                (let ((fd (handler-descriptor handler)))
+                                  (ecase (handler-direction handler)
+                                    (:input (sb!unix:fd-isset fd read-fds))
+                                    (:output (sb!unix:fd-isset fd write-fds)))))))
+                     (funcall (handler-function handler)
+                              (handler-descriptor handler)))
+                   t)
+                  ((zerop value)
+                   ;; Timeout.
+                   (cond (poll
+                          (funcall poll)
+                          (sub-serve-event more-sec more-usec deadlinep))
+                         (deadlinep
+                          (signal-deadline))))))))))
+
