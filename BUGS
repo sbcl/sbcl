@@ -1881,6 +1881,35 @@ MISC.556 by falling into gdb with
   fatal error encountered in SBCL pid 2827: Unhandled SIGILL
 unless the MISC.556 test is commented out.
 
+Analysis: + and a number of other arithmetic functions exhibit the
+same behaviour. Here's the underlying problem: On x86 we perform
+single-float + integer normally using double-precision, and then
+coerce the result back to single-float. (The FILD instruction always
+gives us a double-float, and unless we do MOVE-FROM-SINGLE it remains
+one. Or so it seems to me, and that would also explain the observed
+behaviour below.)
+
+During IR1 we derive the types for both
+
+ (+ <single> <integer>)                   ; uses double-precision
+ (+ <single> (FLOAT <integer> <single>))  ; uses single-precision
+
+and get a mismatch for a number of unlucky arguments. This leads to
+derived result type NIL, and ends up flushing the whole whole
+operation -- and finally we generate code without a return sequence,
+and fall through to whatever.
+
+The use of double-precision in the first case appears to be an
+(un)happy accident -- interval arithmetic gives us the
+double-precision result because that's what the backend does.
+
+ (+ 8172.0 (coerce -95195347 'single-float)) ; => -9.518717e7
+ (+ 8172.0 -95195347)                        ; => -9.5187176e7
+ (coerce (+ 8172.0 (coerce -95195347 'double-float)) 'single-float)
+                                             ; => -9.5187176e7
+
+Which should be fixed, the IR1, or the backend?
+
 421: READ-CHAR-NO-HANG misbehaviour on Windows Console:
 
   It seems that on Windows READ-CHAR-NO-HANG hangs if the user
