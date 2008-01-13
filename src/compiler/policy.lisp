@@ -154,16 +154,19 @@ EXPERIMENTAL INTERFACE: Subject to change."
 
 ;;; Dependent qualities
 (defmacro define-optimization-quality
-    (name expression &optional documentation)
+    (name expression &optional values-documentation documentation)
+  (declare (ignorable documentation))
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (let ((acons (assoc ',name *policy-dependent-qualities*))
            (item (make-policy-dependent-quality
                   :name ',name
                   :expression ',expression
                   :getter (lambda (policy) (policy policy ,expression))
-                  :values-documentation ',documentation)))
+                  :values-documentation ',values-documentation)))
        (if acons
            (setf (cdr acons) item)
            (setf *policy-dependent-qualities*
                  (nconc *policy-dependent-qualities* (list `(,',name . ,item))))))
+     #-sb-xc-host
+     ,@(when documentation `((setf (fdocumentation ',name 'optimize) ,documentation)))
      ',name))

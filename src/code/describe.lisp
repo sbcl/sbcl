@@ -353,10 +353,13 @@
   (%describe-doc x s 'type "Type")
   (%describe-doc x s 'setf "Setf macro")
   (dolist (assoc (info :random-documentation :stuff x))
-    (format s
-            "~&~@<Documentation on the ~(~A~):~@:_~A~:>"
-            (car assoc)
-            (cdr assoc)))
+    (let ((type (car assoc)))
+      (format s
+              "~&~@<Documentation on the ~(~A~):~@:_~A~:>"
+              (case type
+                ((optimize) "optimize quality")
+                (t (car assoc)))
+              (cdr assoc))))
 
   ;; Mention the associated type information, if any.
   ;;

@@ -47,6 +47,9 @@
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
   (values (info :setf :documentation x)))
 
+(defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
+  (random-documentation x 'optimize))
+
 (defun (setf fun-doc) (new-value x)
   (etypecase x
     (generic-function

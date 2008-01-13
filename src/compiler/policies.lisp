@@ -18,16 +18,26 @@
     (cond ((= safety 0) 0)
           ((and (< safety 2) (< safety speed)) 2)
           (t 3))
-  ("no" "maybe" "weak" "full"))
+  ("no" "maybe" "weak" "full")
+  "Control the way to perform runtime type checking:
+0: declared types are simply trusted; no runtime checks are performed;
+2: fast checks are performed: declared types are weakened to
+   FIXNUM/SINGLE-FLOAT/FLOAT/NUMBER/structure/specialized array etc.;
+3: declared types are fully checked (several exceptions exist;
+   see \"SBCL User Manual\", Compiler->Handling of Types->
+   Implementation Limitations for details).")
 
 (define-optimization-quality check-tag-existence
     (cond ((= safety 0) 0)
           (t 3))
-  ("no" "maybe" "yes" "yes"))
+  ("no" "maybe" "yes" "yes")
+  "Control whether GO and RETURN-FROM check liveness of the destination tag.
+Enabling this option can increase heap consing of closures.")
 
 (define-optimization-quality let-conversion
     (if (<= debug speed) 3 0)
-  ("off" "maybe" "on" "on"))
+  ("off" "maybe" "on" "on")
+  "Control inline-substitution of used-once local functions.")
 
 (define-optimization-quality verify-arg-count
     (if (zerop safety) 0 3)
@@ -38,32 +48,64 @@
             (> speed debug))
         3
         0)
-  ("no" "maybe" "yes" "yes"))
+  ("no" "maybe" "yes" "yes")
+  "Control whether tail-calls should reuse caller stack frame.
+Enabling this option make functions use less stack space, and make
+tail-recursive functions execute in constant stack, but debugging
+become harder, because backtraces show only part of function call
+sequence.
+
+This options has no effect when INSERT-DEBUG-CATCH is set.")
 
 (define-optimization-quality insert-debug-catch
     (if (> debug (max speed space))
         3
         0)
-  ("no" "maybe" "yes" "yes"))
+  ("no" "maybe" "yes" "yes")
+  "Enable possibility of returning from stack frames with the debugger.
+
+Enabling this option effectively disables MERGE-TAIL-CALLS.")
 
 (define-optimization-quality recognize-self-calls
     (if (> (max speed space) debug)
         3
         0)
-  ("no" "maybe" "yes" "yes"))
+  ("no" "maybe" "yes" "yes")
+  "When enabled, reference to a function FOO inside the body of (DEFUN
+FOO ...) is considered to be the reference to the function being
+defined. Calls to FOO are compiled as local. This allows better
+optimization and type checking, but TRACE will not show recursive
+calls. If the function object is bound to another name BAR, and FOO is
+bound to another function, calls to FOO inside BAR will remain to be
+recursive.
+
+When disabled, internal references to a function FOO will be
+considered ti be a call of a function, bound to the symbol at
+run-time, which is less efficient. TRACE will show recursive calls. In
+case of renaming described above, calls to FOO will not be recursive
+and will refer to the new function, bound to FOO.")
 
 (define-optimization-quality stack-allocate-dynamic-extent
     (if (and (> (max speed space) (max debug safety))
              (< safety 3))
         3
         0)
-  ("no" "maybe" "yes" "yes"))
+  ("no" "maybe" "yes" "yes")
+  "Control whether allocate objects, declared DYNAMIC-EXTENT, on
+stack.")
 
 (define-optimization-quality stack-allocate-vector
     (cond ((= stack-allocate-dynamic-extent 0) 0)
           ((= safety 0) 3)
           (t 2))
-  ("no" "maybe" "one page" "yes"))
+  ("no" "maybe" "one page" "yes")
+  "Control what vectors, declared DYNAMIC-EXTENT, are allocated on stack:
+0: no vectors are allocated on stack;
+2: only short vectors (compiler knows them to fit on one page);
+3: every.
+
+This option has an effect only when STACK-ALLOCATE-DYNAMIC-EXTENT is
+set.")
 
 (define-optimization-quality float-accuracy
     3
@@ -73,7 +115,11 @@
     (if (> debug (max speed space compilation-speed))
         debug
         0)
-  ("no" "no" "partial" "full"))
+  ("no" "no" "partial" "full")
+  "Control instrumentation of code, enabling single-stepping through
+it in the debugger.
+
+This option has no effect without COMPUTE-DEBUG-FUN.")
 
 (define-optimization-quality compute-debug-fun
     debug
@@ -84,7 +130,14 @@
              (< speed 3))
         3
         0)
-  ("no" "no" "no" "yes"))
+  ("no" "no" "no" "yes")
+  "When disabled, LET variable, which is never set and is referenced
+exactly once, is eliminated and the reference is substituted with the
+initial value. This allows better type inference and some algebraic
+optimizations.
+
+When enabled, the variable is preserved and can be seen in the
+debugger.")
 
 (define-optimization-quality insert-array-bounds-checks
     (if (= safety 0) 0 3)
