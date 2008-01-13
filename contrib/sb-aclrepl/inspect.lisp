@@ -665,7 +665,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
      ;; on 64-bit platform, single-floats are not boxed
      (description-maybe-internals "single-float ~W" (list object)
                                   "[#x~8,'0X]"
-                                  (sb-kernel:get-lisp-obj-address object)))))
+                                  (ash (sb-kernel:get-lisp-obj-address object) -32)))))
 
 (defmethod inspected-description ((object fixnum))
   (description-maybe-internals
