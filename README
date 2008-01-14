@@ -11,12 +11,13 @@ If you'd like to install or build the system, see the "INSTALL" file.
 
 If you'd like more information about using the system, see the man
 page, "sbcl.1", or the user manual in the "doc/" subdirectory of the
-distribution. (The user manual is maintained as DocBook SGML in the
-source distribution; there is an HTML version in the binary
-distribution.)
+distribution. (The user manual is maintained as Texinfo in the source
+distribution; HTML version is available for download.)
 
 The system is a work in progress. See the "TODO" file in the source
 distribution for some highlights.
+
+The "BUGS" file lists current known bugs.
 
 If you'd like to make suggestions, report a bug, or help to improve the
 system, please send mail to one of the mailing lists:
@@ -43,13 +44,3 @@ for OpenBSD:
   is just allocating this huge address space, not actually using this
   huge memory at this point. OpenBSD <3.0 had no problem with this,
   but OpenBSD 3.0 is less hospitable.)
-
-for Darwin:
-  PURIFY (which can be used alone but is also used by the system when
-  saving a new core) uses more stack than the default limit on MacOS
-  X.2.  Therefore, in order to get PURIFY to work reliably, you need
-  to increase the limit, with e.g.
-    limit stack 8192 # for the default shell, tcsh
-    ulimit -s 8192 # for bash
-  before running SBCL.  This is also necessary when building the system
-  from sources, as part of the build process involves saving a new core.
