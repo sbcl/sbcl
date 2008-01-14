@@ -19,6 +19,11 @@ INSTALLING SBCL
 
 1.1. Quick start:
 
+  To run SBCL without installing it, from the top of binary distribution
+  directory:
+
+    $ sh run-sbcl.sh
+
   The following command installs SBCL and related documentation under
   the "/usr/local" directory:
   
