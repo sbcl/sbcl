@@ -249,20 +249,17 @@ WORKAROUND:
   comfortable merging the patches in the CVS version of SBCL.
 
 108:
-  (TIME (ROOM T)) reports more than 200 Mbytes consed even for
-  a clean, just-started SBCL system. And it seems to be right:
-  (ROOM T) can bring a small computer to its knees for a *long*
-  time trying to GC afterwards. Surely there's some more economical
-  way to implement (ROOM T).
+  ROOM issues:
 
-  Daniel Barlow doesn't know what fixed this, but observes that it 
-  doesn't seem to be the case in 0.8.7.3 any more.  Instead, (ROOM T)
-  in a fresh SBCL causes
+  a) ROOM works by walking over the heap linearly, instead of
+     following the object graph. Hence, it report garbage objects that
+     are unreachable. (Maybe this is a feature and not a bug?)
 
-    debugger invoked on a SB-INT:BUG in thread 5911:
-        failed AVER: "(SAP= CURRENT END)"
-
-  unless a GC has happened beforehand.
+  b) ROOM uses MAP-ALLOCATED-OBJECTS to walk the heap, which doesn't
+     check all pointers as well as it should, and can hence become
+     confused, leading to aver failures. As of 1.0.13.21 these (the
+     SAP= aver in particular) should be mostly under control, but push
+     ROOM hard enough and it still might croak.
 
 117:
   When the compiler inline expands functions, it may be that different
