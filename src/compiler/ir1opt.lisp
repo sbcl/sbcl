@@ -1717,10 +1717,13 @@
             (with-ir1-environment-from-node node
               (let* ((dums (make-gensym-list count))
                      (ignore (gensym))
+                     (leaf (ref-leaf ref))
                      (fun (ir1-convert-lambda
                            `(lambda (&optional ,@dums &rest ,ignore)
                               (declare (ignore ,ignore))
-                              (funcall ,(ref-leaf ref) ,@dums)))))
+                              (%funcall ,leaf ,@dums))
+                           :source-name (leaf-%source-name leaf)
+                           :debug-name (leaf-%debug-name leaf))))
                 (change-ref-leaf ref fun)
                 (aver (eq (basic-combination-kind node) :full))
                 (locall-analyze-component *current-component*)
