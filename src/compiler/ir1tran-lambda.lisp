@@ -773,6 +773,7 @@
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals))
+  (aver (or debug-name (neq '.anonymous. source-name)))
   (cond ((not vars)
          (if (optional-dispatch-keyp res)
              ;; Handle &KEY with no keys...
@@ -858,17 +859,17 @@
 ;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
 ;;; figure out the MIN-ARGS and MAX-ARGS.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals
-                                      &key
-                                      post-binding-lexenv
-                                      (source-name '.anonymous.)
-                                      (debug-name
-                                       (debug-name '&optional-dispatch vars)))
+                                 &key post-binding-lexenv
+                                 (source-name '.anonymous.)
+                                 debug-name)
   (declare (list body vars aux-vars aux-vals))
+  (aver (or debug-name (neq '.anonymous. source-name)))
   (let ((res (make-optional-dispatch :arglist vars
                                      :allowp allowp
                                      :keyp keyp
                                      :%source-name source-name
-                                     :%debug-name debug-name
+                                     :%debug-name (debug-name '&optional-dispatch
+                                                              (or debug-name source-name))
                                      :plist `(:ir1-environment
                                               (,*lexenv*
                                                ,*current-path*))))
@@ -899,7 +900,8 @@
     (compiler-error
      "The lambda expression has a missing or non-list lambda list:~%  ~S"
      form))
-
+  (unless (or debug-name (neq '.anonymous. source-name))
+    (setf debug-name (name-lambdalike form)))
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
     (multiple-value-bind (forms decls) (parse-body (cddr form))
@@ -970,6 +972,8 @@
                                &key
                                (source-name '.anonymous.)
                                debug-name)
+  (when (and (not debug-name) (eq '.anonymous. source-name))
+    (setf debug-name (name-lambdalike thing)))
   (ecase (car thing)
     ((lambda)
      (ir1-convert-lambda thing
@@ -1016,6 +1020,8 @@
                                   (source-name '.anonymous.)
                                   debug-name
                                   system-lambda)
+  (when (and (not debug-name) (eq '.anonymous. source-name))
+    (setf debug-name (name-lambdalike fun)))
   (destructuring-bind (decls macros symbol-macros &rest body)
       (if (eq (car fun) 'lambda-with-lexenv)
           (cdr fun)

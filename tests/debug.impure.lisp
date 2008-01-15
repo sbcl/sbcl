@@ -92,17 +92,17 @@
         (handler-bind
             ((error (lambda (condition)
                       ;; find the part of the backtrace we're interested in
-                      (let ((backtrace (progn
-                                         ;; (backtrace 13)
-                                         (member (caar frame-specs)
-                                                 (sb-debug:backtrace-as-list)
-                                                 :key #'car
-                                                 :test #'equal))))
-
+                      (let* ((full-backtrace (sb-debug:backtrace-as-list))
+                             (backtrace (member (caar frame-specs) full-backtrace
+                                                :key #'car
+                                                :test #'equal)))
+                        
                         (setf result condition)
 
                         (unless backtrace
-                          (print :missing-backtrace)
+                          (format t "~&//~S not in backtrace:~%   ~S~%" 
+                                  (caar frame-specs)
+                                  full-backtrace)
                           (setf result nil))
 
                         ;; check that we have all the frames we wanted
@@ -252,107 +252,111 @@
 (defbt 5 (&optional (opt (oops)))
   (list opt))
 
+(defmacro with-details (bool &body body)
+  `(let ((sb-debug:*show-entry-point-details* ,bool))
+     ,@body))
+
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(or (and :x86 (or :sunos))
-                           (and :x86-64 :darwin)))
-  (macrolet ((with-details (bool &body body)
-               `(let ((sb-debug:*show-entry-point-details* ,bool))
-                 ,@body)))
+            :fails-on '(or (and :x86 (or :sunos)) (and :x86-64 :darwin)))
+  (write-line "//tl-xep")
+  (with-details t
+    (assert (verify-backtrace #'namestring
+                              '(((sb-c::tl-xep namestring) 0 ?)))))
+  (with-details nil
+    (assert (verify-backtrace #'namestring
+                              '((namestring)))))
 
-    ;; TL-XEP
-    (print :tl-xep)
-    (with-details t
-      (assert (verify-backtrace #'namestring
-                                '(((sb-c::tl-xep namestring) 0 ?)))))
-    (with-details nil
-      (assert (verify-backtrace #'namestring
-                                '((namestring)))))
+  ;; &MORE-PROCESSOR
+  (with-details t
+    (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                              '(((sb-c::&more-processor bt.1.1) &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                              '(((sb-c::&more-processor bt.1.2) &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                              '(((sb-c::&more-processor bt.1.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                              '((bt.1.1 :key))))
+    (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                              '((bt.1.2 &rest))))
+    (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                              '((bt.1.3 &rest)))))
 
+  ;; XEP
+  (write-line "//xep")
+  (with-details t
+    (assert (verify-backtrace #'bt.2.1
+                              '(((sb-c::xep bt.2.1) 0 ?))))
+    (assert (verify-backtrace #'bt.2.2
+                              '(((sb-c::xep bt.2.2) &rest))))
+    (assert (verify-backtrace #'bt.2.3
+                              '(((sb-c::xep bt.2.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.2.1
+                              '((bt.2.1))))
+    (assert (verify-backtrace #'bt.2.2
+                              '((bt.2.2 &rest))))
+    (assert (verify-backtrace #'bt.2.3
+                              '((bt.2.3 &rest)))))
 
-    ;; &MORE-PROCESSOR
-    (with-details t
-      (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                                '(((sb-c::&more-processor bt.1.1) &rest))))
-      (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                                '(((sb-c::&more-processor bt.1.2) &rest))))
-      (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                                '(((sb-c::&more-processor bt.1.3) &rest)))))
-    (with-details nil
-      (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                                '((bt.1.1 :key))))
-      (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                                '((bt.1.2 &rest))))
-      (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                                '((bt.1.3 &rest)))))
+  ;; VARARGS-ENTRY
+  (write-line "//varargs-entry")
+  (with-details t
+    (assert (verify-backtrace #'bt.3.1
+                              '(((sb-c::varargs-entry bt.3.1) :key nil))))
+    (assert (verify-backtrace #'bt.3.2
+                              '(((sb-c::varargs-entry bt.3.2) :key ?))))
+    (assert (verify-backtrace #'bt.3.3
+                              '(((sb-c::varargs-entry bt.3.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.3.1
+                              '((bt.3.1 :key nil))))
+    (assert (verify-backtrace #'bt.3.2
+                              '((bt.3.2 :key ?))))
+    (assert (verify-backtrace #'bt.3.3
+                              '((bt.3.3 &rest)))))
 
-    ;; XEP
-    (print :xep)
-    (with-details t
-      (assert (verify-backtrace #'bt.2.1
-                                '(((sb-c::xep bt.2.1) 0 ?))))
-      (assert (verify-backtrace #'bt.2.2
-                                '(((sb-c::xep bt.2.2) &rest))))
-      (assert (verify-backtrace #'bt.2.3
-                                '(((sb-c::xep bt.2.3) &rest)))))
-    (with-details nil
-      (assert (verify-backtrace #'bt.2.1
-                                '((bt.2.1))))
-      (assert (verify-backtrace #'bt.2.2
-                                '((bt.2.2 &rest))))
-      (assert (verify-backtrace #'bt.2.3
-                                '((bt.2.3 &rest)))))
+  ;; HAIRY-ARG-PROCESSOR
+  (write-line "//hairy-args-processor")
+  (with-details t
+    (assert (verify-backtrace #'bt.4.1
+                              '(((sb-c::hairy-arg-processor bt.4.1) ?))))
+    (assert (verify-backtrace #'bt.4.2
+                              '(((sb-c::hairy-arg-processor bt.4.2) ?))))
+    (assert (verify-backtrace #'bt.4.3
+                              '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.4.1
+                              '((bt.4.1 ?))))
+    (assert (verify-backtrace #'bt.4.2
+                              '((bt.4.2 ?))))
+    (assert (verify-backtrace #'bt.4.3
+                              '((bt.4.3 &rest)))))
 
-    ;; VARARGS-ENTRY
-    (print :varargs-entry)
-    (with-details t
-      (assert (verify-backtrace #'bt.3.1
-                                '(((sb-c::varargs-entry bt.3.1) :key nil))))
-      (assert (verify-backtrace #'bt.3.2
-                                '(((sb-c::varargs-entry bt.3.2) :key ?))))
-      (assert (verify-backtrace #'bt.3.3
-                                '(((sb-c::varargs-entry bt.3.3) &rest)))))
-    (with-details nil
-      (assert (verify-backtrace #'bt.3.1
-                                '((bt.3.1 :key nil))))
-      (assert (verify-backtrace #'bt.3.2
-                                '((bt.3.2 :key ?))))
-      (assert (verify-backtrace #'bt.3.3
-                                '((bt.3.3 &rest)))))
+  ;; &OPTIONAL-PROCESSOR
+  (write-line "//optional-processor")
+  (with-details t
+    (assert (verify-backtrace #'bt.5.1
+                              '(((sb-c::&optional-processor bt.5.1)))))
+    (assert (verify-backtrace #'bt.5.2
+                              '(((sb-c::&optional-processor bt.5.2) &rest))))
+    (assert (verify-backtrace #'bt.5.3
+                              '(((sb-c::&optional-processor bt.5.3) &rest)))))
+  (with-details nil
+    (assert (verify-backtrace #'bt.5.1
+                              '((bt.5.1))))
+    (assert (verify-backtrace #'bt.5.2
+                              '((bt.5.2 &rest))))
+    (assert (verify-backtrace #'bt.5.3
+                              '((bt.5.3 &rest))))))
 
-    ;; HAIRY-ARG-PROCESSOR
-    (print :hairy-args-processor)
-    (with-details t
-      (assert (verify-backtrace #'bt.4.1
-                                '(((sb-c::hairy-arg-processor bt.4.1) ?))))
-      (assert (verify-backtrace #'bt.4.2
-                                '(((sb-c::hairy-arg-processor bt.4.2) ?))))
-      (assert (verify-backtrace #'bt.4.3
-                                '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
-    (with-details nil
-      (assert (verify-backtrace #'bt.4.1
-                                '((bt.4.1 ?))))
-      (assert (verify-backtrace #'bt.4.2
-                                '((bt.4.2 ?))))
-      (assert (verify-backtrace #'bt.4.3
-                                '((bt.4.3 &rest)))))
-
-    ;; &OPTIONAL-PROCESSOR
-    (print :optional-processor)
-    (with-details t
-      (assert (verify-backtrace #'bt.5.1
-                                '(((sb-c::&optional-processor bt.5.1)))))
-      (assert (verify-backtrace #'bt.5.2
-                                '(((sb-c::&optional-processor bt.5.2) &rest))))
-      (assert (verify-backtrace #'bt.5.3
-                                '(((sb-c::&optional-processor bt.5.3) &rest)))))
-    (with-details nil
-      (assert (verify-backtrace #'bt.5.1
-                                '((bt.5.1))))
-      (assert (verify-backtrace #'bt.5.2
-                                '((bt.5.2 &rest))))
-      (assert (verify-backtrace #'bt.5.3
-                                '((bt.5.3 &rest)))))))
+(write-line "//compile nil")
+(defvar *compile-nil-error* (compile nil '(lambda (x) (cons (when x (error "oops")) nil))))
+(defvar *compile-nil-non-tc* (compile nil '(lambda (y) (cons (funcall *compile-nil-error* y) nil))))
+(assert (verify-backtrace (lambda () (funcall *compile-nil-non-tc* 13))
+                          '(((lambda (x)) 13)
+                            ((lambda (y)) 13))))
 
 ;;;; test TRACE
 
@@ -415,6 +419,7 @@
   ;; after 50 successful throws to SB-IMPL::TOPLEVEL-CATCHER sbcl used
   ;; to halt, it produces so much garbage that's hard to suppress that
   ;; it is tested only once
+  (write-line "--HARMLESS BUT ALARMING BACKTRACE COMING UP--")
   (let ((*debugger-hook* #'erroring-debugger-hook))
     (loop repeat 1 do
           (let ((error-counter 0)
@@ -425,7 +430,8 @@
                    (catch 'sb-impl::toplevel-catcher
                      (nest-errors 20 (error "infinite error ~s"
                                             (incf error-counter)))
-                     :normal-exit))))))))
+                     :normal-exit)))))))
+  (write-line "--END OF H-B-A-B--"))
 
 (enable-debugger)
 

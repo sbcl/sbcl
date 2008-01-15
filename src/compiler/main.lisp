@@ -973,7 +973,7 @@
                            (maybe-frob (optional-dispatch-main-entry f)))
                          result))))
 
-(defun make-functional-from-toplevel-lambda (definition
+(defun make-functional-from-toplevel-lambda (lambda-expression
                                              &key
                                              name
                                              (path
@@ -983,17 +983,15 @@
                                               (missing-arg)))
   (let* ((*current-path* path)
          (component (make-empty-component))
-         (*current-component* component))
-    (setf (component-name component)
-          (debug-name 'initial-component name))
-    (setf (component-kind component) :initial)
+         (*current-component* component)
+         (debug-name-tail (or name (name-lambdalike lambda-expression)))
+         (source-name (or name '.anonymous.)))
+    (setf (component-name component) (debug-name 'initial-component debug-name-tail)
+          (component-kind component) :initial)
     (let* ((locall-fun (let ((*allow-instrumenting* t))
                          (funcall #'ir1-convert-lambdalike
-                                  definition
-                                  :source-name name)))
-           (debug-name (debug-name 'tl-xep
-                                   (or name
-                                       (functional-%source-name locall-fun))))
+                                  lambda-expression
+                                  :source-name source-name)))
            ;; Convert the XEP using the policy of the real
            ;; function. Otherwise the wrong policy will be used for
            ;; deciding whether to type-check the parameters of the
@@ -1002,8 +1000,8 @@
            (*lexenv* (make-lexenv :policy (lexenv-policy
                                            (functional-lexenv locall-fun))))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
-                                    :source-name (or name '.anonymous.)
-                                    :debug-name debug-name)))
+                                    :source-name source-name
+                                    :debug-name (debug-name 'tl-xep debug-name-tail))))
       (when name
         (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun

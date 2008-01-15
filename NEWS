@@ -3,6 +3,8 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits
     (see documentation for details.)
   * revived support for OpenBSD (contributed by Josh Elsasser)
+  * bug fix: functions compiled using (COMPILE NIL '(LAMBDA ...))
+    no longer appear as (NIL ...) frames in backtraces.
   * bug fix: ROOM no longer suffers from occasional (AVER (SAP=
     CURRENT END)) failures.
   * bug fix: RESOLVE-CONFLICT (and the other name conflict machinery)
