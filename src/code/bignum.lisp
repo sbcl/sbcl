@@ -1586,24 +1586,27 @@
              (declare (type bignum-element-type y))
              (if (not (logtest y (1- y)))
                  ;; Y is a power of two.
-                 (if (= y 1)
-                     ;; SHIFT-RIGHT-UNALIGNED won't do the right thing
-                     ;; with a shift count of 0, so special case this.
-                     ;; We could probably get away with (VALUES X 0)
-                     ;; here, but it's not clear that some of the
-                     ;; normalization logic further down would avoid
-                     ;; mutilating X.  Just go ahead and cons, consing's
-                     ;; cheap.
-                     (values (copy-bignum x len-x) 0)
-                     (let ((n-bits (1- (integer-length y))))
-                       (values
-                        (shift-right-unaligned x 0 n-bits len-x
-                                               ((= j res-len-1)
-                                                (setf (%bignum-ref res j)
-                                                      (%ashr (%bignum-ref x i) n-bits))
-                                                res)
-                                               res)
-                        (logand (%bignum-ref x 0) (1- y)))))
+                 ;; SHIFT-RIGHT-UNALIGNED won't do the right thing
+                 ;; with a shift count of 0 or -1, so special case this.
+                 (cond ((= y 0)
+                        (error 'division-by-zero))
+                       ((= y 1)
+                        ;; We could probably get away with (VALUES X 0)
+                        ;; here, but it's not clear that some of the
+                        ;; normalization logic further down would avoid
+                        ;; mutilating X.  Just go ahead and cons, consing's
+                        ;; cheap.
+                        (values (copy-bignum x len-x) 0))
+                       (t
+                        (let ((n-bits (1- (integer-length y))))
+                          (values
+                           (shift-right-unaligned x 0 n-bits len-x
+                                                  ((= j res-len-1)
+                                                   (setf (%bignum-ref res j)
+                                                         (%ashr (%bignum-ref x i) n-bits))
+                                                   res)
+                                                  res)
+                           (logand (%bignum-ref x 0) (1- y))))))
                  (do ((i (1- len-x) (1- i))
                       (q (%allocate-bignum len-x))
                       (r 0))
