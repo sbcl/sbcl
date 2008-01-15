@@ -859,14 +859,15 @@
           (< (pprint-dispatch-entry-priority e1)
              (pprint-dispatch-entry-priority e2)))))
 
-(macrolet ((frob (x)
-             `(cons ',x (lambda (object) ,x))))
+(macrolet ((frob (name x)
+             `(cons ',x (named-lambda ,(symbolicate "PPRINT-DISPATCH-" name) (object)
+                            ,x))))
   (defvar *precompiled-pprint-dispatch-funs*
-    (list (frob (typep object 'array))
-          (frob (and (consp object)
-                     (symbolp (car object))
-                     (fboundp (car object))))
-          (frob (typep object 'cons)))))
+    (list (frob array (typep object 'array))
+          (frob sharp-function (and (consp object)
+                                    (symbolp (car object))
+                                    (fboundp (car object))))
+          (frob cons (typep object 'cons)))))
 
 (defun compute-test-fn (type)
   (let ((was-cons nil))
@@ -903,7 +904,15 @@
         (cond ((cdr (assoc expr *precompiled-pprint-dispatch-funs*
                            :test #'equal)))
               (t
-               (compile nil `(lambda (object) ,expr))))))))
+               (let ((name (symbolicate "PPRINT-DISPATCH-"
+                                        (if (symbolp type)
+                                            type
+                                            (write-to-string type
+                                                             :escape t
+                                                             :pretty nil
+                                                             :readably nil)))))
+                 (compile nil `(named-lambda ,name (object)
+                                 ,expr)))))))))
 
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
