@@ -1083,16 +1083,21 @@ e
      Print a report from <graph> instead of the latest profiling
      results.
 
-   Value of this function is a CALL-GRAPH object representing the
-   resulting call-graph."
-  (let ((graph (or call-graph (make-call-graph most-positive-fixnum))))
-    (ecase type
-      (:flat
-       (print-flat graph :stream stream :max max :min-percent min-percent))
-      (:graph
-       (print-graph graph :stream stream :max max :min-percent min-percent))
-      ((nil)))
-    graph))
+Value of this function is a CALL-GRAPH object representing the
+resulting call-graph, or NIL if there are no samples (eg. right after
+calling RESET.)"
+  (cond (*samples*
+         (let ((graph (or call-graph (make-call-graph most-positive-fixnum))))
+           (ecase type
+             (:flat
+              (print-flat graph :stream stream :max max :min-percent min-percent))
+             (:graph
+              (print-graph graph :stream stream :max max :min-percent min-percent))
+             ((nil)))
+           graph))
+        (t
+         (format stream "~&; No samples to report.~%")
+         nil)))
 
 ;;; Interface to DISASSEMBLE
 
