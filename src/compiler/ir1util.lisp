@@ -1636,6 +1636,15 @@
               nil))
         nil)))
 
+(defun lvar-fun-debug-name (lvar)
+  (declare (type lvar lvar))
+  (let ((uses (lvar-uses lvar)))
+    (flet ((name1 (use)
+             (leaf-debug-name (ref-leaf use))))
+      (if (ref-p uses)
+        (name1 uses)
+        (mapcar #'name1 uses)))))
+
 ;;; Return the source name of a combination. (This is an idiom
 ;;; which was used in CMU CL. I gather it always works. -- WHN)
 (defun combination-fun-source-name (combination)

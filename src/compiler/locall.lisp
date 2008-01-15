@@ -595,7 +595,7 @@
                (declare (ignorable ,@ignores))
                (%funcall ,entry ,@args))
             :debug-name (debug-name 'hairy-function-entry
-                                    (lvar-fun-name
+                                    (lvar-fun-debug-name
                                      (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
