@@ -73,3 +73,15 @@
       (assert name))))
 
 (assert (null (name-char 'foo)))
+
+;;; Between 1.0.4.53 and 1.0.4.69 character untagging was broken on
+;;; x86-64 if the result of the VOP was allocated on the stack, failing
+;;; an aver in the compiler.
+(with-test (:name :character-untagging)
+  (compile nil
+           '(lambda (c0 c1 c2 c3 c4 c5 c6 c7
+                     c8 c9 ca cb cc cd ce cf)
+             (declare (type character c0 c1 c2 c3 c4 c5 c6 c7
+                       c8 c9 ca cb cc cd ce cf))
+             (char< c0 c1 c2 c3 c4 c5 c6 c7
+              c8 c9 ca cb cc cd ce cf))))
