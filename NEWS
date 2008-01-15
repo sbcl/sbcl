@@ -12,6 +12,8 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
     Maciej Katafiasz)
   * bug fix: sb-aclrepl now correctly understands how to inspect
     single-floats on 64-bit platforms where single-floats are not boxed.
+  * bug fix: SB-MOP:CLASS-SLOTS now signals an error if the class has not
+    yet been finalized. (reported by Levente Meszaros)
   * DESCRIBE and (DOCUMENTATION ... 'OPTIMIZE) describe meaning of
     SBCL-specific optimize qualities.
 

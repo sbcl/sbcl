@@ -519,5 +519,12 @@
               :metaclass 'funcallable-standard-class)
 (assert (eq (class-of (find-class 'better-be-standard-class))
             (find-class 'standard-class)))
+
+;;; CLASS-SLOTS should signal an error for classes that are not yet
+;;; finalized. Reported by Levente Meszaros on sbcl-devel.
+(defclass has-slots-but-isnt-finalized () (a b c))
+(let ((class (find-class 'has-slots-but-isnt-finalized)))
+  (assert (not (sb-mop:class-finalized-p class)))
+  (assert (raises-error? (sb-mop:class-slots class))))
 
 ;;;; success

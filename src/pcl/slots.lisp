@@ -465,3 +465,10 @@
   (declare (ignore initargs))
   (error "Cannot allocate an instance of ~S." class)) ; So sayeth AMOP
 
+;;; AMOP says that CLASS-SLOTS signals an error for unfinalized classes.
+(defmethod class-slots :before ((class slot-class))
+  (unless (class-finalized-p class)
+    (error 'simple-reference-error
+           :format-control "~S called on ~S, which is not yet finalized."
+           :format-arguments (list 'class-slots class)
+           :references (list '(:amop :generic-function class-slots)))))

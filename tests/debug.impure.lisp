@@ -96,11 +96,11 @@
                              (backtrace (member (caar frame-specs) full-backtrace
                                                 :key #'car
                                                 :test #'equal)))
-                        
+
                         (setf result condition)
 
                         (unless backtrace
-                          (format t "~&//~S not in backtrace:~%   ~S~%" 
+                          (format t "~&//~S not in backtrace:~%   ~S~%"
                                   (caar frame-specs)
                                   full-backtrace)
                           (setf result nil))

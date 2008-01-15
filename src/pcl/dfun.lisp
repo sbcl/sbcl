@@ -1280,8 +1280,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                       (writer (cadr specializers))))
              (specl-cpl (if early-p
                             (early-class-precedence-list specl)
-                            (and (class-finalized-p specl)
-                                 (class-precedence-list specl))))
+                            (when (class-finalized-p specl)
+                              (class-precedence-list specl))))
              (so-p (member *the-class-standard-object* specl-cpl))
              (slot-name (if (consp method)
                             (and (early-method-standard-accessor-p method)
@@ -1296,17 +1296,14 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         ;; all of its subclasses. If either SPECL or one of the subclasses
         ;; is not a standard-class, bail out.
         (labels ((aux (class)
-                   ;; FIND-SLOT-DEFINITION might not be defined yet
-                   (let ((slotd (find-if (lambda (x)
-                                           (eq (sb-pcl::slot-definition-name x)
-                                               slot-name))
-                                         (sb-pcl::class-slots class))))
+                   (let ((slotd (find-slot-definition class slot-name)))
                      (when slotd
-                       (unless (or early-p
-                                   (slot-accessor-std-p slotd type))
+                       (unless (or early-p (slot-accessor-std-p slotd type))
                          (return-from make-accessor-table nil))
                        (push (cons specl slotd) (gethash class table))))
                    (dolist (subclass (sb-pcl::class-direct-subclasses class))
+                     (unless (class-finalized-p subclass)
+                       (return-from make-accessor-table nil))
                      (aux subclass))))
           (aux specl))))
     (maphash (lambda (class specl+slotd-list)

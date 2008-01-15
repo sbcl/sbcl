@@ -900,6 +900,9 @@
           (unless (null (cdr rs))
             (terpri s)))))))
 
+(define-condition simple-reference-error (reference-condition simple-error)
+  ())
+
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
   (:report (lambda (c s)
