@@ -1914,3 +1914,12 @@ Which should be fixed, the IR1, or the backend?
   seems to lie if the OS is buffering input for us on Console.)
 
   reported by Elliot Slaughter on sbcl-devel 2008/1/10.
+
+422: out-of-extent return not checked in safe code
+
+ (declaim (optimize safety))
+ (funcall (catch 't (block nil (throw 't (lambda () (return))))))
+
+behaves ...erratically. Reported by Kevin Reid on sbcl-devel
+2007-07-06. (We don't _have_ to check things like this, but we
+generally try to check returns in safe code, so we should here too.)
