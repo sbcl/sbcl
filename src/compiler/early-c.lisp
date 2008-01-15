@@ -182,24 +182,71 @@ dynamic binding, even though the symbol name follows the usual naming~@
 convention (names like *FOO*) for special variables" symbol))
   (values))
 
-(defvar *debug-name-level* 6)
+(def!struct (debug-name-marker (:make-load-form-fun dump-debug-name-marker)
+                               (:print-function print-debug-name-marker)))
+
+(defvar *debug-name-level* 4)
+(defvar *debug-name-length* 12)
+(defvar *debug-name-punt*)
+(defvar *debug-name-sharp*)
+(defvar *debug-name-ellipsis*)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun dump-debug-name-marker (marker &optional env)
+    (declare (ignore env))
+    (cond ((eq marker *debug-name-sharp*)
+           `(if (boundp '*debug-name-sharp*)
+                *debug-name-sharp*
+                (make-debug-name-marker)))
+          ((eq marker *debug-name-ellipsis*)
+           `(if (boundp '*debug-name-ellipsis*)
+                *debug-name-ellipsis*
+                (make-debug-name-marker)))
+          (t
+           (warn "Dumping unknown debug-name marker.")
+           '(make-debug-name-marker)))))
+
+(defun print-debug-name-marker (marker stream level)
+  (declare (ignore level))
+  (cond ((eq marker *debug-name-sharp*)
+         (write-char #\# stream))
+        ((eq marker *debug-name-ellipsis*)
+         (write-string "..." stream))
+        (t
+         (write-string "???" stream))))
+
+(setf *debug-name-sharp* (make-debug-name-marker)
+      *debug-name-ellipsis* (make-debug-name-marker))
 
 (defun debug-name (type thing)
-  (labels ((walk (x level)
-             (if (> *debug-name-level* (incf level))
-                 (typecase x
-                   (cons
-                    (cons (walk (car x) level) (walk (cdr x) level)))
-                   ((or symbol number string)
-                    x)
-                   (t
-                    (list 'of-type (type-of x))))
-                 "#<...>")))
-    ;; FIXME: It might be nice to put markers in the tree instead of
-    ;; this #<...> business, so that they would evantually be printed
-    ;; without the quotes.
-    (let ((name (list type (walk thing 0))))
-      (when (legal-fun-name-p name)
-        (bug "~S is a legal function name, and cannot be used as a ~
-              debug name." name))
-      name)))
+  (let ((*debug-name-punt* nil))
+    (labels ((walk (x)
+               (typecase x
+                 (cons
+                  (if (plusp *debug-name-level*)
+                      (let ((*debug-name-level* (1- *debug-name-level*)))
+                        (do ((tail (cdr x) (cdr tail))
+                             (name (cons (walk (car x)) nil)
+                                   (cons (walk (car tail)) name))
+                             (n (1- *debug-name-length*) (1- n)))
+                            ((or (not (consp tail))
+                                 (not (plusp n))
+                                 *debug-name-punt*)
+                             (cond (*debug-name-punt*
+                                    (setf *debug-name-punt* nil)
+                                    (nreverse name))
+                                   ((atom tail)
+                                    (nconc (nreverse name) (walk tail)))
+                                   (t
+                                    (setf *debug-name-punt* t)
+                                    (nconc (nreverse name) (list *debug-name-ellipsis*)))))))
+                      *debug-name-sharp*))
+                 ((or symbol number string)
+                  x)
+                 (t
+                  (type-of x)))))
+      (let ((name (list type (walk thing))))
+        (when (legal-fun-name-p name)
+          (bug "~S is a legal function name, and cannot be used as a ~
+                debug name." name))
+        name))))
