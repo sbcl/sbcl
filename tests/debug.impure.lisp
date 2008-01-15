@@ -400,6 +400,11 @@
     (assert (search "returned 1" out))
     (assert (search "returned 120" out))))
 
+(with-test (:name :bug-414)
+  (handler-bind ((warning #'error))
+    (load (compile-file "bug-414.lisp"))
+    (disassemble 'bug-414)))
+
 ;;;; test infinite error protection
 
 (defmacro nest-errors (n-levels error-form)

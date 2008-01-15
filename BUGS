@@ -1800,19 +1800,6 @@ WORKAROUND:
 
   Reported by Faré Rideau on sbcl-devel.
 
-414: strange DISASSEMBLE warning
-
-  Compiling and disassembling 
-
-   (defun disassemble-source-form-bug (x y z)
-     (declare (optimize debug))
-     (list x y z))
-
-  Gives
-
-   WARNING: bogus form-number in form!  The source file has probably 
-   been changed too much to cope with.
-
 415: Issues creating large arrays on x86-64/Linux and x86/Darwin
 
    (make-array (1- array-dimension-limit))
