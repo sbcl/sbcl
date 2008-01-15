@@ -27,7 +27,7 @@ if [ "$1" = "--help" ]; then
 fi
 
 if [ -f sbcl-pwd.sh -a -x src/runtime/sbcl -a -f output/sbcl.core ]; then
-    . sbcl-pwd.sh
+    . ./sbcl-pwd.sh
     sbcl_pwd
     echo "(running SBCL from: $SBCL_PWD)"
     SBCL_HOME=$SBCL_PWD/contrib src/runtime/sbcl --core output/sbcl.core $@
