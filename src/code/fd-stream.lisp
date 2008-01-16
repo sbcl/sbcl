@@ -1950,20 +1950,26 @@
                         input-type
                         output-type))))))
 
-;;; Handles the resource-release aspects of stream closing.
+;;; Handles the resource-release aspects of stream closing, and marks
+;;; it as closed.
 (defun release-fd-stream-resources (fd-stream)
   (handler-case
       (without-interrupts
+        ;; Drop handlers first.
+        (when (fd-stream-handler fd-stream)
+          (remove-fd-handler (fd-stream-handler fd-stream))
+          (setf (fd-stream-handler fd-stream) nil))
         ;; Disable interrupts so that a asynch unwind will not leave
         ;; us with a dangling finalizer (that would close the same
-        ;; --possibly reassigned-- FD again).
+        ;; --possibly reassigned-- FD again), or a stream with a closed
+        ;; FD that appears open.
         (sb!unix:unix-close (fd-stream-fd fd-stream))
+        (set-closed-flame fd-stream)
         (when (fboundp 'cancel-finalization)
           (cancel-finalization fd-stream)))
     ;; On error unwind from WITHOUT-INTERRUPTS.
     (serious-condition (e)
       (error e)))
-
   ;; Release all buffers. If this is undone, or interrupted,
   ;; we're still safe: buffers have finalizers of their own.
   (release-fd-stream-buffers fd-stream))
@@ -2036,66 +2042,71 @@
      (setf (fd-stream-listen fd-stream) t))
     (:close
      (cond (arg1                    ; We got us an abort on our hands.
-            (when (fd-stream-handler fd-stream)
-              (remove-fd-handler (fd-stream-handler fd-stream))
-              (setf (fd-stream-handler fd-stream) nil))
-            ;; We can't do anything unless we know what file were
-            ;; dealing with, and we don't want to do anything
-            ;; strange unless we were writing to the file.
-            (when (and (fd-stream-file fd-stream) (fd-stream-obuf fd-stream))
-              (if (fd-stream-original fd-stream)
-                  ;; If the original is EQ to file we are appending
-                  ;; and can just close the file without renaming.
-                  (unless (eq (fd-stream-original fd-stream)
-                              (fd-stream-file fd-stream))
-                    ;; We have a handle on the original, just revert.
+            (let ((outputp (fd-stream-obuf fd-stream))
+                  (file (fd-stream-file fd-stream))
+                  (orig (fd-stream-original fd-stream)))
+              ;; This takes care of the important stuff -- everything
+              ;; rest is cleaning up the file-system, which we cannot
+              ;; do on some platforms as long as the file is open.
+              (release-fd-stream-resources fd-stream)
+              ;; We can't do anything unless we know what file were
+              ;; dealing with, and we don't want to do anything
+              ;; strange unless we were writing to the file.
+              (when (and outputp file)
+                (if orig
+                    ;; If the original is EQ to file we are appending to
+                    ;; and can just close the file without renaming.
+                    (unless (eq orig file)
+                      ;; We have a handle on the original, just revert.
+                      (multiple-value-bind (okay err)
+                          (sb!unix:unix-rename orig file)
+                        ;; FIXME: Why is this a SIMPLE-STREAM-ERROR, and the
+                        ;; others are SIMPLE-FILE-ERRORS? Surely they should
+                        ;; all be the same?
+                        (unless okay
+                          (error 'simple-stream-error
+                                 :format-control
+                                 "~@<Couldn't restore ~S to its original contents ~
+                                  from ~S while closing ~S: ~2I~_~A~:>"
+                                 :format-arguments
+                                 (list file orig fd-stream (strerror err))
+                                 :stream fd-stream))))
+                    ;; We can't restore the original, and aren't
+                    ;; appending, so nuke that puppy.
+                    ;;
+                    ;; FIXME: This is currently the fate of superseded
+                    ;; files, and according to the CLOSE spec this is
+                    ;; wrong. However, there seems to be no clean way to
+                    ;; do that that doesn't involve either copying the
+                    ;; data (bad if the :abort resulted from a full
+                    ;; disk), or renaming the old file temporarily
+                    ;; (probably bad because stream opening becomes more
+                    ;; racy).
                     (multiple-value-bind (okay err)
-                        (sb!unix:unix-rename (fd-stream-original fd-stream)
-                                             (fd-stream-file fd-stream))
+                        (sb!unix:unix-unlink file)
                       (unless okay
-                        (simple-stream-perror
-                         "couldn't restore ~S to its original contents"
-                         fd-stream
-                         err))))
-                  ;; We can't restore the original, and aren't
-                  ;; appending, so nuke that puppy.
-                  ;;
-                  ;; FIXME: This is currently the fate of superseded
-                  ;; files, and according to the CLOSE spec this is
-                  ;; wrong. However, there seems to be no clean way to
-                  ;; do that that doesn't involve either copying the
-                  ;; data (bad if the :abort resulted from a full
-                  ;; disk), or renaming the old file temporarily
-                  ;; (probably bad because stream opening becomes more
-                  ;; racy).
-                  (multiple-value-bind (okay err)
-                      (sb!unix:unix-unlink (fd-stream-file fd-stream))
-                    (unless okay
-                      (error 'simple-file-error
-                             :pathname (fd-stream-file fd-stream)
-                             :format-control
-                             "~@<couldn't remove ~S: ~2I~_~A~:>"
-                             :format-arguments (list (fd-stream-file fd-stream)
-                                                     (strerror err))))))))
+                        (error 'simple-file-error
+                               :pathname file
+                               :format-control
+                               "~@<Couldn't remove ~S while closing ~S: ~2I~_~A~:>"
+                               :format-arguments
+                               (list file fd-stream (strerror err)))))))))
            (t
             (finish-fd-stream-output fd-stream)
-            (when (and (fd-stream-original fd-stream)
-                       (fd-stream-delete-original fd-stream))
-              (multiple-value-bind (okay err)
-                  (sb!unix:unix-unlink (fd-stream-original fd-stream))
-                (unless okay
-                  (error 'simple-file-error
-                         :pathname (fd-stream-original fd-stream)
-                         :format-control
-                         "~@<couldn't delete ~S during close of ~S: ~
-                          ~2I~_~A~:>"
-                         :format-arguments
-                         (list (fd-stream-original fd-stream)
-                               fd-stream
-                               (strerror err))))))))
-     (release-fd-stream-resources fd-stream)
-     ;; Mark as closed. FIXME: Maybe this should be the first thing done?
-     (sb!impl::set-closed-flame fd-stream))
+            (let ((orig (fd-stream-original fd-stream)))
+              (when (and orig (fd-stream-delete-original fd-stream))
+                (multiple-value-bind (okay err) (sb!unix:unix-unlink orig)
+                  (unless okay
+                    (error 'simple-file-error
+                           :pathname orig
+                           :format-control
+                           "~@<couldn't delete ~S while closing ~S: ~2I~_~A~:>"
+                           :format-arguments
+                           (list orig fd-stream (strerror err)))))))
+            ;; In case of no-abort close, don't *really* close the
+            ;; stream until the last moment -- the cleaning up of the
+            ;; original can be done first.
+            (release-fd-stream-resources fd-stream))))
     (:clear-input
      (fd-stream-clear-input fd-stream))
     (:force-output

@@ -19,6 +19,7 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
     single-floats on 64-bit platforms where single-floats are not boxed.
   * bug fix: SB-MOP:CLASS-SLOTS now signals an error if the class has not
     yet been finalized. (reported by Levente Meszaros)
+  * bug fix: CLOSE :ABORT T behaves more correctly on Windows.
   * DESCRIBE and (DOCUMENTATION ... 'OPTIMIZE) describe meaning of
     SBCL-specific optimize qualities.
 

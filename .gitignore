@@ -28,7 +28,10 @@ src/runtime/target-os.h
 tests/test-status.lisp-expr
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
+tools-for-build/os-provides-putwc-test
+tools-for-build/os-provides-putwc-test.exe
 contrib/*/test-passed
 contrib/*/foo.c
 contrib/*/a.out
+contrib/*/a.exe
 contrib/sb-cover/test-output
