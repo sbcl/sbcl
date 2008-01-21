@@ -137,7 +137,7 @@
 
     (move loop-index count)
     (inst mov start rsp-tn)
-    (inst jecxz DONE)  ; check for 0 count?
+    (inst jrcxz DONE)  ; check for 0 count?
 
     (inst sub rsp-tn count)
     (inst sub src count)

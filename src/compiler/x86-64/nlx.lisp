@@ -148,7 +148,7 @@
           ((= nvals 1)
            (let ((no-values (gen-label)))
              (inst mov (tn-ref-tn values) nil-value)
-             (inst jecxz no-values)
+             (inst jrcxz no-values)
              (loadw (tn-ref-tn values) start -1)
              (emit-label no-values)))
           (t
@@ -207,7 +207,7 @@
     (move num rcx)
     (inst shr rcx word-shift)           ; word count for <rep movs>
     ;; If we got zero, we be done.
-    (inst jecxz DONE)
+    (inst jrcxz DONE)
     ;; Copy them down.
     (inst std)
     (inst rep)

@@ -1155,7 +1155,7 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-           (inst jecxz JUST-ALLOC-FRAME))
+           (inst jrcxz JUST-ALLOC-FRAME))
           (t
            (inst cmp rcx-tn (fixnumize fixed))
            (inst jmp :be JUST-ALLOC-FRAME)))
@@ -1294,7 +1294,7 @@
       (move rcx count)
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
-      (inst jecxz done)
+      (inst jrcxz done)
       (inst lea dst (make-ea :qword :base rcx :index rcx))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p)

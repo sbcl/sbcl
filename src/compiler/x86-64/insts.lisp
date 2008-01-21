@@ -2586,7 +2586,7 @@
          (t
           (emit-byte segment #b11000011)))))
 
-(define-instruction jecxz (segment target)
+(define-instruction jrcxz (segment target)
   (:printer short-jump ((op #b0011)))
   (:emitter
    (emit-byte segment #b11100011)
