@@ -128,7 +128,6 @@
   (setf (ansi-stream-in stream) #'closed-flame)
   (setf (ansi-stream-bin stream) #'closed-flame)
   (setf (ansi-stream-n-bin stream) #'closed-flame)
-  (setf (ansi-stream-in stream) #'closed-flame)
   (setf (ansi-stream-out stream) #'closed-flame)
   (setf (ansi-stream-bout stream) #'closed-flame)
   (setf (ansi-stream-sout stream) #'closed-flame)
