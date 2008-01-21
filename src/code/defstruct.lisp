@@ -479,7 +479,8 @@
           (let ((inherited (accessor-inherited-data name defstruct)))
             (cond
               ((not inherited)
-               (stuff `(declaim (inline ,name (setf ,name))))
+               (stuff `(declaim (inline ,name ,@(unless (dsd-read-only slot)
+                                                        `((setf ,name))))))
                ;; FIXME: The arguments in the next two DEFUNs should
                ;; be gensyms. (Otherwise e.g. if NEW-VALUE happened to
                ;; be the name of a special variable, things could get
