@@ -2266,7 +2266,8 @@ bootstrapping.
             arg-info)))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
-                            &key slot-name object-class method-class-function)
+                            &key slot-name object-class method-class-function
+                            definition-source)
   (let ((parsed ())
         (unparsed ()))
     ;; Figure out whether we got class objects or class names as the
@@ -2307,13 +2308,15 @@ bootstrapping.
                         initargs doc)
                   (when slot-name
                     (list :slot-name slot-name :object-class object-class
-                          :method-class-function method-class-function))))))
+                          :method-class-function method-class-function))
+                  (list :definition-source definition-source)))))
       (initialize-method-function initargs result)
       result)))
 
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
-        &rest args &key slot-name object-class method-class-function)
+        &rest args &key slot-name object-class method-class-function
+        definition-source)
   (if method-class-function
       (let* ((object-class (if (classp object-class) object-class
                                (find-class object-class)))
@@ -2329,6 +2332,7 @@ bootstrapping.
           (apply #'make-instance
                  (apply method-class-function object-class slot-definition
                         initargs)
+                 :definition-source definition-source
                  initargs)))
       (apply #'make-instance class :qualifiers qualifiers
              :lambda-list lambda-list :specializers specializers
@@ -2387,7 +2391,9 @@ bootstrapping.
   (setf (fifth (fifth early-method)) new-value))
 
 (defun early-add-named-method (generic-function-name qualifiers
-                               specializers arglist &rest initargs)
+                               specializers arglist &rest initargs
+                               &key documentation definition-source
+                               &allow-other-keys)
   (let* (;; we don't need to deal with the :generic-function-class
          ;; argument here because the default,
          ;; STANDARD-GENERIC-FUNCTION, is right for all early generic
@@ -2401,7 +2407,8 @@ bootstrapping.
     (setf (getf (getf initargs 'plist) :name)
           (make-method-spec gf qualifiers specializers))
     (let ((new (make-a-method 'standard-method qualifiers arglist
-                              specializers initargs (getf initargs :documentation))))
+                              specializers initargs documentation
+                              :definition-source definition-source)))
       (when existing (remove-method gf existing))
       (add-method gf new))))
 

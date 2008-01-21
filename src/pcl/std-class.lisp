@@ -393,7 +393,8 @@
     ((class std-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
-     (direct-default-initargs nil direct-default-initargs-p))
+     (direct-default-initargs nil direct-default-initargs-p)
+     definition-source)
   (cond (direct-superclasses-p
          (setq direct-superclasses
                (or direct-superclasses
@@ -445,7 +446,7 @@
       ;; required by AMOP, "Reinitialization of Class Metaobjects"
       (finalize-inheritance class)
       (update-class class nil))
-  (add-slot-accessors class direct-slots)
+  (add-slot-accessors class direct-slots definition-source)
   (make-preliminary-layout class))
 
 (defmethod shared-initialize :after ((class forward-referenced-class)
@@ -666,7 +667,8 @@
     ((class structure-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
      (direct-slots nil direct-slots-p)
-     direct-default-initargs)
+     direct-default-initargs
+     definition-source)
   (declare (ignore slot-names direct-default-initargs))
   (if direct-superclasses-p
       (setf (slot-value class 'direct-superclasses)
@@ -723,7 +725,7 @@
         (setf (slot-value class 'wrapper) layout)
         (setf (layout-slot-table layout) (make-slot-table class slots))))
     (setf (slot-value class 'finalized-p) t)
-    (add-slot-accessors class direct-slots)))
+    (add-slot-accessors class direct-slots definition-source)))
 
 (defmethod direct-slot-definition-class ((class structure-class) &rest initargs)
   (declare (ignore initargs))
@@ -732,13 +734,13 @@
 (defmethod finalize-inheritance ((class structure-class))
   nil) ; always finalized
 
-(defun add-slot-accessors (class dslotds)
-  (fix-slot-accessors class dslotds 'add))
+(defun add-slot-accessors (class dslotds &optional source-location)
+  (fix-slot-accessors class dslotds 'add source-location))
 
 (defun remove-slot-accessors (class dslotds)
   (fix-slot-accessors class dslotds 'remove))
 
-(defun fix-slot-accessors (class dslotds add/remove)
+(defun fix-slot-accessors (class dslotds add/remove &optional source-location)
   (flet ((fix (gfspec name r/w doc)
            (let ((gf (cond ((eq add/remove 'add)
                             (or (find-generic-function gfspec nil)
@@ -751,10 +753,10 @@
              (when gf
                (case r/w
                  (r (if (eq add/remove 'add)
-                        (add-reader-method class gf name doc)
+                        (add-reader-method class gf name doc source-location)
                         (remove-reader-method class gf)))
                  (w (if (eq add/remove 'add)
-                        (add-writer-method class gf name doc)
+                        (add-writer-method class gf name doc source-location)
                         (remove-writer-method class gf))))))))
     (dolist (dslotd dslotds)
       (let ((slot-name (slot-definition-name dslotd))
@@ -1152,7 +1154,7 @@
   (declare (ignore direct-slot initargs))
   (find-class 'standard-reader-method))
 
-(defmethod add-reader-method ((class slot-class) generic-function slot-name slot-documentation)
+(defmethod add-reader-method ((class slot-class) generic-function slot-name slot-documentation source-location)
   (add-method generic-function
               (make-a-method 'standard-reader-method
                              ()
@@ -1162,13 +1164,14 @@
                              (or slot-documentation "automatically generated reader method")
                              :slot-name slot-name
                              :object-class class
-                             :method-class-function #'reader-method-class)))
+                             :method-class-function #'reader-method-class
+                             :definition-source source-location)))
 
 (defmethod writer-method-class ((class slot-class) direct-slot &rest initargs)
   (declare (ignore direct-slot initargs))
   (find-class 'standard-writer-method))
 
-(defmethod add-writer-method ((class slot-class) generic-function slot-name slot-documentation)
+(defmethod add-writer-method ((class slot-class) generic-function slot-name slot-documentation source-location)
   (add-method generic-function
               (make-a-method 'standard-writer-method
                              ()
@@ -1178,9 +1181,10 @@
                              (or slot-documentation "automatically generated writer method")
                              :slot-name slot-name
                              :object-class class
-                             :method-class-function #'writer-method-class)))
+                             :method-class-function #'writer-method-class
+                             :definition-source source-location)))
 
-(defmethod add-boundp-method ((class slot-class) generic-function slot-name slot-documentation)
+(defmethod add-boundp-method ((class slot-class) generic-function slot-name slot-documentation source-location)
   (add-method generic-function
               (make-a-method (constantly (find-class 'standard-boundp-method))
                              class
@@ -1189,7 +1193,8 @@
                              (list class)
                              (make-boundp-method-function class slot-name)
                              (or slot-documentation "automatically generated boundp method")
-                             slot-name)))
+                             :slot-name slot-name
+                             :definition-source source-location)))
 
 (defmethod remove-reader-method ((class slot-class) generic-function)
   (let ((method (get-method generic-function () (list class) nil)))

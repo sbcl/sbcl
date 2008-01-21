@@ -411,12 +411,6 @@
 
 ;;;; 4 arguments
 
-(defgeneric add-boundp-method (class generic-function slot-name slot-documentation))
-
-(defgeneric add-reader-method (class generic-function slot-name slot-documentation))
-
-(defgeneric add-writer-method (class generic-function slot-name slot-documentation))
-
 (defgeneric make-method-lambda
     (proto-generic-function proto-method lambda-expression environment))
 
@@ -426,6 +420,14 @@
 (defgeneric (setf slot-value-using-class) (new-value class object slotd))
 
 ;;;; 5 arguments
+
+;;; FIXME: This is currently unused -- where should we call it? Or should we just
+;;; delete it.
+(defgeneric add-boundp-method (class generic-function slot-name slot-documentation source-location))
+
+(defgeneric add-reader-method (class generic-function slot-name slot-documentation source-location))
+
+(defgeneric add-writer-method (class generic-function slot-name slot-documentation source-location))
 
 (defgeneric make-method-initargs-form
     (proto-generic-function proto-method lambda-expression lambda-list
