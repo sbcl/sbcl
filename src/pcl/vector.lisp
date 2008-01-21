@@ -550,104 +550,47 @@
         (declare ,(make-pv-type-declaration '.pv.))
         ,@forms)))
 
-(defvar *non-var-declarations*
-  ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I
-  ;; don't *think* CMU CL had, or SBCL has, VALUES declarations. If
-  ;; SBCL doesn't have 'em, VALUES should probably be removed from
-  ;; this list.
-  '(values
-    %method-name
-    %method-lambda-list
-    optimize
-    ftype
-    muffle-conditions
-    inline
-    notinline))
-
-(defvar *var-declarations-with-arg*
-  '(%class
-    type))
-
-(defvar *var-declarations-without-arg*
-  '(ignore
-    ignorable special dynamic-extent
-    ;; FIXME: Possibly this entire list and variable could go away.
-    ;; If not, certainly we should remove all these built-in typenames
-    ;; from the list, and replace them with a test for "is it a type
-    ;; name?" (CLTL1 allowed only built-in type names as declarations,
-    ;; but ANSI CL allows any type name as a declaration.)
-    array atom base-char bignum bit bit-vector character compiled-function
-    complex cons double-float extended-char
-    fixnum float function hash-table integer
-    keyword list long-float nil null number package pathname random-state ratio
-    rational readtable sequence short-float signed-byte simple-array
-    simple-bit-vector simple-string simple-vector single-float standard-char
-    stream string symbol t unsigned-byte vector))
-
 (defun split-declarations (body args maybe-reads-params-p)
   (let ((inner-decls nil)
         (outer-decls nil)
         decl)
-    (loop (when (null body) (return nil))
-          (setq decl (car body))
-          (unless (and (consp decl)
-                       (eq (car decl) 'declare))
-            (return nil))
-          (dolist (form (cdr decl))
-            (when (consp form)
-              (let ((declaration-name (car form)))
-                (if (member declaration-name *non-var-declarations*)
-                    (push `(declare ,form) outer-decls)
-                    (let ((arg-p
-                           (member declaration-name
-                                   *var-declarations-with-arg*))
-                          (non-arg-p
-                           (member declaration-name
-                                   *var-declarations-without-arg*))
-                          (dname (list (pop form)))
-                          (inners nil) (outers nil))
-                      (unless (or arg-p non-arg-p)
-                        ;; FIXME: This warning, and perhaps the
-                        ;; various *VAR-DECLARATIONS-FOO* and/or
-                        ;; *NON-VAR-DECLARATIONS* variables,
-                        ;; could probably go away now that we're not
-                        ;; trying to be portable between different
-                        ;; CLTL1 hosts the way PCL was. (Note that to
-                        ;; do this right, we need to be able to handle
-                        ;; user-defined (DECLAIM (DECLARATION FOO))
-                        ;; stuff.)
-                        (warn "The declaration ~S is not understood by ~S.~@
-                               Please put ~S on one of the lists ~S,~%~S, or~%~S.~@
-                        (Assuming it is a variable declaration without argument)."
-                              declaration-name 'split-declarations
-                              declaration-name
-                              '*non-var-declarations*
-                              '*var-declarations-with-arg*
-                              '*var-declarations-without-arg*)
-                        (push declaration-name *var-declarations-without-arg*))
-                      (when arg-p
-                        (setq dname (append dname (list (pop form)))))
-                      (case (car dname)
-                        (%class (push `(declare (,@dname ,@form)) inner-decls))
-                        (t
-                         (dolist (var form)
-                           (if (member var args)
-                               ;; Quietly remove IGNORE declarations
-                               ;; on args when a next-method is
-                               ;; involved, to prevent compiler
-                               ;; warnings about ignored args being
-                               ;; read.
-                               (unless (and maybe-reads-params-p
-                                            (eq (car dname) 'ignore))
-                                 (push var outers))
-                               (push var inners)))
-                         (when outers
-                           (push `(declare (,@dname ,@outers)) outer-decls))
-                         (when inners
-                           (push
-                            `(declare (,@dname ,@inners))
-                            inner-decls)))))))))
-          (setq body (cdr body)))
+    (loop
+      (when (null body)
+        (return nil))
+      (setq decl (car body))
+      (unless (and (consp decl) (eq (car decl) 'declare))
+        (return nil))
+      (dolist (form (cdr decl))
+        (when (consp form)
+          (let* ((name (car form)))
+            (cond ((eq '%class name)
+                   (push `(declare ,form) inner-decls))
+                  ((or (member name '(ignore ignorable special dynamic-extent type))
+                       (info :type :kind name))
+                   (let* ((inners nil)
+                          (outers nil)
+                          (tail (cdr form))
+                          (head (if (eq 'type name)
+                                    (list name (pop tail))
+                                    (list name))))
+                     (dolist (var tail)
+                       (if (member var args)
+                           ;; Quietly remove IGNORE declarations on
+                           ;; args when a next-method is involved, to
+                           ;; prevent compiler warnings about ignored
+                           ;; args being read.
+                           (unless (and (eq 'ignore name) maybe-reads-params-p)
+                             (push var outers))
+                           (push var inners)))
+                     (when outers
+                       (push `(declare (,@head ,@outers)) outer-decls))
+                     (when inners
+                       (push `(declare (,@head ,@inners)) inner-decls))))
+                  (t
+                   ;; All other declarations are not variable declarations,
+                   ;; so they become outer declarations.
+                   (push `(declare ,form) outer-decls))))))
+      (setq body (cdr body)))
     (values outer-decls inner-decls body)))
 
 ;;; Pull a name out of the %METHOD-NAME declaration in the function

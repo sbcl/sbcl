@@ -195,12 +195,6 @@
         (push (list class-name symbol) *built-in-wrapper-symbols*)
         symbol)))
 
-(pushnew '%class *var-declarations*)
-(pushnew '%variable-rebinding *var-declarations*)
-
-(defun variable-class (var env)
-  (caddr (var-declaration 'class var env)))
-
 (defvar *standard-method-combination*)
 
 (defun plist-value (object name)

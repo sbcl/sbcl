@@ -276,20 +276,35 @@
     (when (eq (cadar entry) 'sb!sys:macro)
       entry)))
 
-(defvar *var-declarations* '(special))
+(defun walked-var-declaration-p (declaration)
+  (member declaration '(sb!pcl::%class sb!pcl::%variable-rebinding special)))
+
+(defun %var-declaration (declaration var env)
+  (let ((id (or (var-lexical-p var env) var)))
+    (dolist (decl (env-declarations env))
+      (when (and (eq (car decl) declaration)
+                 (eq (cadr decl) id))
+        (return decl)))))
 
 (defun var-declaration (declaration var env)
-  (if (not (member declaration *var-declarations*))
-      (error "~S is not a recognized variable declaration." declaration)
-      (let ((id (or (var-lexical-p var env) var)))
-        (dolist (decl (env-declarations env))
-          (when (and (eq (car decl) declaration)
-                     (eq (cadr decl) id))
-            (return decl))))))
+  (if (walked-var-declaration-p declaration)
+      (%var-declaration declaration var env)
+      (error "Not a variable declaration the walker cares about: ~S" declaration)))
+
+#-sb-xc-host
+(define-compiler-macro var-declaration (&whole form declaration var env
+                                        &environment lexenv)
+  (if (sb!xc:constantp declaration lexenv)
+      (let ((decl (constant-form-value declaration lexenv)))
+        (if (walked-var-declaration-p decl)
+            `(%var-declaration ,declaration ,var ,env)
+            form))
+      form))
 
 (defun var-special-p (var env)
-  (or (not (null (var-declaration 'special var env)))
-      (var-globally-special-p var)))
+  (and (or (var-declaration 'special var env)
+           (var-globally-special-p var))
+       t))
 
 (defun var-globally-special-p (symbol)
   (eq (info :variable :kind symbol) :special))
@@ -613,7 +628,7 @@
            (let ((type (car declaration))
                  (name (cadr declaration))
                  (args (cddr declaration)))
-             (if (member type *var-declarations*)
+             (if (walked-var-declaration-p type)
                  (note-declaration `(,type
                                      ,(or (var-lexical-p name env) name)
                                      ,.args)

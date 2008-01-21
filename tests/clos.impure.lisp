@@ -1597,5 +1597,15 @@
 (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
 (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
 (assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object))))
+
+;;;; bug 402: PCL used to warn about non-standard declarations
+(declaim (declaration bug-402-d))
+(defgeneric bug-402-gf (x))
+(with-test (:name :bug-402)
+  (handler-bind ((warning #'error))
+    (eval '(defmethod bug-402-gf (x)
+            (declare (bug-402-d x))
+            x))))
+
 
 ;;;; success

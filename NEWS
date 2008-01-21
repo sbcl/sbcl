@@ -3,6 +3,11 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits
     (see documentation for details.)
   * revived support for OpenBSD (contributed by Josh Elsasser)
+  * partially fixed bug #108: ROOM no longer suffers from occasional
+    (AVER (SAP= CURRENT END)) failures .
+  * fixed bug #402: proclaimed non-standard declarations in DEFMETHOD
+    bodies no longer cause a WARNING to be signalled. (reported by
+    Vincent Arkesteijn)
   * bug fix: (TRUNCATE X 0) when X is a bignum now correctly signals
     DIVISION-BY-ZERO. Similarly for MOD and REM (which suffered due to
     the bug in TRUNCATE.) (reported by Michael Weber)
@@ -10,8 +15,6 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
     no samples. (reported by Andy Hefner)
   * bug fix: functions compiled using (COMPILE NIL '(LAMBDA ...))
     no longer appear as (NIL ...) frames in backtraces.
-  * bug fix: ROOM no longer suffers from occasional (AVER (SAP=
-    CURRENT END)) failures.
   * bug fix: RESOLVE-CONFLICT (and the other name conflict machinery)
     is now actually exported from SB-EXT as documented.  (reported by
     Maciej Katafiasz)

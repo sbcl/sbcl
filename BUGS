@@ -1612,22 +1612,6 @@ WORKAROUND:
   For some more details see comments for (define-alien-type-method
   (c-string :deport-gen) ...)  in host-c-call.lisp.
 
-402: "DECLAIM DECLARATION does not inform the PCL code-walker"
-  reported by Vincent Arkesteijn:
-
-  (declaim (declaration foo))
-  (defgeneric bar (x))
-  (defmethod bar (x)
-    (declare (foo x))
-    x)
-
-  ==> WARNING: The declaration FOO is not understood by
-      SB-PCL::SPLIT-DECLARATIONS.
-      Please put FOO on one of the lists SB-PCL::*NON-VAR-DECLARATIONS*,
-      SB-PCL::*VAR-DECLARATIONS-WITH-ARG*, or
-      SB-PCL::*VAR-DECLARATIONS-WITHOUT-ARG*.
-      (Assuming it is a variable declaration without argument).
-
 403: FORMAT/PPRINT-LOGICAL-BLOCK of CONDITIONs ignoring *PRINT-CIRCLE*
   In sbcl-0.9.13.34,
     (defparameter *c*
@@ -1784,21 +1768,6 @@ WORKAROUND:
   This gives a type error (#:G1 is not a (NOT SYMBOL)) because of the
   implementation of read circularity, using a symbol as a marker for
   the previously-referenced object.
-
-413: type-errors in ROOM
-
-  (defvar *a* (make-array (expt 2 27)))
-  (room)
-
-  Causes a type-error on 32bit SBCL, as various byte-counts in ROOM
-  implementation overrun fixnums. 
-
-  This was fixed in 1.0.4.89, but the patch was reverted as it caused
-  ROOM to cons sufficiently to make running it in a loop deadly on
-  GENCGC: newly allocated objects survived to generation 1, where next
-  call to ROOM would see them, and allocate even more...
-
-  Reported by Faré Rideau on sbcl-devel.
 
 415: Issues creating large arrays on x86-64/Linux and x86/Darwin
 
