@@ -305,10 +305,11 @@ int sb_mkstemp (char *template, mode_t mode) {
        template on every loop, but only the last several characters.
        But I didn't feel like testing the boundary cases in Windows's
        _mktemp. */
-    strcpy((char*)&buf, template);
-    if (MKTEMP((char*)&buf)) {
-      if ((fd=open((char*)&buf, O_CREAT|O_EXCL|O_RDWR, mode))!=-1) {
-        strcpy(template, (char*)&buf);
+    strncpy(buf, template, PATHNAME_BUFFER_SIZE);
+    buf[PATHNAME_BUFFER_SIZE-1]=0; /* force NULL-termination */
+    if (MKTEMP(buf)) {
+      if ((fd=open(buf, O_CREAT|O_EXCL|O_RDWR, mode))!=-1) {
+        strcpy(template, buf);
         return (fd);
       } else
         if (errno != EEXIST)
