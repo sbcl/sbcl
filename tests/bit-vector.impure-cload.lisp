@@ -83,7 +83,7 @@
     #+gencgc
     (- sb-vm:dynamic-space-end sb-vm:dynamic-space-start)
     #-gencgc
-    (- sb-vm:dynamic-space-0-end sb-vm:dynamic-space-0-start)))
+    (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)))
 
 ;; except on machines where the arrays won't fit into the dynamic space.
 #+#.(cl:if (cl:> (cl-user::dynamic-space-size)
