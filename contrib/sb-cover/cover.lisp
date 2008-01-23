@@ -96,7 +96,10 @@ latter mode is generally easier to read."
     (ensure-directories-exist *default-pathname-defaults*)
     (maphash (lambda (k v)
                (declare (ignore v))
-               (let* ((n (substitute #\_ #\. (substitute #\_ #\/ k)))
+               (let* ((n (format nil "~(~{~2,'0X~}~)"
+                                (coerce (sb-md5:md5sum-string
+                                         (sb-ext:native-namestring k))
+                                        'list)))
                       (path (make-pathname :name n :type "html")))
                  (when (probe-file k)
                    (with-open-file (stream path

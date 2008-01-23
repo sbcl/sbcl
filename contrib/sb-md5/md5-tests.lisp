@@ -132,9 +132,21 @@
        ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" . "ab75504250558b788f99d1ebd219abf2"))))
 
 (deftest sb-md5.md5sum-file.0
-    (string= (format nil "~(~{~2,'0X~}~)" (coerce (md5sum-file #-win32 "/dev/null" #+win32 "nul") 'list))
-             "d41d8cd98f00b204e9800998ecf8427e")
-  t)
+    (let ((file
+           (loop with ret
+                 for filename = (format nil "md5-test-~6,'0D" (random 100000))
+                 do (with-open-file (stream filename :direction :output
+                                            :if-exists nil
+                                            :if-does-not-exist :create)
+                      (when stream
+                        (setf ret stream)))
+                 when ret return ret)))
+      (unwind-protect
+          (string= (format nil "~(~{~2,'0X~}~)"
+                           (coerce (md5sum-file file) 'list))
+                   "d41d8cd98f00b204e9800998ecf8427e")
+        (delete-file file)))
+      t)
 
 (deftest sb-md5.md5sum-sequence.error.0
     (handler-case (md5sum-sequence "foo")
