@@ -418,43 +418,44 @@
          (%primitive print "can't recover from error in cold init, halting")
          (%primitive sb!c:halt))
 
-       (multiple-value-bind (name sb!debug:*stack-top-hint*)
-           (find-interrupted-name-and-frame)
-         (/show0 "back from FIND-INTERRUPTED-NAME")
-         ;; Unblock trap signal here, we unwound the stack and can't return.
-         ;; FIXME: Should we not reset the _entire_ mask, but just
-         ;; restore it to the state before we got the condition?
-         ;; FIXME 2: Signals are currently unblocked in
-         ;; interrupt.c:internal_error before we do stack unwinding, can this
-         ;; introduce a race condition?
-         #!+(and linux mips)
-         (sb!unix::reset-signal-mask)
-         (let ((fp (int-sap (sb!vm:context-register alien-context
-                                                    sb!vm::cfp-offset)))
-               (handler (and (< -1 error-number (length *internal-errors*))
-                             (svref *internal-errors* error-number))))
-           (cond ((null handler)
-                  (error 'simple-error
-                         :format-control
-                         "unknown internal error, ~D, args=~S"
-                         :format-arguments
-                         (list error-number
-                               (mapcar (lambda (sc-offset)
-                                         (sb!di::sub-access-debug-var-slot
-                                          fp sc-offset alien-context))
-                                       arguments))))
-                 ((not (functionp handler))
-                  (error 'simple-error
-                         :format-control "internal error ~D: ~A; args=~S"
-                         :format-arguments
-                         (list error-number
-                               handler
-                               (mapcar (lambda (sc-offset)
-                                         (sb!di::sub-access-debug-var-slot
-                                          fp sc-offset alien-context))
-                                       arguments))))
-                 (t
-                  (funcall handler name fp alien-context arguments)))))))))
+       (with-interrupt-bindings
+         (multiple-value-bind (name sb!debug:*stack-top-hint*)
+             (find-interrupted-name-and-frame)
+           (/show0 "back from FIND-INTERRUPTED-NAME")
+           ;; Unblock trap signal here, we unwound the stack and can't return.
+           ;; FIXME: Should we not reset the _entire_ mask, but just
+           ;; restore it to the state before we got the condition?
+           ;; FIXME 2: Signals are currently unblocked in
+           ;; interrupt.c:internal_error before we do stack unwinding, can this
+           ;; introduce a race condition?
+           #!+(and linux mips)
+           (sb!unix::reset-signal-mask)
+           (let ((fp (int-sap (sb!vm:context-register alien-context
+                                                      sb!vm::cfp-offset)))
+                 (handler (and (< -1 error-number (length *internal-errors*))
+                               (svref *internal-errors* error-number))))
+             (cond ((null handler)
+                    (error 'simple-error
+                           :format-control
+                           "unknown internal error, ~D, args=~S"
+                           :format-arguments
+                           (list error-number
+                                 (mapcar (lambda (sc-offset)
+                                           (sb!di::sub-access-debug-var-slot
+                                            fp sc-offset alien-context))
+                                         arguments))))
+                   ((not (functionp handler))
+                    (error 'simple-error
+                           :format-control "internal error ~D: ~A; args=~S"
+                           :format-arguments
+                           (list error-number
+                                 handler
+                                 (mapcar (lambda (sc-offset)
+                                           (sb!di::sub-access-debug-var-slot
+                                            fp sc-offset alien-context))
+                                         arguments))))
+                   (t
+                    (funcall handler name fp alien-context arguments))))))))))
 
 (defun control-stack-exhausted-error ()
   (let ((sb!debug:*stack-top-hint* nil))

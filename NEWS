@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.15 relative to sbcl-1.0.14:
+  * enhancement: cleaner backtraces for interactive interrupts, as
+    well as other cases where the interesting frames used to be
+    obscured by interrupt handling frames.
+  * bug fix: SORT was not interrupt safe.
+
 changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits
     (see documentation for details.)

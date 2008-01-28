@@ -12,16 +12,22 @@
 (in-package "SB!UNIX")
 
 (defmacro with-interrupt-bindings (&body body)
-  `(let
-      ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
-      ;; handler runs doesn't really matter, since we're not on the
-      ;; same call stack, really -- and if we don't bind these (esp.
-      ;; the cache one) we can get a bogus metacircle if an interrupt
-      ;; handler calls a GF that was being computed when the interrupt
-      ;; hit.
-      ((sb!pcl::*cache-miss-values-stack* nil)
-       (sb!pcl::*dfun-miss-gfs-on-stack* nil))
-     ,@body))
+  (with-unique-names (empty)
+    `(let*
+         ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
+         ;; handler runs doesn't really matter, since we're not on the
+         ;; same call stack, really -- and if we don't bind these (esp.
+         ;; the cache one) we can get a bogus metacircle if an interrupt
+         ;; handler calls a GF that was being computed when the interrupt
+         ;; hit.
+         ((sb!pcl::*cache-miss-values-stack* nil)
+          (sb!pcl::*dfun-miss-gfs-on-stack* nil)
+          ;; Unless we do this, ADJUST-ARRAY and SORT would need to
+          ;; disable interrupts.
+          (,empty (vector))
+          (sb!impl::*zap-array-data-temp* ,empty)
+          (sb!impl::*merge-sort-temp-vector* ,empty))
+       ,@body)))
 
 (defun invoke-interruption (function)
   (with-interrupt-bindings
@@ -34,7 +40,9 @@
       ;; FIXME: Should we not reset the _entire_ mask, but just
       ;; restore it to the state before we got the interrupt?
       (reset-signal-mask)
-      (allow-with-interrupts (funcall function)))))
+      (allow-with-interrupts
+        (let ((sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+          (funcall function))))))
 
 (defmacro in-interruption ((&key) &body body)
   #!+sb-doc

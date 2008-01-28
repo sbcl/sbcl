@@ -89,27 +89,39 @@ WITHOUT-INTERRUPTS in:
     ;; regardless of the interrupt policy in effect when it is called.
     (lambda () (with-local-interrupts ...)))
 "
-  (with-unique-names (outer-allow-with-interrupts)
-    `(dx-flet ((without-interrupts-thunk (,outer-allow-with-interrupts)
-                 (declare (disable-package-locks allow-with-interrupts
-                                                 with-interrupts)
-                          (ignorable ,outer-allow-with-interrupts))
-                 (macrolet ((allow-with-interrupts (&body allow-forms)
-                              `(dx-flet ((allow-with-interrupts-thunk ()
-                                            ,@allow-forms))
-                                 (call-allowing-with-interrupts
-                                  #'allow-with-interrupts-thunk
-                                  ,',outer-allow-with-interrupts)))
-                            (with-local-interrupts (&body with-forms)
-                              `(dx-flet ((with-local-interrupts-thunk ()
-                                           ,@with-forms))
-                                 (call-with-local-interrupts
-                                  #'with-local-interrupts-thunk
-                                  ,',outer-allow-with-interrupts))))
-                   (declare (enable-package-locks allow-with-interrupts
-                                                  with-interrupts))
-                   ,@body)))
-       (call-without-interrupts #'without-interrupts-thunk))))
+  (with-unique-names (outer-allow-with-interrupts without-interrupts-body)
+    `(flet ((,without-interrupts-body ()
+              (declare (disable-package-locks allow-with-interrupts with-local-interrupts))
+              (macrolet ((allow-with-interrupts (&body allow-forms)
+                                                `(let ((*allow-with-interrupts* ,',outer-allow-with-interrupts))
+                                                   ,@allow-forms))
+                         (with-local-interrupts (&body with-forms)
+                                                `(let ((*allow-with-interrupts* ,',outer-allow-with-interrupts)
+                                                       (*interrupts-enabled* ,',outer-allow-with-interrupts))
+                                                   (when (and ,',outer-allow-with-interrupts *interrupt-pending*)
+                                                     (receive-pending-interrupt))
+                                                   (locally ,@with-forms))))
+                (let ((*interrupts-enabled* nil)
+                      (,outer-allow-with-interrupts *allow-with-interrupts*)
+                      (*allow-with-interrupts* nil))
+                  (declare (ignorable ,outer-allow-with-interrupts))
+                  (declare (enable-package-locks allow-with-interrupts with-local-interrupts))
+                  ,@body))))
+       (if *interrupts-enabled*
+           (unwind-protect
+                (,without-interrupts-body)
+             ;; If we were interrupted in the protected section,
+             ;; then the interrupts are still blocked and it remains
+             ;; so until the pending interrupt is handled.
+             ;;
+             ;; If we were not interrupted in the protected section,
+             ;; but here, then even if the interrupt handler enters
+             ;; another WITHOUT-INTERRUPTS, the pending interrupt will be
+             ;; handled immediately upon exit from said
+             ;; WITHOUT-INTERRUPTS, so it is as if nothing has happened.
+             (when *interrupt-pending*
+               (receive-pending-interrupt)))
+           (,without-interrupts-body)))))
 
 (sb!xc:defmacro with-interrupts (&body body)
   #!+sb-doc
@@ -120,62 +132,25 @@ As interrupts are normally allowed WITH-INTERRUPTS only makes sense if there
 is an outer WITHOUT-INTERRUPTS with a corresponding ALLOW-WITH-INTERRUPTS:
 interrupts are not enabled if any outer WITHOUT-INTERRUPTS is not accompanied
 by ALLOW-WITH-INTERRUPTS."
-  `(dx-flet ((with-interrupts-thunk () ,@body))
-     (call-with-interrupts
-      #'with-interrupts-thunk
-      (and (not *interrupts-enabled*) *allow-with-interrupts*))))
+  (with-unique-names (allowp enablep)
+    ;; We could manage without ENABLEP here, but that would require
+    ;; taking extra care not to ever have *ALLOW-WITH-INTERRUPTS* NIL
+    ;; and *INTERRUPTS-ENABLED* T -- instead of risking future breakage
+    ;; we take the tiny hit here.
+    `(let* ((,allowp *allow-with-interrupts*)
+            (,enablep *interrupts-enabled*)
+            (*interrupts-enabled* (or ,enablep ,allowp)))
+       (when (and (and ,allowp (not ,enablep)) *interrupt-pending*)
+         (receive-pending-interrupt))
+       (locally ,@body))))
 
-(defun call-allowing-with-interrupts (function allowp)
-  (declare (function function))
-  (if allowp
-      (let ((*allow-with-interrupts* t))
-        (funcall function))
-      (funcall function)))
+(defmacro allow-with-interrupts (&body body)
+  (declare (ignore body))
+  (error "~S is valid only inside ~S." 'allow-with-interrupts 'without-interrupts))
 
-(defun call-with-interrupts (function allowp)
-  (declare (function function))
-  (if allowp
-      (let ((*interrupts-enabled* t))
-        (when *interrupt-pending*
-          (receive-pending-interrupt))
-        (funcall function))
-      (funcall function)))
-
-;; Distinct from CALL-WITH-INTERRUPTS as it needs to bind both *A-W-I*
-;; and *I-E*.
-(defun call-with-local-interrupts (function allowp)
-  (declare (function function))
-  (if allowp
-      (let* ((*allow-with-interrupts* t)
-             (*interrupts-enabled* t))
-        (when *interrupt-pending*
-          (receive-pending-interrupt))
-        (funcall function))
-      (funcall function)))
-
-(defun call-without-interrupts (function)
-  (declare (function function))
-  (flet ((run-without-interrupts ()
-           (if *allow-with-interrupts*
-               (let ((*allow-with-interrupts* nil))
-                 (funcall function t))
-               (funcall function nil))))
-    (if *interrupts-enabled*
-        (unwind-protect
-             (let ((*interrupts-enabled* nil))
-               (run-without-interrupts))
-          ;; If we were interrupted in the protected section, then the
-          ;; interrupts are still blocked and it remains so until the
-          ;; pending interrupt is handled.
-          ;;
-          ;; If we were not interrupted in the protected section, but
-          ;; here, then even if the interrupt handler enters another
-          ;; WITHOUT-INTERRUPTS, the pending interrupt will be handled
-          ;; immediately upon exit from said WITHOUT-INTERRUPTS, so it
-          ;; is as if nothing has happened.
-          (when *interrupt-pending*
-            (receive-pending-interrupt)))
-        (run-without-interrupts))))
+(defmacro with-local-interrupts (&body body)
+  (declare (ignore body))
+  (error "~S is valid only inside ~S." 'with-local-interrupts 'without-interrupts))
 
 ;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is false,
 ;;; and *ALLOW-WITH-INTERRUPTS* is true.

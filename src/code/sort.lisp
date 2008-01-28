@@ -240,8 +240,8 @@
                 (simple-vector ,temp))
        (when (> ,vector-len ,temp-len)
          (setf ,temp (make-array (max ,vector-len
-                                      (min most-positive-fixnum
-                                           (+ ,temp-len ,temp-len))))
+                                      (min (truncate array-dimension-limit 2)
+                                           (logand most-positive-fixnum (+ ,temp-len ,temp-len)))))
                *merge-sort-temp-vector* ,temp))
        ;; Rebind, in case PRED or KEY calls STABLE-SORT. This is also
        ;; interrupt safe: we bind before we put any data of our own in
@@ -296,10 +296,6 @@
            (setf ,direction (not ,direction)))))))
 
 ) ; EVAL-when
-
-;;; temporary vector for stable sorting vectors, allocated for each new thread
-(defvar *merge-sort-temp-vector* (vector))
-(declaim (simple-vector *merge-sort-temp-vector*))
 
 (defun stable-sort-simple-vector (vector pred key)
   (declare (type simple-vector vector)

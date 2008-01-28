@@ -688,8 +688,9 @@ around and can be retrieved by JOIN-THREAD."
                   ;; internal printer variables
                   (sb!impl::*previous-case* nil)
                   (sb!impl::*previous-readtable-case* nil)
-                  (sb!impl::*merge-sort-temp-vector* (vector)) ; keep these small!
-                  (sb!impl::*zap-array-data-temp* (vector))    ;
+                  (empty (vector))
+                  (sb!impl::*merge-sort-temp-vector* empty)
+                  (sb!impl::*zap-array-data-temp* empty)
                   (sb!impl::*internal-symbol-output-fun* nil)
                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
               (setf (thread-os-thread thread) (current-thread-sap-id))

@@ -1077,6 +1077,12 @@ of specialized arrays is supported."
   (setf (%array-displaced-p array) displacedp)
   array)
 
+;;;; used by SORT
+
+;;; temporary vector for stable sorting vectors, allocated for each new thread
+(defvar *merge-sort-temp-vector* (vector))
+(declaim (simple-vector *merge-sort-temp-vector*))
+
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
 
 ;;; a temporary to be used when OLD-DATA and NEW-DATA are EQ.
@@ -1125,18 +1131,14 @@ of specialized arrays is supported."
            (unless (typep initial-element element-type)
              (error "~S can't be used to initialize an array of type ~S."
                     initial-element element-type)))
-         (without-interrupts
-           ;; Need to disable interrupts while using the temp-vector.
-           ;; An interrupt handler that also happened to call
-           ;; ADJUST-ARRAY could otherwise stomp on our data here.
-           (let ((temp (zap-array-data-temp new-length
-                                            initial-element initial-element-p)))
-             (declare (simple-vector temp))
-             (zap-array-data-aux old-data old-dims offset temp new-dims)
-             (dotimes (i new-length)
-               (setf (aref new-data i) (aref temp i)
-                     ;; zero out any garbage right away
-                     (aref temp i) 0)))))
+         (let ((temp (zap-array-data-temp new-length
+                                          initial-element initial-element-p)))
+           (declare (simple-vector temp))
+           (zap-array-data-aux old-data old-dims offset temp new-dims)
+           (dotimes (i new-length)
+             (setf (aref new-data i) (aref temp i)
+                   ;; zero out any garbage right away
+                   (aref temp i) 0))))
         (t
          ;; When OLD-DATA and NEW-DATA are not EQ, NEW-DATA has
          ;; already been filled with any
