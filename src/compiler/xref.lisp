@@ -19,16 +19,15 @@
     (return-from record-component-xrefs))
   (do ((block (block-next (component-head component)) (block-next block)))
       ((null (block-next block)))
-    (let* ((this-cont (block-start block))
-           (last (block-last block)))
+    (let ((start (block-start block)))
       (flet ((handle-node (functional)
                ;; Record xref information for all nodes in the block.
                ;; Note that this code can get executed several times
                ;; for the same block, if the functional is referenced
                ;; from multiple XEPs.
-               (loop for node = (ctran-next this-cont)
-                     then (ctran-next (node-next node))
-                     until (eq node last)
+               (loop for ctran = start then (node-next node)
+                     while ctran
+                     for node = (ctran-next ctran)
                      do (record-node-xrefs node functional))
                ;; Properly record the deferred macroexpansion information
                ;; that's been stored in the block.
@@ -81,7 +80,7 @@
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry mv-combination cast))
+    ((or creturn cif entry mv-combination cast exit))
     (combination
      ;; Record references to globals made using SYMBOL-VALUE.
      (let ((fun (principal-lvar-use (combination-fun node)))

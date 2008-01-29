@@ -102,6 +102,13 @@
       ;; Doesn't count as calling xref/3, or referring to +z+ / *a*
       (inline/1))))
 
+;; last node of block should also be taken into account
+(defun xref/13 (x)
+  (setf *a* x))
+
+(defun xref/14 ()
+  *a*)
+
 ;; calling a function in a macro body
 (defmacro macro/1 ()
   (when nil

@@ -29,9 +29,9 @@
                  ((sb-introspect::who-macroexpands 'macro/1)
                   (macro-use/1 macro-use/2 macro-use/3 macro-use/4 inline/2))
                  ((sb-introspect::who-binds '*a*) (xref/2))
-                 ((sb-introspect::who-sets '*a*) (xref/2))
+                 ((sb-introspect::who-sets '*a*) (xref/2 xref/13))
                  ((sb-introspect::who-references '*a*)
-                  (xref/1 xref/2 xref/4 inline/1))
+                  (xref/1 xref/2 xref/4 inline/1 xref/14))
                  ((sb-introspect::who-references '+z+)
                   (inline/1)))))
     (loop for x in tests
