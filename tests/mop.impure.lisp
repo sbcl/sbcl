@@ -525,6 +525,6 @@
 (defclass has-slots-but-isnt-finalized () (a b c))
 (let ((class (find-class 'has-slots-but-isnt-finalized)))
   (assert (not (sb-mop:class-finalized-p class)))
-  (assert (raises-error? (sb-mop:class-slots class))))
+  (assert (raises-error? (sb-mop:class-slots class) sb-kernel::reference-condition)))
 
 ;;;; success
