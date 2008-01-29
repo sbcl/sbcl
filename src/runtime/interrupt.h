@@ -38,12 +38,30 @@ sigcopyset(sigset_t *new, sigset_t *old)
 
 /* maximum signal nesting depth
  *
- * Note: In CMU CL, this was 4096, but there was no explanation given,
- * and it's hard to see why we'd need that many nested interrupts, so
- * I've scaled it back (to 256) to see what happens. -- WHN 20000730
-
- * Nothing happened, so let's creep it back a bit further -- dan 20030411 */
-#define MAX_INTERRUPTS 32
+ * FIXME: In CMUCL this was 4096, and it was first scaled down to 256
+ * and then 32, until finally Stumpwm broke: it is possible to receive
+ * interrupts in sufficiently quick succession that handler nesting
+ * can become preposterous. Scaling this back up to 1024 is a bandaid:
+ * for a real fix we should consider the following things:
+ *
+ *   We should almost certainly always use
+ *   arrange_return_to_lisp_function, though it needs to be thought
+ *   about arguments, and it needs to be able to pass a frobbable
+ *   context to the callee...
+ *
+ *   There are cases when nesting handlers is exactly what we want:
+ *   eg. SIGINT.
+ *
+ *   There are cases when we probably want to drop duplicate signals
+ *   on the floor if they arrive before the previous one has been handled.
+ *   Eg. SIGPROF.
+ *
+ *   There are cases when we probably want to handle duplicate signals
+ *   after the previous handler has returned, not before. Eg. SIGALARM.
+ *
+ * -- NS 2007-01-29
+ */
+#define MAX_INTERRUPTS 1024
 
 union interrupt_handler {
     lispobj lisp;
