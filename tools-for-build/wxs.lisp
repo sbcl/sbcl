@@ -116,7 +116,8 @@
     ("fasl" . "fas")
     ("SBCL" . "txt") ; README.SBCL -> README.txt
     ("texinfo" . "tfo")
-    ("lisp-temp" . "lmp")))
+    ("lisp-temp" . "lmp")
+    ("html" . "htm")))
 
 (defun file-names (pathname)
   (if (or (< 8 (length (pathname-name pathname)))
