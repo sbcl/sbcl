@@ -679,20 +679,20 @@ around and can be retrieved by JOIN-THREAD."
             ;; of Allegro's *cl-default-special-bindings*, as that is at
             ;; least accessible to users to secure their own libraries.
             ;;   --njf, 2006-07-15
-            (let ((*current-thread* thread)
-                  (*restart-clusters* nil)
-                  (*handler-clusters* nil)
-                  (*condition-restarts* nil)
-                  (sb!impl::*deadline* nil)
-                  (sb!impl::*step-out* nil)
-                  ;; internal printer variables
-                  (sb!impl::*previous-case* nil)
-                  (sb!impl::*previous-readtable-case* nil)
-                  (empty (vector))
-                  (sb!impl::*merge-sort-temp-vector* empty)
-                  (sb!impl::*zap-array-data-temp* empty)
-                  (sb!impl::*internal-symbol-output-fun* nil)
-                  (sb!impl::*descriptor-handlers* nil)) ; serve-event
+            (let* ((*current-thread* thread)
+                   (*restart-clusters* nil)
+                   (*handler-clusters* nil)
+                   (*condition-restarts* nil)
+                   (sb!impl::*deadline* nil)
+                   (sb!impl::*step-out* nil)
+                   ;; internal printer variables
+                   (sb!impl::*previous-case* nil)
+                   (sb!impl::*previous-readtable-case* nil)
+                   (empty (vector))
+                   (sb!impl::*merge-sort-temp-vector* empty)
+                   (sb!impl::*zap-array-data-temp* empty)
+                   (sb!impl::*internal-symbol-output-fun* nil)
+                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
               (setf (thread-os-thread thread) (current-thread-sap-id))
               (with-mutex ((thread-result-lock thread))
                 (with-all-threads-lock
