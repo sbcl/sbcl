@@ -106,3 +106,17 @@
        (with-open-file (f *tmpfile*)
          (assert (equal "baz" (read-line f)))))
   (delete-file *tmpfile*))
+
+;; Around 1.0.12 there was a regression when :INPUT or :OUTPUT was a
+;; pathname designator.  Since these use the same code, it should
+;; suffice to test just :INPUT.
+(let ((file))
+  (unwind-protect
+       (progn (with-open-file (f "run-program-test.tmp" :direction :output)
+                (setf file (truename f))
+                (write-line "Foo" f))
+                  (assert (run-program "cat" ()
+                                       :input file :output t
+                                       :search t :wait t)))
+    (when file
+      (delete-file file))))

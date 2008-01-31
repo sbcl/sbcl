@@ -976,7 +976,11 @@ Users Manual for details about the PROCESS structure."#-win32"
                 (error "Direction must be either :INPUT or :OUTPUT, not ~S."
                        direction)))))
           ((or (pathnamep object) (stringp object))
-           (with-open-stream (file (apply #'open object keys))
+           ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
+           ;; than munge the &rest list for OPEN, just disable keyword
+           ;; validation there.
+           (with-open-stream (file (apply #'open object :allow-other-keys t
+                                          keys))
              (multiple-value-bind
                    (fd errno)
                  (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
