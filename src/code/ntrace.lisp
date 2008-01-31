@@ -513,11 +513,14 @@
            ((stringp name)
             (let ((package (find-undeleted-package-or-lose name)))
               (do-all-symbols (symbol (find-package name))
-                (when (and (eql package (symbol-package symbol))
-                           (fboundp symbol)
-                           (not (macro-function symbol))
-                           (not (special-operator-p symbol)))
-                  (forms `(trace-1 ',symbol ',options))))))
+                (when (eql package (symbol-package symbol))
+                  (when (and (fboundp symbol)
+                             (not (macro-function symbol))
+                             (not (special-operator-p symbol)))
+                    (forms `(trace-1 ',symbol ',options)))
+                  (let ((setf-name `(setf ,symbol)))
+                    (when (fboundp setf-name)
+                      (forms `(trace-1 ',setf-name ',options))))))))
            ;; special-case METHOD: it itself is not a general function
            ;; name symbol, but it (at least here) designates one of a
            ;; pair of such.
@@ -658,23 +661,30 @@ are evaluated in the null environment."
     (untrace-1 fun))
   t)
 
+(defun untrace-package (name)
+  (let ((package (find-package name)))
+    (when package
+      (dolist (fun (%list-traced-funs))
+        (cond ((and (symbolp fun) (eq package (symbol-package fun)))
+               (untrace-1 fun))
+              ((and (consp fun) (eq 'setf (car fun))
+                    (symbolp (second fun))
+                    (eq package (symbol-package (second fun))))
+               (untrace-1 fun)))))))
+
 (defmacro untrace (&rest specs)
   #+sb-doc
-  "Remove tracing from the specified functions. With no args, untrace all
-   functions."
-  ;; KLUDGE: Since we now allow (TRACE FOO BAR "SB-EXT") to trace not
-  ;; only #'FOO and #'BAR but also all the functions in #<PACKAGE "SB-EXT">,
-  ;; it would be probably be best for consistency to do something similar
-  ;; with UNTRACE. (But I leave it to someone who uses and cares about
-  ;; UNTRACE-with-args more often than I do.) -- WHN 2003-12-17
+  "Remove tracing from the specified functions. Untraces all
+functions when called with no arguments."
   (if specs
-      (collect ((res))
-        (let ((current specs))
-          (loop
-            (unless current (return))
-            (let ((name (pop current)))
-              (res (if (eq name :function)
-                       `(untrace-1 ,(pop current))
-                       `(untrace-1 ',name)))))
-          `(progn ,@(res) t)))
+      `(progn
+         ,@(loop while specs
+                 for name = (pop specs)
+                 collect (cond ((eq name :function)
+                                `(untrace-1 ,(pop specs)))
+                               ((stringp name)
+                                `(untrace-package ,name))
+                               (t
+                                `(untrace-1 ',name))))
+         t)
       '(untrace-all)))
