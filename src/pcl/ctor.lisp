@@ -531,16 +531,16 @@
       ;; initargs, that is, their values must be evaluated even
       ;; if not actually used for initializing a slot.
       (loop for (key initform initfn) in default-initargs and i from 0
-            unless (member key initkeys :test #'eq) do
-            (let* ((kind (if (constantp initform) 'constant 'var))
-                   (init (if (eq kind 'var) initfn initform)))
-              (ecase kind
-                (constant
-                 (push key defaulting-initargs)
-                 (push initform defaulting-initargs))
-                (var
-                 (push key defaulting-initargs)
-                 (push (default-init-var-name i) defaulting-initargs)))
+            unless (member key initkeys :test #'eq)
+            do (let* ((kind (if (constantp initform) 'constant 'var))
+                      (init (if (eq kind 'var) initfn initform)))
+                 (ecase kind
+                   (constant
+                    (push (list 'quote key) defaulting-initargs)
+                    (push initform defaulting-initargs))
+                   (var
+                    (push (list 'quote key) defaulting-initargs)
+                    (push (default-init-var-name i) defaulting-initargs)))
               (when (eq kind 'var)
                 (let ((init-var (default-init-var-name i)))
                   (setq init init-var)

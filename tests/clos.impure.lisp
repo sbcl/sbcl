@@ -1607,5 +1607,17 @@
             (declare (bug-402-d x))
             x))))
 
+;;;; non-keyword :default-initargs + :before method on shared initialize
+;;;; interacted badly with CTOR optimizations
+(defclass ctor-default-initarg-problem ()
+  ((slot :initarg slotto))
+  (:default-initargs slotto 123))
+(defmethod shared-initialize :before ((instance ctor-default-initarg-problem) slot-names &rest initargs)
+  (format t "~&Rock on: ~A~%" initargs))
+(defun provoke-ctor-default-initarg-problem ()
+  (make-instance 'ctor-default-initarg-problem))
+(handler-bind ((warning #'error))
+  (assert (= 123 (slot-value (provoke-ctor-default-initarg-problem) 'slot))))
+
 
 ;;;; success
