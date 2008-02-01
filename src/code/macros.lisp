@@ -63,6 +63,12 @@
 is not of the specified type. If an error is signalled and the restart
 is used to return, this can only return if the STORE-VALUE restart is
 invoked. In that case it will store into PLACE and start over."
+  ;; Detect a common user-error.
+  (when (and (consp type) (eq 'quote (car type)))
+    (error 'simple-reference-error
+           :format-control "Quoted type specifier in ~S: ~S"
+           :format-arguments (list 'check-type type)
+           :references (list '(:ansi-cl :macro check-type))))
   ;; KLUDGE: We use a simpler form of expansion if PLACE is just a
   ;; variable to work around Python's blind spot in type derivation.
   ;; For more complex places getting the type derived should not

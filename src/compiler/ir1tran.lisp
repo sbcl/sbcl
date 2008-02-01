@@ -750,7 +750,7 @@
              (let ((*print-pretty* nil)
                    ;; We rely on the printer to abbreviate FORM.
                    (*print-length* 3)
-                   (*print-level* 1))
+                   (*print-level* 3))
                (format
                 nil
                 #-sb-xc-host "(in macroexpansion of ~S)"
