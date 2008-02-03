@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.102
+;;; This is asdf: Another System Definition Facility.  1.114
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -13,7 +13,7 @@
 ;;; is the latest development version, whereas the revision tagged
 ;;; RELEASE may be slightly older but is considered `stable'
 
-;;; Copyright (c) 2001-2003 Daniel Barlow and contributors
+;;; Copyright (c) 2001-2007 Daniel Barlow and contributors
 ;;;
 ;;; Permission is hereby granted, free of charge, to any person obtaining
 ;;; a copy of this software and associated documentation files (the
@@ -79,6 +79,8 @@
            #:system-maintainer
            #:system-license
            #:system-licence
+           #:system-source-file
+           #:system-relative-pathname
 
            #:operation-on-warnings
            #:operation-on-failure
@@ -106,25 +108,31 @@
            )
   (:use :cl))
 
-#+nil
-(error "The author of this file habitually uses #+nil to comment out forms.  But don't worry, it was unlikely to work in the New Implementation of Lisp anyway")
 
+#+nil
+(error "The author of this file habitually uses #+nil to comment out ~
+        forms. But don't worry, it was unlikely to work in the New ~
+        Implementation of Lisp anyway")
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.102")
+(defvar *asdf-revision* (let* ((v "1.111")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
                                (list (parse-integer v :start (1+ colon)
-                                                    :junk-allowed t)
+                                                      :junk-allowed t)
                                      (parse-integer v :start (1+ dot)
-                                                    :junk-allowed t)))))
+                                                      :junk-allowed t)))))
 
 (defvar *compile-file-warnings-behaviour* :warn)
+
 (defvar *compile-file-failure-behaviour* #+sbcl :error #-sbcl :warn)
 
 (defvar *verbose-out* nil)
+
+(defparameter +asdf-methods+
+  '(perform explain output-files operation-done-p))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; utility stuff
@@ -138,7 +146,7 @@ and NIL NAME and TYPE components"
   (make-pathname :name nil :type nil :defaults pathname))
 
 (define-modify-macro appendf (&rest args)
-                     append "Append onto list")
+  append "Append onto list")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; classes, condiitons
@@ -187,7 +195,7 @@ and NIL NAME and TYPE components"
          "Component name: designator for a string composed of portable pathname characters")
    (version :accessor component-version :initarg :version)
    (in-order-to :initform nil :initarg :in-order-to)
-   ;;; XXX crap name
+   ;; XXX crap name
    (do-first :initform nil :initarg :do-first)
    ;; methods defined using the "inline" style inside a defsystem form:
    ;; need to store them somewhere so we can delete them when the system
@@ -299,13 +307,13 @@ and NIL NAME and TYPE components"
     (nreverse
      (let ((list nil) (start 0) (words 0) end)
        (loop
-        (when (and max (>= words (1- max)))
-          (return (cons (subseq string start) list)))
-        (setf end (position-if #'is-ws string :start start))
-        (push (subseq string start end) list)
-        (incf words)
-        (unless end (return list))
-        (setf start (1+ end)))))))
+         (when (and max (>= words (1- max)))
+           (return (cons (subseq string start) list)))
+         (setf end (position-if #'is-ws string :start start))
+         (push (subseq string start end) list)
+         (incf words)
+         (unless end (return list))
+         (setf start (1+ end)))))))
 
 (defgeneric version-satisfies (component version))
 
@@ -330,11 +338,11 @@ and NIL NAME and TYPE components"
 
 (defvar *defined-systems* (make-hash-table :test 'equal))
 (defun coerce-name (name)
-   (typecase name
-     (component (component-name name))
-     (symbol (string-downcase (symbol-name name)))
-     (string name)
-     (t (sysdef-error "~@<invalid component designator ~A~@:>" name))))
+  (typecase name
+    (component (component-name name))
+    (symbol (string-downcase (symbol-name name)))
+    (string name)
+    (t (sysdef-error "~@<invalid component designator ~A~@:>" name))))
 
 ;;; for the sake of keeping things reasonably neat, we adopt a
 ;;; convention that functions in this list are prefixed SYSDEF-
@@ -366,8 +374,8 @@ and NIL NAME and TYPE components"
 (defun make-temporary-package ()
   (flet ((try (counter)
            (ignore-errors
-                   (make-package (format nil "ASDF~D" counter)
-                                 :use '(:cl :asdf)))))
+             (make-package (format nil "ASDF~D" counter)
+                           :use '(:cl :asdf)))))
     (do* ((counter 0 (+ counter 1))
           (package (try counter) (try counter)))
          (package package))))
@@ -494,7 +502,9 @@ system."))
   (cons (class-name (class-of o)) c))
 
 (defgeneric operation-ancestor (operation)
-  (:documentation   "Recursively chase the operation's parent pointer until we get to the head of the tree"))
+  (:documentation
+   "Recursively chase the operation's parent pointer until we get to
+the head of the tree"))
 
 (defmethod operation-ancestor ((operation operation))
   (aif (operation-parent operation)
@@ -557,7 +567,25 @@ system."))
     (member node (operation-visiting-nodes (operation-ancestor o))
             :test 'equal)))
 
-(defgeneric component-depends-on (operation component))
+(defgeneric component-depends-on (operation component)
+  (:documentation
+   "Returns a list of dependencies needed by the component to perform
+    the operation.  A dependency has one of the following forms:
+
+      (<operation> <component>*), where <operation> is a class
+        designator and each <component> is a component
+        designator, which means that the component depends on
+        <operation> having been performed on each <component>; or
+
+      (FEATURE <feature>), which means that the component depends
+        on <feature>'s presence in *FEATURES*.
+
+    Methods specialized on subclasses of existing component types
+    should usually append the results of CALL-NEXT-METHOD to the
+    list."))
+
+(defmethod component-depends-on ((op-spec symbol) (c component))
+  (component-depends-on (make-instance op-spec) c))
 
 (defmethod component-depends-on ((o operation) (c component))
   (cdr (assoc (class-name (class-of o))
@@ -638,7 +666,8 @@ system."))
                                   ;; in-order-to slot with canonicalized
                                   ;; names instead of coercing this late
                                   (coerce-name required-c) required-v)
-                                 (error 'missing-dependency :required-by c
+                                 (error 'missing-dependency
+                                        :required-by c
                                         :version required-v
                                         :requires required-c)))
                       (op (make-sub-operation c operation dep-c required-op)))
@@ -646,8 +675,10 @@ system."))
              (do-dep (op dep)
                (cond ((eq op 'feature)
                       (or (member (car dep) *features*)
-                          (error 'missing-dependency :required-by c
-                                 :requires (car dep) :version nil)))
+                          (error 'missing-dependency
+                                 :required-by c
+                                 :requires (car dep)
+                                 :version nil)))
                      (t
                       (dolist (d dep)
                         (cond ((consp d)
@@ -744,9 +775,7 @@ system."))
   (let ((source-file (component-pathname c))
         (output-file (car (output-files operation c))))
     (multiple-value-bind (output warnings-p failure-p)
-                         (compile-file source-file
-                                       :output-file output-file)
-      ;(declare (ignore output))
+        (compile-file source-file :output-file output-file)
       (when warnings-p
         (case (operation-on-warnings operation)
           (:warn (warn
@@ -773,6 +802,10 @@ system."))
 
 (defmethod output-files ((operation compile-op) (c static-file))
   nil)
+
+(defmethod input-files ((op compile-op) (c static-file))
+  nil)
+
 
 ;;; load-op
 
@@ -833,10 +866,15 @@ system."))
   nil)
 
 (defgeneric load-preferences (system operation)
-  (:documentation "Called to load system preferences after <perform operation system>. Typical uses are to set parameters that don't exist until after the system has been loaded."))
+  (:documentation
+   "Called to load system preferences after <perform operation
+system>. Typical uses are to set parameters that don't exist until
+after the system has been loaded."))
 
 (defgeneric preference-file-for-system/operation (system operation)
-  (:documentation "Returns the pathname of the preference file for this system. Called by 'load-preferences to determine what file to load."))
+  (:documentation
+   "Returns the pathname of the preference file for this system.
+Called by 'load-preferences to determine what file to load."))
 
 (defmethod load-preferences ((s t) (operation t))
   ;; do nothing
@@ -858,51 +896,75 @@ system."))
   (preference-file-for-system/operation (find-system system t) operation))
 
 (defmethod preference-file-for-system/operation ((s system) (operation t))
-  (merge-pathnames
-   (make-pathname :name (component-name s)
-                  :type "lisp"
-                  :directory '(:relative ".asdf"))
-   (truename (user-homedir-pathname))))
+  (let ((*default-pathname-defaults*
+         (make-pathname :name nil :type nil
+                        :defaults *default-pathname-defaults*)))
+     (merge-pathnames
+      (make-pathname :name (component-name s)
+                     :type "lisp"
+                     :directory '(:relative ".asdf"))
+      (truename (user-homedir-pathname)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; invoking operations
 
+(defvar *operate-docstring*
+  "Operate does three things:
+
+1. It creates an instance of `operation-class` using any keyword parameters
+as initargs.
+2. It finds the  asdf-system specified by `system` (possibly loading
+it from disk).
+3. It then calls `traverse` with the operation and system as arguments
+
+The traverse operation is wrapped in `with-compilation-unit` and error
+handling code. If a `version` argument is supplied, then operate also
+ensures that the system found satisfies it using the `version-satisfies`
+method.")
+
 (defun operate (operation-class system &rest args &key (verbose t) version
-                                &allow-other-keys)
+                &allow-other-keys)
   (let* ((op (apply #'make-instance operation-class
                     :original-initargs args
                     args))
-         (*verbose-out* (if verbose *trace-output* (make-broadcast-stream)))
+         (*verbose-out* (if verbose *standard-output* (make-broadcast-stream)))
          (system (if (typep system 'component) system (find-system system))))
     (unless (version-satisfies system version)
       (error 'missing-component :requires system :version version))
     (let ((steps (traverse op system)))
       (with-compilation-unit ()
         (loop for (op . component) in steps do
-             (loop
-                (restart-case
-                    (progn (perform op component)
-                           (return))
-                  (retry ()
-                    :report
-                    (lambda (s)
-                      (format s "~@<Retry performing ~S on ~S.~@:>"
-                              op component)))
-                  (accept ()
-                    :report
-                    (lambda (s)
-                      (format s
-                              "~@<Continue, treating ~S on ~S as ~
-                               having been successful.~@:>"
-                              op component))
-                    (setf (gethash (type-of op)
-                                   (component-operation-times component))
-                          (get-universal-time))
-                    (return)))))))))
+                 (loop
+                   (restart-case
+                       (progn (perform op component)
+                              (return))
+                     (retry ()
+                       :report
+                       (lambda (s)
+                         (format s "~@<Retry performing ~S on ~S.~@:>"
+                                 op component)))
+                     (accept ()
+                       :report
+                       (lambda (s)
+                         (format s "~@<Continue, treating ~S on ~S as ~
+                                   having been successful.~@:>"
+                                 op component))
+                       (setf (gethash (type-of op)
+                                      (component-operation-times component))
+                             (get-universal-time))
+                       (return)))))))))
 
-(defun oos (&rest args)
-  "Alias of OPERATE function"
-  (apply #'operate args))
+(setf (documentation 'operate 'function)
+      *operate-docstring*)
+
+(defun oos (operation-class system &rest args &key force (verbose t) version)
+  (declare (ignore force verbose version))
+  (apply #'operate operation-class system args))
+
+(setf (documentation 'oos 'function)
+      (format nil
+              "Short for _operate on system_ and an alias for the `operate` function. ~&~&~a"
+              *operate-docstring*))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; syntax
@@ -917,38 +979,45 @@ system."))
     (aux key arglist)))
 
 (defmacro defsystem (name &body options)
-  (destructuring-bind (&key pathname (class 'system) &allow-other-keys) options
+  (destructuring-bind (&key (pathname nil pathname-arg-p) (class 'system)
+                            &allow-other-keys)
+      options
     (let ((component-options (remove-keyword :class options)))
       `(progn
-        ;; system must be registered before we parse the body, otherwise
-        ;; we recur when trying to find an existing system of the same name
-        ;; to reuse options (e.g. pathname) from
-        (let ((s (system-registered-p ',name)))
-          (cond ((and s (eq (type-of (cdr s)) ',class))
-                 (setf (car s) (get-universal-time)))
-                (s
-                 #+clisp
-                 (sysdef-error "Cannot redefine the existing system ~A with a different class" s)
-                 #-clisp
-                 (change-class (cdr s) ',class))
-                (t
-                 (register-system (quote ,name)
-                                  (make-instance ',class :name ',name)))))
-        (parse-component-form nil (apply
-                                   #'list
-                                   :module (coerce-name ',name)
-                                   :pathname
-                                   (or ,pathname
-                                       (pathname-sans-name+type
-                                        (resolve-symlinks  *load-truename*))
-                                       *default-pathname-defaults*)
-                                   ',component-options))))))
+         ;; system must be registered before we parse the body, otherwise
+         ;; we recur when trying to find an existing system of the same name
+         ;; to reuse options (e.g. pathname) from
+         (let ((s (system-registered-p ',name)))
+           (cond ((and s (eq (type-of (cdr s)) ',class))
+                  (setf (car s) (get-universal-time)))
+                 (s
+                  #+clisp
+                  (sysdef-error "Cannot redefine the existing system ~A with a different class" s)
+                  #-clisp
+                  (change-class (cdr s) ',class))
+                 (t
+                  (register-system (quote ,name)
+                                   (make-instance ',class :name ',name)))))
+         (parse-component-form nil (apply
+                                    #'list
+                                    :module (coerce-name ',name)
+                                    :pathname
+                                    ;; to avoid a note about unreachable code
+                                    ,(if pathname-arg-p
+                                         pathname
+                                         `(or (when *load-truename*
+                                                (pathname-sans-name+type
+                                                 (resolve-symlinks
+                                                  *load-truename*)))
+                                              *default-pathname-defaults*))
+                                    ',component-options))))))
 
 
 (defun class-for-type (parent type)
   (let* ((extra-symbols (list (find-symbol (symbol-name type) *package*)
                               (find-symbol (symbol-name type)
-                                           #.(package-name *package*))))
+                                           (load-time-value
+                                            (package-name :asdf)))))
          (class (dolist (symbol (if (keywordp type)
                                     extra-symbols
                                     (cons type extra-symbols)))
@@ -997,6 +1066,7 @@ Returns the new tree (which probably shares structure with the old one)"
 (defvar *serial-depends-on*)
 
 (defun parse-component-form (parent options)
+
   (destructuring-bind
         (type name &rest rest &key
               ;; the following list of keywords is reproduced below in the
@@ -1007,14 +1077,15 @@ Returns the new tree (which probably shares structure with the old one)"
               depends-on serial in-order-to
               ;; list ends
               &allow-other-keys) options
+    (declare (ignorable perform explain output-files operation-done-p))
     (check-component-input type name weakly-depends-on depends-on components in-order-to)
 
     (when (and parent
-             (find-component parent name)
-             ;; ignore the same object when rereading the defsystem
-             (not
-              (typep (find-component parent name)
-                     (class-for-type parent type))))
+               (find-component parent name)
+               ;; ignore the same object when rereading the defsystem
+               (not
+                (typep (find-component parent name)
+                       (class-for-type parent type))))
       (error 'duplicate-names :name name))
 
     (let* ((other-args (remove-keys
@@ -1031,8 +1102,7 @@ Returns the new tree (which probably shares structure with the old one)"
       (when (boundp '*serial-depends-on*)
         (setf depends-on
               (concatenate 'list *serial-depends-on* depends-on)))
-      (apply #'reinitialize-instance
-             ret
+      (apply #'reinitialize-instance ret
              :name (coerce-name name)
              :pathname pathname
              :parent parent
@@ -1058,9 +1128,9 @@ Returns the new tree (which probably shares structure with the old one)"
                              name-hash)
                     (error 'duplicate-names
                            :name (component-name c))
-                  (setf (gethash (component-name c)
-                                 name-hash)
-                        t)))))
+                    (setf (gethash (component-name c)
+                                   name-hash)
+                          t)))))
 
       (setf (slot-value ret 'in-order-to)
             (union-of-dependencies
@@ -1069,22 +1139,29 @@ Returns the new tree (which probably shares structure with the old one)"
                (load-op (load-op ,@depends-on))))
             (slot-value ret 'do-first) `((compile-op (load-op ,@depends-on))))
 
-      (loop for (n v) in `((perform ,perform) (explain ,explain)
-                           (output-files ,output-files)
-                           (operation-done-p ,operation-done-p))
-            do (map 'nil
-                    ;; this is inefficient as most of the stored
-                    ;; methods will not be for this particular gf n
-                    ;; But this is hardly performance-critical
-                    (lambda (m) (remove-method (symbol-function n) m))
-                    (component-inline-methods ret))
-            when v
-            do (destructuring-bind (op qual (o c) &body body) v
-                 (pushnew
-                  (eval `(defmethod ,n ,qual ((,o ,op) (,c (eql ,ret)))
-                          ,@body))
-                  (component-inline-methods ret))))
+      (%remove-component-inline-methods ret rest)
+
       ret)))
+
+(defun %remove-component-inline-methods (ret rest)
+  (loop for name in +asdf-methods+
+        do (map 'nil
+                ;; this is inefficient as most of the stored
+                ;; methods will not be for this particular gf n
+                ;; But this is hardly performance-critical
+                (lambda (m)
+                  (remove-method (symbol-function name) m))
+                (component-inline-methods ret)))
+  ;; clear methods, then add the new ones
+  (setf (component-inline-methods ret) nil)
+  (loop for name in +asdf-methods+
+        for v = (getf rest (intern (symbol-name name) :keyword))
+        when v do
+        (destructuring-bind (op qual (o c) &body body) v
+          (pushnew
+           (eval `(defmethod ,name ,qual ((,o ,op) (,c (eql ,ret)))
+                             ,@body))
+           (component-inline-methods ret)))))
 
 (defun check-component-input (type name weakly-depends-on depends-on components in-order-to)
   "A partial test of the values of a component."
@@ -1100,7 +1177,7 @@ Returns the new tree (which probably shares structure with the old one)"
                             type name components))
   (unless (and (listp in-order-to) (listp (car in-order-to)))
     (sysdef-error-component ":in-order-to must be NIL or a list of components."
-                           type name in-order-to)))
+                            type name in-order-to)))
 
 (defun sysdef-error-component (msg type name value)
   (sysdef-error (concatenate 'string msg
@@ -1148,7 +1225,7 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
      :shell-type "/bin/sh"
      :output-stream *verbose-out*)
 
-    #+clisp                             ;XXX not exactly *verbose-out*, I know
+    #+clisp                     ;XXX not exactly *verbose-out*, I know
     (ext:run-shell-command  command :output :terminal :wait t)
 
     #+openmcl
@@ -1170,6 +1247,28 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
 
 (defun hyperdoc (name doc-type)
   (hyperdocumentation (symbol-package name) name doc-type))
+
+(defun system-source-file (system-name)
+  (let ((system (asdf:find-system system-name)))
+    (make-pathname
+     :type "asd"
+     :name (asdf:component-name system)
+     :defaults (asdf:component-relative-pathname system))))
+
+(defun system-source-directory (system-name)
+  (make-pathname :name nil
+                 :type nil
+                 :defaults (system-source-file system-name)))
+
+(defun system-relative-pathname (system pathname &key name type)
+  (let ((directory (pathname-directory pathname)))
+    (when (eq (car directory) :absolute)
+      (setf (car directory) :relative))
+    (merge-pathnames
+     (make-pathname :name (or name (pathname-name pathname))
+                    :type (or type (pathname-type pathname))
+                    :directory directory)
+     (system-source-directory system))))
 
 
 (pushnew :asdf *features*)
@@ -1218,4 +1317,3 @@ output to *VERBOSE-OUT*.  Returns the shell's exit code."
   (pushnew 'contrib-sysdef-search *system-definition-search-functions*))
 
 (provide 'asdf)
-
