@@ -25,10 +25,9 @@
                ;; Note that this code can get executed several times
                ;; for the same block, if the functional is referenced
                ;; from multiple XEPs.
-               (loop for ctran = start then (node-next node)
+               (loop for ctran = start then (node-next (ctran-next ctran))
                      while ctran
-                     for node = (ctran-next ctran)
-                     do (record-node-xrefs node functional))
+                     do (record-node-xrefs (ctran-next ctran) functional))
                ;; Properly record the deferred macroexpansion information
                ;; that's been stored in the block.
                (dolist (xref-data (block-macroexpands block))
