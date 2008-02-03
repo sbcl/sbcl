@@ -684,3 +684,44 @@
     ;; FIXME: something saner, please
     (equal (sb-unix::posix-getcwd) (sb-posix:getcwd))
   t)
+
+#-win32
+(deftest mkstemp.1
+    (multiple-value-bind (fd temp)
+        (sb-posix:mkstemp (make-pathname
+                           :name "mkstemp-1"
+                           :type "XXX"
+                           :defaults *test-directory*))
+      (let ((pathname (sb-ext:parse-native-namestring temp)))
+        (unwind-protect
+             (values (integerp fd) (pathname-name pathname))
+          (delete-file temp))))
+  t "mkstemp-1")
+
+#-win32
+(deftest mkdtemp.1
+    (let ((pathname
+           (sb-ext:parse-native-namestring
+            (sb-posix:mkdtemp (make-pathname
+                               :name "mkdtemp-1"
+                               :type "XXX"
+                               :defaults *test-directory*))
+            nil
+            *default-pathname-defaults*
+            :as-directory t)))
+      (unwind-protect
+           (values (let* ((xxx (car (last (pathname-directory pathname))))
+                          (p (position #\. xxx)))
+                     (and p (subseq xxx 0 p)))
+                   (pathname-name pathname)
+                   (pathname-type pathname))
+        (sb-posix:rmdir pathname)))
+  "mkdtemp-1" nil nil)
+
+#-win32
+(deftest mktemp.1
+    (let ((pathname (sb-ext:parse-native-namestring
+                     (sb-posix:mktemp #p"mktemp.XXX"))))
+      (values (equal "mktemp" (pathname-name pathname))
+              (not (equal "XXX" (pathname-type pathname)))))
+  t t)

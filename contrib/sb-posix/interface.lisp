@@ -81,6 +81,14 @@
   (let ((errno (get-errno)))
     (error (elt *errno-table* errno) :errno errno)))
 
+(defun unsupported-error (lisp-name c-name)
+  (error "~S is unsupported by SBCL on this platform due to lack of ~A()."
+         lisp-name c-name))
+
+(defun unsupported-warning (lisp-name c-name)
+  (warn "~S is unsupported by SBCL on this platform due to lack of ~A()."
+        lisp-name c-name))
+
 ;; Note that we inherit from SIMPLE-FILE-ERROR first, to get its
 ;; error reporting, rather than SYSCALL-ERROR's.
 (define-condition file-syscall-error
@@ -221,26 +229,47 @@
   (define-call "sync" void never-fails)
   (define-call ("truncate" :options :largefile)
       int minusp (pathname filename) (length off-t))
-  ;; FIXME: Windows does have _mktemp, which has a slightlty different
-  ;; interface
-  (defun mkstemp (template)
-    ;; we are emulating sb-alien's charset conversion for strings
-    ;; here, to accommodate for the call-by-reference nature of
-    ;; mkstemp's template strings.
-    (let ((arg (sb-ext:string-to-octets
-                (filename template)
-                :external-format sb-alien::*default-c-string-external-format*)))
-      (sb-sys:with-pinned-objects (arg)
-        (let ((result (alien-funcall (extern-alien "mkstemp"
-                                                   (function int c-string))
-                                     (sap-alien (sb-alien::vector-sap arg)
-                                                (* char)))))
-          (when (minusp result)
-            (syscall-error))
-          (values result
-                  (sb-ext:octets-to-string
-                   arg
-                   :external-format sb-alien::*default-c-string-external-format*))))))
+  #-win32
+  (macrolet ((def-mk*temp (lisp-name c-name result-type errorp dirp values)
+               (declare (ignore dirp))
+               (if (sb-sys:find-foreign-symbol-address c-name)
+                   `(progn
+                      (defun ,lisp-name (template)
+                        (let* ((external-format sb-alien::*default-c-string-external-format*)
+                               (arg (sb-ext:string-to-octets
+                                     (filename template)
+                                     :external-format external-format)))
+                          (sb-sys:with-pinned-objects (arg)
+                            ;; accommodate for the call-by-reference
+                            ;; nature of mks/dtemp's template strings.
+                            (let ((result (alien-funcall (extern-alien ,c-name
+                                                                       (function ,result-type system-area-pointer))
+                                                         (sb-alien::vector-sap arg))))
+                              (when (,errorp result)
+                                (syscall-error))
+                              ;; FIXME: We'd rather return pathnames, but other
+                              ;; SB-POSIX functions like this return strings...
+                              (let ((pathname (sb-ext:octets-to-string
+                                               arg :external-format external-format)))
+                                ,(if values
+                                     '(values result pathname)
+                                     'pathname))))))
+                      (export ',lisp-name))
+                   `(progn
+                      (defun ,lisp-name (template)
+                        (declare (ignore template))
+                        (unsupported-error ',lisp-name ,c-name))
+                      (define-compiler-macro ,lisp-name (&whole form template)
+                        (declare (ignore template))
+                        (unsupported-warning ',lisp-name ,c-name)
+                        form)
+                      (export ',lisp-name)))))
+    (def-mk*temp mktemp "mktemp" (* char) null-alien nil nil)
+    ;; FIXME: Windows does have _mktemp, which has a slightly different
+    ;; interface
+    (def-mk*temp mkstemp "mkstemp" int minusp nil t)
+    ;; FIXME: What about Windows?
+    (def-mk*temp mkdtemp "mkdtemp" (* char) null-alien t nil))
   (define-call-internally ioctl-without-arg "ioctl" int minusp
                           (fd file-descriptor) (cmd int))
   (define-call-internally ioctl-with-int-arg "ioctl" int minusp

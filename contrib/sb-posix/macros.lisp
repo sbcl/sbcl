@@ -2,7 +2,8 @@
 
 (define-designator filename c-string
   (pathname
-   (sb-ext:native-namestring (translate-logical-pathname filename)))
+   (sb-ext:native-namestring (translate-logical-pathname filename)
+                             :as-file t))
   (string filename))
 
 (define-designator file-descriptor (integer 32)
