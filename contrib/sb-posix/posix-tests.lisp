@@ -690,7 +690,7 @@
     (multiple-value-bind (fd temp)
         (sb-posix:mkstemp (make-pathname
                            :name "mkstemp-1"
-                           :type "XXX"
+                           :type "XXXXXX"
                            :defaults *test-directory*))
       (let ((pathname (sb-ext:parse-native-namestring temp)))
         (unwind-protect
@@ -704,7 +704,7 @@
            (sb-ext:parse-native-namestring
             (sb-posix:mkdtemp (make-pathname
                                :name "mkdtemp-1"
-                               :type "XXX"
+                               :type "XXXXXX"
                                :defaults *test-directory*))
             nil
             *default-pathname-defaults*
@@ -721,7 +721,7 @@
 #-win32
 (deftest mktemp.1
     (let ((pathname (sb-ext:parse-native-namestring
-                     (sb-posix:mktemp #p"mktemp.XXX"))))
+                     (sb-posix:mktemp #p"mktemp.XXXXXX"))))
       (values (equal "mktemp" (pathname-name pathname))
-              (not (equal "XXX" (pathname-type pathname)))))
+              (not (equal "XXXXXX" (pathname-type pathname)))))
   t t)
