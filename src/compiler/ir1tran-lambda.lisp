@@ -988,7 +988,7 @@
     ((named-lambda)
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))
-       (if (legal-fun-name-p name)
+       (if (and name (legal-fun-name-p name))
            (let ((defined-fun-res (get-defined-fun name))
                  (res (ir1-convert-lambda lambda-expression
                                           :maybe-add-debug-catch t
@@ -1003,7 +1003,8 @@
              res)
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
-                               :debug-name name))))
+                               :debug-name
+                               (or name (name-lambdalike thing))))))
     ((lambda-with-lexenv)
      (ir1-convert-inline-lambda thing
                                 :source-name source-name
