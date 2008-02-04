@@ -876,7 +876,8 @@
                              `(locally
                                   (declare (optimize speed
                                                      (safety 0)
-                                                     (debug 0)))
+                                                     (debug 0)
+                                                     (check-constant-modification 0)))
                                 ;; We're being naughty here, and
                                 ;; modifying constant data. That's ok,
                                 ;; we know what we're doing.

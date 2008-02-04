@@ -11,6 +11,12 @@
 
 (in-package "SB!C")
 
+(define-optimization-quality check-constant-modification
+    safety
+  ("no" "maybe" "yes" "yes")
+  "Control whether the compiler should check for constant
+modification. Defaults to SAFETY.")
+
 (define-optimization-quality type-check
     ;; FIXME: grepping the tree for "policy.*safety" yields some
     ;; places which might want to use this instead -- or

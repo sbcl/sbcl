@@ -697,7 +697,7 @@
          (when (and fun
                     ;; If somebody is really sure that they want to modify
                     ;; constants, let them.
-                    (policy node (> safety 0)))
+                    (policy node (> check-constant-modification 0)))
            (let ((destroyed-constant-args (funcall fun args)))
              (when destroyed-constant-args
                (let ((*compiler-error-context* node))
