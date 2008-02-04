@@ -35,7 +35,7 @@
 (declaim (hash-table *source-paths*))
 (defvar *source-paths*)
 
-(declaim (inline source-form-hash-path-p))
+(declaim (inline source-form-has-path-p))
 (defun source-form-has-path-p (form)
   (not (typep form '(or symbol fixnum character))))
 
