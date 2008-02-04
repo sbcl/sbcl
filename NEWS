@@ -7,6 +7,8 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
     now supported, and tracing a whole package using (TRACE "FOO") now
     traces SETF-functions as well.
   * enhancement: implement SB-POSIX:MKTEMP and SB-POSIX:MKDTEMP.
+  * bug fix: compiler gave a bogus STYLE-WARNING for the :SYNCHRONIZED
+    keyword with MAKE-HASH-TABLE.
   * bug fix: export SB-POSIX:MKSTEMP.
   * bug fix: SORT was not interrupt safe.
   * bug fix: XREF accounts for the last node of each basic-block as

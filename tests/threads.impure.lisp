@@ -631,31 +631,153 @@
 
 (format t "~&binding test done~%")
 
-;; Try to corrupt the NEXT-VECTOR. Operations on a hash table with a
-;; cyclic NEXT-VECTOR can loop endlessly in a WITHOUT-GCING form
-;; causing the next gc hang SBCL.
-(with-test (:name (:hash-table-thread-safety))
+;;; HASH TABLES
+
+(defvar *errors* nil)
+
+(defun oops (e)
+  (setf *errors* e)
+  (format t "~&oops: ~A in ~S~%" e *current-thread*)
+  (sb-debug:backtrace)
+  (catch 'done))
+
+(with-test (:name (:unsynchronized-hash-table))
+  ;; We expect a (probable) error here: parellel readers and writers
+  ;; on a hash-table are not expected to work -- but we also don't
+  ;; expect this to corrupt the image.
   (let* ((hash (make-hash-table))
+         (*errors* nil)
          (threads (list (sb-thread:make-thread
                          (lambda ()
-                           (loop
-                            ;;(princ "1") (force-output)
-                            (setf (gethash (random 100) hash) 'h))))
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 ;;(princ "1") (force-output)
+                                 (setf (gethash (random 100) hash) 'h)))))
+                         :name "writer")
                         (sb-thread:make-thread
                          (lambda ()
-                           (loop
-                            ;;(princ "2") (force-output)
-                            (remhash (random 100) hash))))
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 ;;(princ "2") (force-output)
+                                 (remhash (random 100) hash)))))
+                         :name "reader")
                         (sb-thread:make-thread
                          (lambda ()
-                           (loop
-                            (sleep (random 1.0))
-                            (sb-ext:gc :full t)))))))
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 (sleep (random 1.0))
+                                 (sb-ext:gc :full t)))))
+                         :name "collector"))))
     (unwind-protect
-         (sleep 5)
+         (sleep 10)
       (mapc #'sb-thread:terminate-thread threads))))
 
-(format t "~&hash table test done~%")
+(format t "~&unsynchronized hash table test done~%")
+
+(with-test (:name (:synchronized-hash-table))
+  (let* ((hash (make-hash-table :synchronized t))
+         (*errors* nil)
+         (threads (list (sb-thread:make-thread
+                         (lambda ()
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 ;;(princ "1") (force-output)
+                                 (setf (gethash (random 100) hash) 'h)))))
+                         :name "writer")
+                        (sb-thread:make-thread
+                         (lambda ()
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 ;;(princ "2") (force-output)
+                                 (remhash (random 100) hash)))))
+                         :name "reader")
+                        (sb-thread:make-thread
+                         (lambda ()
+                           (catch 'done
+                             (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 (sleep (random 1.0))
+                                 (sb-ext:gc :full t)))))
+                         :name "collector"))))
+    (unwind-protect
+         (sleep 10)
+      (mapc #'sb-thread:terminate-thread threads))
+    (assert (not *errors*))))
+
+(format t "~&synchronized hash table test done~%")
+
+(with-test (:name (:hash-table-parallel-readers))
+  (let ((hash (make-hash-table))
+        (*errors* nil))
+    (loop repeat 50
+          do (setf (gethash (random 100) hash) 'xxx))
+    (let ((threads (list (sb-thread:make-thread
+                          (lambda ()
+                            (catch 'done
+                              (handler-bind ((serious-condition 'oops))
+                                (loop
+                                      until (eq t (gethash (random 100) hash))))))
+                          :name "reader 1")
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (catch 'done
+                              (handler-bind ((serious-condition 'oops))
+                                (loop
+                                      until (eq t (gethash (random 100) hash))))))
+                          :name "reader 2")
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (catch 'done
+                              (handler-bind ((serious-condition 'oops))
+                                (loop
+                                      until (eq t (gethash (random 100) hash))))))
+                          :name "reader 3")
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (catch 'done
+                              (handler-bind ((serious-condition 'oops))
+                               (loop
+                                 (sleep (random 1.0))
+                                 (sb-ext:gc :full t)))))
+                          :name "collector"))))
+      (unwind-protect
+           (sleep 10)
+        (mapc #'sb-thread:terminate-thread threads))
+      (assert (not *errors*)))))
+
+(format t "~&multiple reader hash table test done~%")
+
+(with-test (:name (:hash-table-single-accessor-parallel-gc))
+  (let ((hash (make-hash-table))
+        (*errors* nil))
+    (let ((threads (list (sb-thread:make-thread
+                          (lambda ()
+                            (handler-bind ((serious-condition 'oops))
+                              (loop
+                                (let ((n (random 100)))
+                                  (if (gethash n hash)
+                                      (remhash n hash)
+                                      (setf (gethash n hash) 'h))))))
+                          :name "accessor")
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (handler-bind ((serious-condition 'oops))
+                              (loop
+                                (sleep (random 1.0))
+                                (sb-ext:gc :full t))))
+                          :name "collector"))))
+      (unwind-protect
+           (sleep 10)
+        (mapc #'sb-thread:terminate-thread threads))
+      (assert (not *errors*)))))
+
+(format t "~&single accessor hash table test~%")
+
 #|  ;; a cll post from eric marsden
 | (defun crash ()
 |   (setq *debugger-hook*

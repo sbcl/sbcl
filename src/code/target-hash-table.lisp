@@ -732,14 +732,14 @@ if there is no such entry. Entries can be added using SETF."
   (aver (hash-table-index-vector hash-table))
   (macrolet ((put-it (lockedp)
                `(let ((cache (hash-table-cache hash-table))
-        (kv-vector (hash-table-table hash-table)))
-    ;; Check the cache
-    (if (and cache
-             (< cache (length kv-vector))
-             (eq (aref kv-vector cache) key))
-        ;; If cached, just store here
-        (setf (aref kv-vector (1+ cache)) value)
-        ;; Otherwise do things the hard way
+                      (kv-vector (hash-table-table hash-table)))
+                  ;; Check the cache
+                  (if (and cache
+                           (< cache (length kv-vector))
+                           (eq (aref kv-vector cache) key))
+                      ;; If cached, just store here
+                      (setf (aref kv-vector (1+ cache)) value)
+                      ;; Otherwise do things the hard way
                       ,(if lockedp
                            '(%%puthash key hash-table value)
                            '(with-hash-table-locks
@@ -791,6 +791,8 @@ if there is no such entry. Entries can be added using SETF."
                (when hash-vector
                  (setf (aref hash-vector slot-location)
                        +magic-hash-vector-value+))
+               ;; On parallel accesses this may turn out to be a
+               ;; type-error, so don't turn down the safety!
                (decf (hash-table-number-entries hash-table))
                t))
         (cond ((zerop next)
