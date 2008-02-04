@@ -154,7 +154,10 @@
 (defmacro /show0 (&rest string-designators)
   ;; We can't use inline MAPCAR here because, at least in 0.6.11.x,
   ;; this code gets compiled before DO-ANONYMOUS is defined.
-  (declare (notinline mapcar))
+  ;; Similarly, we don't use inline CONCATENATE, because some of the
+  ;; machinery behind its optimizations isn't available in the
+  ;; cross-compiler.
+  (declare (notinline mapcar concatenate))
   (let ((s (apply #'concatenate
                   'simple-string
                   (mapcar #'string string-designators))))
