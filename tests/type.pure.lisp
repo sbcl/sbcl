@@ -387,3 +387,12 @@ ACTUAL ~D DERIVED ~D~%"
                       (typep x (quote fixnum))))))
     (assert (not (funcall f (1+ most-positive-fixnum))))
     (assert (funcall f most-positive-fixnum))))
+
+(with-test (:name (:typep :member-uses-eql))
+  (assert (eval '(typep 1/3 '(member 1/3 nil))))
+  (assert (eval '(typep 1.0 '(member 1.0 t))))
+  (assert (eval '(typep #c(1.1 1.2) '(member #c(1.1 1.2)))))
+  (assert (eval '(typep #c(1 1) '(member #c(1 1)))))
+  (let ((bignum1 (+ 12 most-positive-fixnum))
+        (bignum2 (- (+ 15 most-positive-fixnum) 3)))
+    (assert (eval `(typep ,bignum1 '(member ,bignum2))))))
