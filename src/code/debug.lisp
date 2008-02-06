@@ -170,29 +170,40 @@ Other commands:
 
 ;;;; BACKTRACE
 
+(defun map-backtrace (thunk &key (start 0) (count most-positive-fixnum))
+  (loop
+     with result = nil
+     for index upfrom 0
+     for frame = (if *in-the-debugger*
+                     *current-frame*
+                     (sb!di:top-frame))
+               then (sb!di:frame-down frame)
+     until (null frame)
+     when (<= start index) do
+       (if (minusp (decf count))
+           (return result)
+           (setf result (funcall thunk frame)))
+     finally (return result)))
+
 (defun backtrace (&optional (count most-positive-fixnum) (stream *debug-io*))
   #!+sb-doc
   "Show a listing of the call stack going down from the current frame.
 In the debugger, the current frame is indicated by the prompt. COUNT
 is how many frames to show."
   (fresh-line stream)
-  (do ((frame (if *in-the-debugger* *current-frame* (sb!di:top-frame))
-              (sb!di:frame-down frame))
-       (count count (1- count)))
-      ((or (null frame) (zerop count)))
-    (print-frame-call frame stream :number t))
+  (map-backtrace (lambda (frame)
+                   (print-frame-call frame stream :number t))
+                 :count count)
   (fresh-line stream)
   (values))
 
 (defun backtrace-as-list (&optional (count most-positive-fixnum))
   #!+sb-doc "Return a list representing the current BACKTRACE."
-  (do ((reversed-result nil)
-       (frame (if *in-the-debugger* *current-frame* (sb!di:top-frame))
-              (sb!di:frame-down frame))
-       (count count (1- count)))
-      ((or (null frame) (zerop count))
-       (nreverse reversed-result))
-    (push (frame-call-as-list frame) reversed-result)))
+  (let ((reversed-result (list)))
+    (map-backtrace (lambda (frame)
+                     (push (frame-call-as-list frame) reversed-result))
+                   :count count)
+    (nreverse reversed-result)))
 
 (defun frame-call-as-list (frame)
   (multiple-value-bind (name args) (frame-call frame)
@@ -234,38 +245,41 @@ is how many frames to show."
 ) ; EVAL-WHEN
 
 ;;; Extract the function argument values for a debug frame.
+(defun map-frame-args (thunk frame)
+  (let ((debug-fun (sb!di:frame-debug-fun frame)))
+    (dolist (element (sb!di:debug-fun-lambda-list debug-fun))
+      (funcall thunk element))))
+
 (defun frame-args-as-list (frame)
-  (let ((debug-fun (sb!di:frame-debug-fun frame))
-        (loc (sb!di:frame-code-location frame))
-        (reversed-result nil))
-    (handler-case
-        (progn
-          (dolist (ele (sb!di:debug-fun-lambda-list debug-fun))
-            (lambda-list-element-dispatch ele
-             :required ((push (frame-call-arg ele loc frame) reversed-result))
-             :optional ((push (frame-call-arg (second ele) loc frame)
-                              reversed-result))
-             :keyword ((push (second ele) reversed-result)
-                       (push (frame-call-arg (third ele) loc frame)
-                             reversed-result))
-             :deleted ((push (frame-call-arg ele loc frame) reversed-result))
-             :rest ((lambda-var-dispatch (second ele) loc
-                     nil
-                     (progn
-                       (setf reversed-result
-                             (append (reverse (sb!di:debug-var-value
-                                               (second ele) frame))
-                                     reversed-result))
-                       (return))
-                     (push (make-unprintable-object
-                            "unavailable &REST argument")
-                     reversed-result)))))
-          ;; As long as we do an ordinary return (as opposed to SIGNALing
-          ;; a CONDITION) from the DOLIST above:
-          (nreverse reversed-result))
-      (sb!di:lambda-list-unavailable
-       ()
-       (make-unprintable-object "unavailable lambda list")))))
+  (handler-case
+      (let ((location (sb!di:frame-code-location frame))
+            (reversed-result nil))
+        (block enumerating
+          (map-frame-args
+           (lambda (element)
+             (lambda-list-element-dispatch element
+               :required ((push (frame-call-arg element location frame) reversed-result))
+               :optional ((push (frame-call-arg (second element) location frame)
+                                reversed-result))
+               :keyword ((push (second element) reversed-result)
+                         (push (frame-call-arg (third element) location frame)
+                               reversed-result))
+               :deleted ((push (frame-call-arg element location frame) reversed-result))
+               :rest ((lambda-var-dispatch (second element) location
+                        nil
+                        (progn
+                          (setf reversed-result
+                                (append (reverse (sb!di:debug-var-value
+                                                  (second element) frame))
+                                        reversed-result))
+                          (return-from enumerating))
+                        (push (make-unprintable-object
+                               "unavailable &REST argument")
+                              reversed-result)))))
+           frame))
+        (nreverse reversed-result))
+    (sb!di:lambda-list-unavailable ()
+      (make-unprintable-object "unavailable lambda list"))))
 
 (defvar *show-entry-point-details* nil)
 
