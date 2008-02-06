@@ -7,6 +7,8 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
     now supported, and tracing a whole package using (TRACE "FOO") now
     traces SETF-functions as well.
   * enhancement: implement SB-POSIX:MKTEMP and SB-POSIX:MKDTEMP.
+  * SB-DEBUG:PRINT-FRAME-CALL now prints the entry-point kind even
+    when SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS* is NIL.
   * bug fix: compiler gave a bogus STYLE-WARNING for the :SYNCHRONIZED
     keyword with MAKE-HASH-TABLE.
   * bug fix: export SB-POSIX:MKSTEMP.

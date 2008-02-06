@@ -331,9 +331,7 @@ is how many frames to show."
       (multiple-value-bind (name args)
           (clean-name-and-args (sb!di:debug-fun-name debug-fun)
                                 (frame-args-as-list frame))
-        (values name args
-                (when *show-entry-point-details*
-                  (sb!di:debug-fun-kind debug-fun)))))))
+        (values name args (sb!di:debug-fun-kind debug-fun))))))
 
 (defun ensure-printable-object (object)
   (handler-case
