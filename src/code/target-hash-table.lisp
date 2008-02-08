@@ -943,16 +943,16 @@ to protect the MAPHASH call."
   (cond ((or (not *print-readably*) (not *read-eval*))
          (print-unreadable-object (hash-table stream :type t :identity t)
            (format stream
-                   ":TEST ~S :COUNT ~S"
+                   ":TEST ~S :COUNT ~S~@[ :WEAKNESS ~S~]"
                    (hash-table-test hash-table)
-                   (hash-table-count hash-table))))
+                   (hash-table-count hash-table)
+                   (hash-table-weakness hash-table))))
         (t
-         (with-standard-io-syntax
-          (format stream
-                  "#.~W"
-                  `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
+         (write-string "#." stream)
+         (write `(%stuff-hash-table (make-hash-table ,@(%hash-table-ctor-args
                                                           hash-table))
-                                     ',(%hash-table-alist hash-table)))))))
+                                     ',(%hash-table-alist hash-table))
+                :stream stream))))
 
 (def!method make-load-form ((hash-table hash-table) &optional environment)
   (declare (ignore environment))

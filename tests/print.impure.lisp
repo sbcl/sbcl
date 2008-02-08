@@ -416,4 +416,15 @@
 ;;; This used to trigger an AVER instead.
 (assert (raises-error? (format t "~>") sb-format:format-error))
 
+;;; readably printing hash-tables, check for circularity
+(let ((x (cons 1 2))
+      (h (make-hash-table))
+      (*print-readably* t)
+      (*print-circle* t)
+      (*read-eval* t))
+  (setf (gethash x h) h)
+  (destructuring-bind (x2 . h2) (read-from-string (write-to-string (cons x h)))
+    (assert (equal x x2))
+    (assert (eq h2 (gethash x2 h2)))))
+
 ;;; success

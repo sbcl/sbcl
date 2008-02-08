@@ -9,6 +9,10 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
   * enhancement: implement SB-POSIX:MKTEMP and SB-POSIX:MKDTEMP.
   * SB-DEBUG:PRINT-FRAME-CALL now prints the entry-point kind even
     when SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS* is NIL.
+  * unreadably printed representation of hash-tables now includes
+    weakness if any.
+  * bug fix: readably printing hash-tables now respects other printer
+    control variables.
   * bug fix: compiler gave a bogus STYLE-WARNING for the :SYNCHRONIZED
     keyword with MAKE-HASH-TABLE.
   * bug fix: export SB-POSIX:MKSTEMP.
