@@ -69,7 +69,8 @@
 (defmacro-mundanely cond (&rest clauses)
   (if (endp clauses)
       nil
-      (let ((clause (first clauses)))
+      (let ((clause (first clauses))
+            (more (rest clauses)))
         (if (atom clause)
             (error "COND clause is not a list: ~S" clause)
             (let ((test (first clause))
@@ -79,10 +80,12 @@
                     `(let ((,n-result ,test))
                        (if ,n-result
                            ,n-result
-                           (cond ,@(rest clauses)))))
-                  `(if ,test
-                       (progn ,@forms)
-                       (cond ,@(rest clauses)))))))))
+                           (cond ,@more))))
+                  (if (eq t test)
+                      `(progn ,@forms)
+                      `(if ,test
+                           (progn ,@forms)
+                           ,(when more `(cond ,@more))))))))))
 
 (defmacro-mundanely when (test &body forms)
   #!+sb-doc

@@ -933,14 +933,13 @@ Form: A   Context: EVAL
 Form: (PROGN B)   Context: EVAL
 Form: B   Context: EVAL
 Form: (COND ((FOO BAR) A (FOO A)))   Context: EVAL
-Form: (IF (FOO BAR) (PROGN A (FOO A)) (COND))   Context: EVAL
+Form: (IF (FOO BAR) (PROGN A (FOO A)) NIL)   Context: EVAL
 Form: (FOO BAR)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: (PROGN A (FOO A))   Context: EVAL
 Form: A   Context: EVAL
 Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-Form: (COND)   Context: EVAL
 Form: NIL   Context: EVAL; bound: NIL
 (COND (A B) ((FOO BAR) A (FOO A)))"))
 
