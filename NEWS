@@ -12,7 +12,7 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
   * unreadably printed representation of hash-tables now includes
     weakness if any.
   * bug fix: readably printing hash-tables now respects other printer
-    control variables.
+    control variables. (reported by Cedric St-Jean)
   * bug fix: compiler gave a bogus STYLE-WARNING for the :SYNCHRONIZED
     keyword with MAKE-HASH-TABLE.
   * bug fix: export SB-POSIX:MKSTEMP.
@@ -28,7 +28,7 @@ changes in sbcl-1.0.14 relative to sbcl-1.0.13:
     (see documentation for details.)
   * revived support for OpenBSD (contributed by Josh Elsasser)
   * partially fixed bug #108: ROOM no longer suffers from occasional
-    (AVER (SAP= CURRENT END)) failures .
+    (AVER (SAP= CURRENT END)) failures.
   * fixed bug #402: proclaimed non-standard declarations in DEFMETHOD
     bodies no longer cause a WARNING to be signalled. (reported by
     Vincent Arkesteijn)
@@ -57,7 +57,7 @@ changes in sbcl-1.0.13 relative to sbcl-1.0.12:
     been removed; it can be found in the CVS history, for somebody who
     needs that search behavior (see the manual).
   * minor incompatible change: compiler policy re. weakening type
-    checks has changed: now type checks are weakened on if SAFETY < 2
+    checks has changed: now type checks are weakened only if SAFETY < 2
     and SAFETY < SPEED.
   * SB-EXT:NATIVE-NAMESTRING takes a new keyword AS-FILE, forcing
     unparsing of directory pathnames as files. Analogously,
@@ -99,7 +99,7 @@ changes in sbcl-1.0.12 relative to sbcl-1.0.11:
     concurrent accesses (but not iteration.) See also:
     SB-EXT:WITH-LOCKED-HASH-TABLE, and
     SB-EXT:HASH-TABLE-SYNCHRONIZED-P.
-  * optimization: CONCATENATE on strings is an order of magnitue faster
+  * optimization: CONCATENATE on strings is an order of magnitude faster
     in code compiled with (> SPEED SPACE).
   * optimization: SUBSEQ is ~50% faster on lists.
   * bug fix: bug 417 fixed -- source location reporting is now more robust.
@@ -213,7 +213,7 @@ changes in sbcl-1.0.9 relative to sbcl-1.0.8:
     could cause buffer-overflows.
   * bug fix: source location information is stored correctly 
     (broken since 1.0.6). This bug would generally show up as the
-    Slime debugger higlighting the wrong form when the sldb-show-source
+    Slime debugger highlighting the wrong form when the sldb-show-source
     command was used.
   * bug fix: Branch forms are again annotated as branches in the sb-cover
     annotations.
@@ -229,7 +229,7 @@ changes in sbcl-1.0.8 relative to sbcl-1.0.7:
   * enhancement: experimental macro SB-EXT:COMPARE-AND-SWAP provides
     atomic compare-and-swap operations on threaded platforms.
   * enhancement: experimental function SB-EXT:RESTRICT-COMPILER-POLICY
-    allows assining a global minimum value to optimization qualities
+    allows assigning a global minimum value to optimization qualities
     (overriding proclamations and declarations).
   * enhancement: closed over variables can be stack-allocated on x86
     and x86-64.
@@ -387,7 +387,7 @@ changes in sbcl-1.0.5 relative to sbcl-1.0.4:
   * bug fix: number of characters that can be written onto a single
     line in a file is unlimited.
   * bug fix: some GC deadlocks caused by asynchronous interrupts have
-    been fixed by inhibiting interrupts for when GC is disbled.
+    been fixed by inhibiting interrupts for when GC is disabled.
   * bug fix: some interrupt safety issues with GETHASH, (SETF
     GETHASH), CLRHASH and REMHASH have been fixed.
   * bug fix: binding *BREAK-ON-SIGNALS* to a value that is not a type
@@ -501,7 +501,7 @@ changes in sbcl-1.0.2 relative to sbcl-1.0.1:
 changes in sbcl-1.0.1 relative to sbcl-1.0:
   * new platform: FreeBSD/x86-64, including support for threading.
   * new feature: the compiler stores cross-referencing information
-    abount function calls (who-calls), macroexpansion (who-macroexpands)
+    about function calls (who-calls), macroexpansion (who-macroexpands)
     and special variables (who-binds, who-sets, who-references) for code
     compiled with (< SPACE 3). This information is available through the
     sb-introspect contrib.
