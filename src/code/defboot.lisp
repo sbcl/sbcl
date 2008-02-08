@@ -84,17 +84,18 @@
                        (progn ,@forms)
                        (cond ,@(rest clauses)))))))))
 
-;;; other things defined in terms of COND
 (defmacro-mundanely when (test &body forms)
   #!+sb-doc
   "If the first argument is true, the rest of the forms are
-  evaluated as a PROGN."
-  `(cond (,test nil ,@forms)))
+evaluated as a PROGN."
+  `(if ,test (progn ,@forms) nil))
+
 (defmacro-mundanely unless (test &body forms)
   #!+sb-doc
   "If the first argument is not true, the rest of the forms are
-  evaluated as a PROGN."
-  `(cond ((not ,test) nil ,@forms)))
+evaluated as a PROGN."
+  `(if ,test nil (progn ,@forms)))
+
 (defmacro-mundanely and (&rest forms)
   (cond ((endp forms) t)
         ((endp (rest forms)) (first forms))
@@ -102,6 +103,7 @@
          `(if ,(first forms)
               (and ,@(rest forms))
               nil))))
+
 (defmacro-mundanely or (&rest forms)
   (cond ((endp forms) nil)
         ((endp (rest forms)) (first forms))
