@@ -11,6 +11,15 @@
 
 (in-package "SB!IMPL")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant max-hash sb!xc:most-positive-fixnum))
+
+(deftype hash ()
+  `(integer 0 ,max-hash))
+
+(defun pointer-hash (key)
+  (pointer-hash key))
+
 ;;; the depthoid explored when calculating hash values
 ;;;
 ;;; "Depthoid" here is a sort of mixture of what Common Lisp ordinarily calls

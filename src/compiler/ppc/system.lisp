@@ -121,13 +121,14 @@
     (move res x)))
 
 
-(define-vop (make-fixnum)
+(define-vop (pointer-hash)
+  (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg)))
   (:results (res :scs (any-reg descriptor-reg)))
+  (:policy :fast-safe)
   (:generator 1
-    ;;
-    ;; Some code (the hash table code) depends on this returning a
-    ;; positive number so make sure it does.
+    ;; FIXME: It would be better if this would mask the lowtag,
+    ;; and shift the result into a positive fixnum like on x86.
     (inst rlwinm res ptr n-fixnum-tag-bits 1 n-positive-fixnum-bits)))
 
 (define-vop (make-other-immediate-type)

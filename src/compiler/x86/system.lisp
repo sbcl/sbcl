@@ -124,14 +124,16 @@
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
 
-(define-vop (make-fixnum)
+(define-vop (pointer-hash)
+  (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg) :target res))
   (:results (res :scs (any-reg descriptor-reg)))
+  (:policy :fast-safe)
   (:generator 1
-    ;; Some code (the hash table code) depends on this returning a
-    ;; positive number so make sure it does.
     (move res ptr)
-    (inst shl res 3)
+    ;; Mask the lowtag, and shift the whole address into a positive
+    ;; fixnum.
+    (inst and res (lognot lowtag-mask))
     (inst shr res 1)))
 
 (define-vop (make-other-immediate-type)

@@ -69,6 +69,8 @@
 
 ;;;; miscellaneous "sub-primitives"
 
+(defknown pointer-hash (t) hash (flushable))
+
 (defknown %sp-string-compare
   (simple-string index index simple-string index index)
   (or index null)

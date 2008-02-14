@@ -14,9 +14,6 @@
 
 ;;;; utilities
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash sb!xc:most-positive-fixnum))
-
 ;;; Code for detecting concurrent accesses to the same table from
 ;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
 ;;; feature is enabled. The main reason for the existence of this code
@@ -74,19 +71,6 @@
                    (setf (,thread-slot-accessor ,hash-table) nil)))
                (body-fun)))))))
 
-(deftype hash ()
-  `(integer 0 ,max-hash))
-
-;;; FIXME: Does this always make a nonnegative FIXNUM? If so, then
-;;; explain why. If not (or if the reason it always makes a
-;;; nonnegative FIXNUM is only the accident that pointers in supported
-;;; architectures happen to be in the lower half of the address
-;;; space), then fix it.
-#!-sb-fluid (declaim (inline pointer-hash))
-(defun pointer-hash (key)
-  (declare (values hash))
-  (truly-the hash (%primitive sb!c:make-fixnum key)))
-
 #!-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
@@ -129,18 +113,19 @@
   (ash 1 (integer-length num)))
 
 (declaim (inline index-for-hashing))
-(defun index-for-hashing (index length)
-  (declare (type index index length))
+(defun index-for-hashing (hash length)
+  (declare (type hash hash length))
   ;; We're using power of two tables which obviously are very
   ;; sensitive to the exact values of the low bits in the hash
   ;; value. Do a little shuffling of the value to mix the high bits in
   ;; there too.
-  (logand (1- length)
-          (+ (logxor #b11100101010001011010100111
-                     index)
-             (ash index -6)
-             (ash index -15)
-             (ash index -23))))
+  (truly-the index
+             (logand (1- length)
+                     (+ (logxor #b11100101010001011010100111
+                                hash)
+                        (ash hash -3)
+                        (ash hash -12)
+                        (ash hash -20)))))
 
 
 ;;;; user-defined hash table tests

@@ -583,11 +583,11 @@
                                        :element-type 'compact-info-entry))
              (sorted (sort (names)
                            #+sb-xc-host #'<
-                           ;; (This MAKE-FIXNUM hack implements
-                           ;; pointer comparison, as explained above.)
+                           ;; POINTER-HASH hack implements pointer
+                           ;; comparison, as explained above.
                            #-sb-xc-host (lambda (x y)
-                                          (< (%primitive make-fixnum x)
-                                             (%primitive make-fixnum y))))))
+                                          (< (pointer-hash x)
+                                             (pointer-hash y))))))
         (/show0 "done making/sorting vectors in COMPACT-INFO-ENVIRONMENT")
         (let ((entries-idx 0))
           (dolist (types sorted)
