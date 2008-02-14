@@ -49,7 +49,7 @@
                  (code-converter #'default-code-converter)
                  (constant-converter #'default-constant-converter))
   (function-apply (get-fun-generator lambda test-converter code-converter)
-                  (compute-constants      lambda constant-converter)))
+                  (compute-constants lambda constant-converter)))
 
 (defun get-fun1 (lambda &optional
                   (test-converter #'default-test-converter)
@@ -60,7 +60,7 @@
           (compute-constants lambda constant-converter)))
 
 (defun default-constantp (form)
-  (constant-typep form '(not (or symbol fixnum))))
+  (constant-typep form '(not (or symbol fixnum cons))))
 
 (defun default-test-converter (form)
   (if (default-constantp form)
@@ -77,36 +77,30 @@
       (list (constant-form-value form))
       nil))
 
-;;; *FGENS* is a list of all the function generators we have so far. Each
-;;; element is a FGEN structure as implemented below. Don't ever touch this
-;;; list by hand, use STORE-FGEN.
-(defvar *fgens* ())
+(defstruct (fgen (:constructor make-fgen (gensyms generator generator-lambda system)))
+  gensyms
+  generator
+  generator-lambda
+  system)
 
-(defun store-fgen (fgen)
-  (let ((old (lookup-fgen (fgen-test fgen))))
-    (if old
-        (setf (svref old 2) (fgen-generator fgen)
-              (svref old 4) (or (svref old 4)
-                                (fgen-system fgen)))
-        (setq *fgens* (nconc *fgens* (list fgen))))))
+;;; *FGENS* stores all the function generators we have so far. Each
+;;; element is a FGEN structure as implemented below. Don't ever touch this
+;;; list by hand, use LOOKUP-FGEN, and ENSURE-FGEN.
+(defvar *fgens* (make-hash-table :test #'equal :synchronized t))
+
+(defun ensure-fgen (test gensyms generator generator-lambda system)
+  (with-locked-hash-table (*fgens*)
+    (let ((old (lookup-fgen test)))
+      (cond (old
+             (setf (fgen-generator old) generator)
+             (unless (fgen-system old)
+               (setf (fgen-system old) system)))
+            (t
+             (setf (gethash test *fgens*)
+                   (make-fgen gensyms generator generator-lambda system)))))))
 
 (defun lookup-fgen (test)
-  (find test (the list *fgens*) :key #'fgen-test :test #'equal))
-
-(defun make-fgen (test gensyms generator generator-lambda system)
-  (let ((new (make-array 6)))
-    (setf (svref new 0) test
-          (svref new 1) gensyms
-          (svref new 2) generator
-          (svref new 3) generator-lambda
-          (svref new 4) system)
-    new))
-
-(defun fgen-test             (fgen) (svref fgen 0))
-(defun fgen-gensyms          (fgen) (svref fgen 1))
-(defun fgen-generator        (fgen) (svref fgen 2))
-(defun fgen-generator-lambda (fgen) (svref fgen 3))
-(defun fgen-system           (fgen) (svref fgen 4))
+  (gethash test *fgens*))
 
 (defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
@@ -116,17 +110,11 @@
         (get-new-fun-generator lambda test code-converter))))
 
 (defun get-new-fun-generator (lambda test code-converter)
-  (multiple-value-bind (gensyms generator-lambda)
-      (get-new-fun-generator-internal lambda code-converter)
-    (let* ((generator (compile nil generator-lambda))
-           (fgen (make-fgen test gensyms generator generator-lambda nil)))
-      (store-fgen fgen)
-      generator)))
-
-(defun get-new-fun-generator-internal (lambda code-converter)
-  (multiple-value-bind (code gensyms)
-      (compute-code lambda code-converter)
-    (values gensyms `(lambda ,gensyms (function ,code)))))
+  (multiple-value-bind (code gensyms) (compute-code lambda code-converter)
+    (let ((generator-lambda `(lambda ,gensyms (function ,code))))
+      (let ((generator (compile nil generator-lambda)))
+        (ensure-fgen test gensyms generator generator-lambda nil)
+        generator))))
 
 (defun compute-test (lambda test-converter)
   (let ((*walk-form-expand-macros-p* t))
@@ -150,7 +138,8 @@
                              f
                              (multiple-value-bind (converted gens)
                                  (funcall code-converter f)
-                               (when gens (setq gensyms (append gensyms gens)))
+                               (when gens
+                                 (setq gensyms (append gensyms gens)))
                                (values converted (neq converted f))))))
             gensyms)))
 
@@ -172,20 +161,19 @@
     collect))
 
 (defmacro precompile-function-generators (&optional system)
-  `(progn
-    ,@(let (collect)
-        (dolist (fgen *fgens*)
-          (when (or (null (fgen-system fgen))
-                    (eq (fgen-system fgen) system))
-            (when system (setf (svref fgen 4) system))
-            (push `(load-function-generator
-                    ',(fgen-test fgen)
-                    ',(fgen-gensyms fgen)
-                    (function ,(fgen-generator-lambda fgen))
-                    ',(fgen-generator-lambda fgen)
-                    ',system)
-                  collect)))
-        (nreverse collect))))
-
-(defun load-function-generator (test gensyms generator generator-lambda system)
-  (store-fgen (make-fgen test gensyms generator generator-lambda system)))
+  (let (collect)
+    (with-locked-hash-table (*fgens*)
+      (maphash (lambda (test fgen)
+                 (when (or (null (fgen-system fgen))
+                           (eq (fgen-system fgen) system))
+                   (when system
+                     (setf (fgen-system fgen) system))
+                   (push `(ensure-fgen
+                           ',test
+                           ',(fgen-gensyms fgen)
+                           (function ,(fgen-generator-lambda fgen))
+                           ',(fgen-generator-lambda fgen)
+                           ',system)
+                         collect)))
+               *fgens*))
+    `(progn ,@collect)))
