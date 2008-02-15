@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.114
+;;; This is asdf: Another System Definition Facility.  1.115
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -116,7 +116,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.111")
+(defvar *asdf-revision* (let* ((v "1.115")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
