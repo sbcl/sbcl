@@ -14,7 +14,7 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
   * bug fix: on x86 and x86-64 pointer based EQ-hashing now uses the
     full address of the object, and none of the tag bits.
   * bug fix: readably printing hash-tables now respects other printer
-    control variables. (reported by Cedric St-Jean)
+    control variables.  (reported by Cedric St-Jean)
   * bug fix: compiler gave a bogus STYLE-WARNING for the :SYNCHRONIZED
     keyword with MAKE-HASH-TABLE.
   * bug fix: export SB-POSIX:MKSTEMP.
@@ -23,7 +23,10 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
     well.
   * bug fix: MAKE-INSTANCE optimizations interacted badly with
     non-keyword :DEFAULT-INITARGS in the presence of :BEFORE/:AFTER
-    methods on SHARED-INITIALIZE. (thanks to Matt Marjanovic)
+    methods on SHARED-INITIALIZE.  (thanks to Matt Marjanovic)
+  * bug fix: the CTOR optimization for MAKE-INSTANCE should no longer
+    create obsolete instances in the case of redefinition or
+    obsoletion of a superclass.  (thanks to Andy Hefner)
 
 changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits

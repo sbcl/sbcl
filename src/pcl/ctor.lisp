@@ -244,6 +244,13 @@
   (let ((class (find-class (ctor-class-name ctor))))
     (unless (class-finalized-p class)
       (finalize-inheritance class))
+    ;; We can have a class with an invalid layout here.  Such a class
+    ;; cannot have a LAYOUT-INVALID of (:FLUSH ...) or (:OBSOLETE
+    ;; ...), because part of the deal is that those only happen from
+    ;; FORCE-CACHE-FLUSHES, which create a new valid wrapper for the
+    ;; class.  An invalid layout of T needs to be flushed, however.
+    (when (eq (layout-invalid (class-wrapper class)) t)
+      (force-cache-flushes class))
     (setf (ctor-class ctor) class)
     (pushnew ctor (plist-value class 'ctors))
     (setf (funcallable-instance-fun ctor)
@@ -359,12 +366,17 @@
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (locations names body before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods)
-    (values
-     `(lambda ,(make-ctor-parameter-list ctor)
-       (declare #.*optimize-speed*)
-       ,(wrap-in-allocate-forms ctor body before-method-p))
-     locations
-     names)))
+    (let ((wrapper (class-wrapper (ctor-class ctor))))
+      (values
+       `(lambda ,(make-ctor-parameter-list ctor)
+         (declare #.*optimize-speed*)
+         (block nil
+           (when (layout-invalid ,wrapper)
+             (install-initial-constructor ,ctor)
+             (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
+           ,(wrap-in-allocate-forms ctor body before-method-p)))
+       locations
+       names))))
 
 ;;; Return a form wrapped around BODY that allocates an instance
 ;;; constructed by CTOR.  BEFORE-METHOD-P set means we have to run
