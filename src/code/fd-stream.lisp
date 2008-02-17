@@ -185,6 +185,8 @@
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null))
   (external-format :default)
+  ;; fixed width, or function to call with a character
+  (char-size 1 :type (or fixnum function))
   (output-bytes #'ill-out :type function))
 (def!method print-object ((fd-stream fd-stream) stream)
   (declare (type stream stream))
@@ -2307,6 +2309,7 @@
                                  :buffering buffering
                                  :dual-channel-p dual-channel-p
                                  :external-format external-format
+                                 :char-size (external-format-char-size external-format)
                                  :timeout
                                  (if timeout
                                      (coerce timeout 'single-float)

@@ -134,6 +134,11 @@
   (setf (ansi-stream-misc stream) #'closed-flame))
 
 ;;;; file position and file length
+(defun external-format-char-size (external-format)
+  (let ((ef-entry (find-external-format external-format)))
+    (if (variable-width-external-format-p ef-entry)
+        (bytes-for-char-fun ef-entry)
+        (funcall (bytes-for-char-fun ef-entry) #\x))))
 
 ;;; Call the MISC method with the :FILE-POSITION operation.
 #!-sb-fluid (declaim (inline ansi-stream-file-position))
@@ -155,19 +160,20 @@
             (- +ansi-stream-in-buffer-length+
                (ansi-stream-in-index stream)))
          #!+sb-unicode
-         (let* ((external-format (stream-external-format stream))
-                (ef-entry (find-external-format external-format))
-                (variable-width-p (variable-width-external-format-p ef-entry))
-                (char-len (bytes-for-char-fun ef-entry)))
+         (let ((char-size (if (fd-stream-p stream)
+                              (fd-stream-char-size stream)
+                              (external-format-char-size (stream-external-format stream)))))
            (- res
-              (if variable-width-p
-                  (loop with buffer = (ansi-stream-cin-buffer stream)
-                        with start = (ansi-stream-in-index stream)
-                        for i from start below +ansi-stream-in-buffer-length+
-                        sum (funcall char-len (aref buffer i)))
-                  (* (funcall char-len #\x)  ; arbitrary argument
-                     (- +ansi-stream-in-buffer-length+
-                        (ansi-stream-in-index stream)))))))))))
+              (etypecase char-size
+                (function
+                 (loop with buffer = (ansi-stream-cin-buffer stream)
+                       with start = (ansi-stream-in-index stream)
+                       for i from start below +ansi-stream-in-buffer-length+
+                       sum (funcall char-size (aref buffer i))))
+                (fixnum
+                 (* char-size
+                    (- +ansi-stream-in-buffer-length+
+                       (ansi-stream-in-index stream))))))))))))
 
 (defun file-position (stream &optional position)
   (if (ansi-stream-p stream)
