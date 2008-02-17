@@ -15,8 +15,8 @@
 
 ;;;; coercions
 
-(defknown %single-float (real) single-float (movable foldable flushable))
-(defknown %double-float (real) double-float (movable foldable flushable))
+(defknown %single-float (real) single-float (movable foldable))
+(defknown %double-float (real) double-float (movable foldable))
 
 (deftransform float ((n f) (* single-float) *)
   '(%single-float n))
@@ -286,7 +286,10 @@
                 (specifier-type `(,',type ,(or lo '*) ,(or hi '*)))))
 
             (defoptimizer (,fun derive-type) ((num))
-              (one-arg-derive-type num #',aux-name #',fun))))))
+              (handler-case
+                  (one-arg-derive-type num #',aux-name #',fun)
+                (type-error ()
+                  nil)))))))
   (frob %single-float single-float
         most-negative-single-float most-positive-single-float)
   (frob %double-float double-float

@@ -1713,6 +1713,10 @@ WORKAROUND:
 		3: (SB-C::BOUND-FUNC ...)
 		4: (SB-C::%SINGLE-FLOAT-DERIVE-TYPE-AUX ...)
 
+  These are now fixed, but (COERCE HUGE 'SINGLE-FLOAT) still signals a
+  type-error at runtime. The question is, should it instead signal a
+  floating-point overflow, or return an infinity?
+
 408: SUBTYPEP confusion re. OR of SATISFIES of not-yet-defined predicate
 	As reported by Levente M\'{e}sz\'{a}ros sbcl-devel 2006-02-20,
 		(aver (equal (multiple-value-list

@@ -119,3 +119,22 @@
 (defun new-pu-label-from-pu-labels (array)
   (setf (aref (the myarraytype array) 0)
         sb-ext:double-float-positive-infinity))
+
+;;; bug 407
+;;;
+;;; FIXME: it may be that TYPE-ERROR is wrong, and we should
+;;; instead signal an overflow or coerce into an infinity.
+(defun bug-407a ()
+  (loop for n from (expt 2 1024) upto (+ 10 (expt 2 1024))
+        do (handler-case
+               (coerce n 'single-float)
+             (simple-type-error ()
+               (return-from bug-407a :type-error)))))
+(assert (eq :type-error (bug-407a)))
+(defun bug-407b ()
+  (loop for n from (expt 2 1024) upto (+ 10 (expt 2 1024))
+        do (handler-case
+               (format t "~E~%" (coerce n 'single-float))
+             (simple-type-error ()
+               (return-from bug-407b :type-error)))))
+(assert (eq :type-error (bug-407b)))
