@@ -87,7 +87,10 @@ arch_skip_instruction(os_context_t *context)
     /* This may be complete rubbish, as (at least for traps) pc points
      * _after_ the instruction that caused us to be here anyway.
      */
-    ((char*)*os_context_pc_addr(context)) +=4; }
+    char **pcptr;
+    pcptr = (char **) os_context_pc_addr(context);
+    *pcptr += 4;
+}
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
@@ -301,6 +304,15 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
     *os_context_pc_addr(context) -=4;
     *os_context_pc_addr(context) =
         (int)handle_fun_end_breakpoint(context);
+}
+
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    unsigned int code = *((u32 *) (*os_context_pc_addr(context)));
+    int register_offset = code >> 5 & 0x1f;
+    handle_single_step_trap(context, trap, register_offset);
+    arch_skip_instruction(context);
 }
 
 static void

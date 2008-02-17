@@ -95,7 +95,7 @@ call_into_lisp:
 
 	/* Indirect the closure */
 	ldl	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
-	addl	reg_CODE,6*4-FUN_POINTER_LOWTAG, reg_LIP
+	addl	reg_CODE, SIMPLE_FUN_CODE_OFFSET, reg_LIP
 
 	/* And into lisp we go. */
 	jsr	reg_ZERO,(reg_LIP)
@@ -303,6 +303,7 @@ end_of_tramps:
 	.long SIMPLE_FUN_HEADER_WIDETAG
 funcallable_instance_tramp = . + 1
 	.long funcallable_instance_tramp
+	.long NIL
 	.long NIL
 	.long NIL
 	.long NIL

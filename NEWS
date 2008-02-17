@@ -27,6 +27,8 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
   * bug fix: the CTOR optimization for MAKE-INSTANCE should no longer
     create obsolete instances in the case of redefinition or
     obsoletion of a superclass.  (thanks to Andy Hefner)
+  * bug fix: Support for the Alpha architecture has been revived; it had
+    suffered somewhat from lack of maintenance since sbcl-1.0.
 
 changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits
