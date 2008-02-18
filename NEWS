@@ -11,6 +11,10 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
     when SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS* is NIL.
   * unreadably printed representation of hash-tables now includes
     weakness if any.
+  * bug fix: partially fixed #188: type propagation from assignments
+    is now more efficient.
+  * bug fix: fixed #407: (COERCE X 'SINGLE-FLOAT) and (COERCE X
+    'DOUBLE-FLOAT) are not flushable.
   * bug fix: on x86 and x86-64 pointer based EQ-hashing now uses the
     full address of the object, and none of the tag bits.
   * bug fix: readably printing hash-tables now respects other printer

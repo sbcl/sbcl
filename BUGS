@@ -479,6 +479,11 @@ WORKAROUND:
                (print (incf start 22))
                (print (incf start 26))))))
 
+  [ Update: 1.0.14.36 improved this quite a bit (20-25%) by
+    eliminating useless work from PROPAGATE-FROM-SETS -- but as alluded
+    below, maybe we should be smarter about when to decide a derived
+    type is "good enough". ]
+
   This example could be solved with clever enough constraint
   propagation or with SSA, but consider
 

@@ -1114,6 +1114,8 @@
   ;; determine that this is a set closure variable, and is thus not a
   ;; good subject for flow analysis.
   (constraints nil :type (or sset null))
+  ;; Initial type of a LET variable as last seen by PROPAGATE-FROM-SETS.
+  (last-initial-type *universal-type* :type ctype)
   ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
   ;; in the fopcompiler.
   (fop-value nil))

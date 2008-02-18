@@ -306,6 +306,9 @@
            (when value
              (derive-node-type node (lvar-derived-type value)))))
         (cset
+         ;; PROPAGATE-FROM-SETS can do a better job if NODE-REOPTIMIZE
+         ;; is accurate till the node actually has been reoptimized.
+         (setf (node-reoptimize node) t)
          (ir1-optimize-set node))
         (cast
          (ir1-optimize-cast node)))))
@@ -1342,17 +1345,22 @@
 ;;; the union of the INITIAL-TYPE and the types of all the set
 ;;; values and to a PROPAGATE-TO-REFS with this type.
 (defun propagate-from-sets (var initial-type)
-  (collect ((res initial-type type-union))
-    (dolist (set (basic-var-sets var))
+  (let ((changes (not (csubtypep (lambda-var-last-initial-type var) initial-type)))
+        (types nil))
+    (dolist (set (lambda-var-sets var))
       (let ((type (lvar-type (set-value set))))
-        (res type)
+        (push type types)
         (when (node-reoptimize set)
-          (derive-node-type set (make-single-value-type type))
+          (let ((old-type (node-derived-type set)))
+            (unless (values-subtypep old-type type)
+              (derive-node-type set (make-single-value-type type))
+              (setf changes t)))
           (setf (node-reoptimize set) nil))))
-    (let ((res (res)))
-      (awhen (maybe-infer-iteration-var-type var initial-type)
-        (setq res it))
-      (propagate-to-refs var res)))
+    (when changes
+      (setf (lambda-var-last-initial-type var) initial-type)
+      (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
+                          (apply #'type-union initial-type types))))
+        (propagate-to-refs var res-type))))
   (values))
 
 ;;; If a LET variable, find the initial value's type and do
@@ -1368,9 +1376,9 @@
                  (initial-type (lvar-type initial-value)))
             (setf (lvar-reoptimize initial-value) nil)
             (propagate-from-sets var initial-type))))))
-
   (derive-node-type node (make-single-value-type
                           (lvar-type (set-value node))))
+  (setf (node-reoptimize node) nil)
   (values))
 
 ;;; Return true if the value of REF will always be the same (and is
