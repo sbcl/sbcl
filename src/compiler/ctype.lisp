@@ -765,8 +765,9 @@
                                    (type-specifier type))))
                        (t
                         (setf (leaf-type var) type)
-                        (dolist (ref (leaf-refs var))
-                          (derive-node-type ref (make-single-value-type type))))))
+                        (let ((s-type (make-single-value-type type)))
+                          (dolist (ref (leaf-refs var))
+                            (derive-node-type ref s-type))))))
            t))))))
 
 ;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.

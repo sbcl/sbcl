@@ -1240,12 +1240,13 @@
       (let ((int (type-approx-intersection2 var-type type)))
         (when (type/= int var-type)
           (setf (leaf-type leaf) int)
-          (dolist (ref (leaf-refs leaf))
-            (derive-node-type ref (make-single-value-type int))
-            ;; KLUDGE: LET var substitution
-            (let* ((lvar (node-lvar ref)))
-              (when (and lvar (combination-p (lvar-dest lvar)))
-                (reoptimize-lvar lvar))))))
+          (let ((s-int (make-single-value-type int)))
+            (dolist (ref (leaf-refs leaf))
+              (derive-node-type ref s-int)
+              ;; KLUDGE: LET var substitution
+              (let* ((lvar (node-lvar ref)))
+                (when (and lvar (combination-p (lvar-dest lvar)))
+                  (reoptimize-lvar lvar)))))))
       (values))))
 
 ;;; Iteration variable: exactly one SETQ of the form:
