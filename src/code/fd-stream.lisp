@@ -2380,7 +2380,7 @@
 
   ;; Calculate useful stuff.
   (multiple-value-bind (input output mask)
-      (case direction
+      (ecase direction
         (:input  (values   t nil sb!unix:o_rdonly))
         (:output (values nil   t sb!unix:o_wronly))
         (:io     (values   t   t sb!unix:o_rdwr))

@@ -352,57 +352,80 @@
 ;;; accordingly.
 (defun constrain-ref-type (ref constraints in)
   (declare (type ref ref) (type sset constraints in))
+  ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
+  ;; cons up endless union types when propagating large number of EQL
+  ;; constraints -- eg. from large CASE forms -- instead we just
+  ;; directly accumulate one XSET, and a set of fp zeroes, which we at
+  ;; the end turn into a MEMBER-TYPE.
+  ;;
+  ;; Since massive symbol cases are an especially atrocious pattern
+  ;; and the (NOT (MEMBER ...ton of symbols...)) will never turn into
+  ;; a more useful type, don't propagate their negation except for NIL
+  ;; unless SPEED > COMPILATION-SPEED.
   (let ((res (single-value-type (node-derived-type ref)))
+        (constrain-symbols (policy ref (> speed compilation-speed)))
+        (not-set (alloc-xset))
+        (not-fpz nil)
         (not-res *empty-type*)
         (leaf (ref-leaf ref)))
-    (do-sset-elements (con constraints)
-      (when (sset-member con in)
-        (let* ((x (constraint-x con))
-               (y (constraint-y con))
-               (not-p (constraint-not-p con))
-               (other (if (eq x leaf) y x))
-               (kind (constraint-kind con)))
-          (case kind
-            (typep
-             (if not-p
-                 (setq not-res (type-union not-res other))
-                 (setq res (type-approx-intersection2 res other))))
-            (eql
-             (unless (lvar-p other)
-               (let ((other-type (leaf-type other)))
-                 (if not-p
-                     (when (and (constant-p other)
-                                (member-type-p other-type))
-                       (setq not-res (type-union not-res other-type)))
-                     (let ((leaf-type (leaf-type leaf)))
-                       (cond
-                         ((or (constant-p other)
-                              (and (leaf-refs other) ; protect from
+    (flet ((note-not (x)
+             (if (fp-zero-p x)
+                 (push x not-fpz)
+                 (when (or constrain-symbols (null x) (not (symbolp x)))
+                   (add-to-xset x not-set)))))
+      (do-sset-elements (con constraints)
+        (when (sset-member con in)
+          (let* ((x (constraint-x con))
+                 (y (constraint-y con))
+                 (not-p (constraint-not-p con))
+                 (other (if (eq x leaf) y x))
+                 (kind (constraint-kind con)))
+            (case kind
+              (typep
+               (if not-p
+                   (if (member-type-p other)
+                       (mapc-member-type-members #'note-not other)
+                       (setq not-res (type-union not-res other)))
+                   (setq res (type-approx-intersection2 res other))))
+              (eql
+               (unless (lvar-p other)
+                 (let ((other-type (leaf-type other)))
+                   (if not-p
+                       (when (and (constant-p other)
+                                  (member-type-p other-type))
+                         (note-not (constant-value other)))
+                       (let ((leaf-type (leaf-type leaf)))
+                         (cond
+                           ((or (constant-p other)
+                                (and (leaf-refs other) ; protect from
                                         ; deleted vars
-                                   (csubtypep other-type leaf-type)
-                                   (not (type= other-type leaf-type))))
-                          (change-ref-leaf ref other)
-                          (when (constant-p other) (return)))
-                         (t
-                          (setq res (type-approx-intersection2
-                                     res other-type)))))))))
-            ((< >)
-             (cond
-               ((and (integer-type-p res) (integer-type-p y))
-                (let ((greater (eq kind '>)))
-                  (let ((greater (if not-p (not greater) greater)))
-                    (setq res
-                          (constrain-integer-type res y greater not-p)))))
-               ((and (float-type-p res) (float-type-p y))
-                (let ((greater (eq kind '>)))
-                  (let ((greater (if not-p (not greater) greater)))
-                    (setq res
-                          (constrain-float-type res y greater not-p)))))))))))
+                                     (csubtypep other-type leaf-type)
+                                     (not (type= other-type leaf-type))))
+                            (change-ref-leaf ref other)
+                            (when (constant-p other) (return)))
+                           (t
+                            (setq res (type-approx-intersection2
+                                       res other-type)))))))))
+              ((< >)
+               (cond
+                 ((and (integer-type-p res) (integer-type-p y))
+                  (let ((greater (eq kind '>)))
+                    (let ((greater (if not-p (not greater) greater)))
+                      (setq res
+                            (constrain-integer-type res y greater not-p)))))
+                 ((and (float-type-p res) (float-type-p y))
+                  (let ((greater (eq kind '>)))
+                    (let ((greater (if not-p (not greater) greater)))
+                      (setq res
+                            (constrain-float-type res y greater not-p))))))))))))
     (cond ((and (if-p (node-dest ref))
-                (csubtypep (specifier-type 'null) not-res))
+                (or (xset-member-p nil not-set)
+                    (csubtypep (specifier-type 'null) not-res)))
            (setf (node-derived-type ref) *wild-type*)
            (change-ref-leaf ref (find-constant t)))
           (t
+           (setf not-res
+                 (type-union not-res (make-member-type :xset not-set :fp-zeroes not-fpz)))
            (derive-node-type ref
                              (make-single-value-type
                               (or (type-difference res not-res)
