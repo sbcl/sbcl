@@ -80,7 +80,7 @@ enum {
 boolean enable_page_protection = 1;
 
 /* the minimum size (in bytes) for a large object*/
-unsigned long large_object_size = 4 * PAGE_BYTES;
+long large_object_size = 4 * PAGE_BYTES;
 
 
 /*
@@ -163,7 +163,7 @@ static boolean conservative_stack = 1;
 /* An array of page structures is allocated on gc initialization.
  * This helps quickly map between an address its page structure.
  * page_table_pages is set from the size of the dynamic space. */
-unsigned page_table_pages;
+page_index_t page_table_pages;
 struct page *page_table;
 
 /* To map addresses to page structures the address of the first page
@@ -1188,7 +1188,7 @@ gc_alloc_with_region(long nbytes,int unboxed_p, struct alloc_region *my_region,
 {
     void *new_free_pointer;
 
-    if(nbytes>=large_object_size)
+    if (nbytes>=large_object_size)
         return gc_alloc_large(nbytes,unboxed_p,my_region);
 
     /* Check whether there is room in the current alloc region. */

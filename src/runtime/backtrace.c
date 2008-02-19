@@ -408,7 +408,7 @@ debug_function_from_pc (struct code* code, void *pc)
     if (i == len)
       return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
 
-    if (offset >= fixnum_value(df->elsewhere_pc)) {
+    if (offset >= (unsigned long)fixnum_value(df->elsewhere_pc)) {
       struct compiled_debug_fun *p
         = ((struct compiled_debug_fun *) native_pointer(v->data[i + 1]));
       next_pc = fixnum_value(p->elsewhere_pc);

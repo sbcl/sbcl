@@ -359,7 +359,7 @@ uid_homedir(uid_t uid)
         } else {
             char *result = malloc(len + 2);
             if (result) {
-                int nchars = sprintf(result,"%s/",p->pw_dir);
+                unsigned int nchars = sprintf(result,"%s/",p->pw_dir);
                 if (nchars == len + 1) {
                     return result;
                 } else {

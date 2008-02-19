@@ -23,7 +23,7 @@ NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
 
-CFLAGS = -g -Wall -O3
+CFLAGS = -g -Wall -Wsign-compare -O3
 ASFLAGS = $(CFLAGS)
 CPPFLAGS = -I.
 

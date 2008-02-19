@@ -1638,7 +1638,7 @@ scav_hash_table_entries (struct hash_table *hash_table)
     unsigned long hash_vector_length;
     lispobj empty_symbol;
     lispobj weakness = hash_table->weakness;
-    long i;
+    unsigned long i;
 
     kv_vector = get_array_data(hash_table->table,
                                SIMPLE_VECTOR_WIDETAG, &kv_length);
@@ -1827,7 +1827,7 @@ scan_weak_hash_table (struct hash_table *hash_table)
     lispobj *hash_vector;
     lispobj empty_symbol;
     lispobj weakness = hash_table->weakness;
-    long i;
+    unsigned long i;
 
     kv_vector = get_array_data(hash_table->table,
                                SIMPLE_VECTOR_WIDETAG, NULL);
@@ -1903,7 +1903,7 @@ size_lose(lispobj *where)
 void
 gc_init_tables(void)
 {
-    long i;
+    unsigned long i;
 
     /* Set default value in all slots of scavenge table.  FIXME
      * replace this gnarly sizeof with something based on

@@ -42,7 +42,7 @@
 #endif
 
 
-char build_id[] =
+unsigned char build_id[] =
 #include "../../output/build-id.tmp"
 ;
 
@@ -121,7 +121,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
         os_vm_address_t addr =
             (os_vm_address_t) (os_vm_page_size * entry->address);
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
-        long len = os_vm_page_size * entry->page_count;
+        unsigned long len = os_vm_page_size * entry->page_count;
 
         if (len != 0) {
             os_vm_address_t real_addr;
@@ -199,7 +199,8 @@ lispobj
 load_core_file(char *file, os_vm_offset_t file_offset)
 {
     lispobj *header, val, len, *ptr, remaining_len;
-    int fd = open_binary(file, O_RDONLY), count;
+    int fd = open_binary(file, O_RDONLY);
+    unsigned int count;
 
     lispobj initial_function = NIL;
     FSHOW((stderr, "/entering load_core_file(%s)\n", file));
@@ -253,7 +254,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
             SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
             {
-                int i;
+                unsigned int i;
 
                 FSHOW((stderr, "build_id[]=\"%s\"\n", build_id));
                 FSHOW((stderr, "remaining_len = %d\n", remaining_len));

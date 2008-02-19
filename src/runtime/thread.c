@@ -364,7 +364,7 @@ create_thread_struct(lispobj initial_function) {
     void *spaces=0;
     void *aligned_spaces=0;
 #ifdef LISP_FEATURE_SB_THREAD
-    int i;
+    unsigned int i;
 #endif
 
     /* May as well allocate all the spaces at once: it saves us from

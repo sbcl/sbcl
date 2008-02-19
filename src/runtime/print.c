@@ -237,7 +237,8 @@ static void print_fixnum(lispobj obj)
 
 static void brief_otherimm(lispobj obj)
 {
-    int type, c, idx;
+    int type, c;
+    unsigned int idx;
     char buffer[10];
 
     type = widetag_of(obj);
@@ -288,7 +289,9 @@ static void brief_otherimm(lispobj obj)
 
 static void print_otherimm(lispobj obj)
 {
-    int type, idx;
+    int type;
+
+    unsigned int idx;
 
     type = widetag_of(obj);
     idx = type >> 2;
@@ -379,7 +382,7 @@ static void brief_struct(lispobj obj)
 static void print_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
-    int i;
+    unsigned int i;
     char buffer[16];
     print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
     for (i = 1; i < HeaderValue(instance->header); i++) {

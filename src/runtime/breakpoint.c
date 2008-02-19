@@ -115,7 +115,7 @@ static long compute_offset(os_context_t *context, lispobj code)
         if (pc < code_start)
             return 0;
         else {
-            long offset = pc - code_start;
+            unsigned long offset = pc - code_start;
             if (offset >= codeptr->code_size)
                 return 0;
             else

@@ -21,7 +21,7 @@
 #include "interr.h"
 
 static inline void
-get_spinlock(volatile lispobj *word,long value)
+get_spinlock(volatile lispobj *word, unsigned long value)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     u32 eax=0;

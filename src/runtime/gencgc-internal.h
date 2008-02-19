@@ -93,7 +93,7 @@ struct page {
 /* values for the page.allocated field */
 
 
-extern unsigned page_table_pages;
+extern page_index_t page_table_pages;
 extern struct page *page_table;
 
 
