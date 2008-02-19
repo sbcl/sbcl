@@ -673,21 +673,6 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
-    /* we can do this after releasing free_pages_lock */
-    if (gencgc_zero_check) {
-        long *p;
-        for (p = (long *)alloc_region->start_addr;
-             p < (long *)alloc_region->end_addr; p++) {
-            if (*p != 0) {
-                /* KLUDGE: It would be nice to use %lx and explicit casts
-                 * (long) in code like this, so that it is less likely to
-                 * break randomly when running on a machine with different
-                 * word sizes. -- WHN 19991129 */
-                lose("The new region at %x is not zero.\n", p);
-            }
-        }
-    }
-
 #ifdef READ_PROTECT_FREE_PAGES
     os_protect(page_address(first_page),
                PAGE_BYTES*(1+last_page-first_page),
@@ -703,6 +688,22 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
     }
 
     zero_dirty_pages(first_page, last_page);
+
+    /* we can do this after releasing free_pages_lock */
+    if (gencgc_zero_check) {
+        long *p;
+        for (p = (long *)alloc_region->start_addr;
+             p < (long *)alloc_region->end_addr; p++) {
+            if (*p != 0) {
+                /* KLUDGE: It would be nice to use %lx and explicit casts
+                 * (long) in code like this, so that it is less likely to
+                 * break randomly when running on a machine with different
+                 * word sizes. -- WHN 19991129 */
+                lose("The new region at %x is not zero (start=%p, end=%p).\n",
+                     p, alloc_region->start_addr, alloc_region->end_addr);
+            }
+        }
+    }
 }
 
 /* If the record_new_objects flag is 2 then all new regions created
