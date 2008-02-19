@@ -33,6 +33,9 @@ changes in sbcl-1.0.15 relative to sbcl-1.0.14:
     obsoletion of a superclass.  (thanks to Andy Hefner)
   * bug fix: Support for the Alpha architecture has been revived; it had
     suffered somewhat from lack of maintenance since sbcl-1.0.
+  * improvements to the Windows port:
+     ** The system detects the codepage to use at startup, instead of
+        using the value from the saved core. (thanks to Kei Suzuki)
 
 changes in sbcl-1.0.14 relative to sbcl-1.0.13:
   * new feature: SB-EXT:*EXIT-HOOKS* are called when the process exits

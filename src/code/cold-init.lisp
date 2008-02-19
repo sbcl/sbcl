@@ -291,6 +291,8 @@ systems, UNIX-STATUS is used as the status code."
   (sb!thread::get-foreground))
 
 (defun reinit ()
+  #!+win32
+  (setf sb!win32::*ansi-codepage* nil)
   (setf *default-external-format* nil)
   (setf sb!alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
