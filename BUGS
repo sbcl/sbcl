@@ -1888,3 +1888,23 @@ Which should be fixed, the IR1, or the backend?
 behaves ...erratically. Reported by Kevin Reid on sbcl-devel
 2007-07-06. (We don't _have_ to check things like this, but we
 generally try to check returns in safe code, so we should here too.)
+
+423: TRULY-THE and *CHECK-CONSISTENCY*
+
+ The following signals errors due to TRULY-THEs in dead code:
+
+ (let ((sb-c::*check-consistency* t))
+  (handler-bind ((warning #'error))
+    (flet ((make-lambda (type)
+             `(lambda (x)
+                ((lambda (z)
+                   (if (listp z)
+                       (let ((q (truly-the list z)))
+                         (length q))
+                       (if (arrayp z)
+                           (let ((q (truly-the vector z)))
+                             (length q))
+                           (error "oops"))))
+                 (the ,type x)))))
+      (compile nil (make-lambda 'list))
+      (compile nil (make-lambda 'vector)))))
