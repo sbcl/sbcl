@@ -736,7 +736,8 @@
            (do ((i end (1- i)))
                ((<= i ,src-word))
              (setf (sb!kernel:%vector-raw-bits dst (1- i))
-                   (sb!kernel:%vector-raw-bits src (1- i)))))))))
+                   (sb!kernel:%vector-raw-bits src (1- i))))
+           (values))))))
 
 #.(loop for i = 1 then (* i 2)
         collect `(deftransform ,(intern (format nil "UB~D-BASH-COPY" i)

@@ -194,3 +194,14 @@
   (multiple-value-bind (seq err) (ignore-errors (copy-seq '(1 2 3 . 4)))
     (assert (not seq))
     (assert (typep err 'type-error))))
+
+;;; UBX-BASH-COPY transform had an inconsistent return type
+(let ((sb-c::*check-consistency* t))
+  (handler-bind ((warning #'error))
+    (compile nil
+             '(lambda (l)
+               (declare (type fixnum l))
+               (let* ((bsize 128)
+                      (b1 (make-array bsize :element-type '(unsigned-byte 8)))
+                      (b2 (make-array l :element-type '(unsigned-byte 8))))
+                 (replace b1 b2 :start2 0 :end2 l))))))
