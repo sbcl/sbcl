@@ -504,7 +504,7 @@
 ;;;   As realpath(3) is not atomic anyway, we only ever call it when
 ;;;   we think a file exists, so just be careful when rewriting this
 ;;;   routine.
-(defun query-file-system (pathspec query-for enoent-errorp)
+(defun query-file-system (pathspec query-for)
   (let ((pathname (translate-logical-pathname
                    (merge-pathnames
                     (pathname pathspec)
@@ -603,25 +603,17 @@
                         pathname))
                       (:author (sb!unix:uid-username uid))
                       (:write-date (+ unix-to-universal-time mtime))))))
-              ;; If we're still here, the file doesn't exist; return
-              ;; NIL or error.
-              (if (and (= errno sb!unix:enoent) (not enoent-errorp))
-                  nil
-                  (simple-file-perror
-                   (format nil "failed to find the ~A of ~~A" query-for)
-                   pathspec errno))))))))
+              ;; If we're still here, the file doesn't exist; error.
+              (simple-file-perror
+               (format nil "failed to find the ~A of ~~A" query-for)
+               pathspec errno)))))))
 
 
 (defun probe-file (pathspec)
   #!+sb-doc
-  "Return the truename of PATHSPEC if such a file exists, the
-coercion of PATHSPEC to a pathname if PATHSPEC names a symlink
-that links to itself or to a file that doesn't exist, or NIL if
-errno is set to ENOENT after trying to stat(2) the file.  An
-error of type FILE-ERROR is signaled if PATHSPEC is a wild
-pathname, or for any other circumstance where stat(2) fails."
-  (query-file-system pathspec :truename nil))
-
+  "Return the truename of PATHSPEC if the truename can be found,
+or NIL otherwise.  See TRUENAME for more information."
+  (handler-case (truename pathspec) (file-error () nil)))
 
 (defun truename (pathspec)
   #!+sb-doc
@@ -641,22 +633,22 @@ broken symlink itself."
   ;; Note that eventually this routine might be different for streams
   ;; than for other pathname designators.
   (if (streamp pathspec)
-      (query-file-system pathspec :truename t)
-      (query-file-system pathspec :truename t)))
+      (query-file-system pathspec :truename)
+      (query-file-system pathspec :truename)))
 
 (defun file-author (pathspec)
   #!+sb-doc
   "Return the author of the file specified by PATHSPEC. Signal an
 error of type FILE-ERROR if no such file exists, or if PATHSPEC
 is a wild pathname."
-  (query-file-system pathspec :author t))
+  (query-file-system pathspec :author))
 
 (defun file-write-date (pathspec)
   #!+sb-doc
   "Return the write date of the file specified by PATHSPEC.
 An error of type FILE-ERROR is signaled if no such file exists,
 or if PATHSPEC is a wild pathname."
-  (query-file-system pathspec :write-date t))
+  (query-file-system pathspec :write-date))
 
 ;;;; miscellaneous other operations
 
