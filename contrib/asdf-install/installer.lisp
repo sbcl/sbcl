@@ -138,7 +138,7 @@
 
 
 (defun copy-stream (in out)
-  (let ((buf (make-array 8192 :element-type (stream-element-type in))))
+  (let ((buf (make-array 8192 :element-type (stream-element-type out))))
     (loop for pos = (read-sequence buf in)
           until (zerop pos)
           do (write-sequence buf out :end pos))))
