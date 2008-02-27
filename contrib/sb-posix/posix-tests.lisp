@@ -428,6 +428,71 @@
                   sb-posix::o-nonblock)))
   t)
 
+(deftest fcntl.flock.1
+    (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+      (let ((flock (make-instance 'sb-posix:flock
+                      :type sb-posix:f-wrlck
+                      :whence sb-posix:seek-set
+                      :start 0 :len 10))
+            (pathname "fcntl.flock.1")
+            kid-status)
+        (catch 'test
+          (with-open-file (f pathname :direction :output)
+            (write-line "1234567890" f)
+            (assert (zerop (sb-posix:fcntl f sb-posix:f-setlk flock)))
+            (let ((pid (sb-posix:fork)))
+              (if (zerop pid)
+                  (progn
+                    (multiple-value-bind (nope error)
+                        (ignore-errors (sb-posix:fcntl f sb-posix:f-setlk flock))
+                      (sb-ext:quit
+                       :unix-status
+                       (cond ((not (null nope)) 1)
+                             ((= (sb-posix:syscall-errno error) sb-posix:eagain)
+                              42)
+                             (t 86))
+                       :recklessly-p t #| don't delete the file |#)))
+                  (progn
+                    (setf kid-status
+                          (sb-posix:wexitstatus
+                           (nth-value
+                            1 (sb-posix:waitpid pid 0))))
+                    (throw 'test nil))))))
+        kid-status))
+  42)
+
+
+(deftest fcntl.flock.2
+    (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+      (let ((flock (make-instance 'sb-posix:flock
+                      :type sb-posix:f-wrlck
+                      :whence sb-posix:seek-set
+                      :start 0 :len 10))
+            (pathname "fcntl.flock.2")
+            kid-status)
+        (catch 'test
+          (with-open-file (f pathname :direction :output)
+            (write-line "1234567890" f)
+            (assert (zerop (sb-posix:fcntl f sb-posix:f-setlk flock)))
+            (let ((ppid (sb-posix:getpid))
+                  (pid (sb-posix:fork)))
+              (if (zerop pid)
+                  (let ((r (sb-posix:fcntl f sb-posix:f-getlk flock)))
+                    (sb-ext:quit
+                     :unix-status
+                     (cond ((not (zerop r)) 1)
+                           ((= (sb-posix:flock-pid flock) ppid) 42)
+                           (t 86))
+                     :recklessly-p t #| don't delete the file |#))
+                  (progn
+                    (setf kid-status
+                          (sb-posix:wexitstatus
+                           (nth-value
+                            1 (sb-posix:waitpid pid 0))))
+                    (throw 'test nil))))))
+        kid-status))
+  42)
+
 (deftest opendir.1
   (let ((dir (sb-posix:opendir "/")))
     (unwind-protect (sb-alien:null-alien dir)

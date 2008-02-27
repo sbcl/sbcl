@@ -213,6 +213,10 @@ objects corresponding to supported POSIX structures, and the supported
 slots for those structures.
 
 @itemize
+
+@item flock
+@include class-sb-posix-flock.texinfo
+
 @item passwd
 @include class-sb-posix-passwd.texinfo
 

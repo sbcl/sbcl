@@ -290,11 +290,32 @@
   (define-call-internally fcntl-with-pointer-arg "fcntl" int minusp
                           (fd file-descriptor) (cmd int)
                           (arg alien-pointer-to-anything-or-nil))
+  (define-protocol-class flock alien-flock ()
+   ((type :initarg :type :accessor flock-type
+          :documentation "Type of lock; F_RDLCK, F_WRLCK, F_UNLCK.")
+    (whence :initarg :whence :accessor flock-whence
+            :documentation "Flag for starting offset.")
+    (start :initarg :start :accessor flock-start
+           :documentation "Relative offset in bytes.")
+    (len :initarg :len :accessor flock-len
+         :documentation "Size; if 0 then until EOF.")
+    ;; Note: PID isn't initable, and is read-only.  But other stuff in
+    ;; SB-POSIX right now loses when a protocol-class slot is unbound,
+    ;; so we initialize it to 0.
+    (pid :initform 0 :reader flock-pid
+         :documentation
+         "Process ID of the process holding the lock; returned with F_GETLK."))
+   (:documentation "Class representing locks used in fcntl(2)."))
   (define-entry-point "fcntl" (fd cmd &optional (arg nil argp))
     (if argp
         (etypecase arg
           ((alien int) (fcntl-with-int-arg fd cmd arg))
-          ((or (alien (* t)) null) (fcntl-with-pointer-arg fd cmd arg)))
+          ((or (alien (* t)) null) (fcntl-with-pointer-arg fd cmd arg))
+          (flock (with-alien-flock a-flock ()
+                   (flock-to-alien arg a-flock)
+                   (let ((r (fcntl-with-pointer-arg fd cmd a-flock)))
+                     (alien-to-flock a-flock arg)
+                     r))))
         (fcntl-without-arg fd cmd)))
 
   ;; uid, gid

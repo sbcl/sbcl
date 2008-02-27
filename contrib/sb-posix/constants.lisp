@@ -358,6 +358,17 @@
  (:integer f-setlkw "F_SETLKW" nil t)
  (:integer f-getown "F_GETOWN" nil t)
  (:integer f-setown "F_SETOWN" nil t)
+ (:integer f-rdlck "F_RDLCK" nil t)
+ (:integer f-wrlck "F_WRLCK" nil t)
+ (:integer f-unlck "F_UNLCK" nil t)
+
+ (:structure alien-flock
+             ("struct flock"
+              (short type "short" "l_type")
+              (short whence "short" "l_whence")
+              (off-t start "off_t" "l_start")
+              (off-t len "off_t" "l_len")
+              (pid-t pid "pid_t" "l_pid")))
 
  ;; lockf()
  (:integer f-lock "F_LOCK" nil t)
