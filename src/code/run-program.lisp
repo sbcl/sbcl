@@ -830,9 +830,11 @@ Users Manual for details about the PROCESS structure."#-win32"
                                          (ash 1 descriptor)
                                          0 0 0)
                   (cond ((null result)
-                         (error "~@<couldn't select on sub-process: ~
-                                           ~2I~_~A~:>"
-                                (strerror readable/errno)))
+                         (if (eql sb-unix:eintr readable/errno)
+                             (return)
+                             (error "~@<Couldn't select on sub-process: ~
+                                        ~2I~_~A~:>"
+                                    (strerror readable/errno))))
                         ((zerop result)
                          (return))))
                 (multiple-value-bind (count errno)
