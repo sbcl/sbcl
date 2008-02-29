@@ -2,6 +2,9 @@
 changes in sbcl-1.0.16 relative to 1.0.15:
   * minor incompatible change: change PROBE-FILE back to returning
     NIL whenever we can't get a truename, as was the case before 1.0.14.
+  * bug fix: periodic polling was broken. (thanks to Espen S Johnsen)
+  * bug fix: copying output from RUN-PROGRAM to a stream signalled
+    bogus errors if select() was interrupted.
   * enhancement: add support for fcntl's struct flock to SB-POSIX.
 
 changes in sbcl-1.0.15 relative to sbcl-1.0.14:
