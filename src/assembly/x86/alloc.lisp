@@ -81,6 +81,8 @@
 
 #+sb-assembling
 (macrolet ((def (reg)
+             (declare (ignorable reg))
+             #!+sb-thread
              (let* ((name (intern (format nil "ALLOCATE-TLS-INDEX-IN-~A" reg)))
                     (target-offset (intern (format nil "~A-OFFSET" reg)))
                     (other-offset (if (eql 'eax reg)
