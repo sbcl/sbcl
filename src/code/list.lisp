@@ -1217,34 +1217,44 @@
 
 ;;;; Specialized versions
 
-;;; %MEMBER-* and %ASSOC-* function. The transforms for %MEMBER and
-;;; %ASSOC pick the appropriate version. These win because they have
-;;; only positional arguments, the TEST & KEY functions are known to
-;;; exist (or not), and are known to be functions, not function
-;;; designators.
-(macrolet ((def (funs form &optional variant)
-             (flet ((%def (name)
-                      `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
-                           (item list ,@funs)
-                         (declare (optimize speed))
-                         ,@(when funs `((declare (function ,@funs))))
-                         (do ((list list (cdr list)))
-                             ((null list) nil)
-                           (declare (list list))
-                           (let ((this (car list)))
-                             ,(ecase name
-                                     (assoc
-                                      `(when this
-                                         (let ((target (car this)))
-                                           (when (and this ,form)
-                                             (return this)))))
-                                     (member
-                                      `(let ((target this))
+;;; %MEMBER-* and %ASSOC-* functions. The transforms for MEMBER and
+;;; ASSOC pick the appropriate version. These win because they have
+;;; only positional arguments, the TEST, TEST-NOT & KEY functions are
+;;; known to exist (or not), and are known to be functions instead of
+;;; function designators. We are also able to transform many common
+;;; cases to -EQ versions, which are substantially faster then EQL
+;;; using ones.
+(macrolet
+    ((def (funs form &optional variant)
+       (flet ((%def (name)
+                `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
+                     (item list ,@funs)
+                   (declare (optimize speed))
+                   ,@(when funs `((declare (function ,@funs))))
+                   (do ((list list (cdr list)))
+                       ((null list) nil)
+                     (declare (list list))
+                     (let ((this (car list)))
+                       ,(ecase name
+                               (assoc
+                                (if funs
+                                    `(when this
+                                       (let ((target (car this)))
                                          (when ,form
-                                           (return list))))))))))
-               `(progn
-                  ,(%def 'member)
-                  ,(%def 'assoc)))))
+                                           (return this))))
+                                    ;; If there is no TEST/TEST-NOT or
+                                    ;; KEY, do the EQ/EQL test first,
+                                    ;; before checking for NIL.
+                                    `(let ((target (car this)))
+                                       (when (and ,form this)
+                                         (return this)))))
+                               (member
+                                `(let ((target this))
+                                   (when ,form
+                                     (return list))))))))))
+         `(progn
+            ,(%def 'member)
+            ,(%def 'assoc)))))
   (def ()
       (eql item target))
   (def ()
