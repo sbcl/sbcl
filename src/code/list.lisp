@@ -19,9 +19,9 @@
 
 (declaim (maybe-inline
           tree-equal nth %setnth nthcdr last last1 make-list append
-          nconc nconc2 member member-if member-if-not tailp adjoin union
+          nconc nconc2 member-if member-if-not tailp adjoin union
           nunion intersection nintersection set-difference nset-difference
-          set-exclusive-or nset-exclusive-or subsetp acons assoc
+          set-exclusive-or nset-exclusive-or subsetp acons
           assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
           subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
@@ -1217,35 +1217,44 @@
 
 ;;;; Specialized versions
 
-;;; %MEMBER-* and %ASSOC-* function. The transforms for %MEMBER and %ASSOC pick
-;;; the appropriate version. These win because they have only positional arguments,
-;;; the TEST & KEY functions are known to exist (or not), and are known to be
-;;; functions, not function designators.
-(macrolet ((def (funs form)
+;;; %MEMBER-* and %ASSOC-* function. The transforms for %MEMBER and
+;;; %ASSOC pick the appropriate version. These win because they have
+;;; only positional arguments, the TEST & KEY functions are known to
+;;; exist (or not), and are known to be functions, not function
+;;; designators.
+(macrolet ((def (funs form &optional variant)
              (flet ((%def (name)
-                      `(defun ,(intern (format nil "%~A~{-~A~}" name funs))
+                      `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
                            (item list ,@funs)
+                         (declare (optimize speed))
                          ,@(when funs `((declare (function ,@funs))))
                          (do ((list list (cdr list)))
                              ((null list) nil)
+                           (declare (list list))
                            (let ((this (car list)))
                              ,(ecase name
-                                    (assoc
-                                     `(when this
-                                        (let ((target (car this)))
-                                          (when (and this ,form)
-                                            (return this)))))
-                                    (member
-                                     `(let ((target this))
-                                        (when ,form
-                                          (return list))))))))))
+                                     (assoc
+                                      `(when this
+                                         (let ((target (car this)))
+                                           (when (and this ,form)
+                                             (return this)))))
+                                     (member
+                                      `(let ((target this))
+                                         (when ,form
+                                           (return list))))))))))
                `(progn
                   ,(%def 'member)
                   ,(%def 'assoc)))))
   (def ()
       (eql item target))
+  (def ()
+      (eq item target)
+    eq)
   (def (key)
       (eql item (funcall key target)))
+  (def (key)
+      (eq item (funcall key target))
+    eq)
   (def (key test)
       (funcall test item (funcall key target)))
   (def (key test-not)

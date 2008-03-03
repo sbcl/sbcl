@@ -3315,6 +3315,10 @@
   (def eq)
   (def char=))
 
+;;; True if EQL comparisons involving type can be simplified to EQ.
+(defun eq-comparable-type-p (type)
+  (csubtypep type (specifier-type '(or fixnum (not number)))))
+
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
 ;;; -- If both args are characters, convert to CHAR=. This is better than
@@ -3335,9 +3339,7 @@
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
         (char-type (specifier-type 'character)))
-    (flet ((simple-type-p (type)
-             (csubtypep type (specifier-type '(or fixnum (not number)))))
-           (fixnum-type-p (type)
+    (flet ((fixnum-type-p (type)
              (csubtypep type (specifier-type 'fixnum))))
       (cond
         ((same-leaf-ref-p x y) t)
@@ -3348,7 +3350,7 @@
          '(char= x y))
         ((or (fixnum-type-p x-type) (fixnum-type-p y-type))
          (commutative-arg-swap node))
-        ((or (simple-type-p x-type) (simple-type-p y-type))
+        ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
          '(eq x y))
         ((and (not (constant-lvar-p y))
               (or (constant-lvar-p x)

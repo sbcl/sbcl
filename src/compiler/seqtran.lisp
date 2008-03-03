@@ -291,7 +291,7 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(defun specialized-list-seek-function-name (function-name key-functions)
+(defun specialized-list-seek-function-name (function-name key-functions variant)
   (or (find-symbol (with-output-to-string (s)
                      ;; Write "%NAME-FUN1-FUN2-FUN3", etc. Not only is
                      ;; this ever so slightly faster then FORMAT, this
@@ -301,32 +301,48 @@
                      (write-string (symbol-name function-name) s)
                      (dolist (f key-functions)
                        (write-char #\- s)
-                       (write-string (symbol-name f) s)))
+                       (write-string (symbol-name f) s))
+                     (when variant
+                       (write-char #\- s)
+                       (write-string (symbol-name variant) s)))
                    (load-time-value (find-package "SB!KERNEL")))
-      (bug "Unknown list item seek transform: name=~S, key-functions=~S"
-           function-name key-functions)))
+      (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
+           function-name key-functions variant)))
 
-(defun transform-list-item-seek (name list key test test-not node)
+(defun transform-list-item-seek (name item list key test test-not node)
+  ;; If TEST is EQL, drop it.
+  (when (and test (lvar-for-named-function test 'eql))
+    (setf test nil))
+  ;; Ditto for KEY IDENTITY.
+  (when (and key (lvar-for-named-function key 'identity))
+    (set key nil))
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
-  ;; ensure it is a function.
+  ;; ensures it is a function.
   (multiple-value-bind (key key-form)
-      (if key
-          (let ((key-type (lvar-type key))
-                (null-type (specifier-type 'null)))
-            (cond ((csubtypep key-type null-type)
-                   (values nil nil))
-                  ((csubtypep null-type key-type)
-                   (values key '(if key
-                                 (%coerce-callable-to-fun key)
-                                 #'identity)))
-                  (t
-                   (values key '(%coerce-callable-to-fun key))))))
-    (let* ((funs (remove nil (list (and key 'key) (cond (test 'test)
+      (when key
+        (let ((key-type (lvar-type key))
+              (null-type (specifier-type 'null)))
+          (cond ((csubtypep key-type null-type)
+                 (values nil nil))
+                ((csubtypep null-type key-type)
+                 (values key '(if key
+                               (%coerce-callable-to-fun key)
+                               #'identity)))
+                (t
+                 (values key '(%coerce-callable-to-fun key))))))
+    (let* ((c-test (cond ((and test (lvar-for-named-function test 'eq))
+                          (setf test nil)
+                          'eq)
+                         ((and (not test) (not test-not))
+                          (when (eq-comparable-type-p (lvar-type item))
+                            'eq))))
+           (funs (remove nil (list (and key 'key) (cond (test 'test)
                                                         (test-not 'test-not)))))
            (target-expr (if key '(%funcall key target) 'target))
            (test-expr (cond (test `(%funcall test item ,target-expr))
                             (test-not `(not (%funcall test-not item ,target-expr)))
+                            (c-test `(,c-test item ,target-expr))
                             (t `(eql item ,target-expr)))))
       (labels ((open-code (tail)
                  (when tail
@@ -356,14 +372,14 @@
                  nil)
                 (t
                  ;; specialized out-of-line version
-                 `(,(specialized-list-seek-function-name name funs)
+                 `(,(specialized-list-seek-function-name name funs c-test)
                     item list ,@(mapcar #'ensure-fun funs)))))))))
 
 (deftransform member ((item list &key key test test-not) * * :node node)
-  (transform-list-item-seek 'member list key test test-not node))
+  (transform-list-item-seek 'member item list key test test-not node))
 
 (deftransform assoc ((item list &key key test test-not) * * :node node)
-  (transform-list-item-seek 'assoc list key test test-not node))
+  (transform-list-item-seek 'assoc item list key test test-not node))
 
 (deftransform memq ((item list) (t (constant-arg list)))
   (labels ((rec (tail)
