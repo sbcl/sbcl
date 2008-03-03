@@ -315,7 +315,7 @@
     (setf test nil))
   ;; Ditto for KEY IDENTITY.
   (when (and key (lvar-for-named-function key 'identity))
-    (set key nil))
+    (setf key nil))
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
   ;; ensures it is a function.

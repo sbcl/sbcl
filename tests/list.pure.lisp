@@ -157,6 +157,8 @@
   (let ((x-numbers '(1 2))
         (fun (car (list 'member))))
     (test x-numbers (member 1 numbers))
+    (test x-numbers (member 1 numbers :key 'identity))
+    (test x-numbers (member 1 numbers :key #'identity))
     (test (cdr x-numbers) (member 2 numbers))
     (test nil (member 1.0 numbers ))
 
@@ -199,6 +201,8 @@
   (let ((fun (car (list 'assoc))))
     (test (1 a) (assoc 1 numbers))
     (test (2 b) (assoc 2 numbers))
+    (test (1 a) (assoc 1 numbers :key 'identity))
+    (test (2 b) (assoc 2 numbers :key #'identity))
     (test nil (assoc 1.0 numbers))
 
     (test (1 a) (assoc 1.0 numbers :test #'=))
