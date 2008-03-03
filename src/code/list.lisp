@@ -490,15 +490,15 @@
 
 ;;;; functions to alter list structure
 
-(defun rplaca (x y)
+(defun rplaca (cons x)
   #!+sb-doc
-  "Change the CAR of X to Y and return the new X."
-  (rplaca x y))
+  "Change the CAR of CONS to X and return the CONS."
+  (rplaca cons x))
 
-(defun rplacd (x y)
+(defun rplacd (cons x)
   #!+sb-doc
-  "Change the CDR of X to Y and return the new X."
-  (rplacd x y))
+  "Change the CDR of CONS to X and return the CONS."
+  (rplacd cons x))
 
 ;;; The following are for use by SETF.
 
