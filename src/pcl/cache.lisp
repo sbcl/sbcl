@@ -326,7 +326,8 @@
 ;;;; incomplete lines.
 (defun copy-and-expand-cache (cache layouts value)
   (let ((copy (%copy-cache cache))
-        (length (length (cache-vector cache))))
+        (length (length (cache-vector cache)))
+        (drop-random-entries nil))
     (declare (index length))
     (when (< length +cache-vector-max-length+)
       (setf length (* 2 length)))
@@ -343,20 +344,39 @@
        ;; the cache has reached it's maximum size we may end up
        ;; looping in FILL-CACHE.
        (unless (try-update-cache copy layouts value)
-         (bug "Could not insert ~S:~S to supposedly empty ~S." layouts value cache))
-       (map-cache (lambda (layouts value)
-                    (unless (try-update-cache copy layouts value)
-                      ;; If the cache would grow too much we drop the
-                      ;; remaining the entries that don't fit. FIXME:
-                      ;; It would be better to drop random entries to
-                      ;; avoid getting into a rut here (best done by
-                      ;; making MAP-CACHE map in a random order?), and
-                      ;; possibly to downsize the cache more
-                      ;; aggressively (on the assumption that most
-                      ;; entries aren't getting used at the moment.)
-                      (when (< length +cache-vector-max-length+)
-                        (setf length (* 2 length))
-                        (go :again))))
+         (bug "Could not insert ~S:~S to supposedly empty ~S." layouts value copy))
+       (map-cache (if drop-random-entries
+                      ;; The cache is at maximum size, and all entries
+                      ;; do not fit in. Drop a random ~50% of entries,
+                      ;; to make space for new ones. This needs to be
+                      ;; random, since otherwise we might get in a
+                      ;; rut: add A causing B to drop, then add B
+                      ;; causing A to drop... repeat ad nauseam,
+                      ;; spending most of the time here instead of
+                      ;; doing real work. 50% because if we drop to
+                      ;; few we need to do this almost right away
+                      ;; again, and if we drop to many, we need to
+                      ;; recompute more then we'd like.
+                      ;; _Experimentally_ 50% seems to perform the
+                      ;; best, but it would be nice to have a proper
+                      ;; analysis...
+                      (flet ((random-fixnum ()
+                               (random (1+ most-positive-fixnum))))
+                        (let ((drops (random-fixnum)))
+                          (declare (fixnum drops))
+                          (lambda (layouts value)
+                            (when (logbitp 0 drops)
+                              (try-update-cache copy layouts value))
+                            (when (zerop (ash drops -1))
+                              (setf drops (random-fixnum))))))
+                      (lambda (layouts value)
+                        (unless (try-update-cache copy layouts value)
+                          ;; Didn't fit -- expand the cache, or drop
+                          ;; a few unlucky ones.
+                          (if (< length +cache-vector-max-length+)
+                              (setf length (* 2 length))
+                              (setf drop-random-entries t))
+                          (go :again))))
                   cache))
     copy))
 
@@ -398,18 +418,18 @@
 ;;; necessary, and returns the new cache.
 (defun fill-cache (cache layouts value)
   (labels
-      ((%fill-cache (cache layouts value)
+      ((%fill-cache (cache layouts value expand)
          (cond ((try-update-cache cache layouts value)
                 cache)
-               ((cache-has-invalid-entries-p cache)
+               ((and (not expand) (cache-has-invalid-entries-p cache))
                 ;; Don't expand yet: maybe there will be enough space if
                 ;; we just drop the invalid entries.
-                (%fill-cache (copy-cache cache) layouts value))
+                (%fill-cache (copy-cache cache) layouts value t))
                (t
                 (copy-and-expand-cache cache layouts value)))))
     (if (listp layouts)
-        (%fill-cache cache layouts value)
-        (%fill-cache cache (list layouts) value))))
+        (%fill-cache cache layouts value nil)
+        (%fill-cache cache (list layouts) value nil))))
 
 ;;; Calls FUNCTION with all layouts and values in cache.
 (defun map-cache (function cache)
