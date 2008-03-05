@@ -247,7 +247,7 @@
       ;; The assembly routines test the sign flag from this one, so if
       ;; you change stuff here, make sure the sign flag doesn't get
       ;; overwritten before the CALL!
-      (inst test x #xe0000000)
+      (inst test x #.(ash lowtag-mask (- n-word-bits n-fixnum-tag-bits 1)))
       ;; Faster but bigger then SHL Y 2. The cost of doing this speculatively
       ;; is noise compared to bignum consing if that is needed.
       (inst lea y (make-ea :dword :index x :scale 4))

@@ -295,85 +295,83 @@
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
-;;; Result may be a bignum, so we have to check. Use a worst-case cost
-;;; to make sure people know they may be number consing.
+;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
+;;; as the case may be. Fixnum case inline, bignum case in an assembly
+;;; routine.
 (define-vop (move-from-signed)
   (:args (x :scs (signed-reg unsigned-reg) :to :result))
   (:results (y :scs (any-reg descriptor-reg) :from :argument))
   (:note "signed word to integer coercion")
-  (:node-var node)
+  ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
      (aver (not (location= x y)))
-     (let ((bignum (gen-label))
-           (done (gen-label)))
-       ;; We can't do the overflow check with SHL Y, 3, since the
-       ;; state of the overflow flag is only reliably set when
-       ;; shifting by 1. There used to be code here for doing "shift
-       ;; by one, check whether it overflowed" three times. But on all
-       ;; x86-64 processors IMUL is a reasonably fast instruction, so
-       ;; we can just do a straight multiply instead of trying to
-       ;; optimize it to a shift. This is both faster and smaller.
-       ;; -- JES, 2006-07-08
-       (inst imul y x (ash 1 n-fixnum-tag-bits))
-       (inst jmp :o bignum)
-       (emit-label done)
-
-       (assemble (*elsewhere*)
-          (emit-label bignum)
-          (with-fixed-allocation
-              (y bignum-widetag (+ bignum-digits-offset 1) node)
-            (storew x y bignum-digits-offset other-pointer-lowtag))
-          (inst jmp done)))))
+     (let ((done (gen-label)))
+       (inst imul y x #.(ash 1 n-fixnum-tag-bits))
+       (inst jmp :no done)
+       (inst mov y x)
+       (inst lea temp-reg-tn
+             (make-ea :qword :disp
+                      (make-fixup (ecase (tn-offset y)
+                                    (#.rax-offset 'alloc-signed-bignum-in-rax)
+                                    (#.rcx-offset 'alloc-signed-bignum-in-rcx)
+                                    (#.rdx-offset 'alloc-signed-bignum-in-rdx)
+                                    (#.rbx-offset 'alloc-signed-bignum-in-rbx)
+                                    (#.rsi-offset 'alloc-signed-bignum-in-rsi)
+                                    (#.rdi-offset 'alloc-signed-bignum-in-rdi)
+                                    (#.r8-offset  'alloc-signed-bignum-in-r8)
+                                    (#.r9-offset  'alloc-signed-bignum-in-r9)
+                                    (#.r10-offset 'alloc-signed-bignum-in-r10)
+                                    (#.r12-offset 'alloc-signed-bignum-in-r12)
+                                    (#.r13-offset 'alloc-signed-bignum-in-r13)
+                                    (#.r14-offset 'alloc-signed-bignum-in-r14)
+                                    (#.r15-offset 'alloc-signed-bignum-in-r15))
+                                  :assembly-routine)))
+       (inst call temp-reg-tn)
+       (emit-label done))))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
-;;; Check for fixnum, and possibly allocate one or two word bignum
-;;; result. Use a worst-case cost to make sure people know they may be
-;;; number consing.
-
+;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
+;;; as the case may be. Fixnum case inline, bignum case in an assembly
+;;; routine.
 (define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :to :save))
-  (:temporary (:sc unsigned-reg) alloc)
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:node-var node)
+  (:args (x :scs (signed-reg unsigned-reg) :to :result))
+  (:results (y :scs (any-reg descriptor-reg) :from :argument))
   (:note "unsigned word to integer coercion")
+  ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
     (aver (not (location= x y)))
-    (aver (not (location= x alloc)))
-    (aver (not (location= y alloc)))
-    (let ((bignum (gen-label))
-          (done (gen-label))
-          (one-word-bignum (gen-label))
-          (L1 (gen-label)))
-      (inst bsr y x)                    ;find msb
-      (inst cmov :z y x)
-      (inst cmp y 60)
-      (inst jmp :ae bignum)
+    (let ((done (gen-label)))
+      (inst mov y #.(ash lowtag-mask (- n-word-bits n-fixnum-tag-bits 1)))
+      ;; The assembly routines test the sign flag from this one, so if
+      ;; you change stuff here, make sure the sign flag doesn't get
+      ;; overwritten before the CALL!
+      (inst test x y)
+      ;; Faster but bigger then SHL Y 4. The cost of doing this
+      ;; speculatively should be noise compared to bignum consing if
+      ;; that is needed and saves one branch.
       (inst lea y (make-ea :qword :index x :scale 8))
-      (emit-label done)
-      (assemble (*elsewhere*)
-         (emit-label bignum)
-         ;; Note: As on the mips port, space for a two word bignum is
-         ;; always allocated and the header size is set to either one
-         ;; or two words as appropriate.
-         (inst cmp y 63)
-         (inst jmp :l one-word-bignum)
-         ;; two word bignum
-         (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
-                                  n-widetag-bits)
-                             bignum-widetag))
-         (inst jmp L1)
-         (emit-label one-word-bignum)
-         (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
-                                  n-widetag-bits)
-                             bignum-widetag))
-         (emit-label L1)
-         (pseudo-atomic
-          (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)
-          (storew y alloc)
-          (inst lea y (make-ea :byte :base alloc :disp other-pointer-lowtag))
-          (storew x y bignum-digits-offset other-pointer-lowtag))
-         (inst jmp done)))))
+      (inst jmp :z done)
+      (inst mov y x)
+      (inst lea temp-reg-tn
+            (make-ea :qword :disp
+                     (make-fixup (ecase (tn-offset y)
+                                   (#.rax-offset 'alloc-unsigned-bignum-in-rax)
+                                   (#.rcx-offset 'alloc-unsigned-bignum-in-rcx)
+                                   (#.rdx-offset 'alloc-unsigned-bignum-in-rdx)
+                                   (#.rbx-offset 'alloc-unsigned-bignum-in-rbx)
+                                   (#.rsi-offset 'alloc-unsigned-bignum-in-rsi)
+                                   (#.rdi-offset 'alloc-unsigned-bignum-in-rdi)
+                                   (#.r8-offset  'alloc-unsigned-bignum-in-r8)
+                                   (#.r9-offset  'alloc-unsigned-bignum-in-r9)
+                                   (#.r10-offset 'alloc-unsigned-bignum-in-r10)
+                                   (#.r12-offset 'alloc-unsigned-bignum-in-r12)
+                                   (#.r13-offset 'alloc-unsigned-bignum-in-r13)
+                                   (#.r14-offset 'alloc-unsigned-bignum-in-r14)
+                                   (#.r15-offset 'alloc-unsigned-bignum-in-r15))
+                                 :assembly-routine)))
+      (inst call temp-reg-tn)
+      (emit-label done))))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
