@@ -122,9 +122,6 @@ GNAME(call_into_c):
 	fstp	%st(0)
 	fstp	%st(0)
 
-	cld                       # clear out DF: Darwin, Solaris and Win32 at
-	                          # least need this, and it should not hurt others
-
 	call	*%eax		  # normal callout using Lisp stack
 	movl	%eax,%ecx	  # remember integer return value
 
@@ -443,14 +440,12 @@ GNAME(do_pending_interrupt):
         andl    $0xfffffff0,%esp;  /* Align stack            */ \
         pushl   $0;                /* Padding                */ \
         pushl   size;              /* Argument to alloc      */ \
-        cld;                       /* Clear DF               */ \
         call    GNAME(alloc);                                   \
         movl    %ebp,%esp;         /* Restore ESP from EBP   */ \
         popl    %ebp;              /* Restore EBP            */
 #else
 #define ALLOC(size)                                             \
         pushl   size;              /* Argument to alloc      */ \
-        cld;                       /* Clear DF               */ \
         call    GNAME(alloc);                                   \
         addl    $4,%esp;           /* Pop argument           */
 #endif
@@ -872,7 +867,6 @@ GNAME(fast_bzero_base):
         xor %eax, %eax            /* Zero EAX */
         shr $2, %ecx              /* Amount of 4-byte blocks to copy */
         jz  Lend_base
-        cld                       /* Set direction of STOSL to increment */
 
         rep
         stosl                     /* Store EAX to *EDI, ECX times, incrementing

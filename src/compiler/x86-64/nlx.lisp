@@ -212,7 +212,7 @@
     (inst std)
     (inst rep)
     (inst movs :qword)
-
+    (inst cld)
     DONE
     ;; Reset the CSP at last moved arg.
     (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))))

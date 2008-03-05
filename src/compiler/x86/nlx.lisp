@@ -237,7 +237,7 @@
     (inst std)
     (inst rep)
     (inst movs :dword)
-
+    (inst cld)
     DONE
     ;; Reset the CSP at last moved arg.
     (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))))

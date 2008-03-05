@@ -105,9 +105,6 @@
 	.globl  GNAME(call_into_c)
 	TYPE(GNAME(call_into_c))
 GNAME(call_into_c):
-        /* ABI requires that the direction flag be clear on function
-         * entry and exit. */
-        cld
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 
@@ -241,10 +238,6 @@ LsingleValue:
 	pop	%r12
 	pop	%rbx
 
-        /* ABI requires that the direction flag be clear on function
-         * entry and exit. */
-        cld
-        
 /* FIXME Restore the NPX state. */
 
 	/* return value is already in rax where lisp expects it */

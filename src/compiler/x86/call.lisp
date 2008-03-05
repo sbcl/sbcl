@@ -364,7 +364,8 @@
       ;; Restore EDI, and reset the stack.
       (emit-label restore-edi)
       (loadw edi-tn ebx-tn (frame-word-offset 1))
-      (inst mov esp-tn ebx-tn))))
+      (inst mov esp-tn ebx-tn)
+      (inst cld))))
   (values))
 
 ;;;; unknown values receiving
@@ -1376,7 +1377,8 @@
        (inst sub ecx 1)
        (inst jmp :nz loop)
        ;; NIL out the last cons.
-       (storew nil-value dst 1 list-pointer-lowtag))
+       (storew nil-value dst 1 list-pointer-lowtag)
+       (inst cld))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by

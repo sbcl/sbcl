@@ -54,6 +54,7 @@
   (inst lea edi (make-ea :qword :base ebx :disp (- n-word-bytes)))
   (inst rep)
   (inst movs :qword)
+  (inst cld)
 
   ;; Restore the count.
   (inst mov ecx edx)
@@ -150,6 +151,7 @@
   (inst sub esi (fixnumize 1))
   (inst rep)
   (inst movs :qword)
+  (inst cld)
 
   ;; Load the register arguments carefully.
   (loadw edx rbp-tn -1)
@@ -169,10 +171,10 @@
   (inst push ebx)
 
   ;; And jump into the function.
-    (inst jmp
-          (make-ea :byte :base eax
-                   :disp (- (* closure-fun-slot n-word-bytes)
-                            fun-pointer-lowtag)))
+  (inst jmp
+        (make-ea :byte :base eax
+                 :disp (- (* closure-fun-slot n-word-bytes)
+                          fun-pointer-lowtag)))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS

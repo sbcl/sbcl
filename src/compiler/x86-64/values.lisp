@@ -38,6 +38,7 @@
     (inst movs :qword)
     (inst cmp rsp-tn rsi)
     (inst jmp :be LOOP)
+    (inst cld)
     DONE
     (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))
     (inst sub rdi rsi)

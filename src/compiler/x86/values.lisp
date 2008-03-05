@@ -38,6 +38,7 @@
     (inst movs :dword)
     (inst cmp esp-tn esi)
     (inst jmp :be loop)
+    (inst cld)
     DONE
     (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
     (inst sub edi esi)
