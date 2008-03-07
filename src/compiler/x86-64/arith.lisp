@@ -1,4 +1,4 @@
-;;;; the VM definition of arithmetic VOPs for the x86
+;;;; the VM definition of arithmetic VOPs for the x86-64
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -46,13 +46,13 @@
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
-  (:generator 2
+  (:generator 1
     (move res x)
     (inst xor res (fixnumize -1))))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (move res x)
     (inst not res)))
 
@@ -1263,8 +1263,8 @@
                    (svop61f (intern (format nil "FAST-~S-SMOD61/FIXNUM=>FIXNUM" name)))
                    (svop61cf (intern (format nil "FAST-~S-SMOD61-C/FIXNUM=>FIXNUM" name))))
                `(progn
-                  (define-modular-fun ,fun64 (x y) ,name :unsigned 64)
-                  (define-modular-fun ,sfun61 (x y) ,name :signed 61)
+                  (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
+                  (define-modular-fun ,sfun61 (x y) ,name :tagged t 61)
                   (define-mod-binop (,vop64u ,vopu) ,fun64)
                   (define-vop (,vop64f ,vopf) (:translate ,fun64))
                   (define-vop (,svop61f ,vopf) (:translate ,sfun61))
@@ -1307,19 +1307,19 @@
   (signed-byte 61)
   (foldable flushable movable))
 
-(define-modular-fun-optimizer %lea ((base index scale disp) :unsigned :width width)
+(define-modular-fun-optimizer %lea ((base index scale disp) :untagged nil :width width)
   (when (and (<= width 64)
              (constant-lvar-p scale)
              (constant-lvar-p disp))
-    (cut-to-width base :unsigned width)
-    (cut-to-width index :unsigned width)
+    (cut-to-width base :untagged width nil)
+    (cut-to-width index :untagged width nil)
     'sb!vm::%lea-mod64))
-(define-modular-fun-optimizer %lea ((base index scale disp) :signed :width width)
+(define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
   (when (and (<= width 61)
              (constant-lvar-p scale)
              (constant-lvar-p disp))
-    (cut-to-width base :signed width)
-    (cut-to-width index :signed width)
+    (cut-to-width base :tagged width t)
+    (cut-to-width index :tagged width t)
     'sb!vm::%lea-smod61))
 
 #+sb-xc-host
@@ -1353,7 +1353,7 @@
   (:translate %lea-smod61))
 
 ;;; logical operations
-(define-modular-fun lognot-mod64 (x) lognot :unsigned 64)
+(define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
 (define-vop (lognot-mod64/unsigned=>unsigned)
   (:translate lognot-mod64)
   (:args (x :scs (unsigned-reg unsigned-stack) :target r
@@ -1370,20 +1370,6 @@
   (:generator 1
     (move r x)
     (inst not r)))
-
-(define-modular-fun logxor-mod64 (x y) logxor :unsigned 64)
-(define-mod-binop (fast-logxor-mod64/word=>unsigned
-                   fast-logxor/unsigned=>unsigned)
-    logxor-mod64)
-(define-mod-binop-c (fast-logxor-mod64-c/word=>unsigned
-                     fast-logxor-c/unsigned=>unsigned)
-    logxor-mod64)
-(define-vop (fast-logxor-mod64/fixnum=>fixnum
-             fast-logxor/fixnum=>fixnum)
-  (:translate logxor-mod64))
-(define-vop (fast-logxor-mod64-c/fixnum=>fixnum
-             fast-logxor-c/fixnum=>fixnum)
-  (:translate logxor-mod64))
 
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))

@@ -5,6 +5,10 @@ changes in sbcl-1.0.16 relative to 1.0.15:
   * optimization: MEMBER and ASSOC are over 50% faster for :TEST #'EQ
     and cases where no :TEST is given but the compiler can infer that
     the element to search is of type (OR FIXNUM (NOT NUMBER)).
+  * optimization: better LOGNOT on fixnums.
+  * optimization: modular arithmetic for a particular requested width
+    is implemented using a tagged representation unless a better 
+    representation is available.
   * bug fix: periodic polling was broken. (thanks to Espen S Johnsen)
   * bug fix: copying output from RUN-PROGRAM to a stream signalled
     bogus errors if select() was interrupted.

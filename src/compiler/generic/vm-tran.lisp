@@ -616,40 +616,58 @@
 
 
 ;;;; modular functions
-(define-good-modular-fun logand :unsigned)
-(define-good-modular-fun logior :unsigned)
-;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
+;;;
+;;; FIXME: I think that the :GOODness of a modular function boils down
+;;; to whether the normal definition can be used in the middle of a
+;;; modular arrangement.  LOGAND and LOGIOR can be for all unsigned
+;;; modular implementations, I believe, because for all unsigned
+;;; arguments of a given size the result of the ordinary definition is
+;;; the right one.  This should follow through to other logical
+;;; functions, such as LOGXOR, should it not?  -- CSR, 2007-12-29,
+;;; trying to understand a comment he wrote over four years
+;;; previously: "FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16"
+(define-good-modular-fun logand :untagged nil)
+(define-good-modular-fun logior :untagged nil)
+(define-good-modular-fun logxor :untagged nil)
+(macrolet ((define-good-signed-modular-funs (&rest funs)
+             (let (result)
+               `(progn
+                 ,@(dolist (fun funs (nreverse result))
+                     (push `(define-good-modular-fun ,fun :untagged t) result)
+                     (push `(define-good-modular-fun ,fun :tagged t) result))))))
+  (define-good-signed-modular-funs
+      logand logandc1 logandc2 logeqv logior lognand lognor lognot
+      logorc1 logorc2 logxor))
 
 (macrolet
-    ((def (name class width)
-       (let ((type (ecase class
-                     (:unsigned 'unsigned-byte)
-                     (:signed 'signed-byte))))
+    ((def (name kind width signedp)
+       (let ((type (ecase signedp
+                     ((nil) 'unsigned-byte)
+                     (t 'signed-byte))))
          `(progn
             (defknown ,name (integer (integer 0)) (,type ,width)
                       (foldable flushable movable))
-            (define-modular-fun-optimizer ash ((integer count) ,class :width width)
+            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
               (when (and (<= width ,width)
                          (or (and (constant-lvar-p count)
                                   (plusp (lvar-value count)))
                              (csubtypep (lvar-type count)
                                         (specifier-type '(and unsigned-byte fixnum)))))
-                (cut-to-width integer ,class width)
+                (cut-to-width integer ,kind width ,signedp)
                 ',name))
-            (setf (gethash ',name (modular-class-versions (find-modular-class ',class)))
+            (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))))))
   ;; This should really be dependent on SB!VM:N-WORD-BITS, but since we
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
   #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
   (progn
-    #!+x86 (def sb!vm::ash-left-smod30 :signed 30)
-    (def sb!vm::ash-left-mod32 :unsigned 32))
+    #!+x86 (def sb!vm::ash-left-smod30 :tagged 30 t)
+    (def sb!vm::ash-left-mod32 :untagged 32 nil))
   #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))
   (progn
-    #!+x86-64 (def sb!vm::ash-left-smod61 :signed 61)
-    (def sb!vm::ash-left-mod64 :unsigned 64)))
-
+    #!+x86-64 (def sb!vm::ash-left-smod61 :tagged 61 t)
+    (def sb!vm::ash-left-mod64 :untagged 64 nil)))
 
 ;;;; word-wise logical operations
 

@@ -2816,19 +2816,20 @@
 ;;;
 ;;; and similar for other arguments.
 
-(defun make-modular-fun-type-deriver (prototype class width)
+(defun make-modular-fun-type-deriver (prototype kind width signedp)
+  (declare (ignore kind))
   #!-sb-fluid
   (binding* ((info (info :function :info prototype) :exit-if-null)
              (fun (fun-info-derive-type info) :exit-if-null)
              (mask-type (specifier-type
-                         (ecase class
-                             (:unsigned (let ((mask (1- (ash 1 width))))
-                                          `(integer ,mask ,mask)))
-                             (:signed `(signed-byte ,width))))))
+                         (ecase signedp
+                             ((nil) (let ((mask (1- (ash 1 width))))
+                                      `(integer ,mask ,mask)))
+                             (t `(signed-byte ,width))))))
     (lambda (call)
       (let ((res (funcall fun call)))
         (when res
-          (if (eq class :unsigned)
+          (if (eq signedp nil)
               (logand-derive-type-aux res mask-type))))))
   #!+sb-fluid
   (lambda (call)
@@ -2836,11 +2837,11 @@
                (fun (fun-info-derive-type info) :exit-if-null)
                (res (funcall fun call) :exit-if-null)
                (mask-type (specifier-type
-                           (ecase class
-                             (:unsigned (let ((mask (1- (ash 1 width))))
-                                          `(integer ,mask ,mask)))
-                             (:signed `(signed-byte ,width))))))
-      (if (eq class :unsigned)
+                           (ecase signedp
+                             ((nil) (let ((mask (1- (ash 1 width))))
+                                      `(integer ,mask ,mask)))
+                             (t `(signed-byte ,width))))))
+      (if (eq signedp nil)
           (logand-derive-type-aux res mask-type)))))
 
 ;;; Try to recursively cut all uses of LVAR to WIDTH bits.
@@ -2855,12 +2856,13 @@
 ;;; modular version, if it exists, or NIL. If we have changed
 ;;; anything, we need to flush old derived types, because they have
 ;;; nothing in common with the new code.
-(defun cut-to-width (lvar class width)
+(defun cut-to-width (lvar kind width signedp)
   (declare (type lvar lvar) (type (integer 0) width))
   (let ((type (specifier-type (if (zerop width)
                                   '(eql 0)
-                                  `(,(ecase class (:unsigned 'unsigned-byte)
-                                            (:signed 'signed-byte))
+                                  `(,(ecase signedp
+                                       ((nil) 'unsigned-byte)
+                                       (t 'signed-byte))
                                      ,width)))))
     (labels ((reoptimize-node (node name)
                (setf (node-derived-type node)
@@ -2876,7 +2878,7 @@
                           (eq (basic-combination-kind node) :known))
                  (let* ((fun-ref (lvar-use (combination-fun node)))
                         (fun-name (leaf-source-name (ref-leaf fun-ref)))
-                        (modular-fun (find-modular-version fun-name class width)))
+                        (modular-fun (find-modular-version fun-name kind signedp width)))
                    (when (and modular-fun
                               (not (and (eq fun-name 'logand)
                                         (csubtypep
@@ -2909,6 +2911,30 @@
                did-something))
       (cut-lvar lvar))))
 
+(defun best-modular-version (width signedp)
+  ;; 1. exact width-matched :untagged
+  ;; 2. >/>= width-matched :tagged
+  ;; 3. >/>= width-matched :untagged
+  (let* ((uuwidths (modular-class-widths *untagged-unsigned-modular-class*))
+         (uswidths (modular-class-widths *untagged-signed-modular-class*))
+         (uwidths (merge 'list uuwidths uswidths #'< :key #'car))
+         (twidths (modular-class-widths *tagged-modular-class*)))
+    (let ((exact (find (cons width signedp) uwidths :test #'equal)))
+      (when exact
+        (return-from best-modular-version (values width :untagged signedp))))
+    (flet ((inexact-match (w)
+             (cond
+               ((eq signedp (cdr w)) (<= width (car w)))
+               ((eq signedp nil) (< width (car w))))))
+      (let ((tgt (find-if #'inexact-match twidths)))
+        (when tgt
+          (return-from best-modular-version
+            (values (car tgt) :tagged (cdr tgt)))))
+      (let ((ugt (find-if #'inexact-match uwidths)))
+        (when ugt
+          (return-from best-modular-version
+            (values (car ugt) :untagged (cdr ugt))))))))
+
 (defoptimizer (logand optimizer) ((x y) node)
   (let ((result-type (single-value-type (node-derived-type node))))
     (when (numeric-type-p result-type)
@@ -2918,13 +2944,14 @@
                    (numberp high)
                    (>= low 0))
           (let ((width (integer-length high)))
-            (when (some (lambda (x) (<= width x))
-                        (modular-class-widths *unsigned-modular-class*))
-              ;; FIXME: This should be (CUT-TO-WIDTH NODE WIDTH).
-              (cut-to-width x :unsigned width)
-              (cut-to-width y :unsigned width)
-              nil ; After fixing above, replace with T.
-              )))))))
+            (multiple-value-bind (w kind signedp)
+                (best-modular-version width nil)
+              (when w
+                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH SIGNEDP).
+                (cut-to-width x kind width signedp)
+                (cut-to-width y kind width signedp)
+                nil ; After fixing above, replace with T.
+                ))))))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
   (let ((result-type (single-value-type (node-derived-type node))))
@@ -2933,12 +2960,13 @@
             (high (numeric-type-high result-type)))
         (when (and (numberp low) (numberp high))
           (let ((width (max (integer-length high) (integer-length low))))
-            (when (some (lambda (x) (<= width x))
-                        (modular-class-widths *signed-modular-class*))
-              ;; FIXME: This should be (CUT-TO-WIDTH NODE WIDTH).
-              (cut-to-width x :signed width)
-              nil ; After fixing above, replace with T.
-              )))))))
+            (multiple-value-bind (w kind)
+                (best-modular-version width t)
+              (when w
+                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH T).
+                (cut-to-width x kind width t)
+                nil ; After fixing above, replace with T.
+                ))))))))
 
 ;;; miscellanous numeric transforms
 
@@ -4134,4 +4162,3 @@
                (policy-quality-name-p (lvar-value quality-name)))
     (give-up-ir1-transform))
   '(%policy-quality policy quality-name))
-

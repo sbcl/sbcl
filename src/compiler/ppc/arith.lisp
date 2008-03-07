@@ -44,12 +44,12 @@
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
-  (:generator 2
-    (inst xori res x (fixnumize -1))))
+  (:generator 1
+    (inst subfic res x (fixnumize -1))))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (inst not res x)))
 
 ;;;; Binary fixnum operations.
@@ -714,7 +714,7 @@
 
 
 ;;;; Modular functions:
-(define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
+(define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg)))
@@ -745,7 +745,7 @@
              (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
              (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
          `(progn
-            (define-modular-fun ,mfun-name (x y) ,fun :unsigned 32)
+            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 32)
             (define-vop (,modvop ,vop)
               (:translate ,mfun-name))
             ,@(when constantp
@@ -754,7 +754,6 @@
   (define-modular-backend + t)
   (define-modular-backend - t)
   (define-modular-backend * t)
-  (define-modular-backend logxor t)
   (define-modular-backend logeqv)
   (define-modular-backend lognand)
   (define-modular-backend lognor)

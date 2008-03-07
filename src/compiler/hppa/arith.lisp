@@ -43,13 +43,13 @@
   (:temporary (:scs (any-reg) :type fixnum :to (:result 0))
               temp)
   (:translate lognot)
-  (:generator 2
+  (:generator 1
     (inst li (fixnumize -1) temp)
     (inst xor x temp res)))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (inst uaddcm zero-tn x res)))
 
 ;;;; Binary fixnum operations.

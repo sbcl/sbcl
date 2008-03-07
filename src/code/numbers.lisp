@@ -1425,30 +1425,18 @@ the first."
 ;;;; modular functions
 #.
 (collect ((forms))
-  (flet ((definition (name lambda-list width pattern)
-           `(defun ,name ,lambda-list
-              (flet ((prepare-argument (x)
-                       (declare (integer x))
-                       (etypecase x
-                         ((unsigned-byte ,width) x)
-                         (fixnum (logand x ,pattern))
-                         (bignum (logand x ,pattern)))))
-                (,name ,@(loop for arg in lambda-list
-                               collect `(prepare-argument ,arg)))))))
-    (loop for infos being each hash-value of (sb!c::modular-class-funs sb!c::*unsigned-modular-class*)
-          ;; FIXME: We need to process only "toplevel" functions
-          when (listp infos)
-          do (loop for info in infos
-                   for name = (sb!c::modular-fun-info-name info)
-                   and width = (sb!c::modular-fun-info-width info)
-                   and lambda-list = (sb!c::modular-fun-info-lambda-list info)
-                   for pattern = (1- (ash 1 width))
-                   do (forms (definition name lambda-list width pattern)))))
-  `(progn ,@(forms)))
-
-#.
-(collect ((forms))
-  (flet ((definition (name lambda-list width)
+  (flet ((unsigned-definition (name lambda-list width)
+           (let ((pattern (1- (ash 1 width))))
+             `(defun ,name ,lambda-list
+               (flet ((prepare-argument (x)
+                        (declare (integer x))
+                        (etypecase x
+                          ((unsigned-byte ,width) x)
+                          (fixnum (logand x ,pattern))
+                          (bignum (logand x ,pattern)))))
+                 (,name ,@(loop for arg in lambda-list
+                                collect `(prepare-argument ,arg)))))))
+         (signed-definition (name lambda-list width)
            `(defun ,name ,lambda-list
               (flet ((prepare-argument (x)
                        (declare (integer x))
@@ -1458,14 +1446,22 @@ the first."
                          (bignum (sb!c::mask-signed-field ,width x)))))
                 (,name ,@(loop for arg in lambda-list
                                collect `(prepare-argument ,arg)))))))
-    (loop for infos being each hash-value of (sb!c::modular-class-funs sb!c::*signed-modular-class*)
-          ;; FIXME: We need to process only "toplevel" functions
-          when (listp infos)
-          do (loop for info in infos
-                   for name = (sb!c::modular-fun-info-name info)
-                   and width = (sb!c::modular-fun-info-width info)
-                   and lambda-list = (sb!c::modular-fun-info-lambda-list info)
-                   do (forms (definition name lambda-list width)))))
+    (flet ((do-mfuns (class)
+             (loop for infos being each hash-value of (sb!c::modular-class-funs class)
+                   ;; FIXME: We need to process only "toplevel" functions
+                   when (listp infos)
+                   do (loop for info in infos
+                            for name = (sb!c::modular-fun-info-name info)
+                            and width = (sb!c::modular-fun-info-width info)
+                            and signedp = (sb!c::modular-fun-info-signedp info)
+                            and lambda-list = (sb!c::modular-fun-info-lambda-list info)
+                            if signedp
+                            do (forms (signed-definition name lambda-list width))
+                            else
+                            do (forms (unsigned-definition name lambda-list width))))))
+      (do-mfuns sb!c::*untagged-unsigned-modular-class*)
+      (do-mfuns sb!c::*untagged-signed-modular-class*)
+      (do-mfuns sb!c::*tagged-modular-class*)))
   `(progn ,@(forms)))
 
 ;;; KLUDGE: these out-of-line definitions can't use the modular

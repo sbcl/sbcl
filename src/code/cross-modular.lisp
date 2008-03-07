@@ -22,30 +22,27 @@
 
 #.
 (collect ((forms))
-  (flet ((definition (name lambda-list prototype width)
+  (flet ((unsigned-definition (name lambda-list prototype width)
            `(defun ,name ,lambda-list
-              (ldb (byte ,width 0) (,prototype ,@lambda-list)))))
-    (loop for infos being each hash-value of (modular-class-funs *unsigned-modular-class*) using (hash-key prototype)
-          when (listp infos)
-          do (loop for info in infos
-                   for name = (modular-fun-info-name info)
-                   and width = (modular-fun-info-width info)
-                   and lambda-list = (modular-fun-info-lambda-list info)
-                   do (forms (definition name lambda-list prototype width)))))
-  `(progn ,@(forms)))
-
-#.
-(collect ((forms))
-  (flet ((definition (name lambda-list prototype width)
+              (ldb (byte ,width 0) (,prototype ,@lambda-list))))
+         (signed-definition (name lambda-list prototype width)
            `(defun ,name ,lambda-list
               (mask-signed-field ,width (,prototype ,@lambda-list)))))
-    (loop for infos being each hash-value of (modular-class-funs *signed-modular-class*) using (hash-key prototype)
-          when (listp infos)
-          do (loop for info in infos
-                   for name = (modular-fun-info-name info)
-                   and width = (modular-fun-info-width info)
-                   and lambda-list = (modular-fun-info-lambda-list info)
-                   do (forms (definition name lambda-list prototype width)))))
+    (flet ((do-mfuns (class)
+             (loop for infos being each hash-value of (modular-class-funs class) using (hash-key prototype)
+                   when (listp infos)
+                   do (loop for info in infos
+                            for name = (modular-fun-info-name info)
+                            and width = (modular-fun-info-width info)
+                            and signedp = (modular-fun-info-signedp info)
+                            and lambda-list = (modular-fun-info-lambda-list info)
+                            if signedp
+                            do (forms (signed-definition name lambda-list prototype width))
+                            else
+                            do (forms (unsigned-definition name lambda-list prototype width))))))
+      (do-mfuns *untagged-unsigned-modular-class*)
+      (do-mfuns *untagged-signed-modular-class*)
+      (do-mfuns *tagged-modular-class*)))
   `(progn ,@(forms)))
 
 #!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 32) '(and) '(or))

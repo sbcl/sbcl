@@ -46,13 +46,13 @@
   (:temporary (:scs (any-reg) :type fixnum :to (:result 0))
               temp)
   (:translate lognot)
-  (:generator 2
+  (:generator 1
     (inst li temp (fixnumize -1))
     (inst xor res x temp)))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (inst nor res x zero-tn)))
 
 ;;;; Binary fixnum operations.
@@ -668,12 +668,12 @@
        (inst sll r num amount)))))
 
 ;;;; Modular arithmetic
-(define-modular-fun +-mod32 (x y) + :unsigned 32)
+(define-modular-fun +-mod32 (x y) + :untagged nil 32)
 (define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
   (:translate +-mod32))
 (define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
   (:translate +-mod32))
-(define-modular-fun --mod32 (x y) - :unsigned 32)
+(define-modular-fun --mod32 (x y) - :untagged nil 32)
 (define-vop (fast---mod32/unsigned=>unsigned fast--/unsigned=>unsigned)
   (:translate --mod32))
 (define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
@@ -692,7 +692,7 @@
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
 ;;; logical operations
-(define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
+(define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg)))
@@ -703,15 +703,7 @@
   (:generator 1
     (inst nor r x zero-tn)))
 
-(define-modular-fun logxor-mod32 (x y) logxor :unsigned 32)
-(define-vop (fast-logxor-mod32/unsigned=>unsigned
-             fast-logxor/unsigned=>unsigned)
-  (:translate logxor-mod32))
-(define-vop (fast-logxor-mod32-c/unsigned=>unsigned
-             fast-logxor-c/unsigned=>unsigned)
-  (:translate logxor-mod32))
-
-(define-modular-fun lognor-mod32 (x y) lognor :unsigned 32)
+(define-modular-fun lognor-mod32 (x y) lognor :untagged nil 32)
 (define-vop (fast-lognor-mod32/unsigned=>unsigned
              fast-lognor/unsigned=>unsigned)
   (:translate lognor-mod32))

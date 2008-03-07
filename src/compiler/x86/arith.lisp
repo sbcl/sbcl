@@ -46,13 +46,13 @@
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
-  (:generator 2
+  (:generator 1
     (move res x)
     (inst xor res (fixnumize -1))))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (move res x)
     (inst not res)))
 
@@ -1320,8 +1320,8 @@
                    (svop30f (intern (format nil "FAST-~S-SMOD30/FIXNUM=>FIXNUM" name)))
                    (svop30cf (intern (format nil "FAST-~S-SMOD30-C/FIXNUM=>FIXNUM" name))))
                `(progn
-                  (define-modular-fun ,fun32 (x y) ,name :unsigned 32)
-                  (define-modular-fun ,sfun30 (x y) ,name :signed 30)
+                  (define-modular-fun ,fun32 (x y) ,name :untagged nil 32)
+                  (define-modular-fun ,sfun30 (x y) ,name :tagged t 30)
                   (define-mod-binop (,vop32u ,vopu) ,fun32)
                   (define-vop (,vop32f ,vopf) (:translate ,fun32))
                   (define-vop (,svop30f ,vopf) (:translate ,sfun30))
@@ -1367,19 +1367,19 @@
   (signed-byte 30)
   (foldable flushable movable))
 
-(define-modular-fun-optimizer %lea ((base index scale disp) :unsigned :width width)
+(define-modular-fun-optimizer %lea ((base index scale disp) :untagged nil :width width)
   (when (and (<= width 32)
              (constant-lvar-p scale)
              (constant-lvar-p disp))
-    (cut-to-width base :unsigned width)
-    (cut-to-width index :unsigned width)
+    (cut-to-width base :untagged width nil)
+    (cut-to-width index :untagged width nil)
     'sb!vm::%lea-mod32))
-(define-modular-fun-optimizer %lea ((base index scale disp) :signed :width width)
+(define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
   (when (and (<= width 30)
              (constant-lvar-p scale)
              (constant-lvar-p disp))
-    (cut-to-width base :signed width)
-    (cut-to-width index :signed width)
+    (cut-to-width base :tagged width t)
+    (cut-to-width index :tagged width t)
     'sb!vm::%lea-smod30))
 
 #+sb-xc-host
@@ -1413,7 +1413,7 @@
   (:translate %lea-smod30))
 
 ;;; logical operations
-(define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
+(define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
 (define-vop (lognot-mod32/word=>unsigned)
   (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :target r
@@ -1435,20 +1435,6 @@
   (:generator 1
     (move r x)
     (inst not r)))
-
-(define-modular-fun logxor-mod32 (x y) logxor :unsigned 32)
-(define-mod-binop (fast-logxor-mod32/word=>unsigned
-                   fast-logxor/unsigned=>unsigned)
-    logxor-mod32)
-(define-mod-binop-c (fast-logxor-mod32-c/word=>unsigned
-                     fast-logxor-c/unsigned=>unsigned)
-    logxor-mod32)
-(define-vop (fast-logxor-mod32/fixnum=>fixnum
-             fast-logxor/fixnum=>fixnum)
-  (:translate logxor-mod32))
-(define-vop (fast-logxor-mod32-c/fixnum=>fixnum
-             fast-logxor-c/fixnum=>fixnum)
-  (:translate logxor-mod32))
 
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
