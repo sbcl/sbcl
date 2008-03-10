@@ -327,46 +327,37 @@
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
-  (:temporary (:sc descriptor-reg :offset rax-offset) rax)
   (:temporary (:sc unsigned-reg) tls-index bsp)
   (:generator 10
-    (let ((tls-index-valid (gen-label))
-          (get-tls-index-lock (gen-label))
-          (release-tls-index-lock (gen-label)))
+    (let ((tls-index-valid (gen-label)))
       (load-binding-stack-pointer bsp)
       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst add bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp)
       (inst or tls-index tls-index)
       (inst jmp :ne tls-index-valid)
-
-      ;; FIXME:
-      ;; * We should ensure the existence of TLS index for LET-bound specials
-      ;;   at compile/load time, and use write a FAST-BIND for use with those.
-      ;; * PROGV will need to do this, but even there this should not be inline.
-      ;;   This is probably best moved to C, since dynbind.c also needs to do this.
-      (pseudo-atomic
-       (emit-label get-tls-index-lock)
-       (inst mov tls-index 1)
-       (zeroize rax)
-       (inst lock)
-       (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) tls-index)
-       (inst jmp :ne get-tls-index-lock)
-       ;; now with the lock held, see if the symbol's tls index has
-       ;; been set in the meantime
-       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-       (inst or tls-index tls-index)
-       (inst jmp :ne release-tls-index-lock)
-       ;; allocate a new tls-index
-       (load-symbol-value tls-index *free-tls-index*)
-       (inst add (make-ea-for-symbol-value *free-tls-index*) 8) ; fixnum + 1
-       (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-       (emit-label release-tls-index-lock)
-       (store-symbol-value 0 *tls-index-lock*))
-
+      (inst mov tls-index symbol)
+      (inst lea temp-reg-tn
+            (make-ea :qword :disp
+                     (make-fixup (ecase (tn-offset tls-index)
+                                   (#.rax-offset 'alloc-tls-index-in-rax)
+                                   (#.rcx-offset 'alloc-tls-index-in-rcx)
+                                   (#.rdx-offset 'alloc-tls-index-in-rdx)
+                                   (#.rbx-offset 'alloc-tls-index-in-rbx)
+                                   (#.rsi-offset 'alloc-tls-index-in-rsi)
+                                   (#.rdi-offset 'alloc-tls-index-in-rdi)
+                                   (#.r8-offset  'alloc-tls-index-in-r8)
+                                   (#.r9-offset  'alloc-tls-index-in-r9)
+                                   (#.r10-offset 'alloc-tls-index-in-r10)
+                                   (#.r12-offset 'alloc-tls-index-in-r12)
+                                   (#.r13-offset 'alloc-tls-index-in-r13)
+                                   (#.r14-offset 'alloc-tls-index-in-r14)
+                                   (#.r15-offset 'alloc-tls-index-in-r15))
+                                 :assembly-routine)))
+      (inst call temp-reg-tn)
       (emit-label tls-index-valid)
-      (inst mov rax (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
-      (storew rax bsp (- binding-value-slot binding-size))
+      (inst push (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
+      (popw bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
       (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
             val))))
@@ -385,20 +376,19 @@
     (storew symbol bsp (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
-
 #!+sb-thread
 (define-vop (unbind)
-    ;; four temporaries?
-  (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
+  (:temporary (:sc unsigned-reg) temp bsp tls-index)
   (:generator 0
     (load-binding-stack-pointer bsp)
-    (loadw symbol bsp (- binding-symbol-slot binding-size))
-    (loadw value bsp (- binding-value-slot binding-size))
-
-    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    ;; Load SYMBOL from stack, and get the TLS-INDEX
+    (loadw temp bsp (- binding-symbol-slot binding-size))
+    (loadw tls-index temp symbol-tls-index-slot other-pointer-lowtag)
+    ;; Load VALUE from stack, the restore it to the TLS area.
+    (loadw temp bsp (- binding-value-slot binding-size))
     (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
-          value)
-
+          temp)
+    ;; Zero out the stack.
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
@@ -416,7 +406,6 @@
     (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)))
-
 
 (define-vop (unbind-to-here)
   (:args (where :scs (descriptor-reg any-reg)))

@@ -70,3 +70,58 @@
   (def r13)
   (def r14)
   (def r15))
+
+#+sb-assembling
+(macrolet ((def (reg)
+             (declare (ignorable reg))
+             #!+sb-thread
+             (let* ((name (intern (format nil "ALLOC-TLS-INDEX-IN-~A" reg)))
+                    (target-offset (intern (format nil "~A-OFFSET" reg)))
+                    (other-offset (if (eql 'rax reg)
+                                      'rcx-offset
+                                      'rax-offset)))
+               ;; Symbol starts in TARGET, where the TLS-INDEX ends up in.
+               `(define-assembly-routine ,name
+                    ((:temp other descriptor-reg ,other-offset)
+                     (:temp target descriptor-reg ,target-offset))
+                  (let ((get-tls-index-lock (gen-label))
+                        (release-tls-index-lock (gen-label)))
+                    (pseudo-atomic
+                     ;; Save OTHER & push the symbol. RAX is either one of the two.
+                     (inst push other)
+                     (inst push target)
+                     (emit-label get-tls-index-lock)
+                     (inst mov target 1)
+                     (zeroize rax-tn)
+                     (inst lock)
+                     (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) target)
+                     (inst jmp :ne get-tls-index-lock)
+                     ;; The symbol is now in OTHER.
+                     (inst pop other)
+                     ;; Now with the lock held, see if the symbol's tls index has been
+                     ;; set in the meantime.
+                     (loadw target other symbol-tls-index-slot other-pointer-lowtag)
+                     (inst or target target)
+                     (inst jmp :ne release-tls-index-lock)
+                     ;; Allocate a new tls-index.
+                     (load-symbol-value target *free-tls-index*)
+                     (inst add (make-ea-for-symbol-value *free-tls-index*) (fixnumize 1))
+                     (storew target other symbol-tls-index-slot other-pointer-lowtag)
+                     (emit-label release-tls-index-lock)
+                     (store-symbol-value 0 *tls-index-lock*)
+                     ;; Restore OTHER.
+                     (inst pop other))
+                    (inst ret))))))
+  (def rax)
+  (def rcx)
+  (def rdx)
+  (def rbx)
+  (def rsi)
+  (def rdi)
+  (def r8)
+  (def r9)
+  (def r10)
+  (def r12)
+  (def r13)
+  (def r14)
+  (def r15))

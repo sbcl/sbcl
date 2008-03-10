@@ -83,7 +83,7 @@
 (macrolet ((def (reg)
              (declare (ignorable reg))
              #!+sb-thread
-             (let* ((name (intern (format nil "ALLOCATE-TLS-INDEX-IN-~A" reg)))
+             (let* ((name (intern (format nil "ALLOC-TLS-INDEX-IN-~A" reg)))
                     (target-offset (intern (format nil "~A-OFFSET" reg)))
                     (other-offset (if (eql 'eax reg)
                                       'ecx-offset
@@ -113,7 +113,7 @@
                      (inst jmp :ne release-tls-index-lock)
                      ;; Allocate a new tls-index.
                      (load-symbol-value target *free-tls-index*)
-                     (inst add (make-ea-for-symbol-value *free-tls-index*) 4) ; fixnum + 1
+                     (inst add (make-ea-for-symbol-value *free-tls-index*) (fixnumize 1))
                      (storew target other symbol-tls-index-slot other-pointer-lowtag)
                      (emit-label release-tls-index-lock)
                      (store-symbol-value 0 *tls-index-lock*)
