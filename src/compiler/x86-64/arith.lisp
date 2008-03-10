@@ -919,7 +919,9 @@
   (:result-types unsigned-num)
   (:generator 28
     (move res arg)
-    (inst cmp res 0)
+    (if (sc-is res unsigned-reg)
+        (inst test res res)
+        (inst cmp res 0))
     (inst jmp :ge POS)
     (inst not res)
     POS
