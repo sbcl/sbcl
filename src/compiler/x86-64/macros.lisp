@@ -213,16 +213,6 @@
              (inst jmp DONE))
            (values)))))
 
-#+nil
-(defun allocation (alloc-tn size &optional ignored)
-  (declare (ignore ignored))
-  (inst push size)
-  (inst lea temp-reg-tn (make-ea :qword
-                            :disp (make-fixup "alloc_tramp" :foreign)))
-  (inst call temp-reg-tn)
-  (inst pop alloc-tn)
-  (values))
-
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
