@@ -60,7 +60,8 @@ in future versions."
 (defvar *all-threads-lock* (make-mutex :name "all threads lock"))
 
 (defmacro with-all-threads-lock (&body body)
-  `(call-with-system-mutex (lambda () ,@body) *all-threads-lock*))
+  `(with-system-mutex (*all-threads-lock*)
+     ,@body))
 
 (defun list-all-threads ()
   #!+sb-doc
@@ -500,11 +501,21 @@ on this semaphore, then N of them is woken up."
 
 (defvar *session* nil)
 
-;;; the debugger itself tries to acquire the session lock, don't let
+;;; The debugger itself tries to acquire the session lock, don't let
 ;;; funny situations (like getting a sigint while holding the session
-;;; lock) occur
+;;; lock) occur. At the same time we need to allow interrupts while
+;;; *waiting* for the session lock for things like GET-FOREGROUND
+;;; to be interruptible.
+;;;
+;;; Take care: we sometimes need to obtain the session lock while holding
+;;; on to *ALL-THREADS-LOCK*, so we must _never_ obtain it _after_ getting
+;;; a session lock! (Deadlock risk.)
+;;;
+;;; FIXME: It would be good to have ordered locks to ensure invariants like
+;;; the above.
 (defmacro with-session-lock ((session) &body body)
-  `(call-with-system-mutex (lambda () ,@body) (session-lock ,session)))
+  `(with-system-mutex ((session-lock ,session) :allow-with-interrupts t)
+     ,@body))
 
 (defun new-session ()
   (make-session :threads (list *current-thread*)
@@ -778,7 +789,8 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
       "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
-  `(call-with-system-mutex (lambda () ,@body) (thread-interruptions-lock ,thread)))
+  `(with-system-mutex ((thread-interruptions-lock ,thread))
+     ,@body))
 
 ;; Called from the signal handler in C.
 (defun run-interruption ()

@@ -200,8 +200,9 @@ from now. For timers with a repeat interval it returns true."
 (defvar *scheduler-lock* (sb!thread:make-mutex :name "Scheduler lock"))
 
 (defmacro with-scheduler-lock ((&optional) &body body)
-  ;; don't let the SIGALRM handler mess things up
-  `(sb!thread::call-with-system-mutex (lambda () ,@body) *scheduler-lock*))
+  ;; Don't let the SIGALRM handler mess things up.
+  `(sb!thread::with-system-mutex (*scheduler-lock*)
+     ,@body))
 
 (defun under-scheduler-lock-p ()
   #!-sb-thread
@@ -292,10 +293,13 @@ triggers."
 ;;; Not public, but related
 
 (defun reschedule-timer (timer)
-  (with-scheduler-lock ()
-    (setf (%timer-expire-time timer) (+ (get-internal-real-time)
-                                        (%timer-repeat-interval timer)))
-    (%schedule-timer timer)))
+  (let ((thread (%timer-thread timer)))
+    (if (and (sb!thread::thread-p thread) (not (sb!thread:thread-alive-p thread)))
+        (unschedule-timer timer)
+        (with-scheduler-lock ()
+          (setf (%timer-expire-time timer) (+ (get-internal-real-time)
+                                              (%timer-repeat-interval timer)))
+          (%schedule-timer timer)))))
 
 ;;; Expiring timers
 

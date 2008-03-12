@@ -70,8 +70,8 @@
   ;;
   ;; ...again, once we have smarted locks the spinlock here can become
   ;; a mutex.
-  `(sb!thread::call-with-system-spinlock (lambda () ,@body)
-                                         *available-buffers-spinlock*))
+  `(sb!thread::with-system-spinlock (*available-buffers-spinlock*)
+     ,@body))
 
 (defconstant +bytes-per-buffer+ (* 4 1024)
   #!+sb-doc

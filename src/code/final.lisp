@@ -17,9 +17,8 @@
   (sb!thread:make-mutex :name "Finalizer store lock."))
 
 (defmacro with-finalizer-store-lock (&body body)
-  `(sb!thread::call-with-system-mutex (lambda () ,@body)
-                                      *finalizer-store-lock*
-                                      t))
+  `(sb!thread::with-system-mutex (*finalizer-store-lock* :without-gcing t)
+     ,@body))
 
 (defun finalize (object function &key dont-save)
   #!+sb-doc
