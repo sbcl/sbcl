@@ -29,4 +29,4 @@ test: all
 
 
 install: $(EXTRA_INSTALL_TARGETS)
-	tar cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar xpvf - )
+	tar --exclude=CVS -cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar --no-same-owner -xpvf - )
