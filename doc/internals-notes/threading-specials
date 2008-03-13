@@ -109,6 +109,9 @@ but sometimes it can be hard to tell...
 The most suspicious parts should probably be tested by asserting
 at various sites that the *PCL-LOCK* is held.
 
+accesses locked with a nice granularity
+   SB-PCL::*FIND-CLASS*
+
 read-only & safe:
    SB-PCL::*BUILT-IN-TYPEP-COST* 
    SB-PCL::*CACHE-EXPAND-THRESHOLD* 
@@ -188,7 +191,6 @@ SB-PCL::*EMIT-FUNCTION-P*
 SB-PCL::*ENABLE-DFUN-CONSTRUCTOR-CACHING* 
 SB-PCL::*ENABLE-EMF-CALL-TRACING-P* 
 SB-PCL::*EQL-SPECIALIZER-TABLE* 
-SB-PCL::*FIND-CLASS* 
 SB-PCL::*GLOBAL-EFFECTIVE-METHOD-GENSYMS* 
 SB-PCL::*IN-GF-ARG-INFO-P* 
 SB-PCL::*IN-PRECOMPUTE-EFFECTIVE-METHODS-P* 

@@ -92,11 +92,13 @@
   '(list* nil #'constantly-nil nil))
 
 (defun find-class-cell (symbol &optional dont-create-p)
-  (or (gethash symbol *find-class*)
-      (unless dont-create-p
-        (unless (legal-class-name-p symbol)
-          (error "~S is not a legal class name." symbol))
-        (setf (gethash symbol *find-class*) (make-find-class-cell symbol)))))
+  (let ((table *find-class*))
+    (with-locked-hash-table (table)
+      (or (gethash symbol table)
+          (unless dont-create-p
+            (unless (legal-class-name-p symbol)
+              (error "~S is not a legal class name." symbol))
+            (setf (gethash symbol table) (make-find-class-cell symbol)))))))
 
 (/show "pcl/macros.lisp 157")
 

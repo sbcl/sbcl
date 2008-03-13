@@ -54,8 +54,7 @@
 ;;; GET-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
 
 #+sb-thread
-(with-test (:name without-interrupts+get-mutex
-            :fails-on :sb-lutex)
+(with-test (:name without-interrupts+get-mutex)
   (let* ((lock (make-mutex))
          (foo (get-mutex lock))
          (bar nil)
@@ -73,3 +72,16 @@
     (assert (not (thread-alive-p thread)))
     (assert (eq :aborted (join-thread thread :default :aborted)))
     (assert bar)))
+
+#+sb-thread
+(with-test (:name parallel-find-class)
+  (let* ((oops nil)
+         (threads (loop repeat 10
+                        collect (make-thread (lambda ()
+                                               (handler-case
+                                                   (loop repeat 10000
+                                                         do (find-class (gensym) nil))
+                                                 (serious-condition ()
+                                                   (setf oops t))))))))
+    (mapcar #'sb-thread:join-thread threads)
+    (assert (not oops))))

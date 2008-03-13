@@ -15,6 +15,7 @@ changes in sbcl-1.0.16 relative to 1.0.15:
   * optimization: modular arithmetic for a particular requested width
     is implemented using a tagged representation unless a better 
     representation is available.
+  * bug fix: FIND-CLASS was not thread-safe. (reported by Attila Lendvai)
   * bug fix: ~R was broken for vigtillions. (thanks to Luis Oliveira)
   * bug fix: attempt to obtain *SCHEDULER-LOCK* recursively when
     unscheduling timer at the same time as another timer fires.
