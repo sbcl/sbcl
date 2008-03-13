@@ -151,7 +151,7 @@
 ;;; FIXME: Since timeouts do not work on Windows this would loop
 ;;; forever.
 #-win32
-(with-test (:name '(:hash-cache :interrupt))
+(with-test (:name (:hash-cache :interrupt))
   (let* ((type1 (random-type 500))
          (type2 (random-type 500))
          (wanted (subtypep type1 type2)))
@@ -164,3 +164,69 @@
                                0.05)
         (loop
            (assert (eq wanted (subtypep type1 type2))))))))
+
+#+sb-thread
+(with-test (:name (:timer :parallel-unschedule))
+  (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
+        (other nil))
+    (flet ((flop ()
+             (sleep (random 0.01))
+             (loop repeat 10000
+                   do (sb-ext:unschedule-timer timer))))
+      (loop repeat 5
+            do (mapcar #'sb-thread:join-thread
+                       (loop for i from 1 upto 10
+                             collect (let* ((thread (sb-thread:make-thread #'flop
+                                                                           :name (format nil "scheduler ~A" i)))
+                                            (ticker (sb-ext:make-timer (lambda () 13) :thread (or other thread)
+                                                                       :name (format nil "ticker ~A" i))))
+                                       (setf other thread)
+                                       (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
+                                       thread)))))))
+
+;;;; OS X doesn't like these being at all, and gives us a SIGSEGV
+;;;; instead of using the Mach expection system! Our or OS X's fault?
+;;;; :/
+
+(with-test (:name (:timer :schedule-stress))
+  (flet ((test ()
+           (let* ((slow-timers (loop for i from 1 upto 100
+                                     collect (sb-ext:make-timer (lambda () 13) :name (format nil "slow ~A" i))))
+                  (fast-timer (sb-ext:make-timer (lambda () 42) :name "fast")))
+             (sb-ext:schedule-timer fast-timer 0.0001 :repeat-interval 0.0001)
+             (dolist (timer slow-timers)
+               (sb-ext:schedule-timer timer (random 0.1) :repeat-interval (random 0.1)))
+             (dolist (timer slow-timers)
+               (sb-ext:unschedule-timer timer))
+             (sb-ext:unschedule-timer fast-timer))))
+    #+sb-thread
+    (mapcar #'sb-thread:join-thread (loop repeat 10 collect (sb-thread:make-thread #'test)))
+    #-sb-thread
+    (loop repeat 10 do (test))))
+
+#+sb-thread
+(with-test (:name (:timer :threaded-stress))
+  (let ((barrier (sb-thread:make-semaphore))
+        (goal 100))
+    (flet ((wait-for-goal ()
+             (let ((*n* 0))
+               (declare (special *n*))
+               (sb-thread:signal-semaphore barrier)
+               (loop until (eql *n* goal))))
+           (one ()
+             (declare (special *n*))
+             (incf *n*)))
+      (let ((threads (list (sb-thread:make-thread #'wait-for-goal)
+                           (sb-thread:make-thread #'wait-for-goal)
+                           (sb-thread:make-thread #'wait-for-goal))))
+        (sb-thread:wait-on-semaphore barrier)
+        (sb-thread:wait-on-semaphore barrier)
+        (sb-thread:wait-on-semaphore barrier)
+        (flet ((sched (thread)
+                 (sb-thread:make-thread (lambda ()
+                                          (loop repeat goal
+                                                do (sb-ext:schedule-timer (make-timer #'one :thread thread) 0.001))))))
+          (dolist (thread threads)
+            (sched thread)))
+        (with-timeout (truncate goal 100)
+          (mapcar #'sb-thread:join-thread threads))))))

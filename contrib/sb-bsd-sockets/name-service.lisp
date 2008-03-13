@@ -170,7 +170,7 @@ GET-NAME-SERVICE-ERRNO")
   (let ((condition (condition-for-name-service-error-code error-code)))
     (error condition :error-code error-code :syscall where)))
 
-(define-condition name-service-error (condition)
+(define-condition name-service-error (error)
   ((errno :initform nil :initarg :errno :reader name-service-error-errno)
    (error-code :initform nil :initarg :error-code
                :reader name-service-error-error-code)

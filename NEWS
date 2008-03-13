@@ -2,6 +2,8 @@
 changes in sbcl-1.0.16 relative to 1.0.15:
   * minor incompatible change: change PROBE-FILE back to returning
     NIL whenever we can't get a truename, as was the case before 1.0.14.
+  * minor incompatible change: SB-BSD-SOCKETS:NAME-SERVICE-ERROR now
+    inherits from ERROR instead of just CONDITION.
   * optimization: binding special variables now generates smaller code
     on threaded platforms.
   * optimization: MEMBER and ASSOC are over 50% faster for :TEST #'EQ
@@ -11,6 +13,9 @@ changes in sbcl-1.0.16 relative to 1.0.15:
   * optimization: modular arithmetic for a particular requested width
     is implemented using a tagged representation unless a better 
     representation is available.
+  * bug fix: attempt to obtain *SCHEDULER-LOCK* recursively when
+    unscheduling timer at the same time as another timer fires.
+  * bug fix: don't reschedule timers for dead threads.
   * bug fix: periodic polling was broken. (thanks to Espen S Johnsen)
   * bug fix: copying output from RUN-PROGRAM to a stream signalled
     bogus errors if select() was interrupted.
