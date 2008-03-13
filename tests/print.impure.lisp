@@ -427,4 +427,10 @@
     (assert (equal x x2))
     (assert (eq h2 (gethash x2 h2)))))
 
+;;; an off-by-one error in the ~R format directive until 1.0.15.20
+;;; prevented printing cardinals and ordinals between (expt 10 63) and
+;;; (1- (expt 10 66))
+(assert (string= (format nil "~R" (expt 10 63)) "one vigintillion"))
+(assert (string= (format nil "~:R" (expt 10 63)) "one vigintillionth"))
+
 ;;; success

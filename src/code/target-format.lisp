@@ -377,7 +377,7 @@
 
 (defun format-print-cardinal-aux (stream n period err)
   (multiple-value-bind (beyond here) (truncate n 1000)
-    (unless (<= period 20)
+    (unless (<= period 21)
       (error "number too large to print in English: ~:D" err))
     (unless (zerop beyond)
       (format-print-cardinal-aux stream beyond (1+ period) err))
