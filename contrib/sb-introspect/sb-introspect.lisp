@@ -340,8 +340,10 @@ If an unsupported TYPE is requested, the function will return NIL.
              (struct-predicate-structure-class object)))
            (t
             (find-function-definition-source object))))
+    ((or condition standard-object structure-object)
+     (find-definition-source (class-of object)))
     (t
-     (error "Don't know how to retrive source location for a ~S~%"
+     (error "Don't know how to retrieve source location for a ~S~%"
             (type-of object)))))
 
 (defun find-function-definition-source (function)
