@@ -1304,30 +1304,30 @@ the first."
 
 ;;;; GCD and LCM
 
-(defun gcd (&rest numbers)
+(defun gcd (&rest integers)
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
-  (cond ((null numbers) 0)
-        ((null (cdr numbers)) (abs (the integer (car numbers))))
+  (cond ((null integers) 0)
+        ((null (cdr integers)) (abs (the integer (car integers))))
         (t
-         (do ((gcd (the integer (car numbers))
+         (do ((gcd (the integer (car integers))
                    (gcd gcd (the integer (car rest))))
-              (rest (cdr numbers) (cdr rest)))
+              (rest (cdr integers) (cdr rest)))
              ((null rest) gcd)
            (declare (integer gcd)
                     (list rest))))))
 
-(defun lcm (&rest numbers)
+(defun lcm (&rest integers)
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
-  (cond ((null numbers) 1)
-        ((null (cdr numbers)) (abs (the integer (car numbers))))
+  (cond ((null integers) 1)
+        ((null (cdr integers)) (abs (the integer (car integers))))
         (t
-         (do ((lcm (the integer (car numbers))
+         (do ((lcm (the integer (car integers))
                    (lcm lcm (the integer (car rest))))
-              (rest (cdr numbers) (cdr rest)))
+              (rest (cdr integers) (cdr rest)))
              ((null rest) lcm)
            (declare (integer lcm) (list rest))))))
 
@@ -1340,6 +1340,10 @@ the first."
       ;; complicated way of writing the algorithm in the CLHS page for
       ;; LCM, and I don't know why.  To be investigated.  -- CSR,
       ;; 2003-09-11
+      ;;
+      ;;    It seems to me that this is written this way to avoid
+      ;;    unnecessary bignumification of intermediate results.
+      ;;        -- TCR, 2008-03-05
       (let ((m (abs m))
             (n (abs n)))
         (multiple-value-bind (max min)
