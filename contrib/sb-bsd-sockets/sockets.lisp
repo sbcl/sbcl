@@ -156,25 +156,27 @@ values"))
 
 (defgeneric socket-receive (socket buffer length
                             &key
-                            oob peek waitall element-type)
-  (:documentation "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed buffer if
-NIL), using recvfrom(2).  If LENGTH is NIL, the length of BUFFER is
-used, so at least one of these two arguments must be non-NIL.  If
-BUFFER is supplied, it had better be of an element type one octet wide.
-Returns the buffer, its length, and the address of the peer
-that sent it, as multiple values.  On datagram sockets, sets MSG_TRUNC
-so that the actual packet length is returned even if the buffer was too
-small"))
+                            oob peek waitall dontwait element-type)
+  (:documentation
+   "Read LENGTH octets from SOCKET into BUFFER (or a freshly-consed
+buffer if NIL), using recvfrom(2). If LENGTH is NIL, the length of
+BUFFER is used, so at least one of these two arguments must be
+non-NIL. If BUFFER is supplied, it had better be of an element type
+one octet wide. Returns the buffer, its length, and the address of the
+peer that sent it, as multiple values. On datagram sockets, sets
+MSG_TRUNC so that the actual packet length is returned even if the
+buffer was too small."))
 
 (defmethod socket-receive ((socket socket) buffer length
                            &key
-                           oob peek waitall
+                           oob peek waitall dontwait
                            (element-type 'character))
   (with-sockaddr-for (socket sockaddr)
     (let ((flags
            (logior (if oob sockint::MSG-OOB 0)
                    (if peek sockint::MSG-PEEK 0)
                    (if waitall sockint::MSG-WAITALL 0)
+                   (if dontwait sockint::MSG-DONTWAIT 0)
                    #+linux sockint::MSG-NOSIGNAL ;don't send us SIGPIPE
                    (if (eql (socket-type socket) :datagram)
                        sockint::msg-TRUNC 0))))
