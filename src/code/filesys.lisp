@@ -714,20 +714,22 @@ is returned; otherwise obtains the home directory from the operating
 system."
   (declare (ignore host))
   (let ((env-home (posix-getenv "HOME")))
-    (parse-native-namestring
-     (if (and env-home (not (string= env-home "")))
-         env-home
-         #!-win32
-         (sb!unix:uid-homedir (sb!unix:unix-getuid))
-         #!+win32
-         ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
-         ;; What?! -- RMK, 2007-12-31
-         (return-from user-homedir-pathname
-           (sb!win32::get-folder-pathname sb!win32::csidl_profile)))
-     #-win32 sb!impl::*unix-host*
-     #+win32 sb!impl::*win32-host*
-     *default-pathname-defaults*
-     :as-directory t)))
+    (values
+     (parse-native-namestring
+      (if (and env-home (not (string= env-home "")))
+          env-home
+          #!-win32
+          (sb!unix:uid-homedir (sb!unix:unix-getuid))
+          #!+win32
+          ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
+          ;; What?! -- RMK, 2007-12-31
+          (return-from user-homedir-pathname
+            (sb!win32::get-folder-pathname sb!win32::csidl_profile)))
+      #-win32 sb!impl::*unix-host*
+      #+win32 sb!impl::*win32-host*
+      *default-pathname-defaults*
+      :as-directory t))))
+
 
 ;;;; DIRECTORY
 
