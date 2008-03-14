@@ -22,10 +22,30 @@ Examples:
 
 (defun make-inet-address (dotted-quads)
   "Return a vector of octets given a string DOTTED-QUADS in the format
-\"127.0.0.1\""
-  (map 'vector
-       #'parse-integer
-       (split dotted-quads nil '(#\.))))
+\"127.0.0.1\". Signals an error if the string is malformed."
+  (declare (type string dotted-quads))
+  (labels ((oops ()
+             (error "~S is not a string designating an IP address." 
+                    dotted-quads))
+           (check (x)
+             (if (typep x '(unsigned-byte 8))
+                 x
+                 (oops))))
+    (let* ((s1 (position #\. dotted-quads))
+           (s2 (if s1 (position #\. dotted-quads :start (1+ s1)) (oops)))
+           (s3 (if s2 (position #\. dotted-quads :start (1+ s2)) (oops)))
+           (u0 (parse-integer dotted-quads :end s1))
+           (u1 (parse-integer dotted-quads :start (1+ s1) :end s2))
+           (u2 (parse-integer dotted-quads :start (1+ s2) :end s3)))
+      (multiple-value-bind (u3 end) (parse-integer dotted-quads :start (1+ s3) :junk-allowed t)
+        (unless (= end (length dotted-quads))
+          (oops))
+        (let ((vector (make-array 4 :element-type '(unsigned-byte 8))))
+          (setf (aref vector 0) (check u0)
+                (aref vector 1) (check u1)
+                (aref vector 2) (check u2)
+                (aref vector 3) (check u3))
+          vector)))))
 
 (define-condition unknown-protocol ()
   ((name :initarg :name
