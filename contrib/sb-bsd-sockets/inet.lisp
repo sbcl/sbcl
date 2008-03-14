@@ -25,7 +25,7 @@ Examples:
 \"127.0.0.1\". Signals an error if the string is malformed."
   (declare (type string dotted-quads))
   (labels ((oops ()
-             (error "~S is not a string designating an IP address." 
+             (error "~S is not a string designating an IP address."
                     dotted-quads))
            (check (x)
              (if (typep x '(unsigned-byte 8))
