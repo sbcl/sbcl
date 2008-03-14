@@ -101,11 +101,11 @@
     (aver ctype)
     (ir1-transform-type-predicate object ctype)))
 
-;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
-;;; at load time.
+;;; If FIND-CLASSOID is called on a constant class, locate the
+;;; CLASSOID-CELL at load time.
 (deftransform find-classoid ((name) ((constant-arg symbol)) *)
   (let* ((name (lvar-value name))
-         (cell (find-classoid-cell name)))
+         (cell (find-classoid-cell name :create t)))
     `(or (classoid-cell-classoid ',cell)
          (error "class not yet defined: ~S" name))))
 
@@ -492,7 +492,7 @@
             (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
             `(and (,pred object)
                   (classoid-cell-typep (,get-layout object)
-                                       ',(find-classoid-cell name)
+                                       ',(find-classoid-cell name :create t)
                                        object)))))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider

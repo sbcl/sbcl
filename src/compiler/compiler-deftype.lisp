@@ -23,7 +23,7 @@
     (:instance
      (warn "The class ~S is being redefined to be a DEFTYPE." name)
      (undefine-structure (layout-info (classoid-layout (find-classoid name))))
-     (setf (classoid-cell-classoid (find-classoid-cell name)) nil)
+     (setf (classoid-cell-classoid (find-classoid-cell name :create t)) nil)
      (setf (info :type :compiler-layout name) nil)
      (setf (info :type :kind name) :defined))
     (:defined

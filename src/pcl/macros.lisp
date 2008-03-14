@@ -79,49 +79,31 @@
 
 (/show "pcl/macros.lisp 119")
 
-(defvar *find-class* (make-hash-table :test 'eq))
-
-(defmacro find-class-cell-class (cell)
-  `(car ,cell))
-
-(defmacro find-class-cell-predicate (cell)
-  `(cadr ,cell))
-
-(defmacro make-find-class-cell (class-name)
-  (declare (ignore class-name))
-  '(list* nil #'constantly-nil nil))
-
-(defun find-class-cell (symbol &optional dont-create-p)
-  (let ((table *find-class*))
-    (with-locked-hash-table (table)
-      (or (gethash symbol table)
-          (unless dont-create-p
-            (unless (legal-class-name-p symbol)
-              (error "~S is not a legal class name." symbol))
-            (setf (gethash symbol table) (make-find-class-cell symbol)))))))
-
-(/show "pcl/macros.lisp 157")
+(declaim (inline legal-class-name-p))
+(defun legal-class-name-p (x)
+  (symbolp x))
 
 (defvar *create-classes-from-internal-structure-definitions-p* t)
 
 (defun find-class-from-cell (symbol cell &optional (errorp t))
-  (or (find-class-cell-class cell)
-      (and *create-classes-from-internal-structure-definitions-p*
-           (or (structure-type-p symbol) (condition-type-p symbol))
-           (ensure-non-standard-class symbol))
+  (or (when cell
+        (or (classoid-cell-pcl-class cell)
+            (when *create-classes-from-internal-structure-definitions-p*
+              (let ((classoid (classoid-cell-classoid cell)))
+                (when (and classoid
+                           (or (condition-classoid-p classoid)
+                               (defstruct-classoid-p classoid)))
+                  (ensure-non-standard-class symbol classoid))))))
       (cond ((null errorp) nil)
             ((legal-class-name-p symbol)
              (error "There is no class named ~S." symbol))
             (t
              (error "~S is not a legal class name." symbol)))))
 
-(defun legal-class-name-p (x)
-  (symbolp x))
-
 (defun find-class (symbol &optional (errorp t) environment)
   (declare (ignore environment))
   (find-class-from-cell symbol
-                        (find-class-cell symbol errorp)
+                        (find-classoid-cell symbol)
                         errorp))
 
 
@@ -143,49 +125,34 @@
            (constantp errorp)
            (member *boot-state* '(braid complete)))
       (let ((errorp (not (null (constant-form-value errorp))))
-            (class-cell (make-symbol "CLASS-CELL")))
-        `(let ((,class-cell (load-time-value (find-class-cell ',symbol))))
-           (or (find-class-cell-class ,class-cell)
+            (cell (make-symbol "CLASSOID-CELL")))
+        `(let ((,cell (load-time-value (find-classoid-cell ',symbol :create t))))
+           (or (classoid-cell-pcl-class ,cell)
                ,(if errorp
-                    `(find-class-from-cell ',symbol ,class-cell t)
-                    `(and (classoid-cell-classoid
-                           ',(find-classoid-cell symbol))
-                          (find-class-from-cell ',symbol ,class-cell nil))))))
+                    `(find-class-from-cell ',symbol ,cell t)
+                    `(when (classoid-cell-classoid ,cell)
+                       (find-class-from-cell ',symbol ,cell nil))))))
       form))
+
+(declaim (inline class-classoid))
+(defun class-classoid (class)
+  (layout-classoid (class-wrapper class)))
 
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
   (cond ((legal-class-name-p name)
          (with-single-package-locked-error
-             (:symbol name "using ~A as the class-name argument in ~
+             (:symbol name "Using ~A as the class-name argument in ~
                            (SETF FIND-CLASS)"))
-         (let* ((cell (find-class-cell name))
-                (class (find-class-cell-class cell)))
-           (setf (find-class-cell-class cell) new-value)
-           (when (eq *boot-state* 'complete)
-             (if (null new-value)
-                 (progn
-                   (setf (find-classoid name) new-value)
-                   (when class
-                     ;; KLUDGE: This horror comes about essentially
-                     ;; because we use the proper name of a classoid
-                     ;; to do TYPEP, which needs to be available
-                     ;; early, and also to determine whether TYPE-OF
-                     ;; should return the name or the class (using
-                     ;; CLASSOID-PROPER-NAME).  So if we are removing
-                     ;; proper nameness, arrange for
-                     ;; CLASSOID-PROPER-NAME to do the right thing
-                     ;; too.  (This is almost certainly not the right
-                     ;; solution; instead, CLASSOID-NAME and
-                     ;; FIND-CLASSOID should be direct parallels to
-                     ;; CLASS-NAME and FIND-CLASS, and TYPEP on
-                     ;; not-yet-final classes should be compileable.
-                     (let ((classoid (layout-classoid (slot-value class 'wrapper))))
-                       (setf (classoid-name classoid) nil))))
-
-                 (let ((classoid (layout-classoid (slot-value new-value 'wrapper))))
-                   (setf (find-classoid name) classoid)
-                   (set-class-type-translation new-value classoid))))
+         (let ((cell (find-classoid-cell name :create new-value)))
+           (cond (new-value
+                  (setf (classoid-cell-pcl-class cell) new-value)
+                  (when (eq *boot-state* 'complete)
+                    (let ((classoid (class-classoid new-value)))
+                      (setf (find-classoid name) classoid)
+                      (set-class-type-translation new-value classoid))))
+                 (cell
+                  (clear-classoid name cell)))
            (when (or (eq *boot-state* 'complete)
                      (eq *boot-state* 'braid))
              (update-ctors 'setf-find-class :class new-value :name name))

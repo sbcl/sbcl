@@ -56,8 +56,7 @@
 #+sb-thread
 (with-test (:name without-interrupts+get-mutex)
   (let* ((lock (make-mutex))
-         (foo (get-mutex lock))
-         (bar nil)
+         (bar (progn (get-mutex lock) nil))
          (thread (make-thread (lambda ()
                                 (sb-sys:without-interrupts
                                     (with-mutex (lock)

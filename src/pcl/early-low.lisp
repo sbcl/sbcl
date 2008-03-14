@@ -44,6 +44,12 @@
 ;;; and use that to replace all three variables.)
 (defvar *pcl-package*                (find-package "SB-PCL"))
 
+(declaim (inline defstruct-classoid-p))
+(defun defstruct-classoid-p (classoid)
+  ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
+  ;; work instead of this. -- NS 2008-03-14
+  (typep (layout-info (classoid-layout classoid)) 'defstruct-description))
+
 ;;; This excludes structure types created with the :TYPE option to
 ;;; DEFSTRUCT. It also doesn't try to deal with types created by
 ;;; hairy DEFTYPEs, e.g.
@@ -53,12 +59,10 @@
 ;;; it needs a more mnemonic name. -- WHN 19991204
 (defun structure-type-p (type)
   (and (symbolp type)
-       (not (condition-type-p type))
        (let ((classoid (find-classoid type nil)))
          (and classoid
-              (typep (layout-info
-                      (classoid-layout classoid))
-                     'defstruct-description)))))
+              (not (condition-classoid-p classoid))
+              (defstruct-classoid-p classoid)))))
 
 ;;; Symbol contruction utilities
 (defun format-symbol (package format-string &rest format-arguments)

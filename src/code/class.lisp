@@ -101,9 +101,7 @@
 ;;; cold-load time.
 (defvar *forward-referenced-layouts*)
 (!cold-init-forms
-  (setq *forward-referenced-layouts* (make-hash-table :test 'equal
-                                                      #-sb-xc-host #-sb-xc-host
-                                                      :synchronized t))
+  (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
                  (dolist (x *!initial-layouts*)
@@ -250,14 +248,18 @@
 ;;; cross-compilability reasons (i.e. convenience of using this
 ;;; function in a MAKE-LOAD-FORM expression) that functionality has
 ;;; been split off into INIT-OR-CHECK-LAYOUT.
-(declaim (ftype (function (symbol) layout) find-layout))
+(declaim (ftype (sfunction (symbol) layout) find-layout))
 (defun find-layout (name)
-  (let ((classoid (find-classoid name nil)))
-    (or (and classoid (classoid-layout classoid))
-        (gethash name *forward-referenced-layouts*)
-        (setf (gethash name *forward-referenced-layouts*)
-              (make-layout :classoid (or classoid
-                                         (make-undefined-classoid name)))))))
+  ;; This seems to be currently used only from the compiler, but make
+  ;; it thread-safe all the same. We need to lock *F-R-L* before doing
+  ;; FIND-CLASSOID in case (SETF FIND-CLASSOID) happens in parallel.
+  (let ((table *forward-referenced-layouts*))
+    (with-locked-hash-table (table)
+      (let ((classoid (find-classoid name nil)))
+        (or (and classoid (classoid-layout classoid))
+            (gethash name table)
+            (setf (gethash name table)
+                  (make-layout :classoid (or classoid (make-undefined-classoid name)))))))))
 
 ;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
 ;;; INHERITS, and DEPTHOID, otherwise require that it be consistent
@@ -679,128 +681,166 @@
              (:constructor make-classoid-cell (name &optional classoid))
              (:make-load-form-fun (lambda (c)
                                     `(find-classoid-cell
-                                      ',(classoid-cell-name c))))
+                                      ',(classoid-cell-name c)
+                                      :errorp t)))
              #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
                                 (prin1 (classoid-cell-name s) stream)))))
   ;; Name of class we expect to find.
   (name nil :type symbol :read-only t)
-  ;; Class or NIL if not yet defined.
-  (classoid nil :type (or classoid null)))
-(defun find-classoid-cell (name)
-  (or (info :type :classoid name)
-      (setf (info :type :classoid name)
-            (make-classoid-cell name))))
+  ;; Classoid or NIL if not yet defined.
+  (classoid nil :type (or classoid null))
+  ;; PCL class, if any
+  (pcl-class nil))
+
+(defvar *classoid-cells*)
+(!cold-init-forms
+  (setq *classoid-cells* (make-hash-table :test 'eq)))
+
+(defun find-classoid-cell (name &key create errorp)
+  (let ((table *classoid-cells*)
+        (real-name (uncross name)))
+    (or (with-locked-hash-table (table)
+          (or (gethash real-name table)
+              (when create
+                (setf (gethash real-name table) (make-classoid-cell real-name)))))
+        (when errorp
+          (error 'simple-type-error
+                 :datum nil
+                 :expected-type 'class
+                 :format-control "Class not yet defined: ~S"
+                 :format-arguments (list name))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-(defun find-classoid (name &optional (errorp t) environment)
-  #!+sb-doc
-  "Return the class with the specified NAME. If ERRORP is false, then
-NIL is returned when no such class exists."
-  (declare (type symbol name) (ignore environment))
-  (let ((res (classoid-cell-classoid (find-classoid-cell name))))
-    (if (or res (not errorp))
-        res
-        (error 'simple-type-error
-               :datum nil
-               :expected-type 'class
-               :format-control "class not yet defined:~%  ~S"
-               :format-arguments (list name)))))
-(defun (setf find-classoid) (new-value name)
-  #-sb-xc (declare (type (or null classoid) new-value))
-  (cond
-    ((null new-value)
-     (ecase (info :type :kind name)
-       ((nil))
-       (:defined)
-       (:primitive
-        (error "attempt to redefine :PRIMITIVE type: ~S" name))
-       ((:forthcoming-defclass-type :instance)
-        (setf (info :type :kind name) nil
-              (info :type :classoid name) nil
-              (info :type :documentation name) nil
-              (info :type :compiler-layout name) nil))))
-    (t
-     (ecase (info :type :kind name)
-       ((nil))
-       (:forthcoming-defclass-type
-        ;; XXX Currently, nothing needs to be done in this
-        ;; case. Later, when PCL is integrated tighter into SBCL, this
-        ;; might need more work.
-        nil)
-       (:instance
-        ;; KLUDGE: The reason these clauses aren't directly parallel
-        ;; is that we need to use the internal CLASSOID structure
-        ;; ourselves, because we don't have CLASSes to work with until
-        ;; PCL is built.  In the host, CLASSes have an approximately
-        ;; one-to-one correspondence with the target CLASSOIDs (as
-        ;; well as with the target CLASSes, modulo potential
-        ;; differences with respect to conditions).
-        #+sb-xc-host
-        (let ((old (class-of (find-classoid name)))
-              (new (class-of new-value)))
-          (unless (eq old new)
-            (bug "trying to change the metaclass of ~S from ~S to ~S in the ~
-                  cross-compiler."
-                 name (class-name old) (class-name new))))
-        #-sb-xc-host
-        (let ((old (classoid-of (find-classoid name)))
-              (new (classoid-of new-value)))
-          (unless (eq old new)
-            (warn "changing meta-class of ~S from ~S to ~S"
-                  name (classoid-name old) (classoid-name new)))))
-       (:primitive
-        (error "illegal to redefine standard type ~S" name))
-       (:defined
-           (warn "redefining DEFTYPE type to be a class: ~S" name)
-           (setf (info :type :expander name) nil)))
 
-     (remhash name *forward-referenced-layouts*)
-     (%note-type-defined name)
-     ;; we need to handle things like
-     ;;   (setf (find-class 'foo) (find-class 'integer))
-     ;; and
-     ;;   (setf (find-class 'integer) (find-class 'integer))
-     (cond
-       ((built-in-classoid-p new-value)
-        (setf (info :type :kind name) (or (info :type :kind name) :defined))
-        (let ((translation (built-in-classoid-translation new-value)))
-          (when translation
-            (setf (info :type :translator name)
-                  (lambda (c) (declare (ignore c)) translation)))))
-       (t (setf (info :type :kind name) :instance)))
-     (setf (classoid-cell-classoid (find-classoid-cell name)) new-value)
-     (unless (eq (info :type :compiler-layout name)
-                 (classoid-layout new-value))
-       (setf (info :type :compiler-layout name) (classoid-layout new-value)))))
-  new-value)
-) ; EVAL-WHEN
+  ;; Return the classoid with the specified NAME. If ERRORP is false,
+  ;; then NIL is returned when no such class exists."
+  (defun find-classoid (name &optional (errorp t))
+    (declare (type symbol name))
+    (let ((cell (find-classoid-cell name :errorp errorp)))
+      (when cell (classoid-cell-classoid cell))))
+
+  ;; This is definitely not thread safe with itself -- but should be
+  ;; OK with parallel FIND-CLASSOID & FIND-LAYOUT.
+  (defun (setf find-classoid) (new-value name)
+    #-sb-xc (declare (type (or null classoid) new-value))
+    (aver new-value)
+    (let ((table *forward-referenced-layouts*))
+      (with-locked-hash-table (table)
+        (let ((cell (find-classoid-cell name :create t)))
+          (ecase (info :type :kind name)
+            ((nil))
+            (:forthcoming-defclass-type
+             ;; FIXME: Currently, nothing needs to be done in this case.
+             ;; Later, when PCL is integrated tighter into SBCL, this
+             ;; might need more work.
+             nil)
+            (:instance
+             (aver cell)
+             (let ((old-value (classoid-cell-classoid cell)))
+               (aver old-value)
+               ;; KLUDGE: The reason these clauses aren't directly
+               ;; parallel is that we need to use the internal
+               ;; CLASSOID structure ourselves, because we don't
+               ;; have CLASSes to work with until PCL is built. In
+               ;; the host, CLASSes have an approximately
+               ;; one-to-one correspondence with the target
+               ;; CLASSOIDs (as well as with the target CLASSes,
+               ;; modulo potential differences with respect to
+               ;; conditions).
+               #+sb-xc-host
+               (let ((old (class-of old-value))
+                     (new (class-of new-value)))
+                 (unless (eq old new)
+                   (bug "Trying to change the metaclass of ~S from ~S to ~S in the ~
+                            cross-compiler."
+                        name (class-name old) (class-name new))))
+               #-sb-xc-host
+               (let ((old (classoid-of old-value))
+                     (new (classoid-of new-value)))
+                 (unless (eq old new)
+                   (warn "Changing meta-class of ~S from ~S to ~S."
+                         name (classoid-name old) (classoid-name new))))))
+            (:primitive
+             (error "Cannot redefine standard type ~S." name))
+            (:defined
+             (warn "Redefining DEFTYPE type to be a class: ~S" name)
+                (setf (info :type :expander name) nil)))
+
+          (remhash name table)
+          (%note-type-defined name)
+          ;; we need to handle things like
+          ;;   (setf (find-class 'foo) (find-class 'integer))
+          ;; and
+          ;;   (setf (find-class 'integer) (find-class 'integer))
+          (cond ((built-in-classoid-p new-value)
+                 (setf (info :type :kind name)
+                       (or (info :type :kind name) :defined))
+                 (let ((translation (built-in-classoid-translation new-value)))
+                   (when translation
+                     (setf (info :type :translator name)
+                           (lambda (c) (declare (ignore c)) translation)))))
+                (t
+                 (setf (info :type :kind name) :instance)))
+          (setf (classoid-cell-classoid cell) new-value)
+          (unless (eq (info :type :compiler-layout name)
+                      (classoid-layout new-value))
+            (setf (info :type :compiler-layout name)
+                  (classoid-layout new-value))))))
+    new-value)
+
+  (defun clear-classoid (name cell)
+    (ecase (info :type :kind name)
+      ((nil))
+      (:defined)
+      (:primitive
+       (error "Attempt to remove :PRIMITIVE type: ~S" name))
+      ((:forthcoming-defclass-type :instance)
+       (when cell
+         ;; Note: We cannot remove the classoid cell from the table,
+         ;; since compiled code may refer directly to the cell, and
+         ;; getting a different cell for a classoid with the same name
+         ;; just would not do.
+
+         ;; Remove the proper name of the classoid.
+         (setf (classoid-name (classoid-cell-classoid cell)) nil)
+         ;; Clear the cell.
+         (setf (classoid-cell-classoid cell) nil
+               (classoid-cell-pcl-class cell) nil))
+       (setf (info :type :kind name) nil
+             (info :type :documentation name) nil
+             (info :type :compiler-layout name) nil)))))
 
 ;;; Called when we are about to define NAME as a class meeting some
 ;;; predicate (such as a meta-class type test.) The first result is
 ;;; always of the desired class. The second result is any existing
 ;;; LAYOUT for this name.
+;;;
+;;; Again, this should be compiler-only, but easier to make this
+;;; thread-safe.
 (defun insured-find-classoid (name predicate constructor)
   (declare (type function predicate constructor))
-  (let* ((old (find-classoid name nil))
-         (res (if (and old (funcall predicate old))
-                  old
-                  (funcall constructor :name name)))
-         (found (or (gethash name *forward-referenced-layouts*)
-                    (when old (classoid-layout old)))))
-    (when found
-      (setf (layout-classoid found) res))
-    (values res found)))
+  (let ((table *forward-referenced-layouts*))
+    (with-locked-hash-table (table)
+      (let* ((old (find-classoid name nil))
+             (res (if (and old (funcall predicate old))
+                      old
+                      (funcall constructor :name name)))
+             (found (or (gethash name table)
+                        (when old (classoid-layout old)))))
+        (when found
+          (setf (layout-classoid found) res))
+        (values res found)))))
 
-;;; If the class has a proper name, return the name, otherwise return
-;;; the class.
-(defun classoid-proper-name (class)
-  #-sb-xc (declare (type classoid class))
-  (let ((name (classoid-name class)))
-    (if (and name (eq (find-classoid name nil) class))
+;;; If the classoid has a proper name, return the name, otherwise return
+;;; the classoid.
+(defun classoid-proper-name (classoid)
+  #-sb-xc (declare (type classoid classoid))
+  (let ((name (classoid-name classoid)))
+    (if (and name (eq (find-classoid name nil) classoid))
         name
-        class)))
+        classoid)))
 
 ;;;; CLASS type operations
 
@@ -1363,7 +1403,7 @@ NIL is returned when no such class exists."
                            nil
                            (mapcar #'find-classoid direct-superclasses)))))
         (setf (info :type :kind name) #+sb-xc-host :defined #-sb-xc-host :primitive
-              (classoid-cell-classoid (find-classoid-cell name)) classoid)
+              (classoid-cell-classoid (find-classoid-cell name :create t)) classoid)
         (unless trans-p
           (setf (info :type :builtin name) classoid))
         (let* ((inherits-vector
@@ -1416,11 +1456,10 @@ NIL is returned when no such class exists."
     (let* ((name (first x))
            (inherits-list (second x))
            (classoid (make-standard-classoid :name name))
-           (classoid-cell (find-classoid-cell name)))
+           (classoid-cell (find-classoid-cell name :create t)))
       ;; Needed to open-code the MAP, below
       (declare (type list inherits-list))
       (setf (classoid-cell-classoid classoid-cell) classoid
-            (info :type :classoid name) classoid-cell
             (info :type :kind name) :instance)
       (let ((inherits (map 'simple-vector
                            (lambda (x)
@@ -1485,10 +1524,8 @@ NIL is returned when no such class exists."
             ((eq (classoid-layout class) layout)
              (remhash name *forward-referenced-layouts*))
             (t
-             ;; FIXME: ERROR?
-             (warn "something strange with forward layout for ~S:~%  ~S"
-                   name
-                   layout))))))
+             (error "Something strange with forward layout for ~S:~%  ~S"
+                    name layout))))))
 
 (!cold-init-forms
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")

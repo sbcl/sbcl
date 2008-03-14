@@ -81,7 +81,7 @@
 
 (sb!xc:deftype name-for-class () t)
 (defknown classoid-name (classoid) name-for-class (flushable))
-(defknown find-classoid (name-for-class &optional t lexenv-designator)
+(defknown find-classoid (name-for-class &optional t)
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))

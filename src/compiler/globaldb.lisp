@@ -1169,17 +1169,6 @@
   :type-spec (or ctype null)
   :default nil)
 
-;;; If this is a class name, then the value is a cons (NAME . CLASS),
-;;; where CLASS may be null if the class hasn't been defined yet. Note
-;;; that for built-in classes, the kind may be :PRIMITIVE and not
-;;; :INSTANCE. The name is in the cons so that we can signal a
-;;; meaningful error if we only have the cons.
-(define-info-type
-  :class :type
-  :type :classoid
-  :type-spec (or sb!kernel::classoid-cell null)
-  :default nil)
-
 ;;; layout for this type being used by the compiler
 (define-info-type
   :class :type

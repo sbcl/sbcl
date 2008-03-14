@@ -58,10 +58,6 @@
                   (error "Class is not a structure class: ~S" ',name))
                 ,layout))))))
 
-;;; Get layout right away.
-(sb!xc:defmacro compile-time-find-layout (name)
-  (find-layout name))
-
 ;;; re. %DELAYED-GET-COMPILER-LAYOUT and COMPILE-TIME-FIND-LAYOUT, above..
 ;;;
 ;;; FIXME: Perhaps both should be defined with DEFMACRO-MUNDANELY?

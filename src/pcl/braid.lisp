@@ -538,12 +538,10 @@
 (defun eval-form (form)
   (lambda () (eval form)))
 
-(defun ensure-non-standard-class (name &optional existing-class)
+(defun ensure-non-standard-class (name classoid &optional existing-class)
   (flet
       ((ensure (metaclass &optional (slots nil slotsp))
-         (let ((supers
-                (mapcar #'classoid-name (classoid-direct-superclasses
-                                         (find-classoid name)))))
+         (let ((supers (mapcar #'classoid-name (classoid-direct-superclasses classoid))))
            (if slotsp
                (ensure-class-using-class existing-class name
                                          :metaclass metaclass :name name
@@ -584,16 +582,16 @@
           ((condition-type-p name)
            (ensure 'condition-class
                    (mapcar #'slot-initargs-from-condition-slot
-                           (condition-classoid-slots (find-classoid name)))))
+                           (condition-classoid-slots classoid))))
           (t
            (error "~@<~S is not the name of a class.~@:>" name)))))
 
 (defun ensure-deffoo-class (classoid)
   (let ((class (classoid-pcl-class classoid)))
     (cond (class
-           (ensure-non-standard-class (class-name class) class))
+           (ensure-non-standard-class (class-name class) classoid class))
           ((eq 'complete *boot-state*)
-           (ensure-non-standard-class (classoid-name classoid))))))
+           (ensure-non-standard-class (classoid-name classoid) classoid)))))
 
 (pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
 (pushnew 'ensure-deffoo-class sb-kernel::*define-condition-hooks*)
@@ -670,7 +668,6 @@
      (setf (info :type :translator class)
            (lambda (spec) (declare (ignore spec)) classoid)))))
 
-(clrhash *find-class*)
 (!bootstrap-meta-braid)
 (!bootstrap-accessor-definitions t)
 (!bootstrap-class-predicates t)
@@ -678,24 +675,25 @@
 (!bootstrap-class-predicates nil)
 (!bootstrap-built-in-classes)
 
-(dohash ((name x) *find-class*)
-  (let* ((class (find-class-from-cell name x))
-         (layout (class-wrapper class))
-         (lclass (layout-classoid layout))
-         (lclass-pcl-class (classoid-pcl-class lclass))
-         (olclass (find-classoid name nil)))
-    (if lclass-pcl-class
-        (aver (eq class lclass-pcl-class))
-        (setf (classoid-pcl-class lclass) class))
+(dohash ((name x) sb-kernel::*classoid-cells*)
+  (when (classoid-cell-pcl-class x)
+    (let* ((class (find-class-from-cell name x))
+           (layout (class-wrapper class))
+           (lclass (layout-classoid layout))
+           (lclass-pcl-class (classoid-pcl-class lclass))
+           (olclass (find-classoid name nil)))
+      (if lclass-pcl-class
+          (aver (eq class lclass-pcl-class))
+          (setf (classoid-pcl-class lclass) class))
 
-    (update-lisp-class-layout class layout)
+      (update-lisp-class-layout class layout)
 
-    (cond (olclass
-           (aver (eq lclass olclass)))
-          (t
-           (setf (find-classoid name) lclass)))
+      (cond (olclass
+             (aver (eq lclass olclass)))
+            (t
+             (setf (find-classoid name) lclass)))
 
-    (set-class-type-translation class name)))
+      (set-class-type-translation class name))))
 
 (setq *boot-state* 'braid)
 

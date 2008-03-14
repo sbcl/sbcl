@@ -99,8 +99,10 @@
 (declaim (inline wrapper-class*))
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
-      (ensure-non-standard-class
-       (classoid-name (layout-classoid wrapper)))))
+      (let ((classoid (layout-classoid wrapper)))
+        (ensure-non-standard-class
+         (classoid-name classoid)
+         classoid))))
 
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This
