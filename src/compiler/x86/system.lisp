@@ -284,7 +284,70 @@
     (note-next-instruction vop :internal-error)
     (inst wait)))
 
-;;;; dynamic vop count collection support
+;;;; Miscellany
+
+;;; the RDTSC instruction (present on Pentium processors and
+;;; successors) allows you to access the time-stamp counter, a 64-bit
+;;; model-specific register that counts executed cycles. The
+;;; instruction returns the low cycle count in EAX and high cycle
+;;; count in EDX.
+;;;
+;;; In order to obtain more significant results on out-of-order
+;;; processors (such as the Pentium II and later), we issue a
+;;; serializing CPUID instruction before reading the cycle counter.
+;;; This instruction is used for its side effect of emptying the
+;;; processor pipeline, to ensure that the RDTSC instruction is
+;;; executed once all pending instructions have been completed.
+;;; CPUID writes to EBX and ECX in addition to EAX and EDX, so
+;;; they need to be added as temporaries.
+;;;
+;;; Note that cache effects mean that the cycle count can vary for
+;;; different executions of the same code (it counts cycles, not
+;;; retired instructions). Furthermore, the results are per-processor
+;;; and not per-process, so are unreliable on multiprocessor machines
+;;; where processes can migrate between processors.
+;;;
+;;; This method of obtaining a cycle count has the advantage of being
+;;; very fast (around 20 cycles), and of not requiring a system call.
+;;; However, you need to know your processor's clock speed to translate
+;;; this into real execution time.
+;;;
+;;; FIXME: This about the WITH-CYCLE-COUNTER interface a bit, and then
+;;; perhaps export it from SB-SYS.
+
+(defknown %read-cycle-counter () (values (unsigned-byte 32) (unsigned-byte 32)) ())
+
+(define-vop (%read-cycle-counter)
+  (:policy :fast-safe)
+  (:translate %read-cycle-counter)
+  (:temporary (:sc unsigned-reg :offset eax-offset :target lo) eax)
+  (:temporary (:sc unsigned-reg :offset edx-offset :target hi) edx)
+  (:temporary (:sc unsigned-reg :offset ebx-offset) ebx)
+  (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
+  (:ignore ebx ecx)
+  (:results (hi :scs (unsigned-reg))
+            (lo :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 5
+     (inst xor eax eax)
+     (inst cpuid)
+     (inst rdtsc)
+     (inst push edx)
+     (inst push eax)
+     (inst xor eax eax)
+     (inst cpuid)
+     (inst pop lo)
+     (inst pop hi)))
+
+(defmacro with-cycle-counter (&body body)
+  "Returns the primary value of BODY as the primary value, and the
+number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
+  (with-unique-names (hi0 hi1 lo0 lo1)
+    `(multiple-value-bind (,hi0 ,lo0) (%read-cycle-counter)
+       (values (locally ,@body)
+               (multiple-value-bind (,hi1 ,lo1) (%read-cycle-counter)
+                 (+ (ash (- ,hi1 ,hi0) 32)
+                    (- ,lo1 ,lo0)))))))
 
 #!+sb-dyncount
 (define-vop (count-me)

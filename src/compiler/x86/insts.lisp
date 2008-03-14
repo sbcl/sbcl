@@ -378,6 +378,10 @@
   (accum :type 'accum)
   (imm))
 
+(sb!disassem:define-instruction-format (two-bytes 16
+                                        :default-printer '(:name))
+  (op :fields (list (byte 8 0) (byte 8 8))))
+
 ;;; Same as simple, but with direction bit
 (sb!disassem:define-instruction-format (simple-dir 8 :include 'simple)
   (op :field (byte 6 2))
@@ -2731,3 +2735,17 @@
   (:emitter
    (emit-byte segment #b11011001)
    (emit-byte segment #b11101101)))
+
+;;;; Miscellany
+
+(define-instruction cpuid (segment)
+  (:printer two-bytes ((op '(#b00001111 #b10100010))))
+  (:emitter
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b10100010)))
+
+(define-instruction rdtsc (segment)
+  (:printer two-bytes ((op '(#b00001111 #b00110001))))
+  (:emitter
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00110001)))

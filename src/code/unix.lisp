@@ -113,9 +113,9 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 #!-win32
 (define-alien-routine ("getenv" posix-getenv) c-string
-  "Return the \"value\" part of the environment string \"name=value\" which
-   corresponds to NAME, or NIL if there is none."
-  (name c-string))
+    "Return the \"value\" part of the environment string \"name=value\" which
+corresponds to NAME, or NIL if there is none."
+    (name c-string))
 
 ;;; from stdio.h
 

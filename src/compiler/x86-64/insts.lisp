@@ -542,6 +542,10 @@
   (accum :type 'accum)
   (imm))
 
+(sb!disassem:define-instruction-format (two-bytes 16
+                                        :default-printer '(:name))
+  (op :fields (list (byte 8 0) (byte 8 8))))
+
 ;;; A one-byte instruction with a #x66 prefix, used to indicate an
 ;;; operand size of :word.
 (sb!disassem:define-instruction-format (x66-byte 16
@@ -2967,3 +2971,17 @@
    (emit-byte segment #x0f)
    (emit-byte segment #xae)
    (emit-ea segment dst 3)))
+
+;;;; Miscellany
+
+(define-instruction cpuid (segment)
+  (:printer two-bytes ((op '(#b00001111 #b10100010))))
+  (:emitter
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b10100010)))
+
+(define-instruction rdtsc (segment)
+  (:printer two-bytes ((op '(#b00001111 #b00110001))))
+  (:emitter
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00110001)))
