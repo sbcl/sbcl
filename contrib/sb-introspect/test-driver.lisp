@@ -10,7 +10,7 @@
 (assert (equal (function-arglist 'cl-user::one)
                '(cl-user::a cl-user::b cl-user::c)))
 (assert (equal (function-arglist 'the)
-               '(type sb-c::value)))
+               '(sb-c::value-type sb-c::form)))
 
 (assert (equal (function-arglist #'(sb-pcl::slow-method cl-user::j (t)))
                '(sb-pcl::method-args sb-pcl::next-methods)))
@@ -81,7 +81,7 @@
 (assert (equal (function-arglist 'cl-user::one)
                '(cl-user::a cl-user::b cl-user::c)))
 (assert (equal (function-arglist 'the)
-               '(type sb-c::value)))
+               '(sb-c::value-type sb-c::form)))
 
 ;;; Check wrt. interplay of generic functions and their methods.
 

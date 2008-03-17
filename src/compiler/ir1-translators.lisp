@@ -860,26 +860,34 @@ other."
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
-(def-ir1-translator the ((type value) start next result)
-  (the-in-policy type value (lexenv-policy *lexenv*) start next result))
+(def-ir1-translator the ((value-type form) start next result)
+  #!+sb-doc
+  "Specifies that the values returned by FORM conform to the VALUE-TYPE.
+
+CLHS specifies that the consequences are undefined if any result is
+not of the declared type, but SBCL treats declarations as assertions
+as long as SAFETY is at least 2, in which case incorrect type
+information will result in a runtime type-error instead of leading to
+eg. heap corruption. This is however expressly non-portable: use
+CHECK-TYPE instead of THE to catch type-errors at runtime. THE is best
+considered an optimization tool to inform the compiler about types it
+is unable to derive from other declared types."
+  (the-in-policy value-type form (lexenv-policy *lexenv*) start next result))
 
 ;;; This is like the THE special form, except that it believes
 ;;; whatever you tell it. It will never generate a type check, but
 ;;; will cause a warning if the compiler can prove the assertion is
 ;;; wrong.
-(def-ir1-translator truly-the ((type value) start next result)
+(def-ir1-translator truly-the ((value-type form) start next result)
   #!+sb-doc
-  ""
-  #-nil
-  (let ((type (coerce-to-values (compiler-values-specifier-type type)))
-        (old (when result (find-uses result))))
-    (ir1-convert start next result value)
-    (when result
-      (do-uses (use result)
-        (unless (memq use old)
-          (derive-node-type use type)))))
-  #+nil
-  (the-in-policy type value '((type-check . 0)) start cont))
+  "Specifies that the values returned by FORM conform to the
+VALUE-TYPE, and causes the compiler to trust this information
+unconditionally.
+
+Consequences are undefined if any result is not of the declared type
+-- typical symptoms including memory corruptions. Use with great
+care."
+  (the-in-policy value-type form '((type-check . 0)) start next result))
 
 ;;;; SETQ
 

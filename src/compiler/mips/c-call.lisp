@@ -271,6 +271,7 @@
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
+  (:result-types system-area-pointer)
   (:results (result :scs (sap-reg any-reg)))
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0

@@ -269,6 +269,7 @@
 (define-vop (alloc-number-stack-space)
   (:info amount)
   (:results (result :scs (sap-reg any-reg)))
+  (:result-types system-area-pointer)
   (:generator 0
     (aver (location= result rsp-tn))
     (unless (zerop amount)
@@ -289,6 +290,7 @@
   (:info amount)
   #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (sap-reg any-reg)))
+  (:result-types system-area-pointer)
   #!+sb-thread
   (:generator 0
     (aver (not (location= result rsp-tn)))

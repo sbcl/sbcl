@@ -2323,3 +2323,22 @@
                (declare (fixnum y) (character x))
                (sb-sys:with-pinned-objects (x y)
                  (some-random-function))))
+
+;;; *CHECK-CONSISTENCY* and TRULY-THE
+
+(with-test (:name :bug-423)
+  (let ((sb-c::*check-consistency* t))
+    (handler-bind ((warning #'error))
+      (flet ((make-lambda (type)
+               `(lambda (x)
+                  ((lambda (z)
+                     (if (listp z)
+                         (let ((q (truly-the list z)))
+                           (length q))
+                         (if (arrayp z)
+                             (let ((q (truly-the vector z)))
+                               (length q))
+                             (error "oops"))))
+                   (the ,type x)))))
+        (compile nil (make-lambda 'list))
+        (compile nil (make-lambda 'vector))))))

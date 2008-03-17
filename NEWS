@@ -15,6 +15,7 @@ changes in sbcl-1.0.16 relative to 1.0.15:
   * optimization: modular arithmetic for a particular requested width
     is implemented using a tagged representation unless a better 
     representation is available.
+  * fixed bug 423: TRULY-THE and *CHECK-CONSISTENCY* interaction.
   * bug fix: SB-BSD-SOCKETS:MAKE-INET-ADDRESS checks the input string
     for wellformedness and returns a specialized vector. (reported by
     Francois-Rene Rideau)
