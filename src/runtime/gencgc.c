@@ -1571,6 +1571,8 @@ sniff_code_object(struct code *code, unsigned long displacement)
     if (!check_code_fixups)
         return;
 
+    FSHOW((stderr, "/sniffing code: %p, %lu\n", code, displacement));
+
     ncode_words = fixnum_value(code->code_size);
     nheader_words = HeaderValue(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
@@ -3502,15 +3504,14 @@ verify_space(lispobj *start, size_t words)
 #ifdef LUTEX_WIDETAG
                 case LUTEX_WIDETAG:
 #endif
+#ifdef NO_TLS_VALUE_MARKER_WIDETAG
+                case NO_TLS_VALUE_MARKER_WIDETAG:
+#endif
                     count = (sizetab[widetag_of(*start)])(start);
                     break;
 
                 default:
-                    FSHOW((stderr,
-                           "/Unhandled widetag 0x%x at 0x%x\n",
-                           widetag_of(*start), start));
-                    fflush(stderr);
-                    gc_abort();
+                    lose("Unhandled widetag 0x%x at 0x%x\n", widetag_of(*start), start);
                 }
             }
         }
@@ -4445,8 +4446,7 @@ gc_free_heap(void)
 
     if (verify_after_free_heap) {
         /* Check whether purify has left any bad pointers. */
-        if (gencgc_verbose)
-            SHOW("checking after free_heap\n");
+        FSHOW((stderr, "checking after free_heap\n"));
         verify_gc();
     }
 }
