@@ -428,6 +428,7 @@
                   sb-posix::o-nonblock)))
   t)
 
+#-win32
 (deftest fcntl.flock.1
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
@@ -462,6 +463,7 @@
   42)
 
 
+#-win32
 (deftest fcntl.flock.2
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
