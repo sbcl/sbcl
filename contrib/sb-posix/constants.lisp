@@ -362,6 +362,7 @@
  (:integer f-wrlck "F_WRLCK" nil t)
  (:integer f-unlck "F_UNLCK" nil t)
 
+ #-win32
  (:structure alien-flock
              ("struct flock"
               (short type "short" "l_type")

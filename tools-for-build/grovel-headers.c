@@ -208,6 +208,7 @@ main(int argc, char *argv[])
 
     defconstant("enoent", ENOENT);
     defconstant("eexist", EEXIST);
+    defconstant("eintr", EINTR);
 
     defconstant("s-ifmt",  S_IFMT);
     defconstant("s-ifdir", S_IFDIR);
