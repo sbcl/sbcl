@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.16 relative to 1.0.15:
+  * minor incompatible change: revert the changes to sb-posix's error
+    signaling added in 1.0.14.
   * minor incompatible change: change PROBE-FILE back to returning
     NIL whenever we can't get a truename, as was the case before 1.0.14.
   * minor incompatible change: SB-BSD-SOCKETS:NAME-SERVICE-ERROR now

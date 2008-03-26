@@ -63,23 +63,8 @@
                (format s "System call error ~A (~A)"
                        errno (sb-int:strerror errno))))))
 
-(defvar *errno-table*
-  (let ((errno-max 0)
-        list)
-    (do-symbols (symbol (find-package "SB-POSIX"))
-      (when (get symbol 'errno)
-        (let ((errno (symbol-value symbol)))
-          (setf errno-max (max errno  errno-max))
-          (push (cons errno
-                      (eval `(define-condition ,symbol (syscall-error) ())))
-                list))))
-    (let ((table (make-array (1+ errno-max))))
-      (mapc #'(lambda (cons) (setf (elt table (car cons)) (cdr cons))) list)
-      table)))
-
 (defun syscall-error ()
-  (let ((errno (get-errno)))
-    (error (elt *errno-table* errno) :errno errno)))
+  (error 'sb-posix:syscall-error :errno (get-errno)))
 
 (defun unsupported-error (lisp-name c-name)
   (error "~S is unsupported by SBCL on this platform due to lack of ~A()."
@@ -89,60 +74,6 @@
   (warn "~S is unsupported by SBCL on this platform due to lack of ~A()."
         lisp-name c-name))
 
-;; Note that we inherit from SIMPLE-FILE-ERROR first, to get its
-;; error reporting, rather than SYSCALL-ERROR's.
-(define-condition file-syscall-error
-    (sb-impl::simple-file-error syscall-error)
-  ())
-
-(defvar *file-errno-table*
-  (let ((array (copy-seq *errno-table*)))
-    (map-into array
-              (lambda (condition-class-name)
-                (if (symbolp condition-class-name)
-                    (let ((file-condition-name
-                           (read-from-string
-                            (format nil "FILE-~A" condition-class-name))))
-                      ;; Should condition class names like FILE-ENOENT
-                      ;; and FILE-ENOTDIR be exported?  I want to say
-                      ;; "no", since we already export ENOENT, ENOTDIR
-                      ;; et al, and so the user can write handlers
-                      ;; such as
-                      ;;
-                      ;;  (handler-bind ((sb-posix:enoent ...)
-                      ;;                 (sb-posix:enotdir ...)
-                      ;;                 (file-error ...))
-                      ;;    ...)
-                      ;;
-                      ;; which will do the right thing for all our
-                      ;; FILE-SYSCALL-ERRORs, without exposing this
-                      ;; implementation detail.  (Recall that some
-                      ;; FILE-ERRORs don't strictly have to do with
-                      ;; the file system, e.g., supplying a wild
-                      ;; pathname to some functions.)  But if the
-                      ;; prevailing opinion is otherwise, uncomment
-                      ;; the following.
-                      #| (export file-condition-name) |#
-                      (eval `(define-condition ,file-condition-name
-                                 (,condition-class-name file-syscall-error)
-                               ())))
-                    condition-class-name))
-              array)
-    array))
-
-;; Note: do we have to declare SIMPLE-FILE-PERROR notinline in
-;; fd-stream.lisp?
-(sb-ext:without-package-locks
-  (defun sb-impl::simple-file-perror (note-format pathname errno)
-    (error (elt *file-errno-table* errno)
-           :pathname pathname
-           :errno errno
-           :format-control "~@<~?: ~2I~_~A~:>"
-           :format-arguments
-           (list note-format (list pathname) (sb-int:strerror errno)))))
-
-;; Note: it might prove convenient to develop a parallel set of
-;; condition classes for STREAM-ERRORs, too.
 (declaim (inline never-fails))
 (defun never-fails (&rest args)
   (declare (ignore args))
