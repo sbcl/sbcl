@@ -27,6 +27,10 @@ test: all
 	     "(asdf:operate (quote asdf:test-op) :$(SYSTEM))" | \
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
-
+# KLUDGE / FIXME: Perhaps each module should have it's own list of
+# files to install? At any rate, this is a portable (we hope) way of
+# installing all the files needed -- as long as all the files are in
+# the first level directory...
 install: $(EXTRA_INSTALL_TARGETS)
-	tar --exclude=CVS -cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar --no-same-owner -xpvf - )
+	cp -p $(SYSTEM).asd *.lisp *.fasl "$(BUILD_ROOT)$(INSTALL_DIR)"
+	find "$(BUILD_ROOT)$(INSTALL_DIR)" -type f -exec chown `id -u`:`id -g` {} \;
