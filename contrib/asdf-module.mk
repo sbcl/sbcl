@@ -27,10 +27,8 @@ test: all
 	     "(asdf:operate (quote asdf:test-op) :$(SYSTEM))" | \
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
-# KLUDGE / FIXME: Perhaps each module should have it's own list of
-# files to install? At any rate, this is a portable (we hope) way of
-# installing all the files needed -- as long as all the files are in
-# the first level directory...
+# KLUDGE: There seems to be no portable way to tell tar to not to
+# preserve owner, so chown after installing for the current user.
 install: $(EXTRA_INSTALL_TARGETS)
-	cp -p $(SYSTEM).asd *.lisp *.fasl "$(BUILD_ROOT)$(INSTALL_DIR)"
+	tar cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar xpvf - )
 	find "$(BUILD_ROOT)$(INSTALL_DIR)" -type f -exec chown `id -u`:`id -g` {} \;
