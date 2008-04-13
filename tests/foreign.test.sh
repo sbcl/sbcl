@@ -311,5 +311,28 @@ run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit <<EOF
 EOF
 check_status_maybe_lose "missing-so" $?
 
+# ADDR of a heap-allocated object
+cat > $TEST_FILESTEM.addr.heap.c <<EOF
+  struct foo
+  {
+    int x, y;
+  } a, *b;
+EOF
+
+build_so $TEST_FILESTEM.addr.heap
+
+run_sbcl <<EOF
+  (load-shared-object "$TEST_FILESTEM.addr.heap.so")
+  (define-alien-type foo (struct foo (x int) (y int)))
+
+  (define-alien-variable a foo)
+  (define-alien-variable b (* foo))
+  (funcall (compile nil '(lambda () (setq b (addr a)))))
+  (assert (sb-sys:sap= (alien-sap a) (alien-sap (deref b))))
+  (quit :unix-status $EXIT_LISP_WIN)
+EOF
+check_status_maybe_lose "ADDR of a heap-allocated object" $?
+
+
 # success convention for script
 exit $EXIT_TEST_WIN

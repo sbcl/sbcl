@@ -467,7 +467,7 @@ area pointer) to a foreign value with the specified
 The @var{type} must be some foreign pointer, array, or record type.
 @end defun
 
-@defun sb-alien:alien-sap @var{foreign-value} @var{type}
+@defun sb-alien:alien-sap @var{foreign-value}
 @findex alien-sap
 
 The @code{sb-alien:alien-sap} function returns the @acronym{SAP} which

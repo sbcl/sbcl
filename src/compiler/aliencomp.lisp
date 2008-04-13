@@ -332,7 +332,8 @@
 (deftransform %heap-alien-addr ((info) * * :important t)
   (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
     (/noshow "in DEFTRANSFORM %HEAP-ALIEN-ADDR, creating %SAP-ALIEN")
-    `(%sap-alien ,sap ',type)))
+    `(%sap-alien ,sap ',(make-alien-pointer-type :to type))))
+
 
 ;;;; support for local (stack or register) aliens
 
