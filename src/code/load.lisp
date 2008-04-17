@@ -312,26 +312,25 @@
                  (read-string-as-bytes stream result)
                  result)))
         ;; Read and validate implementation and version.
-        (let* ((implementation (keywordicate (string-from-stream)))
-               (fasl-version (read-word-arg))
+        (let ((implementation (keywordicate (string-from-stream)))
+              (expected-implementation +backend-fasl-file-implementation+))
+          (unless (string= expected-implementation implementation)
+            (error 'invalid-fasl-implementation
+                   :stream stream
+                   :implementation implementation
+                   :expected expected-implementation)))
+        (let* ((fasl-version (read-word-arg))
                (sbcl-version (if (<= fasl-version 76)
                                  "1.0.11.18"
                                  (string-from-stream)))
-               (expected-version (sb!xc:lisp-implementation-version))
-               (expected-implementation +backend-fasl-file-implementation+))
-          (cond ((string/= expected-implementation implementation)
-                 (error 'invalid-fasl-implementation
-                        :stream stream
-                        :implementation implementation
-                        :expected expected-implementation))
-                ((string/= expected-version sbcl-version)
-                 (restart-case
-                     (error 'invalid-fasl-version
-                            :stream stream
-                            :version sbcl-version
-                            :expected expected-version)
-                   (continue ()
-                     :report "Load the fasl file anyway")))))
+               (expected-version (sb!xc:lisp-implementation-version)))
+          (unless (string= expected-version sbcl-version)
+            (restart-case
+                (error 'invalid-fasl-version
+                       :stream stream
+                       :version sbcl-version
+                       :expected expected-version)
+              (continue () :report "Load the fasl file anyway"))))
         ;; Read and validate *FEATURES* which affect binary compatibility.
         (let ((faff-in-this-file (string-from-stream)))
           (unless (string= faff-in-this-file *features-affecting-fasl-format*)
