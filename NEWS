@@ -4,6 +4,8 @@ changes in sbcl-1.0.17 relative to 1.0.16:
     reference.
   * bug fix: fasl header checking is less vulnerable to different
     platform word lengths.
+  * bug fix: more correct assembler syntax for GNU binutils
+    2.18.50.0.4 support.  (thanks to Marijn Schouten)
 
 changes in sbcl-1.0.16 relative to 1.0.15:
   * minor incompatible change: revert the changes to sb-posix's error

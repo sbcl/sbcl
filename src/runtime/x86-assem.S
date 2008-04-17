@@ -127,7 +127,7 @@ GNAME(call_into_c):
 
 /* Check for a return FP value. */
 	fxam
-	fnstsw	%eax
+	fnstsw	%ax
 	andl	$0x4500,%eax
 	cmpl	$0x4100,%eax
 	jne	Lfp_rtn_value
