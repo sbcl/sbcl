@@ -389,6 +389,12 @@
                (combination-fun-info use))
          (funcall it use))))
 
+(defun lvar-good-for-dx-p (lvar)
+  (let ((uses (lvar-uses lvar)))
+    (if (listp uses)
+        (every #'use-good-for-dx-p uses)
+        (use-good-for-dx-p uses))))
+
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)
   (or (block-delete-p block)

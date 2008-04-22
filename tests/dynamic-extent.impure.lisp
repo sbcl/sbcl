@@ -291,4 +291,14 @@
     (assert (every (lambda (x) (eql x 0)) a))))
 (bdowning-2005-iv-16)
 
+
+(defun-with-dx let-converted-vars-dx-allocated-bug (x y z)
+  (let* ((a (list x y z))
+         (b (list x y z))
+         (c (list a b)))
+    (declare (dynamic-extent c))
+    (values (first c) (second c))))
+(multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
+  (assert (and (equal i j)
+               (equal i (list 1 2 3)))))
 

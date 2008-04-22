@@ -54,6 +54,7 @@
     ;; combination, and its arguments are potentially DX as well.
     (flet ((recurse (use)
              (loop for arg in (combination-args use)
+                   when (lvar-good-for-dx-p arg)
                    append (handle-nested-dynamic-extent-lvars arg))))
       (cons lvar
             (if (listp uses)
