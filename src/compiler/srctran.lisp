@@ -2840,7 +2840,7 @@
                          (ecase signedp
                              ((nil) (let ((mask (1- (ash 1 width))))
                                       `(integer ,mask ,mask)))
-                             (t `(signed-byte ,width))))))
+                             ((t) `(signed-byte ,width))))))
     (lambda (call)
       (let ((res (funcall fun call)))
         (when res
@@ -2855,7 +2855,7 @@
                            (ecase signedp
                              ((nil) (let ((mask (1- (ash 1 width))))
                                       `(integer ,mask ,mask)))
-                             (t `(signed-byte ,width))))))
+                             ((t) `(signed-byte ,width))))))
       (if (eq signedp nil)
           (logand-derive-type-aux res mask-type)))))
 
@@ -2877,7 +2877,7 @@
                                   '(eql 0)
                                   `(,(ecase signedp
                                        ((nil) 'unsigned-byte)
-                                       (t 'signed-byte))
+                                       ((t) 'signed-byte))
                                      ,width)))))
     (labels ((reoptimize-node (node name)
                (setf (node-derived-type node)

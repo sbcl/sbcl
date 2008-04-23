@@ -184,7 +184,7 @@
     (:untagged
      (ecase signedp
        ((nil) *untagged-unsigned-modular-class*)
-       (t *untagged-signed-modular-class*)))
+       ((t) *untagged-signed-modular-class*)))
     (:tagged
      (aver signedp)
      *tagged-modular-class*)))
@@ -255,7 +255,7 @@
      (defknown ,name ,(mapcar (constantly 'integer) lambda-list)
                (,(ecase signedp
                    ((nil) 'unsigned-byte)
-                   (t 'signed-byte))
+                   ((t) 'signed-byte))
                  ,width)
                (foldable flushable movable)
                :derive-type (make-modular-fun-type-deriver

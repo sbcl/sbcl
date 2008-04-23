@@ -643,7 +643,7 @@
     ((def (name kind width signedp)
        (let ((type (ecase signedp
                      ((nil) 'unsigned-byte)
-                     (t 'signed-byte))))
+                     ((t) 'signed-byte))))
          `(progn
             (defknown ,name (integer (integer 0)) (,type ,width)
                       (foldable flushable movable))
