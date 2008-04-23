@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.17 relative to 1.0.16:
+  * optimization: ADJOIN and PUSHNEW are upto ~70% faster in normal
+    SPEED policies.
   * bug fix: dynamic extent allocation of nested lists and vectors
     could leak to otherwise accessible parts.
   * bug fix: invalid optimization of heap-allocated alien variable

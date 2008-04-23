@@ -19,7 +19,7 @@
 
 (declaim (maybe-inline
           tree-equal nth %setnth nthcdr last last1 make-list append
-          nconc nconc2 member-if member-if-not tailp adjoin union
+          nconc nconc2 member-if member-if-not tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
           assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
@@ -776,13 +776,20 @@
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key))))
-    (declare (inline member))
     (if (let ((key-val (apply-key key item)))
           (if notp
               (member key-val list :test-not test-not :key key)
               (member key-val list :test test :key key)))
         list
         (cons item list))))
+
+(define-compiler-macro adjoin (item list &rest keys)
+  (with-unique-names (n-item n-list)
+    `(let ((,n-item ,item)
+           (,n-list ,list))
+       (if (member ,n-item ,n-list ,@keys)
+           ,n-list
+           (cons ,n-item ,n-list)))))
 
 (defconstant +list-based-union-limit+ 80)
 
