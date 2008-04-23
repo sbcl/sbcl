@@ -19,7 +19,7 @@
 
 (declaim (maybe-inline
           tree-equal nth %setnth nthcdr make-list
-          nconc nconc2 member-if member-if-not tailp union
+          member-if member-if-not tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
           assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
@@ -467,47 +467,36 @@
 ;;; and it avoids running down the last argument to NCONC which allows
 ;;; the last argument to be circular.
 (defun nconc (&rest lists)
-  #!+sb-doc
-  "Concatenates the lists given as arguments (by changing them)"
-  (flet ((fail (object)
-           (error 'type-error
-                  :datum object
-                  :expected-type 'list)))
-    (do ((top lists (cdr top)))
-        ((null top) nil)
-      (let ((top-of-top (car top)))
-        (typecase top-of-top
-          (cons
-           (let* ((result top-of-top)
-                  (splice result))
-             (do ((elements (cdr top) (cdr elements)))
-                 ((endp elements))
-               (let ((ele (car elements)))
-                 (typecase ele
-                   (cons (rplacd (last splice) ele)
-                         (setf splice ele))
-                   (null (rplacd (last splice) nil))
-                   (atom (if (cdr elements)
-                             (fail ele)
-                             (rplacd (last splice) ele)))
-                   (t (fail ele)))))
-             (return result)))
-          (null)
-          (atom
-           (if (cdr top)
-               (fail top-of-top)
-               (return top-of-top)))
-          (t (fail top-of-top)))))))
-
-(defun nconc2 (x y)
-  (if (null x) y
-    (let ((z x)
-          (rest (cdr x)))
-      (loop
-       (unless (consp rest)
-         (rplacd z y)
-         (return x))
-       (shiftf z rest (cdr rest))))))
+   #!+sb-doc
+   "Concatenates the lists given as arguments (by changing them)"
+   (declare (dynamic-extent lists) (optimize speed))
+   (flet ((fail (object)
+            (error 'type-error
+                   :datum object
+                   :expected-type 'list)))
+     (do ((top lists (cdr top)))
+         ((null top) nil)
+       (let ((top-of-top (car top)))
+         (typecase top-of-top
+           (cons
+            (let* ((result top-of-top)
+                   (splice result))
+              (do ((elements (cdr top) (cdr elements)))
+                  ((endp elements))
+                (let ((ele (car elements)))
+                  (typecase ele
+                    (cons (rplacd (last splice) ele)
+                          (setf splice ele))
+                    (null (rplacd (last splice) nil))
+                    (atom (if (cdr elements)
+                              (fail ele)
+                              (rplacd (last splice) ele))))))
+              (return result)))
+           (null)
+           (atom
+            (if (cdr top)
+                (fail top-of-top)
+                (return top-of-top))))))))
 
 (defun nreconc (x y)
   #!+sb-doc
