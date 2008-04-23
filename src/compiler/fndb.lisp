@@ -678,8 +678,13 @@
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
 (defknown nth (unsigned-byte list) t (foldable flushable))
 (defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
+
 (defknown last (list &optional unsigned-byte) t (foldable flushable))
-(defknown sb!impl::last1 (list) t (foldable flushable))
+(defknown %last0 (list) t (foldable flushable))
+(defknown %last1 (list) t (foldable flushable))
+(defknown %lastn/fixnum (list (and unsigned-byte fixnum)) t (foldable flushable))
+(defknown %lastn/bignum (list (and unsigned-byte bignum)) t (foldable flushable))
+
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
 (defknown make-list (index &key (:initial-element t)) list

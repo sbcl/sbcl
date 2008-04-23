@@ -142,7 +142,22 @@
 
 (define-source-transform nth (n l) `(car (nthcdr ,n ,l)))
 
-(define-source-transform last (x) `(sb!impl::last1 ,x))
+(deftransform last ((list &optional n) (t &optional t))
+  (let ((c (constant-lvar-p n)))
+    (cond ((or (not n)
+               (and c (eql 1 (lvar-value n))))
+           '(%last1 list))
+          ((and c (eql 0 (lvar-value n)))
+           '(%last0 list))
+          (t
+           (let ((type (lvar-type n)))
+             (cond ((csubtypep type (specifier-type 'fixnum))
+                    '(%lastn/fixnum list n))
+                   ((csubtypep type (specifier-type 'bignum))
+                    '(%lastn/bignum list n))
+                   (t
+                    (give-up-ir1-transform "second argument type too vague"))))))))
+
 (define-source-transform gethash (&rest args)
   (case (length args)
    (2 `(sb!impl::gethash3 ,@args nil))

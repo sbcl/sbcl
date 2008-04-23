@@ -130,6 +130,9 @@
   (assert (null (butlast s (* 1440 most-positive-fixnum))))
   (assert (null (nbutlast s (* 1440 most-positive-fixnum)))))
 
+(assert (eq :atom (last (list* 1 2 3 :atom) (eval 0))))
+(assert (eq :atom (last (list* 1 2 3 :atom) 0)))
+
 ;;; enforce lists in symbol-plist
 (let ((s (gensym))
       (l (list 1 3 4)))

@@ -18,7 +18,7 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal nth %setnth nthcdr last last1 make-list
+          tree-equal nth %setnth nthcdr make-list
           nconc nconc2 member-if member-if-not tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
@@ -230,28 +230,85 @@
               (fast-nthcdr (mod n i) r-i))
            (declare (type index i)))))))
 
-(defun last1 (list)
-  #!+sb-doc
-  "Return the last cons (not the last element) of a list"
-  (let ((rest list)
-        (list list))
-    (loop (unless (consp rest) (return list))
-          (shiftf list rest (cdr rest)))))
+;;; LAST
+;;;
+;;; Transforms in src/compiler/srctran.lisp pick the most specific
+;;; version possible. %LAST/BIGNUM is admittedly somewhat academic...
+(macrolet ((last0-macro ()
+             `(let ((rest list)
+                    (list list))
+                (loop (unless (consp rest)
+                        (return rest))
+                  (shiftf list rest (cdr rest)))))
+           (last1-macro ()
+             `(let ((rest list)
+                    (list list))
+                (loop (unless (consp rest)
+                        (return list))
+                  (shiftf list rest (cdr rest)))))
+           (lastn-macro (type)
+             `(let ((returned-list list)
+                    (checked-list list)
+                    (n (truly-the ,type n)))
+                (declare (,type n))
+                (tagbody
+                 :scan
+                   (pop checked-list)
+                   (when (atom checked-list)
+                     (go :done))
+                   (if (zerop (truly-the ,type (decf n)))
+                       (go :pop)
+                       (go :scan))
+                 :pop
+                   (pop returned-list)
+                   (pop checked-list)
+                   (if (atom checked-list)
+                       (go :done)
+                       (go :pop))
+                 :done)
+                returned-list)))
 
-(defun last (list &optional (n 1))
-  #!+sb-doc
-  "Return the last N conses (not the last element!) of a list."
-  (if (eql n 1)
-      (last1 list)
-    (if (typep n 'index)
-        (do ((checked-list list (cdr checked-list))
-             (returned-list list)
-             (index 0 (1+ index)))
-            ((atom checked-list) returned-list)
-          (declare (type index index))
-          (if (>= index n)
-              (pop returned-list)))
-      list)))
+  (defun %last0 (list)
+    (declare (optimize speed (sb!c::verify-arg-count 0)))
+    (last0-macro))
+
+  (defun %last1 (list)
+    (declare (optimize speed (sb!c::verify-arg-count 0)))
+    (last1-macro))
+
+  (defun %lastn/fixnum (list n)
+    (declare (optimize speed (sb!c::verify-arg-count 0))
+             (type (and unsigned-byte fixnum) n))
+    (case n
+      (1 (last1-macro))
+      (0 (last0-macro))
+      (t (lastn-macro fixnum))))
+
+  (defun %lastn/bignum (list n)
+    (declare (optimize speed (sb!c::verify-arg-count 0))
+             (type (and unsigned-byte bignum) n))
+    (lastn-macro unsigned-byte))
+
+  (defun last (list &optional (n 1))
+    #!+sb-doc
+    "Return the last N conses (not the last element!) of a list."
+    (case n
+      (1 (last1-macro))
+      (0 (last0-macro))
+      (t
+       (typecase n
+         (fixnum
+          (lastn-macro fixnum))
+         (bignum
+          (lastn-macro unsigned-byte)))))))
+
+(define-compiler-macro last (&whole form list &optional (n 1) &environment env)
+  (if (sb!xc:constantp n env)
+      (case (constant-form-value n env)
+        (0 `(%last0 ,list))
+        (1 `(%last1 ,list))
+        (t form))
+      form))
 
 (defun list (&rest args)
   #!+sb-doc
