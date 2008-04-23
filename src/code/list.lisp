@@ -18,7 +18,7 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal nth %setnth nthcdr last last1 make-list append
+          tree-equal nth %setnth nthcdr last last1 make-list
           nconc nconc2 member-if member-if-not tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
@@ -282,33 +282,61 @@
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
+  (declare (dynamic-extent lists) (optimize speed))
   (labels ((fail (object)
              (error 'type-error
                     :datum object
                     :expected-type 'list))
            (append-into (last-cons current rest)
-             "Set (CDR LAST-CONS) to (APPLY #'APPEND CURRENT REST)."
+             ;; Set (CDR LAST-CONS) to (APPLY #'APPEND CURRENT REST).
              (declare (cons last-cons rest))
-             (cond ((consp current)
-                    (append-into (setf (cdr last-cons) (list (car current)))
-                                (cdr current)
-                                rest))
-                   ((not (null current)) (fail current))
-                   ((null (cdr rest)) (setf (cdr last-cons) (car rest)))
-                   (t (append-into last-cons (car rest) (cdr rest)))))
+             (if (listp current)
+                 (if (consp current)
+                     ;; normal case, cdr down the list
+                     (append-into (setf (cdr last-cons) (list (car current)))
+                                  (cdr current)
+                                  rest)
+                     ;; empty list
+                     (let ((more (cdr rest)))
+                       (if (null more)
+                           (setf (cdr last-cons) (car rest))
+                           (append-into last-cons (car rest) more))))
+                 (fail current)))
            (append1 (lists)
              (let ((current (car lists))
                    (rest (cdr lists)))
-               (cond ((null rest) current)
+               (cond ((null rest)
+                      current)
                      ((consp current)
                       (let ((result (truly-the cons (list (car current)))))
                         (append-into result
-                                    (cdr current)
-                                    rest)
+                                     (cdr current)
+                                     rest)
                         result))
-                     ((null current) (append1 rest))
-                     (t (fail current))))))
+                     ((null current)
+                      (append1 rest))
+                     (t
+                      (fail current))))))
     (append1 lists)))
+
+(defun append2 (x y)
+  (declare (optimize speed (sb!c::verify-arg-count 0)))
+  (if (null x)
+      y
+      (let ((result (list (car x))))
+        (do ((more (cdr x) (cdr more))
+             (tail result (cdr tail)))
+            ((null more)
+             (rplacd tail y)
+             result)
+          (rplacd tail (list (car more)))))))
+
+(define-compiler-macro append (&whole form &rest lists)
+  (case (length lists)
+    (0 nil)
+    (1 (car lists))
+    (2 `(append2 ,@lists))
+    (t form)))
 
 ;;;; list copying functions
 
