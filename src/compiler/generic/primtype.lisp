@@ -16,7 +16,7 @@
 
 (/show0 "primtype.lisp 17")
 
-(!def-primitive-type t (descriptor-reg))
+(!def-primitive-type t (descriptor-reg #!+(or x86 x86-64) any-reg))
 (/show0 "primtype.lisp 20")
 (setf *backend-t-primitive-type* (primitive-type-or-lose t))
 
