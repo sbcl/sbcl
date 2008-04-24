@@ -23,7 +23,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop nil-array-accessed-error object)))
+    (error-call vop
+                #!+x86 'nil-array-accessed-error
+                #!-x86 nil-array-accessed-error
+                object)))
 
 ;;; It shouldn't be possible to fall through to here in normal user
 ;;; code, as the system is smart enough to deduce that there must be
@@ -48,7 +51,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop nil-array-accessed-error object)))
+    (error-call vop
+                #!+x86 'nil-array-accessed-error
+                #!-x86 nil-array-accessed-error
+                object)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-nil)
   (:translate data-vector-ref-with-offset)
@@ -64,7 +70,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop nil-array-accessed-error object)))
+    (error-call vop
+                #!+x86 'nil-array-accessed-error
+                #!-x86 nil-array-accessed-error
+                object)))
 
 (define-vop (data-vector-set/simple-array-nil)
   (:translate data-vector-set)
@@ -81,7 +90,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop nil-array-accessed-error object)))
+    (error-call vop
+                #!+x86 'nil-array-accessed-error
+                #!-x86 nil-array-accessed-error
+                object)))
 
 ;;; FIXME: There is probably plenty of other array stuff that looks
 ;;; the same or similar enough to be genericized.  Do so, and move it

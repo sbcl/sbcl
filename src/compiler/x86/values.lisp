@@ -93,7 +93,7 @@
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn list-pointer-lowtag)
     (inst jmp :e loop)
-    (error-call vop bogus-arg-to-values-list-error list)
+    (error-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
     (inst mov count start)              ; start is high address

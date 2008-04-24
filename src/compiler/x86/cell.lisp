@@ -66,7 +66,7 @@
     ;; This code has to pathological cases: NO-TLS-VALUE-MARKER
     ;; or UNBOUND-MARKER as NEW: in either case we would end up
     ;; doing possible damage with CMPXCHG -- so don't do that!
-    (let ((unbound (generate-error-code vop unbound-symbol-error symbol))
+    (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol))
           (check (gen-label)))
       (move eax old)
       #!+sb-thread
@@ -130,7 +130,7 @@
   (:save-p :compute-only)
   (:generator 9
     (let* ((check-unbound-label (gen-label))
-           (err-lab (generate-error-code vop unbound-symbol-error object))
+           (err-lab (generate-error-code vop 'unbound-symbol-error object))
            (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst fs-segment-prefix)
@@ -171,7 +171,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 9
-    (let ((err-lab (generate-error-code vop unbound-symbol-error object)))
+    (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
@@ -261,7 +261,7 @@
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value nil-value)
-    (let ((err-lab (generate-error-code vop undefined-fun-error object)))
+    (let ((err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst jmp :e err-lab))))
 
 (define-vop (set-fdefn-fun)

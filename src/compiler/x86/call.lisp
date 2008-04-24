@@ -1422,7 +1422,7 @@
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (if (zerop count)
           (inst test nargs nargs)  ; smaller instruction
         (inst cmp nargs (fixnumize count)))
@@ -1440,7 +1440,7 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ,error ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (def arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs)
   (def type-check-error object-not-type-error sb!c::%type-check-error

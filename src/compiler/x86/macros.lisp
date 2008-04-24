@@ -294,6 +294,32 @@
       ,@forms)))
 
 ;;;; error code
+(defun emit-error-break (vop kind code values)
+  (assemble ()
+    #-darwin
+    (inst int 3)                        ; i386 breakpoint instruction
+    ;; CLH 20060314
+    ;; On Darwin, we need to use #x0b0f instead of int3 in order
+    ;; to generate a SIGILL instead of a SIGTRAP as darwin/x86
+    ;; doesn't seem to be reliably firing SIGTRAP
+    ;; handlers. Hopefully this will be fixed by Apple at a
+    ;; later date.
+    #+darwin
+    (inst word #x0b0f)
+    (when vop
+      (note-this-location vop :internal-error))
+    (inst byte kind)                    ; e.g. trap_xyyy
+    (with-adjustable-vector (vector)    ; interr arguments
+      (write-var-integer code vector)
+      (dolist (tn values)
+        (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
+                                           (or (tn-offset tn) 0))
+                           vector))
+      (inst byte (length vector))
+      (dotimes (i (length vector))
+        (inst byte (aref vector i))))))
+
+#+nil
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
@@ -328,21 +354,20 @@
           (dotimes (i (length ,vector))
             (inst byte (aref ,vector i))))))))
 
-(defmacro error-call (vop error-code &rest values)
+(defun error-call (vop error-code &rest values)
   #!+sb-doc
   "Cause an error. ERROR-CODE is the error to cause."
-  (cons 'progn
-        (emit-error-break vop error-trap error-code values)))
+  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
-(defmacro generate-error-code (vop error-code &rest values)
+(defun generate-error-code (vop error-code &rest values)
   #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
-  `(assemble (*elsewhere*)
-     (let ((start-lab (gen-label)))
-       (emit-label start-lab)
-       (error-call ,vop ,error-code ,@values)
-       start-lab)))
+  (assemble (*elsewhere*)
+    (let ((start-lab (gen-label)))
+      (emit-label start-lab)
+      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
+      start-lab)))
 
 
 ;;;; PSEUDO-ATOMIC

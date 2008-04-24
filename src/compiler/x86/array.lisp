@@ -112,7 +112,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
-    (let ((error (generate-error-code vop invalid-array-index-error
+    (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index))
           (index (if (sc-is index immediate)
                    (fixnumize (tn-value index))

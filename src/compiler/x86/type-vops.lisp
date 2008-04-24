@@ -197,7 +197,7 @@
            `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
                (:generator ,cost
                  (let ((err-lab
-                        (generate-error-code vop ,error-code value)))
+                        (generate-error-code vop ',error-code value)))
                    (test-type value err-lab t (,@type-codes))
                    (move result value))))))
        ,@(when ptype
@@ -237,7 +237,7 @@
 (define-vop (check-signed-byte-32 check-type)
   (:generator 45
     (let ((nope (generate-error-code vop
-                                     object-not-signed-byte-32-error
+                                     'object-not-signed-byte-32-error
                                      value)))
       (generate-fixnum-test value)
       (inst jmp :e yep)
@@ -302,7 +302,7 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 45
     (let ((nope
-           (generate-error-code vop object-not-unsigned-byte-32-error value))
+           (generate-error-code vop 'object-not-unsigned-byte-32-error value))
           (yep (gen-label))
           (fixnum (gen-label))
           (single-word (gen-label)))
@@ -359,7 +359,7 @@
 
 (define-vop (check-symbol check-type)
   (:generator 12
-    (let ((error (generate-error-code vop object-not-symbol-error value)))
+    (let ((error (generate-error-code vop 'object-not-symbol-error value)))
       (inst cmp value nil-value)
       (inst jmp :e drop-thru)
       (test-type value error t (symbol-header-widetag)))
@@ -377,7 +377,7 @@
 
 (define-vop (check-cons check-type)
   (:generator 8
-    (let ((error (generate-error-code vop object-not-cons-error value)))
+    (let ((error (generate-error-code vop 'object-not-cons-error value)))
       (inst cmp value nil-value)
       (inst jmp :e error)
       (test-type value error t (list-pointer-lowtag))
