@@ -243,3 +243,10 @@
     (assert (not res))
     (assert (typep err 'sb-kernel:bounding-indices-bad-error))))
 
+;;; ADJOIN must apply key to item as well
+(assert (equal '((:b)) (funcall
+                        (compile nil '(lambda (x y) (adjoin x y :key #'car :test #'string=)))
+                        (list 'b) (list '(:b)))))
+(assert (equal '((:b))
+               (let ((sb-ext:*evaluator-mode* :interpret))
+                 (eval '(adjoin (list 'b) (list '(:b)) :key #'car :test #'string=)))))
