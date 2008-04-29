@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.17 relative to 1.0.16:
+  * optimization: ADJOIN and PUSHNEW are upto ~70% faster in normal
+    SPEED policies.
   * optimization: APPEND is upto ~10% faster in normal SPEED policies.
   * optimization: two argument forms of LAST are upto ~10% faster
     in normal SPEED policies.

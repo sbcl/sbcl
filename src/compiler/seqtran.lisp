@@ -381,6 +381,9 @@
 (deftransform assoc ((item list &key key test test-not) * * :node node)
   (transform-list-item-seek 'assoc item list key test test-not node))
 
+(deftransform adjoin ((item list &key key test test-not) * * :node node)
+  (transform-list-item-seek 'adjoin item list key test test-not node))
+
 (deftransform memq ((item list) (t (constant-arg list)))
   (labels ((rec (tail)
              (if tail
