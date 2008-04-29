@@ -337,9 +337,9 @@ scavenge_interrupt_context(os_context_t *context)
        0x7FFFFFFFFFFFFFFF on 64-bit platforms */
     lip_offset = (((unsigned long)1) << (N_WORD_BITS - 1)) - 1;
     lip_register_pair = -1;
-    for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
+    for (i = 0; i < (int)(sizeof(boxed_registers) / sizeof(int)); i++) {
         unsigned long reg;
-        long offset;
+        unsigned long offset;
         int index;
 
         index = boxed_registers[i];
@@ -372,7 +372,7 @@ scavenge_interrupt_context(os_context_t *context)
 #endif
 
     /* Scavenge all boxed registers in the context. */
-    for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
+    for (i = 0; i < (int)(sizeof(boxed_registers) / sizeof(int)); i++) {
         int index;
         lispobj foo;
 
