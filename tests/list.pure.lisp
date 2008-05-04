@@ -250,3 +250,15 @@
 (assert (equal '((:b))
                (let ((sb-ext:*evaluator-mode* :interpret))
                  (eval '(adjoin (list 'b) (list '(:b)) :key #'car :test #'string=)))))
+
+;;; constant list argument to ADJOIN
+(assert (equal '(:x :y) (funcall
+                         (compile nil '(lambda (elt)
+                                        (declare (optimize speed))
+                                        (adjoin elt '(:x :y))))
+                         ':x)))
+(assert (equal '(:x :y) (funcall
+                         (compile nil '(lambda (elt)
+                                        (declare (optimize speed))
+                                        (adjoin elt '(:y))))
+                         ':x)))
