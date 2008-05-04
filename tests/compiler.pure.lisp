@@ -528,10 +528,18 @@
     (funcall f y 1)
     (assert (equal y #*10))))
 
+;;; use of declared array types
 (handler-bind ((sb-ext:compiler-note #'error))
   (compile nil '(lambda (x)
-                 (declare (type (simple-array (simple-string 3) (5)) x))
+                 (declare (type (simple-array (simple-string 3) (5)) x)
+                          (optimize speed))
                  (aref (aref x 0) 0))))
+
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda (x)
+                 (declare (type (simple-array (simple-array bit (10)) (10)) x)
+                          (optimize speed))
+                 (1+ (aref (aref x 0) 0)))))
 
 ;;; compiler failure
 (let ((f (compile nil '(lambda (x) (typep x '(not (member 0d0)))))))

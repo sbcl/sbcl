@@ -800,19 +800,23 @@
 ;; without bloating the code. If we already know the type of the array
 ;; with sufficient precision, skip directly to DATA-VECTOR-REF.
 (deftransform aref ((array index) (t t) * :node node)
-  (let ((type (lvar-type array)))
-    (cond ((and (array-type-p type)
-                (null (array-type-complexp type))
-                (not (eql (extract-upgraded-element-type array)
-                          *wild-type*))
-                (eql (length (array-type-dimensions type)) 1))
-           `(data-vector-ref array (%check-bound array
-                                                 (array-dimension array 0)
-                                                 index)))
-          ((policy node (zerop insert-array-bounds-checks))
-           `(hairy-data-vector-ref array index))
-          (t
-           `(hairy-data-vector-ref/check-bounds array index)))))
+  (let* ((type (lvar-type array))
+         (element-ctype (extract-upgraded-element-type array)))
+    (cond
+      ((and (array-type-p type)
+            (null (array-type-complexp type))
+            (not (eql element-ctype *wild-type*))
+            (eql (length (array-type-dimensions type)) 1))
+       (let* ((declared-element-ctype (extract-declared-element-type array))
+              (bare-form
+               `(data-vector-ref array
+                 (%check-bound array (array-dimension array 0) index))))
+         (if (type= declared-element-ctype element-ctype)
+             bare-form
+             `(the ,(type-specifier declared-element-ctype) ,bare-form))))
+      ((policy node (zerop insert-array-bounds-checks))
+       `(hairy-data-vector-ref array index))
+      (t `(hairy-data-vector-ref/check-bounds array index)))))
 
 (deftransform %aset ((array index new-value) (t t t) * :node node)
   (if (policy node (zerop insert-array-bounds-checks))
