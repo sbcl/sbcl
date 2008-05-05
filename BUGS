@@ -1927,3 +1927,27 @@ generally try to check returns in safe code, so we should here too.)
 
  The problem is with the fast path using ansi-stream-cin-buffer not hitting
  closed-flame.
+
+426: inlining failure involving multiple nested calls
+
+   (declaim (inline foo))
+   (defun foo (x y)
+     (cons x y))
+   (defun bar (x)
+     (foo (foo x x) (foo x x)))
+   ;; shows a full call to FOO
+   (disassemble 'bar)
+   ;; simple way to test this programmatically
+   (let ((code (sb-c::fun-code-header #'bar))
+         (foo (sb-impl::fdefinition-object 'foo nil)))
+     (loop for i from sb-vm:code-constants-offset below (sb-kernel:get-header-data code)
+           do (assert (not (eq foo (sb-kernel:code-header-ref code i))))))
+
+ This appears to be an ancient bug, inherited from CMUCL: reportedly
+ 18c does the same thing. RECOGNIZE-KNOWN-CALL correctly picks up only
+ one of the calls, but local call analysis fails to inline the call
+ for the second time. Nikodemus thinks (but is not 100% sure based on
+ very brief investigation) that the call that is not inlined is the
+ second nested one. A trivial fix is to call CHANGE-REF-LEAF in known
+ call for functions already inline converted there, but he is not sure
+ if this has adverse effects elsewhere.
