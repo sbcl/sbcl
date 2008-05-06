@@ -125,7 +125,7 @@
         ;; See comment in interr.lisp
         *heap-exhausted-error-condition* (make-condition 'heap-exhausted-error)))
 
-(declaim (ftype (function () unsigned-byte) get-bytes-consed))
+(declaim (ftype (sfunction () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()
   #!+sb-doc
   "Return the number of bytes consed since the program began. Typically

@@ -827,6 +827,7 @@
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
 (macrolet ((define (name transform-to extra extra-type)
+             (declare (ignore extra-type))
              `(deftransform ,name ((array index ,@extra))
                 (let ((type (lvar-type array))
                       (element-type (extract-upgraded-element-type array)))

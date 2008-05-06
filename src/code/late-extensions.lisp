@@ -126,6 +126,8 @@ EXPERIMENTAL: Interface subject to change."
 (macrolet ((def (name lambda-list ref &optional set)
              `(defun ,name (,@lambda-list old new)
                 #!+compare-and-swap-vops
+                (declare (ignore ref set))
+                #!+compare-and-swap-vops
                 (,name ,@lambda-list old new)
                 #!-compare-and-swap-vops
                 (let ((current (,ref ,@lambda-list)))

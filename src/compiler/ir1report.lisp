@@ -399,10 +399,10 @@ has written, having proved that it is unreachable."))
     (values))
 
   ;; Issue a note when we might or might not be in the compiler.
-  (defun maybe-compiler-notify (&rest rest)
+  (defun maybe-compiler-notify (datum &rest args)
     (if (boundp '*lexenv*) ; if we're in the compiler
-        (apply #'compiler-notify rest)
-        (with-condition (condition (car rest) (cdr rest))
+        (apply #'compiler-notify datum args)
+        (with-condition (condition datum args)
           (let ((stream *error-output*))
             (pprint-logical-block (stream nil :per-line-prefix ";")
               (format stream " note: ~3I~_")

@@ -39,11 +39,6 @@
 (defun sb!xc:deposit-field (new cross-byte int)
   (cl:deposit-field new (uncross-byte cross-byte) int))
 
-(defun sb!c::mask-signed-field (size integer)
-  (if (logbitp (1- size) integer)
-      (dpb integer (byte size 0) -1)
-      (ldb (byte size 0) integer)))
-
 (define-setf-expander sb!xc:ldb (cross-byte int &environment env)
   (multiple-value-bind (temps vals stores store-form access-form)
       (get-setf-expansion int env)

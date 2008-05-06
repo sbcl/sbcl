@@ -272,8 +272,6 @@
          (type (pathname-type pathname))
          (type-present-p (typep type '(not (member nil :unspecific))))
          (type-string (if type-present-p type "")))
-    (when name-present-p
-      (setf as-file nil))
     (coerce
      (with-output-to-string (s)
        (when device
