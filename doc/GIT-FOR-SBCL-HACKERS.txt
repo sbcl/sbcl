@@ -72,8 +72,7 @@ in one step, which you will be doing a lot, since branches are really
 nice in Git! The magic is: "git checkout -b hack-a-bit-more" -- but
 leave that for another time.
 
-Let's do something. Edit version.lisp-expr, and maybe give SBCL some
-love.
+Let's do something. Edit BUGS, and maybe give SBCL some love.
 
  git diff                # shows you the changes in your tree
  git status              # shows you the state of files in the tree
@@ -85,7 +84,7 @@ nothing would happen. What's going on?
 Git has a notion of a separate "staging area", from which commits are
 made. You can add content to the it by using git-add:
 
- git add version.lisp-expr
+ git add BUGS
  git status
  git diff
 
@@ -95,8 +94,8 @@ is silent!
 By default git-diff shows the differences between the working tree and
 the staging area (which starts out identical to HEAD after a checkout).
 
-Edit version.lisp-expr again. Now you have three versions of it
-(ignoring all the historical versions for a second) to compare:
+Edit BUGS again. Now you have three versions of it (ignoring all the
+historical versions for a second) to compare:
 
  git diff               # between tree and staging area
  git diff HEAD          # between tree and last commit
@@ -107,7 +106,7 @@ staging area, not the one in the tree.
 
 We like our latest version, so do
 
- git add version.lisp-expr
+ git add BUGS
 
 again. Now the latest version is in the staging area, and version that
 used to be there is gone. You don't need to worry about the staging
@@ -158,7 +157,7 @@ to ignore whitespace changes -- you can usually leave it out, but it's
 nice when diffing across the great whitespacification patches.
 
 Onwards: just so that we have a bit more history on the branch, edit
-version.lisp-expr again, and git-commit again. You can use
+BUGS again, and git-commit again. You can use
 
  git commit -a
 
@@ -295,6 +294,11 @@ foo-hacks, naming them
   0001-first-line-of-commit-message.patch
   0002-and-so-and-so-forth.patch
   ...
+
+Due to, among other things, the cvs->git synchronization lag it is
+easy to get conflicts on version.lisp-expr so you may want to delay
+finalizing version.lisp-expr and the .msg file that cvsexportcommit
+produced by bumping the version and adding it to the commit message.
 
 To get latest changes from the CVS Git mirror you originally cloned
 from, do
