@@ -37,7 +37,7 @@ This is intended to be used interactively, to facilitate recompiling large
 bodies of code with eg. a known minimum safety.
 
 EXPERIMENTAL INTERFACE: Subject to change."
-  (declare (policy-quality min))
+  (declare (type policy-quality min))
   (when quality
     (aver (policy-quality-name-p quality))
     (if (zerop min)

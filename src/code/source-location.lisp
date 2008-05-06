@@ -30,6 +30,7 @@
   (plist *source-plist*))
 
 (defun make-file-info-namestring (name file-info)
+  #+sb-xc-host (declare (ignore name))
   (let* ((untruename (file-info-untruename file-info))
          (dir (and untruename (pathname-directory untruename))))
     #+sb-xc-host
@@ -49,6 +50,7 @@
 
 #!+sb-source-locations
 (define-compiler-macro source-location (&environment env)
+  #+sb-xc-host (declare (ignore env))
   #-sb-xc-host
   (unless (policy env (and (> space 1)
                            (> space debug)))
