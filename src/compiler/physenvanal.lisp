@@ -334,11 +334,10 @@
                    (loop for what in (cleanup-info cleanup)
                          do (etypecase what
                               (lvar
-                               (if (let ((uses (lvar-uses what)))
-                                     (if (listp uses)
-                                         (every #'use-good-for-dx-p uses)
-                                         (use-good-for-dx-p uses)))
-                                   (real-dx-lvars what)
+                               (if (lvar-good-for-dx-p what component)
+                                   (let ((real (principal-lvar what)))
+                                     (setf (lvar-dynamic-extent real) cleanup)
+                                     (real-dx-lvars real))
                                    (setf (lvar-dynamic-extent what) nil)))
                               (node ; DX closure
                                (let* ((call what)
@@ -347,9 +346,9 @@
                                       (dx nil))
                                  (dolist (fun funs)
                                    (binding* ((() (leaf-dynamic-extent fun)
-                                                  :exit-if-null)
+                                               :exit-if-null)
                                               (xep (functional-entry-fun fun)
-                                                   :exit-if-null)
+                                               :exit-if-null)
                                               (closure (physenv-closure
                                                         (get-lambda-physenv xep))))
                                      (cond (closure
@@ -359,9 +358,10 @@
                                  (when dx
                                    (setf (lvar-dynamic-extent arg) cleanup)
                                    (real-dx-lvars arg))))))
-                   (setf (cleanup-info cleanup) (real-dx-lvars))
-                   (setf (component-dx-lvars component)
-                         (append (real-dx-lvars) (component-dx-lvars component)))))))
+                   (let ((real-dx-lvars (delete-duplicates (real-dx-lvars))))
+                     (setf (cleanup-info cleanup) real-dx-lvars)
+                     (setf (component-dx-lvars component)
+                           (append real-dx-lvars (component-dx-lvars component))))))))
   (values))
 
 ;;;; cleanup emission

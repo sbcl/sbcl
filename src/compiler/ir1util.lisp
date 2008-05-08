@@ -62,6 +62,15 @@
         uses
         (list uses))))
 
+(declaim (ftype (sfunction (lvar) lvar) principal-lvar))
+(defun principal-lvar (lvar)
+  (labels ((pl (lvar)
+             (let ((use (lvar-uses lvar)))
+               (if (cast-p use)
+                   (pl (cast-value use))
+                   lvar))))
+    (pl lvar)))
+
 (defun principal-lvar-use (lvar)
   (labels ((plu (lvar)
              (declare (type lvar lvar))
@@ -382,18 +391,37 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
-(defun use-good-for-dx-p (use)
-  (and (combination-p use)
-       (eq (combination-kind use) :known)
-       (awhen (fun-info-stack-allocate-result
-               (combination-fun-info use))
-         (funcall it use))))
+(declaim (ftype (sfunction (node &optional (or null component)) boolean)
+                use-good-for-dx-p))
+(declaim (ftype (sfunction (lvar &optional (or null component)) boolean)
+                lvar-good-for-dx-p))
+(defun use-good-for-dx-p (use &optional component)
+  ;; FIXME: Can casts point to LVARs in other components?
+  ;; RECHECK-DYNAMIC-EXTENT-LVARS assumes that they can't -- that
+  ;; is, that the PRINCIPAL-LVAR is always in the same component
+  ;; as the original one. It would be either good to have an
+  ;; explanation of why casts don't point across components, or an
+  ;; explanation of when they do it. ...in the meanwhile AVER that
+  ;; our expactation holds true.
+  (aver (or (not component) (eq component (node-component use))))
+  (or (and (combination-p use)
+           (eq (combination-kind use) :known)
+           (awhen (fun-info-stack-allocate-result
+                   (combination-fun-info use))
+             (funcall it use))
+           t)
+      (and (cast-p use)
+           (not (cast-type-check use))
+           (lvar-good-for-dx-p (cast-value use) component)
+           t)))
 
-(defun lvar-good-for-dx-p (lvar)
+(defun lvar-good-for-dx-p (lvar &optional component)
   (let ((uses (lvar-uses lvar)))
     (if (listp uses)
-        (every #'use-good-for-dx-p uses)
-        (use-good-for-dx-p uses))))
+        (every (lambda (use)
+                 (use-good-for-dx-p use component))
+               uses)
+        (use-good-for-dx-p uses component))))
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)

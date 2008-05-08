@@ -50,12 +50,16 @@
     ;; so we just need to process used-once LVARs.
     (when (node-p uses)
       (node-ends-block uses))
-    ;; If this LVAR's USE is good for DX, it must be a regular
-    ;; combination, and its arguments are potentially DX as well.
+    ;; If this LVAR's USE is good for DX, it is either a CAST, or it
+    ;; must be a regular combination whose arguments are potentially DX as well.
     (flet ((recurse (use)
-             (loop for arg in (combination-args use)
-                   when (lvar-good-for-dx-p arg)
-                   append (handle-nested-dynamic-extent-lvars arg))))
+             (etypecase use
+               (cast
+                (handle-nested-dynamic-extent-lvars (cast-value use)))
+               (combination
+                (loop for arg in (combination-args use)
+                      when (lvar-good-for-dx-p arg)
+                      append (handle-nested-dynamic-extent-lvars arg))))))
       (cons lvar
             (if (listp uses)
                 (loop for use in uses

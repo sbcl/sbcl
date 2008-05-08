@@ -146,6 +146,14 @@
     (true cons)
     nil))
 
+;;; MAKE-ARRAY
+
+(defun-with-dx make-array-on-stack ()
+  (let ((v (make-array '(42) :element-type 'single-float)))
+    (declare (dynamic-extent v))
+    (true v)
+    nil))
+
 ;;; Nested DX
 
 (defun-with-dx nested-dx-lists ()
@@ -240,6 +248,7 @@
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
   (assert-no-consing (cons-on-stack 42))
+  (assert-no-consing (make-array-on-stack))
   (assert-no-consing (nested-dx-conses))
   (assert-no-consing (nested-dx-lists))
   (assert-consing (nested-dx-not-used *a-cons*))
@@ -289,7 +298,7 @@
   (let ((a (make-array 11 :initial-element 0)))
     (declare (dynamic-extent a))
     (assert (every (lambda (x) (eql x 0)) a))))
-(bdowning-2005-iv-16)
+(assert-no-consing (bdowning-2005-iv-16))
 
 
 (defun-with-dx let-converted-vars-dx-allocated-bug (x y z)
