@@ -51,6 +51,9 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
                 sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
                 SetSymbolValue(FREE_TLS_INDEX,
                                make_fixnum(fixnum_value(sym->tls_index)+1),0);
+                if(fixnum_value(sym->tls_index)>=TLS_SIZE) {
+                    lose("Thread local storage exhausted.");
+                }
             }
             release_spinlock(tls_index_lock);
             clear_pseudo_atomic_atomic(th);

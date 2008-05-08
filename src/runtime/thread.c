@@ -82,7 +82,7 @@ pthread_mutex_t freeable_stack_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct freeable_stack * volatile freeable_stack = 0;
 #endif
 
-int dynamic_values_bytes=4096*sizeof(lispobj);  /* same for all threads */
+int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
 extern struct interrupt_data * global_interrupt_data;
 

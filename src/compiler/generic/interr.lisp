@@ -145,6 +145,8 @@
    "Object layout is invalid. (indicates obsolete instance)")
   (object-not-complex-vector
    "Object is not a complex (non-SIMPLE-ARRAY) vector.")
+  (tls-exhausted
+   "Thread local storage exhausted.")
   .
   #.(map 'list
          (lambda (saetp)

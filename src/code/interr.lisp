@@ -282,6 +282,15 @@
          :datum object
          :expected-type '(unsigned-byte 32)))
 
+(deferr tls-exhausted-error ()
+  ;; There is nothing we can do about it. A number of entries in the
+  ;; tls could be reserved and made available for recovery but since
+  ;; tls indices are never reused it would be kind of silly and
+  ;; without it signalling an error is more than likely to end in a
+  ;; recursive error.
+  (%primitive print "Thread local storage exhausted.")
+  (sb!impl::%halt))
+
 (macrolet
     ((define-simple-array-internal-errors ()
          `(progn

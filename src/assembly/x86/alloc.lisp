@@ -80,50 +80,54 @@
   (frob-cons-routines))
 
 #+sb-assembling
-(macrolet ((def (reg)
-             (declare (ignorable reg))
-             #!+sb-thread
-             (let* ((name (intern (format nil "ALLOC-TLS-INDEX-IN-~A" reg)))
-                    (target-offset (intern (format nil "~A-OFFSET" reg)))
-                    (other-offset (if (eql 'eax reg)
-                                      'ecx-offset
-                                      'eax-offset)))
-               ;; Symbol starts in TARGET, where the TLS-INDEX ends up in.
-               `(define-assembly-routine ,name
-                    ((:temp other descriptor-reg ,other-offset)
-                     (:temp target descriptor-reg ,target-offset))
-                  (let ((get-tls-index-lock (gen-label))
-                        (release-tls-index-lock (gen-label)))
-                    (pseudo-atomic
-                     ;; Save OTHER & push the symbol. EAX is either one of the two.
-                     (inst push other)
-                     (inst push target)
-                     (emit-label get-tls-index-lock)
-                     (inst mov target 1)
-                     (inst xor eax-tn eax-tn)
-                     (inst lock)
-                     (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) target)
-                     (inst jmp :ne get-tls-index-lock)
-                     ;; The symbol is now in OTHER.
-                     (inst pop other)
-                     ;; Now with the lock held, see if the symbol's tls index has been
-                     ;; set in the meantime.
-                     (loadw target other symbol-tls-index-slot other-pointer-lowtag)
-                     (inst or target target)
-                     (inst jmp :ne release-tls-index-lock)
-                     ;; Allocate a new tls-index.
-                     (load-symbol-value target *free-tls-index*)
-                     (inst add (make-ea-for-symbol-value *free-tls-index*) (fixnumize 1))
-                     (storew target other symbol-tls-index-slot other-pointer-lowtag)
-                     (emit-label release-tls-index-lock)
-                     (store-symbol-value 0 *tls-index-lock*)
-                     ;; Restore OTHER.
-                     (inst pop other))
-                    (inst ret))))))
+(macrolet
+    ((def (reg)
+       (declare (ignorable reg))
+       #!+sb-thread
+       (let* ((name (intern (format nil "ALLOC-TLS-INDEX-IN-~A" reg)))
+              (target-offset (intern (format nil "~A-OFFSET" reg)))
+              (other-offset (if (eql 'eax reg)
+                                'ecx-offset
+                                'eax-offset)))
+         ;; Symbol starts in TARGET, where the TLS-INDEX ends up in.
+         `(define-assembly-routine ,name
+              ((:temp other descriptor-reg ,other-offset)
+               (:temp target descriptor-reg ,target-offset))
+            (let ((get-tls-index-lock (gen-label))
+                  (release-tls-index-lock (gen-label)))
+              (pseudo-atomic
+               ;; Save OTHER & push the symbol. EAX is either one of the two.
+               (inst push other)
+               (inst push target)
+               (emit-label get-tls-index-lock)
+               (inst mov target 1)
+               (inst xor eax-tn eax-tn)
+               (inst lock)
+               (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) target)
+               (inst jmp :ne get-tls-index-lock)
+               ;; The symbol is now in OTHER.
+               (inst pop other)
+               ;; Now with the lock held, see if the symbol's tls index has been
+               ;; set in the meantime.
+               (loadw target other symbol-tls-index-slot other-pointer-lowtag)
+               (inst or target target)
+               (inst jmp :ne release-tls-index-lock)
+               ;; Allocate a new tls-index.
+               (load-symbol-value target *free-tls-index*)
+               (let ((error (generate-error-code nil 'tls-exhausted-error)))
+                 (inst cmp target (fixnumize tls-size))
+                 (inst jmp :ge error))
+               (inst add (make-ea-for-symbol-value *free-tls-index*)
+                     (fixnumize 1))
+               (storew target other symbol-tls-index-slot other-pointer-lowtag)
+               (emit-label release-tls-index-lock)
+               (store-symbol-value 0 *tls-index-lock*)
+               ;; Restore OTHER.
+               (inst pop other))
+              (inst ret))))))
   (def eax)
   (def ebx)
   (def ecx)
   (def edx)
   (def edi)
   (def esi))
-

@@ -71,3 +71,7 @@
     :value
     :key-and-value
     :key-or-value))
+
+;;; Number of entries in the thread local storage. Limits the number
+;;; of symbols with thread local bindings.
+(def!constant tls-size 4096)
