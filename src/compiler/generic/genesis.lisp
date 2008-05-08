@@ -1108,6 +1108,8 @@ core and return a descriptor to it."
         *cl-package*
         ;; ordinary case
         (let ((result (symbol-package symbol)))
+          (unless (package-ok-for-target-symbol-p result)
+            (bug "~A in bad package for target: ~A" symbol result))
           (aver (package-ok-for-target-symbol-p result))
           result))))
 
