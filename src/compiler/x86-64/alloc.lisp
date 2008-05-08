@@ -255,7 +255,7 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
-    (pseudo-atomic
+    (maybe-pseudo-atomic stack-allocate-p
      (allocation result (pad-data-block words) node stack-allocate-p)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (when type

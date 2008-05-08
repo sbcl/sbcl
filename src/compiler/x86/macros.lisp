@@ -382,8 +382,8 @@
 ;;; does not matter whether a signal occurs during construction of a
 ;;; dynamic-extent object, as the half-finished construction of the
 ;;; object will not cause any difficulty.  We can therefore elide
-(defmacro maybe-pseudo-atomic (really-p &body forms)
-  `(if ,really-p
+(defmacro maybe-pseudo-atomic (not-really-p &body forms)
+  `(if ,not-really-p
        (progn ,@forms)
        (pseudo-atomic ,@forms)))
 

@@ -290,9 +290,8 @@
 ;;; place and there's no logical single place to attach documentation.
 ;;; grep (mostly in src/runtime) is your friend
 
-;;; FIXME: THIS NAME IS BACKWARDS!
-(defmacro maybe-pseudo-atomic (really-p &body body)
-  `(if ,really-p
+(defmacro maybe-pseudo-atomic (not-really-p &body body)
+  `(if ,not-really-p
        (progn ,@body)
        (pseudo-atomic ,@body)))
 
