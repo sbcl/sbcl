@@ -106,7 +106,7 @@
                (inst jmp :ne release-tls-index-lock)
                ;; Allocate a new tls-index.
                (load-symbol-value target *free-tls-index*)
-               (let ((error (generate-error-code nil tls-exhausted-error)))
+               (let ((error (generate-error-code nil 'tls-exhausted-error)))
                  (inst cmp target (fixnumize tls-size))
                  (inst jmp :ge error))
                (inst add (make-ea-for-symbol-value *free-tls-index*)

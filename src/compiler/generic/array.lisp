@@ -24,8 +24,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!+x86 'nil-array-accessed-error
-                #!-x86 nil-array-accessed-error
+                #!+(or x86 x86-64) 'nil-array-accessed-error
+                #!-(or x86 x86-64) nil-array-accessed-error
                 object)))
 
 ;;; It shouldn't be possible to fall through to here in normal user
@@ -52,8 +52,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!+x86 'nil-array-accessed-error
-                #!-x86 nil-array-accessed-error
+                #!+(or x86 x86-64) 'nil-array-accessed-error
+                #!-(or x86 x86-64) nil-array-accessed-error
                 object)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-nil)
@@ -71,8 +71,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!+x86 'nil-array-accessed-error
-                #!-x86 nil-array-accessed-error
+                #!+(or x86 x86-64) 'nil-array-accessed-error
+                #!-(or x86 x86-64) nil-array-accessed-error
                 object)))
 
 (define-vop (data-vector-set/simple-array-nil)
@@ -91,8 +91,8 @@
   (:save-p :compute-only)
   (:generator 1
     (error-call vop
-                #!+x86 'nil-array-accessed-error
-                #!-x86 nil-array-accessed-error
+                #!+(or x86 x86-64) 'nil-array-accessed-error
+                #!-(or x86 x86-64) nil-array-accessed-error
                 object)))
 
 ;;; FIXME: There is probably plenty of other array stuff that looks

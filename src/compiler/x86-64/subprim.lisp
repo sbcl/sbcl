@@ -48,7 +48,7 @@
     (inst cmp al-tn list-pointer-lowtag)
     (inst jmp :e LOOP)
     ;; It's dotted all right. Flame out.
-    (error-call vop object-not-list-error ptr)
+    (error-call vop 'object-not-list-error ptr)
     ;; We be done.
     DONE))
 

@@ -296,7 +296,7 @@
 ;;;; error code
 (defun emit-error-break (vop kind code values)
   (assemble ()
-    #-darwin
+    #!-darwin
     (inst int 3)                        ; i386 breakpoint instruction
     ;; CLH 20060314
     ;; On Darwin, we need to use #x0b0f instead of int3 in order
@@ -304,55 +304,24 @@
     ;; doesn't seem to be reliably firing SIGTRAP
     ;; handlers. Hopefully this will be fixed by Apple at a
     ;; later date.
-    #+darwin
+    #!+darwin
     (inst word #x0b0f)
+    ;; The return PC points here; note the location for the debugger.
     (when vop
       (note-this-location vop :internal-error))
     (inst byte kind)                    ; e.g. trap_xyyy
     (with-adjustable-vector (vector)    ; interr arguments
       (write-var-integer code vector)
       (dolist (tn values)
+        ;; classic CMU CL comment:
+        ;;   zzzzz jrd here. tn-offset is zero for constant
+        ;;   tns.
         (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
                                            (or (tn-offset tn) 0))
                            vector))
       (inst byte (length vector))
       (dotimes (i (length vector))
         (inst byte (aref vector i))))))
-
-#+nil
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun emit-error-break (vop kind code values)
-    (let ((vector (gensym)))
-      `((progn
-          #-darwin (inst int 3)         ; i386 breakpoint instruction
-          ;; CLH 20060314
-          ;; On Darwin, we need to use #x0b0f instead of int3 in order
-          ;; to generate a SIGILL instead of a SIGTRAP as darwin/x86
-          ;; doesn't seem to be reliably firing SIGTRAP
-          ;; handlers. Hopefully this will be fixed by Apple at a
-          ;; later date.
-          #+darwin (inst word #x0b0f))
-        ;; The return PC points here; note the location for the debugger.
-        (let ((vop ,vop))
-          (when vop
-                (note-this-location vop :internal-error)))
-        (inst byte ,kind)                       ; eg trap_Xyyy
-        (with-adjustable-vector (,vector)       ; interr arguments
-          (write-var-integer (error-number-or-lose ',code) ,vector)
-          ,@(mapcar (lambda (tn)
-                      `(let ((tn ,tn))
-                         ;; classic CMU CL comment:
-                         ;;   zzzzz jrd here. tn-offset is zero for constant
-                         ;;   tns.
-                         (write-var-integer (make-sc-offset (sc-number
-                                                             (tn-sc tn))
-                                                            (or (tn-offset tn)
-                                                                0))
-                                            ,vector)))
-                    values)
-          (inst byte (length ,vector))
-          (dotimes (i (length ,vector))
-            (inst byte (aref ,vector i))))))))
 
 (defun error-call (vop error-code &rest values)
   #!+sb-doc
