@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.115
+;;; This is asdf: Another System Definition Facility.  1.117
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -44,11 +44,11 @@
 
            #:compile-op #:load-op #:load-source-op #:test-system-version
            #:test-op
-           #:operation                  ; operations
-           #:feature                    ; sort-of operation
-           #:version                    ; metaphorically sort-of an operation
+           #:operation           ; operations
+           #:feature             ; sort-of operation
+           #:version             ; metaphorically sort-of an operation
 
-           #:input-files #:output-files #:perform       ; operation methods
+           #:input-files #:output-files #:perform ; operation methods
            #:operation-done-p #:explain
 
            #:component #:source-file
@@ -85,7 +85,7 @@
            #:operation-on-warnings
            #:operation-on-failure
 
-           ;#:*component-parent-pathname*
+                                        ;#:*component-parent-pathname*
            #:*system-definition-search-functions*
            #:*central-registry*         ; variables
            #:*compile-file-warnings-behaviour*
@@ -102,10 +102,11 @@
 
            #:retry
            #:accept                     ; restarts
-
-           #:preference-file-for-system/operation
-           #:load-preferences
            )
+  ;; preference loading - to be expunged
+  (:export
+   #:preference-file-for-system/operation
+   #:load-preferences)
   (:use :cl))
 
 
@@ -116,7 +117,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.115")
+(defvar *asdf-revision* (let* ((v "1.117")
                                (colon (or (position #\: v) -1))
                                (dot (position #\. v)))
                           (and v colon dot
@@ -124,6 +125,11 @@
                                                       :junk-allowed t)
                                      (parse-integer v :start (1+ dot)
                                                       :junk-allowed t)))))
+
+(defvar *load-preference-files* nil
+  "If true, then preference files will be loaded.
+
+This variable will be removed August 2008.")
 
 (defvar *compile-file-warnings-behaviour* :warn)
 
@@ -766,7 +772,8 @@ the head of the tree"))
 (defmethod perform :after ((operation operation) (c component))
   (setf (gethash (type-of operation) (component-operation-times c))
         (get-universal-time))
-  (load-preferences c operation))
+  (when *load-preference-files*
+    (load-preferences c operation)))
 
 ;;; perform is required to check output-files to find out where to put
 ;;; its answers, in case it has been overridden for site policy
@@ -816,8 +823,49 @@ the head of the tree"))
 (defmethod perform ((o load-op) (c cl-source-file))
   (mapcar #'load (input-files o c)))
 
+(defmethod perform :around ((o load-op) (c cl-source-file))
+  (let ((state :initial))
+    (loop until (or (eq state :success)
+                    (eq state :failure)) do
+         (case state
+           (:recompiled
+            (setf state :failure)
+            (call-next-method)
+            (setf state :success))
+           (:failed-load
+            (setf state :recompiled)
+            (perform (make-instance 'asdf:compile-op) c))
+           (t
+            (with-simple-restart
+                (:try-recompiling "Recompile ~a and try loading it again"
+                                  (component-name c))
+              (setf state :failed-load)
+              (call-next-method)
+              (setf state :success)))))))
+
+(defmethod perform :around ((o compile-op) (c cl-source-file))
+  (let ((state :initial))
+    (loop until (or (eq state :success)
+                    (eq state :failure)) do
+         (case state
+           (:recompiled
+            (setf state :failure)
+            (call-next-method)
+            (setf state :success))
+           (:failed-compile
+            (setf state :recompiled)
+            (perform (make-instance 'asdf:compile-op) c))
+           (t
+            (with-simple-restart
+                (:try-recompiling "Try recompiling ~a"
+                                  (component-name c))
+              (setf state :failed-compile)
+              (call-next-method)
+              (setf state :success)))))))
+
 (defmethod perform ((operation load-op) (c static-file))
   nil)
+
 (defmethod operation-done-p ((operation load-op) (c static-file))
   t)
 
@@ -867,13 +915,17 @@ the head of the tree"))
 
 (defgeneric load-preferences (system operation)
   (:documentation
-   "Called to load system preferences after <perform operation
+   "Deprecated - will be removed August 2008
+
+Called to load system preferences after <perform operation
 system>. Typical uses are to set parameters that don't exist until
 after the system has been loaded."))
 
 (defgeneric preference-file-for-system/operation (system operation)
   (:documentation
-   "Returns the pathname of the preference file for this system.
+   "Deprecated - will be removed August 2008
+
+Returns the pathname of the preference file for this system.
 Called by 'load-preferences to determine what file to load."))
 
 (defmethod load-preferences ((s t) (operation t))
