@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.17 relative to 1.0.16:
+  * temporary regression: user code can no longer allocate closure
+    variable storage on stack, due to bug 419 without explicitly
+    requesting it. Please consult sbcl-devel for advice if you need to
+    use this feature in the meanwhile.    
   * optimization: ADJOIN and PUSHNEW are upto ~70% faster in normal
     SPEED policies.
   * optimization: APPEND is upto ~10% faster in normal SPEED policies.

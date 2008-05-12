@@ -1810,7 +1810,8 @@ WORKAROUND:
 
 419: stack-allocated indirect closure variables are not popped
 
-    (locally (declare (optimize speed (safety 0)))
+    (locally (declare (optimize sb-c::stack-allocate-dynamic-extent
+                                sb-c::stack-allocate-value-cells))
       (defun bug419 (x)
         (multiple-value-call #'list
           (eval '(values 1 2 3))
@@ -1823,7 +1824,13 @@ WORKAROUND:
               (declare (dynamic-extent #'mget #'mset))
               ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset))))))
 
-  (ASSERT (EQUAL (BUG419) '(1 2 3 4 5 6))) => failure
+  (ASSERT (EQUAL (BUG419 42) '(1 2 3 4 5 6))) => failure
+
+  Note: as of SBCL 1.0.26.29 this bug no longer affects user code, as
+  SB-C::STACK-ALLOCATE-VALUE-CELLS needs to be explicitly turned on for
+  that to happen. Proper fix for this bug requires (Nikodemus thinks)
+  storing the relevant LAMBDA-VARs in a :DYNAMIC-EXTENT cleanup, and
+  teaching stack analysis how to deal with them.
 
 420: The MISC.556 test from gcl/ansi-tests/misc.lsp fails hard.
 

@@ -100,6 +100,13 @@ and will refer to the new function, bound to FOO.")
   "Control whether allocate objects, declared DYNAMIC-EXTENT, on
 stack.")
 
+(define-optimization-quality stack-allocate-value-cells
+    ;; FIXME, see bug 419
+    0
+  ("no" "maybe" "yes" "yes")
+  "Control whether allocate closure variable storage, declared
+DYNAMIC-EXTENT, on stack.")
+
 (define-optimization-quality stack-allocate-vector
     (cond ((= stack-allocate-dynamic-extent 0) 0)
           ((= safety 0) 3)

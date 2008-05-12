@@ -129,6 +129,7 @@
 ;;; value-cells
 
 (defun-with-dx dx-value-cell (x)
+  (declare (optimize sb-c::stack-allocate-value-cells))
   ;; Not implemented everywhere, yet.
   #+(or x86 x86-64 mips)
   (let ((cell x))
@@ -310,4 +311,19 @@
 (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
   (assert (and (equal i j)
                (equal i (list 1 2 3)))))
+
+;;; workaround for bug 419 -- real issue remains, but check that the
+;;; bandaid holds.
+(defun-with-dx bug419 (x)
+  (multiple-value-call #'list
+    (eval '(values 1 2 3))
+    (let ((x x))
+      (declare (dynamic-extent x))
+      (flet ((mget (y)
+               (+ x y))
+             (mset (z)
+               (incf x z)))
+        (declare (dynamic-extent #'mget #'mset))
+        ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset)))))
+(assert (equal (bug419 42) '(1 2 3 4 5 6)))
 
