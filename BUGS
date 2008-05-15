@@ -1958,3 +1958,13 @@ generally try to check returns in safe code, so we should here too.)
  second nested one. A trivial fix is to call CHANGE-REF-LEAF in known
  call for functions already inline converted there, but he is not sure
  if this has adverse effects elsewhere.
+
+427: ANY-REG not good for primitive type T
+
+ ...which is true, of course, but the following should not complain
+ about it (on x86 and x86-64):
+
+  (sb-alien:with-alien ((buf (array (sb-alien:signed 8) 16))))
+
+ reported by Stelian Ionescu on sbcl-devel.
+

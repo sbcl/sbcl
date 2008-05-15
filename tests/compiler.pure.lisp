@@ -2350,3 +2350,21 @@
                    (the ,type x)))))
         (compile nil (make-lambda 'list))
         (compile nil (make-lambda 'vector))))))
+
+;;; this caused a momentary regression when an ill-adviced fix to
+;;; bug 427 made ANY-REG suitable for primitive-type T:
+;;;
+;;; no :MOVE-ARG VOP defined to move #<SB-C:TN t1> (SC SB-VM::SINGLE-REG) to #<SB-C:TN t2> (SC SB-VM::ANY-REG)
+;;;    [Condition of type SIMPLE-ERROR]
+(compile nil 
+         '(lambda (frob)
+           (labels 
+               ((%zig (frob)
+                  (typecase frob
+                    (double-float
+                     (setf (sb-alien:deref (sb-alien:cast (sb-alien:sap-alien (unknown1) (* unsigned-char))
+                                                          (* double-float))) frob))
+                    (hash-table
+                     (%zig (the (values (single-float (0.0) 1.0) &optional) (unknown2)))
+                     nil))))
+             (%zig))))

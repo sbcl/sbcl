@@ -203,8 +203,4 @@
          (error ()
            :ok)))))
 
-;; This used to signal an error on x86 due to primitive type T not having
-;; been compatible with ANY-REG. (On x86 and -64 ANY-REG is fine.)
-(sb-alien:with-alien ((buf (array (sb-alien:signed 8) 16))))
-
 ;;; success

@@ -15,9 +15,6 @@ changes in sbcl-1.0.17 relative to 1.0.16:
     in normal SPEED policies.
   * bug fix: result of MAKE-ARRAY can be stack allocated - regression
     since 1.0.15.36. (thanks to Paul Khuong)
-  * bug fix: bogus errors when generating certain code sequences, due
-    to the compiler not accepting ANY-REG for primitive type T on x86
-    and x86-64. (reported by Stelian Ionescu.)
   * bug fix: LAST when always returned the whole list when given a bignum
     as the second argument.
   * bug fix: dynamic extent allocation of nested lists and vectors
