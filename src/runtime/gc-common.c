@@ -54,6 +54,7 @@
 #endif
 
 size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
+size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {

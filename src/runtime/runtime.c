@@ -147,6 +147,7 @@ Common runtime options:\n\
   --version                  Print version information and exit.\n\
   --core <filename>          Use the specified core file instead of the default.\n\
   --dynamic-space-size <MiB> Size of reserved dynamic space in megabytes.\n\
+  --control-stack-size <MiB> Size of reserved control stack in megabytes.\n\
 \n\
 Common toplevel options:\n\
   --sysinit <filename>       System-wide init-file to use instead of default.\n\
@@ -279,6 +280,14 @@ main(int argc, char *argv[], char *envp[])
                 dynamic_space_size = strtol(argv[argi++], 0, 0) << 20;
                 if (errno)
                     lose("argument to --dynamic-space-size is not a number");
+            } else if (0 == strcmp(arg, "--control-stack-size")) {
+                ++argi;
+                if (argi >= argc)
+                    lose("missing argument for --control-stack-size");
+                errno = 0;
+                thread_control_stack_size = strtol(argv[argi++], 0, 0) << 20;
+                if (errno)
+                    lose("argument to --dynamic-space-size is not a number");
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 int n = 0;
                 printf("; Commandline arguments:\n");
@@ -332,8 +341,10 @@ main(int argc, char *argv[], char *envp[])
         }
     }
 
-    /* Align down to multiple of page_table page size */
-    dynamic_space_size &= ~(PAGE_BYTES - 1);
+    /* Align down to multiple of page_table page size, and to the appropriate
+     * stack alignment. */
+    dynamic_space_size &= ~(PAGE_BYTES-1);
+    thread_control_stack_size &= ~(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so

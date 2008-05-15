@@ -143,10 +143,7 @@ GNAME(call_into_lisp_first_time):
 #else
         movq    GNAME(all_threads),%rax
 #endif
-	mov     THREAD_CONTROL_STACK_START_OFFSET(%rax) ,%rsp
-	/* don't think too hard about what happens if we get interrupted
-	* here */
-        add 	$(THREAD_CONTROL_STACK_SIZE)-16,%rsp
+	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
 	.text	

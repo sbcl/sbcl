@@ -185,6 +185,10 @@ options.
 Size of the dynamic space reserved on startup in megabytes. Default
 value is platform dependent.
 
+@item --control-stack-size @var{megabytes}
+Size of control stack reserved for each thread in megabytes. Default
+value is 2.
+
 @item --noinform
 Suppress the printing of any banner or other informational message at
 startup. This makes it easier to write Lisp programs which work

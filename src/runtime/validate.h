@@ -19,7 +19,7 @@
 
 #define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
 /* eventually choosable per-thread: */
-#define THREAD_CONTROL_STACK_SIZE (2*1024*1024)
+#define DEFAULT_CONTROL_STACK_SIZE (2*1024*1024)
 
 /* constants derived from the fundamental constants in passed by GENESIS */
 #ifdef LISP_FEATURE_GENCGC

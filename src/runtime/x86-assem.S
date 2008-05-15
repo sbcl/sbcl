@@ -185,10 +185,8 @@ GNAME(call_into_lisp_first_time):
 #ifndef LISP_FEATURE_WIN32
 	movl    %esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
 	movl    GNAME(all_threads),%eax
-	movl    THREAD_CONTROL_STACK_START_OFFSET(%eax) ,%esp
-	/* don't think too hard about what happens if we get interrupted
-	* here */
-	addl 	$(THREAD_CONTROL_STACK_SIZE),%esp
+	/* pthread machinery takes care of this for other threads */
+	movl    THREAD_CONTROL_STACK_END_OFFSET(%eax) ,%esp
 #else
 /* Win32 -really- doesn't like you switching stacks out from under it. */
 	movl	GNAME(all_threads),%eax

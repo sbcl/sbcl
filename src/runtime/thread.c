@@ -32,7 +32,7 @@
 #endif
 
 #include "runtime.h"
-#include "validate.h"           /* for CONTROL_STACK_SIZE etc */
+#include "validate.h"           /* for BINDING_STACK_SIZE etc */
 #include "alloc.h"
 #include "thread.h"
 #include "arch.h"
@@ -54,7 +54,7 @@
 #endif
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
-#define QUEUE_FREEABLE_THREAD_STACKS
+#define DELAY_THREAD_POST_MORTEM 5
 #define LOCK_CREATE_THREAD
 #endif
 
@@ -65,22 +65,21 @@
 
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
-struct freeable_stack {
-#ifdef QUEUE_FREEABLE_THREAD_STACKS
-    struct freeable_stack *next;
+struct thread_post_mortem {
+#ifdef DELAY_THREAD_POST_MORTEM
+    struct thread_post_mortem *next;
 #endif
     os_thread_t os_thread;
+    pthread_attr_t *os_attr;
     os_vm_address_t os_address;
 };
 
 
-#ifdef QUEUE_FREEABLE_THREAD_STACKS
-static struct freeable_stack * volatile freeable_stack_queue = 0;
-static int freeable_stack_count = 0;
-pthread_mutex_t freeable_stack_lock = PTHREAD_MUTEX_INITIALIZER;
-#else
-static struct freeable_stack * volatile freeable_stack = 0;
+#ifdef DELAY_THREAD_POST_MORTEM
+static int pending_thread_post_mortem_count = 0;
+pthread_mutex_t thread_post_mortem_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
+static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
@@ -145,126 +144,97 @@ initial_thread_trampoline(struct thread *th)
 #endif
 }
 
-#define THREAD_STRUCT_SIZE (THREAD_CONTROL_STACK_SIZE + BINDING_STACK_SIZE + \
-                            ALIEN_STACK_SIZE + dynamic_values_bytes + \
-                            32 * SIGSTKSZ + \
-                            BACKEND_PAGE_SIZE)
+#define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
+                            ALIEN_STACK_SIZE + dynamic_values_bytes +        \
+                            32 * SIGSTKSZ +                                  \
+                            THREAD_ALIGNMENT_BYTES)
 
 #ifdef LISP_FEATURE_SB_THREAD
+/* THREAD POST MORTEM CLEANUP
+ *
+ * Memory allocated for the thread stacks cannot be reclaimed while
+ * the thread is still alive, so we need a mechanism for post mortem
+ * cleanups. FIXME: We actually have three, for historical reasons as
+ * the saying goes. Do we really need three? Nikodemus guesses that
+ * not anymore, now that we properly call pthread_attr_destroy before
+ * freeing the stack. */
 
-#ifdef QUEUE_FREEABLE_THREAD_STACKS
+static struct thread_post_mortem *
+plan_thread_post_mortem(struct thread *corpse)
+{
+    if (corpse) {
+        struct thread_post_mortem *post_mortem = malloc(sizeof(struct thread_post_mortem));
+        gc_assert(post_mortem);
+        post_mortem->os_thread = corpse->os_thread;
+        post_mortem->os_attr = corpse->os_attr;
+        post_mortem->os_address = corpse->os_address;
+#ifdef DELAY_THREAD_POST_MORTEM
+        post_mortem->next = NULL;
+#endif
+        return post_mortem;
+    } else {
+        /* FIXME: When does this happen? */
+        return NULL;
+    }
+}
 
 static void
-queue_freeable_thread_stack(struct thread *thread_to_be_cleaned_up)
+perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 {
-     struct freeable_stack *new_freeable_stack = 0;
-     if (thread_to_be_cleaned_up) {
-        /* FIXME: os_validate is mmap -- for small things like these
-         * malloc would probably perform better. */
-        new_freeable_stack = (struct freeable_stack *)
-            os_validate(0, sizeof(struct freeable_stack));
-        new_freeable_stack->next = NULL;
-        new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
-        new_freeable_stack->os_address = thread_to_be_cleaned_up->os_address;
-        pthread_mutex_lock(&freeable_stack_lock);
-        if (freeable_stack_queue) {
-            struct freeable_stack *next;
-            next = freeable_stack_queue;
+#ifdef CREATE_POST_MORTEM_THREAD
+    pthread_detach(pthread_self());
+#endif
+    if (post_mortem) {
+        gc_assert(!pthread_join(post_mortem->os_thread, NULL));
+        gc_assert(!pthread_attr_destroy(post_mortem->os_attr));
+        free(post_mortem->os_attr);
+        os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
+        free(post_mortem);
+    }
+}
+
+static void
+schedule_thread_post_mortem(struct thread *corpse)
+{
+    struct thread_post_mortem *post_mortem = NULL;
+    if (corpse) {
+        post_mortem = plan_thread_post_mortem(corpse);
+
+#ifdef DELAY_THREAD_POST_MORTEM
+        pthread_mutex_lock(&thread_post_mortem_lock);
+        /* First stick the new post mortem to the end of the queue. */
+        if (pending_thread_post_mortem) {
+            struct thread_post_mortem *next = pending_thread_post_mortem;
             while (next->next) {
                 next = next->next;
             }
-            next->next = new_freeable_stack;
+            next->next = post_mortem;
         } else {
-            freeable_stack_queue = new_freeable_stack;
+            pending_thread_post_mortem = post_mortem;
         }
-        freeable_stack_count++;
-        pthread_mutex_unlock(&freeable_stack_lock);
-    }
-}
-
-#define FREEABLE_STACK_QUEUE_SIZE 4
-
-static void
-free_freeable_stacks() {
-    if (freeable_stack_queue && (freeable_stack_count > FREEABLE_STACK_QUEUE_SIZE)) {
-        struct freeable_stack* old;
-        pthread_mutex_lock(&freeable_stack_lock);
-        old = freeable_stack_queue;
-        freeable_stack_queue = old->next;
-        freeable_stack_count--;
-        gc_assert(pthread_join(old->os_thread, NULL) == 0);
-        FSHOW((stderr, "freeing thread %x stack\n", old->os_thread));
-        os_invalidate(old->os_address, THREAD_STRUCT_SIZE);
-        os_invalidate((os_vm_address_t)old, sizeof(struct freeable_stack));
-        pthread_mutex_unlock(&freeable_stack_lock);
-    }
-}
-
-#elif defined(CREATE_CLEANUP_THREAD)
-static void *
-cleanup_thread(void *arg)
-{
-    struct freeable_stack *freeable = arg;
-    pthread_t self = pthread_self();
-
-    FSHOW((stderr, "/cleaner thread(%p): joining %p\n",
-           self, freeable->os_thread));
-    gc_assert(pthread_join(freeable->os_thread, NULL) == 0);
-    FSHOW((stderr, "/cleaner thread(%p): free stack %p\n",
-           self, freeable->stack));
-    os_invalidate(freeable->os_address, THREAD_STRUCT_SIZE);
-    free(freeable);
-
-    pthread_detach(self);
-
-    return NULL;
-}
-
-static void
-create_cleanup_thread(struct thread *thread_to_be_cleaned_up)
-{
-    pthread_t thread;
-    int result;
-
-    if (thread_to_be_cleaned_up) {
-        struct freeable_stack *freeable =
-            malloc(sizeof(struct freeable_stack));
-        gc_assert(freeable != NULL);
-        freeable->os_thread = thread_to_be_cleaned_up->os_thread;
-        freeable->os_address =
-            (os_vm_address_t) thread_to_be_cleaned_up->os_address;
-        result = pthread_create(&thread, NULL, cleanup_thread, freeable);
-        gc_assert(result == 0);
-    }
-}
-
+        /* Then, if there are enough things in the queue, clean up one
+         * from the head -- or increment the count, and null out the
+         * post_mortem we have. */
+        if (pending_thread_post_mortem_count > DELAY_THREAD_POST_MORTEM) {
+            post_mortem = pending_thread_post_mortem;
+            pending_thread_post_mortem = post_mortem->next;
+        } else {
+            pending_thread_post_mortem_count++;
+            post_mortem = NULL;
+        }
+        pthread_mutex_unlock(&thread_post_mortem_lock);
+        /* Finally run, the cleanup, if any. */
+        perform_thread_post_mortem(post_mortem);
+#elif defined(CREATE_POST_MORTEM_THREAD)
+        gc_assert(!pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem));
 #else
-static void
-free_thread_stack_later(struct thread *thread_to_be_cleaned_up)
-{
-    struct freeable_stack *new_freeable_stack = 0;
-    if (thread_to_be_cleaned_up) {
-        new_freeable_stack = (struct freeable_stack *)
-            os_validate(0, sizeof(struct freeable_stack));
-        new_freeable_stack->os_thread = thread_to_be_cleaned_up->os_thread;
-        new_freeable_stack->os_address = (os_vm_address_t)
-            thread_to_be_cleaned_up->os_address;
-    }
-    new_freeable_stack = (struct freeable_stack *)
-        swap_lispobjs((lispobj *)(void *)&freeable_stack,
-                      (lispobj)new_freeable_stack);
-    if (new_freeable_stack) {
-        FSHOW((stderr,"/reaping %p\n", (void*) new_freeable_stack->os_thread));
-        /* Under NPTL pthread_join really waits until the thread
-         * exists and the stack can be safely freed. This is sadly not
-         * mandated by the pthread spec. */
-        gc_assert(pthread_join(new_freeable_stack->os_thread, NULL) == 0);
-        os_invalidate(new_freeable_stack->os_address, THREAD_STRUCT_SIZE);
-        os_invalidate((os_vm_address_t) new_freeable_stack,
-                      sizeof(struct freeable_stack));
+        post_mortem = (struct thread_post_mortem *)
+            swap_lispobjs((lispobj *)(void *)&pending_thread_post_mortem,
+                          (lispobj)post_mortem);
+        perform_thread_post_mortem(post_mortem);
+#endif
     }
 }
-#endif
 
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
@@ -328,14 +298,7 @@ new_thread_trampoline(struct thread *th)
                       THREAD_STRUCT_TO_EXCEPTION_PORT(th));
 #endif
 
-#ifdef QUEUE_FREEABLE_THREAD_STACKS
-    queue_freeable_thread_stack(th);
-#elif defined(CREATE_CLEANUP_THREAD)
-    create_cleanup_thread(th);
-#else
-    free_thread_stack_later(th);
-#endif
-
+    schedule_thread_post_mortem(th);
     FSHOW((stderr,"/exiting thread %p\n", thread_self()));
     return result;
 }
@@ -369,22 +332,23 @@ create_thread_struct(lispobj initial_function) {
 
     /* May as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
-     * succeed.  SPACES must be page-aligned, since the GC expects the
-     * control stack to start at a page boundary.  We can't rely on the
-     * alignment passed from os_validate, since that might assume the
-     * current (e.g. 4k) pagesize, while we calculate with the biggest
-     * (e.g. 64k) pagesize allowed by the ABI.  */
+     * succeed. SPACES must be appropriately aligned, since the GC
+     * expects the control stack to start at a page boundary -- and
+     * the OS may have even more rigorous requirements. We can't rely
+     * on the alignment passed from os_validate, since that might
+     * assume the current (e.g. 4k) pagesize, while we calculate with
+     * the biggest (e.g. 64k) pagesize allowed by the ABI. */
     spaces=os_validate(0, THREAD_STRUCT_SIZE);
     if(!spaces)
         return NULL;
-    /* Aligning up is safe as THREAD_STRUCT_SIZE has BACKEND_PAGE_SIZE
-     * padding. */
+    /* Aligning up is safe as THREAD_STRUCT_SIZE has
+     * THREAD_ALIGNMENT_BYTES padding. */
     aligned_spaces = (void *)((((unsigned long)(char *)spaces)
-                               + BACKEND_PAGE_SIZE - 1)
-                              & ~(unsigned long)(BACKEND_PAGE_SIZE - 1));
+                               + THREAD_ALIGNMENT_BYTES-1)
+                              &~(unsigned long)(THREAD_ALIGNMENT_BYTES-1));
     per_thread=(union per_thread_data *)
         (aligned_spaces+
-         THREAD_CONTROL_STACK_SIZE+
+         thread_control_stack_size+
          BINDING_STACK_SIZE+
          ALIEN_STACK_SIZE);
 
@@ -421,13 +385,14 @@ create_thread_struct(lispobj initial_function) {
     th->os_address = spaces;
     th->control_stack_start = aligned_spaces;
     th->binding_stack_start=
-        (lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
+        (lispobj*)((void*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
     th->alien_stack_start=
         (lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
+    th->os_attr=malloc(sizeof(pthread_attr_t));
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
@@ -495,8 +460,6 @@ void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     if(th) {
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-        kern_return_t ret;
-
         setup_mach_exception_handling_thread();
 #endif
         initial_thread_trampoline(th); /* no return */
@@ -514,7 +477,6 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 {
     /* The new thread inherits the restrictive signal mask set here,
      * and enables signals again when it is set up properly. */
-    pthread_attr_t attr;
     sigset_t newset,oldset;
     boolean r=1;
     int retcode = 0, initcode;
@@ -533,32 +495,22 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     sigaddset_deferrable(&newset);
     thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
-#if defined(LISP_FEATURE_DARWIN)
-#define CONTROL_STACK_ADJUST 8192 /* darwin wants page-aligned stacks */
-#else
-#define CONTROL_STACK_ADJUST 16
-#endif
-
-    if((initcode = pthread_attr_init(&attr)) ||
-       /* FIXME: why do we even have this in the first place? */
-       (pthread_attr_setstack(&attr,th->control_stack_start,
-                              THREAD_CONTROL_STACK_SIZE-CONTROL_STACK_ADJUST)) ||
-#undef CONTROL_STACK_ADJUST
+    if((initcode = pthread_attr_init(th->os_attr)) ||
+       /* call_into_lisp_first_time switches the stack for the initial thread. For the
+        * others, we use this. */
+       (pthread_attr_setstack(th->os_attr,th->control_stack_start,thread_control_stack_size)) ||
        (retcode = pthread_create
-        (kid_tid,&attr,(void *(*)(void *))new_thread_trampoline,th))) {
+        (kid_tid,th->os_attr,(void *(*)(void *))new_thread_trampoline,th))) {
         FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
         FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
         FSHOW_SIGNAL((stderr, "wanted stack size %d, min stack size %d\n",
-                      THREAD_CONTROL_STACK_SIZE-16, PTHREAD_STACK_MIN));
+                      cstack_size, PTHREAD_STACK_MIN));
         if(retcode < 0) {
             perror("create_os_thread");
         }
         r=0;
     }
 
-#ifdef QUEUE_FREEABLE_THREAD_STACKS
-    free_freeable_stacks();
-#endif
     thread_sigmask(SIG_SETMASK,&oldset,0);
 #ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_unlock(&create_thread_lock);

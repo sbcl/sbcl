@@ -33,6 +33,7 @@ extern int foreign_function_call_active;
 #endif
 
 extern size_t dynamic_space_size;
+extern size_t thread_control_stack_size;
 
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
