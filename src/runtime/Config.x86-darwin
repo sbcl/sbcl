@@ -12,6 +12,9 @@
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
 OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-dlshim.c darwin-langinfo.c
 OS_LIBS = -lSystem -lc -ldl
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
 
 CC = gcc
 

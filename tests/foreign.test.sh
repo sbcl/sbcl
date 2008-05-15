@@ -36,6 +36,9 @@ build_so() (
   esac
   if [ "`uname`" = Darwin ]; then
     SO_FLAGS="-bundle"
+    if run_sbcl --eval '(sb-ext:quit :unix-status #+x86-64 0 #-x86-64 1)'; then
+	CFLAGS="$CFLAGS -arch x86_64"
+    fi
   else
     SO_FLAGS="-shared"
   fi

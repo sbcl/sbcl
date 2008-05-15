@@ -12,15 +12,14 @@
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
 OS_SRC = bsd-os.c x86-64-bsd-os.c darwin-os.c x86-64-darwin-os.c darwin-dlshim.c darwin-langinfo.c
 OS_LIBS = -lSystem -lc -ldl
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
 
 ASSEM_SRC = x86-64-assem.S ldso-stubs.S
 ARCH_SRC = x86-64-arch.c
 
 LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000
-
-OS_LIBS += $(shell if grep LISP_FEATURE_SB_THREAD genesis/config.h \
-                      > /dev/null 2>&1; \
-                   then echo "-lpthread"; fi)
 
 CFLAGS += -arch x86_64 -fno-omit-frame-pointer -pagezero_size 0x100000
 
