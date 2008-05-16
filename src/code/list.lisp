@@ -873,7 +873,7 @@
         (key (and key (%coerce-callable-to-fun key)))
         (test (if notp
                   (let ((test-not-fun (%coerce-callable-to-fun test-not)))
-                    (lambda (x) (not (funcall test-not-fun x))))
+                    (lambda (x y) (not (funcall test-not-fun x y))))
                   (%coerce-callable-to-fun test))))
     (multiple-value-bind (short long n-short)
         (if (< n1 n2)
@@ -922,7 +922,7 @@
         (key (and key (%coerce-callable-to-fun key)))
         (test (if notp
                   (let ((test-not-fun (%coerce-callable-to-fun test-not)))
-                    (lambda (x) (not (funcall test-not-fun x))))
+                    (lambda (x y) (not (funcall test-not-fun x y))))
                   (%coerce-callable-to-fun test))))
     (multiple-value-bind (short long n-short)
         (if (< n1 n2)

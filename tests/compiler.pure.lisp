@@ -2356,9 +2356,9 @@
 ;;;
 ;;; no :MOVE-ARG VOP defined to move #<SB-C:TN t1> (SC SB-VM::SINGLE-REG) to #<SB-C:TN t2> (SC SB-VM::ANY-REG)
 ;;;    [Condition of type SIMPLE-ERROR]
-(compile nil 
+(compile nil
          '(lambda (frob)
-           (labels 
+           (labels
                ((%zig (frob)
                   (typecase frob
                     (double-float

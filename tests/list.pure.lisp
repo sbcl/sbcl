@@ -262,3 +262,22 @@
                                         (declare (optimize speed))
                                         (adjoin elt '(:y))))
                          ':x)))
+
+
+(macrolet ((test (expected list-1 list-2 &rest args)
+             `(progn
+                (assert (equal ,expected (funcall #'union ,list-1 ,list-2 ,@args)))
+                (assert (equal ,expected (funcall #'nunion
+                                                  (copy-list ,list-1)
+                                                  (copy-list ,list-2)
+                                                  ,@args))))))
+  (test nil nil nil)
+  (test '(42) nil '(42))
+  (test '(42) '(42) nil)
+  (test '(42) '(42) '(42))
+  (test '((42) (42)) '((42)) '((42)))
+  (test '((42) (42)) '((42)) '((42)) :test-not #'equal)
+  (test '((42)) '((42)) '((42)) :test #'equal)
+  (test '((42)) '((42)) '((42)) :key #'car)
+  (test '((42)) '((42)) '((42)) :key #'car :test-not #'<))
+
