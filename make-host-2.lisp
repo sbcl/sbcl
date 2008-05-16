@@ -29,9 +29,7 @@
        ;; never insert stepper conditions
        (sb!c:insert-step-conditions 0)
        ;; always stack-allocate if requested
-       (sb!c::stack-allocate-dynamic-extent 3)
-       ;; ...even value cells!
-       (sb!c::stack-allocate-value-cells 3)))))
+       (sb!c::stack-allocate-dynamic-extent 3)))))
 (compile 'proclaim-target-optimization)
 
 (defun in-target-cross-compilation-mode (fun)

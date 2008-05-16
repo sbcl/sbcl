@@ -847,7 +847,8 @@
   (let ((fd (fd-stream-fd stream))
         (errno 0)
         (count 0))
-    (declare (dynamic-extent fd errno count))
+    (declare (optimize sb!c::stack-allocate-value-cells)
+             (dynamic-extent fd errno count))
     (tagbody
        ;; Check for blocking input before touching the stream, as if
        ;; we happen to wait we are liable to be interrupted, and the
