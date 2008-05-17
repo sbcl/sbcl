@@ -11,6 +11,15 @@
 
 (in-package "SB!IMPL")
 
+(defparameter *eval-calls* 0)
+
+(defun !eval-cold-init ()
+  (setf *eval-calls* 0
+        *evaluator-mode* :compile)
+  #!+sb-eval
+  (setf sb!eval::*eval-level* -1
+        sb!eval::*eval-verbose* nil))
+
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
 (defun %simple-eval (expr lexenv)
@@ -93,6 +102,7 @@
 (defun simple-eval-in-lexenv (original-exp lexenv)
   (declare (optimize (safety 1)))
   ;; (aver (lexenv-simple-p lexenv))
+  (incf *eval-calls*)
   (handler-bind
       ((sb!c:compiler-error
         (lambda (c)

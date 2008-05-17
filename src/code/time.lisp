@@ -265,13 +265,92 @@ format."
 
 (defmacro time (form)
   #!+sb-doc
-  "Execute FORM and print timing information on *TRACE-OUTPUT*."
+  "Execute FORM and print timing information on *TRACE-OUTPUT*.
+
+On some hardware platforms estimated processor cycle counts are
+included in this output; this number is slightly inflated, since it
+includes the pipeline involved in reading the cycle counter --
+executing \(TIME NIL) a few times will give you an idea of the
+overhead, and its variance. The cycle counters are also per processor,
+not per thread: if multiple threads are running on the same processor,
+the reported counts will include cycles taken up by all threads
+running on the processor where TIME was executed. Furthermore, if the
+operating system migrates the thread to another processor between
+reads of the cycle counter, the results will be completely bogus.
+Finally, the counter is cycle counter, incremented by the hardware
+even when the process is halted -- which is to say that cycles pass
+normally during operations like SLEEP."
   `(%time (lambda () ,form)))
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
   (multiple-value-bind (user sys faults) (sb!sys:get-system-info)
     (values user sys faults (get-bytes-consed))))
+
+
+(defun elapsed-cycles (h0 l0 h1 l1)
+  (declare (ignorable h0 l0 h1 l1))
+  #!+cycle-counter
+  (+ (ash (- h1 h0) 32)
+     (- l1 l0))
+  #!-cycle-counter
+  nil)
+(declaim (inline read-cycle-counter))
+(defun read-cycle-counter ()
+  #!+cycle-counter
+  (sb!vm::%read-cycle-counter)
+  #!-cycle-counter
+  (values 0 0))
+
+;;; This is so that we don't have to worry about the vagaries of
+;;; floating point printing, or about conversions to floats dropping
+;;; or introducing decimals, which are liable to imply wrong precision.
+(defun format-microseconds (stream usec &optional colonp atp)
+  (declare (ignore colonp))
+  (%format-decimal stream usec 6)
+  (unless atp
+    (write-string " seconds" stream)))
+
+(defun format-milliseconds (stream usec &optional colonp atp)
+  (declare (ignore colonp))
+  (%format-decimal stream usec 3)
+  (unless atp
+    (write-string " seconds" stream)))
+
+(defun %format-decimal (stream number power)
+  (declare (stream stream)
+           (integer number power))
+  (when (minusp number)
+    (write-char #\- stream)
+    (setf number (- number)))
+  (let ((scale (expt 10 power)))
+    (flet ((%fraction (fraction)
+             (let ((scaled (* 10 fraction)))
+               (loop while (< scaled scale)
+                     do (write-char #\0 stream)
+                        (setf scaled (* scaled 10))))
+             (format stream "~D" fraction))
+           (%zeroes ()
+             (let ((scaled (/ scale 10)))
+               (write-char #\0 stream)
+               (loop while (> scaled 1)
+                     do (write-char #\0 stream)
+                        (setf scaled (/ scaled 10))))))
+      (cond ((zerop number)
+             (write-string "0." stream)
+             (%zeroes))
+            ((< number scale)
+             (write-string "0." stream)
+             (%fraction number))
+            ((= number scale)
+             (write-string "1." stream)
+             (%zeroes))
+            ((> number scale)
+             (multiple-value-bind (whole fraction) (floor number scale)
+               (format stream "~D." whole)
+               (%fraction fraction))))))
+
+  nil)
 
 ;;; The guts of the TIME macro. Compute overheads, run the (compiled)
 ;;; function, report the times.
@@ -316,35 +395,53 @@ format."
         (old-run-utime old-run-stime old-page-faults old-bytes-consed)
       (time-get-sys-info))
     (setq old-real-time (get-internal-real-time))
-    (let ((start-gc-run-time *gc-run-time*)
-          #!+sb-eval (sb!eval:*eval-calls* 0))
-      (declare #!+sb-eval (special sb!eval:*eval-calls*))
-      (multiple-value-prog1
-          ;; Execute the form and return its values.
-          (funcall fun)
-        (multiple-value-setq
-            (new-run-utime new-run-stime new-page-faults new-bytes-consed)
-          (time-get-sys-info))
-        (setq new-real-time (- (get-internal-real-time) real-time-overhead))
-        (let ((gc-run-time (max (- *gc-run-time* start-gc-run-time) 0)))
-          (format *trace-output*
-                  "~&Evaluation took:~%  ~
-                 ~S second~:P of real time~%  ~
-                 ~S second~:P of user run time~%  ~
-                 ~S second~:P of system run time~%  ~
-              ~@[[Run times include ~S second~:P GC run time.]~%  ~]~
-              ~@[~S call~:P to %EVAL~%  ~]~
-                 ~S page fault~:P and~%  ~
-                 ~:D bytes consed.~%"
-                  (max (/ (- new-real-time old-real-time)
-                          (float sb!xc:internal-time-units-per-second))
-                       0.0)
-                  (max (/ (- new-run-utime old-run-utime) 1000000.0) 0.0)
-                  (max (/ (- new-run-stime old-run-stime) 1000000.0) 0.0)
-                  (unless (zerop gc-run-time)
-                    (/ (float gc-run-time)
-                       (float sb!xc:internal-time-units-per-second)))
-                  #!+sb-eval sb!eval:*eval-calls* #!-sb-eval nil
-                  (max (- new-page-faults old-page-faults) 0)
-                  (max (- new-bytes-consed old-bytes-consed) 0)))))))
-
+    (let ((start-gc-internal-run-time *gc-run-time*)
+          (*eval-calls* 0)
+          (sb!c::*lambda-conversions* 0))
+      (declare (special *eval-calls* sb!c::*lambda-conversions*))
+      (multiple-value-bind (h0 l0) (read-cycle-counter)
+        (multiple-value-prog1
+            ;; Execute the form and return its values.
+            (funcall fun)
+          (multiple-value-bind (h1 l1) (read-cycle-counter)
+            (let ((stop-gc-internal-run-time *gc-run-time*))
+              (multiple-value-setq
+                  (new-run-utime new-run-stime new-page-faults new-bytes-consed)
+                (time-get-sys-info))
+              (setq new-real-time (- (get-internal-real-time) real-time-overhead))
+              (let* ((gc-internal-run-time (max (- stop-gc-internal-run-time start-gc-internal-run-time) 0))
+                     (real-time (max (- new-real-time old-real-time) 0))
+                     (user-run-time (max (- new-run-utime old-run-utime) 0))
+                     (system-run-time (max (- new-run-stime old-run-stime) 0))
+                     (total-run-time (+ user-run-time system-run-time))
+                     (cycles (elapsed-cycles h0 l0 h1 l1))
+                     (page-faults (max (- new-page-faults old-page-faults) 0)))
+                (format *trace-output*
+                        "~&Evaluation took:~%~
+                         ~@<  ~@;~/sb-impl::format-milliseconds/ of real time~%~
+                                 ~/sb-impl::format-microseconds/ of total run time ~
+                                  (~@/sb-impl::format-microseconds/ user, ~@/sb-impl::format-microseconds/ system)~%~
+                                 ~[[ Run times consist of ~/sb-impl::format-milliseconds/ GC time, ~
+                                                      and ~/sb-impl::format-milliseconds/ non-GC time. ]~%~;~2*~]~
+                                 ~,2F% CPU~%~
+                                 ~@[~:D form~:P interpreted~%~]~
+                                 ~@[~:D lambda~:P converted~%~]~
+                                 ~@[~:D processor cycles~%~]~
+                                 ~@[~:D page fault~:P~%~]~
+                                 ~:D bytes consed~:>~%"
+                        real-time
+                        total-run-time
+                        user-run-time
+                        system-run-time
+                        (if (zerop gc-internal-run-time) 1 0)
+                        gc-internal-run-time
+                        ;; Round up so we don't mislead by saying 0.0 seconds of non-GC time...
+                        (- (ceiling total-run-time 1000) gc-internal-run-time)
+                        (if (zerop real-time)
+                            100.0
+                            (float (* 100 (/ (round total-run-time 1000) real-time))))
+                        (unless (zerop *eval-calls*) *eval-calls*)
+                        (unless (zerop sb!c::*lambda-conversions*) sb!c::*lambda-conversions*)
+                        cycles
+                        (unless (zerop page-faults) page-faults)
+                        (max (- new-bytes-consed old-bytes-consed) 0))))))))))

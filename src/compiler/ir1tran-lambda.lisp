@@ -933,6 +933,12 @@
                                                    :debug-name debug-name))))
         (setf (functional-inline-expansion res) form)
         (setf (functional-arg-documentation res) (cadr form))
+        (when (boundp '*lambda-conversions*)
+          ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
+          ;; keeps things less confusing to users of TIME, where this
+          ;; count gets used.
+          (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
+            (incf *lambda-conversions*)))
         res))))
 
 (defun wrap-forms-in-debug-catch (forms)

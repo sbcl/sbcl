@@ -123,6 +123,7 @@
 (defvar *trace-table*)
 (defvar *undefined-warnings*)
 (defvar *warnings-p*)
+(defvar *lambda-conversions*)
 
 ;;; This lock is seized in the compiler, and related areas: the
 ;;; compiler is not presently thread-safe

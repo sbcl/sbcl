@@ -6,6 +6,16 @@ changes in sbcl-1.0.17 relative to 1.0.16:
     use this feature in the meanwhile.
   * new feature: runtime argument --control-stack-size can be used to
     adjust thread default control stack size.
+  * enhancement: improved TIME output
+    ** all times are reported using the measured accuracy (milliseconds
+       for real and GC times, microseconds for everything else.)
+    ** processor cycle counts on x86 and x86-64.
+    ** interpreted forms are counted for both evaluator modes.
+    ** number of lambdas converted by the compiler is reported.
+    ** CPU percentage report (computed from real and total run time.)
+    ** more comprehensive run time reporting, using a condenced format
+    ** interperted form, lambda, and page fault counts are omitted
+       when zero.
   * optimization: ADJOIN and PUSHNEW are upto ~70% faster in normal
     SPEED policies.
   * optimization: APPEND is upto ~10% faster in normal SPEED policies.

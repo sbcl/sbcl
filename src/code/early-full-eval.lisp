@@ -12,14 +12,7 @@
 (in-package "SB!EVAL")
 
 (defparameter *eval-level* -1)
-(defparameter *eval-calls* 0)
 (defparameter *eval-verbose* nil)
-
-(defun !full-eval-cold-init ()
-  (setf *eval-level* -1
-        *eval-calls* 0
-        *eval-verbose* nil
-        *evaluator-mode* :compile))
 
 ;; !defstruct-with-alternate-metaclass is unslammable and the
 ;; RECOMPILE restart doesn't work on it.  This is the main reason why

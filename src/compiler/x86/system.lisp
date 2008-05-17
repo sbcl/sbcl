@@ -330,14 +330,12 @@
   (:result-types unsigned-num unsigned-num)
   (:generator 5
      (inst xor eax eax)
+     ;; Intel docs seem quite consistent on only using CPUID before RDTSC,
+     ;; not both before and after. Go figure.
      (inst cpuid)
      (inst rdtsc)
-     (inst push edx)
-     (inst push eax)
-     (inst xor eax eax)
-     (inst cpuid)
-     (inst pop lo)
-     (inst pop hi)))
+     (move lo eax)
+     (move hi edx)))
 
 (defmacro with-cycle-counter (&body body)
   "Returns the primary value of BODY as the primary value, and the

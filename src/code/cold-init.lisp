@@ -108,8 +108,7 @@
         sb!kernel::*gc-epoch* (cons nil nil))
 
   ;; I'm not sure where eval is first called, so I put this first.
-  #!+sb-eval
-  (show-and-call sb!eval::!full-eval-cold-init)
+  (show-and-call !eval-cold-init)
 
   (show-and-call thread-init-or-reinit)
   (show-and-call !typecheckfuns-cold-init)

@@ -1256,7 +1256,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%WITH-ARRAY-DATA/FP"
                "%WITH-ARRAY-DATA-MACRO"
                "*CURRENT-LEVEL-IN-PRINT*"
-               "*EMPTY-TYPE*" "*GC-INHIBIT*" "*GC-PENDING*"
+               "*EMPTY-TYPE*"
+               "*EVAL-CALLS*"
+               "*GC-INHIBIT*" "*GC-PENDING*"
                #!+sb-thread "*STOP-FOR-GC-PENDING*"
                "*UNIVERSAL-TYPE*"
                "*UNIVERSAL-FUN-TYPE*" "*UNPARSE-FUN-TYPE-SIMPLIFY*"
@@ -2549,6 +2551,7 @@ structure representations"
       :name "SB!EVAL"
       :doc "internal: the evaluator implementation used to execute code without compiling it."
       :use ("CL" "SB!KERNEL" "SB!EXT")
+      :reexport ("*EVAL-CALLS*")
       :export ("INTERPRETED-FUNCTION"
                "INTERPRETED-FUNCTION-P"
                "INTERPRETED-FUNCTION-NAME"
@@ -2561,8 +2564,7 @@ structure representations"
                "EVAL-IN-NATIVE-ENVIRONMENT"
                "PREPARE-FOR-COMPILE"
                "COUNT-EVAL-CALLS"
-               "*EVAL-LEVEL*"
-               "*EVAL-CALLS*"))
+               "*EVAL-LEVEL*"))
 
    #!+win32
    #s(sb-cold:package-data

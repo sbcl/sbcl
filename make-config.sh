@@ -283,7 +283,7 @@ cd "$original_dir"
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
+    printf ' :stack-allocatable-closures :alien-callbacks :cycle-counter' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | netbsd | openbsd | sunos | darwin | win32)
         printf ' :linkage-table' >> $ltf
@@ -296,7 +296,7 @@ if [ "$sbcl_arch" = "x86" ]; then
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :stack-allocatable-closures :alien-callbacks' >> $ltf
+    printf ' :stack-allocatable-closures :alien-callbacks :cycle-counter' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
