@@ -65,6 +65,7 @@
 
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
+#ifdef LISP_FEATURE_SB_THREAD
 struct thread_post_mortem {
 #ifdef DELAY_THREAD_POST_MORTEM
     struct thread_post_mortem *next;
@@ -74,12 +75,12 @@ struct thread_post_mortem {
     os_vm_address_t os_address;
 };
 
-
 #ifdef DELAY_THREAD_POST_MORTEM
 static int pending_thread_post_mortem_count = 0;
 pthread_mutex_t thread_post_mortem_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
+#endif
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
 struct thread * volatile all_threads;
@@ -392,7 +393,9 @@ create_thread_struct(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
+#ifdef LISP_FEATURE_SB_THREAD
     th->os_attr=malloc(sizeof(pthread_attr_t));
+#endif
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start

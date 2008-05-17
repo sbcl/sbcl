@@ -381,6 +381,7 @@
   ;; Kept here so that when the thread dies we can releast the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
+  #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
