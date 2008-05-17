@@ -556,11 +556,6 @@ WORKAROUND:
   c. The cross-compiler cannot inline functions defined in a non-null
      lexical environment.
 
-206: ":SB-FLUID feature broken"
-  (reported by Antonio Martinez-Shotton sbcl-devel 2002-10-07)
-  Enabling :SB-FLUID in the target-features list in sbcl-0.7.8 breaks
-  the build.
-
 207: "poorly distributed SXHASH results for compound data"
   SBCL's SXHASH could probably try a little harder. ANSI: "the
   intent is that an implementation should make a good-faith

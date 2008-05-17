@@ -89,7 +89,7 @@
 ;;;; <http://burtleburtle.net/bob/hash/doobs.html> for some more
 ;;;; information).
 
-#!-sb-fluid (declaim (inline %sxhash-substring))
+(declaim (inline %sxhash-substring))
 (defun %sxhash-substring (string &optional (count (length string)))
   ;; FIXME: As in MIX above, we wouldn't need (SAFETY 0) here if the
   ;; cross-compiler were smarter about ASH, but we need it for

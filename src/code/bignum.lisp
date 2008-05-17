@@ -194,7 +194,7 @@
   (%lognot digit))
 
 ;;; Each of these does the digit-size unsigned op.
-#!-sb-fluid (declaim (inline %logand %logior %logxor))
+(declaim (inline %logand %logior %logxor))
 (defun %logand (a b)
   (declare (type bignum-element-type a b))
   (logand a b))
@@ -270,7 +270,7 @@
 
 ;;; These take two digit-size quantities and compare or contrast them
 ;;; without wasting time with incorrect type checking.
-#!-sb-fluid (declaim (inline %digit-compare %digit-greater))
+(declaim (inline %digit-compare %digit-greater))
 (defun %digit-compare (x y)
   (= x y))
 (defun %digit-greater (x y)
