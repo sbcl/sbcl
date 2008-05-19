@@ -73,8 +73,8 @@ in future versions."
 (defun current-thread-sap ()
   (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot))
 
-(declaim (inline current-thread-sap-id))
-(defun current-thread-sap-id ()
+(declaim (inline current-thread-os-thread))
+(defun current-thread-os-thread ()
   (sap-int
    (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot)))
 
@@ -82,7 +82,7 @@ in future versions."
   (/show0 "Entering INIT-INITIAL-THREAD")
   (let ((initial-thread (%make-thread :name "initial thread"
                                       :%alive-p t
-                                      :os-thread (current-thread-sap-id))))
+                                      :os-thread (current-thread-os-thread))))
     (setq *current-thread* initial-thread)
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
@@ -704,7 +704,7 @@ around and can be retrieved by JOIN-THREAD."
                    (sb!impl::*zap-array-data-temp* empty)
                    (sb!impl::*internal-symbol-output-fun* nil)
                    (sb!impl::*descriptor-handlers* nil)) ; serve-event
-              (setf (thread-os-thread thread) (current-thread-sap-id))
+              (setf (thread-os-thread thread) (current-thread-os-thread))
               (with-mutex ((thread-result-lock thread))
                 (with-all-threads-lock
                   (push thread *all-threads*))
@@ -840,37 +840,61 @@ won't like the effect."
 SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (interrupt-thread thread 'sb!ext:quit))
 
-;;; internal use only.  If you think you need to use this, either you
-;;; are an SBCL developer, are doing something that you should discuss
-;;; with an SBCL developer first, or are doing something that you
-;;; should probably discuss with a professional psychiatrist first
-#!+sb-thread
-(defun thread-sap-for-id (id)
-  (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t)))))
-    (loop
-     (when (sap= thread-sap (int-sap 0)) (return nil))
-     (let ((os-thread (sap-ref-word thread-sap
-                                    (* sb!vm:n-word-bytes
-                                       sb!vm::thread-os-thread-slot))))
-       (when (= os-thread id) (return thread-sap))
-       (setf thread-sap
-             (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
-                                        sb!vm::thread-next-slot)))))))
-
 (define-alien-routine "thread_yield" int)
 
 #!+sb-doc
 (setf (fdocumentation 'thread-yield 'function)
       "Yield the processor to other threads.")
 
+;;; internal use only.  If you think you need to use these, either you
+;;; are an SBCL developer, are doing something that you should discuss
+;;; with an SBCL developer first, or are doing something that you
+;;; should probably discuss with a professional psychiatrist first
 #!+sb-thread
-(defun symbol-value-in-thread (symbol thread-sap)
-  (let* ((index (sb!vm::symbol-tls-index symbol))
-         (tl-val (sap-ref-word thread-sap
-                               (* sb!vm:n-word-bytes index))))
-    (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
-        (sb!vm::symbol-global-value symbol)
-        (make-lisp-obj tl-val))))
+(progn
+  (defun %thread-sap (thread)
+    (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t))))
+          (target (thread-os-thread thread)))
+      (loop
+        (when (sap= thread-sap (int-sap 0)) (return nil))
+        (let ((os-thread (sap-ref-word thread-sap
+                                       (* sb!vm:n-word-bytes
+                                          sb!vm::thread-os-thread-slot))))
+          (when (= os-thread target) (return thread-sap))
+          (setf thread-sap
+                (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
+                                           sb!vm::thread-next-slot)))))))
+
+  (defun %symbol-value-in-thread (symbol thread)
+    (tagbody
+       ;; Prevent the dead from dying completely while we look for the TLS area...
+       (with-all-threads-lock
+         (if (thread-alive-p thread)
+             (let* ((offset (* sb!vm:n-word-bytes (sb!vm::symbol-tls-index symbol)))
+                    (tl-val (sap-ref-word (%thread-sap thread) offset)))
+               (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
+                   (go :unbound)
+                   (return-from %symbol-value-in-thread (values (make-lisp-obj tl-val) t))))
+             (return-from %symbol-value-in-thread (values nil nil))))
+     :unbound
+       (error "Cannot read thread-local symbol value: ~S unbound in ~S" symbol thread)))
+
+  (defun %set-symbol-value-in-thread (symbol thread value)
+    (tagbody
+       (with-pinned-objects (value)
+         ;; Prevent the dead from dying completely while we look for the TLS area...
+         (with-all-threads-lock
+           (if (thread-alive-p thread)
+               (let* ((offset (* sb!vm:n-word-bytes (sb!vm::symbol-tls-index symbol)))
+                      (sap (%thread-sap thread))
+                      (tl-val (sap-ref-word sap offset)))
+                 (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
+                     (go :unbound)
+                     (setf (sap-ref-word sap offset) (get-lisp-obj-address value)))
+                 (return-from %set-symbol-value-in-thread (values value t)))
+               (return-from %set-symbol-value-in-thread (values nil nil)))))
+     :unbound
+       (error "Cannot set thread-local symbol value: ~S unbound in ~S" symbol thread))))
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
   (sb!vm::locked-symbol-global-value-add symbol-name delta))
