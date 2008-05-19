@@ -145,6 +145,16 @@
  ;; code will also trap multiple readers.
  ; :sb-hash-table-debug
 
+ ;; Enabled automatically by make-config.sh for platforms which implement
+ ;; the %READ-CYCLE-COUNTER VOP. Can be disabled manually: affects TIME.
+ ;;
+ ;; FIXME: Should this be :SB-CYCLE-COUNTER instead? If so, then the same goes
+ ;; for :COMPARE-AND-SWAP-VOPS as well, and a bunch of others. Perhaps
+ ;; built-time convenience features like this should all live in eg. SB!INT
+ ;; instead?
+ ;;
+ ; :cycle-counter
+
  ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
  ;; Some of the code which was #+high-security before the fork has now
