@@ -30,8 +30,8 @@
        ,@body)))
 
 (defun invoke-interruption (function)
-  (with-interrupt-bindings
-    (without-interrupts
+  (without-interrupts
+    (with-interrupt-bindings
       ;; Reset signal mask: the C-side handler has blocked all
       ;; deferrable interrupts before arranging return to lisp. This is
       ;; safe because we can't get a pending interrupt before we unblock
@@ -40,9 +40,8 @@
       ;; FIXME: Should we not reset the _entire_ mask, but just
       ;; restore it to the state before we got the interrupt?
       (reset-signal-mask)
-      (allow-with-interrupts
-        (let ((sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
-          (funcall function))))))
+      (let ((sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+        (allow-with-interrupts (funcall function))))))
 
 (defmacro in-interruption ((&key) &body body)
   #!+sb-doc
@@ -93,6 +92,7 @@
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (/show0 "enable-interrupt")
   (flet ((run-handler (&rest args)
+           (declare (dynamic-extent args))
            (in-interruption ()
              (apply handler args))))
     (without-gcing
