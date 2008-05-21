@@ -321,7 +321,7 @@
                                     for-value-p)))
                    ((if)
                     (fopcompile-if args path for-value-p))
-                   ((progn)
+                   ((progn locally)
                     (loop for (arg . next) on args
                           do (fopcompile arg
                                          path (if next

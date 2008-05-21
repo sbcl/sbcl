@@ -41,6 +41,8 @@ changes in sbcl-1.0.17 relative to 1.0.16:
     2.18.50.0.4 support.  (thanks to Marijn Schouten)
   * bug fix: fix ECASE warnings from CMUCL-as-xc-host.  (reported by
     Andreas Franke)
+  * bug fix: the fopcompiler can handle LOCALLY forms (with no
+    declarations) successfully.  (reported by Attila Lendvai)
 
 changes in sbcl-1.0.16 relative to 1.0.15:
   * minor incompatible change: revert the changes to sb-posix's error

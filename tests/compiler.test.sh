@@ -379,5 +379,10 @@ cat > $tmpfilename <<EOF
 EOF
 expect_aborted_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(if t (locally))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

@@ -30,6 +30,19 @@ EOF
     check_status_maybe_lose load-into-interpreter $?
 }
 
+expect_clean_cload ()
+{
+    expect_clean_compile $1
+    run_sbcl <<EOF
+        (multiple-value-bind (value0 value1) 
+            (ignore-errors (load (compile-file-pathname "$1")))
+          (assert value0)
+          (assert (null value1)))
+        (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+EOF
+    check_status_maybe_lose load-compiled $?
+}
+
 # Test that a file compiles cleanly, with no ERRORs, WARNINGs or
 # STYLE-WARNINGs.
 expect_clean_compile ()
