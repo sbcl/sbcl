@@ -13,7 +13,7 @@
 
 . ./subr.sh
 
-sbcl <<EOF
+run_sbcl <<EOF
     (compile-file "./stress-gc.lisp")
     (load *)
     (time (stress-gc ${1:-100000} ${2:-3000}))
