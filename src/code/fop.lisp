@@ -71,7 +71,7 @@
      (macrolet ((clone-arg () '(read-word-arg)))
        (define-fop (,name ,code :pushp ,pushp :stackp ,stackp) ,@forms))
      (macrolet ((clone-arg () '(read-byte-arg)))
-       (define-fop (,small-name ,small-code :pushp ,pushp :stackp stackp) ,@forms))))
+       (define-fop (,small-name ,small-code :pushp ,pushp :stackp ,stackp) ,@forms))))
 
 ;;; a helper function for reading string values from FASL files: sort
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
