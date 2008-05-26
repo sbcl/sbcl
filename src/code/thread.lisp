@@ -159,7 +159,6 @@ provided the default value is used for the mutex."
                   (declare (function function))
                   (flet ((%call-with-system-mutex ()
                            (dx-let (got-it)
-                             #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
                              (unwind-protect
                                   (when (setf got-it (get-mutex mutex))
                                     (funcall function))
@@ -181,7 +180,6 @@ provided the default value is used for the mutex."
     (declare (function function))
     (without-interrupts
       (dx-let (got-it)
-        #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
         (unwind-protect
              (when (setf got-it (get-spinlock spinlock))
                (funcall function))
@@ -194,7 +192,6 @@ provided the default value is used for the mutex."
                   (flet ((%call-with-system-spinlock ()
                            (dx-let ((inner-lock-p (eq *current-thread* (spinlock-value spinlock)))
                                     (got-it nil))
-                             #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
                              (unwind-protect
                                   (when (or inner-lock-p (setf got-it (get-spinlock spinlock)))
                                     (funcall function))
@@ -212,7 +209,6 @@ provided the default value is used for the mutex."
   (defun call-with-spinlock (function spinlock)
     (declare (function function))
     (dx-let ((got-it nil))
-      #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
       (without-interrupts
         (unwind-protect
              (when (setf got-it (allow-with-interrupts
@@ -224,7 +220,6 @@ provided the default value is used for the mutex."
   (defun call-with-mutex (function mutex value waitp)
     (declare (function function))
     (dx-let ((got-it nil))
-      #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
       (without-interrupts
         (unwind-protect
              (when (setq got-it (allow-with-interrupts
@@ -237,7 +232,6 @@ provided the default value is used for the mutex."
     (declare (function function))
     (dx-let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
              (got-it nil))
-      #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
       (without-interrupts
         (unwind-protect
              (when (or inner-lock-p (setf got-it (allow-with-interrupts
@@ -252,7 +246,6 @@ provided the default value is used for the mutex."
     (declare (function function))
     (dx-let ((inner-lock-p (eq (spinlock-value spinlock) *current-thread*))
           (got-it nil))
-      #-sb-xc-host (declare (optimize sb!c::stack-allocate-value-cells))
       (without-interrupts
         (unwind-protect
              (when (or inner-lock-p (setf got-it (allow-with-interrupts

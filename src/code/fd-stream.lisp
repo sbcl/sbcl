@@ -844,11 +844,9 @@
 ;;; then fill the input buffer, and return the number of bytes read. Throws
 ;;; to EOF-INPUT-CATCHER if the eof was reached.
 (defun refill-input-buffer (stream)
-  (let ((fd (fd-stream-fd stream))
-        (errno 0)
-        (count 0))
-    (declare (optimize sb!c::stack-allocate-value-cells)
-             (dynamic-extent fd errno count))
+  (dx-let ((fd (fd-stream-fd stream))
+           (errno 0)
+           (count 0))
     (tagbody
        ;; Check for blocking input before touching the stream, as if
        ;; we happen to wait we are liable to be interrupted, and the

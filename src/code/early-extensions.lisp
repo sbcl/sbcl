@@ -1254,8 +1254,8 @@ to :INTERPRET, an interpreter will be used.")
 ;;; so take care with this one...
 (defmacro dx-let (bindings &body forms)
   `(locally
-       #-sb-xc-host
-       (declare (optimize sb!c::stack-allocate-dynamic-extent))
+       (declare (optimize #-sb-xc-host sb!c::stack-allocate-dynamic-extent
+                          #-sb-xc-host sb!c::stack-allocate-value-cells))
      (let ,bindings
        (declare (dynamic-extent ,@(mapcar (lambda (bind)
                                             (if (consp bind)
