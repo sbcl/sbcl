@@ -184,10 +184,17 @@
                                        (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
                                        thread)))))))
 
-;;;; OS X doesn't like these being at all, and gives us a SIGSEGV
-;;;; instead of using the Mach expection system! Our or OS X's fault?
-;;;; :/
-
+;;;; FIXME: OS X 10.4 doesn't like these being at all, and gives us a SIGSEGV
+;;;; instead of using the Mach expection system! 10.5 on the other tends to
+;;;; lose() where with interrupt already pending. :/
+;;;;
+;;;; FIXME: This test also occasionally hangs on Linux/x86-64 at least. The
+;;;; common feature is one thread in gc_stop_the_world, and another trying to
+;;;; signal_interrupt_thread, but both (apparently) getting EAGAIN repeatedly.
+;;;; Exactly how or why this is happening remains under investigation -- but
+;;;; it seems plausible that the fast timers simply fill up the interrupt
+;;;; queue completely. (On some occasions the process unwedges itself after
+;;;; a few minutes, but not always.)
 (with-test (:name (:timer :schedule-stress))
   (flet ((test ()
            (let* ((slow-timers (loop for i from 1 upto 100
@@ -228,5 +235,4 @@
                                                 do (sb-ext:schedule-timer (make-timer #'one :thread thread) 0.001))))))
           (dolist (thread threads)
             (sched thread)))
-        (with-timeout (truncate goal 100)
-          (mapcar #'sb-thread:join-thread threads))))))
+        (mapcar #'sb-thread:join-thread threads)))))

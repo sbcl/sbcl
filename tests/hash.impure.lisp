@@ -268,6 +268,10 @@
 
 (defvar *cons-here*)
 
+(declaim (notinline args))
+(defun take (&rest args)
+  (declare (ignore args)))
+
 (defmacro alloc (&body body)
   "Execute BODY and try to reduce the chance of leaking a conservative root."
   #-sb-thread
@@ -287,9 +291,6 @@
                                 (sb-thread::signal-semaphore ,sem)))
        (sb-thread::wait-on-semaphore ,sem)
        (values-list ,values))))
-
-(defun take (&rest args)
-  (declare (ignore args)))
 
 (with-test (:name (:hash-table :weakness :eql :numbers))
   (flet ((random-number ()

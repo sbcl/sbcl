@@ -68,7 +68,7 @@
   (make-instance 'one-slot-subclass :b b))
 (compile 'make-one-slot-subclass)
 
-(defmethod update-instance-for-redifined-class
+(defmethod update-instance-for-redefined-class
     ((object one-slot-superclass) added discarded plist &rest initargs)
   (declare (ignore initargs))
   (error "Called U-I-F-R-C on ~A" object))
