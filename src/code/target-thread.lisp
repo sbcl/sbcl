@@ -39,14 +39,22 @@ in future versions."
       "The name of the thread. Setfable.")
 
 (def!method print-object ((thread thread) stream)
-  (if (thread-name thread)
-      (print-unreadable-object (thread stream :type t :identity t)
-        (prin1 (thread-name thread) stream))
-      (print-unreadable-object (thread stream :type t :identity t)
-        ;; body is empty => there is only one space between type and
-        ;; identity
-        ))
-  thread)
+  (print-unreadable-object (thread stream :type t :identity t)
+    (let* ((cookie (list thread))
+           (info (if (thread-alive-p thread)
+                     :running
+                     (multiple-value-list (join-thread thread :default cookie))))
+           (state (if (eq :running info)
+                      info
+                      (if (eq cookie (car info))
+                          :aborted
+                          :finished)))
+           (values (when (eq :finished state) info)))
+      (format stream "~@[~S ~]~:[~A~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
+              (thread-name thread)
+              (eq :finished state)
+              state
+              values))))
 
 (defun thread-alive-p (thread)
   #!+sb-doc
