@@ -659,9 +659,7 @@
 (defun make-defstruct-allocation-function (class)
   ;; FIXME: Why don't we go class->layout->info == dd
   (let ((dd (find-defstruct-description (class-name class))))
-    (lambda ()
-      (sb-kernel::%make-instance-with-layout
-       (sb-kernel::compiler-layout-or-lose (dd-name dd))))))
+    (%make-structure-instance-allocator dd nil)))
 
 (defmethod shared-initialize :after
     ((class structure-class) slot-names &key

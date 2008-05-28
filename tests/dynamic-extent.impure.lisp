@@ -155,6 +155,190 @@
     (true v)
     nil))
 
+;;; MAKE-STRUCTURE
+
+(declaim (inline make-fp-struct-1))
+(defstruct fp-struct-1
+  (s 0.0 :type single-float)
+  (d 0.0d0 :type double-float))
+
+(defun-with-dx test-fp-struct-1.1 (s d)
+  (let ((fp (make-fp-struct-1 :s s)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-1-s fp)))
+    (assert (eql 0.0d0 (fp-struct-1-d fp)))))
+
+(defun-with-dx test-fp-struct-1.2 (s d)
+  (let ((fp (make-fp-struct-1 :d d)))
+    (declare (dynamic-extent fp))
+    (assert (eql 0.0 (fp-struct-1-s fp)))
+    (assert (eql d (fp-struct-1-d fp)))))
+
+(defun-with-dx test-fp-struct-1.3 (s d)
+  (let ((fp (make-fp-struct-1 :d d :s s)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-1-s fp)))
+    (assert (eql d (fp-struct-1-d fp)))))
+
+(defun-with-dx test-fp-struct-1.4 (s d)
+  (let ((fp (make-fp-struct-1 :s s :d d)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-1-s fp)))
+    (assert (eql d (fp-struct-1-d fp)))))
+
+(test-fp-struct-1.1 123.456 876.243d0)
+(test-fp-struct-1.2 123.456 876.243d0)
+(test-fp-struct-1.3 123.456 876.243d0)
+(test-fp-struct-1.4 123.456 876.243d0)
+
+(declaim (inline make-fp-struct-2))
+(defstruct fp-struct-2
+  (d 0.0d0 :type double-float)
+  (s 0.0 :type single-float))
+
+(defun-with-dx test-fp-struct-2.1 (s d)
+  (let ((fp (make-fp-struct-2 :s s)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-2-s fp)))
+    (assert (eql 0.0d0 (fp-struct-2-d fp)))))
+
+(defun-with-dx test-fp-struct-2.2 (s d)
+  (let ((fp (make-fp-struct-2 :d d)))
+    (declare (dynamic-extent fp))
+    (assert (eql 0.0 (fp-struct-2-s fp)))
+    (assert (eql d (fp-struct-2-d fp)))))
+
+(defun-with-dx test-fp-struct-2.3 (s d)
+  (let ((fp (make-fp-struct-2 :d d :s s)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-2-s fp)))
+    (assert (eql d (fp-struct-2-d fp)))))
+
+(defun-with-dx test-fp-struct-2.4 (s d)
+  (let ((fp (make-fp-struct-2 :s s :d d)))
+    (declare (dynamic-extent fp))
+    (assert (eql s (fp-struct-2-s fp)))
+    (assert (eql d (fp-struct-2-d fp)))))
+
+(test-fp-struct-2.1 123.456 876.243d0)
+(test-fp-struct-2.2 123.456 876.243d0)
+(test-fp-struct-2.3 123.456 876.243d0)
+(test-fp-struct-2.4 123.456 876.243d0)
+
+(declaim (inline make-cfp-struct-1))
+(defstruct cfp-struct-1
+  (s (complex 0.0) :type (complex single-float))
+  (d (complex 0.0d0) :type (complex double-float)))
+
+(defun-with-dx test-cfp-struct-1.1 (s d)
+  (let ((cfp (make-cfp-struct-1 :s s)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-1-s cfp)))
+    (assert (eql (complex 0.0d0) (cfp-struct-1-d cfp)))))
+
+(defun-with-dx test-cfp-struct-1.2 (s d)
+  (let ((cfp (make-cfp-struct-1 :d d)))
+    (declare (dynamic-extent cfp))
+    (assert (eql (complex 0.0) (cfp-struct-1-s cfp)))
+    (assert (eql d (cfp-struct-1-d cfp)))))
+
+(defun-with-dx test-cfp-struct-1.3 (s d)
+  (let ((cfp (make-cfp-struct-1 :d d :s s)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-1-s cfp)))
+    (assert (eql d (cfp-struct-1-d cfp)))))
+
+(defun-with-dx test-cfp-struct-1.4 (s d)
+  (let ((cfp (make-cfp-struct-1 :s s :d d)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-1-s cfp)))
+    (assert (eql d (cfp-struct-1-d cfp)))))
+
+(test-cfp-struct-1.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-1.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-1.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-1.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+
+(declaim (inline make-cfp-struct-2))
+(defstruct cfp-struct-2
+  (d (complex 0.0d0) :type (complex double-float))
+  (s (complex 0.0) :type (complex single-float)))
+
+(defun-with-dx test-cfp-struct-2.1 (s d)
+  (let ((cfp (make-cfp-struct-2 :s s)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-2-s cfp)))
+    (assert (eql (complex 0.0d0) (cfp-struct-2-d cfp)))))
+
+(defun-with-dx test-cfp-struct-2.2 (s d)
+  (let ((cfp (make-cfp-struct-2 :d d)))
+    (declare (dynamic-extent cfp))
+    (assert (eql (complex 0.0) (cfp-struct-2-s cfp)))
+    (assert (eql d (cfp-struct-2-d cfp)))))
+
+(defun-with-dx test-cfp-struct-2.3 (s d)
+  (let ((cfp (make-cfp-struct-2 :d d :s s)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-2-s cfp)))
+    (assert (eql d (cfp-struct-2-d cfp)))))
+
+(defun-with-dx test-cfp-struct-2.4 (s d)
+  (let ((cfp (make-cfp-struct-2 :s s :d d)))
+    (declare (dynamic-extent cfp))
+    (assert (eql s (cfp-struct-2-s cfp)))
+    (assert (eql d (cfp-struct-2-d cfp)))))
+
+(test-cfp-struct-2.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-2.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-2.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(test-cfp-struct-2.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+
+(declaim (inline make-foo1 make-foo2 make-foo3))
+(defstruct foo1 x)
+
+(defun-with-dx make-foo1-on-stack (x)
+  (let ((foo (make-foo1 :x x)))
+    (declare (dynamic-extent foo))
+    (assert (eql x (foo1-x foo)))))
+
+(defstruct foo2
+  (x 0.0 :type single-float)
+  (y 0.0d0 :type double-float)
+  a
+  b
+  c)
+
+(defmacro assert-eql (expected got)
+  `(let ((exp ,expected)
+         (got ,got))
+     (unless (eql exp got)
+       (error "Expected ~S, got ~S!" exp got))))
+
+(defun-with-dx make-foo2-on-stack (x y)
+  (let ((foo (make-foo2 :y y :c 'c)))
+    (declare (dynamic-extent foo))
+    (assert-eql 0.0 (foo2-x foo))
+    (assert-eql y (foo2-y foo))
+    (assert-eql 'c (foo2-c foo))
+    (assert-eql nil (foo2-b foo))))
+
+;;; Check that constants work out as argument for all relevant
+;;; slot types.
+(defstruct foo3
+  (a 0 :type t)
+  (b 1 :type fixnum)
+  (c 2 :type sb-vm:word)
+  (d 3.0 :type single-float)
+  (e 4.0d0 :type double-float))
+(defun-with-dx make-foo3-on-stack ()
+  (let ((foo (make-foo3)))
+    (declare (dynamic-extent foo))
+    (assert (eql 0 (foo3-a foo)))
+    (assert (eql 1 (foo3-b foo)))
+    (assert (eql 2 (foo3-c foo)))
+    (assert (eql 3.0 (foo3-d foo)))
+    (assert (eql 4.0d0 (foo3-e foo)))))
+
 ;;; Nested DX
 
 (defun-with-dx nested-dx-lists ()
@@ -250,6 +434,13 @@
   (assert-no-consing (dx-value-cell 13))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-array-on-stack))
+  (assert-no-consing (make-foo1-on-stack 123))
+  (#+raw-instance-init-vops assert-no-consing
+   #-raw-instance-init-vops progn
+   (make-foo2-on-stack 1.24 1.23d0))
+  (#+raw-instance-init-vops assert-no-consing
+   #-raw-instance-init-vops progn
+   (make-foo3-on-stack))
   (assert-no-consing (nested-dx-conses))
   (assert-no-consing (nested-dx-lists))
   (assert-consing (nested-dx-not-used *a-cons*))

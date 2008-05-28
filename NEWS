@@ -1,4 +1,13 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.18 relative to 1.0.17:
+  * optimization: structure allocation has been improved
+    ** constructors created by non-toplevel DEFSTRUCTs are ~40% faster.
+    ** out of line constructors are ~10% faster.
+    ** inline constructors are ~15% faster.
+    ** inline constructors are capable of dynamic extent allocation
+       (generally on x86 and x86-64, in some cases on other platforms
+       as well.)
+
 changes in sbcl-1.0.17 relative to 1.0.16:
   * temporary regression: user code can no longer allocate closure
     variable storage on stack, due to bug 419 without explicitly

@@ -151,19 +151,6 @@
 
 (defun (setf funcallable-instance-fun) (new-value fin)
   (setf (%funcallable-instance-function fin) new-value))
-
-;;; service function for structure constructors
-(defun %make-instance-with-layout (layout)
-  ;; Make sure the object ends at a two-word boundary.  Note that this does
-  ;; not affect the amount of memory used, since the allocator would add the
-  ;; same padding anyway.  However, raw slots are indexed from the length of
-  ;; the object as indicated in the header, so the pad word needs to be
-  ;; included in that length to guarantee proper alignment of raw double float
-  ;; slots, necessary for (at least) the SPARC backend.
-  (let* ((length (layout-length layout))
-         (result (%make-instance (+ length (mod (1+ length) 2)))))
-    (setf (%instance-layout result) layout)
-    result))
 
 ;;;; target-only parts of the DEFSTRUCT top level code
 

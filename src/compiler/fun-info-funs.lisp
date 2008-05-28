@@ -23,16 +23,22 @@
                 (ir2-convert-setter node block name offset lowtag)))))
   name)
 
-(defun %def-alloc (name words variable-length-p header lowtag inits)
+(defun %def-alloc (name words allocation-style header lowtag inits)
   (let ((info (fun-info-or-lose name)))
     (setf (fun-info-ir2-convert info)
-          (if variable-length-p
-              (lambda (node block)
+          (ecase allocation-style
+            (:var-alloc
+             (lambda (node block)
                 (ir2-convert-variable-allocation node block name words header
-                                                 lowtag inits))
-              (lambda (node block)
-                (ir2-convert-fixed-allocation node block name words header
-                                              lowtag inits)))))
+                                                 lowtag inits)))
+            (:fixed-alloc
+             (lambda (node block)
+               (ir2-convert-fixed-allocation node block name words header
+                                             lowtag inits)))
+            (:structure-alloc
+             (lambda (node block)
+               (ir2-convert-structure-allocation node block name words header
+                                                 lowtag inits))))))
   name)
 
 (defun %def-casser (name offset lowtag)

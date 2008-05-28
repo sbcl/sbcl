@@ -26,6 +26,33 @@
            (error "Class is not a structure class: ~S" name))
           (t res))))
 
+(defun compiler-layout-ready-p (name)
+  (let ((layout (info :type :compiler-layout name)))
+    (and layout (typep (layout-info layout) 'defstruct-description))))
+
+(sb!xc:defmacro %make-structure-instance-macro (dd slot-specs &rest slot-vars)
+  `(truly-the ,(dd-name dd)
+              ,(if (compiler-layout-ready-p (dd-name dd))
+                   `(%make-structure-instance ,dd ,slot-specs ,@slot-vars)
+                   ;; Non-toplevel defstructs don't have a layout at compile time,
+                   ;; so we need to construct the actual function at runtime -- but
+                   ;; we cache it at the call site, so that we don't perform quite
+                   ;; so horribly.
+                   `(let* ((cell (load-time-value (list nil)))
+                           (fun (car cell)))
+                      (if (functionp fun)
+                          (funcall fun ,@slot-vars)
+                          (funcall (setf (car cell)
+                                         (%make-structure-instance-allocator ,dd ,slot-specs))
+                                   ,@slot-vars))))))
+
+(declaim (ftype (sfunction (defstruct-description list) function)
+                %Make-structure-instance-allocator))
+(defun %make-structure-instance-allocator (dd slot-specs)
+  (let ((vars (make-gensym-list (length slot-specs))))
+    (values (compile nil `(lambda (,@vars)
+                            (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
+
 ;;; Delay looking for compiler-layout until the constructor is being
 ;;; compiled, since it doesn't exist until after the EVAL-WHEN
 ;;; (COMPILE) stuff is compiled. (Or, in the oddball case when
@@ -223,6 +250,7 @@
     (raw-type (missing-arg) :type (or symbol cons) :read-only t)
     ;; What operator is used to access a slot of this type?
     (accessor-name (missing-arg) :type symbol :read-only t)
+    (init-vop (missing-arg) :type symbol :read-only t)
     ;; How many words are each value of this type?
     (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
     ;; Necessary alignment in units of words.  Note that instances
@@ -242,9 +270,11 @@
       (list
        (make-raw-slot-data :raw-type 'sb!vm:word
                            :accessor-name '%raw-instance-ref/word
+                           :init-vop 'sb!vm::raw-instance-init/word
                            :n-words 1)
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
+                           :init-vop 'sb!vm::raw-instance-init/single
                            ;; KLUDGE: On 64 bit architectures, we
                            ;; could pack two SINGLE-FLOATs into the
                            ;; same word if raw slots were indexed
@@ -258,22 +288,27 @@
                            :n-words 1)
        (make-raw-slot-data :raw-type 'double-float
                            :accessor-name '%raw-instance-ref/double
+                           :init-vop 'sb!vm::raw-instance-init/double
                            :alignment double-float-alignment
                            :n-words (/ 8 sb!vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-single-float
                            :accessor-name '%raw-instance-ref/complex-single
+                           :init-vop 'sb!vm::raw-instance-init/complex-single
                            :n-words (/ 8 sb!vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-double-float
                            :accessor-name '%raw-instance-ref/complex-double
+                           :init-vop 'sb!vm::raw-instance-init/complex-double
                            :alignment double-float-alignment
                            :n-words (/ 16 sb!vm:n-word-bytes))
        #!+long-float
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
+                           :init-vop 'sb!vm::raw-instance-init/long
                            :n-words #!+x86 3 #!+sparc 4)
        #!+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
+                           :init-vop 'sb!vm::raw-instance-init/complex-long
                            :n-words #!+x86 6 #!+sparc 8)))))
 
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
@@ -1142,6 +1177,22 @@
                         :destruct-layout old-layout))))
   (values))
 
+(declaim (inline dd-layout-length))
+(defun dd-layout-length (dd)
+  (+ (dd-length dd) (dd-raw-length dd)))
+
+(declaim (ftype (sfunction (defstruct-description) index) dd-instance-length))
+(defun dd-instance-length (dd)
+  ;; Make sure the object ends at a two-word boundary.  Note that this does
+  ;; not affect the amount of memory used, since the allocator would add the
+  ;; same padding anyway.  However, raw slots are indexed from the length of
+  ;; the object as indicated in the header, so the pad word needs to be
+  ;; included in that length to guarantee proper alignment of raw double float
+  ;; slots, necessary for (at least) the SPARC backend.
+  (let ((layout-length (dd-layout-length dd)))
+    (declare (index layout-length))
+    (+ layout-length (mod (1+ layout-length) 2))))
+
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should
 ;;; be used for the new definition (may be the current layout, and
@@ -1179,8 +1230,7 @@
     (let ((new-layout (make-layout :classoid class
                                    :inherits inherits
                                    :depthoid (length inherits)
-                                   :length (+ (dd-length info)
-                                              (dd-raw-length info))
+                                   :length (dd-layout-length info)
                                    :n-untagged-slots (dd-raw-length info)
                                    :info info))
           (old-layout (or compiler-layout old-layout)))
@@ -1304,29 +1354,60 @@
     (loop for dsd in (dd-slots dd) and val in values do
       (setf (elt vals (dsd-index dsd))
             (if (eq val '.do-not-initialize-slot.) 0 val)))
-
     `(defun ,cons-name ,arglist
        (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
        (list ,@vals))))
 (defun create-structure-constructor (dd cons-name arglist vars types values)
-  (let* ((instance (gensym "INSTANCE")))
+  ;; The difference between the two implementations here is that on all
+  ;; platforms we don't have the appropriate RAW-INSTANCE-INIT VOPS, which
+  ;; must be able to deal with immediate values as well -- unlike
+  ;; RAW-INSTANCE-SET VOPs, which never end up seeing immediate values. With
+  ;; some additional cleverness we might manage without them and just a single
+  ;; implementation here, though -- figure out a way to ensure that on those
+  ;; platforms we always still get a non-immediate TN in every case...
+  ;;
+  ;; Until someone does that, this means that instances with raw slots can be
+  ;; DX allocated only on platforms with those additional VOPs.
+  #!+raw-instance-init-vops
+  (let* ((slot-values nil)
+         (slot-specs
+          (mapcan (lambda (dsd value)
+                    (unless (eq value '.do-not-initialize-slot.)
+                      (push value slot-values)
+                      (list (list* :slot (dsd-raw-type dsd) (dsd-index dsd)))))
+                  (dd-slots dd)
+                  values)))
     `(defun ,cons-name ,arglist
-       (declare ,@(mapcar (lambda (var type) `(type ,type ,var))
-                          vars types))
-       (let ((,instance (truly-the ,(dd-name dd)
-                          (%make-instance-with-layout
-                           (%delayed-get-compiler-layout ,(dd-name dd))))))
-         ,@(mapcar (lambda (dsd value)
-                     ;; (Note that we can't in general use the
-                     ;; ordinary named slot setter function here
-                     ;; because the slot might be :READ-ONLY, so we
-                     ;; whip up new LAMBDA representations of slot
-                     ;; setters for the occasion.)
-                     (unless (eq value '.do-not-initialize-slot.)
-                       `(,(slot-setter-lambda-form dd dsd) ,value ,instance)))
-                   (dd-slots dd)
-                   values)
-         ,instance))))
+       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
+       (%make-structure-instance-macro ,dd ',slot-specs ,@(reverse slot-values))))
+  #!-raw-instance-init-vops
+  (let ((instance (gensym "INSTANCE")) slot-values slot-specs raw-slots raw-values)
+    (mapc (lambda (dsd value)
+            (unless (eq value '.do-not-initialize-slot.)
+              (let ((raw-type (dsd-raw-type dsd)))
+                (cond ((eq t raw-type)
+                       (push value slot-values)
+                       (push (list* :slot raw-type (dsd-index dsd)) slot-specs))
+                      (t
+                       (push value raw-values)
+                       (push dsd raw-slots))))))
+          (dd-slots dd)
+          values)
+    `(defun ,cons-name ,arglist
+       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
+       ,(if raw-slots
+            `(let ((,instance (%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))
+              ,@(mapcar (lambda (dsd value)
+                          ;; (Note that we can't in general use the
+                          ;; ordinary named slot setter function here
+                          ;; because the slot might be :READ-ONLY, so we
+                          ;; whip up new LAMBDA representations of slot
+                          ;; setters for the occasion.)
+                          `(,(slot-setter-lambda-form dd dsd) ,value ,instance))
+                        raw-slots
+                        raw-values)
+              ,instance)
+            `(%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))))
 
 ;;; Create a default (non-BOA) keyword constructor.
 (defun create-keyword-constructor (defstruct creator)
@@ -1632,10 +1713,7 @@
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type
           (structure
-           (values `(let ((,object-gensym (%make-instance ,dd-length)))
-                      (setf (%instance-layout ,object-gensym)
-                            ,delayed-layout-form)
-                      ,object-gensym)
+           (values `(%make-structure-instance-macro ,dd nil)
                    '%instance-ref))
           (funcallable-structure
            (values `(let ((,object-gensym

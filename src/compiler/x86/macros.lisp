@@ -31,10 +31,10 @@
 ;;; will probably be loading the wrong register!
 (defmacro with-empty-tn@fp-top((tn) &body body)
   `(progn
-    (inst fstp ,tn)
-    ,@body
-    (unless (zerop (tn-offset ,tn))
-      (inst fxch ,tn))))                ; save into new dest and restore st(0)
+     (inst fstp ,tn)
+     ,@body
+     (unless (zerop (tn-offset ,tn))
+       (inst fxch ,tn))))                ; save into new dest and restore st(0)
 
 ;;;; instruction-like macros
 

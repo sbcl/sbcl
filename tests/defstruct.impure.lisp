@@ -715,3 +715,25 @@
                        (make-raw-slot-equalp-bug :a 1d0 :b 3s0))))
   (assert (not (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
                        (make-raw-slot-equalp-bug :a 2d0 :b 2s0)))))
+
+;;; Check that all slot types (non-raw and raw) can be initialized with
+;;; constant arguments.
+(defstruct constant-arg-inits
+  (a 42 :type t)
+  (b 1 :type fixnum)
+  (c 2 :type sb-vm:word)
+  (d 3.0 :type single-float)
+  (e 4.0d0 :type double-float)
+  (f #c(5.0 5.0) :type (complex single-float))
+  (g #c(6.0d0 6.0d0) :type (complex double-float)))
+(defun test-constant-arg-inits ()
+  (let ((foo (make-constant-arg-inits)))
+    (declare (dynamic-extent foo))
+    (assert (eql 42 (constant-arg-inits-a foo)))
+    (assert (eql 1 (constant-arg-inits-b foo)))
+    (assert (eql 2 (constant-arg-inits-c foo)))
+    (assert (eql 3.0 (constant-arg-inits-d foo)))
+    (assert (eql 4.0d0 (constant-arg-inits-e foo)))
+    (assert (eql #c(5.0 5.0) (constant-arg-inits-f foo)))
+    (assert (eql #c(6.0d0 6.0d0) (constant-arg-inits-g foo)))))
+(make-constant-arg-inits)

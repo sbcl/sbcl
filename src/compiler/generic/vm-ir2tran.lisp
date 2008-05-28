@@ -9,6 +9,13 @@
 
 (in-package "SB!C")
 
+(def-alloc %make-structure-instance 1 :structure-alloc
+           sb!vm:instance-header-widetag sb!vm:instance-pointer-lowtag
+           nil)
+
+(defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args))
+  t)
+
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar
@@ -46,37 +53,62 @@
          res)
     (move-lvar-result node block locs lvar)))
 
-(defun emit-inits (node block name result lowtag inits args)
+(defun emit-inits (node block name object lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil))
     (dolist (init inits)
       (let ((kind (car init))
             (slot (cdr init)))
-        (vop set-slot node block result
-             (ecase kind
-               (:arg
-                (aver args)
-                (lvar-tn node block (pop args)))
-               (:unbound
-                (or unbound-marker-tn
-                    (setf unbound-marker-tn
-                          (let ((tn (make-restricted-tn
-                                     nil
-                                     (sc-number-or-lose 'sb!vm::any-reg))))
-                            (vop make-unbound-marker node block tn)
-                            tn))))
-               (:null
-                (emit-constant nil))
-               (:funcallable-instance-tramp
-                (or funcallable-instance-tramp-tn
-                    (setf funcallable-instance-tramp-tn
-                          (let ((tn (make-restricted-tn
-                                     nil
-                                     (sc-number-or-lose 'sb!vm::any-reg))))
-                            (vop make-funcallable-instance-tramp node block tn)
-                            tn)))))
-             name slot lowtag))))
-  (aver (null args)))
+        (case kind
+          (:slot
+           (let ((raw-type (pop slot))
+                 (arg-tn (lvar-tn node block (pop args))))
+             (macrolet ((make-case ()
+                          `(ecase raw-type
+                             ((t)
+                              (vop set-slot node block object arg-tn
+                                   name (+ sb!vm:instance-slots-offset slot) lowtag))
+                             ,@(mapcar (lambda (rsd)
+                                         `(,(sb!kernel::raw-slot-data-raw-type rsd)
+                                            (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
+                                                 node block
+                                                 object arg-tn slot)))
+                                       #!+raw-instance-init-vops
+                                       sb!kernel::*raw-slot-data-list*
+                                       #!-raw-instance-init-vops
+                                       nil))))
+               (make-case))))
+          (:dd
+           (vop set-slot node block object
+                (emit-constant (sb!kernel::dd-layout-or-lose slot))
+                name sb!vm:instance-slots-offset lowtag))
+          (otherwise
+           (vop set-slot node block object
+                (ecase kind
+                  (:arg
+                   (aver args)
+                   (lvar-tn node block (pop args)))
+                  (:unbound
+                   (or unbound-marker-tn
+                       (setf unbound-marker-tn
+                             (let ((tn (make-restricted-tn
+                                        nil
+                                        (sc-number-or-lose 'sb!vm::any-reg))))
+                               (vop make-unbound-marker node block tn)
+                               tn))))
+                  (:null
+                   (emit-constant nil))
+                  (:funcallable-instance-tramp
+                   (or funcallable-instance-tramp-tn
+                       (setf funcallable-instance-tramp-tn
+                             (let ((tn (make-restricted-tn
+                                        nil
+                                        (sc-number-or-lose 'sb!vm::any-reg))))
+                               (vop make-funcallable-instance-tramp node block tn)
+                               tn)))))
+                name slot lowtag))))))
+  (unless (null args)
+    (bug "Leftover args: ~S" args)))
 
 (defun emit-fixed-alloc (node block name words type lowtag result lvar)
   (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
@@ -106,6 +138,20 @@
              type lowtag result))
     (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
+
+(defoptimizer ir2-convert-structure-allocation
+    ((dd slot-specs &rest args) node block name words type lowtag inits)
+  (let* ((lvar (node-lvar node))
+         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (result (first locs)))
+    (aver (constant-lvar-p dd))
+    (aver (constant-lvar-p slot-specs))
+    (let* ((c-dd (lvar-value dd))
+           (c-slot-specs (lvar-value slot-specs))
+           (words (+ (sb!kernel::dd-instance-length c-dd) words)))
+      (emit-fixed-alloc node block name words type lowtag result lvar)
+      (emit-inits node block name result lowtag `((:dd . ,c-dd) ,@c-slot-specs) args)
+      (move-lvar-result node block locs lvar))))
 
 ;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options

@@ -111,7 +111,9 @@
   (flushable))
 
 (defknown %make-instance (index) instance
-  (unsafe))
+  (flushable))
+(defknown %make-structure-instance (defstruct-description list &rest t) instance
+  (flushable always-translatable))
 (defknown %instance-layout (instance) layout
   (foldable flushable))
 (defknown %set-instance-layout (instance layout) layout

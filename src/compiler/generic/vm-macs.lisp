@@ -119,8 +119,10 @@
           (constants `(def!constant ,size ,offset))
           (exports size)))
       (when alloc-trans
-        (forms `(def-alloc ,alloc-trans ,offset ,variable-length-p ,widetag
-                           ,lowtag ',(inits))))
+        (forms `(def-alloc ,alloc-trans ,offset
+                  ,(if variable-length-p :var-alloc :fixed-alloc)
+                  ,widetag
+                  ,lowtag ',(inits))))
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (%define-primitive-object
@@ -141,8 +143,8 @@
   `(%def-reffer ',name ,offset ,lowtag))
 (defmacro def-setter (name offset lowtag)
   `(%def-setter ',name ,offset ,lowtag))
-(defmacro def-alloc (name words variable-length-p header lowtag inits)
-  `(%def-alloc ',name ,words ,variable-length-p ,header ,lowtag ,inits))
+(defmacro def-alloc (name words alloc-style header lowtag inits)
+  `(%def-alloc ',name ,words ,alloc-style ,header ,lowtag ,inits))
 #!+compare-and-swap-vops
 (defmacro def-casser (name offset lowtag)
   `(%def-casser ',name ,offset ,lowtag))
