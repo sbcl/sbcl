@@ -1551,4 +1551,17 @@
                  (not (or c d e f g h i j k l m n o p q r s))))))
 (wants-many-values 1 42)
 
+;;; constant coalescing (named and unnamed)
+(defconstant +born-to-coalesce+ '.born-to-coalesce.)
+(let* ((f (compile nil '(lambda ()
+                         (let ((x (cons +born-to-coalesce+ nil))
+                               (y (cons '.born-to-coalesce. nil)))
+                           (list x y)))))
+       (b-t-c 0)
+       (code (sb-kernel:fun-code-header f)))
+  (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+        do (when (eq '.born-to-coalesce. (sb-kernel:code-header-ref code i))
+             (incf b-t-c)))
+  (assert (= 1 b-t-c)))
+
 ;;; success

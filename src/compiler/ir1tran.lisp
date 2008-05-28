@@ -241,11 +241,7 @@
                        (type (type-specifier (info :variable :type name))))
                    `(macro . (the ,type ,expansion))))
                 (:constant
-                 (let ((value (info :variable :constant-value name)))
-                   (make-constant :value value
-                                  :%source-name name
-                                  :type (ctype-of value)
-                                  :where-from where-from)))
+                 (find-constant (info :variable :constant-value name)))
                 (t
                  (make-global-var :kind kind
                                   :%source-name name
@@ -527,8 +523,7 @@
   ;; needs to be.
   (defun reference-constant (start next result value)
     (declare (type ctran start next)
-             (type (or lvar null) result)
-             (inline find-constant))
+             (type (or lvar null) result))
     (ir1-error-bailout (start next result value)
      (when (producing-fasl-file)
        (maybe-emit-make-load-forms value))
@@ -566,7 +561,7 @@
 ;;; needed. If LEAF represents a defined function which has already
 ;;; been converted, and is not :NOTINLINE, then reference the
 ;;; functional instead.
-(defun reference-leaf (start next result leaf)
+(defun reference-leaf (start next result leaf &optional (name '.anonymous.))
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (when (functional-p leaf)
     (assure-functional-live-p leaf))
@@ -590,7 +585,7 @@
                                     '(nil :optional)))
                      (maybe-reanalyze-functional leaf))
                    leaf))
-         (ref (make-ref leaf)))
+         (ref (make-ref leaf name)))
     (push ref (leaf-refs leaf))
     (setf (leaf-ever-used leaf) t)
     (link-node-to-previous-ctran ref start)
@@ -632,7 +627,7 @@
                ;; processing our own code, though.
                #+sb-xc-host
                (warn "reading an ignored variable: ~S" name)))
-           (reference-leaf start next result var))
+           (reference-leaf start next result var name))
           (cons
            (aver (eq (car var) 'macro))
            ;; FIXME: [Free] type declarations. -- APD, 2002-01-26

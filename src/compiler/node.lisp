@@ -672,7 +672,6 @@
   ;; the value of the constant
   (value nil :type t))
 (defprinter (constant :identity t)
-  (%source-name :test %source-name)
   value)
 
 ;;; The BASIC-VAR structure represents information common to all
@@ -1142,14 +1141,20 @@
 (def!struct (ref (:include valued-node (reoptimize nil))
                  (:constructor make-ref
                                (leaf
+                                &optional (%source-name '.anonymous.)
                                 &aux (leaf-type (leaf-type leaf))
                                 (derived-type
                                  (make-single-value-type leaf-type))))
                  (:copier nil))
   ;; The leaf referenced.
-  (leaf nil :type leaf))
+  (leaf nil :type leaf)
+  ;; CONSTANT nodes are always anonymous, since we wish to coalesce named and
+  ;; unnamed constants that are equivalent, we need to keep track of the
+  ;; reference name for XREF.
+  (%source-name (missing-arg) :type symbol :read-only t))
 (defprinter (ref :identity t)
   #!+sb-show id
+  %source-name
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.

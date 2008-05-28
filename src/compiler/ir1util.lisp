@@ -1570,20 +1570,20 @@
 ;;; the object is not in *CONSTANTS*, then we create a new constant
 ;;; LEAF and enter it.
 (defun find-constant (object)
-  (if (typep object
-             ;; FIXME: What is the significance of this test? ("things
-             ;; that are worth uniquifying"?)
-             '(or symbol number character instance))
-      (or (gethash object *constants*)
-          (setf (gethash object *constants*)
-                (make-constant :value object
-                               :%source-name '.anonymous.
-                               :type (ctype-of object)
-                               :where-from :defined)))
-      (make-constant :value object
-                     :%source-name '.anonymous.
-                     :type (ctype-of object)
-                     :where-from :defined)))
+  (flet ((make-it ()
+           (make-constant :value object
+                          :%source-name '.anonymous.
+                          :type (ctype-of object)
+                          :where-from :defined)))
+    (if (and (typep object
+                    ;; FIXME: What is the significance of this test? ("things
+                    ;; that are worth uniquifying"?)
+                    '(or symbol number character instance))
+             (boundp '*constants*))
+        (or (gethash object *constants*)
+            (setf (gethash object *constants*)
+                  (make-it)))
+        (make-it))))
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different

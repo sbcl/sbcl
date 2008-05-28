@@ -117,8 +117,7 @@
                 (record-xref :calls name context node nil)))))
          ;; Reading a constant
          (constant
-          (let* ((name (constant-%source-name leaf)))
-            (record-xref :references name context node nil))))))
+          (record-xref :references (ref-%source-name node) context node nil)))))
     ;; Setting a special variable
     (cset
      (let* ((var (set-var node)))
@@ -149,15 +148,16 @@
     (list
      (every #'internal-name-p what))
     (symbol
-     (member (symbol-package what)
-             (load-time-value (list* (find-package "COMMON-LISP")
-                                     (find-package "KEYWORD")
-                                     (remove-if-not
-                                      (lambda (package)
-                                        (= (mismatch "SB!"
-                                                     (package-name package))
-                                           3))
-                                      (list-all-packages))))))
+     (or (eq '.anonymous. what)
+         (member (symbol-package what)
+                 (load-time-value (list* (find-package "COMMON-LISP")
+                                         (find-package "KEYWORD")
+                                         (remove-if-not
+                                          (lambda (package)
+                                            (= (mismatch "SB!"
+                                                         (package-name package))
+                                               3))
+                                          (list-all-packages)))))))
     (t t)))
 
 (defun record-xref (kind what context node path)
