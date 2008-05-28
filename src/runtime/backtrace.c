@@ -528,6 +528,29 @@ print_entry_points (struct code *code)
   }
 }
 
+void
+describe_thread_state(void)
+{
+    sigset_t mask;
+    struct thread *thread = arch_os_get_current_thread();
+    pthread_sigmask(SIG_SETMASK, NULL, &mask);
+    printf("Signal mask:\n");
+    printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
+    printf(" SIGINT = %d\n", sigismember(&mask, SIGINT));
+    printf(" SIGPROF = %d\n", sigismember(&mask, SIGPROF));
+    printf(" SIG_INTERRUPT_THREAD = %d\n", sigismember(&mask, SIG_INTERRUPT_THREAD));
+#ifdef SIG_STOP_FOR_GC
+    printf(" SIG_STOP_FOR_GC = %d\n", sigismember(&mask, SIG_STOP_FOR_GC));
+#endif
+    printf("Specials:\n");
+    printf(" *GC-INHIBIT* = %s\n", (SymbolValue(GC_INHIBIT, thread) == T) ? "T" : "NIL");
+    printf(" *GC-PENDING* = %s\n", (SymbolValue(GC_PENDING, thread) == T) ? "T" : "NIL");
+    printf(" *INTERRUPTS-ENABLED* = %s\n", (SymbolValue(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
+#ifdef STOP_FOR_GC_PENDING
+    printf(" *STOP-FOR-GC-PENDING* = %s\n", (SymbolValue(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
+#endif
+}
+
 /* This function has been split from backtrace() to enable Lisp
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
  * example when debugging threading deadlocks.
