@@ -53,7 +53,7 @@
          res)
     (move-lvar-result node block locs lvar)))
 
-(defun emit-inits (node block name object lowtag inits args)
+(defun emit-inits (node block name object lowtag instance-length inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil))
     (dolist (init inits)
@@ -72,7 +72,7 @@
                                          `(,(sb!kernel::raw-slot-data-raw-type rsd)
                                             (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
                                                  node block
-                                                 object arg-tn slot)))
+                                                 object arg-tn instance-length slot)))
                                        #!+raw-instance-init-vops
                                        sb!kernel::*raw-slot-data-list*
                                        #!-raw-instance-init-vops
@@ -123,7 +123,7 @@
          (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
-    (emit-inits node block name result lowtag inits args)
+    (emit-inits node block name result lowtag words inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -136,7 +136,7 @@
           (emit-fixed-alloc node block name words type lowtag result lvar))
         (vop var-alloc node block (lvar-tn node block extra) name words
              type lowtag result))
-    (emit-inits node block name result lowtag inits args)
+    (emit-inits node block name result lowtag nil inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
@@ -150,7 +150,7 @@
            (c-slot-specs (lvar-value slot-specs))
            (words (+ (sb!kernel::dd-instance-length c-dd) words)))
       (emit-fixed-alloc node block name words type lowtag result lvar)
-      (emit-inits node block name result lowtag `((:dd . ,c-dd) ,@c-slot-specs) args)
+      (emit-inits node block name result lowtag words `((:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 
 ;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite

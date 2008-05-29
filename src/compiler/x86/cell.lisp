@@ -503,24 +503,32 @@
 ;;;; raw instance slot accessors
 
 (defun make-ea-for-raw-slot (object index instance-length n-words)
-  (flet ((make-ea-using-value (value)
-           (make-ea :dword :base object
-                    :index instance-length
-                    :scale 4
-                    :disp (- (* (- instance-slots-offset n-words)
-                                n-word-bytes)
-                             instance-pointer-lowtag
-                             (fixnumize value)))))
-    (if (typep index 'tn)
-        (sc-case index
-          (any-reg (make-ea :dword
-                            :base object
-                            :index instance-length
-                            :disp (- (* (- instance-slots-offset n-words)
-                                        n-word-bytes)
-                                     instance-pointer-lowtag)))
-          (immediate (make-ea-using-value (tn-value index))))
-        (make-ea-using-value index))))
+  (if (integerp instance-length)
+      ;; For RAW-INSTANCE-INIT/* VOPs, which know the exact instance length
+      ;; at compile time.
+      (make-ea :dword
+               :base object
+               :disp (- (* (- instance-length instance-slots-offset index (1- n-words))
+                           n-word-bytes)
+                        instance-pointer-lowtag))
+      (flet ((make-ea-using-value (value)
+               (make-ea :dword :base object
+                        :index instance-length
+                        :scale 4
+                        :disp (- (* (- instance-slots-offset n-words)
+                                    n-word-bytes)
+                                 instance-pointer-lowtag
+                                 (* value n-word-bytes)))))
+        (if (typep index 'tn)
+            (sc-case index
+              (any-reg (make-ea :dword
+                                :base object
+                                :index instance-length
+                                :disp (- (* (- instance-slots-offset n-words)
+                                            n-word-bytes)
+                                         instance-pointer-lowtag)))
+              (immediate (make-ea-using-value (tn-value index))))
+            (make-ea-using-value index)))))
 
 (define-vop (raw-instance-ref/word)
   (:translate %raw-instance-ref/word)
@@ -561,12 +569,9 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (unsigned-reg)))
   (:arg-types * unsigned-num)
-  (:info index)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:info instance-length index)
   (:generator 5
-    (loadw tmp object 0 instance-pointer-lowtag)
-    (inst shr tmp n-widetag-bits)
-    (inst mov (make-ea-for-raw-slot object index tmp 1) value)))
+    (inst mov (make-ea-for-raw-slot object index instance-length 1) value)))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)
@@ -619,13 +624,10 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (single-reg)))
   (:arg-types * single-float)
-  (:info index)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:info instance-length index)
   (:generator 5
-    (loadw tmp object 0 instance-pointer-lowtag)
-    (inst shr tmp n-widetag-bits)
     (with-tn@fp-top (value)
-      (inst fst (make-ea-for-raw-slot object index tmp 1)))))
+      (inst fst (make-ea-for-raw-slot object index instance-length 1)))))
 
 (define-vop (raw-instance-ref/double)
   (:translate %raw-instance-ref/double)
@@ -678,13 +680,10 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (double-reg)))
   (:arg-types * double-float)
-  (:info index)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:info instance-length index)
   (:generator 5
-    (loadw tmp object 0 instance-pointer-lowtag)
-    (inst shr tmp n-widetag-bits)
     (with-tn@fp-top (value)
-      (inst fstd (make-ea-for-raw-slot object index tmp 2)))))
+      (inst fstd (make-ea-for-raw-slot object index instance-length 2)))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
@@ -756,17 +755,14 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-single-reg)))
   (:arg-types * complex-single-float)
-  (:info index)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:info instance-length index)
   (:generator 5
-    (loadw tmp object 0 instance-pointer-lowtag)
-    (inst shr tmp n-widetag-bits)
     (let ((value-real (complex-single-reg-real-tn value)))
       (with-tn@fp-top (value-real)
-        (inst fst (make-ea-for-raw-slot object index tmp 2))))
+        (inst fst (make-ea-for-raw-slot object index instance-length 2))))
     (let ((value-imag (complex-single-reg-imag-tn value)))
       (with-tn@fp-top (value-imag)
-        (inst fst (make-ea-for-raw-slot object index tmp 1))))))
+        (inst fst (make-ea-for-raw-slot object index instance-length 1))))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
@@ -838,14 +834,11 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-double-reg)))
   (:arg-types * complex-double-float)
-  (:info index)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:info instance-length index)
   (:generator 20
-    (loadw tmp object 0 instance-pointer-lowtag)
-    (inst shr tmp n-widetag-bits)
     (let ((value-real (complex-double-reg-real-tn value)))
       (with-tn@fp-top (value-real)
-        (inst fstd (make-ea-for-raw-slot object index tmp 4))))
+        (inst fstd (make-ea-for-raw-slot object index instance-length 4))))
     (let ((value-imag (complex-double-reg-imag-tn value)))
       (with-tn@fp-top (value-imag)
-        (inst fstd (make-ea-for-raw-slot object index tmp 2))))))
+        (inst fstd (make-ea-for-raw-slot object index instance-length 2))))))
