@@ -384,5 +384,12 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+cat > $tmpfilename <<EOF
+(defconstant cl-package (find-package :cl))
+(defun cl-symbol-p (x)
+  (eq (symbol-package x) cl-package))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

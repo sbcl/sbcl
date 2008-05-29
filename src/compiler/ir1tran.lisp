@@ -518,20 +518,16 @@
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf
-  ;; if necessary. If we are producing a fasl file, make sure that
-  ;; MAKE-LOAD-FORM gets used on any parts of the constant that it
-  ;; needs to be.
+  ;; if necessary.
   (defun reference-constant (start next result value)
     (declare (type ctran start next)
              (type (or lvar null) result))
     (ir1-error-bailout (start next result value)
-     (when (producing-fasl-file)
-       (maybe-emit-make-load-forms value))
-     (let* ((leaf (find-constant value))
-            (res (make-ref leaf)))
-       (push res (leaf-refs leaf))
-       (link-node-to-previous-ctran res start)
-       (use-continuation res next result)))
+      (let* ((leaf (find-constant value))
+             (res (make-ref leaf)))
+        (push res (leaf-refs leaf))
+        (link-node-to-previous-ctran res start)
+        (use-continuation res next result)))
     (values)))
 
 ;;; Add FUNCTIONAL to the COMPONENT-REANALYZE-FUNCTIONALS, unless it's

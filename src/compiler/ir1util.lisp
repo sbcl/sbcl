@@ -1568,9 +1568,13 @@
 
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in *CONSTANTS*, then we create a new constant
-;;; LEAF and enter it.
+;;; LEAF and enter it. If we are producing a fasl file, make sure that
+;;; MAKE-LOAD-FORM gets used on any parts of the constant that it
+;;; needs to be.
 (defun find-constant (object)
   (flet ((make-it ()
+           (when (producing-fasl-file)
+             (maybe-emit-make-load-forms object))
            (make-constant :value object
                           :%source-name '.anonymous.
                           :type (ctype-of object)
