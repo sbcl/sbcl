@@ -435,9 +435,9 @@ GNAME(do_pending_interrupt):
 #define ALLOC(size)                                             \
         pushl   %ebp;              /* Save EBP               */ \
         movl    %esp,%ebp;         /* Save ESP to EBP        */ \
-        andl    $0xfffffff0,%esp;  /* Align stack            */ \
-        pushl   $0;                /* Padding                */ \
-        pushl   size;              /* Argument to alloc      */ \
+        pushl   $0;                /* Reserve space for arg  */ \
+        andl    $0xfffffff0,%esp;  /* Align stack to 16bytes */ \
+        movl    size, (%esp);      /* Argument to alloc      */ \
         call    GNAME(alloc);                                   \
         movl    %ebp,%esp;         /* Restore ESP from EBP   */ \
         popl    %ebp;              /* Restore EBP            */
