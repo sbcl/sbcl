@@ -437,7 +437,7 @@
   (let ((intercept-rebindings
          (let (rebindings)
            (dolist (arg args-lambda-list (nreverse rebindings))
-             (unless (member arg lambda-list-keywords)
+             (unless (member arg lambda-list-keywords :test #'eq)
                (typecase arg
                  (symbol (push `(,arg ',arg) rebindings))
                  (cons

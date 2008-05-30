@@ -252,7 +252,7 @@
     (when (eq (layout-invalid (class-wrapper class)) t)
       (force-cache-flushes class))
     (setf (ctor-class ctor) class)
-    (pushnew ctor (plist-value class 'ctors))
+    (pushnew ctor (plist-value class 'ctors) :test #'eq)
     (setf (funcallable-instance-fun ctor)
           (multiple-value-bind (form locations names)
               (constructor-function-form ctor)

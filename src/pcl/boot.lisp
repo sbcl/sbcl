@@ -1496,7 +1496,7 @@ bootstrapping.
                           ;; another binding it won't have a %CLASS
                           ;; declaration anymore, and this won't get
                           ;; executed.
-                          (pushnew var parameters-setqd))))
+                          (pushnew var parameters-setqd :test #'eq))))
                     form)
                    ((and (eq (car form) 'function)
                          (cond ((eq (cadr form) 'call-next-method)

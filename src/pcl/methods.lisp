@@ -345,7 +345,7 @@
     (let ((pos 0))
       (dolist (type-spec (method-specializers method))
         (unless (eq type-spec *the-class-t*)
-          (pushnew pos specialized-argument-positions))
+          (pushnew pos specialized-argument-positions :test #'eq))
         (incf pos)))
     ;; Finally merge the values for this method into the values
     ;; for the exisiting methods and return them. Note that if
@@ -433,41 +433,58 @@
       (list '(:sbcl :node "Metaobject Protocol")
             '(:amop :generic-function (setf slot-value-using-class)))))
 
+(defgeneric values-for-add-method (gf method)
+  (:method ((gf standard-generic-function) (method standard-method))
+    ;; KLUDGE: Just a single generic dispatch, and everything else
+    ;; comes from permutation vectors. Would be nicer to define 
+    ;; REAL-ADD-METHOD with a proper method so that we could efficiently
+    ;; use SLOT-VALUE there.
+    ;;
+    ;; Optimization note: REAL-ADD-METHOD has a lot of O(N) stuff in it (as
+    ;; does PCL as a whole). It should not be too hard to internally store
+    ;; many of the things we now keep in lists as either purely functional
+    ;; O(log N) sets, or --if we don't mind the memory cost-- using
+    ;; specialized hash-tables: most things are used to answer questions about
+    ;; set-membership, not ordering.
+    (values (slot-value gf '%lock)
+            (slot-value method 'qualifiers)
+            (slot-value method 'specializers)
+            (slot-value method 'lambda-list)
+            (slot-value method '%generic-function))))
+
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
-  (when (method-generic-function method)
-    (error "~@<The method ~S is already part of the generic ~
-            function ~S; it can't be added to another generic ~
-            function until it is removed from the first one.~@:>"
-           method (method-generic-function method)))
-  (flet ((similar-lambda-lists-p (method-a method-b)
+  (flet ((similar-lambda-lists-p (old-method new-lambda-list)
            (multiple-value-bind (a-nreq a-nopt a-keyp a-restp)
-               (analyze-lambda-list (method-lambda-list method-a))
+               (analyze-lambda-list (method-lambda-list old-method))
              (multiple-value-bind (b-nreq b-nopt b-keyp b-restp)
-                 (analyze-lambda-list (method-lambda-list method-b))
+                 (analyze-lambda-list new-lambda-list)
                (and (= a-nreq b-nreq)
                     (= a-nopt b-nopt)
                     (eq (or a-keyp a-restp)
                         (or b-keyp b-restp)))))))
-    (let ((lock (gf-lock generic-function)))
-      ;; HANDLER-CASE takes care of releasing the lock and enabling
-      ;; interrupts before going forth with the error.
+    (multiple-value-bind (lock qualifiers specializers new-lambda-list
+                          method-gf)
+        (values-for-add-method generic-function method)
+      (when method-gf
+        (error "~@<The method ~S is already part of the generic ~
+                function ~S; it can't be added to another generic ~
+                function until it is removed from the first one.~@:>"
+               method method-gf))
       (handler-case
           ;; System lock because interrupts need to be disabled as
           ;; well: it would be bad to unwind and leave the gf in an
           ;; inconsistent state.
           (sb-thread::with-recursive-system-spinlock (lock)
-            (let* ((qualifiers (method-qualifiers method))
-                   (specializers (method-specializers method))
-                   (existing (get-method generic-function
-                                         qualifiers
-                                         specializers
-                                         nil)))
+            (let ((existing (get-method generic-function
+                                        qualifiers
+                                        specializers
+                                        nil)))
 
               ;; If there is already a method like this one then we must get
               ;; rid of it before proceeding.  Note that we call the generic
               ;; function REMOVE-METHOD to remove it rather than doing it in
               ;; some internal way.
-              (when (and existing (similar-lambda-lists-p existing method))
+              (when (and existing (similar-lambda-lists-p existing new-lambda-list))
                 (remove-method generic-function existing))
 
               ;; KLUDGE: We have a special case here, as we disallow
@@ -481,7 +498,7 @@
                 (error 'new-value-specialization :method  method))
 
               (setf (method-generic-function method) generic-function)
-              (pushnew method (generic-function-methods generic-function))
+              (pushnew method (generic-function-methods generic-function) :test #'eq)
               (dolist (specializer specializers)
                 (add-direct-method specializer method))
 
@@ -589,7 +606,7 @@
   (dolist (class classes)
     (dolist (other-class classes)
       (unless (eq class other-class)
-        (pushnew other-class (class-incompatible-superclass-list class))))))
+        (pushnew other-class (class-incompatible-superclass-list class) :test #'eq)))))
 
 (defun superclasses-compatible-p (class1 class2)
   (let ((cpl1 (cpl-or-nil class1))
@@ -730,22 +747,23 @@
   (let ((methods (generic-function-methods c-a-m-gf)))
     (if (and *old-c-a-m-gf-methods*
              (every (lambda (old-method)
-                      (member old-method methods))
+                      (member old-method methods :test #'eq))
                     *old-c-a-m-gf-methods*))
         (let ((gfs-to-do nil)
               (gf-classes-to-do nil))
           (dolist (method methods)
-            (unless (member method *old-c-a-m-gf-methods*)
+            (unless (member method *old-c-a-m-gf-methods* :test #'eq)
               (let ((specl (car (method-specializers method))))
                 (if (eql-specializer-p specl)
-                    (pushnew (specializer-object specl) gfs-to-do)
-                    (pushnew (specializer-class specl) gf-classes-to-do)))))
+                    (pushnew (specializer-object specl) gfs-to-do :test #'eq)
+                    (pushnew (specializer-class specl) gf-classes-to-do :test #'eq)))))
           (map-all-generic-functions
            (lambda (gf)
-             (when (or (member gf gfs-to-do)
+             (when (or (member gf gfs-to-do :test #'eq)
                        (dolist (class gf-classes-to-do nil)
                          (member class
-                                 (class-precedence-list (class-of gf)))))
+                                 (class-precedence-list (class-of gf))
+                                 :test #'eq)))
                (update-c-a-m-gf-info gf)))))
         (map-all-generic-functions #'update-c-a-m-gf-info))
     (setq *old-c-a-m-gf-methods* methods)))
@@ -816,8 +834,8 @@
                  (get-optimized-std-slot-value-using-class-method-function
                   class slotd type))
                 (method-alist
-                 `((,(car (or (member std-method methods)
-                              (member str-method methods)
+                 `((,(car (or (member std-method methods :test #'eq)
+                              (member str-method methods :test #'eq)
                               (bug "error in ~S"
                                    'get-accessor-method-function)))
                     ,optimized-std-fun)))

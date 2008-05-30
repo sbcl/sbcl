@@ -121,7 +121,7 @@
 (defun canonize-defclass-options (class-name options)
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
-               (when (member option-name sublist :key #'first)
+               (when (member option-name sublist :key #'first :test #'eq)
                  (error 'simple-program-error
                         :format-control "Multiple ~S options in DEFCLASS ~S."
                         :format-arguments (list option-name class-name)))))
@@ -145,7 +145,7 @@
           (:default-initargs
            (let (initargs arg-names)
              (doplist (key val) (cdr option)
-               (when (member key arg-names)
+               (when (member key arg-names :test #'eq)
                  (error 'simple-program-error
                         :format-control "~@<Duplicate initialization argument ~
                                            name ~S in :DEFAULT-INITARGS of ~
@@ -261,7 +261,7 @@
            (slot-name-illegal "a keyword"))
           ((constantp name env)
            (slot-name-illegal "a constant"))
-          ((member name *slot-names-for-this-defclass*)
+          ((member name *slot-names-for-this-defclass* :test #'eq)
            (error 'simple-program-error
                   :format-control "Multiple slots named ~S in DEFCLASS ~S."
                   :format-arguments (list name class-name))))))

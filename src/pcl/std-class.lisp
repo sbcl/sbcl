@@ -150,7 +150,7 @@
 ;;; here, the values are read by an automatically generated reader method.
 (defmethod add-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
-    (pushnew subclass direct-subclasses)
+    (pushnew subclass direct-subclasses :test #'eq)
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
@@ -196,7 +196,7 @@
     ;; be in progress, and because if an interrupt catches us we
     ;; need to have a consistent state.
     (setf (cdr cell) ()
-          (car cell) (adjoin method (car cell))))
+          (car cell) (adjoin method (car cell) :test #'eq)))
   method)
 
 (defmethod remove-direct-method ((specializer class) (method method))
@@ -229,8 +229,10 @@
 
 ;;; This hash table is used to store the direct methods and direct generic
 ;;; functions of EQL specializers. Each value in the table is the cons.
-(defvar *eql-specializer-methods* (make-hash-table :test 'eql))
-(defvar *class-eq-specializer-methods* (make-hash-table :test 'eq))
+;;;
+;;; These tables are shared between threads, so they need to be synchronized.
+(defvar *eql-specializer-methods* (make-hash-table :test 'eql :synchronized t))
+(defvar *class-eq-specializer-methods* (make-hash-table :test 'eq :synchronized t))
 
 (defmethod specializer-method-table ((specializer eql-specializer))
   *eql-specializer-methods*)
@@ -243,9 +245,6 @@
   (let* ((object (specializer-object specializer))
          (table (specializer-method-table specializer))
          (entry (gethash object table)))
-    ;; This table is shared between multiple specializers, but
-    ;; no worries as (at least for the time being) our hash-tables
-    ;; are thread safe.
     (unless entry
       (setf entry
             (setf (gethash object table) (cons nil nil))))
@@ -253,7 +252,7 @@
     ;; be in progress, and because if an interrupt catches us we
     ;; need to have a consistent state.
     (setf (cdr entry) ()
-          (car entry) (adjoin method (car entry)))
+          (car entry) (adjoin method (car entry) :test #'eq))
     method))
 
 (defmethod remove-direct-method ((specializer specializer-with-object)
@@ -433,7 +432,7 @@
                      (old (assoc name old-class-slot-cells)))
                 (if (or (not old)
                         (eq t slot-names)
-                        (member name slot-names))
+                        (member name slot-names :test #'eq))
                     (let* ((initfunction (slot-definition-initfunction dslotd))
                            (value (if initfunction
                                       (funcall initfunction)
@@ -847,11 +846,11 @@
   (when cpl
     (let ((first (car cpl)))
       (dolist (c (cdr cpl))
-        (pushnew c (slot-value first 'can-precede-list))))
+        (pushnew c (slot-value first 'can-precede-list) :test #'eq)))
     (update-class-can-precede-p (cdr cpl))))
 
 (defun class-can-precede-p (class1 class2)
-  (member class2 (class-can-precede-list class1)))
+  (member class2 (class-can-precede-list class1) :test #'eq))
 
 (defun update-slots (class eslotds)
   (let ((instance-slots ())
@@ -933,9 +932,9 @@
 (defun update-gfs-of-class (class)
   (when (and (class-finalized-p class)
              (let ((cpl (class-precedence-list class)))
-               (or (member *the-class-slot-class* cpl)
+               (or (member *the-class-slot-class* cpl :test #'eq)
                    (member *the-class-standard-effective-slot-definition*
-                           cpl))))
+                           cpl :test #'eq))))
     (let ((gf-table (make-hash-table :test 'eq)))
       (labels ((collect-gfs (class)
                  (dolist (gf (specializer-direct-generic-functions class))
@@ -1590,7 +1589,7 @@
   t)
 
 (defmethod add-dependent ((metaobject dependent-update-mixin) dependent)
-  (pushnew dependent (plist-value metaobject 'dependents)))
+  (pushnew dependent (plist-value metaobject 'dependents) :test #'eq))
 
 (defmethod remove-dependent ((metaobject dependent-update-mixin) dependent)
   (setf (plist-value metaobject 'dependents)

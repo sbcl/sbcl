@@ -267,12 +267,12 @@
   (push (list thing :lexical-var) (cadddr (env-lock env))))
 
 (defun var-lexical-p (var env)
-  (let ((entry (member var (env-lexical-variables env) :key #'car)))
+  (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
     (when (eq (cadar entry) :lexical-var)
       entry)))
 
 (defun variable-symbol-macro-p (var env)
-  (let ((entry (member var (env-lexical-variables env) :key #'car)))
+  (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
     (when (eq (cadar entry) 'sb!sys:macro)
       entry)))
 
@@ -668,7 +668,7 @@
                                          &aux arg)
   (cond ((null arglist) ())
         ((symbolp (setq arg (car arglist)))
-         (or (member arg lambda-list-keywords)
+         (or (member arg lambda-list-keywords :test #'eq)
              (note-lexical-binding arg env))
          (recons arglist
                  arg

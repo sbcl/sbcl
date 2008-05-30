@@ -1195,8 +1195,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                    (let ((subcpl (member (ecase type
                                            (reader (car specializers))
                                            (writer (cadr specializers)))
-                                         cpl)))
-                     (and subcpl (member found-specializer subcpl))))
+                                         cpl :test #'eq)))
+                     (and subcpl (member found-specializer subcpl :test #'eq))))
           (setf found-specializer (ecase type
                                     (reader (car specializers))
                                     (writer (cadr specializers))))
@@ -1235,7 +1235,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                            (early-class-precedence-list
                                             accessor-class)
                                            (class-precedence-list
-                                            accessor-class)))
+                                            accessor-class))
+                                       :test #'eq)
                                (if early-p
                                    (not (eq *the-class-standard-method*
                                             (early-method-class meth)))
@@ -1282,7 +1283,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                             (early-class-precedence-list specl)
                             (when (class-finalized-p specl)
                               (class-precedence-list specl))))
-             (so-p (member *the-class-standard-object* specl-cpl))
+             (so-p (member *the-class-standard-object* specl-cpl :test #'eq))
              (slot-name (if (consp method)
                             (and (early-method-standard-accessor-p method)
                                  (early-method-standard-accessor-slot-name
@@ -1290,7 +1291,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                             (accessor-method-slot-name method))))
         (when (or (null specl-cpl)
                   (null so-p)
-                  (member *the-class-structure-object* specl-cpl))
+                  (member *the-class-structure-object* specl-cpl :test #'eq))
           (return-from make-accessor-table nil))
         ;; Collect all the slot-definitions for SLOT-NAME from SPECL and
         ;; all of its subclasses. If either SPECL or one of the subclasses
@@ -1471,7 +1472,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; CMUCL comment: used only in map-all-orders
 (defun class-might-precede-p (class1 class2)
   (if (not *in-precompute-effective-methods-p*)
-      (not (member class1 (cdr (class-precedence-list class2))))
+      (not (member class1 (cdr (class-precedence-list class2)) :test #'eq))
       (class-can-precede-p class1 class2)))
 
 (defun compute-precedence (lambda-list nreq argument-precedence-order)

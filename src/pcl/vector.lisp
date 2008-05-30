@@ -574,7 +574,7 @@
                                     (list name (pop tail))
                                     (list name))))
                      (dolist (var tail)
-                       (if (member var args)
+                       (if (member var args :test #'eq)
                            ;; Quietly remove IGNORE declarations on
                            ;; args when a next-method is involved, to
                            ;; prevent compiler warnings about ignored
@@ -652,7 +652,7 @@
   ;; Given a valid lambda list, extract the parameter names.
   (loop for x in lambda-list
         with res = nil
-        do (unless (member x lambda-list-keywords)
+        do (unless (member x lambda-list-keywords :test #'eq)
              (if (consp x)
                  (let ((name (car x)))
                    (if (consp name)

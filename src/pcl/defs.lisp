@@ -230,7 +230,7 @@
                    (dohash ((sub v) subs)
                      (declare (ignore v))
                      (/noshow sub)
-                     (when (member class (direct-supers sub))
+                     (when (member class (direct-supers sub) :test #'eq)
                        (res sub)))))
                (res))))
     (mapcar (lambda (kernel-bic-entry)
