@@ -382,6 +382,21 @@
     (true dx)
     nil))
 
+;;; handler-case and handler-bind should use DX internally
+
+(defun dx-handler-bind (x)
+  (handler-bind ((error (lambda (c) (break "OOPS: ~S caused ~S" x c)))
+                 ((and serious-condition (not error))
+                  #'(lambda (c) (break "OOPS2: ~S did ~S" x c))))
+    (/ 2 x)))
+
+(defun dx-handler-case (x)
+  (assert (zerop (handler-case (/ 2 x)
+                   (error (c)
+                     (break "OOPS: ~S caused ~S" x c))
+                   (:no-error (res)
+                     (1- res))))))
+
 ;;; with-spinlock should use DX and not cons
 
 (defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
@@ -446,6 +461,8 @@
   (assert-consing (nested-dx-not-used *a-cons*))
   (assert-no-consing (nested-evil-dx-used *a-cons*))
   (assert-no-consing (multiple-dx-uses))
+  (assert-no-consing (dx-handler-bind 2))
+  (assert-no-consing (dx-handler-case 2))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread

@@ -7,6 +7,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     ** inline constructors are capable of dynamic extent allocation
        (generally on x86 and x86-64, in some cases on other platforms
        as well.)
+  * optimization: simple uses of HANDLER-CASE and HANDLER-BIND no
+    longer cons.
 
 changes in sbcl-1.0.17 relative to 1.0.16:
   * temporary regression: user code can no longer allocate closure

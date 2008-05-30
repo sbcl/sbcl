@@ -563,39 +563,60 @@ evaluated as a PROGN."
                   (format stream ,format-string ,@format-arguments))
       (values nil t))))
 
-(defmacro-mundanely handler-bind (bindings &body forms)
-  #!+sb-doc
-  "(HANDLER-BIND ( {(type handler)}* )  body)
-   Executes body in a dynamic context where the given handler bindings are
-   in effect. Each handler must take the condition being signalled as an
-   argument. The bindings are searched first to last in the event of a
-   signalled condition."
+(defmacro-mundanely %handler-bind (bindings form)
   (let ((member-if (member-if (lambda (x)
                                 (not (proper-list-of-length-p x 2)))
                               bindings)))
     (when member-if
       (error "ill-formed handler binding: ~S" (first member-if))))
-  `(let ((*handler-clusters*
-          (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
-                                bindings))
-                *handler-clusters*)))
-     (multiple-value-prog1
-         (progn
-           ,@forms)
-       ;; Wait for any float exceptions.
-       #!+x86 (float-wait))))
+  (let* ((local-funs nil)
+         (mapped-bindings (mapcar (lambda (binding)
+                                    (destructuring-bind (type handler) binding
+                                      (let (lambda-form)
+                                        (if (and (consp handler)
+                                                 (or (prog1 (eq 'lambda (car handler))
+                                                       (setf lambda-form handler))
+                                                     (and (eq 'function (car handler))
+                                                          (consp (cdr handler))
+                                                          (consp (cadr handler))
+                                                          (prog1 (eq 'lambda (caadr handler))
+                                                            (setf lambda-form (cadr handler))))))
+                                            (let ((name (gensym "LAMBDA")))
+                                              (push `(,name ,@(cdr lambda-form)) local-funs)
+                                              (list type `(function ,name)))
+                                            binding))))
+                                  bindings))
+         (form-fun (gensym "FORM-FUN")))
+    `(dx-flet (,@(reverse local-funs)
+               (,form-fun () (progn ,form)))
+       (let ((*handler-clusters*
+              (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
+                                    mapped-bindings))
+                    *handler-clusters*)))
+         (declare (dynamic-extent *handler-clusters*))
+         (,form-fun)))))
+
+(defmacro-mundanely handler-bind (bindings &body forms)
+  #!+sb-doc
+  "(HANDLER-BIND ( {(type handler)}* )  body)
+
+Executes body in a dynamic context where the given handler bindings are in
+effect. Each handler must take the condition being signalled as an argument.
+The bindings are searched first to last in the event of a signalled
+condition."
+  `(%handler-bind ,bindings
+                  #!-x86 (progn ,@forms)
+                  ;; Need to catch FP errors here!
+                  #!+x86 (multiple-value-prog1 (progn ,@forms) (float-wait))))
 
 (defmacro-mundanely handler-case (form &rest cases)
-  "(HANDLER-CASE form
-   { (type ([var]) body) }* )
-   Execute FORM in a context with handlers established for the condition
-   types. A peculiar property allows type to be :NO-ERROR. If such a clause
-   occurs, and form returns normally, all its values are passed to this clause
-   as if by MULTIPLE-VALUE-CALL.  The :NO-ERROR clause accepts more than one
-   var specification."
-  ;; FIXME: Replacing CADR, CDDDR and friends with DESTRUCTURING-BIND
-  ;; and names for the subexpressions would make it easier to
-  ;; understand the code below.
+  "(HANDLER-CASE form { (type ([var]) body) }* )
+
+Execute FORM in a context with handlers established for the condition types. A
+peculiar property allows type to be :NO-ERROR. If such a clause occurs, and
+form returns normally, all its values are passed to this clause as if by
+MULTIPLE-VALUE-CALL. The :NO-ERROR clause accepts more than one var
+specification."
   (let ((no-error-clause (assoc ':no-error cases)))
     (if no-error-clause
         (let ((normal-return (make-symbol "normal-return"))
@@ -606,41 +627,47 @@ evaluated as a PROGN."
                  (return-from ,error-return
                    (handler-case (return-from ,normal-return ,form)
                      ,@(remove no-error-clause cases)))))))
-        (let ((tag (gensym))
-              (var (gensym))
-              (annotated-cases (mapcar (lambda (case) (cons (gensym) case))
-                                       cases)))
-          `(block ,tag
-             (let ((,var nil))
-               (declare (ignorable ,var))
-               (tagbody
-                (handler-bind
-                    ,(mapcar (lambda (annotated-case)
-                               (list (cadr annotated-case)
-                                     `(lambda (temp)
-                                        ,(if (caddr annotated-case)
-                                             `(setq ,var temp)
-                                             '(declare (ignore temp)))
-                                        (go ,(car annotated-case)))))
-                             annotated-cases)
-                  (return-from ,tag
-                    #!-x86 ,form
-                    #!+x86 (multiple-value-prog1 ,form
-                             ;; Need to catch FP errors here!
-                             (float-wait))))
-                ,@(mapcan
-                   (lambda (annotated-case)
-                     (list (car annotated-case)
-                           (let ((body (cdddr annotated-case)))
-                             `(return-from
-                                  ,tag
-                                ,(cond ((caddr annotated-case)
-                                        `(let ((,(caaddr annotated-case)
-                                                ,var))
-                                           ,@body))
-                                       (t
-                                        `(locally ,@body)))))))
-                   annotated-cases))))))))
+        (let* ((local-funs nil)
+               (annotated-cases (mapcar (lambda (case)
+                                          (let ((tag (gensym "TAG"))
+                                                (fun (gensym "FUN")))
+                                            (destructuring-bind (type ll &body body) case
+                                              (push `(,fun ,ll ,@body) local-funs)
+                                              (list tag type ll fun))))
+                                        cases)))
+          (with-unique-names (block var form-fun)
+            `(dx-flet ((,form-fun ()
+                         #!-x86 ,form
+                         ;; Need to catch FP errors here!
+                         #!+x86 (multiple-value-prog1 ,form (float-wait)))
+                       ,@(reverse local-funs))
+               (declare (optimize (sb!c::check-tag-existence 0)))
+               (block ,block
+                 (dx-let ((,var nil))
+                   (declare (ignorable ,var))
+                   (tagbody
+                      (%handler-bind
+                       ,(mapcar (lambda (annotated-case)
+                                  (destructuring-bind (tag type ll fun-name) annotated-case
+                                    (declare (ignore fun-name))
+                                    (list type
+                                          `(lambda (temp)
+                                             ,(if ll
+                                                  `(setf ,var temp)
+                                                  '(declare (ignore temp)))
+                                             (go ,tag)))))
+                                annotated-cases)
+                       (return-from ,block (,form-fun)))
+                      ,@(mapcan
+                         (lambda (annotated-case)
+                           (destructuring-bind (tag type ll fun-name) annotated-case
+                             (declare (ignore type))
+                             (list tag
+                                   `(return-from ,block
+                                      ,(if ll
+                                           `(,fun-name ,var)
+                                           `(,fun-name))))))
+                         annotated-cases))))))))))
 
 ;;;; miscellaneous
 
