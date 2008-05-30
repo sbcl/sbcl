@@ -533,7 +533,7 @@ describe_thread_state(void)
 {
     sigset_t mask;
     struct thread *thread = arch_os_get_current_thread();
-    pthread_sigmask(SIG_SETMASK, NULL, &mask);
+    thread_sigmask(SIG_SETMASK, NULL, &mask);
     printf("Signal mask:\n");
     printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
     printf(" SIGINT = %d\n", sigismember(&mask, SIGINT));

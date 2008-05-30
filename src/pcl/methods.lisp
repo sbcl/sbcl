@@ -436,7 +436,7 @@
 (defgeneric values-for-add-method (gf method)
   (:method ((gf standard-generic-function) (method standard-method))
     ;; KLUDGE: Just a single generic dispatch, and everything else
-    ;; comes from permutation vectors. Would be nicer to define 
+    ;; comes from permutation vectors. Would be nicer to define
     ;; REAL-ADD-METHOD with a proper method so that we could efficiently
     ;; use SLOT-VALUE there.
     ;;
