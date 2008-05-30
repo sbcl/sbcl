@@ -533,6 +533,7 @@ describe_thread_state(void)
 {
     sigset_t mask;
     struct thread *thread = arch_os_get_current_thread();
+#ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_SETMASK, NULL, &mask);
     printf("Signal mask:\n");
     printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
@@ -541,6 +542,7 @@ describe_thread_state(void)
     printf(" SIG_INTERRUPT_THREAD = %d\n", sigismember(&mask, SIG_INTERRUPT_THREAD));
 #ifdef SIG_STOP_FOR_GC
     printf(" SIG_STOP_FOR_GC = %d\n", sigismember(&mask, SIG_STOP_FOR_GC));
+#endif
 #endif
     printf("Specials:\n");
     printf(" *GC-INHIBIT* = %s\n", (SymbolValue(GC_INHIBIT, thread) == T) ? "T" : "NIL");
