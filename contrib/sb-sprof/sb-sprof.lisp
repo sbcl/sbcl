@@ -100,6 +100,7 @@
 (defpackage #:sb-sprof
   (:use #:cl #:sb-ext #:sb-unix #:sb-alien #:sb-sys)
   (:export #:*sample-interval* #:*max-samples* #:*alloc-interval*
+           #:*report-sort-by* #:*report-sort-order*
            #:start-sampling #:stop-sampling #:with-sampling
            #:with-profiling #:start-profiling #:stop-profiling
            #:profile-call-counts #:unprofile-call-counts
@@ -249,9 +250,11 @@
   ;; the graph was created (depending on the current allocation mode)
   (sample-interval (sb-impl::missing-arg) :type number)
   ;; the sampling-mode that was used for the profiling run
-  (sampling-mode (sb-impl::missing-arg) :type (member :cpu :alloc))
+  (sampling-mode (sb-impl::missing-arg) :type (member :cpu :alloc :time))
   ;; number of samples taken
   (nsamples (sb-impl::missing-arg) :type sb-int:index)
+  ;; threads that have been sampled
+  (sampled-threads nil :type list)
   ;; sample count for samples not in any function
   (elsewhere-count (sb-impl::missing-arg) :type sb-int:index)
   ;; a flat list of NODEs, sorted by sample count
@@ -326,11 +329,12 @@ on the depth of the call stack.")
           :type simple-vector)
   (trace-count 0 :type sb-int:index)
   (index 0 :type sb-int:index)
-  (mode nil :type (member :cpu :alloc))
-  (sample-interval *sample-interval* :type number)
-  (alloc-interval *alloc-interval* :type number)
+  (mode nil :type (member :cpu :alloc :time))
+  (sample-interval (sb-int:missing-arg) :type number)
+  (alloc-interval (sb-int:missing-arg) :type number)
   (max-depth most-positive-fixnum :type number)
-  (max-samples *max-samples* :type sb-int:index))
+  (max-samples (sb-int:missing-arg) :type sb-int:index)
+  (sampled-threads nil :type list))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -351,7 +355,7 @@ on the depth of the call stack.")
 (defvar *sampling-mode* :cpu
   "Default sampling mode. :CPU for cpu profiling, :ALLOC for allocation
 profiling")
-(declaim (type (member :cpu :alloc) *sampling-mode*))
+(declaim (type (member :cpu :alloc :time) *sampling-mode*))
 
 (defvar *alloc-region-size*
   #-gencgc
@@ -366,8 +370,9 @@ profiling")
 (declaim (type (or null samples) *samples*))
 
 (defvar *profiling* nil)
+(declaim (type (member nil :alloc :cpu :time) *profiling*))
 (defvar *sampling* nil)
-(declaim (type boolean *profiling* *sampling*))
+(declaim (type boolean *sampling*))
 
 (defvar *show-progress* nil)
 
@@ -478,68 +483,124 @@ profiling")
           'trace-start))
   (incf (samples-index samples) 2))
 
-;;; Ensure that only one thread at a time will be executing sigprof handler.
-(defvar *sigprof-handler-lock* (sb-thread:make-mutex :name "SIGPROF handler"))
+;;; List of thread currently profiled, or T for all threads.
+(defvar *profiled-threads* nil)
+(declaim (type (or list (member :all)) *profiled-threads*))
 
-;;; SIGPROF handler.  Record current PC and return address in
-;;; *SAMPLES*.
+;;; Thread which runs the wallclock timers, if any.
+(defvar *timer-thread* nil)
+
+(defun profiled-threads ()
+  (let ((profiled-threads *profiled-threads*))
+    (if (eq :all profiled-threads)
+        (remove *timer-thread* (sb-thread:list-all-threads))
+        profiled-threads)))
+
+(defun profiled-thread-p (thread)
+  (let ((profiled-threads *profiled-threads*))
+    (or (and (eq :all profiled-threads)
+             (not (eq *timer-thread* thread)))
+        (member thread profiled-threads :test #'eq))))
+
 #+(or x86 x86-64)
-(defun sigprof-handler (signal code scp)
-  (declare (ignore signal code)
-           (optimize speed (space 0))
-           (muffle-conditions compiler-note)
-           (disable-package-locks sb-di::x86-call-context)
-           (type system-area-pointer scp))
-  (sb-sys:without-interrupts
-    (let ((sb-vm:*alloc-signal* nil)
-          (samples *samples*))
+(progn
+  ;; Ensure that only one thread at a time will be doing profiling stuff.
+  (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
+  (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
+
+  (define-alien-routine pthread-kill int (signal int) (os-thread unsigned-long))
+
+  ;;; A random thread will call this in response to either a timer firing,
+  ;;; This in turn will distribute the notice to those threads we are
+  ;;; interested using SIGPROF.
+  (defun thread-distribution-handler ()
+    (declare (optimize sb-c::merge-tail-calls))
+    (when *sampling*
+      #+sb-thread
+      (let ((lock *distribution-lock*))
+        ;; Don't flood the system with more interrupts if the last
+        ;; set is still being delivered.
+        (unless (sb-thread:mutex-value lock)
+          (sb-thread::with-system-mutex (lock)
+            (dolist (thread (profiled-threads))
+              ;; This may occasionally fail to deliver the signal, but that
+              ;; seems better then using kill_thread_safely with it's 1
+              ;; second backoff.
+              (let ((os-thread (sb-thread::thread-os-thread thread)))
+                (when os-thread
+                  (pthread-kill os-thread sb-unix:sigprof)))))))
+      #-sb-thread
+      (unix-kill 0 sb-unix:sigprof)))
+
+  (defun sigprof-handler (signal code scp)
+    (declare (ignore signal code) (optimize speed (space 0))
+             (disable-package-locks sb-di::x86-call-context)
+             (muffle-conditions compiler-note)
+             (type system-area-pointer scp))
+    (let ((self sb-thread:*current-thread*)
+          (profiling *profiling*))
+      ;; Turn off allocation counter when it is not needed. Doing this in the
+      ;; signal handler means we don't have to worry about racing with the runtime
+      (unless (eq :alloc profiling)
+        (setf sb-vm::*alloc-signal* nil))
       (when (and *sampling*
-                 samples
-                 (< (samples-trace-count samples)
-                    (samples-max-samples samples)))
-        (sb-sys:without-gcing
-          (sb-thread:with-mutex (*sigprof-handler-lock*)
-            (with-alien ((scp (* os-context-t) :local scp))
-              (let* ((pc-ptr (sb-vm:context-pc scp))
-                     (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
-                ;; For some reason completely bogus small values for the
-                ;; frame pointer are returned every now and then, leading
-                ;; to segfaults. Try to avoid these cases.
-                ;;
-                ;; FIXME: Do a more thorough sanity check on ebp, or figure
-                ;; out why this is happening.
-                ;; -- JES, 2005-01-11
-                (when (< fp 4096)
-                  (return-from sigprof-handler nil))
-                (incf (samples-trace-count samples))
-                (let ((fp (int-sap fp))
-                      (ok t))
-                  (declare (type system-area-pointer fp pc-ptr))
-                  ;; FIXME: How annoying. The XC doesn't store enough
-                  ;; type information about SB-DI::X86-CALL-CONTEXT,
-                  ;; even if we declaim the ftype explicitly in
-                  ;; src/code/debug-int. And for some reason that type
-                  ;; information is needed for the inlined version to
-                  ;; be compiled without boxing the returned saps. So
-                  ;; we declare the correct ftype here manually, even
-                  ;; if the compiler should be able to deduce this
-                  ;; exact same information.
-                  (declare (ftype (function (system-area-pointer)
-                                            (values (member nil t)
-                                                    system-area-pointer
-                                                    system-area-pointer))
-                                  sb-di::x86-call-context))
-                  (record-trace-start samples)
-                  (dotimes (i (samples-max-depth samples))
-                    (record samples pc-ptr)
-                    (setf (values ok pc-ptr fp)
-                          (sb-di::x86-call-context fp))
-                    (unless ok
-                      (return))))))))))
-    ;; Reset the allocation counter
-    (when (and sb-vm:*alloc-signal*
-               (<= sb-vm:*alloc-signal* 0))
-      (setf sb-vm:*alloc-signal* (1- *alloc-interval*)))
+                 ;; Normal SIGPROF gets practically speaking delivered to threads
+                 ;; depending on the run time they use, so we need to filter
+                 ;; out those we don't care about. For :ALLOC and :TIME profiling
+                 ;; only the interesting threads get SIGPROF in the first place.
+                 ;;
+                 ;; ...except that Darwin at least doesn't seem to work like we
+                 ;; would want it to, which makes multithreaded :CPU profiling pretty
+                 ;; pointless there -- though it may be that our mach magic is
+                 ;; partially to blame?
+                 (or (not (eq :cpu profiling)) (profiled-thread-p self)))
+        (sb-thread::with-system-mutex (*profiler-lock* :without-gcing t)
+          (let ((samples *samples*))
+            (when (and samples
+                       (< (samples-trace-count samples)
+                          (samples-max-samples samples)))
+              (with-alien ((scp (* os-context-t) :local scp))
+                (let* ((pc-ptr (sb-vm:context-pc scp))
+                       (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
+                  ;; For some reason completely bogus small values for the
+                  ;; frame pointer are returned every now and then, leading
+                  ;; to segfaults. Try to avoid these cases.
+                  ;;
+                  ;; FIXME: Do a more thorough sanity check on ebp, or figure
+                  ;; out why this is happening.
+                  ;; -- JES, 2005-01-11
+                  (when (< fp 4096)
+                    (return-from sigprof-handler nil))
+                  (incf (samples-trace-count samples))
+                  (pushnew self (samples-sampled-threads samples))
+                  (let ((fp (int-sap fp))
+                        (ok t))
+                    (declare (type system-area-pointer fp pc-ptr))
+                    ;; FIXME: How annoying. The XC doesn't store enough
+                    ;; type information about SB-DI::X86-CALL-CONTEXT,
+                    ;; even if we declaim the ftype explicitly in
+                    ;; src/code/debug-int. And for some reason that type
+                    ;; information is needed for the inlined version to
+                    ;; be compiled without boxing the returned saps. So
+                    ;; we declare the correct ftype here manually, even
+                    ;; if the compiler should be able to deduce this
+                    ;; exact same information.
+                    (declare (ftype (function (system-area-pointer)
+                                              (values (member nil t)
+                                                      system-area-pointer
+                                                      system-area-pointer))
+                                    sb-di::x86-call-context))
+                    (record-trace-start samples)
+                    (dotimes (i (samples-max-depth samples))
+                      (record samples pc-ptr)
+                      (setf (values ok pc-ptr fp)
+                            (sb-di::x86-call-context fp))
+                      (unless ok
+                        (return))))))
+              ;; Reset thread-local allocation counter before interrupts
+              ;; are enabled.
+              (when (eq t sb-vm::*alloc-signal*)
+                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples)))))))))
     nil))
 
 ;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
@@ -586,6 +647,7 @@ profiling")
                                 (loop t)
                                 (max-depth most-positive-fixnum)
                                 show-progress
+                                (threads '(list sb-thread:*current-thread*))
                                 (report nil report-p))
                           &body body)
   "Repeatedly evaluate BODY with statistical profiling turned on.
@@ -604,8 +666,9 @@ profiling")
      *ALLOC-INTERVAL*.
 
    :MODE <mode>
-     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
-     the profiler in allocation profiling mode.
+     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run the
+     profiler in allocation profiling mode. If :TIME, run the profiler
+     in wallclock profiling mode.
 
    :MAX-SAMPLES <max>
      Repeat evaluating body until <max> samples are taken.
@@ -620,7 +683,20 @@ profiling")
 
    :RESET <bool>
      It true, call RESET at the beginning.
-e
+
+   :THREADS <list-form>
+     Form that evaluates to the list threads to profile, or :ALL to indicate
+     that all threads should be profiled. Defaults to the current
+     thread. (Note: START-PROFILING defaults to all threads.)
+
+     :THREADS has no effect on call-counting at the moment.
+
+     On some platforms (eg. Darwin) the signals used by the profiler are
+     not properly delivered to threads in proportion to their CPU usage
+     when doing :CPU profiling. If you see empty call graphs, or are obviously
+     missing several samples from certain threads, you may be falling afoul
+     of this.
+
    :LOOP <bool>
      If true (the default) repeatedly evaluate BODY. If false, evaluate
      if only once."
@@ -628,13 +704,12 @@ e
   `(let* ((*sample-interval* ,sample-interval)
           (*alloc-interval* ,alloc-interval)
           (*sampling* nil)
-          (sb-vm:*alloc-signal* nil)
           (*sampling-mode* ,mode)
           (*max-samples* ,max-samples))
      ,@(when reset '((reset)))
      (unwind-protect
           (progn
-            (start-profiling :max-depth ',max-depth)
+            (start-profiling :max-depth ,max-depth :threads ,threads)
             (loop
                (when (>= (samples-trace-count *samples*)
                          (samples-max-samples *samples*))
@@ -653,14 +728,20 @@ e
        (stop-profiling))
      ,@(when report-p `((report :type ,report)))))
 
+(defvar *timer* nil)
+
+(defvar *old-alloc-interval* nil)
+(defvar *old-sample-interval* nil)
+
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)
                         (sample-interval *sample-interval*)
                         (alloc-interval *alloc-interval*)
                         (max-depth most-positive-fixnum)
+                        (threads :all)
                         (sampling t))
-  "Start profiling statistically if not already profiling.
-   The following keyword args are recognized:
+  "Start profiling statistically in the current thread if not already profiling.
+The following keyword args are recognized:
 
    :SAMPLE-INTERVAL <n>
      Take a sample every <n> seconds.  Default is *SAMPLE-INTERVAL*.
@@ -672,7 +753,8 @@ e
 
    :MODE <mode>
      If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run
-     the profiler in allocation profiling mode.
+     the profiler in allocation profiling mode. If :TIME, run the profiler
+     in wallclock profiling mode.
 
    :MAX-SAMPLES <max>
      Maximum number of samples.  Default is *MAX-SAMPLES*.
@@ -680,6 +762,19 @@ e
    :MAX-DEPTH <max>
      Maximum call stack depth that the profiler should consider. Only
      has an effect on x86 and x86-64.
+
+   :THREADS <list>
+     List threads to profile, or :ALL to indicate that all threads should be
+     profiled. Defaults to :ALL. (Note: WITH-PROFILING defaults to the current
+     thread.)
+
+     :THREADS has no effect on call-counting at the moment.
+
+     On some platforms (eg. Darwin) the signals used by the profiler are
+     not properly delivered to threads in proportion to their CPU usage
+     when doing :CPU profiling. If you see empty call graphs, or are obviously
+     missing several samples from certain threads, you may be falling afoul
+     of this.
 
    :SAMPLING <bool>
      If true, the default, start sampling right away.
@@ -695,28 +790,69 @@ e
       (setf *sampling* sampling
             *samples* (make-samples :max-depth max-depth
                                     :max-samples max-samples
+                                    :sample-interval sample-interval
+                                    :alloc-interval alloc-interval
                                     :mode mode))
       (enable-call-counting)
+      (setf *profiled-threads* threads)
       (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
-      (if (eq mode :alloc)
-          (setf sb-vm:*alloc-signal* (1- alloc-interval))
-          (progn
-            (unix-setitimer :profile secs usecs secs usecs)
-            (setf sb-vm:*alloc-signal* nil)))
-      (setq *profiling* t)))
+      (ecase mode
+        (:alloc
+         (let ((alloc-signal (1- alloc-interval)))
+           #+sb-thread
+           (progn
+             (when (eq t threads)
+               ;; Set the value new threads inherit.
+               (sb-thread::with-all-threads-lock
+                 (setf sb-thread::*default-alloc-signal* alloc-signal)))
+             ;; Turn on allocation profiling in existing threads.
+             (dolist (thread (profiled-threads))
+               (sb-thread::%set-symbol-value-in-thread 'sb-vm::*alloc-signal* thread alloc-signal)))
+           #-sb-thread
+           (setf sb-vm:*alloc-signal* alloc-signal)))
+        (:cpu
+         (unix-setitimer :profile secs usecs secs usecs))
+        (:time
+         #+sb-thread
+         (let ((setup (sb-thread:make-semaphore :name "Timer thread setup semaphore")))
+           (setf *timer-thread*
+                 (sb-thread:make-thread (lambda ()
+                                          (sb-thread:wait-on-semaphore setup)
+                                          (loop while (eq sb-thread:*current-thread* *timer-thread*)
+                                                do (sleep 1.0)))
+                                        :name "SB-SPROF wallclock timer thread"))
+           (sb-thread:signal-semaphore setup))
+         #-sb-thread
+         (setf *timer-thread* nil)
+         (setf *timer* (make-timer #'thread-distribution-handler :name "SB-PROF wallclock timer"
+                                   :thread *timer-thread*))
+         (schedule-timer *timer* sample-interval :repeat-interval sample-interval)))
+      (setq *profiling* mode)))
   (values))
 
 (defun stop-profiling ()
   "Stop profiling if profiling."
-  (when *profiling*
-    (unix-setitimer :profile 0 0 0 0)
-    (disable-call-counting)
-    ;; Even with the timer shut down we cannot be sure that there is
-    ;; no undelivered sigprof. Besides, leaving the signal handler
-    ;; installed won't hurt.
-    (setq *sampling* nil)
-    (setq sb-vm:*alloc-signal* nil)
-    (setq *profiling* nil))
+  (let ((profiling *profiling*))
+    (when profiling
+      ;; Even with the timers shut down we cannot be sure that there is no
+      ;; undelivered sigprof. The handler is also responsible for turning the
+      ;; *ALLOC-SIGNAL* off in individual threads.
+      (ecase profiling
+        (:alloc
+         #+sb-thread
+         (setf sb-thread::*default-alloc-signal* nil)
+         #-sb-thread
+         (setf sb-vm:*alloc-signal* nil))
+        (:cpu
+         (unix-setitimer :profile 0 0 0 0))
+        (:time
+         (unschedule-timer *timer*)
+         (setf *timer* nil
+               *timer-thread* nil)))
+     (disable-call-counting)
+     (setf *profiling* nil
+           *sampling* nil
+           *profiled-threads* nil)))
   (values))
 
 (defun reset ()
@@ -863,6 +999,7 @@ e
                                                (samples-alloc-interval *samples*)
                                                (samples-sample-interval *samples*))
                           :sampling-mode (samples-mode *samples*)
+                          :sampled-threads (samples-sampled-threads *samples*)
                           :elsewhere-count elsewhere-count
                           :vertices sorted-nodes)))))
 
@@ -929,26 +1066,42 @@ e
                        count (scc-p v))))
     (if (eq (call-graph-sampling-mode call-graph) :alloc)
         (format t "~2&Number of samples:     ~d~%~
-                  Sample interval:       ~a regions (approximately ~a kB)~%~
-                  Total sampling amount: ~a regions (approximately ~a kB)~%~
-                  Number of cycles:      ~d~2%"
+                      Alloc interval:        ~a regions (approximately ~a kB)~%~
+                      Total sampling amount: ~a regions (approximately ~a kB)~%~
+                      Number of cycles:      ~d~%~
+                      Sampled threads:~{~%   ~S~}~2%"
                 nsamples
                 interval
                 (truncate (* interval *alloc-region-size*) 1024)
                 (* nsamples interval)
                 (truncate (* nsamples interval *alloc-region-size*) 1024)
-                ncycles)
+                ncycles
+                (call-graph-sampled-threads call-graph))
         (format t "~2&Number of samples:   ~d~%~
-                  Sample interval:     ~f seconds~%~
-                  Total sampling time: ~f seconds~%~
-                  Number of cycles:    ~d~2%"
+                      Sample interval:     ~f seconds~%~
+                      Total sampling time: ~f seconds~%~
+                      Number of cycles:    ~d~%~
+                      Sampled threads:~{~% ~S~}~2%"
                 nsamples
                 interval
                 (* nsamples interval)
-                ncycles))))
+                ncycles
+                (call-graph-sampled-threads call-graph)))))
+
+(declaim (type (member :samples :cumulative-samples) *report-sort-by*))
+(defvar *report-sort-by* :samples
+  "Method for sorting the flat report: either by :SAMPLES or by :CUMULATIVE-SAMPLES.")
+
+(declaim (type (member :descending :ascending) *report-sort-order*))
+(defvar *report-sort-order* :descending
+  "Order for sorting the flat report: either :DESCENDING or :ASCENDING.")
 
 (defun print-flat (call-graph &key (stream *standard-output*) max
-                   min-percent (print-header t))
+                   min-percent (print-header t)
+                   (sort-by *report-sort-by*)
+                   (sort-order *report-sort-order*))
+  (declare (type (member :descending :ascending) sort-order)
+           (type (member :samples :cumulative-samples) sort-by))
   (let ((*standard-output* stream)
         (*print-pretty* nil)
         (total-count 0)
@@ -963,8 +1116,20 @@ e
     (format t "~&  Nr  Count     %  Count     %  Count     %    Calls  Function~%")
     (print-separator)
     (let ((elsewhere-count (call-graph-elsewhere-count call-graph))
-          (i 0))
-      (dolist (node (call-graph-flat-nodes call-graph))
+          (i 0)
+          (nodes (stable-sort (copy-list (call-graph-flat-nodes call-graph))
+                              (let ((cmp (if (eq :descending sort-order) #'> #'<)))
+                                (multiple-value-bind (primary secondary)
+                                    (if (eq :samples sort-by)
+                                        (values #'node-count #'node-accrued-count)
+                                        (values #'node-accrued-count #'node-count))
+                                  (lambda (x y)
+                                    (let ((cx (funcall primary x))
+                                          (cy (funcall primary y)))
+                                      (if (= cx cy)
+                                          (funcall cmp (funcall secondary x) (funcall secondary y))
+                                          (funcall cmp cx cy)))))))))
+      (dolist (node nodes)
         (when (or (and max (> (incf i) max))
                   (< (node-count node) min-count))
           (return))
@@ -975,7 +1140,7 @@ e
           (incf total-count count)
           (incf total-percent percent)
           (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  ~s~%"
-                  (node-index node)
+                  (incf i)
                   count
                   percent
                   accrued-count
@@ -1056,6 +1221,8 @@ e
                   :min-percent min-percent :print-header nil))))
 
 (defun report (&key (type :graph) max min-percent call-graph
+               ((:sort-by *report-sort-by*) *report-sort-by*)
+               ((:sort-order *report-sort-order*) *report-sort-order*)
                (stream *standard-output*) ((:show-progress *show-progress*)))
   "Report statistical profiling results.  The following keyword
    args are recognized:
@@ -1075,6 +1242,16 @@ e
    :MIN-PERCENT <min-percent>
       Don't show functions taking less than <min-percent> of the
       total time in the flat report.
+
+   :SORT-BY <column>
+      If :SAMPLES, sort flat report by number of samples taken.
+      If :CUMULATIVE-SAMPLES, sort flat report by cumulative number of samples
+      taken (shows how much time each function spent on stack.) Default
+      is *REPORT-SORT-BY*.
+
+   :SORT-ORDER <order>
+      If :DESCENDING, sort flat report in descending order. If :ASCENDING,
+      sort flat report in ascending order. Default is *REPORT-SORT-ORDER*.
 
    :SHOW-PROGRESS <bool>
      If true, print progress messages while generating the call graph.

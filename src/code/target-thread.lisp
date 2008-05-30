@@ -67,6 +67,8 @@ in future versions."
 (defvar *all-threads* ())
 (defvar *all-threads-lock* (make-mutex :name "all threads lock"))
 
+(defvar *default-alloc-signal* nil)
+
 (defmacro with-all-threads-lock (&body body)
   `(with-system-mutex (*all-threads-lock*)
      ,@body))
@@ -712,6 +714,8 @@ around and can be retrieved by JOIN-THREAD."
                    (sb!impl::*zap-array-data-temp* empty)
                    (sb!impl::*internal-symbol-output-fun* nil)
                    (sb!impl::*descriptor-handlers* nil)) ; serve-event
+              ;; Binding from C
+              (setf sb!vm:*alloc-signal* *default-alloc-signal*)
               (setf (thread-os-thread thread) (current-thread-os-thread))
               (with-mutex ((thread-result-lock thread))
                 (with-all-threads-lock

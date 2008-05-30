@@ -4657,6 +4657,7 @@ alloc(long nbytes)
     alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((signed long) alloc_signal <= 0) {
+            SetSymbolValue(ALLOC_SIGNAL, T, thread);
 #ifdef LISP_FEATURE_SB_THREAD
             kill_thread_safely(thread->os_thread, SIGPROF);
 #else
