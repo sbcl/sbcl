@@ -123,10 +123,15 @@
     (t (values nil t))))
 
 ;;; And similarly for LIST*.
-(define-source-transform list* (&rest args)
-  (case (length args)
-    (2 `(cons ,(first args) ,(second args)))
-    (t (values nil t))))
+(define-source-transform list* (arg &rest others)
+  (cond ((not others) arg)
+        ((not (cdr others)) `(cons ,arg ,(car others)))
+        (t (values nil t))))
+
+(defoptimizer (list* derive-type) ((arg &rest args))
+  (if args
+      (specifier-type 'cons)
+      (lvar-type arg)))
 
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)

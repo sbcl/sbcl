@@ -320,7 +320,9 @@
 
 (defun list* (arg &rest others)
   #!+sb-doc
-  "Return a list of the arguments with last cons a dotted pair"
+  "Return a list of the arguments with last cons a dotted pair."
+  ;; We know the &REST is a proper list.
+  (declare (optimize (sb!c::type-check 0)))
   (cond ((atom others) arg)
         ((atom (cdr others)) (cons arg (car others)))
         (t (do ((x others (cdr x)))
