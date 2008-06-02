@@ -230,8 +230,11 @@ GET-NAME-SERVICE-ERRNO")
     sockint::EAI-FAIL
     no-recovery-error)
 (define-name-service-condition
-    sockint::NO-ADDRESS  ;; Also defined as NO-DATA, with the same value
-    #-freebsd sockint::EAI-NODATA #+freebsd nil
+    ;; Also defined as NO-DATA, with the same value
+    sockint::NO-ADDRESS
+    ;; getaddrinfo() as of RFC 3493 can no longer distinguish between
+    ;; host no found and address not found
+    nil
     no-address-error)
 
 (defun condition-for-name-service-errno (err)

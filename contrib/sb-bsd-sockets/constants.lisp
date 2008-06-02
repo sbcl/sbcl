@@ -288,8 +288,6 @@
  (:integer EAI-SERVICE "EAI_SERVICE")
  #-freebsd
  (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
- #-freebsd
- (:integer EAI-NODATA "EAI_NODATA")
  (:integer EAI-MEMORY "EAI_MEMORY")
  (:integer EAI-FAIL "EAI_FAIL")
  (:integer EAI-AGAIN "EAI_AGAIN")

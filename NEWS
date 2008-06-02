@@ -14,6 +14,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
        as well.)
   * optimization: simple uses of HANDLER-CASE and HANDLER-BIND no
     longer cons.
+  * bug fix: EAI_NODATA is deprecated since RFC 3493. Stop using it
+    in sb-bsd-sockets.
 
 changes in sbcl-1.0.17 relative to 1.0.16:
   * temporary regression: user code can no longer allocate closure
