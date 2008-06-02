@@ -98,3 +98,7 @@
 (load (compile-file (merge-pathnames #p"test-data-3.lisp" *path*)))
 (test-2)
 
+;; Clean up after the tests
+
+(map nil #'delete-file
+     (directory (merge-pathnames #p"*.html" *output-directory*)))
