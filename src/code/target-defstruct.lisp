@@ -31,6 +31,29 @@
 (defun %instance-set (instance index new-value)
   (setf (%instance-ref instance index) new-value))
 
+;;; Normally IR2 converted, definition needed for interpreted structure
+;;; constructors only.
+#!+sb-eval
+(defun %make-structure-instance (dd slot-specs &rest slot-values)
+  (let ((instance (%make-instance (dd-instance-length dd))))
+    (setf (%instance-layout instance) (dd-layout-or-lose dd))
+    (mapc (lambda (spec value)
+            (destructuring-bind (raw-type . index) (cdr spec)
+              (macrolet ((make-case ()
+                           `(ecase raw-type
+                              ((t)
+                               (setf (%instance-ref instance index) value))
+                              ,@(mapcar
+                                 (lambda (rsd)
+                                   `(,(raw-slot-data-raw-type rsd)
+                                      (setf (,(raw-slot-data-accessor-name rsd)
+                                              instance index)
+                                            value)))
+                                 *raw-slot-data-list*))))
+                (make-case))))
+          slot-specs slot-values)
+    instance))
+
 #!-hppa
 (progn
   (defun %raw-instance-ref/word (instance index)
