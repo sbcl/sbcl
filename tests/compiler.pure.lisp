@@ -2368,3 +2368,11 @@
                      (%zig (the (values (single-float (0.0) 1.0) &optional) (unknown2)))
                      nil))))
              (%zig))))
+
+;;; non-required arguments in HANDLER-BIND
+(assert (eq :oops (car (funcall (compile nil
+                                         '(lambda (x)
+                                           (block nil
+                                             (handler-bind ((error (lambda (&rest args) (return (cons :oops args)))))
+                                               (/ 2 x)))))
+                                0))))

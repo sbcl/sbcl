@@ -580,7 +580,9 @@ evaluated as a PROGN."
                                                           (consp (cdr handler))
                                                           (consp (cadr handler))
                                                           (prog1 (eq 'lambda (caadr handler))
-                                                            (setf lambda-form (cadr handler))))))
+                                                            (setf lambda-form (cadr handler)))))
+                                                 ;; KLUDGE: DX-FLET doesn't handle non-required arguments yet.
+                                                 (not (intersection (second lambda-form) lambda-list-keywords)))
                                             (let ((name (gensym "LAMBDA")))
                                               (push `(,name ,@(cdr lambda-form)) local-funs)
                                               (list type `(function ,name)))
