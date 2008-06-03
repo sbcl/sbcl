@@ -127,3 +127,13 @@
   (assert (equal "abcdaba" s))
   (assert (equal "cdaba" s2))
   (assert (equal "abcd" s3)))
+
+;;; Trimming should replace displacement offsets
+(let* ((etype 'base-char)
+             (s0
+              (make-array '(6) :initial-contents "abcaeb" :element-type etype))
+             (s
+              (make-array '(3) :element-type etype :displaced-to s0 :displaced-index-offset 1)))
+  (assert (equal "bc" (string-right-trim "ab" s)))
+  (assert (equal "bca" s))
+  (assert (equal "abcaeb" s0)))

@@ -414,7 +414,7 @@ new string COUNT long filled with the fill character."
                                              :test #'char=)))
                               index)
                            (declare (fixnum index)))
-                         0))
+                         start))
            (right-end (if right-p
                           (do ((index (1- (the fixnum end)) (1- index)))
                               ((or (< index left-end)
@@ -424,7 +424,7 @@ new string COUNT long filled with the fill character."
                                (1+ index))
                             (declare (fixnum index)))
                           end)))
-      (if (and (eql left-end 0)
+      (if (and (eql left-end start)
                (eql right-end end))
           string
           (subseq (the simple-string string) left-end right-end)))))
