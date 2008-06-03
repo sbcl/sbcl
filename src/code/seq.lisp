@@ -497,7 +497,8 @@
               (loop repeat n
                     do (setf pointer (cdr (rplaca pointer item))))))
           (loop while pointer
-                do (setf pointer (cdr (rplaca pointer item))))))))
+                do (setf pointer (cdr (rplaca pointer item)))))))
+  sequence)
 
 (defun vector-fill* (sequence item start end)
   (with-array-data ((data sequence)
