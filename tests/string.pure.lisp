@@ -119,3 +119,11 @@
   (make-test " x x " "x x " " x x" "x x"))
 
 
+;;; Trimming should respect fill-pointers
+(let* ((s (make-array 9 :initial-contents "abcdabadd" :element-type
+                      'character :fill-pointer 7))
+       (s2 (string-left-trim "ab" s))
+       (s3 (string-right-trim "ab" s)))
+  (assert (equal "abcdaba" s))
+  (assert (equal "cdaba" s2))
+  (assert (equal "abcd" s3)))
