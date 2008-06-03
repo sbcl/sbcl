@@ -220,8 +220,6 @@ convention (names like *FOO*) for special variables" symbol))
       *debug-name-ellipsis* (make-debug-name-marker))
 
 (defun debug-name (type thing)
-  ;; We can _always_ do better thing NIL for this.
-  (aver thing)
   (let ((*debug-name-punt* nil))
     (labels ((walk (x)
                (typecase x

@@ -2376,3 +2376,7 @@
                                              (handler-bind ((error (lambda (&rest args) (return (cons :oops args)))))
                                                (/ 2 x)))))
                                 0))))
+
+;;; NIL is a legal function name
+(assert (eq 'a (flet ((nil () 'a)) (nil))))
+
