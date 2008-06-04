@@ -21,9 +21,7 @@
             :constant))
 ;;; It's possible in general for a constant to have the value NIL, but
 ;;; not for vector-data-offset, which must be a number:
-(multiple-value-bind (value successp)
-    (sb!int:info :variable :constant-value 'sb!vm:vector-data-offset)
-  (assert value)
-  (assert successp))
+(assert (boundp 'sb!vm:vector-data-offset))
+(assert (integerp (symbol-value 'sb!vm:vector-data-offset)))
 
 (/show "done with tests/info.before-xc.lisp")

@@ -241,7 +241,7 @@
                        (type (type-specifier (info :variable :type name))))
                    `(macro . (the ,type ,expansion))))
                 (:constant
-                 (find-constant (info :variable :constant-value name)))
+                 (find-constant (symbol-value name) name))
                 (t
                  (make-global-var :kind kind
                                   :%source-name name
@@ -256,7 +256,7 @@
   ;; The EVAL-WHEN is necessary for #.(1+ LIST-TO-HASH-TABLE-THRESHOLD)
   ;; below. -- AL 20010227
   (def!constant list-to-hash-table-threshold 32))
-(defun maybe-emit-make-load-forms (constant)
+(defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((things-processed nil)
         (count 0))
     ;; FIXME: Does this LIST-or-HASH-TABLE messiness give much benefit?
@@ -268,11 +268,11 @@
                ;; can't contain other objects
                (unless (typep value
                               '(or #-sb-xc-host unboxed-array
-                                   #+sb-xc-host (simple-array (unsigned-byte 8) (*))
-                                   symbol
-                                   number
-                                   character
-                                   string))
+                                #+sb-xc-host (simple-array (unsigned-byte 8) (*))
+                                symbol
+                                number
+                                character
+                                string))
                  (etypecase things-processed
                    (list
                     (when (member value things-processed :test #'eq)
@@ -315,7 +315,9 @@
                     ;; instances, only on STRUCTURE!OBJECTs.
                     #+sb-xc-host structure!object
                     #-sb-xc-host instance
-                    (when (emit-make-load-form value)
+                    (when (if namep
+                              (emit-make-load-form value name)
+                              (emit-make-load-form value))
                       (dotimes (i (- (%instance-length value)
                                      #+sb-xc-host 0
                                      #-sb-xc-host (layout-n-untagged-slots

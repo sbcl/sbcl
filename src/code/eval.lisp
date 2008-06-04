@@ -125,9 +125,7 @@
         (typecase exp
           (symbol
            (ecase (info :variable :kind exp)
-             (:constant
-              (values (info :variable :constant-value exp)))
-             ((:special :global)
+             ((:special :global :constant)
               (symbol-value exp))
              ;; FIXME: This special case here is a symptom of non-ANSI
              ;; weirdness in SBCL's ALIEN implementation, which could

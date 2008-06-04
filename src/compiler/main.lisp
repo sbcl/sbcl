@@ -1812,7 +1812,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 (defvar *constants-being-created* nil)
 (defvar *constants-created-since-last-init* nil)
 ;;; FIXME: Shouldn't these^ variables be unbound outside LET forms?
-(defun emit-make-load-form (constant)
+(defun emit-make-load-form (constant &optional (name nil namep))
   (aver (fasl-output-p *compile-object*))
   (unless (or (fasl-constant-already-dumped-p constant *compile-object*)
               ;; KLUDGE: This special hack is because I was too lazy
@@ -1828,10 +1828,14 @@ SPEED and COMPILATION-SPEED optimization values, and the
           (throw constant t))
         (throw 'pending-init circular-ref)))
     (multiple-value-bind (creation-form init-form)
-        (handler-case
-            (sb!xc:make-load-form constant (make-null-lexenv))
-          (error (condition)
-            (compiler-error condition)))
+        (if namep
+            ;; If the constant is a reference to a named constant, we can
+            ;; just use SYMBOL-VALUE during LOAD.
+            (values `(symbol-value ',name) nil)
+            (handler-case
+                (sb!xc:make-load-form constant (make-null-lexenv))
+              (error (condition)
+                (compiler-error condition))))
       (case creation-form
         (:sb-just-dump-it-normally
          (fasl-validate-structure constant *compile-object*)

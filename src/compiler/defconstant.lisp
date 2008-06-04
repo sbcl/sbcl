@@ -23,7 +23,6 @@
 (defun sb!c::%defconstant (name value doc source-location)
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
-  (about-to-modify-symbol-value name)
   (when (looks-like-name-of-special-var-p name)
     (style-warn "defining ~S as a constant, even though the name follows~@
 the usual naming convention (names like *FOO*) for special variables"
@@ -41,18 +40,23 @@ the usual naming convention (names like *FOO*) for special variables"
        ;; appropriate, despite the un-mnemonic name), or defining
        ;; something like the DEFCONSTANT-EQX macro used in SBCL (which
        ;; is occasionally more appropriate). -- WHN 2001-12-21
-       (unless (eql value
-                    (info :variable :constant-value name))
-         (multiple-value-bind (ignore aborted)
-             (with-simple-restart (abort "Keep the old value.")
-               (cerror "Go ahead and change the value."
-                       'defconstant-uneql
-                       :name name
-                       :old-value (info :variable :constant-value name)
-                       :new-value value))
-           (declare (ignore ignore))
-           (when aborted
-             (return-from sb!c::%defconstant name)))))
+       (if (boundp name)
+           (if (typep name '(or boolean keyword))
+               ;; Non-continuable error.
+               (about-to-modify-symbol-value name "define ~S as a constant")
+               (let ((old (symbol-value name)))
+                 (unless (eql value old)
+                   (multiple-value-bind (ignore aborted)
+                       (with-simple-restart (abort "Keep the old value.")
+                         (cerror "Go ahead and change the value."
+                                 'defconstant-uneql
+                                 :name name
+                                 :old-value old
+                                 :new-value value))
+                     (declare (ignore ignore))
+                     (when aborted
+                       (return-from sb!c::%defconstant name))))))
+           (warn "redefining a MAKUNBOUND constant: ~S" name)))
       (:global
        ;; (This is OK -- undefined variables are of this kind. So we
        ;; don't warn or error or anything, just fall through.)
@@ -61,57 +65,40 @@ the usual naming convention (names like *FOO*) for special variables"
   (when doc
     (setf (fdocumentation name 'variable) doc))
   #-sb-xc-host
-  (setf (symbol-value name) value)
+  (%set-symbol-value name value)
   #+sb-xc-host
   (progn
-                 ;; Redefining our cross-compilation host's CL symbols
-                 ;; would be poor form.
-                 ;;
-                 ;; FIXME: Having to check this and then not treat it
-                 ;; as a fatal error seems like a symptom of things
-                 ;; being pretty broken. It's also a problem in and of
-                 ;; itself, since it makes it too easy for cases of
-                 ;; using the cross-compilation host Lisp's CL
-                 ;; constant values in the target Lisp to slip by. I
-                 ;; got backed into this because the cross-compiler
-                 ;; translates DEFCONSTANT SB!XC:FOO into DEFCONSTANT
-                 ;; CL:FOO. It would be good to unscrew the
-                 ;; cross-compilation package hacks so that that
-                 ;; translation doesn't happen. Perhaps:
-                 ;;   * Replace SB-XC with SB-CL. SB-CL exports all the
-                 ;;     symbols which ANSI requires to be exported from CL.
-                 ;;   * Make a nickname SB!CL which behaves like SB!XC.
-                 ;;   * Go through the loaded-on-the-host code making
-                 ;;     every target definition be in SB-CL. E.g.
-                 ;;     DEFMACRO-MUNDANELY DEFCONSTANT becomes
-                 ;;     DEFMACRO-MUNDANELY SB!CL:DEFCONSTANT.
-                 ;;   * Make IN-TARGET-COMPILATION-MODE do
-                 ;;     UNUSE-PACKAGE CL and USE-PACKAGE SB-CL in each
-                 ;;     of the target packages (then undo it on exit).
-                 ;;   * Make the cross-compiler's implementation of
-                 ;;     EVAL-WHEN (:COMPILE-TOPLEVEL) do UNCROSS.
-                 ;;     (This may not require any change.)
-                 ;;   * Hack GENESIS as necessary so that it outputs
-                 ;;     SB-CL stuff as COMMON-LISP stuff.
-                 ;;   * Now the code here can assert that the symbol
-                 ;;     being defined isn't in the cross-compilation
-                 ;;     host's CL package.
-                 (unless (eql (find-symbol (symbol-name name) :cl) name)
-                   ;; KLUDGE: In the cross-compiler, we use the
-                   ;; cross-compilation host's DEFCONSTANT macro
-                   ;; instead of just (SETF SYMBOL-VALUE), in order to
-                   ;; get whatever blessing the cross-compilation host
-                   ;; may expect for a global (SETF SYMBOL-VALUE).
-                   ;; (CMU CL, at least around 2.4.19, generated full
-                   ;; WARNINGs for code -- e.g. DEFTYPE expanders --
-                   ;; which referred to symbols which had been set by
-                   ;; (SETF SYMBOL-VALUE). I doubt such warnings are
-                   ;; ANSI-compliant, but I'm not sure, so I've
-                   ;; written this in a way that CMU CL will tolerate
-                   ;; and which ought to work elsewhere too.) -- WHN
-                   ;; 2001-03-24
-                   (eval `(defconstant ,name ',value))))
-
-  (setf (info :variable :kind name) :constant
-        (info :variable :constant-value name) value)
+    ;; Redefining our cross-compilation host's CL symbols would be poor form.
+    ;;
+    ;; FIXME: Having to check this and then not treat it as a fatal error
+    ;; seems like a symptom of things being pretty broken. It's also a problem
+    ;; in and of itself, since it makes it too easy for cases of using the
+    ;; cross-compilation host Lisp's CL constant values in the target Lisp to
+    ;; slip by. I got backed into this because the cross-compiler translates
+    ;; DEFCONSTANT SB!XC:FOO into DEFCONSTANT CL:FOO. It would be good to
+    ;; unscrew the cross-compilation package hacks so that that translation
+    ;; doesn't happen. Perhaps: * Replace SB-XC with SB-CL. SB-CL exports all
+    ;; the symbols which ANSI requires to be exported from CL. * Make a
+    ;; nickname SB!CL which behaves like SB!XC. * Go through the
+    ;; loaded-on-the-host code making every target definition be in SB-CL.
+    ;; E.g. DEFMACRO-MUNDANELY DEFCONSTANT becomes DEFMACRO-MUNDANELY
+    ;; SB!CL:DEFCONSTANT. * Make IN-TARGET-COMPILATION-MODE do UNUSE-PACKAGE
+    ;; CL and USE-PACKAGE SB-CL in each of the target packages (then undo it
+    ;; on exit). * Make the cross-compiler's implementation of EVAL-WHEN
+    ;; (:COMPILE-TOPLEVEL) do UNCROSS. (This may not require any change.) *
+    ;; Hack GENESIS as necessary so that it outputs SB-CL stuff as COMMON-LISP
+    ;; stuff. * Now the code here can assert that the symbol being defined
+    ;; isn't in the cross-compilation host's CL package.
+    (unless (eql (find-symbol (symbol-name name) :cl) name)
+      ;; KLUDGE: In the cross-compiler, we use the cross-compilation host's
+      ;; DEFCONSTANT macro instead of just (SETF SYMBOL-VALUE), in order to
+      ;; get whatever blessing the cross-compilation host may expect for a
+      ;; global (SETF SYMBOL-VALUE). (CMU CL, at least around 2.4.19,
+      ;; generated full WARNINGs for code -- e.g. DEFTYPE expanders -- which
+      ;; referred to symbols which had been set by (SETF SYMBOL-VALUE). I
+      ;; doubt such warnings are ANSI-compliant, but I'm not sure, so I've
+      ;; written this in a way that CMU CL will tolerate and which ought to
+      ;; work elsewhere too.) -- WHN 2001-03-24
+      (eval `(defconstant ,name ',value))))
+  (setf (info :variable :kind name) :constant)
   name)

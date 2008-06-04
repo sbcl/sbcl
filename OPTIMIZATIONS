@@ -311,32 +311,6 @@ using the x86 FP stack.  It would be nice if SBCL included an SSE2-based
 floating point backend with a compile-time option to switch between the
 two.
 --------------------------------------------------------------------------------
-#34
-Compiling
-
-(defun foo (x y)
-  (declare (type (integer 0 45) x y))
-  (+ x y))
-
-results in the following error trapping code for type-checking the
-arguments:
-
-;      424: L0:   8B058CE31812     MOV EAX, [#x1218E38C]      ; '(MOD 46)
-;      42A:       0F0B0A           BREAK 10                   ; error trap
-;      42D:       05               BYTE #X05
-;      42E:       1F               BYTE #X1F                  ; OBJECT-NOT-TYPE-ERROR
-;      42F:       FECE01           BYTE #XFE, #XCE, #X01      ; EDI
-;      432:       0E               BYTE #X0E                  ; EAX
-;      433: L1:   8B0590E31812     MOV EAX, [#x1218E390]      ; '(MOD 46)
-;      439:       0F0B0A           BREAK 10                   ; error trap
-;      43C:       03               BYTE #X03
-;      43D:       1F               BYTE #X1F                  ; OBJECT-NOT-TYPE-ERROR
-;      43E:       8E               BYTE #X8E                  ; EDX
-;      43F:       0E               BYTE #X0E                  ; EAX
-
-Notice that '(MOD 46) has two entries in the constant vector.  Having
-one would be preferable.
---------------------------------------------------------------------------------
 #35
 Compiling
 

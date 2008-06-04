@@ -32,20 +32,23 @@
   #!+sb-doc
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))
-  (about-to-modify-symbol-value symbol)
+  (about-to-modify-symbol-value symbol "set SYMBOL-VALUE of ~S")
   (%set-symbol-value symbol new-value))
 
 (defun %set-symbol-value (symbol new-value)
   (%set-symbol-value symbol new-value))
 
+(declaim (inline %makunbound))
+(defun %makunbound (symbol)
+  (%set-symbol-value symbol (%primitive sb!c:make-other-immediate-type
+                                        0 sb!vm:unbound-marker-widetag)))
+
 (defun makunbound (symbol)
   #!+sb-doc
   "Make SYMBOL unbound, removing any value it may currently have."
   (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
-    (set symbol
-         (%primitive sb!c:make-other-immediate-type
-                     0
-                     sb!vm:unbound-marker-widetag))
+    (about-to-modify-symbol-value symbol "make ~S unbound")
+    (%makunbound symbol)
     symbol))
 
 ;;; Return the built-in hash value for SYMBOL.

@@ -249,7 +249,7 @@
   (check-type kind (member :untagged :tagged))
   (check-type width unsigned-byte)
   (dolist (arg lambda-list)
-    (when (member arg lambda-list-keywords)
+    (when (member arg sb!xc:lambda-list-keywords)
       (error "Lambda list keyword ~S is not supported for ~
               modular function lambda lists." arg)))
   `(progn
@@ -278,7 +278,7 @@
   (check-type name symbol)
   (check-type kind (member :untagged :tagged))
   (dolist (arg lambda-list)
-    (when (member arg lambda-list-keywords)
+    (when (member arg sb!xc:lambda-list-keywords)
       (error "Lambda list keyword ~S is not supported for ~
               modular function lambda lists." arg)))
   (with-unique-names (call args)

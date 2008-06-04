@@ -66,7 +66,6 @@
   (defun %define-alien-variable (lisp-name alien-name type)
     (setf (info :variable :kind lisp-name) :alien)
     (setf (info :variable :where-from lisp-name) :defined)
-    (clear-info :variable :constant-value lisp-name)
     (setf (info :variable :alien-info lisp-name)
           (make-heap-alien-info :type type
                                 :sap-form `(foreign-symbol-sap ',alien-name t)))))

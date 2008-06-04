@@ -64,28 +64,6 @@
   (declare (type lvar lvar))
   (ir2-lvar-primitive-type (lvar-info lvar)))
 
-;;; Return true if a constant LEAF is of a type which we can legally
-;;; directly reference in code. Named constants with arbitrary pointer
-;;; values cannot, since we must preserve EQLness.
-;;;
-;;; FIXME: why not?  The values in a function's constant vector are
-;;; subject to being moved by the garbage collector.  Having arbitrary
-;;; values in said vector doesn't seem like a problem.
-(defun legal-immediate-constant-p (leaf)
-  (declare (type constant leaf))
-  (or (not (leaf-has-source-name-p leaf))
-      ;; Specialized arrays are legal, too.  KLUDGE: this would be
-      ;; *much* cleaner if SIMPLE-UNBOXED-ARRAY was defined on the host.
-      #.(loop for saetp across sb!vm:*specialized-array-element-type-properties*
-              unless (eq t (sb!vm:saetp-specifier saetp))
-              collect `((simple-array ,(sb!vm:saetp-specifier saetp) (*)) t) into cases
-              finally (return
-                        `(typecase (constant-value leaf)
-                           ((or number character) t)
-                           (symbol (symbol-package (constant-value leaf)))
-                           ,@cases
-                           (t nil))))))
-
 ;;; If LVAR is used only by a REF to a leaf that can be delayed, then
 ;;; return the leaf, otherwise return NIL.
 (defun lvar-delayed-leaf (lvar)
@@ -95,7 +73,7 @@
          (let ((leaf (ref-leaf use)))
            (etypecase leaf
              (lambda-var (if (null (lambda-var-sets leaf)) leaf nil))
-             (constant (if (legal-immediate-constant-p leaf) leaf nil))
+             (constant leaf)
              ((or functional global-var) nil))))))
 
 ;;; Annotate a normal single-value lvar. If its only use is a ref that

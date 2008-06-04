@@ -900,8 +900,8 @@ care."
       (compiler-error "odd number of args to SETQ: ~S" source))
     (if (= len 2)
         (let* ((name (first things))
-               (leaf (or (lexenv-find name vars)
-                         (find-free-var name))))
+               (value-form (second things))
+               (leaf (or (lexenv-find name vars) (find-free-var name))))
           (etypecase leaf
             (leaf
              (when (constant-p leaf)
@@ -916,7 +916,11 @@ care."
                  (compiler-style-warn
                   "~S is being set even though it was declared to be ignored."
                   name)))
-             (setq-var start next result leaf (second things)))
+             (if (and (global-var-p leaf) (eq :global (global-var-kind leaf)))
+                 ;; For undefined variables go through SET, so that we can catch
+                 ;; constant modifications.
+                 (ir1-convert start next result `(set ',name ,value-form))
+                 (setq-var start next result leaf value-form)))
             (cons
              (aver (eq (car leaf) 'macro))
              ;; FIXME: [Free] type declaration. -- APD, 2002-01-26

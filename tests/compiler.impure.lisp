@@ -1551,17 +1551,88 @@
                  (not (or c d e f g h i j k l m n o p q r s))))))
 (wants-many-values 1 42)
 
-;;; constant coalescing (named and unnamed)
+;;; constant coalescing
+
+(defun count-code-constants (x f)
+  (let ((code (sb-kernel:fun-code-header f))
+        (n 0))
+    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+          do (when (equal x (sb-kernel:code-header-ref code i))
+               (incf n)))
+    n))
+
+(defvar *lambda*)
+
+(defun compile2 (lambda)
+  (let* ((lisp "compiler-impure-tmp.lisp")
+         (fasl (compile-file-pathname lisp)))
+    (unwind-protect
+         (progn
+           (with-open-file (f lisp :direction :output)
+             (prin1 `(setf *lambda* ,lambda) f))
+           (multiple-value-bind (fasl warn fail) (compile-file lisp)
+             (declare (ignore warn))
+             (when fail
+               (error "File-compiling ~S failed." lambda))
+             (let ((*lambda* nil))
+               (load fasl)
+               (values *lambda* (compile nil lambda)))))
+      (ignore-errors (delete-file lisp))
+      (ignore-errors (delete-file fasl)))))
+
+;; named and unnamed
 (defconstant +born-to-coalesce+ '.born-to-coalesce.)
-(let* ((f (compile nil '(lambda ()
-                         (let ((x (cons +born-to-coalesce+ nil))
-                               (y (cons '.born-to-coalesce. nil)))
-                           (list x y)))))
-       (b-t-c 0)
-       (code (sb-kernel:fun-code-header f)))
-  (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
-        do (when (eq '.born-to-coalesce. (sb-kernel:code-header-ref code i))
-             (incf b-t-c)))
-  (assert (= 1 b-t-c)))
+(multiple-value-bind (file-fun core-fun)
+    (compile2 '(lambda ()
+                (let ((x (cons +born-to-coalesce+ nil))
+                      (y (cons '.born-to-coalesce. nil)))
+                  (list x y))))
+  (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
+  (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun))))
+
+;; some things must retain identity under COMPILE, but we want to coalesce them under COMPILE-FILE
+(defun assert-coalescing (constant)
+  (let ((value (copy-seq (symbol-value constant))))
+    (multiple-value-bind (file-fun core-fun)
+        (compile2 `(lambda ()
+                     (let ((x (cons ,constant nil))
+                           (y (cons ',value nil)))
+                       (list x y))))
+      (assert (= 1 (count-code-constants value file-fun)))
+      (assert (= 2 (count-code-constants value core-fun)))
+      (let* ((l (funcall file-fun))
+             (a (car (first l)))
+             (b (car (second l))))
+        (assert (and (equal value a)
+                     (equal a b)
+                     (eq a b))))
+      (let* ((l (funcall core-fun))
+             (a (car (first l)))
+             (b (car (second l))))
+        (assert (and (equal value a)
+                     (equal a b)
+                     (not (eq a b))))))))
+
+(defconstant +born-to-coalesce2+ "maybe coalesce me!")
+(assert-coalescing '+born-to-coalesce2+)
+
+(defconstant +born-to-coalesce3+ #*01101001011101110100011)
+(assert-coalescing '+born-to-coalesce3+)
+
+(defconstant +born-to-coalesce4+ '(foo bar "zot" 123 (nested "quux") #*0101110010))
+(assert-coalescing '+born-to-coalesce4+)
+
+;;; catch constant modifications thru undefined variables
+(defun sneak-set-dont-set-me (x)
+  (ignore-errors (setq dont-set-me x)))
+(defconstant dont-set-me 42)
+(assert (not (sneak-set-dont-set-me 13)))
+(assert (= 42 dont-set-me))
+(defclass some-constant-thing () ())
+(defun sneak-set-dont-set-me2 (x)
+  (ignore-errors (setq dont-set-me2 x)))
+(defconstant dont-set-me2 (make-instance 'some-constant-thing))
+(assert (not (sneak-set-dont-set-me2 13)))
+(assert (typep dont-set-me2 'some-constant-thing))
 
 ;;; success

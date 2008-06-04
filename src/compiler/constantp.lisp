@@ -145,7 +145,7 @@ constantness of the FORM in ENVIRONMENT."
                   ;; instead of general (not handling cases like &key (x y))
                   (declare (ignorable
                             ,@(remove-if (lambda (arg)
-                                           (member arg lambda-list-keywords))
+                                           (member arg sb!xc:lambda-list-keywords))
                                          lambda-list)))
                    ,body))))
       `(progn

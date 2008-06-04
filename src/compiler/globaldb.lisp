@@ -1066,7 +1066,7 @@
   :class :variable
   :type :kind
   :type-spec (member :special :constant :macro :global :alien)
-  :default (if (symbol-self-evaluating-p name)
+  :default (if (typep name '(or boolean keyword))
                :constant
                :global))
 
@@ -1083,22 +1083,6 @@
   :type :where-from
   :type-spec (member :declared :assumed :defined)
   :default :assumed)
-
-;;; the Lisp object which is the value of this constant, if known
-(define-info-type
-  :class :variable
-  :type :constant-value
-  :type-spec t
-  ;; CMU CL used to return two values for (INFO :VARIABLE :CONSTANT-VALUE ..).
-  ;; Now we don't: it was the last remaining multiple-value return from
-  ;; the INFO system, and bringing it down to one value lets us simplify
-  ;; things, especially simplifying the declaration of return types.
-  ;; Software which used to check the second value (for "is it defined
-  ;; as a constant?") should check (EQL (INFO :VARIABLE :KIND ..) :CONSTANT)
-  ;; instead.
-  :default (if (symbol-self-evaluating-p name)
-               name
-               (bug "constant lookup of nonconstant ~S" name)))
 
 ;;; the macro-expansion for symbol-macros
 (define-info-type

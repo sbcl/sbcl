@@ -135,13 +135,7 @@
              (vop value-cell-ref node block tn res)
              (emit-move node block tn res))))
       (constant
-       (if (legal-immediate-constant-p leaf)
-           (emit-move node block (constant-tn leaf) res)
-           (let* ((name (leaf-source-name leaf))
-                  (name-tn (emit-constant name)))
-             (if (policy node (zerop safety))
-                 (vop fast-symbol-value node block name-tn res)
-                 (vop symbol-value node block name-tn res)))))
+       (emit-move node block (constant-tn leaf) res))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
@@ -306,7 +300,7 @@
                (emit-move node block val tn)))))
       (global-var
        (ecase (global-var-kind leaf)
-         ((:special :global)
+         ((:special)
           (aver (symbolp (leaf-source-name leaf)))
           (vop set node block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs

@@ -1407,7 +1407,7 @@ PACKAGE."
   (setq *keyword-package* (find-package "KEYWORD"))
 
   (/show0 "about to MAKUNBOUND *!INITIAL-SYMBOLS*")
-  (makunbound '*!initial-symbols*)       ; (so that it gets GCed)
+  (%makunbound '*!initial-symbols*)       ; (so that it gets GCed)
 
   ;; Make some other packages that should be around in the cold load.
   ;; The COMMON-LISP-USER package is required by the ANSI standard,

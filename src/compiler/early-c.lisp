@@ -29,20 +29,6 @@
   #!+sb-doc
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
-
-(defconstant-eqx sb!xc:lambda-list-keywords
-  '(&allow-other-keys
-    &aux
-    &body
-    &environment
-    &key
-    &more
-    &optional
-    &rest
-    &whole)
-  #'equal
-  #!+sb-doc
-  "symbols which are magical in a lambda list")
 
 ;;;; cross-compiler-only versions of CL special variables, so that we
 ;;;; don't have weird interactions with the host compiler

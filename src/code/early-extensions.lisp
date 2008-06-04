@@ -102,7 +102,7 @@
                       ((or (atom result)
                            (not (eq (car result) 'values)))
                        `(values ,result &optional))
-                      ((intersection (cdr result) lambda-list-keywords)
+                      ((intersection (cdr result) sb!xc:lambda-list-keywords)
                        result)
                       (t `(values ,@(cdr result) &optional)))))
     `(function ,args ,result)))
@@ -755,37 +755,35 @@
               (char= #\* (aref name 0))
               (char= #\* (aref name (1- (length name))))))))
 
-;;; Some symbols are defined by ANSI to be self-evaluating. Return
-;;; non-NIL for such symbols (and make the non-NIL value a traditional
-;;; message, for use in contexts where the user asks us to change such
-;;; a symbol).
-(defun symbol-self-evaluating-p (symbol)
-  (declare (type symbol symbol))
-  (cond ((eq symbol t)
-         "Veritas aeterna. (can't change T)")
-        ((eq symbol nil)
-         "Nihil ex nihil. (can't change NIL)")
-        ((keywordp symbol)
-         "Keyword values can't be changed.")
-        (t
-         nil)))
-
-;;; This function is to be called just before a change which would
-;;; affect the symbol value. (We don't absolutely have to call this
-;;; function before such changes, since such changes are given as
-;;; undefined behavior. In particular, we don't if the runtime cost
-;;; would be annoying. But otherwise it's nice to do so.)
-(defun about-to-modify-symbol-value (symbol)
-  (declare (type symbol symbol))
-  (let ((reason (symbol-self-evaluating-p symbol)))
-    (when reason
-      (error reason)))
-  ;; (Note: Just because a value is CONSTANTP is not a good enough
-  ;; reason to complain here, because we want DEFCONSTANT to be able
-  ;; to use this function, and it's legal to DEFCONSTANT a constant as
-  ;; long as the new value is EQL to the old value.)
+;;; This function is to be called just before a change which would affect the
+;;; symbol value. We don't absolutely have to call this function before such
+;;; changes, since such changes to constants are given as undefined behavior,
+;;; it's nice to do so. To circumvent this you need code like this:
+;;;
+;;;   (defvar foo)
+;;;   (defun set-foo (x) (setq foo x))
+;;;   (defconstant foo 42)
+;;;   (set-foo 13)
+;;;   foo => 13, (constantp 'foo) => t
+;;;
+;;; ...in which case you frankly deserve to lose.
+(defun about-to-modify-symbol-value (symbol action)
+  (declare (symbol symbol))
+  (multiple-value-bind (what continue)
+      (when (eq :constant (info :variable :kind symbol))
+        (cond ((eq symbol t)
+               (values "Veritas aeterna. (can't ~@?)" nil))
+              ((eq symbol nil)
+               (values "Nihil ex nihil. (can't ~@?)" nil))
+              ((keywordp symbol)
+               (values "Can't ~@?." nil))
+              (t
+               (values "Constant modification: attempt to ~@?." t))))
+    (when what
+      (if continue
+          (cerror "Modify the constant." what action symbol)
+          (error what action symbol))))
   (values))
-
 
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
 ;;; assignment instead of doing cold static linking. That way things like
@@ -1240,7 +1238,7 @@ to :INTERPRET, an interpreter will be used.")
                (lambda (f)
                  (let ((args (cadr f))
                        (name (car f)))
-                   (when (intersection args lambda-list-keywords)
+                   (when (intersection args sb!xc:lambda-list-keywords)
                      ;; No fundamental reason not to support them, but we
                      ;; don't currently need them here.
                      (error "Non-required arguments not implemented for DX-FLET."))

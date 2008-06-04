@@ -172,12 +172,10 @@
        (dolist (name args)
          (unless (symbolp name)
            (error "can't declare a non-symbol as SPECIAL: ~S" name))
-         (when (sb!xc:constantp name)
-           (error "can't declare a constant as SPECIAL: ~S" name))
          (with-single-package-locked-error
-             (:symbol name "globally declaring ~A special"))
-         (clear-info :variable :constant-value name)
-         (setf (info :variable :kind name) :special)))
+             (:symbol name "globally declaring ~A special")
+           (about-to-modify-symbol-value name "proclaim ~S as SPECIAL")
+           (setf (info :variable :kind name) :special))))
       (type
        (if *type-system-initialized*
            (let ((type (specifier-type (first args))))

@@ -1571,23 +1571,52 @@
 ;;; LEAF and enter it. If we are producing a fasl file, make sure that
 ;;; MAKE-LOAD-FORM gets used on any parts of the constant that it
 ;;; needs to be.
-(defun find-constant (object)
-  (flet ((make-it ()
-           (when (producing-fasl-file)
-             (maybe-emit-make-load-forms object))
-           (make-constant :value object
-                          :%source-name '.anonymous.
-                          :type (ctype-of object)
-                          :where-from :defined)))
-    (if (and (typep object
-                    ;; FIXME: What is the significance of this test? ("things
-                    ;; that are worth uniquifying"?)
-                    '(or symbol number character instance))
-             (boundp '*constants*))
-        (or (gethash object *constants*)
-            (setf (gethash object *constants*)
-                  (make-it)))
-        (make-it))))
+;;;
+;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
+;;; when file-compiling, but not when using COMPILE.
+(defun find-constant (object &optional (name nil namep))
+  (let ((faslp (producing-fasl-file)))
+    (labels ((make-it ()
+               (when faslp
+                 (if namep
+                     (maybe-emit-make-load-forms object name)
+                     (maybe-emit-make-load-forms object)))
+               (make-constant object))
+             (core-coalesce-p (x)
+               ;; True for things which retain their identity under EQUAL,
+               ;; so we can safely share the same CONSTANT leaf between
+               ;; multiple references.
+               (or (typep x '(or symbol number character))
+                   ;; Amusingly enough, we see CLAMBDAs --among other things--
+                   ;; here, from compiling things like %ALLOCATE-CLOSUREs forms.
+                   ;; No point in stuffing them in the hash-table.
+                   (and (typep x 'instance)
+                        (not (or (leaf-p x) (node-p x))))))
+             (file-coalesce-p (x)
+               ;; CLHS 3.2.4.2.2: We are also allowed to coalesce various
+               ;; other things when file-compiling.
+               (or (core-coalesce-p x)
+                   (if (consp x)
+                       (if (eq +code-coverage-unmarked+ (cdr x))
+                           ;; These are already coalesced, and the CAR should
+                           ;; always be OK, so no need to check.
+                           t
+                           (unless (maybe-cyclic-p x) ; safe for EQUAL?
+                             (do ((y x (cdr y)))
+                                 ((atom y) (file-coalesce-p y))
+                               (unless (file-coalesce-p (car y))
+                                 (return nil)))))
+                       ;; We *could* coalesce base-strings as well, but we'd need
+                       ;; a separate hash-table for that, since we are not allowed to
+                       ;; coalesce base-strings with non-base-strings.
+                       (typep x '(or (vector character) bit-vector)))))
+             (coalescep (x)
+               (if faslp (file-coalesce-p x) (core-coalesce-p x))))
+      (if (and (boundp '*constants*) (coalescep object))
+          (or (gethash object *constants*)
+              (setf (gethash object *constants*)
+                    (make-it)))
+          (make-it)))))
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different

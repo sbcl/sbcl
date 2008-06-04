@@ -1110,7 +1110,6 @@ core and return a descriptor to it."
         (let ((result (symbol-package symbol)))
           (unless (package-ok-for-target-symbol-p result)
             (bug "~A in bad package for target: ~A" symbol result))
-          (aver (package-ok-for-target-symbol-p result))
           result))))
 
 ;;; Return a handle on an interned symbol. If necessary allocate the

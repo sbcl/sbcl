@@ -665,12 +665,16 @@
     (functional-%debug-name leaf)))
 
 ;;; The CONSTANT structure is used to represent known constant values.
-;;; If NAME is not null, then it is the name of the named constant
-;;; which this leaf corresponds to, otherwise this is an anonymous
-;;; constant.
-(def!struct (constant (:include leaf))
+;;; Since the same constant leaf may be shared between named and anonymous
+;;; constants, %SOURCE-NAME is never used.
+(def!struct (constant (:constructor make-constant (value
+                                                   &aux
+                                                   (type (ctype-of value))
+                                                   (%source-name '.anonynous.)
+                                                   (where-from :defined)))
+                      (:include leaf))
   ;; the value of the constant
-  (value nil :type t))
+  (value (missing-arg) :type t))
 (defprinter (constant :identity t)
   value)
 

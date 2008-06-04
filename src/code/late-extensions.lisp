@@ -124,9 +124,9 @@ EXPERIMENTAL: Interface subject to change."
              (error "Invalid first argument to COMPARE-AND-SWAP: ~S" place))))))))
 
 (macrolet ((def (name lambda-list ref &optional set)
+             #!+compare-and-swap-vops
+             (declare (ignore ref set))
              `(defun ,name (,@lambda-list old new)
-                #!+compare-and-swap-vops
-                (declare (ignore ref set))
                 #!+compare-and-swap-vops
                 (,name ,@lambda-list old new)
                 #!-compare-and-swap-vops

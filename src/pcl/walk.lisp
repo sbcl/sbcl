@@ -668,7 +668,7 @@
                                          &aux arg)
   (cond ((null arglist) ())
         ((symbolp (setq arg (car arglist)))
-         (or (member arg lambda-list-keywords :test #'eq)
+         (or (member arg sb!xc:lambda-list-keywords :test #'eq)
              (note-lexical-binding arg env))
          (recons arglist
                  arg
@@ -676,8 +676,7 @@
                                context
                                env
                                (and destructuringp
-                                    (not (member arg
-                                                 lambda-list-keywords))))))
+                                    (not (member arg sb!xc:lambda-list-keywords))))))
         ((consp arg)
          (prog1 (recons arglist
                         (if destructuringp

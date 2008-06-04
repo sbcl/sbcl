@@ -43,6 +43,8 @@
  ;; for everything.
  ("src/code/early-source-location")
 
+ ("src/code/early-constants")
+
  ;; This comes early because the cross-compilation host's backquote
  ;; logic can expand into something which can't be executed on the
  ;; target Lisp (e.g. in CMU CL where it expands into internal
