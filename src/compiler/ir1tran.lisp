@@ -309,24 +309,28 @@
                    ((array t)
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
-                   (;; In the target SBCL, we can dump any instance,
-                    ;; but in the cross-compilation host,
-                    ;; %INSTANCE-FOO functions don't work on general
-                    ;; instances, only on STRUCTURE!OBJECTs.
-                    #+sb-xc-host structure!object
-                    #-sb-xc-host instance
-                    (when (if namep
-                              (emit-make-load-form value name)
-                              (emit-make-load-form value))
-                      (dotimes (i (- (%instance-length value)
-                                     #+sb-xc-host 0
-                                     #-sb-xc-host (layout-n-untagged-slots
-                                                   (%instance-ref value 0))))
-                        (grovel (%instance-ref value i)))))
                    (t
-                    (compiler-error
-                     "Objects of type ~S can't be dumped into fasl files."
-                     (type-of value)))))))
+                    (if namep
+                        ;; We can dump arbitrary named constant references by
+                        ;; using the name.
+                        (emit-make-load-form value name)
+                        ;; In the target SBCL, we can dump any instance, but
+                        ;; in the cross-compilation host, %INSTANCE-FOO
+                        ;; functions don't work on general instances, only on
+                        ;; STRUCTURE!OBJECTs.
+                        ;;
+                        ;; FIXME: What about funcallable instances with user-defined
+                        ;; MAKE-LOAD-FORM methods?
+                        (if (typep value #+sb-xc-host 'structure!object #-sb-xc-host 'instance)
+                            (when (emit-make-load-form value)
+                              (dotimes (i (- (%instance-length value)
+                                             #+sb-xc-host 0
+                                             #-sb-xc-host (layout-n-untagged-slots
+                                                           (%instance-ref value 0))))
+                                (grovel (%instance-ref value i))))
+                            (compiler-error
+                             "Objects of type ~S can't be dumped into fasl files."
+                             (type-of value)))))))))
       (grovel constant)))
   (values))
 
