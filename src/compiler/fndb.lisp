@@ -1252,7 +1252,7 @@
    &key
    (:verbose t)
    (:print t)
-   (:if-does-not-exist (member :error :create nil))
+   (:if-does-not-exist t)
    (:external-format keyword))
   t)
 

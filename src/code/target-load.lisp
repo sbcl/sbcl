@@ -112,13 +112,13 @@
                                      (open pathname
                                            :if-does-not-exist
                                            (if if-does-not-exist :error nil)
-                                           :element-type '(unsigned-byte 8)))
-                              (if if-does-not-exist
-                                  (error 'simple-file-error
-                                         :pathname pathspec
-                                         :format-control
-                                         "~@<Couldn't load ~S: file does not exist.~@:>"
-                                         :format-arguments (list pathspec))))))))
+                                           :element-type '(unsigned-byte 8))))))
+                      (if if-does-not-exist
+                          (error 'simple-file-error
+                                 :pathname pathspec
+                                 :format-control
+                                 "~@<Couldn't load ~S: file does not exist.~@:>"
+                                 :format-arguments (list pathspec)))))
         (unless stream
           (return-from load nil))
 

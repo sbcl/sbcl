@@ -20,3 +20,8 @@
 (load "i-am-not.lisp" :if-does-not-exist nil)
 (load "i-am-not.fasl" :if-does-not-exist nil)
 (load "i-am-not.misc-garbage" :if-does-not-exist nil)
+
+;;; In 1.0.17, LOAD didn't error when the file didn't exist and
+;;; IF-DOES-NOT-EXIST was true.
+(assert (typep (nth-value 1 (ignore-errors (load "i-am-not"))) 'file-error))
+(assert (typep (nth-value 1 (ignore-errors (load "i-am-not" :if-does-not-exist t))) 'file-error))
