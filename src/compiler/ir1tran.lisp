@@ -252,43 +252,23 @@
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
 ;;; CONSTANT might be circular. We also check that the constant (and
 ;;; any subparts) are dumpable at all.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; The EVAL-WHEN is necessary for #.(1+ LIST-TO-HASH-TABLE-THRESHOLD)
-  ;; below. -- AL 20010227
-  (def!constant list-to-hash-table-threshold 32))
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
-  (let ((things-processed nil)
-        (count 0))
-    ;; FIXME: Does this LIST-or-HASH-TABLE messiness give much benefit?
-    (declare (type (or list hash-table) things-processed)
-             (type (integer 0 #.(1+ list-to-hash-table-threshold)) count)
-             (inline member))
-    (labels ((grovel (value)
+  (let ((xset (alloc-xset)))
+    (labels ((trivialp (value)
+               (typep value
+                      '(or #-sb-xc-host unboxed-array
+                        #+sb-xc-host (simple-array (unsigned-byte 8) (*))
+                        symbol
+                        number
+                        character
+                        string)))
+             (grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
-               (unless (typep value
-                              '(or #-sb-xc-host unboxed-array
-                                #+sb-xc-host (simple-array (unsigned-byte 8) (*))
-                                symbol
-                                number
-                                character
-                                string))
-                 (etypecase things-processed
-                   (list
-                    (when (member value things-processed :test #'eq)
-                      (return-from grovel nil))
-                    (push value things-processed)
-                    (incf count)
-                    (when (> count list-to-hash-table-threshold)
-                      (let ((things things-processed))
-                        (setf things-processed
-                              (make-hash-table :test 'eq))
-                        (dolist (thing things)
-                          (setf (gethash thing things-processed) t)))))
-                   (hash-table
-                    (when (gethash value things-processed)
-                      (return-from grovel nil))
-                    (setf (gethash value things-processed) t)))
+               (unless (trivialp value)
+                 (if (xset-member-p value xset)
+                     (return-from grovel nil)
+                     (add-to-xset value xset))
                  (typecase value
                    (cons
                     (grovel (car value))
@@ -313,7 +293,9 @@
                     (if namep
                         ;; We can dump arbitrary named constant references by
                         ;; using the name.
-                        (emit-make-load-form value name)
+                        (progn
+                          (emit-make-load-form constant name)
+                          (return-from maybe-emit-make-load-forms (values)))
                         ;; In the target SBCL, we can dump any instance, but
                         ;; in the cross-compilation host, %INSTANCE-FOO
                         ;; functions don't work on general instances, only on

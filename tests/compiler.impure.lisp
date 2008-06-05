@@ -1622,13 +1622,21 @@
 (defconstant +born-to-coalesce4+ '(foo bar "zot" 123 (nested "quux") #*0101110010))
 (assert-coalescing '+born-to-coalesce4+)
 
+(defclass some-constant-thing () ())
+
+;;; correct handling of nested things loaded via SYMBOL-VALUE
+(defvar *sneaky-nested-thing* (list (make-instance 'some-constant-thing)))
+(defconstant +sneaky-nested-thing+ *sneaky-nested-thing*)
+(multiple-value-bind (file-fun core-fun) (compile2 '(lambda () +sneaky-nested-thing+))
+  (assert (eq *sneaky-nested-thing* (funcall file-fun)))
+  (assert (eq *sneaky-nested-thing* (funcall core-fun))))
+
 ;;; catch constant modifications thru undefined variables
 (defun sneak-set-dont-set-me (x)
   (ignore-errors (setq dont-set-me x)))
 (defconstant dont-set-me 42)
 (assert (not (sneak-set-dont-set-me 13)))
 (assert (= 42 dont-set-me))
-(defclass some-constant-thing () ())
 (defun sneak-set-dont-set-me2 (x)
   (ignore-errors (setq dont-set-me2 x)))
 (defconstant dont-set-me2 (make-instance 'some-constant-thing))
