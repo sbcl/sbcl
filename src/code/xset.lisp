@@ -51,7 +51,7 @@
                  data)))
   nil)
 
-(defconstant +xset-list-size-limit+ 12)
+(defconstant +xset-list-size-limit+ 24)
 
 ;;; Checks that the element is not in the set yet.
 (defun add-to-xset (elt xset)

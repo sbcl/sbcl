@@ -182,11 +182,7 @@
 ;;; Check that a literal form is fopcompilable. It would not for example
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
 (defun constant-fopcompilable-p (constant)
-  (let ((things-processed nil)
-        (count 0))
-    (declare (type (or list hash-table) things-processed)
-             (type (integer 0 #.(1+ list-to-hash-table-threshold)) count)
-             (inline member))
+  (let ((xset (alloc-xset)))
     (labels ((grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
@@ -196,22 +192,9 @@
                                 number
                                 character
                                 string))
-                 (etypecase things-processed
-                   (list
-                    (when (member value things-processed :test #'eq)
-                      (return-from grovel nil))
-                    (push value things-processed)
-                    (incf count)
-                    (when (> count list-to-hash-table-threshold)
-                      (let ((things things-processed))
-                        (setf things-processed
-                              (make-hash-table :test 'eq))
-                        (dolist (thing things)
-                          (setf (gethash thing things-processed) t)))))
-                   (hash-table
-                    (when (gethash value things-processed)
-                      (return-from grovel nil))
-                    (setf (gethash value things-processed) t)))
+                 (if (xset-member-p value xset)
+                     (return-from grovel nil)
+                     (add-to-xset value xset))
                  (typecase value
                    (cons
                     (grovel (car value))
