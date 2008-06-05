@@ -339,15 +339,15 @@
 (defun close-fasl-output (fasl-output abort-p)
   (declare (type fasl-output fasl-output))
 
-  ;; sanity checks
-  (aver (zerop (hash-table-count (fasl-output-patch-table fasl-output))))
-
-  ;; End the group.
-  (dump-fop 'fop-verify-empty-stack fasl-output)
-  (dump-fop 'fop-verify-table-size fasl-output)
-  (dump-word (fasl-output-table-free fasl-output)
-                    fasl-output)
-  (dump-fop 'fop-end-group fasl-output)
+  (unless abort-p
+    ;; sanity checks
+    (aver (zerop (hash-table-count (fasl-output-patch-table fasl-output))))
+    ;; End the group.
+    (dump-fop 'fop-verify-empty-stack fasl-output)
+    (dump-fop 'fop-verify-table-size fasl-output)
+    (dump-word (fasl-output-table-free fasl-output)
+               fasl-output)
+    (dump-fop 'fop-end-group fasl-output))
 
   ;; That's all, folks.
   (close (fasl-output-stream fasl-output) :abort abort-p)

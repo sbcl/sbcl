@@ -21,6 +21,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     are never referenced through SYMBOL-VALUE at runtime.
   * bug fix: EAI_NODATA is deprecated since RFC 3493. Stop using it
     in sb-bsd-sockets.
+  * bug fix: if COMPILE-FILE aborts due to an unwind, the partial
+    fasl is now deleted. (reported by Attila Lendvai)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is a valid function name (regression at 1.0.13.38)
     ** FILL on lists was missing its return value (regression at 1.0.12.27)

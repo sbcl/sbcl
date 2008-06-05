@@ -1666,7 +1666,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 |#
   (let* ((fasl-output nil)
          (output-file-name nil)
-         (abort-p nil)
+         (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
          (input-pathname (verify-source-file input-file))
