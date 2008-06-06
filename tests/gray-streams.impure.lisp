@@ -331,3 +331,8 @@
  (make-two-way-stream *part-of-composite* *standard-output*)
  (make-concatenated-stream *part-of-composite*)
  (make-synonym-stream '*part-of-composite*))
+
+;;; Using STREAM-FILE-POSITION on an ANSI-STREAM
+(with-output-to-string (s)
+  (assert (zerop (file-position s)))
+  (assert (zerop (stream-file-position s))))
