@@ -256,7 +256,8 @@
   (let ((xset (alloc-xset)))
     (labels ((trivialp (value)
                (typep value
-                      '(or #-sb-xc-host unboxed-array
+                      '(or
+                        #-sb-xc-host unboxed-array
                         #+sb-xc-host (simple-array (unsigned-byte 8) (*))
                         symbol
                         number
@@ -289,31 +290,34 @@
                    ((array t)
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
+                   (#+sb-xc-host structure!object
+                    #-sb-xc-host instance
+                    ;; In the target SBCL, we can dump any instance, but
+                    ;; in the cross-compilation host, %INSTANCE-FOO
+                    ;; functions don't work on general instances, only on
+                    ;; STRUCTURE!OBJECTs.
+                    ;;
+                    ;; FIXME: What about funcallable instances with
+                    ;; user-defined MAKE-LOAD-FORM methods?
+                    (when (emit-make-load-form value)
+                      (dotimes (i (- (%instance-length value)
+                                     #+sb-xc-host 0
+                                     #-sb-xc-host (layout-n-untagged-slots
+                                                   (%instance-ref value 0))))
+                        (grovel (%instance-ref value i)))))
                    (t
-                    (if namep
-                        ;; We can dump arbitrary named constant references by
-                        ;; using the name.
-                        (progn
-                          (emit-make-load-form constant name)
-                          (return-from maybe-emit-make-load-forms (values)))
-                        ;; In the target SBCL, we can dump any instance, but
-                        ;; in the cross-compilation host, %INSTANCE-FOO
-                        ;; functions don't work on general instances, only on
-                        ;; STRUCTURE!OBJECTs.
-                        ;;
-                        ;; FIXME: What about funcallable instances with user-defined
-                        ;; MAKE-LOAD-FORM methods?
-                        (if (typep value #+sb-xc-host 'structure!object #-sb-xc-host 'instance)
-                            (when (emit-make-load-form value)
-                              (dotimes (i (- (%instance-length value)
-                                             #+sb-xc-host 0
-                                             #-sb-xc-host (layout-n-untagged-slots
-                                                           (%instance-ref value 0))))
-                                (grovel (%instance-ref value i))))
-                            (compiler-error
-                             "Objects of type ~S can't be dumped into fasl files."
-                             (type-of value)))))))))
-      (grovel constant)))
+                    (compiler-error
+                     "Objects of type ~S can't be dumped into fasl files."
+                     (type-of value)))))))
+      ;; Dump all non-trivial named constants using the name.
+      (if (and namep (not (typep constant '(or symbol character
+                                            ;; FIXME: Cold init breaks if we
+                                            ;; try to reference FP constants
+                                            ;; thru their names.
+                                            #+sb-xc-host number
+                                            #-sb-xc-host fixnum))))
+          (emit-make-load-form constant name)
+          (grovel constant))))
   (values))
 
 ;;;; some flow-graph hacking utilities

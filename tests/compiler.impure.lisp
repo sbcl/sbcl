@@ -1628,8 +1628,8 @@
 (defvar *sneaky-nested-thing* (list (make-instance 'some-constant-thing)))
 (defconstant +sneaky-nested-thing+ *sneaky-nested-thing*)
 (multiple-value-bind (file-fun core-fun) (compile2 '(lambda () +sneaky-nested-thing+))
-  (assert (eq *sneaky-nested-thing* (funcall file-fun)))
-  (assert (eq *sneaky-nested-thing* (funcall core-fun))))
+  (assert (equal *sneaky-nested-thing* (funcall file-fun)))
+  (assert (equal *sneaky-nested-thing* (funcall core-fun))))
 
 ;;; catch constant modifications thru undefined variables
 (defun sneak-set-dont-set-me (x)
@@ -1642,5 +1642,31 @@
 (defconstant dont-set-me2 (make-instance 'some-constant-thing))
 (assert (not (sneak-set-dont-set-me2 13)))
 (assert (typep dont-set-me2 'some-constant-thing))
+
+;;; check that non-trivial constants are EQ across different files: this is
+;;; not something ANSI either guarantees or requires, but we want to do it
+;;; anyways.
+(defconstant +share-me-1+ 123.456d0)
+(defconstant +share-me-2+ "a string to share")
+(defconstant +share-me-3+ (vector 1 2 3))
+(defconstant +share-me-4+ (* 2 most-positive-fixnum))
+(multiple-value-bind (f1 c1) (compile2 '(lambda () (values +share-me-1+
+                                                           +share-me-2+
+                                                           +share-me-3+
+                                                           +share-me-4+
+                                                           pi)))
+  (multiple-value-bind (f2 c2) (compile2 '(lambda () (values +share-me-1+
+                                                             +share-me-2+
+                                                             +share-me-3+
+                                                             +share-me-4+
+                                                             pi)))
+    (flet ((test (fa fb)
+             (mapc (lambda (a b)
+                     (assert (eq a b)))
+                   (multiple-value-list (funcall fa))
+                   (multiple-value-list (funcall fb)))))
+      (test f1 c1)
+      (test f1 f2)
+      (test f1 c2))))
 
 ;;; success
