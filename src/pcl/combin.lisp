@@ -419,7 +419,7 @@
       (dolist (m applicable-methods)
         (let ((qualifiers (if (listp m)
                               (early-method-qualifiers m)
-                              (method-qualifiers m))))
+                              (safe-method-qualifiers m))))
           (cond
             ((null qualifiers) (primary m))
             ((cdr qualifiers) (invalid generic-function combin m))

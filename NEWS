@@ -19,6 +19,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
   * optimization: file compiler is now able to coalesce non-circular
     lists, non-base strings, and bit-vectors. Additionally, constants
     are never referenced through SYMBOL-VALUE at runtime.
+  * optimization: code defining methods on PRINT-OBJECT (and other
+    generic functions in the COMMON-LISP package) now loads faster.
   * bug fix: EAI_NODATA is deprecated since RFC 3493. Stop using it
     in sb-bsd-sockets.
   * bug fix: if COMPILE-FILE aborts due to an unwind, the partial

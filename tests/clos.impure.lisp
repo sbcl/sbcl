@@ -1344,7 +1344,7 @@
 (defclass class-with-odd-class-name-method ()
   ((a :accessor class-name)))
 
-;;; another case where precomputing (this time on PRINT-OBJET) and
+;;; another case where precomputing (this time on PRINT-OBJECT) and
 ;;; lazily-finalized classes caused problems.  (report from James Y
 ;;; Knight sbcl-devel 20-07-2006)
 

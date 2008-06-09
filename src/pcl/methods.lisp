@@ -265,7 +265,7 @@
            (dolist (method methods)
              (let ((mspecializers (method-specializers method)))
                (aver (= lspec (length mspecializers)))
-               (when (and (equal qualifiers (method-qualifiers method))
+               (when (and (equal qualifiers (safe-method-qualifiers method))
                           (every #'same-specializer-p specializers
                                  (method-specializers method)))
                  (return method))))))
@@ -450,7 +450,18 @@
             (slot-value method 'qualifiers)
             (slot-value method 'specializers)
             (slot-value method 'lambda-list)
-            (slot-value method '%generic-function))))
+            (slot-value method '%generic-function)
+            (slot-value gf 'name))))
+
+(define-condition print-object-stream-specializer (reference-condition simple-warning)
+  ()
+  (:default-initargs
+   :references (list '(:ansi-cl :function print-object))
+   :format-control "~@<Specializing on the second argument to ~S has ~
+                    unportable effects, and also interferes with ~
+                    precomputation of print functions for exceptional ~
+                    situations.~@:>"
+   :format-arguments (list 'print-object)))
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (flet ((similar-lambda-lists-p (old-method new-lambda-list)
@@ -463,13 +474,15 @@
                     (eq (or a-keyp a-restp)
                         (or b-keyp b-restp)))))))
     (multiple-value-bind (lock qualifiers specializers new-lambda-list
-                          method-gf)
+                          method-gf name)
         (values-for-add-method generic-function method)
       (when method-gf
         (error "~@<The method ~S is already part of the generic ~
                 function ~S; it can't be added to another generic ~
                 function until it is removed from the first one.~@:>"
                method method-gf))
+      (when (and (eq name 'print-object) (not (eq (second specializers) *the-class-t*)))
+        (warn 'print-object-stream-specializer))
       (handler-case
           ;; System lock because interrupts need to be disabled as
           ;; well: it would be bad to unwind and leave the gf in an
@@ -1516,34 +1529,63 @@
       (eq gf #'(setf slot-value-using-class))
       (eq gf #'slot-boundp-using-class)))
 
-(defmethod compute-discriminating-function ((gf standard-generic-function))
-  (let ((dfun-state (slot-value gf 'dfun-state)))
-    (when (special-case-for-compute-discriminating-function-p gf)
-      ;; if we have a special case for
-      ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
-      ;; special cases implemented as of 2006-05-09) any information
-      ;; in the cache is misplaced.
-      (aver (null dfun-state)))
-    (typecase dfun-state
-      (null
-       (when (eq gf #'compute-applicable-methods)
-         (update-all-c-a-m-gf-info gf))
-       (cond
-         ((eq gf #'slot-value-using-class)
-          (update-slot-value-gf-info gf 'reader)
-          #'slot-value-using-class-dfun)
-         ((eq gf #'(setf slot-value-using-class))
-          (update-slot-value-gf-info gf 'writer)
-          #'setf-slot-value-using-class-dfun)
-         ((eq gf #'slot-boundp-using-class)
-          (update-slot-value-gf-info gf 'boundp)
-          #'slot-boundp-using-class-dfun)
-         ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
-          (make-final-dfun gf))
-         (t
-          (make-initial-dfun gf))))
-      (function dfun-state)
-      (cons (car dfun-state)))))
+(let (po-cache)
+  (defmethod compute-discriminating-function ((gf standard-generic-function))
+    (let ((dfun-state (slot-value gf 'dfun-state)))
+      (when (special-case-for-compute-discriminating-function-p gf)
+        ;; if we have a special case for
+        ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
+        ;; special cases implemented as of 2006-05-09) any information
+        ;; in the cache is misplaced.
+        (aver (null dfun-state)))
+      (typecase dfun-state
+        (null
+         (when (eq gf #'compute-applicable-methods)
+           (update-all-c-a-m-gf-info gf))
+         (cond
+           ((eq gf #'slot-value-using-class)
+            (update-slot-value-gf-info gf 'reader)
+            #'slot-value-using-class-dfun)
+           ((eq gf #'(setf slot-value-using-class))
+            (update-slot-value-gf-info gf 'writer)
+            #'setf-slot-value-using-class-dfun)
+           ((eq gf #'slot-boundp-using-class)
+            (update-slot-value-gf-info gf 'boundp)
+            #'slot-boundp-using-class-dfun)
+           ;; KLUDGE: PRINT-OBJECT is not a special-case in the sense
+           ;; of having a desperately special discriminating function.
+           ;; However, it is important that the machinery for printing
+           ;; conditions for stack and heap exhaustion, and the
+           ;; restarts offered by the debugger, work without consuming
+           ;; many extra resources.  This way (testing by name of GF
+           ;; rather than by identity) was the only way I found to get
+           ;; this to bootstrap, given that the PRINT-OBJECT generic
+           ;; function is only set up later, in
+           ;; SRC;PCL;PRINT-OBJECT.LISP.  -- CSR, 2008-06-09
+           ((eq (slot-value gf 'name) 'print-object)
+            (let ((nkeys (nth-value 3 (get-generic-fun-info gf))))
+              (cond ((/= nkeys 1)
+                     ;; KLUDGE: someone has defined a method
+                     ;; specialized on the second argument: punt.
+                     (make-initial-dfun gf))
+                    (po-cache
+                     (multiple-value-bind (dfun cache info)
+                         (make-caching-dfun gf po-cache)
+                       (set-dfun gf dfun cache info)))
+                    (t (multiple-value-bind (dfun cache info)
+                           (make-final-dfun-internal
+                            gf
+                            (list (list (find-class 'sb-kernel::control-stack-exhausted))
+                                  (list (find-class 'sb-kernel::heap-exhausted-error))
+                                  (list (find-class 'restart))))
+                         (setq po-cache cache)
+                         (set-dfun gf dfun cache info))))))
+           ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
+            (make-final-dfun gf))
+           (t
+            (make-initial-dfun gf))))
+        (function dfun-state)
+        (cons (car dfun-state))))))
 
 (defmethod update-gf-dfun ((class std-class) gf)
   (let ((*new-class* class)

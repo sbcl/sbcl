@@ -54,7 +54,7 @@
 ;;; (i.e. portably) but it's much easier using the MOP and
 ;;; MAP-ALL-CLASSES.
 (flet ((standardized-class-p (c)
-         (find-symbol (symbol-name (class-name c)) "CL")))
+         (eq (class-name c) (find-symbol (symbol-name (class-name c)) "CL"))))
   (let (result)
     (sb-pcl::map-all-classes
      (lambda (c) (when (standardized-class-p c)

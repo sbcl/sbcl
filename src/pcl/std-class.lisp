@@ -519,7 +519,7 @@
 (defmethod shared-initialize :after ((class condition-class) slot-names
                                      &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
-  (let ((classoid (find-classoid (class-name class))))
+  (let ((classoid (find-classoid (slot-value class 'name))))
     (with-slots (wrapper %class-precedence-list cpl-available-p
                          prototype (direct-supers direct-superclasses))
         class
@@ -655,9 +655,9 @@
                (cons nil nil))))
     (values defstruct-form constructor reader-names writer-names)))
 
-(defun make-defstruct-allocation-function (class)
+(defun make-defstruct-allocation-function (name)
   ;; FIXME: Why don't we go class->layout->info == dd
-  (let ((dd (find-defstruct-description (class-name class))))
+  (let ((dd (find-defstruct-description name)))
     (%make-structure-instance-allocator dd nil)))
 
 (defmethod shared-initialize :after
@@ -671,10 +671,10 @@
       (setf (slot-value class 'direct-superclasses)
             (or direct-superclasses
                 (setq direct-superclasses
-                      (and (not (eq (class-name class) 'structure-object))
+                      (and (not (eq (slot-value class 'name) 'structure-object))
                            (list *the-class-structure-object*)))))
       (setq direct-superclasses (slot-value class 'direct-superclasses)))
-  (let* ((name (class-name class))
+  (let* ((name (slot-value class 'name))
          (from-defclass-p (slot-value class 'from-defclass-p))
          (defstruct-p (or from-defclass-p (not (structure-type-p name)))))
     (if direct-slots-p
@@ -709,14 +709,16 @@
             (setf (slot-value class 'defstruct-form) defstruct-form)
             (setf (slot-value class 'defstruct-constructor) constructor)))
         (setf (slot-value class 'defstruct-constructor)
-              (make-defstruct-allocation-function class)))
+              ;; KLUDGE: not class; in fixup.lisp, can't access slots
+              ;; outside methods yet.
+              (make-defstruct-allocation-function name)))
     (add-direct-subclasses class direct-superclasses)
     (setf (slot-value class '%class-precedence-list)
           (compute-class-precedence-list class))
     (setf (slot-value class 'cpl-available-p) t)
     (let ((slots (compute-slots class)))
       (setf (slot-value class 'slots) slots)
-      (let* ((lclass (find-classoid (class-name class)))
+      (let* ((lclass (find-classoid (slot-value class 'name)))
              (layout (classoid-layout lclass)))
         (setf (classoid-pcl-class lclass) class)
         (setf (slot-value class 'wrapper) layout)

@@ -342,7 +342,9 @@
     (methods &optional standard-method)
   (loop with primary-checked-p = nil
         for method in methods
-        as qualifiers = (method-qualifiers method)
+        as qualifiers = (if (consp method)
+                            (early-method-qualifiers method)
+                            (safe-method-qualifiers method))
         when (or (eq :around (car qualifiers))
                  (and (null qualifiers)
                       (not primary-checked-p)
@@ -456,7 +458,9 @@
 ;;; must be called.
 (defun standard-sort-methods (applicable-methods)
   (loop for method in applicable-methods
-        as qualifiers = (method-qualifiers method)
+        as qualifiers = (if (consp method)
+                            (early-method-qualifiers method)
+                            (safe-method-qualifiers method))
         if (null qualifiers)
           collect method into primary
         else if (eq :around (car qualifiers))

@@ -1913,14 +1913,19 @@ bootstrapping.
   (aver (= (symbol-value (intern (format nil "*SM-~A-INDEX*" s)))
            (!bootstrap-slot-index 'standard-reader-method s)
            (!bootstrap-slot-index 'standard-writer-method s)
-           (!bootstrap-slot-index 'standard-boundp-method s))))
+           (!bootstrap-slot-index 'standard-boundp-method s)
+           (!bootstrap-slot-index 'global-reader-method s)
+           (!bootstrap-slot-index 'global-writer-method s)
+           (!bootstrap-slot-index 'global-boundp-method s))))
+
+(define-symbol-macro *standard-method-classes*
+  (list *the-class-standard-method* *the-class-standard-reader-method*
+        *the-class-standard-writer-method* *the-class-standard-boundp-method*
+        *the-class-global-reader-method* *the-class-global-writer-method*
+        *the-class-global-boundp-method*))
 
 (defun safe-method-specializers (method)
-  (let ((standard-method-classes
-         (list *the-class-standard-method*
-               *the-class-standard-reader-method*
-               *the-class-standard-writer-method*
-               *the-class-standard-boundp-method*))
+  (let ((standard-method-classes *standard-method-classes*)
         (class (class-of method)))
     (if (member class standard-method-classes)
         (clos-slots-ref (get-slots method) *sm-specializers-index*)
@@ -1930,21 +1935,13 @@ bootstrapping.
     (and (typep mf '%method-function)
          (%method-function-fast-function mf))))
 (defun safe-method-function (method)
-  (let ((standard-method-classes
-         (list *the-class-standard-method*
-               *the-class-standard-reader-method*
-               *the-class-standard-writer-method*
-               *the-class-standard-boundp-method*))
+  (let ((standard-method-classes *standard-method-classes*)
         (class (class-of method)))
     (if (member class standard-method-classes)
         (clos-slots-ref (get-slots method) *sm-%function-index*)
         (method-function method))))
 (defun safe-method-qualifiers (method)
-  (let ((standard-method-classes
-         (list *the-class-standard-method*
-               *the-class-standard-reader-method*
-               *the-class-standard-writer-method*
-               *the-class-standard-boundp-method*))
+  (let ((standard-method-classes *standard-method-classes*)
         (class (class-of method)))
     (if (member class standard-method-classes)
         (clos-slots-ref (get-slots method) *sm-qualifiers-index*)
@@ -2011,6 +2008,7 @@ bootstrapping.
                         (package (symbol-package symbol)))
                    (and (or (eq package *pcl-package*)
                             (memq package (package-use-list *pcl-package*)))
+                        (not (eq package #.(find-package "CL")))
                         ;; FIXME: this test will eventually be
                         ;; superseded by the *internal-pcl...* test,
                         ;; above.  While we are in a process of
