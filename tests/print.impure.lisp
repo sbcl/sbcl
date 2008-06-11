@@ -433,4 +433,17 @@
 (assert (string= (format nil "~R" (expt 10 63)) "one vigintillion"))
 (assert (string= (format nil "~:R" (expt 10 63)) "one vigintillionth"))
 
+;;; too-clever cacheing for PRINT-OBJECT resulted in a bogus method
+;;; for printing RESTART objects.  Check also CONTROL-STACK-EXHAUSTED
+;;; and HEAP-EXHAUSTED-ERROR.
+(let ((result (with-output-to-string (*standard-output*)
+                (princ (find-restart 'abort)))))
+  (assert (string/= result "#<" :end1 2)))
+(let ((result (with-output-to-string (*standard-output*)
+                (princ (make-condition 'sb-kernel::control-stack-exhausted)))))
+  (assert (string/= result "#<" :end1 2)))
+(let ((result (with-output-to-string (*standard-output*)
+                (princ (make-condition 'sb-kernel::heap-exhausted-error)))))
+  (assert (string/= result "#<" :end1 2)))
+
 ;;; success

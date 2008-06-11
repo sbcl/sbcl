@@ -148,22 +148,35 @@
     (lambda (condition stream)
       (declare (ignore condition))
       (format stream
-             "Control stack exhausted (no more space for function call frames).  This is probably due to heavily nested or infinitely recursive function calls, or a tail call that SBCL cannot or has not optimized away."))))
+              ;; no pretty-printing, because that would use a lot of stack.
+              "Control stack exhausted (no more space for function call frames).
+This is probably due to heavily nested or infinitely recursive function
+calls, or a tail call that SBCL cannot or has not optimized away.
+
+PROCEED WITH CAUTION."))))
 
 (define-condition heap-exhausted-error (storage-condition)
   ()
   (:report
    (lambda (condition stream)
+     (declare (ignore condition))
      (declare (special *heap-exhausted-error-available-bytes*
                        *heap-exhausted-error-requested-bytes*))
      ;; See comments in interr.lisp -- there is a method to this madness.
      (if (and (boundp '*heap-exhausted-error-available-bytes*)
               (boundp '*heap-exhausted-error-requested-bytes*))
          (format stream
-                 "Heap exhausted: ~D bytes available, ~D requested. PROCEED WITH CAUTION!"
+                 ;; no pretty-printing, because that will use a lot of heap.
+                 "Heap exhausted (no more space for allocation).
+There are still ~D bytes available; the request was for ~D bytes.
+
+PROCEED WITH CAUTION."
                  *heap-exhausted-error-available-bytes*
                  *heap-exhausted-error-requested-bytes*)
-         (print-unreadable-object (condition stream))))))
+         (format stream
+                 "A ~S condition without bindings for heap statistics.  (If
+you did not expect to see this message, please report it."
+                 'heap-exhausted-error)))))
 
 (define-condition system-condition (condition)
   ((address :initarg :address :reader system-condition-address :initform nil)

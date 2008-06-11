@@ -1567,11 +1567,19 @@
               (cond ((/= nkeys 1)
                      ;; KLUDGE: someone has defined a method
                      ;; specialized on the second argument: punt.
+                     (setf po-cache nil)
                      (make-initial-dfun gf))
                     (po-cache
                      (multiple-value-bind (dfun cache info)
                          (make-caching-dfun gf po-cache)
                        (set-dfun gf dfun cache info)))
+                    ;; the relevant PRINT-OBJECT methods get defined
+                    ;; late, by delayed DEF!METHOD.  We mustn't cache
+                    ;; the effective method for our classes earlier
+                    ;; than the relevant PRINT-OBJECT methods are
+                    ;; defined...
+                    ((boundp 'sb-impl::*delayed-def!method-args*)
+                     (make-initial-dfun gf))
                     (t (multiple-value-bind (dfun cache info)
                            (make-final-dfun-internal
                             gf
