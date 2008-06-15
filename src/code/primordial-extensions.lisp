@@ -131,7 +131,7 @@
   (let ((block-name (when env
                       (car (find-if #'car (sb!c::lexenv-blocks env))))))
     (if block-name
-        (gensym (format nil "~A[~S]" name block-name))
+        (gensym (format nil "~A[~A]" name block-name))
         (gensym name))))
 
 

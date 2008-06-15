@@ -670,7 +670,7 @@
 (def!struct (constant (:constructor make-constant (value
                                                    &aux
                                                    (type (ctype-of value))
-                                                   (%source-name '.anonynous.)
+                                                   (%source-name '.anonymous.)
                                                    (where-from :defined)))
                       (:include leaf))
   ;; the value of the constant

@@ -99,6 +99,10 @@ the usual naming convention (names like *FOO*) for special variables"
       ;; doubt such warnings are ANSI-compliant, but I'm not sure, so I've
       ;; written this in a way that CMU CL will tolerate and which ought to
       ;; work elsewhere too.) -- WHN 2001-03-24
-      (eval `(defconstant ,name ',value))))
+      (eval `(defconstant ,name ',value)))
+    ;; It would certainly be awesome if this was only needed for symbols
+    ;; in CL. Unfortunately, that is not the case. Maybe some are moved
+    ;; back in CL later on?
+    (setf (info :variable :xc-constant-value name) value))
   (setf (info :variable :kind name) :constant)
   name)

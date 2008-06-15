@@ -1084,6 +1084,15 @@
   :type-spec (member :declared :assumed :defined)
   :default :assumed)
 
+;;; We only need a mechanism different from the
+;;; usual SYMBOL-VALUE for the cross compiler.
+#+sb-xc-host
+(define-info-type
+  :class :variable
+  :type :xc-constant-value
+  :type-spec t
+  :default nil)
+
 ;;; the macro-expansion for symbol-macros
 (define-info-type
   :class :variable

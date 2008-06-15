@@ -241,7 +241,20 @@
                        (type (type-specifier (info :variable :type name))))
                    `(macro . (the ,type ,expansion))))
                 (:constant
-                 (find-constant (symbol-value name) name))
+                 (let ((value (symbol-value name)))
+                   ;; Override the values of standard symbols in XC,
+                   ;; since we can't redefine them.
+                   #+sb-xc-host
+                   (when (eql (find-symbol (symbol-name name) :cl) name)
+                     (multiple-value-bind (xc-value foundp)
+                         (info :variable :xc-constant-value name)
+                       (cond (foundp
+                              (setf value xc-value))
+                             ((not (eq value name))
+                              (compiler-warn
+                               "Using cross-compilation host's definition of ~S: ~A~%"
+                               name (symbol-value name))))))
+                   (find-constant value name)))
                 (t
                  (make-global-var :kind kind
                                   :%source-name name
