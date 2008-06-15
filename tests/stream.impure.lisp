@@ -486,5 +486,16 @@
   (with-open-stream (stream (make-synonym-stream '*stream*))
     (assert (input-stream-p stream))))
 
-
+;;; READ-LINE on ANSI-STREAM did not return T for the last line
+;;; (reported by Yoshinori Tahara)
+(let ((pathname "test-read-line-eol"))
+  (with-open-file (out pathname :direction :output :if-exists :supersede)
+    (format out "a~%b"))
+  (let ((result (with-open-file (in pathname)
+                  (list (multiple-value-list (read-line in nil nil))
+                        (multiple-value-list (read-line in nil nil))
+                        (multiple-value-list (read-line in nil nil))))))
+    (delete-file pathname)
+    (assert (equal result '(("a" nil) ("b" t) (nil t))))))
+
 ;;; success

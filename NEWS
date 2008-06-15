@@ -25,6 +25,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     in sb-bsd-sockets.
   * bug fix: if COMPILE-FILE aborts due to an unwind, the partial
     fasl is now deleted. (reported by Attila Lendvai)
+  * bug fix: READ-LINE always returned NIL for the last line in files.
+    (reported by Yoshinori Tahara)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is a valid function name (regression at 1.0.13.38)
     ** FILL on lists was missing its return value (regression at 1.0.12.27)

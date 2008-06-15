@@ -268,7 +268,7 @@
                               :start2 %frc-index% :end2 pos)
                      (setf %frc-index% (1+ pos)))
                    (done-with-fast-read-char)
-                   (return-from ansi-stream-read-line-from-frc-buffer res)))
+                   (return-from ansi-stream-read-line-from-frc-buffer (values res (null pos)))))
                (add-chunk ()
                  (let* ((end (length %frc-buffer%))
                         (len (- end %frc-index%))
