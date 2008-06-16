@@ -7,6 +7,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
   * enhancement: SB-SPROF now has support for wallclock profiling,
     and is also able to profile specific threads. REPORT output
     has also additional sorting options.
+  * enhancement: better pretty-printing of DEFPACKAGE forms.  (Thanks
+    to Michael Weber)
   * optimization: structure allocation has been improved
     ** constructors created by non-toplevel DEFSTRUCTs are ~40% faster.
     ** out of line constructors are ~10% faster.

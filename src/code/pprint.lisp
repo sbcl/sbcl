@@ -1238,6 +1238,13 @@ line break."
            stream
            list))
 
+(defun pprint-defpackage (stream list &rest noise)
+  (declare (ignore noise))
+  (funcall  (formatter
+             "~:<~W~^ ~3I~:_~W~^~1I~@{~:@_~:<~W~^ ~:I~@_~@{~W~^ ~_~}~:>~}~:>")
+            stream
+            list))
+
 (defun pprint-destructuring-bind (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter
@@ -1360,6 +1367,7 @@ line break."
                           (define-modify-macro pprint-defun)
                           (define-setf-expander pprint-defun)
                           (defmacro pprint-defun)
+                          (defpackage pprint-defpackage)
                           (defparameter pprint-block)
                           (defsetf pprint-defun)
                           (defstruct pprint-block)
