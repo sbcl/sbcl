@@ -294,8 +294,8 @@
                                    (compiler-error-context-original-source last)))
                (note-message-repeats stream)
                (setq last nil)
-               (pprint-logical-block (stream nil :per-line-prefix "; ")
-                 (format stream "  ~A" form))
+               (pprint-logical-block (stream nil :per-line-prefix ";   ")
+                 (princ form stream))
                (fresh-line stream))
 
              (unless (and last
