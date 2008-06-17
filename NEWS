@@ -29,6 +29,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     fasl is now deleted. (reported by Attila Lendvai)
   * bug fix: READ-LINE always returned NIL for the last line in files.
     (reported by Yoshinori Tahara)
+  * bug fix: more accurate disassembly annotations of foreign function
+    calls.  (thanks to Andy Hefner)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is a valid function name (regression at 1.0.13.38)
     ** FILL on lists was missing its return value (regression at 1.0.12.27)
