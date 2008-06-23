@@ -262,6 +262,10 @@
  (:integer ms-invalidate "MS_INVALIDATE"
            #+sb-doc "msync: invalidate all cached data" t)
 
+ ;; mlockall()
+ (:integer mcl-current "MCL_CURRENT" #+sb-doc "mlockall: lock all pages which are currently mapped into the address space of the process." t)
+ (:integer mcl-future "MCL_FUTURE" #+sb-doc "mlockall: lock all pages which will become mapped into the address space of the process in the future." t)
+
  ;; opendir()
  (:structure dirent
              (#+(and linux largefile) "struct dirent64"

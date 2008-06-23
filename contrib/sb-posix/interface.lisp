@@ -296,7 +296,8 @@
   (define-call "killpg" int minusp (pgrp int) (signal int))
   (define-call "pause" int minusp)
   (define-call "setpgid" int minusp (pid pid-t) (pgid pid-t))
-  (define-call "setpgrp" int minusp))
+  (define-call "setpgrp" int minusp)
+  (define-call "setsid" pid-t minusp))
 
 (defmacro with-growing-c-string ((buffer size) &body body)
   (sb-int:with-unique-names (c-string-block)
@@ -408,6 +409,10 @@
 (define-call "msync" int minusp
   (addr sb-sys:system-area-pointer) (length unsigned) (flags int)))
 
+;;; mlockall, munlockall
+(define-call "mlockall" int minusp (flags int))
+(define-call "munlockall" int minusp)
+
 #-win32
 (define-call "getpagesize" int minusp)
 #+win32
@@ -438,22 +443,6 @@
   (:documentation "Instances of this class represent entries in
                    the system's user database."))
 
-(defmacro define-pw-call (name arg type)
-  #-win32
-  ;; FIXME: this isn't the documented way of doing this, surely?
-  (let ((lisp-name (intern (string-upcase name) :sb-posix)))
-    `(progn
-      (export ',lisp-name :sb-posix)
-      (declaim (inline ,lisp-name))
-      (defun ,lisp-name (,arg)
-        (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
-          (if (null-alien r)
-              nil
-              (alien-to-passwd r)))))))
-
-(define-pw-call "getpwnam" login-name (function (* alien-passwd) c-string))
-(define-pw-call "getpwuid" uid (function (* alien-passwd) uid-t))
-
 ;;; group database
 #-win32
 (define-protocol-class group alien-group ()
@@ -461,7 +450,7 @@
    (passwd :initarg :passwd :accessor group-passwd)
    (gid :initarg :gid :accessor group-gid)))
 
-(defmacro define-gr-call (name arg type)
+(defmacro define-obj-call (name arg type conv)
   #-win32
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
@@ -472,10 +461,12 @@
         (let ((r (alien-funcall (extern-alien ,name ,type) ,arg)))
           (if (null-alien r)
               nil
-              (alien-to-group r)))))))
+              (,conv r)))))))
 
-(define-gr-call "getgrnam" login-name (function (* alien-group) c-string))
-(define-gr-call "getgrgid" gid (function (* alien-group) gid-t))
+(define-obj-call "getpwnam" login-name (function (* alien-passwd) c-string) alien-to-passwd)
+(define-obj-call "getpwuid" uid (function (* alien-passwd) uid-t) alien-to-passwd)
+(define-obj-call "getgrnam" login-name (function (* alien-group) c-string) alien-to-group)
+(define-obj-call "getgrgid" gid (function (* alien-group) gid-t) alien-to-group)
 
 
 #-win32

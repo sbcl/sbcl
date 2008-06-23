@@ -31,6 +31,8 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     (reported by Yoshinori Tahara)
   * bug fix: more accurate disassembly annotations of foreign function
     calls.  (thanks to Andy Hefner)
+  * new feature: SB-POSIX bindings for mlockall, munlockall, and setsid.
+    (thanks to Travis Cross)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is a valid function name (regression at 1.0.13.38)
     ** FILL on lists was missing its return value (regression at 1.0.12.27)
