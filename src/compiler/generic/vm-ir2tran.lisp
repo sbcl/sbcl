@@ -54,6 +54,8 @@
     (move-lvar-result node block locs lvar)))
 
 (defun emit-inits (node block name object lowtag instance-length inits args)
+  #!-raw-instance-init-vops
+  (declare (ignore instance-length))
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil))
     (dolist (init inits)
