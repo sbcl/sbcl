@@ -137,3 +137,11 @@
   (assert (equal "bc" (string-right-trim "ab" s)))
   (assert (equal "bca" s))
   (assert (equal "abcaeb" s0)))
+
+;;; Trimming non-simple-strings when there is nothing to do
+(let ((a (make-array 10 :element-type 'character :initial-contents "abcde00000" :fill-pointer 5)))
+  (assert (equal "abcde" (string-right-trim "Z" a))))
+
+;;; Trimming non-strings when there is nothing to do.
+(string-right-trim " " #\a)
+

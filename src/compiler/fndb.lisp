@@ -913,7 +913,7 @@
   simple-string (flushable))
 
 (defknown (string-trim string-left-trim string-right-trim)
-  (sequence string-designator) simple-string (flushable))
+  (sequence string-designator) string (flushable))
 
 (defknown (string-upcase string-downcase string-capitalize)
   (string-designator &key (:start index) (:end sequence-end))

@@ -9,6 +9,9 @@
 
 (in-package "SB!IMPL")
 
+(eval-when (:compile-toplevel)
+  (sb!xc:defmacro %string (x) `(if (stringp ,x) ,x (string ,x))))
+
 (defun string (x)
   #!+sb-doc
   "Coerces X into a string. If X is a string, X is returned. If X is a
@@ -37,26 +40,18 @@
 ;;; keywords are parsed, and the string is hacked into a
 ;;; simple-string.
 (sb!xc:defmacro with-one-string ((string start end) &body forms)
-  `(let* ((,string (if (stringp ,string) ,string (string ,string))))
+  `(let ((,string (%string ,string)))
      (with-array-data ((,string ,string)
                        (,start ,start)
                        (,end ,end)
-                       :check-fill-pointer t)
-       ,@forms)))
-;;; WITH-STRING is like WITH-ONE-STRING, but doesn't parse keywords.
-(sb!xc:defmacro with-string (string &rest forms)
-  `(let ((,string (if (stringp ,string) ,string (string ,string))))
-     (with-array-data ((,string ,string)
-                       (start)
-                       (end)
                        :check-fill-pointer t)
        ,@forms)))
 ;;; WITH-TWO-STRINGS is used to set up string comparison operations. The
 ;;; keywords are parsed, and the strings are hacked into SIMPLE-STRINGs.
 (sb!xc:defmacro with-two-strings (string1 string2 start1 end1 cum-offset-1
                                             start2 end2 &rest forms)
-  `(let ((,string1 (if (stringp ,string1) ,string1 (string ,string1)))
-         (,string2 (if (stringp ,string2) ,string2 (string ,string2))))
+  `(let ((,string1 (%string ,string1))
+         (,string2 (%string ,string2)))
      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
                        (,start1 ,start1)
                        (,end1 ,end1)
@@ -405,29 +400,33 @@ new string COUNT long filled with the fill character."
 ) ; FLET
 
 (defun generic-string-trim (char-bag string left-p right-p)
-  (with-string string
-    (let* ((left-end (if left-p
-                         (do ((index start (1+ index)))
-                             ((or (= index (the fixnum end))
-                                  (not (find (schar string index)
-                                             char-bag
-                                             :test #'char=)))
-                              index)
-                           (declare (fixnum index)))
-                         start))
-           (right-end (if right-p
-                          (do ((index (1- (the fixnum end)) (1- index)))
-                              ((or (< index left-end)
-                                   (not (find (schar string index)
-                                              char-bag
-                                              :test #'char=)))
-                               (1+ index))
-                            (declare (fixnum index)))
-                          end)))
-      (if (and (eql left-end start)
-               (eql right-end end))
-          string
-          (subseq (the simple-string string) left-end right-end)))))
+  (let ((header (%string string)))
+    (with-array-data ((string header)
+                      (start)
+                      (end)
+                      :check-fill-pointer t)
+      (let* ((left-end (if left-p
+                           (do ((index start (1+ index)))
+                               ((or (= index (the fixnum end))
+                                    (not (find (schar string index)
+                                               char-bag
+                                               :test #'char=)))
+                                index)
+                             (declare (fixnum index)))
+                           start))
+             (right-end (if right-p
+                            (do ((index (1- (the fixnum end)) (1- index)))
+                                ((or (< index left-end)
+                                     (not (find (schar string index)
+                                                char-bag
+                                                :test #'char=)))
+                                 (1+ index))
+                              (declare (fixnum index)))
+                            end)))
+        (if (and (eql left-end start)
+                 (eql right-end end))
+            header
+            (subseq (the simple-string string) left-end right-end))))))
 
 (defun string-left-trim (char-bag string)
   (generic-string-trim char-bag string t nil))

@@ -31,6 +31,9 @@ changes in sbcl-1.0.18 relative to 1.0.17:
     (reported by Yoshinori Tahara)
   * bug fix: more accurate disassembly annotations of foreign function
     calls.  (thanks to Andy Hefner)
+  * bug fix: trimming non-simple strings and non-string string
+    designators when the there is nothing to trim works properly.
+    (thanks to James Knight)
   * new feature: SB-POSIX bindings for mlockall, munlockall, and setsid.
     (thanks to Travis Cross)
   * fixed some bugs revealed by Paul Dietz' test suite:
