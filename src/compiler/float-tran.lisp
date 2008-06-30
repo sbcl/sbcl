@@ -298,15 +298,29 @@
 
 ;;;; float contagion
 
+(defun safe-ctype-for-single-coercion-p (x)
+  ;; See comment in SAFE-SINGLE-COERCION-P -- this deals with the same
+  ;; problem, but in the context of evaluated and compiled (+ <int> <single>)
+  ;; giving different result if we fail to check for this.
+  (or (not (csubtypep x (specifier-type 'integer)))
+      (csubtypep x (specifier-type `(integer ,most-negative-exactly-single-float-fixnum
+                                             ,most-positive-exactly-single-float-fixnum)))))
+
 ;;; Do some stuff to recognize when the loser is doing mixed float and
 ;;; rational arithmetic, or different float types, and fix it up. If
 ;;; we don't, he won't even get so much as an efficiency note.
 (deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
-  `(,(lvar-fun-name (basic-combination-fun node))
-    (float x y) y))
+  (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
+          (safe-ctype-for-single-coercion-p (lvar-type x)))
+      `(,(lvar-fun-name (basic-combination-fun node))
+         (float x y) y)
+      (give-up-ir1-transform)))
 (deftransform float-contagion-arg2 ((x y) * * :defun-only t :node node)
-  `(,(lvar-fun-name (basic-combination-fun node))
-    x (float y x)))
+  (if (or (not (types-equal-or-intersect (lvar-type x) (specifier-type 'single-float)))
+          (safe-ctype-for-single-coercion-p (lvar-type y)))
+      `(,(lvar-fun-name (basic-combination-fun node))
+         x (float y x))
+      (give-up-ir1-transform)))
 
 (dolist (x '(+ * / -))
   (%deftransform x '(function (rational float) *) #'float-contagion-arg1)

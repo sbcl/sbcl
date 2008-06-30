@@ -2534,3 +2534,15 @@
                                  (type (member ,x #:g5437 char-code #:g5438) p2))
                         (* 104102267 p2))))
           (floatp (funcall (compile nil form) x))))
+
+;;; misc.622
+(assert (eql
+         (funcall
+           (compile
+            nil
+            '(lambda (p2)
+              (declare (optimize (speed 3) (safety 2) (debug 3) (space 0))
+               (type real p2))
+              (+ 81535869 (the (member 17549.955 #:g35917) p2))))
+           17549.955)
+          (+ 81535869 17549.955)))
