@@ -11,6 +11,7 @@ changes in sbcl-1.0.19 relative to 1.0.18:
        if the derived type of the second argument is a MEMBER type
        containing invalid type specifiers.
     ** ADJOIN with constant NIL as second argument works correctly.
+    ** FUNCTION-KEYWORDS was called SB-PCL::FUNCTION-KEYWORD-PARAMETERS.
 
 changes in sbcl-1.0.18 relative to 1.0.17:
   * minor incompatible change: SB-SPROF:WITH-PROFILING now by default

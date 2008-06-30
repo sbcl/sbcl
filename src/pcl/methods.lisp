@@ -1617,7 +1617,7 @@
   (reinitialize-instance generic-function :name new-value)
   new-value)
 
-(defmethod function-keyword-parameters ((method standard-method))
+(defmethod function-keywords ((method standard-method))
   (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
                         keywords keyword-parameters)
       (analyze-lambda-list (if (consp method)
@@ -1658,7 +1658,7 @@
           (let ((methods.keys nil) (methods.allowp nil))
             (dolist (m methods)
               (multiple-value-bind (m.keyparams m.allow-other-keys)
-                  (function-keyword-parameters m)
+                  (function-keywords m)
                 (setq methods.keys (union methods.keys m.keyparams :key #'maybe-car))
                 (setq methods.allowp (or methods.allowp m.allow-other-keys))))
             (let ((arglist '()))
