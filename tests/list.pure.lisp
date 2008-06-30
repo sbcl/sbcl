@@ -262,7 +262,7 @@
                                         (declare (optimize speed))
                                         (adjoin elt '(:y))))
                          ':x)))
-
+(assert (equal '(a) (funcall (compile nil '(lambda () (adjoin 'a nil))))))
 
 (macrolet ((test (expected list-1 list-2 &rest args)
              `(progn

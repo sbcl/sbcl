@@ -10,6 +10,7 @@ changes in sbcl-1.0.19 relative to 1.0.18:
     ** deriving the result type of COERCE no longer signals an error
        if the derived type of the second argument is a MEMBER type
        containing invalid type specifiers.
+    ** ADJOIN with constant NIL as second argument works correctly.
 
 changes in sbcl-1.0.18 relative to 1.0.17:
   * minor incompatible change: SB-SPROF:WITH-PROFILING now by default

@@ -369,8 +369,10 @@
                  `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
                     ,(open-code c-list)))
                 ((and cp (not c-list))
-                 ;; constant nil list -- nothing to find!
-                 nil)
+                 ;; constant nil list
+                 (if (eq name 'adjoin)
+                     '(list item)
+                     nil))
                 (t
                  ;; specialized out-of-line version
                  `(,(specialized-list-seek-function-name name funs c-test)
