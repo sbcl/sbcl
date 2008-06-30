@@ -3990,7 +3990,7 @@
                           (eq (first (second good-cons-type)) 'member))
                      `(,(second (second good-cons-type))
                        ,@(unconsify-type (caddr good-cons-type))))))
-            (coerceable-p (c-type)
+            (coerceable-p (part)
               ;; Can the value be coerced to the given type?  Coerce is
               ;; complicated, so we don't handle every possible case
               ;; here---just the most common and easiest cases:
@@ -4012,13 +4012,14 @@
               ;; the requested type, because (by assumption) COMPLEX
               ;; (and other difficult types like (COMPLEX INTEGER)
               ;; aren't specialized types.
-              (let ((coerced-type c-type))
-                (or (and (subtypep coerced-type 'float)
-                         (csubtypep value-type (specifier-type 'real)))
-                    (and (subtypep coerced-type
-                                   '(or (complex single-float)
-                                        (complex double-float)))
-                         (csubtypep value-type (specifier-type 'number))))))
+              (let ((coerced-type (careful-specifier-type part)))
+                (when coerced-type
+                  (or (and (csubtypep coerced-type (specifier-type 'float))
+                           (csubtypep value-type (specifier-type 'real)))
+                      (and (csubtypep coerced-type
+                                      (specifier-type `(or (complex single-float)
+                                                           (complex double-float))))
+                          (csubtypep value-type (specifier-type 'number)))))))
             (process-types (type)
               ;; FIXME: This needs some work because we should be able
               ;; to derive the resulting type better than just the

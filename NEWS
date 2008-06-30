@@ -7,6 +7,9 @@ changes in sbcl-1.0.19 relative to 1.0.18:
        to single-float coercions.
     ** artihmetic operations involving large integers and single
        floats give the same results in compiled and interpreted code.
+    ** deriving the result type of COERCE no longer signals an error
+       if the derived type of the second argument is a MEMBER type
+       containing invalid type specifiers.
 
 changes in sbcl-1.0.18 relative to 1.0.17:
   * minor incompatible change: SB-SPROF:WITH-PROFILING now by default

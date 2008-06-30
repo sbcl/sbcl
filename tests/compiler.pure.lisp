@@ -2546,3 +2546,27 @@
               (+ 81535869 (the (member 17549.955 #:g35917) p2))))
            17549.955)
           (+ 81535869 17549.955)))
+
+;;; misc.654
+(assert (eql 2
+             (let ((form '(lambda (p2)
+                           (declare (optimize (speed 0) (safety 2) (debug 0) (space 2))
+                            (type (member integer eql) p2))
+                           (coerce 2 p2))))
+               (funcall (compile nil form) 'integer))))
+
+;;; misc.656
+(assert (eql 2
+             (let ((form '(lambda (p2)
+                           (declare (optimize (speed 0) (safety 2) (debug 0) (space 2))
+                            (type (member integer mod) p2))
+                           (coerce 2 p2))))
+               (funcall (compile nil form) 'integer))))
+
+;;; misc.657
+(assert (eql 2
+         (let ((form '(lambda (p2)
+                       (declare (optimize (speed 0) (safety 2) (debug 0) (space 2))
+                        (type (member integer values) p2))
+                       (coerce 2 p2))))
+           (funcall (compile nil form) 'integer))))
