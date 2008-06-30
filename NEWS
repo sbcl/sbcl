@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.19 relative to 1.0.18:
+  * bug fix: compiler no longer makes erronous assumptions in the
+    presense of non-foldable SATISFIES types.
+
 changes in sbcl-1.0.18 relative to 1.0.17:
   * minor incompatible change: SB-SPROF:WITH-PROFILING now by default
     profiles only the current thread.

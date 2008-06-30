@@ -1669,4 +1669,13 @@
       (test f1 f2)
       (test f1 c2))))
 
+;;; user-defined satisfies-types cannot be folded
+(deftype mystery () '(satisfies mysteryp))
+(defvar *mystery* nil)
+(defun mysteryp (x) (eq x *mystery*))
+(defstruct thing (slot (error "missing") :type mystery))
+(defun test-mystery (m) (when (eq :mystery (thing-slot m)) :ok))
+(setf *mystery* :mystery)
+(assert (eq :ok (test-mystery (make-thing :slot :mystery))))
+
 ;;; success

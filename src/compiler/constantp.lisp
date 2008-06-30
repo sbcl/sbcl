@@ -40,7 +40,7 @@
       (list
        (or (constant-special-form-p form environment envp)
            #-sb-xc-host
-           (constant-function-call-p form environment envp)))
+           (values (constant-function-call-p form environment envp))))
       (t t))))
 
 (defun %constant-form-value (form environment envp)
@@ -76,21 +76,21 @@
 ;;; too.
 (defun constant-function-call-p (form environment envp)
   (let ((name (car form)))
-    (and (legal-fun-name-p name)
-         (eq :function (info :function :kind name))
-         (let ((info (info :function :info name)))
-           (and info (ir1-attributep (fun-info-attributes info)
-                                     foldable)))
-         (and (every (lambda (arg)
-                       (%constantp arg environment envp))
-                     (cdr form))
-              ;; Even though the function may be marked as foldable
-              ;; the call may still signal an error -- eg: (CAR 1).
-              (handler-case
-                  (progn
-                    (constant-function-call-value form environment envp)
-                    t)
-                (error () nil))))))
+    (if (and (legal-fun-name-p name)
+             (eq :function (info :function :kind name))
+             (let ((info (info :function :info name)))
+               (and info (ir1-attributep (fun-info-attributes info)
+                                         foldable)))
+             (and (every (lambda (arg)
+                           (%constantp arg environment envp))
+                         (cdr form))))
+        ;; Even though the function may be marked as foldable
+        ;; the call may still signal an error -- eg: (CAR 1).
+        (handler-case
+            (values t (constant-function-call-value form environment envp))
+          (error ()
+            (values nil nil)))
+        (values nil nil))))
 
 (defun constant-function-call-value (form environment envp)
   (apply (fdefinition (car form))
