@@ -248,8 +248,7 @@ LsingleValue:
 	TYPE(GNAME(fpu_save))
 	.align	2,0x90
 GNAME(fpu_save):
-	mov	4(%rsp),%rax
-	fnsave	(%rax)		# Save the NPX state. (resets NPX)
+	fnsave	(%rdi)		# Save the NPX state. (resets NPX)
 	ret
 	SIZE(GNAME(fpu_save))
 
@@ -257,8 +256,7 @@ GNAME(fpu_save):
 	TYPE(GNAME(fpu_restore))
 	.align	2,0x90
 GNAME(fpu_restore):
-	mov	4(%rsp),%rax
-	frstor	(%rax)		# Restore the NPX state.
+	frstor	(%rdi)		# Restore the NPX state.
 	ret
 	SIZE(GNAME(fpu_restore))
 
