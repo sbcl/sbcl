@@ -930,6 +930,7 @@ possibly temporariliy, because it might be used internally."
                "BIT-VECTOR-="
                "READ-EVALUATED-FORM"
                "MAKE-UNPRINTABLE-OBJECT"
+               "POWER-OF-TWO-CEILING"
 
                ;; ..and macros..
                "COLLECT"

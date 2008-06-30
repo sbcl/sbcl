@@ -104,11 +104,6 @@
   ;; bits at the low end.
   (logand (1- vector-length) (- line-size)))
 
-;;; The smallest power of two that is equal to or greater then X.
-(declaim (inline power-of-two-ceiling))
-(defun power-of-two-ceiling (x)
-  (ash 1 (integer-length (1- x))))
-
 (defun cache-statistics (cache)
   (let* ((vector (cache-vector cache))
          (size (length vector))

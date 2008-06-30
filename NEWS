@@ -5,7 +5,7 @@ changes in sbcl-1.0.19 relative to 1.0.18:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** interval arithmetic during type derivation used inexact integer
        to single-float coercions.
-    ** artihmetic operations involving large integers and single
+    ** arithmetic operations involving large integers and single
        floats give the same results in compiled and interpreted code.
     ** deriving the result type of COERCE no longer signals an error
        if the derived type of the second argument is a MEMBER type

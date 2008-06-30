@@ -108,10 +108,6 @@
     (t
      (eq-hash key))))
 
-(defun ceil-power-of-two (num)
-  (declare (type index num))
-  (ash 1 (integer-length num)))
-
 (declaim (inline index-for-hashing))
 (defun index-for-hashing (hash length)
   (declare (type hash hash length))
@@ -234,8 +230,8 @@
            ;; Note that this has not yet been audited for
            ;; correctness. It just seems to work. -- CSR, 2002-11-02
            (scaled-size (truncate (/ (float size+1) rehash-threshold)))
-           (length (ceil-power-of-two (max scaled-size
-                                           (1+ +min-hash-table-size+))))
+           (length (power-of-two-ceiling (max scaled-size
+                                              (1+ +min-hash-table-size+))))
            (index-vector (make-array length
                                      :element-type
                                      '(unsigned-byte #.sb!vm:n-word-bits)
@@ -326,7 +322,7 @@ multiple threads accessing the same hash-table without locking."
          (old-hash-vector (hash-table-hash-vector table))
          (old-size (length old-next-vector))
          (new-size
-          (ceil-power-of-two
+          (power-of-two-ceiling
            (let ((rehash-size (hash-table-rehash-size table)))
              (etypecase rehash-size
                (fixnum
