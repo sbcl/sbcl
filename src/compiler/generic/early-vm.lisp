@@ -45,3 +45,12 @@
     (ash -1 (- n-word-bits n-lowtag-bits))
   #!+sb-doc
   "the fixnum closest in value to negative infinity")
+
+(def!constant most-positive-exactly-single-float-fixnum
+  (min #xffffff most-positive-fixnum))
+(def!constant most-negative-exactly-single-float-fixnum
+  (max #x-ffffff most-negative-fixnum))
+(def!constant most-positive-exactly-double-float-fixnum
+  (min #x1fffffffffffff most-positive-fixnum))
+(def!constant most-negative-exactly-double-float-fixnum
+  (max #x-1fffffffffffff most-negative-fixnum))

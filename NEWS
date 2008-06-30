@@ -2,6 +2,9 @@
 changes in sbcl-1.0.19 relative to 1.0.18:
   * bug fix: compiler no longer makes erronous assumptions in the
     presense of non-foldable SATISFIES types.
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** interval arithmetic during type derivation used inexact integer
+       to single-float coercions.
 
 changes in sbcl-1.0.18 relative to 1.0.17:
   * minor incompatible change: SB-SPROF:WITH-PROFILING now by default

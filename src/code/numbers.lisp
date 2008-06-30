@@ -827,15 +827,6 @@ the first."
      (declare (type real number result))
      (if (< (car nlist) result) (setq result (car nlist)))))
 
-(defconstant most-positive-exactly-single-float-fixnum
-  (min #xffffff most-positive-fixnum))
-(defconstant most-negative-exactly-single-float-fixnum
-  (max #x-ffffff most-negative-fixnum))
-(defconstant most-positive-exactly-double-float-fixnum
-  (min #x1fffffffffffff most-positive-fixnum))
-(defconstant most-negative-exactly-double-float-fixnum
-  (max #x-1fffffffffffff most-negative-fixnum))
-
 (eval-when (:compile-toplevel :execute)
 
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how

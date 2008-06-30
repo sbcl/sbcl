@@ -2380,3 +2380,157 @@
 ;;; NIL is a legal function name
 (assert (eq 'a (flet ((nil () 'a)) (nil))))
 
+;;; misc.528
+(assert (null (let* ((x 296.3066f0)
+                     (y 22717067)
+                     (form `(lambda (r p2)
+                              (declare (optimize speed (safety 1))
+                                       (type (simple-array single-float nil) r)
+                                       (type (integer -9369756340 22717335) p2))
+                              (setf (aref r) (* ,x (the (eql 22717067) p2)))
+                           (values)))
+                     (r (make-array nil :element-type 'single-float))
+                     (expected (* x y)))
+                (funcall (compile nil form) r y)
+                (let ((actual (aref r)))
+                  (unless (eql expected actual)
+                    (list expected actual))))))
+;;; misc.529
+(assert (null (let* ((x -2367.3296f0)
+                     (y 46790178)
+                     (form `(lambda (r p2)
+                              (declare (optimize speed (safety 1))
+                                       (type (simple-array single-float nil) r)
+                                       (type (eql 46790178) p2))
+                              (setf (aref r) (+ ,x (the (integer 45893897) p2)))
+                              (values)))
+                     (r (make-array nil :element-type 'single-float))
+                     (expected (+ x y)))
+                (funcall (compile nil form) r y)
+                (let ((actual (aref r)))
+                  (unless (eql expected actual)
+                    (list expected actual))))))
+
+;;; misc.556
+(assert (eql -1
+             (funcall
+              (compile nil '(lambda (p1 p2)
+                             (declare
+                              (optimize (speed 1) (safety 0)
+                               (debug 0) (space 0))
+                              (type (member 8174.8604) p1)
+                              (type (member -95195347) p2))
+                             (floor p1 p2)))
+              8174.8604 -95195347)))
+
+;;; misc.557
+(assert (eql -1
+             (funcall
+              (compile
+               nil
+               '(lambda (p1)
+                 (declare (optimize (speed 3) (safety 0) (debug 3) (space 1))
+                  (type (member -94430.086f0) p1))
+                 (floor (the single-float p1) 19311235)))
+              -94430.086f0)))
+
+;;; misc.558
+(assert (eql -1.0f0
+             (funcall
+              (compile
+               nil
+               '(lambda (p1)
+                 (declare (optimize (speed 1) (safety 2)
+                           (debug 2) (space 3))
+                  (type (eql -39466.56f0) p1))
+                 (ffloor p1 305598613)))
+              -39466.56f0)))
+
+;;; misc.559
+(assert (eql 1
+             (funcall
+              (compile
+               nil
+               '(lambda (p1)
+                 (declare (optimize (speed 1) (safety 1) (debug 1) (space 2))
+                  (type (eql -83232.09f0) p1))
+                 (ceiling p1 -83381228)))
+              -83232.09f0)))
+
+;;; misc.560
+(assert (eql 1
+             (funcall
+              (compile
+               nil
+               '(lambda (p1)
+                 (declare (optimize (speed 1) (safety 1)
+                           (debug 1) (space 0))
+                  (type (member -66414.414f0) p1))
+                 (ceiling p1 -63019173f0)))
+              -66414.414f0)))
+
+;;; misc.561
+(assert (eql 1.0f0
+             (funcall
+              (compile
+               nil
+               '(lambda (p1)
+                 (declare (optimize (speed 0) (safety 1)
+                           (debug 0) (space 1))
+                  (type (eql 20851.398f0) p1))
+                 (fceiling p1 80839863)))
+              20851.398f0)))
+
+;;; misc.581
+(assert (floatp
+         (funcall
+          (compile nil '(lambda (x)
+                         (declare (type (eql -5067.2056) x))
+                         (+ 213734822 x)))
+          -5067.2056)))
+
+;;; misc.581a
+(assert (typep
+         (funcall
+          (compile nil '(lambda (x) (declare (type (eql -1.0) x))
+                         (+ #x1000001 x)))
+          -1.0f0)
+         'single-float))
+
+;;; misc.582
+(assert (plusp (funcall
+                (compile
+                 nil
+                 ' (lambda (p1)
+                     (declare (optimize (speed 0) (safety 1) (debug 1) (space 1))
+                              (type (eql -39887.645) p1))
+                     (mod p1 382352925)))
+              -39887.645)))
+
+;;; misc.587
+(assert (let ((result (funcall
+                       (compile
+                        nil
+                        '(lambda (p2)
+                          (declare (optimize (speed 0) (safety 3) (debug 1) (space 0))
+                           (type (eql 33558541) p2))
+                          (- 92215.266 p2)))
+                       33558541)))
+          (typep result 'single-float)))
+
+;;; misc.635
+(assert (eql 1
+             (let* ((form '(lambda (p2)
+                            (declare (optimize (speed 0) (safety 1)
+                                      (debug 2) (space 2))
+                             (type (member -19261719) p2))
+                            (ceiling -46022.094 p2))))
+               (values (funcall (compile nil form) -19261719)))))
+
+;;; misc.636
+(assert (let* ((x 26899.875)
+               (form `(lambda (p2)
+                        (declare (optimize (speed 3) (safety 1) (debug 3) (space 1))
+                                 (type (member ,x #:g5437 char-code #:g5438) p2))
+                        (* 104102267 p2))))
+          (floatp (funcall (compile nil form) x))))
