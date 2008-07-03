@@ -1273,7 +1273,11 @@ the values returned by the form as a list. No associated restarts."))
      (format stream "Returning from STEP")))
   #!+sb-doc
   (:documentation "Condition signaled when STEP returns."))
-
+
+;;; A knob for muffling warnings, mostly for use while loading files.
+(defvar *muffled-warnings* nil
+  "A type that ought to specify a subtype of WARNING.  Whenever a warning
+is signaled, if the warning if of this type, it will be muffled.")
 
 ;;;; restart definitions
 

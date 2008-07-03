@@ -702,7 +702,7 @@ around and can be retrieved by JOIN-THREAD."
             ;;   --njf, 2006-07-15
             (let* ((*current-thread* thread)
                    (*restart-clusters* nil)
-                   (*handler-clusters* nil)
+                   (*handler-clusters* (sb!kernel::initial-handler-clusters))
                    (*condition-restarts* nil)
                    (sb!impl::*deadline* nil)
                    (sb!impl::*step-out* nil)

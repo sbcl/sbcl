@@ -645,6 +645,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
 
+               ;; and one for controlling same at runtime
+               "*MUFFLED-WARNINGS*"
+
                ;; extended declarations..
                "FREEZE-TYPE" "INHIBIT-WARNINGS"
                "MAYBE-INLINE"

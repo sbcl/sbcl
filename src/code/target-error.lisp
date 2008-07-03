@@ -19,7 +19,15 @@
 ;;; associated with Condition
 (defvar *condition-restarts* ())
 
-(defvar *handler-clusters* nil)
+(defun initial-handler-clusters ()
+  `(((warning . ,#'(lambda (warning)
+                     (when (typep warning
+                                  (locally
+                                      (declare (special sb!ext:*muffled-warnings*))
+                                    sb!ext:*muffled-warnings*))
+                       (muffle-warning warning)))))))
+
+(defvar *handler-clusters* (initial-handler-clusters))
 
 (defstruct (restart (:copier nil) (:predicate nil))
   (name (missing-arg) :type symbol :read-only t)
