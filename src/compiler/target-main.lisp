@@ -45,7 +45,7 @@
              ;; need *BACKEND-INFO-ENVIRONMENT*.
              (*info-environment* *info-environment*)
              (form (get-lambda-to-compile definition))
-             (*source-info* (make-lisp-source-info form))
+             (*source-info* (make-lisp-source-info form :parent *source-info*))
              (*toplevel-lambdas* ())
              (*block-compile* nil)
              (*allow-instrumenting* nil)

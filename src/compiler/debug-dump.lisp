@@ -250,25 +250,25 @@
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
-(defun debug-source-for-info (info)
+(defun debug-source-for-info (info &key function)
   (declare (type source-info info))
-  (let* ((file-info (source-info-file-info info))
-         (res (make-debug-source
-               :from :file
-               :created (file-info-write-date file-info)
-               :compiled (source-info-start-time info)
-               :source-root (file-info-source-root file-info)
-               :start-positions (coerce-to-smallest-eltype
-                                 (file-info-positions file-info))))
-         (name (file-info-name file-info)))
-    (etypecase name
-      ((member :lisp)
-       (setf (debug-source-from res) name
-             (debug-source-name res) (file-info-forms file-info)))
-      (pathname
-       (setf (debug-source-name res)
-             (make-file-info-namestring name file-info))))
-    res))
+  (let ((file-info (get-toplevelish-file-info info)))
+    (make-debug-source
+     :compiled (source-info-start-time info)
+
+     :namestring (make-file-info-namestring
+                  (if (pathnamep (file-info-name file-info))
+                      (file-info-name file-info))
+                  file-info)
+     :created (file-info-write-date file-info)
+     :source-root (file-info-source-root file-info)
+     :start-positions (coerce-to-smallest-eltype
+                       (file-info-positions file-info))
+
+     :form (let ((direct-file-info (source-info-file-info info)))
+             (if (eq :lisp (file-info-name direct-file-info))
+                 (elt (file-info-forms direct-file-info) 0)))
+     :function function)))
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized

@@ -1271,9 +1271,12 @@ reset to ~S."
         (values *cached-form-number-translations* *cached-toplevel-form*)
         (let* ((offset (sb!di:code-location-toplevel-form-offset location))
                (res
-                (ecase (sb!di:debug-source-from d-source)
-                  (:file (get-file-toplevel-form location))
-                  (:lisp (svref (sb!di:debug-source-name d-source) offset)))))
+                (cond ((sb!di:debug-source-namestring d-source)
+                       (get-file-toplevel-form location))
+                      ((sb!di:debug-source-form d-source)
+                       (sb!di:debug-source-form d-source))
+                      (t (bug "Don't know how to use a DEBUG-SOURCE without ~
+                               a namestring or a form.")))))
           (setq *cached-toplevel-form-offset* offset)
           (values (setq *cached-form-number-translations*
                         (sb!di:form-number-translations res offset))
@@ -1291,7 +1294,7 @@ reset to ~S."
           (aref (or (sb!di:debug-source-start-positions d-source)
                     (error "no start positions map"))
                 local-tlf-offset))
-         (name (sb!di:debug-source-name d-source)))
+         (name (sb!di:debug-source-namestring d-source)))
     (unless (eq d-source *cached-debug-source*)
       (unless (and *cached-source-stream*
                    (equal (pathname *cached-source-stream*)

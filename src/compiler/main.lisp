@@ -720,10 +720,15 @@
 
 ;;; A FILE-INFO structure holds all the source information for a
 ;;; given file.
-(def!struct (file-info (:copier nil))
+(def!struct (file-info
+             (:copier nil)
+             #-no-ansi-print-object
+             (:print-object (lambda (s stream)
+                              (print-unreadable-object (s stream :type t)
+                                (princ (file-info-name s) stream)))))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. If from a stream, :STREAM.
-  (name (missing-arg) :type (or pathname (member :lisp :stream)))
+  (name (missing-arg) :type (or pathname (eql :lisp)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
@@ -756,29 +761,39 @@
   (file-info nil :type (or file-info null))
   ;; the stream that we are using to read the FILE-INFO, or NIL if
   ;; no stream has been opened yet
-  (stream nil :type (or stream null)))
+  (stream nil :type (or stream null))
+  ;; if the current compilation is recursive (e.g., due to EVAL-WHEN
+  ;; processing at compile-time), the invoking compilation's
+  ;; source-info.
+  (parent nil :type (or source-info null)))
 
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format)
-  (let ((file-info (make-file-info :name (truename file)
-                                   :untruename (merge-pathnames file)
-                                   :external-format external-format
-                                   :write-date (file-write-date file))))
-
-    (make-source-info :file-info file-info)))
+  (make-source-info
+   :file-info (make-file-info :name (truename file)
+                              :untruename (merge-pathnames file)
+                              :external-format external-format
+                              :write-date (file-write-date file))))
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
-(defun make-lisp-source-info (form)
-  (make-source-info :start-time (get-universal-time)
-                    :file-info (make-file-info :name :lisp
-                                               :forms (vector form)
-                                               :positions '#(0))))
+(defun make-lisp-source-info (form &key parent)
+  (make-source-info
+   :file-info (make-file-info :name :lisp
+                              :forms (vector form)
+                              :positions '#(0))
+   :parent parent))
 
-;;; Return a SOURCE-INFO which will read from STREAM.
-(defun make-stream-source-info (stream)
-  (let ((file-info (make-file-info :name :stream)))
-    (make-source-info :file-info file-info
-                      :stream stream)))
+;;; Walk up the SOURCE-INFO list until we either reach a SOURCE-INFO
+;;; with no parent (e.g., from a REPL evaluation) or until we reach a
+;;; SOURCE-INFO whose FILE-INFO denotes a file.
+(defun get-toplevelish-file-info (&optional (source-info *source-info*))
+  (if source-info
+      (do* ((sinfo source-info (source-info-parent sinfo))
+            (finfo (source-info-file-info sinfo)
+                   (source-info-file-info sinfo)))
+           ((or (not (source-info-p (source-info-parent sinfo)))
+                (pathnamep (file-info-name finfo)))
+            finfo))))
 
 ;;; Return a form read from STREAM; or for EOF use the trick,
 ;;; popularized by Kent Pitman, of returning STREAM itself. If an
@@ -835,24 +850,37 @@
   (setf (source-info-stream info) nil)
   (values))
 
+;;; Loop over FORMS retrieved from INFO.  Used by COMPILE-FILE and
+;;; LOAD when loading from a FILE-STREAM associated with a source
+;;; file.
+(defmacro do-forms-from-info (((form &rest keys) info)
+                              &body body)
+  (aver (symbolp form))
+  (once-only ((info info))
+    `(let ((*source-info* ,info))
+       (loop (destructuring-bind (,form &key ,@keys &allow-other-keys)
+                 (let* ((file-info (source-info-file-info ,info))
+                        (stream (get-source-stream ,info))
+                        (pos (file-position stream))
+                        (form (read-for-compile-file stream pos)))
+                   (if (eq form stream) ; i.e., if EOF
+                       (return)
+                       (let* ((forms (file-info-forms file-info))
+                              (current-idx (+ (fill-pointer forms)
+                                              (file-info-source-root
+                                               file-info))))
+                         (vector-push-extend form forms)
+                         (vector-push-extend pos (file-info-positions
+                                                  file-info))
+                         (list form :current-index current-idx))))
+               ,@body)))))
+
 ;;; Read and compile the source file.
 (defun sub-sub-compile-file (info)
-  (let* ((file-info (source-info-file-info info))
-         (stream (get-source-stream info)))
-    (loop
-     (let* ((pos (file-position stream))
-            (form (read-for-compile-file stream pos)))
-       (if (eq form stream) ; i.e., if EOF
-           (return)
-           (let* ((forms (file-info-forms file-info))
-                  (current-idx (+ (fill-pointer forms)
-                                  (file-info-source-root file-info))))
-             (vector-push-extend form forms)
-             (vector-push-extend pos (file-info-positions file-info))
-             (find-source-paths form current-idx)
-             (process-toplevel-form form
-                                    `(original-source-start 0 ,current-idx)
-                                    nil)))))))
+  (do-forms-from-info ((form current-index) info)
+    (find-source-paths form current-index)
+    (process-toplevel-form
+     form `(original-source-start 0 ,current-index) nil)))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
@@ -1496,7 +1524,6 @@
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
         (*block-compile* *block-compile-arg*)
-        (*source-info* info)
         (*toplevel-lambdas* ())
         (*fun-names-in-this-file* ())
         (*allow-instrumenting* nil)

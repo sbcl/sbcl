@@ -238,29 +238,36 @@
 ;;; There is one per compiled file and one per function compiled at
 ;;; toplevel or loaded from source.
 (def!struct (debug-source #-sb-xc-host (:pure t))
-  ;; This slot indicates where the definition came from:
-  ;;    :FILE - from a file (i.e. COMPILE-FILE)
-  ;;    :LISP - from Lisp (i.e. COMPILE)
-  (from (missing-arg) :type (member :file :lisp))
-  ;; If :FILE, the file name, if :LISP or :STREAM, then a vector of
-  ;; the top level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
-  (name nil)
+  ;; (This is one of those structures where IWBNI we had multiple
+  ;; inheritance.  The first four slots describe compilation of a
+  ;; file, the fifth and sixth compilation of a form processed by
+  ;; EVAL, and the seventh and eigth all compilation units; and these
+  ;; are orthogonal concerns that can combine independently.)
+
+  ;; When the DEBUG-SOURCE describes a file, the file's namestring.
+  ;; Otherwise, NIL.
+  (namestring nil :type (or null string))
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
-  ;; the universal time that the source was compiled
-  (compiled (missing-arg) :type unsigned-byte)
   ;; the source path root number of the first form read from this
   ;; source (i.e. the total number of forms converted previously in
-  ;; this compilation)
+  ;; this compilation).  (Note: this will always be 0 so long as the
+  ;; SOURCE-INFO structure has exactly one FILE-INFO.)
   (source-root 0 :type index)
   ;; The FILE-POSITIONs of the truly top level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
-  ;; hold the largest element. May be null to save space, or if
-  ;; :DEBUG-SOURCE-FORM is :LISP.
+  ;; hold the largest element.
   (start-positions nil :type (or (simple-array * (*)) null))
-  ;; If from :LISP, this is the function whose source is form 0.
+
+  ;; For functions processed by EVAL (including EVAL-WHEN and LOAD on
+  ;; a source file), the source form.
+  (form nil :type list)
+  ;; This is the function whose source is the form.
   (function nil)
+
+  ;; the universal time that the source was compiled
+  (compiled (missing-arg) :type unsigned-byte)
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
   (plist *source-plist*))
 

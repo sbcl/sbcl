@@ -947,12 +947,15 @@
   (last-location-retrieved nil :type (or null sb!di:code-location))
   (last-form-retrieved -1 :type fixnum))
 
+;;; OAOO note: this shares a lot of implementation with
+;;; SB-DEBUG::GET-FILE-TOPLEVEL-FORM.  Perhaps these should be merged
+;;; somehow.
 (defun get-toplevel-form (debug-source tlf-index)
-  (let ((name (sb!di:debug-source-name debug-source)))
-    (ecase (sb!di:debug-source-from debug-source)
-      (:file
-       (cond ((not (probe-file name))
-              (warn "The source file ~S no longer seems to exist." name)
+  (cond
+    ((sb!di:debug-source-namestring debug-source)
+     (let ((namestring (sb!di:debug-source-namestring debug-source)))
+       (cond ((not (probe-file namestring))
+              (warn "The source file ~S no longer seems to exist." namestring)
               nil)
              (t
               (let ((start-positions
@@ -967,15 +970,15 @@
                                    debug-source)))
                               (char-offset
                                (aref start-positions local-tlf-index)))
-                         (with-open-file (f name)
+                         (with-open-file (f namestring)
                            (cond ((= (sb!di:debug-source-created debug-source)
-                                     (file-write-date name))
+                                     (file-write-date namestring))
                                   (file-position f char-offset))
                                  (t
                                   (warn "Source file ~S has been modified; ~@
                                          using form offset instead of ~
                                          file index."
-                                        name)
+                                        namestring)
                                   (let ((*read-suppress* t))
                                     (dotimes (i local-tlf-index) (read f)))))
                            (let ((*readtable* (copy-readtable)))
@@ -985,10 +988,11 @@
                                 (declare (ignore rest sub-char))
                                 (let ((token (read stream t nil t)))
                                   (format nil "#.~S" token))))
-                             (read f))
-                           ))))))))
-      (:lisp
-       (aref name tlf-index)))))
+                             (read f)))))))))))
+    ((sb!di:debug-source-form debug-source)
+     (sb!di:debug-source-form debug-source))
+    (t (bug "Don't know how to use a DEBUG-SOURCE without ~
+             a namestring or a form."))))
 
 (defun cache-valid (loc cache)
   (and cache

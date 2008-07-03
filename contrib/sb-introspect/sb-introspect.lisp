@@ -353,8 +353,14 @@ If an unsupported TYPE is requested, the function will return NIL.
          (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
     (make-definition-source
      :pathname
-     (if (eql (sb-c::debug-source-from debug-source) :file)
-         (parse-namestring (sb-c::debug-source-name debug-source)))
+     ;; KLUDGE: at the moment, we don't record the correct toplevel
+     ;; form number for forms processed by EVAL (including EVAL-WHEN
+     ;; :COMPILE-TOPLEVEL).  Until that's fixed, don't return a
+     ;; DEFINITION-SOURCE with a pathname.  (When that's fixed, take
+     ;; out the (not (debug-source-form ...)) test.
+     (if (and (sb-c::debug-source-namestring debug-source)
+              (not (sb-c::debug-source-form debug-source)))
+         (parse-namestring (sb-c::debug-source-namestring debug-source)))
      :character-offset
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))

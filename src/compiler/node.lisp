@@ -371,9 +371,6 @@
   ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
   ;;   LAMBDAs onto my NEW-FUNCTIONALS, as in sbcl-0.pre7.115).
   (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
-  ;; the SOURCE-INFO structure describing where this component was
-  ;; compiled from
-  (source-info *source-info* :type source-info)
   ;; count of the number of inline expansions we have done while
   ;; compiling this component, to detect infinite or exponential
   ;; blowups

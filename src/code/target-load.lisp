@@ -27,18 +27,32 @@
 
 ;;;; LOAD-AS-SOURCE
 
-;;; Load a text file.  (Note that load-as-fasl is in another file.)
+;;; Load a text stream.  (Note that load-as-fasl is in another file.)
 (defun load-as-source (stream verbose print)
   (maybe-announce-load stream verbose)
-  (do ((sexpr (read stream nil *eof-object*)
-              (read stream nil *eof-object*)))
-      ((eq sexpr *eof-object*)
-       t)
-    (if print
-        (let ((results (multiple-value-list (eval sexpr))))
-          (load-fresh-line)
-          (format t "~{~S~^, ~}~%" results))
-      (eval sexpr))))
+  (macrolet ((do-sexprs ((sexpr stream) &body body)
+               (aver (symbolp sexpr))
+               (with-unique-names (source-info)
+                 (once-only ((stream stream))
+                   `(if (handler-case (pathname stream)
+                          (error () nil))
+                        (let ((,source-info (sb!c::make-file-source-info
+                                            (pathname ,stream)
+                                            (stream-external-format ,stream))))
+                          (setf (sb!c::source-info-stream ,source-info) ,stream)
+                          (sb!c::do-forms-from-info ((,sexpr) ,source-info)
+                            ,@body))
+                        (do ((,sexpr (read ,stream nil *eof-object*)
+                                     (read ,stream nil *eof-object*)))
+                            ((eq ,sexpr *eof-object*))
+                          ,@body))))))
+    (do-sexprs (sexpr stream)
+      (if print
+          (let ((results (multiple-value-list (eval sexpr))))
+            (load-fresh-line)
+            (format t "~{~S~^, ~}~%" results))
+          (eval sexpr)))
+    t))
 
 ;;;; LOAD itself
 

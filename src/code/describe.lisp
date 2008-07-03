@@ -161,12 +161,14 @@
                   ;; any nondefault options.
                   (format-universal-time nil (sb-c::debug-source-compiled source)
                                          :style :abbreviated))
-          (let ((name (sb-c::debug-source-name source)))
-            (ecase (sb-c::debug-source-from source)
-              (:file
-               (format s "~&~A~@:_  Created: " (namestring name))
-               (format-universal-time s (sb-c::debug-source-created source)))
-              (:lisp (format s "~&  ~S" (aref name 0))))))))))
+          (let ((name (sb-c::debug-source-namestring source)))
+            (cond (name
+                   (format s "~&~A~@:_  Created: " name)
+                   (format-universal-time s (sb-c::debug-source-created source)))
+                  ((sb-di:debug-source-form source)
+                   (format s "~&  ~S" (sb-di:debug-source-form source)))
+                  (t (bug "Don't know how to use a DEBUG-SOURCE without ~
+                           a namestring or a form.")))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print
 ;;; the guts.
