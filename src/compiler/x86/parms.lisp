@@ -169,17 +169,17 @@
 #!+win32
 (progn
 
-  (def!constant read-only-space-start #x02000000)
-  (def!constant read-only-space-end   #x020ff000)
+  (def!constant read-only-space-start #x22000000)
+  (def!constant read-only-space-end   #x220ff000)
 
-  (def!constant static-space-start    #x02100000)
-  (def!constant static-space-end      #x021ff000)
+  (def!constant static-space-start    #x22100000)
+  (def!constant static-space-end      #x221ff000)
 
-  (def!constant dynamic-space-start   #x09000000)
-  (def!constant dynamic-space-end     #x29000000)
+  (def!constant dynamic-space-start   #x22300000)
+  (def!constant dynamic-space-end     #x60000000)
 
-  (def!constant linkage-table-space-start #x02200000)
-  (def!constant linkage-table-space-end   #x022ff000))
+  (def!constant linkage-table-space-start #x22200000)
+  (def!constant linkage-table-space-end   #x222ff000))
 
 #!+linux
 (progn
