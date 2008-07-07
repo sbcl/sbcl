@@ -176,7 +176,7 @@
   (def!constant static-space-end      #x221ff000)
 
   (def!constant dynamic-space-start   #x22300000)
-  (def!constant dynamic-space-end     #x60000000)
+  (def!constant dynamic-space-end     #x42300000)
 
   (def!constant linkage-table-space-start #x22200000)
   (def!constant linkage-table-space-end   #x222ff000))
