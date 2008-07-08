@@ -126,6 +126,7 @@
                 (let ((name (symbol-name arg)))
                   (when (and (plusp (length name))
                              (char= (char name 0) #\&))
+                    ;; Should this be COMPILER-STYLE-WARN?
                     (style-warn
                      "suspicious variable in lambda list: ~S." arg))))
               (case state

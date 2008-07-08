@@ -1275,9 +1275,304 @@ the values returned by the form as a list. No associated restarts."))
   (:documentation "Condition signaled when STEP returns."))
 
 ;;; A knob for muffling warnings, mostly for use while loading files.
-(defvar *muffled-warnings* nil
+(defvar *muffled-warnings* 'uninteresting-redefinition
   "A type that ought to specify a subtype of WARNING.  Whenever a warning
 is signaled, if the warning if of this type, it will be muffled.")
+
+;;; Various STYLE-WARNING signaled in the system.
+;; For the moment, we're only getting into the details for function
+;; redefinitions, but other redefinitions could be done later
+;; (e.g. methods).
+(define-condition redefinition-warning (style-warning)
+  ())
+
+(define-condition function-redefinition-warning (redefinition-warning)
+  ((name :initarg :name :reader function-redefinition-warning-name)
+   (old :initarg :old :reader function-redefinition-warning-old-fdefinition)
+   ;; For DEFGENERIC and perhaps others, the redefinition
+   ;; destructively modifies the original, rather than storing a new
+   ;; object, so there's no NEW here, but only in subclasses.
+   ))
+
+(define-condition redefinition-with-defun (function-redefinition-warning)
+  ((new :initarg :new :reader redefinition-with-defun-new-fdefinition)
+   ;; KLUDGE: it would be nice to fix the unreasonably late
+   ;; back-patching of DEBUG-SOURCEs in the DEBUG-INFO during
+   ;; fasloading and just use the new fdefinition, but for the moment
+   ;; we'll compare the SOURCE-LOCATION created during DEFUN with the
+   ;; previous DEBUG-SOURCE.
+   (new-location :initarg :new-location
+              :reader redefinition-with-defun-new-location))
+  (:report (lambda (warning stream)
+             (format stream "redefining ~S in DEFUN"
+                     (function-redefinition-warning-name warning)))))
+
+(define-condition redefinition-with-defgeneric (function-redefinition-warning)
+  ((new-location :initarg :new-location
+                 :reader redefinition-with-defgeneric-new-location))
+  (:report (lambda (warning stream)
+             (format stream "redefining ~S in DEFGENERIC"
+                     (function-redefinition-warning-name warning)))))
+
+(define-condition redefinition-with-defmethod (redefinition-warning)
+  ((gf :initarg :generic-function
+       :reader redefinition-with-defmethod-generic-function)
+   (qualifiers :initarg :qualifiers
+               :reader redefinition-with-defmethod-qualifiers)
+   (specializers :initarg :specializers
+                 :reader redefinition-with-defmethod-specializers)
+   (new-location :initarg :new-location
+                 :reader redefinition-with-defmethod-new-location)
+   (old-method :initarg :old-method
+               :reader redefinition-with-defmethod-old-method))
+  (:report (lambda (warning stream)
+             (format stream "redefining ~S~{ ~S~} ~S in DEFMETHOD"
+                     (redefinition-with-defmethod-generic-function warning)
+                     (redefinition-with-defmethod-qualifiers warning)
+                     (redefinition-with-defmethod-specializers warning)))))
+
+;; FIXME: see the FIXMEs in defmacro.lisp, then maybe instantiate this.
+(define-condition redefinition-with-defmacro (function-redefinition-warning)
+  ())
+
+;; Here are a few predicates for what people might find interesting
+;; about redefinitions.
+
+;; DEFUN can replace a generic function with an ordinary function.
+;; (Attempting to replace an ordinary function with a generic one
+;; causes an error, though.)
+(defun redefinition-replaces-generic-function-p (warning)
+  (and (typep warning 'redefinition-with-defun)
+       (typep (function-redefinition-warning-old-fdefinition warning)
+              'generic-function)))
+
+(defun redefinition-replaces-compiled-function-with-interpreted-p (warning)
+  (and (typep warning 'redefinition-with-defun)
+       (compiled-function-p
+        (function-redefinition-warning-old-fdefinition warning))
+       (not (compiled-function-p
+             (redefinition-with-defun-new-fdefinition warning)))))
+
+;; Most people seem to agree that re-running a DEFUN in a file is
+;; completely uninteresting.
+(defun uninteresting-ordinary-function-redefinition-p (warning)
+  ;; OAOO violation: this duplicates code in SB-INTROSPECT.
+  ;; Additionally, there are some functions that aren't
+  ;; funcallable-instances for which finding the source location is
+  ;; complicated (e.g. DEFSTRUCT-defined predicates and accessors),
+  ;; but I don't think they're defined with %DEFUN, so the warning
+  ;; isn't raised.
+  (flet ((fdefinition-file-namestring (fdefn)
+           #!+sb-eval
+           (when (typep fdefn 'sb!eval:interpreted-function)
+             (return-from fdefinition-file-namestring
+               (sb!c:definition-source-location-namestring
+                   (sb!eval:interpreted-function-source-location fdefn))))
+           ;; All the following accesses are guarded with conditionals
+           ;; because it's not clear whether any of the slots we're
+           ;; chasing down are guaranteed to be filled in.
+           (let* ((fdefn
+                   ;; KLUDGE: although this looks like it only works
+                   ;; for %SIMPLE-FUNs, in fact there's a pun such
+                   ;; that %SIMPLE-FUN-SELF returns the simple-fun
+                   ;; object for closures and
+                   ;; funcallable-instances. -- CSR, circa 2005
+                   (sb!kernel:%simple-fun-self fdefn))
+                  (code (if fdefn (sb!kernel:fun-code-header fdefn)))
+                  (debug-info (if code (sb!kernel:%code-debug-info code)))
+                  (debug-source (if debug-info
+                                    (sb!c::debug-info-source debug-info)))
+                  (namestring (if debug-source
+                                  (sb!c::debug-source-namestring debug-source))))
+             namestring)))
+    (and
+     ;; There's garbage in various places when the first DEFUN runs in
+     ;; cold-init.
+     sb!kernel::*cold-init-complete-p*
+     (typep warning 'redefinition-with-defun)
+     (let ((old-fdefn
+            (function-redefinition-warning-old-fdefinition warning))
+           (new-fdefn
+            (redefinition-with-defun-new-fdefinition warning)))
+       ;; Replacing a compiled function with a compiled function is
+       ;; clearly uninteresting, and we'll say arbitrarily that
+       ;; replacing an interpreted function with an interpreted
+       ;; function is uninteresting, too, but leave out the
+       ;; compiled-to-interpreted and interpreted-to-compiled cases.
+       (when (or (and (typep old-fdefn
+                             '(or #!+sb-eval sb!eval:interpreted-function))
+                      (typep new-fdefn
+                             '(or #!+sb-eval sb!eval:interpreted-function)))
+                 (and (typep old-fdefn
+                             '(and compiled-function
+                               (not funcallable-instance)))
+                      ;; Since this is a REDEFINITION-WITH-DEFUN,
+                      ;; NEW-FDEFN can't be a FUNCALLABLE-INSTANCE.
+                      (typep new-fdefn 'compiled-function)))
+         (let* ((old-namestring (fdefinition-file-namestring old-fdefn))
+                (new-namestring
+                 (or (fdefinition-file-namestring new-fdefn)
+                     (let ((srcloc
+                            (redefinition-with-defun-new-location warning)))
+                       (if srcloc
+                            (sb!c::definition-source-location-namestring
+                                srcloc))))))
+           (and old-namestring
+                new-namestring
+                (equal old-namestring new-namestring))))))))
+
+(defun uninteresting-generic-function-redefinition-p (warning)
+  (and (typep warning 'redefinition-with-defgeneric)
+       (let* ((old-fdefn
+               (function-redefinition-warning-old-fdefinition warning))
+              (old-location
+               (if (typep old-fdefn 'generic-function)
+                   (sb!pcl::definition-source old-fdefn)))
+              (old-namestring
+               (if old-location
+                   (sb!c:definition-source-location-namestring old-location)))
+              (new-location
+               (redefinition-with-defgeneric-new-location warning))
+              (new-namestring
+               (if new-location
+                   (sb!c:definition-source-location-namestring new-location))))
+         (and old-namestring
+              new-namestring
+              (equal old-namestring new-namestring)))))
+
+(defun uninteresting-method-redefinition-p (warning)
+  (and (typep warning 'redefinition-with-defmethod)
+       (let* ((old-method (redefinition-with-defmethod-old-method warning))
+              (old-location (sb!pcl::definition-source old-method))
+              (old-namestring (if old-location
+                                  (sb!c:definition-source-location-namestring
+                                      old-location)))
+              (new-location (redefinition-with-defmethod-new-location warning))
+              (new-namestring (if new-location
+                                  (sb!c:definition-source-location-namestring
+                                      new-location))))
+         (and new-namestring
+              old-namestring
+              (equal new-namestring old-namestring)))))
+
+(deftype uninteresting-redefinition ()
+  '(or (satisfies uninteresting-ordinary-function-redefinition-p)
+       (satisfies uninteresting-generic-function-redefinition-p)
+       (satisfies uninteresting-method-redefinition-p)))
+
+(define-condition redefinition-with-deftransform (redefinition-warning)
+  ((transform :initarg :transform
+              :reader redefinition-with-deftransform-transform))
+  (:report (lambda (warning stream)
+             (format stream "Overwriting ~S"
+                     (redefinition-with-deftransform-transform warning)))))
+
+;;; Various other STYLE-WARNINGS
+(define-condition ignoring-asterisks-in-variable-name
+    (style-warning simple-condition)
+  ()
+  (:report (lambda (warning stream)
+             (format stream "~@?, even though the name follows~@
+the usual naming convention (names like *FOO*) for special variables"
+                     (simple-condition-format-control warning)
+                     (simple-condition-format-arguments warning)))))
+
+(define-condition ignoring-asterisks-in-lexical-variable-name
+    (ignoring-asterisks-in-variable-name)
+  ())
+
+(define-condition ignoring-asterisks-in-constant-variable-name
+    (ignoring-asterisks-in-variable-name)
+  ())
+
+(define-condition undefined-alien (style-warning)
+  ((symbol :initarg :symbol :reader undefined-alien-symbol))
+  (:report (lambda (warning stream)
+             (format stream "Undefined alien: ~S"
+                     (undefined-alien-symbol warning)))))
+
+#!+sb-eval
+(define-condition lexical-environment-too-complex (style-warning)
+  ((form :initarg :form :reader lexical-environment-too-complex-form)
+   (lexenv :initarg :lexenv :reader lexical-environment-too-complex-lexenv))
+  (:report (lambda (warning stream)
+             (format stream
+                     "~@<Native lexical environment too complex for ~
+                         SB-EVAL to evaluate ~S, falling back to ~
+                         SIMPLE-EVAL-IN-LEXENV.  Lexenv: ~S~:@>"
+                     (lexical-environment-too-complex-form warning)
+                     (lexical-environment-too-complex-lexenv warning)))))
+
+;; Although this has -ERROR- in the name, it's just a STYLE-WARNING.
+(define-condition character-decoding-error-in-comment (style-warning)
+  ((stream :initarg :stream :reader decoding-error-in-comment-stream)
+   (position :initarg :position :reader decoding-error-in-comment-position))
+  (:report (lambda (warning stream)
+             (format stream
+                      "Character decoding error in a ~A-comment at ~
+                      position ~A reading source stream ~A, ~
+                      resyncing."
+                      (decoding-error-in-comment-macro warning)
+                      (decoding-error-in-comment-position warning)
+                      (decoding-error-in-comment-stream warning)))))
+
+(define-condition character-decoding-error-in-macro-char-comment
+    (character-decoding-error-in-comment)
+  ((char :initform #\; :initarg :char
+         :reader character-decoding-error-in-macro-char-comment-char)))
+
+(define-condition character-decoding-error-in-dispatch-macro-char-comment
+    (character-decoding-error-in-comment)
+  ;; ANSI doesn't give a way for a reader function invoked by a
+  ;; dispatch macro character to determine which dispatch character
+  ;; was used, so if a user wants to signal one of these from a custom
+  ;; comment reader, he'll have to supply the :DISP-CHAR himself.
+  ((disp-char :initform #\# :initarg :disp-char
+              :reader character-decoding-error-in-macro-char-comment-disp-char)
+   (sub-char :initarg :sub-char
+             :reader character-decoding-error-in-macro-char-comment-sub-char)))
+
+(defun decoding-error-in-comment-macro (warning)
+  (etypecase warning
+    (character-decoding-error-in-macro-char-comment
+     (character-decoding-error-in-macro-char-comment-char warning))
+    (character-decoding-error-in-dispatch-macro-char-comment
+     (format
+      nil "~C~C"
+      (character-decoding-error-in-macro-char-comment-disp-char warning)
+      (character-decoding-error-in-macro-char-comment-sub-char warning)))))
+
+(define-condition deprecated-eval-when-situations (style-warning)
+  ((situations :initarg :situations
+               :reader deprecated-eval-when-situations-situations))
+  (:report (lambda (warning stream)
+             (format stream "using deprecated EVAL-WHEN situation names~{ ~S~}"
+                     (deprecated-eval-when-situations-situations warning)))))
+
+(define-condition proclamation-mismatch (style-warning)
+  ((name :initarg :name :reader proclamation-mismatch-name)
+   (old :initarg :old :reader proclamation-mismatch-old)
+   (new :initarg :new :reader proclamation-mismatch-new)))
+
+(define-condition type-proclamation-mismatch (proclamation-mismatch)
+  ()
+  (:report (lambda (warning stream)
+             (format stream
+                     "The new TYPE proclamation~% ~S for ~S does not ~
+                     match the old TYPE proclamation ~S"
+                     (proclamation-mismatch-new warning)
+                     (proclamation-mismatch-name warning)
+                     (proclamation-mismatch-old warning)))))
+
+(define-condition ftype-proclamation-mismatch (proclamation-mismatch)
+  ()
+  (:report (lambda (warning stream)
+             (format stream
+                     "The new FTYPE proclamation~% ~S for ~S does not ~
+                     match the old FTYPE proclamation ~S"
+                     (proclamation-mismatch-new warning)
+                     (proclamation-mismatch-name warning)
+                     (proclamation-mismatch-old warning)))))
 
 ;;;; restart definitions
 

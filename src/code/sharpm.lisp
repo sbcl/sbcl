@@ -378,7 +378,9 @@
       ((character-decoding-error
         #'(lambda (decoding-error)
             (declare (ignorable decoding-error))
-            (style-warn "Character decoding error in a #|-comment at position ~A reading source file ~A, resyncing." (file-position stream) stream)
+            (style-warn
+             'sb!kernel::character-decoding-error-in-dispatch-macro-char-comment
+             :sub-char sub-char :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
     (let ((stream (in-synonym-of stream)))
       (if (ansi-stream-p stream)

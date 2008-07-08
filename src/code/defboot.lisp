@@ -212,14 +212,15 @@ evaluated as a PROGN."
 
 #-sb-xc-host
 (defun %defun (name def doc inline-lambda source-location)
-  (declare (ignore source-location))
   (declare (type function def))
   (declare (type (or null simple-string) doc))
   (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
   (sb!c:%compiler-defun name inline-lambda nil)
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
-    (style-warn "redefining ~S in DEFUN" name))
+    (style-warn 'sb!kernel::redefinition-with-defun :name name
+                :old (fdefinition name) :new def
+                :new-location source-location))
   (setf (sb!xc:fdefinition name) def)
 
   (sb!c::note-name-defined name :function)

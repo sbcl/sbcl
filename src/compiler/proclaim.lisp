@@ -187,6 +187,8 @@
                (when (eq (info :variable :where-from name) :declared)
                  (let ((old-type (info :variable :type name)))
                    (when (type/= type old-type)
+                     ;; FIXME: changing to TYPE-PROCLAMATION-MISMATCH
+                     ;; broke late-proclaim.lisp.
                      (style-warn "The new TYPE proclamation~%  ~S~@
                                   for ~S does not match the old TYPE~@
                                   proclamation ~S"
@@ -205,6 +207,8 @@
                (when (eq (info :function :where-from name) :declared)
                  (let ((old-type (info :function :type name)))
                    (when (type/= ctype old-type)
+                     ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
+                     ;; broke late-proclaim.lisp.
                      (style-warn
                       "new FTYPE proclamation~@
                        ~S~@

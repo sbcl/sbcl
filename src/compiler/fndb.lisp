@@ -1557,11 +1557,11 @@
           (flushable))
 
 (defknown compiler-error (t &rest t) nil ())
-(defknown (compiler-warn compiler-style-warn) (string &rest t) (values) ())
+(defknown (compiler-warn compiler-style-warn) (t &rest t) (values) ())
 (defknown (compiler-notify maybe-compiler-notify) ((or string symbol) &rest t)
   (values)
   ())
-(defknown style-warn (string &rest t) null ())
+(defknown style-warn (t &rest t) null ())
 
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t

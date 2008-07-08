@@ -146,12 +146,6 @@ MISC CLEANUPS
   * Some work on conditions emitted by the system
 	** eliminate COMPILER-WARN and COMPILER-STYLE-WARN, which
 		were simply limited versions of WARN and STYLE-WARN.
-	** make STYLE-WARN parallel WARN more closely (by accepting
-		a condition type, which should be a subtype of
-		STYLE-WARNING, and initargs, as well as a format
-		string and format arguments for SIMPLE-STYLE-WARNING.
-		(WARN can also be used to signal STYLE-WARNINGs, but
-		STYLE-WARN helps to document the code)
 	** eliminate use of INHIBIT-WARNINGS by code emitted by the
 		system from user code.
 	** cause use of INHIBIT-WARNINGS to signal a STYLE-WARNING.

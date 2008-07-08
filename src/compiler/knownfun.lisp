@@ -182,7 +182,8 @@
                               (eq (transform-important x) important)))
                        (fun-info-transforms info))))
     (cond (old
-           (style-warn "Overwriting ~S" old)
+           (style-warn 'sb!kernel:redefinition-with-deftransform
+                       :transform old)
            (setf (transform-function old) fun
                  (transform-note old) note))
           (t

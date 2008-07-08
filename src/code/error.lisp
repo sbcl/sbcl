@@ -14,13 +14,19 @@
 (in-package "SB!KERNEL")
 
 ;;; not sure this is the right place, but where else?
-(defun style-warn (format-control &rest format-arguments)
+(defun style-warn (datum &rest arguments)
   (/show0 "entering STYLE-WARN")
   (/show format-control format-arguments)
-  (with-sane-io-syntax
-      (warn 'simple-style-warning
-            :format-control format-control
-            :format-arguments format-arguments)))
+  (if (stringp datum)
+      (with-sane-io-syntax
+        (warn 'simple-style-warning
+              :format-control datum
+              :format-arguments arguments))
+      ;; Maybe FIXME: check that the DATUM is a STYLE-WARNING or a
+      ;; specifier for a subtype of STYLE-WARNING?  (I had trouble
+      ;; getting through cold-init with that check enabled, though.)
+      ;; -- RMK, 20080701.
+      (apply #'warn datum arguments)))
 
 ;;; a utility for SIGNAL, ERROR, CERROR, WARN, COMPILER-NOTIFY and
 ;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a

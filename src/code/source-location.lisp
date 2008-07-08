@@ -50,11 +50,8 @@
 
 #!+sb-source-locations
 (define-compiler-macro source-location (&environment env)
-  #+sb-xc-host (declare (ignore env))
-  #-sb-xc-host
-  (unless (policy env (and (> space 1)
-                           (> space debug)))
-    (make-definition-source-location)))
+  (declare (ignore env))
+  #-sb-xc-host (make-definition-source-location))
 
 (/show0 "/Processing source location thunks")
 #!+sb-source-locations

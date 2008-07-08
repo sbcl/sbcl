@@ -24,9 +24,9 @@
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (when (looks-like-name-of-special-var-p name)
-    (style-warn "defining ~S as a constant, even though the name follows~@
-the usual naming convention (names like *FOO*) for special variables"
-                name))
+    (style-warn 'sb!kernel:ignoring-asterisks-in-constant-variable-name
+                :format-control "defining ~S as a constant"
+                :format-arguments (list name)))
   (sb!c:with-source-location (source-location)
     (setf (info :source-location :constant name) source-location))
   (let ((kind (info :variable :kind name)))

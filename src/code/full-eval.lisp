@@ -1200,11 +1200,6 @@
           (%eval form env))
       (compiler-environment-too-complex-error (condition)
         (declare (ignore condition))
-        ;; FIXME: this could be a really annoying warning. It should
-        ;; have its own class.
-        (sb!int:style-warn
-         "~@<Native lexical environment too complex for SB-EVAL ~
-       to evaluate ~S, falling back to SIMPLE-EVAL-IN-LEXENV.  ~
-       Lexenv: ~S~:@>"
-         form lexenv)
+        (sb!int:style-warn 'sb!kernel:lexical-environment-too-complex
+                           :form form :lexenv lexenv)
         (sb!int:simple-eval-in-lexenv form lexenv)))))
