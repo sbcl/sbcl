@@ -21,6 +21,8 @@
        (let ((,xf (first (first ,nxf))))
          ,@body))))
 
+(defvar *test-path* "external-format-test.tmp")
+
 (do-external-formats (xf)
   (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
     (assert (eq (read-char s nil s) s))))
@@ -28,18 +30,18 @@
 ;;; Test standard character read-write equivalency over all external formats.
 (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
   (do-external-formats (xf)
-    (with-open-file (s "external-format-test.txt" :direction :output
+    (with-open-file (s *test-path* :direction :output
                      :if-exists :supersede :external-format xf)
       (loop for character across standard-characters
             do (write-char character s)))
-    (with-open-file (s "external-format-test.txt" :direction :input
+    (with-open-file (s *test-path* :direction :input
                      :external-format xf)
       (loop for character across standard-characters
             do (let ((got (read-char s)))
                  (unless (eql character got)
                    (error "wanted ~S, got ~S" character got)))))))
 
-(delete-file "external-format-test.txt")
+(delete-file *test-path*)
 #-sb-unicode
 (progn
   (test-util:report-test-status)
@@ -51,13 +53,13 @@
 (dotimes (width-1 4)
   (let ((character (code-char (elt '(1 #x81 #x801 #x10001) width-1))))
     (dotimes (offset (+ width-1 1))
-      (with-open-file (s "external-format-test.txt" :direction :output
+      (with-open-file (s *test-path* :direction :output
                        :if-exists :supersede :external-format :utf-8)
         (dotimes (n offset)
           (write-char #\a s))
         (dotimes (n (+ 4 sb-impl::+bytes-per-buffer+))
           (write-char character s)))
-      (with-open-file (s "external-format-test.txt" :direction :input
+      (with-open-file (s *test-path* :direction :input
                        :external-format :utf-8)
         (dotimes (n offset)
           (assert (eql (read-char s) #\a)))
@@ -68,13 +70,13 @@
         (assert (eql (read-char s nil s) s))))))
 
 ;;; Test character decode restarts.
-(with-open-file (s "external-format-test.txt" :direction :output
+(with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :element-type '(unsigned-byte 8))
   (write-byte 65 s)
   (write-byte 66 s)
   (write-byte #xe0 s)
   (write-byte 67 s))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :external-format :utf-8)
   (handler-bind
       ((sb-int:character-decoding-error #'(lambda (decoding-error)
@@ -83,7 +85,7 @@
                                              'sb-int:attempt-resync))))
     (assert (equal (read-line s nil s) "ABC"))
     (assert (equal (read-line s nil s) s))))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :external-format :utf-8)
   (handler-bind
       ((sb-int:character-decoding-error #'(lambda (decoding-error)
@@ -95,7 +97,7 @@
 
 ;;; And again with more data to account for buffering (this was briefly)
 ;;; broken in early 0.9.6.
-(with-open-file (s "external-format-test.txt" :direction :output
+(with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :element-type '(unsigned-byte 8))
   (let ((a (make-array 50
                        :element-type '(unsigned-byte 64)
@@ -108,7 +110,7 @@
     (dotimes (i 40)
       (write-sequence a s))))
 (with-test (:name (:character-decode-large :attempt-resync))
-  (with-open-file (s "external-format-test.txt" :direction :input
+  (with-open-file (s *test-path* :direction :input
                      :external-format :utf-8)
     (handler-bind
         ((sb-int:character-decoding-error #'(lambda (decoding-error)
@@ -130,7 +132,7 @@
   ;; rightfully confuses some people, so we'll skip running the code
   ;; for now. -- JES, 2006-01-27
   #+nil
-  (with-open-file (s "external-format-test.txt" :direction :input
+  (with-open-file (s *test-path* :direction :input
                      :external-format :utf-8)
     (handler-bind
         ((sb-int:character-decoding-error #'(lambda (decoding-error)
@@ -146,7 +148,7 @@
         (assert (equal (read-line s nil s) s))))))
 
 ;;; Test character encode restarts.
-(with-open-file (s "external-format-test.txt" :direction :output
+(with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :external-format :latin-1)
   (handler-bind
       ((sb-int:character-encoding-error #'(lambda (encoding-error)
@@ -157,12 +159,12 @@
     (write-char #\B s)
     (write-char (code-char 322) s)
     (write-char #\C s)))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :external-format :latin-1)
   (assert (equal (read-line s nil s) "ABC"))
   (assert (equal (read-line s nil s) s)))
 
-(with-open-file (s "external-format-test.txt" :direction :output
+(with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :external-format :latin-1)
   (handler-bind
       ((sb-int:character-encoding-error #'(lambda (encoding-error)
@@ -173,7 +175,7 @@
                               :initial-contents `(#\A #\B ,(code-char 322)
                                                       #\C))))
       (write-string string s))))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :external-format :latin-1)
   (assert (equal (read-line s nil s) "ABC"))
   (assert (equal (read-line s nil s) s)))
@@ -195,7 +197,7 @@
 
 
 ;;;; KOI8-R external format
-(with-open-file (s "external-format-test.txt" :direction :output
+(with-open-file (s *test-path* :direction :output
                  :if-exists :supersede :external-format :koi8-r)
   (write-char (code-char #xB0) s)
   (assert (eq
@@ -206,15 +208,15 @@
              (sb-int:character-encoding-error ()
                :good))
            :good)))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :element-type '(unsigned-byte 8))
   (let ((byte (read-byte s)))
     (assert (= (eval byte) #x9C))))
-(with-open-file (s "external-format-test.txt" :direction :input
+(with-open-file (s *test-path* :direction :input
                  :external-format :koi8-r)
   (let ((char (read-char s)))
     (assert (= (char-code (eval char)) #xB0))))
-(delete-file "external-format-test.txt")
+(delete-file *test-path*)
 
 (let* ((koi8-r-codes (coerce '(240 210 201 215 197 212 33) '(vector (unsigned-byte 8))))
        (uni-codes #(1055 1088 1080 1074 1077 1090 33))
@@ -229,7 +231,7 @@
 ;;; tests of FILE-STRING-LENGTH
 (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
   (do-external-formats (xf)
-    (with-open-file (s "external-format-test.txt" :direction :output
+    (with-open-file (s *test-path* :direction :output
                        :external-format xf)
       (loop for x across standard-characters
             for position = (file-position s)
@@ -240,12 +242,12 @@
             (string-length (file-string-length s standard-characters)))
         (write-string standard-characters s)
         (assert (= (file-position s) (+ position string-length)))))
-    (delete-file "external-format-test.txt")))
+    (delete-file *test-path*)))
 
 (let ((char-codes '(0 1 255 256 511 512 1023 1024 2047 2048 4095 4096
                     8191 8192 16383 16384 32767 32768 65535 65536 131071
                     131072 262143 262144)))
-  (with-open-file (s "external-format-test.txt" :direction :output
+  (with-open-file (s *test-path* :direction :output
                      :external-format :utf-8)
     (dolist (code char-codes)
       (let* ((char (code-char code))
@@ -263,7 +265,7 @@
 ;;; See sbcl-devel "Subject: Bug in FILE-POSITION on UTF-8-encoded files"
 ;;; by Lutz Euler on 2006-03-05 for more details.
 (with-test (:name (:file-position :utf-8))
-  (let ((path "external-format-test.txt"))
+  (let ((path *test-path*))
     (with-open-file (s path
                        :direction :output
                        :if-exists :supersede
@@ -283,6 +285,7 @@
         (let ((new-char (read-char s)))
           (assert (char= char new-char)))))
     (values)))
+(delete-file *test-path*)
 
 ;;; External format support in SB-ALIEN
 

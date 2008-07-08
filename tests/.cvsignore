@@ -1,5 +1,5 @@
 threads-foreign-code.c
-external-format-test.txt
+external-format-test.tmp
 stack-alignment-offset
 test-status.lisp-expr
 run-program-ed-test.tmp
