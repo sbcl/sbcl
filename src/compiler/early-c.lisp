@@ -164,7 +164,7 @@
     ;; and then we happen to compile bar.lisp before foo.lisp.
   (when (looks-like-name-of-special-var-p symbol)
     ;; FIXME: should be COMPILER-STYLE-WARNING?
-    (style-warn 'sb!kernel:ignoring-asterisks-in-lexical-variable-name
+    (style-warn 'sb!kernel:asterisks-around-lexical-variable-name
                 :format-control
                 "using the lexical binding of the symbol ~S, not the~@
                  dynamic binding"

@@ -1468,7 +1468,7 @@ is signaled, if the warning if of this type, it will be muffled.")
                      (redefinition-with-deftransform-transform warning)))))
 
 ;;; Various other STYLE-WARNINGS
-(define-condition ignoring-asterisks-in-variable-name
+(define-condition dubious-asterisks-around-variable-name
     (style-warning simple-condition)
   ()
   (:report (lambda (warning stream)
@@ -1477,15 +1477,17 @@ the usual naming convention (names like *FOO*) for special variables"
                      (simple-condition-format-control warning)
                      (simple-condition-format-arguments warning)))))
 
-(define-condition ignoring-asterisks-in-lexical-variable-name
-    (ignoring-asterisks-in-variable-name)
+(define-condition asterisks-around-lexical-variable-name
+    (dubious-asterisks-around-variable-name)
   ())
 
-(define-condition ignoring-asterisks-in-constant-variable-name
-    (ignoring-asterisks-in-variable-name)
+(define-condition asterisks-around-constant-variable-name
+    (dubious-asterisks-around-variable-name)
   ())
 
-(define-condition undefined-alien (style-warning)
+;; We call this UNDEFINED-ALIEN-STYLE-WARNING because there are some
+;; subclasses of ERROR above having to do with undefined aliens.
+(define-condition undefined-alien-style-warning (style-warning)
   ((symbol :initarg :symbol :reader undefined-alien-symbol))
   (:report (lambda (warning stream)
              (format stream "Undefined alien: ~S"

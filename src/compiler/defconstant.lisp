@@ -24,7 +24,7 @@
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (when (looks-like-name-of-special-var-p name)
-    (style-warn 'sb!kernel:ignoring-asterisks-in-constant-variable-name
+    (style-warn 'sb!kernel:asterisks-around-constant-variable-name
                 :format-control "defining ~S as a constant"
                 :format-arguments (list name)))
   (sb!c:with-source-location (source-location)

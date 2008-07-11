@@ -175,7 +175,8 @@ is never in the linkage-table."
               (error 'undefined-alien-error :name symbol))
              #!+linkage-table
              ((not addr)
-              (style-warn 'sb!kernel:undefined-alien :symbol symbol)
+              (style-warn 'sb!kernel:undefined-alien-style-warning
+                          :symbol symbol)
               (setf (gethash symbol undefineds) t)
               (remhash symbol symbols)
               (if datap
