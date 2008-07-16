@@ -1624,6 +1624,15 @@
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
     (declare (ignore nreq nopt keysp restp keywords))
+    (values keywords allow-other-keys-p)))
+
+(defmethod function-keyword-parameters ((method standard-method))
+  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
+                        keywords keyword-parameters)
+      (analyze-lambda-list (if (consp method)
+                               (early-method-lambda-list method)
+                               (method-lambda-list method)))
+    (declare (ignore nreq nopt keysp restp keywords))
     (values keyword-parameters allow-other-keys-p)))
 
 (defun method-ll->generic-function-ll (ll)
@@ -1658,7 +1667,7 @@
           (let ((methods.keys nil) (methods.allowp nil))
             (dolist (m methods)
               (multiple-value-bind (m.keyparams m.allow-other-keys)
-                  (function-keywords m)
+                  (function-keyword-parameters m)
                 (setq methods.keys (union methods.keys m.keyparams :key #'maybe-car))
                 (setq methods.allowp (or methods.allowp m.allow-other-keys))))
             (let ((arglist '()))
