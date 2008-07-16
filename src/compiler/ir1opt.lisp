@@ -892,12 +892,22 @@
 ;;; syntax check, arg/result type processing, but still call
 ;;; RECOGNIZE-KNOWN-CALL, since the call might be to a known lambda,
 ;;; and that checking is done by local call analysis.
-(defun validate-call-type (call type ir1-converting-not-optimizing-p)
+(defun validate-call-type (call type defined-type ir1-converting-not-optimizing-p)
   (declare (type combination call) (type ctype type))
   (cond ((not (fun-type-p type))
          (aver (multiple-value-bind (val win)
                    (csubtypep type (specifier-type 'function))
                  (or val (not win))))
+         ;; In the commonish case where the function has been defined
+         ;; in another file, we only get FUNCTION for the type; but we
+         ;; can check whether the current call is valid for the
+         ;; existing definition, even if only to STYLE-WARN about it.
+         (when defined-type
+           (valid-fun-use call defined-type
+                          :argument-test #'always-subtypep
+                          :result-test nil
+                          :lossage-fun #'compiler-style-warn
+                          :unwinnage-fun #'compiler-notify))
          (recognize-known-call call ir1-converting-not-optimizing-p))
         ((valid-fun-use call type
                         :argument-test #'always-subtypep
@@ -947,7 +957,7 @@
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
-           (validate-call-type call (lvar-type fun-lvar) nil)
+           (validate-call-type call (lvar-type fun-lvar) nil nil)
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))

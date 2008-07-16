@@ -118,6 +118,9 @@
                              (not (fun-lexically-notinline-p name)))))
                (info :function :type name)
                (specifier-type 'function))
+     :defined-type (if (eq where :defined)
+                       (info :function :type name)
+                       *universal-type*)
      :where-from where)))
 
 ;;; Has the *FREE-FUNS* entry FREE-FUN become invalid?
@@ -1042,8 +1045,9 @@
            (type leaf var))
   (let* ((node (ir1-convert-combination start next result form var))
          (fun-lvar (basic-combination-fun node))
-         (type (leaf-type var)))
-    (when (validate-call-type node type t)
+         (type (leaf-type var))
+         (defined-type (leaf-defined-type var)))
+    (when (validate-call-type node type defined-type t)
       (setf (lvar-%derived-type fun-lvar)
             (make-single-value-type type))
       (setf (lvar-reoptimize fun-lvar) nil)))

@@ -617,6 +617,9 @@
                 :read-only t)
   ;; the type which values of this leaf must have
   (type *universal-type* :type ctype)
+  ;; the type which values of this leaf have last been defined to have
+  ;; (but maybe won't have in future, in case of redefinition)
+  (defined-type *universal-type* :type ctype)
   ;; where the TYPE information came from:
   ;;  :DECLARED, from a declaration.
   ;;  :ASSUMED, from uses of the object.
