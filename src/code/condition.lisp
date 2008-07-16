@@ -1398,11 +1398,10 @@ is signaled, if the warning if of this type, it will be muffled.")
        ;; clearly uninteresting, and we'll say arbitrarily that
        ;; replacing an interpreted function with an interpreted
        ;; function is uninteresting, too, but leave out the
-       ;; compiled-to-interpreted and interpreted-to-compiled cases.
-       (when (or (and (typep old-fdefn
-                             '(or #!+sb-eval sb!eval:interpreted-function))
-                      (typep new-fdefn
-                             '(or #!+sb-eval sb!eval:interpreted-function)))
+       ;; compiled-to-interpreted case.
+       (when (or (typep
+                  old-fdefn
+                  '(or #!+sb-eval sb!eval:interpreted-function))
                  (and (typep old-fdefn
                              '(and compiled-function
                                (not funcallable-instance)))

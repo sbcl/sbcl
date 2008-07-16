@@ -19,7 +19,7 @@
    (when (and (boundp '*source-info*)
               *source-info*)
      (make-file-info-namestring *compile-file-pathname*
-                                (source-info-file-info *source-info*)))
+                                (sb!c:get-toplevelish-file-info *source-info*)))
    :type (or string null))
   ;; Toplevel form index
   (toplevel-form-number
@@ -52,6 +52,12 @@
 (define-compiler-macro source-location (&environment env)
   (declare (ignore env))
   #-sb-xc-host (make-definition-source-location))
+
+;; We need a regular definition of SOURCE-LOCATION for calls processed
+;; during LOAD on a source file while *EVALUATOR-MODE* is :INTERPRET.
+#!+sb-source-locations
+(setf (symbol-function 'source-location)
+      (lambda () (make-definition-source-location)))
 
 (/show0 "/Processing source location thunks")
 #!+sb-source-locations

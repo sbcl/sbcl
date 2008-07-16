@@ -23,8 +23,7 @@
 
 (defvar *source-location-thunks* nil)
 
-;; Should get called only in unusual circumstances. Normally handled
-;; by a compiler macro.
+;; Will be redefined in src/code/source-location.lisp.
 (defun source-location ()
   nil)
 
@@ -35,7 +34,7 @@
              (symbol-value '*source-info*))
     `(cons ,(make-file-info-namestring
               *compile-file-pathname*
-              (source-info-file-info (symbol-value '*source-info*)))
+              (sb!c:get-toplevelish-file-info (symbol-value '*source-info*)))
            ,(when (boundp '*current-path*)
                   (source-path-tlf-number (symbol-value '*current-path*))))))
 
