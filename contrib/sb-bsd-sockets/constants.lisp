@@ -141,6 +141,9 @@
  (:structure sockaddr-un ("struct sockaddr_un"
                           (integer family "sa_family_t" "sun_family")
                           (c-string path "char" "sun_path")))
+ (:structure sockaddr-un-abstract ("struct sockaddr_un"
+                              (integer family "sa_family_t" "sun_family")
+                              ((array (unsigned 8)) path "char" "sun_path")))
  (:structure hostent ("struct hostent"
                       (c-string-pointer name "char *" "h_name")
                       ((* c-string) aliases "char **" "h_aliases")

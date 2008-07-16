@@ -11,7 +11,7 @@
   (:use "COMMON-LISP" "SB-ALIEN" "SB-EXT" "SB-C-CALL"))
 
 (defpackage "SB-BSD-SOCKETS"
-  (:export socket local-socket inet-socket
+  (:export socket local-socket local-abstract-socket inet-socket
            make-local-socket make-inet-socket
            socket-bind socket-accept socket-connect
            socket-send socket-receive socket-recv
