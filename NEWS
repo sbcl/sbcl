@@ -2,6 +2,8 @@
 changes in sbcl-1.0.19 relative to 1.0.18:
   * bug fix: compiler no longer makes erronous assumptions in the
     presense of non-foldable SATISFIES types.
+  * bug fix: stack analysis missed cleanups of dynamic-extent
+    arguments in non-let-converted calls to local functions.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** interval arithmetic during type derivation used inexact integer
        to single-float coercions.

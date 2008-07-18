@@ -534,4 +534,33 @@
         (declare (dynamic-extent #'mget #'mset))
         ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset)))))
 (assert (equal (bug419 42) '(1 2 3 4 5 6)))
+
+;;; Multiple DX arguments in a local function call
+(defun test-dx-flet-test (fun n f1 f2 f3)
+  (let ((res (with-output-to-string (s)
+               (assert (eql n (ignore-errors (funcall fun s)))))))
+    (multiple-value-bind (x pos) (read-from-string res nil)
+      (assert (equalp f1 x))
+      (multiple-value-bind (y pos2) (read-from-string res nil nil :start pos)
+        (assert (equalp f2 y))
+        (assert (equalp f3 (read-from-string res nil nil :start pos2))))))
+  (assert-no-consing (assert (eql n (funcall fun nil)))))
+(macrolet ((def (n f1 f2 f3)
+             (let ((name (sb-pcl::format-symbol :cl-user "DX-FLET-TEST.~A" n)))
+               `(progn
+                  (defun-with-dx ,name (s)
+                    (flet ((f (x)
+                             (declare (dynamic-extent x))
+                             (when s
+                               (print x s)
+                               (finish-output s))
+                             nil))
+                      (f ,f1)
+                      (f ,f2)
+                      (f ,f3)
+                      ,n))
+                  (test-dx-flet-test #',name ,n ,f1 ,f2 ,f3)))))
+  (def 0 (list :one) (list :two) (list :three))
+  (def 1 (make-array 128) (list 1 2 3 4 5 6 7 8) (list 'list))
+  (def 2 (list 1) (list 2 3) (list 4 5 6 7)))
 

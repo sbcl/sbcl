@@ -76,6 +76,11 @@
                   (not (lvar-dynamic-extent arg)))
         append (handle-nested-dynamic-extent-lvars arg) into dx-lvars
         finally (when dx-lvars
+                  ;; A call to non-LET with DX args must end its block,
+                  ;; otherwise stack analysis will not see the combination and
+                  ;; the associated cleanup/entry.
+                  (unless (eq :let (functional-kind fun))
+                    (node-ends-block call))
                   (binding* ((before-ctran (node-prev call))
                              (nil (ensure-block-start before-ctran))
                              (block (ctran-block before-ctran))
