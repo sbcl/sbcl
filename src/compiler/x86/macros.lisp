@@ -177,7 +177,7 @@
 ;;; the duration.  Now we have pseudoatomic there's no need for that
 ;;; overhead.
 
-(defun allocation-dynamic-extent (alloc-tn size)
+(defun allocation-dynamic-extent (alloc-tn size lowtag)
   (inst sub esp-tn size)
   ;; FIXME: SIZE _should_ be double-word aligned (suggested but
   ;; unfortunately not enforced by PAD-DATA-BLOCK and
@@ -187,7 +187,7 @@
   ;; 2004-03-30
   (inst and esp-tn (lognot lowtag-mask))
   (aver (not (location= alloc-tn esp-tn)))
-  (inst mov alloc-tn esp-tn)
+  (inst lea alloc-tn (make-ea :byte :base esp-tn :disp lowtag))
   (values))
 
 (defun allocation-notinline (alloc-tn size)
@@ -269,12 +269,16 @@
 
 ;;; (FIXME: so why aren't we asserting this?)
 
-(defun allocation (alloc-tn size &optional inline dynamic-extent)
+(defun allocation (alloc-tn size &optional inline dynamic-extent lowtag)
   (cond
-    (dynamic-extent (allocation-dynamic-extent alloc-tn size))
+    (dynamic-extent
+     (allocation-dynamic-extent alloc-tn size lowtag))
     ((or (null inline) (policy inline (>= speed space)))
      (allocation-inline alloc-tn size))
-    (t (allocation-notinline alloc-tn size)))
+    (t
+     (allocation-notinline alloc-tn size)))
+  (when (and lowtag (not dynamic-extent))
+    (inst lea alloc-tn (make-ea :byte :base alloc-tn :disp lowtag)))
   (values))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
@@ -286,12 +290,11 @@
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (size size) (stack-allocate-p stack-allocate-p))
     `(maybe-pseudo-atomic ,stack-allocate-p
-      (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p)
-      (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
-              ,result-tn)
-      (inst lea ,result-tn
-            (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
-      ,@forms)))
+       (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p
+                   other-pointer-lowtag)
+       (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
+               ,result-tn 0 other-pointer-lowtag)
+       ,@forms)))
 
 ;;;; error code
 (defun emit-error-break (vop kind code values)

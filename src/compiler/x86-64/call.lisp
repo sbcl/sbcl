@@ -1298,8 +1298,7 @@
       (inst jrcxz done)
       (inst lea dst (make-ea :qword :base rcx :index rcx))
       (maybe-pseudo-atomic stack-allocate-p
-       (allocation dst dst node stack-allocate-p)
-       (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
+       (allocation dst dst node stack-allocate-p list-pointer-lowtag)
        (inst shr rcx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)

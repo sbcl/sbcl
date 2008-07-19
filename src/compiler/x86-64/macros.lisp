@@ -138,30 +138,31 @@
 ;;; node-var then it is used to make an appropriate speed vs size
 ;;; decision.
 
-(defun allocation-dynamic-extent (alloc-tn size)
+(defun allocation-dynamic-extent (alloc-tn size lowtag)
   (inst sub rsp-tn size)
   ;; see comment in x86/macros.lisp implementation of this
   (inst and rsp-tn #.(lognot lowtag-mask))
   (aver (not (location= alloc-tn rsp-tn)))
-  (inst mov alloc-tn rsp-tn)
+  (inst lea alloc-tn (make-ea :byte :base rsp-tn :disp lowtag))
   (values))
 
 ;;; This macro should only be used inside a pseudo-atomic section,
 ;;; which should also cover subsequent initialization of the
 ;;; object.
-(defun allocation-tramp (alloc-tn size &optional ignored)
-  (declare (ignore ignored))
+(defun allocation-tramp (alloc-tn size lowtag)
   (inst push size)
   (inst lea temp-reg-tn (make-ea :qword
                             :disp (make-fixup "alloc_tramp" :foreign)))
   (inst call temp-reg-tn)
   (inst pop alloc-tn)
+  (when lowtag
+    (inst lea alloc-tn (make-ea :byte :base alloc-tn :disp lowtag)))
   (values))
 
-(defun allocation (alloc-tn size &optional ignored dynamic-extent)
+(defun allocation (alloc-tn size &optional ignored dynamic-extent lowtag)
   (declare (ignore ignored))
   (when dynamic-extent
-    (allocation-dynamic-extent alloc-tn size)
+    (allocation-dynamic-extent alloc-tn size lowtag)
     (return-from allocation (values)))
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
@@ -188,7 +189,7 @@
                   :scale 1 :disp
                   (make-fixup "boxed_region" :foreign 8))))
     (cond (in-elsewhere
-           (allocation-tramp alloc-tn size))
+           (allocation-tramp alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)
            (if (tn-p size)
@@ -201,17 +202,19 @@
            (inst cmp end-addr alloc-tn)
            (inst jmp :be NOT-INLINE)
            (inst mov free-pointer alloc-tn)
-           (inst mov alloc-tn temp-reg-tn)
+           (if lowtag
+               (inst lea alloc-tn (make-ea :byte :base temp-reg-tn :disp lowtag))
+               (inst mov alloc-tn temp-reg-tn))
            (emit-label DONE)
            (assemble (*elsewhere*)
              (emit-label NOT-INLINE)
              (cond ((numberp size)
-                    (allocation-tramp alloc-tn size))
+                    (allocation-tramp alloc-tn size lowtag))
                    (t
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp alloc-tn alloc-tn)))
-             (inst jmp DONE))
-           (values)))))
+                    (allocation-tramp alloc-tn alloc-tn lowtag)))
+             (inst jmp DONE))))
+    (values)))
 
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
@@ -222,11 +225,10 @@
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (size size) (stack-allocate-p stack-allocate-p))
     `(maybe-pseudo-atomic ,stack-allocate-p
-      (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p)
+      (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p
+                  other-pointer-lowtag)
       (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
-              ,result-tn)
-      (inst lea ,result-tn
-            (make-ea :qword :base ,result-tn :disp other-pointer-lowtag))
+              ,result-tn 0 other-pointer-lowtag)
       ,@forms)))
 
 ;;;; error code

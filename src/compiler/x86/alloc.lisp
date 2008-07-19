@@ -44,12 +44,12 @@
                              (move temp ,tn)
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
-             (let ((cons-cells (if star (1- num) num)))
-               (pseudo-atomic
+             (let ((cons-cells (if star (1- num) num))
+                   (stack-allocate-p (awhen (sb!c::node-lvar node)
+                                       (sb!c::lvar-dynamic-extent it))))
+               (maybe-pseudo-atomic stack-allocate-p
                 (allocation res (* (pad-data-block cons-size) cons-cells) node
-                            (awhen (sb!c::node-lvar node) (sb!c::lvar-dynamic-extent it)))
-                (inst lea res
-                      (make-ea :byte :base res :disp list-pointer-lowtag))
+                            stack-allocate-p list-pointer-lowtag)
                 (move ptr res)
                 (dotimes (i (1- cons-cells))
                   (store-car (tn-ref-tn things) ptr)
@@ -143,11 +143,11 @@
     ;; FIXME: It would be good to check for stack overflow here.
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
-    (allocation result result node t)
+    (allocation result result node t other-pointer-lowtag)
     (inst cld)
     (inst lea res
-          (make-ea :byte :base result :disp (* vector-data-offset n-word-bytes)))
-    (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+          (make-ea :byte :base result :disp (- (* vector-data-offset n-word-bytes)
+                                               other-pointer-lowtag)))
     (sc-case type
       (immediate
        (aver (typep (tn-value type) '(unsigned-byte 8)))
@@ -245,9 +245,8 @@
    (maybe-pseudo-atomic stack-allocate-p
      (let ((size (+ length closure-info-offset)))
        (allocation result (pad-data-block size) node
-                   stack-allocate-p)
-       (inst lea result
-             (make-ea :byte :base result :disp fun-pointer-lowtag))
+                   stack-allocate-p
+                   fun-pointer-lowtag)
        (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
                result 0 fun-pointer-lowtag))
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
@@ -306,8 +305,7 @@
           (aver (null type))
           (inst call (make-fixup dst :assembly-routine)))
         (maybe-pseudo-atomic stack-allocate-p
-         (allocation result (pad-data-block words) node stack-allocate-p)
-         (inst lea result (make-ea :byte :base result :disp lowtag))
+         (allocation result (pad-data-block words) node stack-allocate-p lowtag)
          (when type
            (storew (logior (ash (1- words) n-widetag-bits) type)
                    result

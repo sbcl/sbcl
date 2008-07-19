@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.19 relative to 1.0.18:
+  * optimization: stack allocation is slightly more efficient on x86
+    and x86-64.
   * bug fix: compiler no longer makes erronous assumptions in the
     presense of non-foldable SATISFIES types.
   * bug fix: stack analysis missed cleanups of dynamic-extent

@@ -1354,8 +1354,7 @@
       (inst jecxz done)
       (inst lea dst (make-ea :dword :base ecx :index ecx))
       (maybe-pseudo-atomic stack-allocate-p
-       (allocation dst dst node stack-allocate-p)
-       (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
+       (allocation dst dst node stack-allocate-p list-pointer-lowtag)
        (inst shr ecx 2)
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
