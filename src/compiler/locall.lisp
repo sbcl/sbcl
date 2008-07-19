@@ -85,22 +85,13 @@
                   ;; Stack analysis requires that the CALL ends the block, so
                   ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
                   (node-ends-block call)
-                  (binding* ((before-ctran (node-prev call))
-                             (nil (ensure-block-start before-ctran))
-                             (block (ctran-block before-ctran))
-                             (new-call-ctran (make-ctran :kind :inside-block
-                                                         :next call
-                                                         :block block))
-                             (entry (with-ir1-environment-from-node call
-                                      (make-entry :prev before-ctran
-                                                  :next new-call-ctran)))
-                             (cleanup (make-cleanup :kind :dynamic-extent
-                                                    :mess-up entry
-                                                    :info dx-lvars)))
-                    (setf (node-prev call) new-call-ctran)
-                    (setf (ctran-next before-ctran) entry)
-                    (setf (ctran-use new-call-ctran) entry)
+                  (let* ((entry (with-ir1-environment-from-node call
+                                  (make-entry)))
+                         (cleanup (make-cleanup :kind :dynamic-extent
+                                                :mess-up entry
+                                                :info dx-lvars)))
                     (setf (entry-cleanup entry) cleanup)
+                    (insert-node-before call entry)
                     (setf (node-lexenv call)
                           (make-lexenv :default (node-lexenv call)
                                        :cleanup cleanup))

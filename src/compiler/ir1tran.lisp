@@ -375,6 +375,17 @@
       (error "~S is already a predecessor of ~S." node-block block))
     (push node-block (block-pred block))))
 
+;;; Insert NEW before OLD in the flow-graph.
+(defun insert-node-before (old new)
+  (let ((prev (node-prev old))
+        (temp (make-ctran)))
+    (ensure-block-start prev)
+    (setf (ctran-next prev) nil)
+    (link-node-to-previous-ctran new prev)
+    (use-ctran new temp)
+    (link-node-to-previous-ctran old temp))
+  (values))
+
 ;;; This function is used to set the ctran for a node, and thus
 ;;; determine what receives the value.
 (defun use-lvar (node lvar)
