@@ -563,4 +563,21 @@
   (def 0 (list :one) (list :two) (list :three))
   (def 1 (make-array 128) (list 1 2 3 4 5 6 7 8) (list 'list))
   (def 2 (list 1) (list 2 3) (list 4 5 6 7)))
+
+;;; Test that unknown-values coming after a DX value won't mess up the stack analysis
+(defun test-update-uvl-live-sets (x y z)
+ (declare (optimize speed (safety 0)))
+ (flet ((bar (a b)
+          (declare (dynamic-extent a))
+          (eval `(list (length ',a) ',b))))
+   (list (bar x y)
+         (bar (list x y z)                  ; dx push
+              (list
+               (multiple-value-call 'list
+                 (eval '(values 1 2 3))     ; uv push
+                 (max y z)
+               )                            ; uv pop
+               14)
+         ))))
+(assert (equal '((0 4) (3 ((1 2 3 5) 14))) (test-update-uvl-live-sets #() 4 5)))
 

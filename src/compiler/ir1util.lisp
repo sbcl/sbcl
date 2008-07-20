@@ -402,7 +402,7 @@
   ;; as the original one. It would be either good to have an
   ;; explanation of why casts don't point across components, or an
   ;; explanation of when they do it. ...in the meanwhile AVER that
-  ;; our expactation holds true.
+  ;; our assumption holds true.
   (aver (or (not component) (eq component (node-component use))))
   (or (and (combination-p use)
            (eq (combination-kind use) :known)
@@ -832,6 +832,7 @@
   (let* ((block (node-block node))
          (start (node-next node))
          (last (block-last block)))
+    (check-type last node)
     (unless (eq last node)
       (aver (and (eq (ctran-kind start) :inside-block)
                  (not (block-delete-p block))))

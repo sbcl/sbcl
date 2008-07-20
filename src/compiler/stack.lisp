@@ -94,23 +94,28 @@
                      block
                      (lambda (dx-cleanup)
                        (dolist (lvar (cleanup-info dx-cleanup))
-                         (let ((uses (lvar-uses lvar)))
-                           (dolist (generator (if (listp uses) uses (list uses)))
-                             (let* ((block (node-block generator))
-                                    (2block (block-info block)))
-                               ;; DX objects, living in the LVAR, are
-                               ;; alive in the environment, protected
-                               ;; by the CLEANUP. We also cannot move
-                               ;; them (because, in general, we cannot
-                               ;; track all references to
-                               ;; them). Therefore, everything,
-                               ;; allocated deeper than a DX object,
-                               ;; should be kept alive until the
-                               ;; object is deallocated.
-                               (setq new-end (merge-uvl-live-sets
-                                              new-end (ir2-block-end-stack 2block)))
-                               (setq new-end (merge-uvl-live-sets
-                                              new-end (ir2-block-pushed 2block)))))))))
+                         (do-uses (generator lvar)
+                           (let* ((block (node-block generator))
+                                  (2block (block-info block)))
+                             ;; DX objects, living in the LVAR, are alive in
+                             ;; the environment, protected by the CLEANUP. We
+                             ;; also cannot move them (because, in general, we
+                             ;; cannot track all references to them).
+                             ;; Therefore, everything, allocated deeper than a
+                             ;; DX object -- that is, before the DX object --
+                             ;; should be kept alive until the object is
+                             ;; deallocated.
+                             ;;
+                             ;; Since DX generators end their blocks, we can
+                             ;; find out UVLs allocated before them by looking
+                             ;; at the stack at the end of the block.
+                             ;;
+                             ;; FIXME: This is not quite true: REFs to DX
+                             ;; closures don't end their blocks!
+                             (setq new-end (merge-uvl-live-sets
+                                            new-end (ir2-block-end-stack 2block)))
+                             (setq new-end (merge-uvl-live-sets
+                                            new-end (ir2-block-pushed 2block))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 

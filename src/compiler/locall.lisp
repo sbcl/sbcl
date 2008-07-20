@@ -45,15 +45,9 @@
 
 (defun handle-nested-dynamic-extent-lvars (lvar)
   (let ((uses (lvar-uses lvar)))
-    ;; Stack analysis wants DX value generators to end their
-    ;; blocks. Uses of mupltiple used LVARs already end their blocks,
-    ;; so we just need to process used-once LVARs.
-    ;;
-    ;; FIXME: Is this true? I cannot trigger any bad behaviour if I nuke this
-    ;; form, and the only assumption regarding block ends I see in in stack
-    ;; analysis is the one made by MAP-BLOCK-NLXES, which assumes that nodes
-    ;; with cleanups in their lexenv end their blocks. If this one is
-    ;; necessary, we should explain why in more detail. --NS 2008-07-19
+    ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
+    ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
+    ;; to process uses of single-use LVARs.
     (when (node-p uses)
       (node-ends-block uses))
     ;; If this LVAR's USE is good for DX, it is either a CAST, or it
