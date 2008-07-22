@@ -2,6 +2,10 @@
 changes in sbcl-1.0.19 relative to 1.0.18:
   * optimization: stack allocation is slightly more efficient on x86
     and x86-64.
+  * bug fix: DEFSTRUCT forms with user-specified :CONSTRUCTOR options,
+    where a raw slot always is initialized using the initform whose
+    type is not know sufficiently well a compile-time are now compiled
+    correctly. (reported by John Morrison)
   * bug fix: compiler no longer makes erronous assumptions in the
     presense of non-foldable SATISFIES types.
   * bug fix: stack analysis missed cleanups of dynamic-extent

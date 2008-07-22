@@ -1516,10 +1516,14 @@
                (loop for slot in (dd-slots defstruct)
                      for name = (dsd-name slot)
                      collect (cond ((find name (skipped-vars) :test #'string=)
+                                    ;; CLHS 3.4.6 Boa Lambda Lists
                                     (setf (dsd-safe-p slot) nil)
                                     '.do-not-initialize-slot.)
                                    ((or (find (dsd-name slot) (vars) :test #'string=)
-                                        (dsd-default slot)))))))))
+                                        (let ((type (dsd-type slot)))
+                                          (if (eq t type)
+                                              (dsd-default slot)
+                                              `(the ,type ,(dsd-default slot))))))))))))
 
 ;;; Grovel the constructor options, and decide what constructors (if
 ;;; any) to create.

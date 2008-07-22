@@ -737,3 +737,8 @@
     (assert (eql #c(5.0 5.0) (constant-arg-inits-f foo)))
     (assert (eql #c(6.0d0 6.0d0) (constant-arg-inits-g foo)))))
 (make-constant-arg-inits)
+
+;;; bug reported by John Morrison, 2008-07-22 on sbcl-devel
+(defstruct (raw-slot-struct-with-unknown-init (:constructor make-raw-slot-struct-with-unknown-init ()))
+ (x (#:unknown-function) :type double-float))
+
