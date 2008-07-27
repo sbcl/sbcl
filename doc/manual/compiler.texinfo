@@ -84,6 +84,9 @@ controlled via the alist
 
 @include var-sb-ext-star-compiler-print-variable-alist-star.texinfo
 
+For information about muffling warnings signaled outside of the
+compiler, see @ref{Customization Hooks for Users}.
+
 @c <!-- FIXME: How much control over error messages is in SBCL?
 @c      _     How much should be? How much of this documentation should
 @c      _     we save or adapt? 

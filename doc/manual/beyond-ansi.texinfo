@@ -337,6 +337,14 @@ mechanisms as follows:
 @include fun-common-lisp-ed.texinfo
 @include var-sb-ext-star-ed-functions-star.texinfo
 
+Conditions of type @code{warning} and @code{style-warning} are
+sometimes signaled at runtime, especially during execution of Common
+Lisp defining forms such as @code{defun}, @code{defmethod}, etc.  To
+muffle these warnings at runtime, SBCL provides a variable
+@code{sb-ext:*muffled-warnings*}:
+
+@include var-sb-ext-star-muffled-warnings-star.texinfo
+
 @node Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @section Tools To Help Developers

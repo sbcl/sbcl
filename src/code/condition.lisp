@@ -1276,8 +1276,9 @@ the values returned by the form as a list. No associated restarts."))
 
 ;;; A knob for muffling warnings, mostly for use while loading files.
 (defvar *muffled-warnings* 'uninteresting-redefinition
-  "A type that ought to specify a subtype of WARNING.  Whenever a warning
-is signaled, if the warning if of this type, it will be muffled.")
+  "A type that ought to specify a subtype of WARNING.  Whenever a
+warning is signaled, if the warning if of this type and is not
+handled by any other handler, it will be muffled.")
 
 ;;; Various STYLE-WARNING signaled in the system.
 ;; For the moment, we're only getting into the details for function

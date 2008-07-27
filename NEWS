@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.19 relative to 1.0.18:
+  * new feature: user-customizable variable SB-EXT:*MUFFLED-WARNINGS*;
+    warnings that go otherwise unhandled will be muffled if they are
+    of the type that's the value of this variable.  
   * optimization: stack allocation is slightly more efficient on x86
     and x86-64.
   * bug fix: DEFSTRUCT forms with user-specified :CONSTRUCTOR options,
