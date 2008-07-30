@@ -450,7 +450,7 @@
     (attempt-resync ()
       :report (lambda (stream)
                 (format stream
-                        "~@<Attempt to resync the stream at a character ~
+                        "~@<Attempt to resync the stream at a ~
                         character boundary and continue.~@:>"))
       (fd-stream-resync stream)
       nil)
