@@ -9,6 +9,9 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     type of a variable or bind a constant is made.
   * bug fix: SET signals an error when an attempt to violate declared
     type of a variable is made.
+  * bug fix: restart computation during the execution of a restart
+    test function no longer causes infinite recursion. (reported by
+    Michael Weber)
 
 changes in sbcl-1.0.19 relative to 1.0.18:
   * new feature: user-customizable variable SB-EXT:*MUFFLED-WARNINGS*;

@@ -108,3 +108,16 @@
     ;; whether escaped or not
     (dolist (*print-escape* '(nil t))
       (write c :stream (make-string-output-stream)))))
+
+;;; Reported by Michael Weber: restart computation in :TEST-FUNCTION used to
+;;; cause infinite recursion.
+(defun restart-test-finds-restarts ()
+  (restart-bind
+      ((bar (lambda ()
+              (return-from restart-test-finds-restarts 42))
+         :test-function
+         (lambda (condition)
+           (find-restart 'qux))))
+    (when (find-restart 'bar)
+      (invoke-restart 'bar))))
+(assert (not (restart-test-finds-restarts)))

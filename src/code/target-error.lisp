@@ -41,6 +41,8 @@
         (prin1 (restart-name restart) stream))
       (restart-report restart stream)))
 
+(defvar *restart-test-stack* nil)
+
 (defun compute-restarts (&optional condition)
   #!+sb-doc
   "Return a list of all the currently active restarts ordered from most recently
@@ -53,13 +55,23 @@ restarts associated with CONDITION (or with no condition) will be returned."
           (setq associated (cdr alist))
           (setq other (append (cdr alist) other))))
     (collect ((res))
-      (dolist (restart-cluster *restart-clusters*)
-        (dolist (restart restart-cluster)
-          (when (and (or (not condition)
-                         (member restart associated)
-                         (not (member restart other)))
-                     (funcall (restart-test-function restart) condition))
-            (res restart))))
+      (let ((stack *restart-test-stack*))
+        (declare (optimize sb!c::stack-allocate-dynamic-extent))
+        (dolist (restart-cluster *restart-clusters*)
+          (dolist (restart restart-cluster)
+            (when (and (or (not condition)
+                           (memq restart associated)
+                           (not (memq restart other)))
+                       ;; A call to COMPUTE-RESTARTS -- from an error, from
+                       ;; user code, whatever -- inside the test function
+                       ;; would cause infinite recursion here, so we disable
+                       ;; each restart using *restart-test-stack* for the
+                       ;; duraction of the test call.
+                       (not (memq restart stack))
+                       (let ((*restart-test-stack* (cons restart stack)))
+                         (declare (dynamic-extent *restart-test-stack*))
+                         (funcall (restart-test-function restart) condition)))
+             (res restart)))))
       (res))))
 
 #!+sb-doc
