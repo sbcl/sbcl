@@ -210,4 +210,20 @@
                   (values)))))
     (assert (not (funcall (compile nil fun))))))
 
+;;; Non-local exit from WITH-ALIEN caused alien stack to be leaked.
+(defvar *sap-int*)
+(defun try-to-leak-alien-stack (x)
+  (with-alien ((alien (array (sb-alien:unsigned 8) 72)))
+    (let ((sap-int (sb-sys:sap-int (alien-sap alien))))
+      (if *sap-int*
+          (assert (= *sap-int* sap-int))
+          (setf *sap-int* sap-int)))
+    (when x
+      (return-from try-to-leak-alien-stack 'going))
+    (never)))
+(with-test (:name :nlx-causes-alien-stack-leak)
+  (let ((*sap-int* nil))
+    (loop repeat 1024
+          do (try-to-leak-alien-stack t))))
+
 ;;; success

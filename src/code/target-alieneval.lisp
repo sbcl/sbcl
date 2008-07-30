@@ -90,82 +90,103 @@
    ALLOCATION should be one of:
      :LOCAL (the default)
        The alien is allocated on the stack, and has dynamic extent.
-     :STATIC
-       The alien is allocated on the heap, and has infinite extent. The alien
-       is allocated at load time, so the same piece of memory is used each time
-       this form executes.
      :EXTERN
        No alien is allocated, but VAR is established as a local name for
        the external alien given by EXTERNAL-NAME."
+  ;; FIXME:
+  ;;      :STATIC
+  ;;        The alien is allocated on the heap, and has infinite extent. The alien
+  ;;        is allocated at load time, so the same piece of memory is used each time
+  ;;        this form executes.
   (/show "entering WITH-ALIEN" bindings)
-  (with-auxiliary-alien-types env
-    (dolist (binding (reverse bindings))
-      (/show binding)
-      (destructuring-bind
-          (symbol type &optional (opt1 nil opt1p) (opt2 nil opt2p))
-          binding
-        (/show symbol type opt1 opt2)
-        (let* ((alien-type (parse-alien-type type env))
-               (datap (not (alien-fun-type-p alien-type))))
-          (/show alien-type)
-          (multiple-value-bind (allocation initial-value)
-              (if opt2p
-                  (values opt1 opt2)
-                  (case opt1
-                    (:extern
-                     (values opt1 (guess-alien-name-from-lisp-name symbol)))
-                    (:static
-                     (values opt1 nil))
-                    (t
-                     (values :local opt1))))
-            (/show allocation initial-value)
-            (setf body
-                  (ecase allocation
-                    #+nil
-                    (:static
-                     (let ((sap
-                            (make-symbol (concatenate 'string "SAP-FOR-"
-                                                      (symbol-name symbol)))))
-                       `((let ((,sap (load-time-value (%make-alien ...))))
-                           (declare (type system-area-pointer ,sap))
-                           (symbol-macrolet
-                            ((,symbol (sap-alien ,sap ,type)))
-                            ,@(when initial-value
-                                `((setq ,symbol ,initial-value)))
-                            ,@body)))))
-                    (:extern
-                     (/show0 ":EXTERN case")
-                     (let ((info (make-heap-alien-info
-                                  :type alien-type
-                                  :sap-form `(foreign-symbol-sap ',initial-value
-                                                                 ,datap))))
-                       `((symbol-macrolet
-                          ((,symbol (%heap-alien ',info)))
-                          ,@body))))
-                    (:local
-                     (/show0 ":LOCAL case")
-                     (let ((var (gensym))
-                           (initval (if initial-value (gensym)))
-                           (info (make-local-alien-info :type alien-type)))
-                       (/show var initval info)
-                       `((let ((,var (make-local-alien ',info))
+  (let (bind-alien-stack)
+    (with-auxiliary-alien-types env
+      (dolist (binding (reverse bindings))
+        (/show binding)
+        (destructuring-bind
+              (symbol type &optional (opt1 nil opt1p) (opt2 nil opt2p))
+            binding
+          (/show symbol type opt1 opt2)
+          (let* ((alien-type (parse-alien-type type env))
+                 (datap (not (alien-fun-type-p alien-type))))
+            (/show alien-type)
+            (multiple-value-bind (allocation initial-value)
+                (if opt2p
+                    (values opt1 opt2)
+                    (case opt1
+                      (:extern
+                       (values opt1 (guess-alien-name-from-lisp-name symbol)))
+                      (:static
+                       (values opt1 nil))
+                      (t
+                       (values :local opt1))))
+              (/show allocation initial-value)
+              (setf body
+                    (ecase allocation
+                      #+nil
+                      (:static
+                       (let ((sap
+                              (make-symbol (concatenate 'string "SAP-FOR-"
+                                                        (symbol-name symbol)))))
+                         `((let ((,sap (load-time-value (%make-alien ...))))
+                             (declare (type system-area-pointer ,sap))
+                             (symbol-macrolet
+                                 ((,symbol (sap-alien ,sap ,type)))
                                ,@(when initial-value
-                                   `((,initval ,initial-value))))
-                           (note-local-alien-type ',info ,var)
-                           (multiple-value-prog1
-                               (symbol-macrolet
-                                ((,symbol (local-alien ',info ,var)))
-                                ,@(when initial-value
-                                    `((setq ,symbol ,initval)))
-                                ,@body)
+                                       `((setq ,symbol ,initial-value)))
+                               ,@body)))))
+                      (:extern
+                       (/show0 ":EXTERN case")
+                       (let ((info (make-heap-alien-info
+                                    :type alien-type
+                                    :sap-form `(foreign-symbol-sap ',initial-value
+                                                                   ,datap))))
+                         `((symbol-macrolet
+                               ((,symbol (%heap-alien ',info)))
+                             ,@body))))
+                      (:local
+                       (/show0 ":LOCAL case")
+                       (let* ((var (gensym))
+                              (initval (if initial-value (gensym)))
+                              (info (make-local-alien-info :type alien-type))
+                              (inner-body
+                               `((note-local-alien-type ',info ,var)
+                                 (symbol-macrolet ((,symbol (local-alien ',info ,var)))
+                                   ,@(when initial-value
+                                           `((setq ,symbol ,initval)))
+                                   ,@body)))
+                              (body-forms
+                               (if initial-value
+                                   `((let ((,initval ,initial-value))
+                                       ,@inner-body))
+                                   inner-body)))
+                         (/show var initval info)
+                         #!+(or x86 x86-64)
+                         (progn
+                           (setf bind-alien-stack t)
+                           `((let ((,var (make-local-alien ',info)))
+                               ,@body-forms)))
+                         ;; FIXME: This version is less efficient then it needs to be, since
+                         ;; it could just save and restore the number-stack pointer once,
+                         ;; instead of doing multiple decrements if there are multiple bindings.
+                         #!-(or x86 x86-64)
+                         `((let (,var)
+                             (unwind-protect
+                                  (progn
+                                    (setf ,var (make-local-alien ',info))
+                                    (let ((,var ,var))
+                                      ,body-form))
                                (dispose-local-alien ',info ,var))))))))))))
-    (/show "revised" body)
-    (verify-local-auxiliaries-okay)
-    (/show0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
-    `(symbol-macrolet ((&auxiliary-type-definitions&
-                        ,(append *new-auxiliary-types*
-                                 (auxiliary-type-definitions env))))
-       ,@body)))
+      (/show "revised" body)
+      (verify-local-auxiliaries-okay)
+      (/show0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
+      `(symbol-macrolet ((&auxiliary-type-definitions&
+                          ,(append *new-auxiliary-types*
+                                   (auxiliary-type-definitions env))))
+         ,@(if bind-alien-stack
+               `((let ((sb!vm::*alien-stack* sb!vm::*alien-stack*))
+                   ,@body))
+               body)))))
 
 ;;;; runtime C values that don't correspond directly to Lisp types
 
