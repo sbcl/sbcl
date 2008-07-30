@@ -145,7 +145,7 @@
     (values
      ;; ENCAPSULATION-FUN
      (lambda (&more arg-context arg-count)
-       (declare (optimize speed safety sb-c::stack-allocate-dynamic-extent))
+       (declare (optimize speed safety))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
          (unprofile-all) ; to avoid further recursion

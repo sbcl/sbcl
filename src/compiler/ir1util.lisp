@@ -391,37 +391,35 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
-(declaim (ftype (sfunction (node &optional (or null component)) boolean)
-                use-good-for-dx-p))
-(declaim (ftype (sfunction (lvar &optional (or null component)) boolean)
-                lvar-good-for-dx-p))
-(defun use-good-for-dx-p (use &optional component)
+(declaim (ftype (sfunction (node (member nil t :truly) &optional (or null component))
+                           boolean) use-good-for-dx-p))
+(declaim (ftype (sfunction (lvar (member nil t :truly) &optional (or null component))
+                           boolean) lvar-good-for-dx-p))
+(defun use-good-for-dx-p (use dx &optional component)
   ;; FIXME: Can casts point to LVARs in other components?
-  ;; RECHECK-DYNAMIC-EXTENT-LVARS assumes that they can't -- that
-  ;; is, that the PRINCIPAL-LVAR is always in the same component
-  ;; as the original one. It would be either good to have an
-  ;; explanation of why casts don't point across components, or an
-  ;; explanation of when they do it. ...in the meanwhile AVER that
-  ;; our assumption holds true.
+  ;; RECHECK-DYNAMIC-EXTENT-LVARS assumes that they can't -- that is, that the
+  ;; PRINCIPAL-LVAR is always in the same component as the original one. It
+  ;; would be either good to have an explanation of why casts don't point
+  ;; across components, or an explanation of when they do it. ...in the
+  ;; meanwhile AVER that our assumption holds true.
   (aver (or (not component) (eq component (node-component use))))
   (or (and (combination-p use)
            (eq (combination-kind use) :known)
-           (awhen (fun-info-stack-allocate-result
-                   (combination-fun-info use))
-             (funcall it use))
+           (awhen (fun-info-stack-allocate-result (combination-fun-info use))
+             (funcall it use dx))
            t)
       (and (cast-p use)
            (not (cast-type-check use))
-           (lvar-good-for-dx-p (cast-value use) component)
+           (lvar-good-for-dx-p (cast-value use) dx component)
            t)))
 
-(defun lvar-good-for-dx-p (lvar &optional component)
+(defun lvar-good-for-dx-p (lvar dx &optional component)
   (let ((uses (lvar-uses lvar)))
     (if (listp uses)
         (every (lambda (use)
-                 (use-good-for-dx-p use component))
+                 (use-good-for-dx-p use dx component))
                uses)
-        (use-good-for-dx-p uses component))))
+        (use-good-for-dx-p uses dx component))))
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)

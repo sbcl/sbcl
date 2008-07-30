@@ -58,9 +58,8 @@
   (event make-value-cell-event node)
   (let ((leaf (tn-leaf res)))
     (vop make-value-cell node block value
-         (and leaf (leaf-dynamic-extent leaf)
-              ;; FIXME: See bug 419
-              (policy node (> stack-allocate-value-cells 1)))
+         ;; FIXME: See bug 419
+         (and leaf (eq :truly (leaf-dynamic-extent leaf)))
          res)))
 
 ;;;; leaf reference

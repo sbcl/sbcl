@@ -1318,54 +1318,59 @@
         (setf (lambda-var-ignorep var) t)))))
   (values))
 
-(defun process-dx-decl (names vars fvars)
+(defun process-dx-decl (names vars fvars kind)
   (flet ((maybe-notify (control &rest args)
            (when (policy *lexenv* (> speed inhibit-warnings))
              (apply #'compiler-notify control args))))
-    (if (policy *lexenv* (= stack-allocate-dynamic-extent 3))
-        (dolist (name names)
-          (cond
-            ((symbolp name)
-             (let* ((bound-var (find-in-bindings vars name))
-                    (var (or bound-var
-                             (lexenv-find name vars)
-                             (find-free-var name))))
-               (etypecase var
-                 (leaf
-                  (if bound-var
-                      (setf (leaf-dynamic-extent var) t)
-                      (maybe-notify
-                       "ignoring DYNAMIC-EXTENT declaration for free ~S"
-                       name)))
-                 (cons
-                  (compiler-error "DYNAMIC-EXTENT on symbol-macro: ~S" name))
-                 (heap-alien-info
-                  (compiler-error "DYNAMIC-EXTENT on heap-alien-info: ~S"
-                                  name)))))
-            ((and (consp name)
-                  (eq (car name) 'function)
-                  (null (cddr name))
-                  (valid-function-name-p (cadr name)))
-             (let* ((fname (cadr name))
-                    (bound-fun (find fname fvars
-                                     :key #'leaf-source-name
-                                     :test #'equal)))
-               (etypecase bound-fun
-                 (leaf
-                  #!+stack-allocatable-closures
-                  (setf (leaf-dynamic-extent bound-fun) t)
-                  #!-stack-allocatable-closures
-                  (maybe-notify
-                   "ignoring DYNAMIC-EXTENT declaration on a function ~S ~
+    (let ((dx (cond ((eq 'truly-dynamic-extent kind)
+                     :truly)
+                    ((and (eq 'dynamic-extent kind)
+                          *stack-allocate-dynamic-extent*)
+                     t))))
+      (if dx
+          (dolist (name names)
+            (cond
+              ((symbolp name)
+               (let* ((bound-var (find-in-bindings vars name))
+                      (var (or bound-var
+                               (lexenv-find name vars)
+                               (find-free-var name))))
+                 (etypecase var
+                   (leaf
+                    (if bound-var
+                        (setf (leaf-dynamic-extent var) dx)
+                        (maybe-notify
+                         "ignoring DYNAMIC-EXTENT declaration for free ~S"
+                         name)))
+                   (cons
+                    (compiler-error "DYNAMIC-EXTENT on symbol-macro: ~S" name))
+                   (heap-alien-info
+                    (compiler-error "DYNAMIC-EXTENT on heap-alien-info: ~S"
+                                    name)))))
+              ((and (consp name)
+                    (eq (car name) 'function)
+                    (null (cddr name))
+                    (valid-function-name-p (cadr name)))
+               (let* ((fname (cadr name))
+                      (bound-fun (find fname fvars
+                                       :key #'leaf-source-name
+                                       :test #'equal)))
+                 (etypecase bound-fun
+                   (leaf
+                    #!+stack-allocatable-closures
+                    (setf (leaf-dynamic-extent bound-fun) dx)
+                    #!-stack-allocatable-closures
+                    (maybe-notify
+                     "ignoring DYNAMIC-EXTENT declaration on a function ~S ~
                     (not supported on this platform)." fname))
-                 (cons
-                  (compiler-error "DYNAMIC-EXTENT on macro: ~S" fname))
-                 (null
-                  (maybe-notify
-                   "ignoring DYNAMIC-EXTENT declaration for free ~S"
-                   fname)))))
-            (t (compiler-error "DYNAMIC-EXTENT on a weird thing: ~S" name))))
-      (maybe-notify "ignoring DYNAMIC-EXTENT declarations for ~S" names))))
+                   (cons
+                    (compiler-error "DYNAMIC-EXTENT on macro: ~S" fname))
+                   (null
+                    (maybe-notify
+                     "ignoring DYNAMIC-EXTENT declaration for free ~S"
+                     fname)))))
+              (t (compiler-error "DYNAMIC-EXTENT on a weird thing: ~S" name))))
+          (maybe-notify "ignoring DYNAMIC-EXTENT declarations for ~S" names)))))
 
 ;;; FIXME: This is non-ANSI, so the default should be T, or it should
 ;;; go away, I think.
@@ -1418,8 +1423,8 @@
                        (car types)
                        `(values ,@types)))))
           res))
-       (dynamic-extent
-        (process-dx-decl (cdr spec) vars fvars)
+       ((dynamic-extent truly-dynamic-extent)
+        (process-dx-decl (cdr spec) vars fvars (first spec))
         res)
        ((disable-package-locks enable-package-locks)
         (make-lexenv

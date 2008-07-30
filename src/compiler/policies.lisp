@@ -91,35 +91,6 @@ run-time, which is less efficient. TRACE will show recursive calls. In
 case of renaming described above, calls to FOO will not be recursive
 and will refer to the new function, bound to FOO.")
 
-(define-optimization-quality stack-allocate-dynamic-extent
-    (if (and (> (max speed space) (max debug safety))
-             (< safety 3))
-        3
-        0)
-  ("no" "maybe" "yes" "yes")
-  "Control whether allocate objects, declared DYNAMIC-EXTENT, on
-stack.")
-
-(define-optimization-quality stack-allocate-value-cells
-    ;; FIXME, see bug 419
-    0
-  ("no" "maybe" "yes" "yes")
-  "Control whether allocate closure variable storage, declared
-DYNAMIC-EXTENT, on stack.")
-
-(define-optimization-quality stack-allocate-vector
-    (cond ((= stack-allocate-dynamic-extent 0) 0)
-          ((= safety 0) 3)
-          (t 2))
-  ("no" "maybe" "one page" "yes")
-  "Control what vectors, declared DYNAMIC-EXTENT, are allocated on stack:
-0: no vectors are allocated on stack;
-2: only short vectors (compiler knows them to fit on one page);
-3: every.
-
-This option has an effect only when STACK-ALLOCATE-DYNAMIC-EXTENT is
-set.")
-
 (define-optimization-quality float-accuracy
     3
   ("degraded" "full" "full" "full"))

@@ -23,7 +23,7 @@
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
     (seq-dispatch sequence
       (stable-sort-list sequence
@@ -43,7 +43,7 @@
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
     (seq-dispatch sequence
       (stable-sort-list sequence

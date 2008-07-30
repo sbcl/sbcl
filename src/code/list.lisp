@@ -341,7 +341,7 @@
 (defun append (&rest lists)
   #!+sb-doc
   "Construct a new list by concatenating the list arguments"
-  (declare (dynamic-extent lists) (optimize speed))
+  (declare (truly-dynamic-extent lists) (optimize speed))
   (labels ((fail (object)
              (error 'type-error
                     :datum object
@@ -471,7 +471,7 @@
 (defun nconc (&rest lists)
    #!+sb-doc
    "Concatenates the lists given as arguments (by changing them)"
-   (declare (dynamic-extent lists) (optimize speed))
+   (declare (truly-dynamic-extent lists) (optimize speed))
    (flet ((fail (object)
             (error 'type-error
                    :datum object

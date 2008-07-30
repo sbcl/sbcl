@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.20 relative to 1.0.19:
+  * minor incompatible change: OPTIMIZE qualities
+    SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT, SB-C::STACK-ALLOCATE-VECTOR,
+    and SB-C::STACK-ALLOCATE-VALUE-CELLS no longer exist. See documentation
+    and SB-EXT:*STACK-ALLOCATE-DYNAMIC-EXTENT* for details.
   * bug fix: fixed #427: unused local aliens no longer cause compiler
     breakage. (reported by Stelian Ionescu, Andy Hefner and Stanislaw
     Halik)

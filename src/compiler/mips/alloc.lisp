@@ -12,11 +12,6 @@
 (in-package "SB!VM")
 
 ;;;; LIST and LIST*
-(defoptimizer (list stack-allocate-result) ((&rest args))
-  (not (null args)))
-(defoptimizer (list* stack-allocate-result) ((&rest args))
-  (not (null (rest args))))
-
 (define-vop (list-or-list*)
   (:args (things :more t))
   (:temporary (:scs (descriptor-reg) :type list) ptr)

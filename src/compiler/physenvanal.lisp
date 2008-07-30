@@ -334,7 +334,7 @@
                    (loop for what in (cleanup-info cleanup)
                          do (etypecase what
                               (lvar
-                               (if (lvar-good-for-dx-p what component)
+                               (if (lvar-good-for-dx-p what t component)
                                    (let ((real (principal-lvar what)))
                                      (setf (lvar-dynamic-extent real) cleanup)
                                      (real-dx-lvars real))

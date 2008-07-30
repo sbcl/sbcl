@@ -1327,9 +1327,6 @@
     (inst mov value (make-ea :dword :base object :index value))))
 
 ;;; Turn more arg (context, count) into a list.
-(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
-  t)
-
 (define-vop (listify-rest-args)
   (:translate %listify-rest-args)
   (:policy :safe)

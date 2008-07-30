@@ -35,6 +35,7 @@
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
+ ("src/code/cross-early" :not-target)
 
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")

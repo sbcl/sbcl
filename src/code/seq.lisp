@@ -673,7 +673,7 @@
   #!+sb-doc
   "The target sequence is destructively modified by copying successive
    elements into it from the source sequence."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let* (;; KLUDGE: absent either rewriting FOO-REPLACE-FROM-BAR, or
          ;; excessively polluting DEFINE-SEQUENCE-TRAVERSER, we rebind
          ;; these things here so that legacy code gets the names it's
@@ -961,9 +961,9 @@
            (type list sequences))
   (let ((result nil))
     (flet ((f (&rest args)
-             (declare (dynamic-extent args))
+             (declare (truly-dynamic-extent args))
              (push (apply fun args) result)))
-      (declare (dynamic-extent #'f))
+      (declare (truly-dynamic-extent #'f))
       (%map-for-effect #'f sequences))
     (nreverse result)))
 (defun %map-to-vector (output-type-spec fun sequences)
@@ -971,19 +971,19 @@
            (type list sequences))
   (let ((min-len 0))
     (flet ((f (&rest args)
-             (declare (dynamic-extent args))
+             (declare (truly-dynamic-extent args))
              (declare (ignore args))
              (incf min-len)))
-      (declare (dynamic-extent #'f))
+      (declare (truly-dynamic-extent #'f))
       (%map-for-effect #'f sequences))
     (let ((result (make-sequence output-type-spec min-len))
           (i 0))
       (declare (type (simple-array * (*)) result))
       (flet ((f (&rest args)
-               (declare (dynamic-extent args))
+               (declare (truly-dynamic-extent args))
                (setf (aref result i) (apply fun args))
                (incf i)))
-        (declare (dynamic-extent #'f))
+        (declare (truly-dynamic-extent #'f))
         (%map-for-effect #'f sequences))
       result)))
 (defun %map-to-sequence (result-type fun sequences)
@@ -991,20 +991,20 @@
            (type list sequences))
   (let ((min-len 0))
     (flet ((f (&rest args)
-             (declare (dynamic-extent args))
+             (declare (truly-dynamic-extent args))
              (declare (ignore args))
              (incf min-len)))
-      (declare (dynamic-extent #'f))
+      (declare (truly-dynamic-extent #'f))
       (%map-for-effect #'f sequences))
     (let ((result (make-sequence result-type min-len)))
       (multiple-value-bind (state limit from-end step endp elt setelt)
           (sb!sequence:make-sequence-iterator result)
         (declare (ignore limit endp elt))
         (flet ((f (&rest args)
-                 (declare (dynamic-extent args))
+                 (declare (truly-dynamic-extent args))
                  (funcall setelt (apply fun args) result state)
                  (setq state (funcall step result state from-end))))
-          (declare (dynamic-extent #'f))
+          (declare (truly-dynamic-extent #'f))
           (%map-for-effect #'f sequences)))
       result)))
 
@@ -1234,7 +1234,7 @@
 (define-sequence-traverser reduce (function sequence &rest args &key key
                                    from-end start end (initial-value nil ivp))
   (declare (type index start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((start start)
         (end (or end length)))
     (declare (type index start end))
@@ -1377,7 +1377,7 @@
   "Return a sequence formed by destructively removing the specified ITEM from
   the given SEQUENCE."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1415,7 +1415,7 @@
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1453,7 +1453,7 @@
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1602,7 +1602,7 @@
   "Return a copy of SEQUENCE with elements satisfying the test (default is
    EQL) with ITEM removed."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1619,7 +1619,7 @@
   #!+sb-doc
   "Return a copy of sequence with elements satisfying PREDICATE removed."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1636,7 +1636,7 @@
   #!+sb-doc
   "Return a copy of sequence with elements not satisfying PREDICATE removed."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
@@ -1788,7 +1788,7 @@
 
    The :TEST-NOT argument is deprecated."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (if sequence
         (list-remove-duplicates* sequence test test-not
@@ -1861,7 +1861,7 @@
    given sequence, is returned.
 
    The :TEST-NOT argument is deprecated."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (if sequence
         (list-delete-duplicates* sequence test test-not
@@ -1981,7 +1981,7 @@
   "Return a sequence of the same kind as SEQUENCE with the same elements,
   except that all elements equal to OLD are replaced with NEW."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (type index end))
     (subst-dispatch 'normal)))
@@ -1993,7 +1993,7 @@
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements satisfying the PRED are replaced with NEW."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (fixnum start))
   (let ((end (or end length))
         (test predicate)
@@ -2007,7 +2007,7 @@
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements not satisfying the PRED are replaced with NEW."
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (fixnum start))
   (let ((end (or end length))
         (test predicate)
@@ -2026,7 +2026,7 @@
   except that all elements equal to OLD are replaced with NEW. SEQUENCE
   may be destructively modified."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (seq-dispatch sequence
       (if from-end
@@ -2079,7 +2079,7 @@
    except that all elements satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (fixnum end))
     (seq-dispatch sequence
@@ -2121,7 +2121,7 @@
    except that all elements not satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length)))
     (declare (fixnum end))
     (seq-dispatch sequence
@@ -2212,7 +2212,7 @@
 
 (defun find
     (item sequence &rest args &key from-end (start 0) end key test test-not)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 0 (%find-position
                   item sequence from-end start end
@@ -2225,7 +2225,7 @@
     (apply #'sb!sequence:find item sequence args)))
 (defun position
     (item sequence &rest args &key from-end (start 0) end key test test-not)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 1 (%find-position
                   item sequence from-end start end
@@ -2238,7 +2238,7 @@
     (apply #'sb!sequence:position item sequence args)))
 
 (defun find-if (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 0 (%find-position-if
                   (%coerce-callable-to-fun predicate)
@@ -2251,7 +2251,7 @@
     (apply #'sb!sequence:find-if predicate sequence args)))
 (defun position-if
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 1 (%find-position-if
                   (%coerce-callable-to-fun predicate)
@@ -2265,7 +2265,7 @@
 
 (defun find-if-not
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 0 (%find-position-if-not
                   (%coerce-callable-to-fun predicate)
@@ -2278,7 +2278,7 @@
     (apply #'sb!sequence:find-if-not predicate sequence args)))
 (defun position-if-not
     (predicate sequence &rest args &key from-end (start 0) end key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
     (nth-value 1 (%find-position-if-not
                   (%coerce-callable-to-fun predicate)
@@ -2327,7 +2327,7 @@
   #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length))
         (pred (%coerce-callable-to-fun pred)))
     (declare (type index end))
@@ -2345,7 +2345,7 @@
   #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end (or end length))
         (pred (%coerce-callable-to-fun pred)))
     (declare (type index end))
@@ -2365,7 +2365,7 @@
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
   (declare (fixnum start))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (when (and test-p test-not-p)
     ;; ANSI Common Lisp has left the behavior in this situation unspecified.
     ;; (CLHS 17.2.1)
@@ -2473,7 +2473,7 @@
    :FROM-END argument is given, then one plus the index of the rightmost
    position in which the sequences differ is returned."
   (declare (fixnum start1 start2))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let* ((end1 (or end1 length1))
          (end2 (or end2 length2)))
     (declare (type index end1 end2))
@@ -2583,7 +2583,7 @@
     (sequence1 sequence2 &rest args &key
      from-end test test-not start1 end1 start2 end2 key)
   (declare (fixnum start1 start2))
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (let ((end1 (or end1 length1))
         (end2 (or end2 length2)))
     (seq-dispatch sequence2

@@ -3,124 +3,10 @@
 @chapter Efficiency
 @cindex Efficiency
 
-FIXME: The material in the CMUCL manual about getting good
-performance from the compiler should be reviewed, reformatted in
-Texinfo, lightly edited for SBCL, and substituted into this
-manual. In the meantime, the original CMUCL manual is still 95+%
-correct for the SBCL version of the Python compiler. See the
-sections
-
-@itemize
-@item Advanced Compiler Use and Efficiency Hints
-@item Advanced Compiler Introduction
-@item More About Types in Python
-@item Type Inference
-@item Source Optimization
-@item Tail Recursion
-@item Local Call
-@item Block Compilation
-@item Inline Expansion
-@item Object Representation
-@item Numbers
-@item General Efficiency Hints
-@item Efficiency Notes
-@end itemize
-
-Besides this information from the CMUCL manual, there are a few other
-points to keep in mind.
-
-@itemize
-  
-@item
-The CMUCL manual doesn't seem to state it explicitly, but Python has a
-mental block about type inference when assignment is involved. Python
-is very aggressive and clever about inferring the types of values
-bound with @code{let}, @code{let*}, inline function call, and so
-forth. However, it's much more passive and dumb about inferring the
-types of values assigned with @code{setq}, @code{setf}, and
-friends. It would be nice to fix this, but in the meantime don't
-expect that just because it's very smart about types in most respects
-it will be smart about types involved in assignments.  (This doesn't
-affect its ability to benefit from explicit type declarations
-involving the assigned variables, only its ability to get by without
-explicit type declarations.)
-
-@c <!-- FIXME: Python dislikes assignments, but not in type
-@c     inference. The real problems are loop induction, closed over
-@c     variables and aliases. -->
-  
-@item
-Since the time the CMUCL manual was written, CMUCL (and thus SBCL) has
-gotten a generational garbage collector. This means that there are
-some efficiency implications of various patterns of memory usage which
-aren't discussed in the CMUCL manual. (Some new material should be
-written about this.)
-  
-@item
-SBCL has some important known efficiency problems.  Perhaps the most
-important are
-    
-@itemize @minus
-      
-@item
-There is only limited support for the ANSI @code{dynamic-extent}
-declaration.  @xref{Dynamic-extent allocation}.
-      
-@item
-The garbage collector is not particularly efficient, at least on
-platforms without the generational collector (as of SBCL 0.8.9, all
-except x86).
-      
-@item
-Various aspects of the PCL implementation of CLOS are more inefficient
-than necessary.
-    
-@end itemize
-
-@end itemize
-
-Finally, note that Common Lisp defines many constructs which, in
-the infamous phrase, ``could be compiled efficiently by a
-sufficiently smart compiler''. The phrase is infamous because
-making a compiler which actually is sufficiently smart to find all
-these optimizations systematically is well beyond the state of the art
-of current compiler technology. Instead, they're optimized on a
-case-by-case basis by hand-written code, or not optimized at all if
-the appropriate case hasn't been hand-coded. Some cases where no such
-hand-coding has been done as of SBCL version 0.6.3 include
-
-@itemize
-  
-@item
-@code{(reduce #'f x)} where the type of @code{x} is known at compile
-time
-  
-@item
-various bit vector operations, e.g.  @code{(position 0
-some-bit-vector)}
-
-@item
-specialized sequence idioms, e.g.  @code{(remove item list :count 1)}
-
-@item
-cases where local compilation policy does not require excessive type
-checking, e.g.  @code{(locally (declare (safety 1)) (assoc item
-list))} (which currently performs safe @code{endp} checking internal
-to assoc).
-
-@end itemize
-
-If your system's performance is suffering because of some construct
-which could in principle be compiled efficiently, but which the SBCL
-compiler can't in practice compile efficiently, consider writing a
-patch to the compiler and submitting it for inclusion in the main
-sources. Such code is often reasonably straightforward to write;
-search the sources for the string ``@code{deftransform}'' to find many
-examples (some straightforward, some less so).
-
 @menu
-* Dynamic-extent allocation::   
-* Modular arithmetic::          
+* Dynamic-extent allocation::
+* Modular arithmetic::
+* Miscellaneous Efficiency Issues::
 @end menu
 
 @node  Dynamic-extent allocation
@@ -129,101 +15,104 @@ examples (some straightforward, some less so).
 @cindex Dynamic-extent declaration
 
 SBCL has limited support for performing allocation on the stack when a
-variable is declared @code{dynamic-extent}.  The @code{dynamic-extent}
-declarations are not verified, but are simply trusted; if the
-constraints in the Common Lisp standard are violated, the best that
-can happen is for the program to have garbage in variables and return
-values; more commonly, the system will crash.
+variable is declared @code{dynamic-extent}. The @code{dynamic-extent}
+declarations are not verified, but are simply trusted as long as
+@code{sb-ext:*stack-allocate-dynamic-extent*} is true.
 
-As a consequence of this, the condition for performing stack
-allocation is stringent: either of the @code{speed} or @code{space}
-optimization qualities must be higher than the maximum of
-@code{safety} and @code{debug} at the point of the allocation.  For
-example:
+If dynamic extent constraints specified in the Common Lisp standard
+are violated, the best that can happen is for the program to have
+garbage in variables and return values; more commonly, the system will
+crash.
 
-@lisp
-(locally
-  (declare (optimize speed (safety 1) (debug 1)))
-  (defun foo (&rest rest)
-    (declare (dynamic-extent rest))
-    (length rest)))
-@end lisp
-
-Here the @code{&rest} list will be allocated on the stack.  Note that
-it would not be in the following situation:
-
-@lisp
-(defun foo (&rest rest)
-  (declare (optimize speed (safety 1) (debug 1)))
-  (declare (dynamic-extent rest))
-  (length rest))
-@end lisp
-
-because both the allocation of the @code{&rest} list and the variable
-binding are outside the scope of the @code{optimize} declaration.
+@include var-sb-ext-star-stack-allocate-dynamic-extent-star.texinfo
 
 There are many cases when @code{dynamic-extent} declarations could be
-useful. At present, SBCL implements
+useful. At present, SBCL implements stack allocation for
 
 @itemize
 
 @item
-Stack allocation of @code{&rest} lists, where these are declared
-@code{dynamic-extent}.
+@code{&rest} lists, when these are declared @code{dynamic-extent}.
 
 @item
-Stack allocation of @code{list} and @code{list*}, whose result is
-bound to a variable, declared @code{dynamic-extent}, such as
+@code{cons}, @code{list} and @code{list*}, when the result is bound to
+a variable declared @code{dynamic-extent}.
+
+@item
+simple forms of @code{make-array}, whose result is bound to a variable
+declared @code{dynamic-extent}: stack allocation is possible only if
+the resulting array is one-dimensional, and the call has no keyword
+arguments with the exception of @code{:element-type}.
+
+@strong{Note}: stack space is limited, so allocation of a large vector
+may cause stack overflow. For this reason potentially large vectors,
+which might circumvent stack overflow detection, are stack allocated
+only in zero @code{safety} policies.
+
+@item
+closures defined with @code{flet} or @code{labels}, with a bound
+@code{dynamic-extent} declaration. Closed-over variables, which are
+assigned to (either inside or outside the closure) are still allocated
+on the heap. Blocks and tags are also allocated on the heap, unless
+all non-local control transfers to them are compiled with zero
+@code{safety}.
+
+@item
+user-defined structures when the structure constructor defined using
+@code{defstruct} has been declared @code{inline} and the result of the
+call to the constructor is bound to a variable declared
+@code{dynamic-extent}.
+
+@strong{Note:} structures with ``raw'' slots can currently be
+stack-allocated only on x86 and x86-64.
+
+@item
+all of the above when they appear as initial parts if another
+stack-allocated object.
+
+@end itemize
+
+Examples:
 
 @lisp
-(let ((list (list 1 2 3)))
-  (declare (dynamic-extent list)
-  ...))
-@end lisp
+;;; Declaiming a structure constructor inline before definition makes
+;;; stack allocation possible.
+(declaim (inline make-thing))
+(defstruct thing obj next)
 
-or
+;;; Stack allocation of various objects bound to DYNAMIC-EXTENT
+;;; variables.
+(let* ((list (list 1 2 3))
+       (nested (cons (list 1 2) (list* 3 4 (list 5))))
+       (vector (make-array 3 :element-type 'single-float))
+       (thing (make-thing :obj list
+                          :next (make-thing :obj (make-array 3)))))
+  (declare (dynamic-extent list nested vector thing))
+  ...)
 
-@lisp
+;;; Stack allocation of arguments to a local function is equivalent
+;;; to stack allocation of local variable values.
 (flet ((f (x)
          (declare (dynamic-extent x))
          ...))
   ...
   (f (list 1 2 3))
+  (f (cons (cons 1 2) (cons 3 4)))
+  ...)
+
+;;; Stack allocation of &REST lists
+(defun foo (&rest args)
+  (declare (dynamic-extent args))
   ...)
 @end lisp
-
-@item
-Stack allocation of simple forms of @code{make-array}, whose result is
-bound to a variable, declared @code{dynamic-extent}. The resulting
-array should be one-dimensional, the only allowed keyword argument is
-@code{:element-type}.
-
-Notice, that stack space is limited, so allocation of a large vector
-may cause stack overflow and abnormal termination of the SBCL process.
-
-@item
-Stack allocation of closures, defined with @code{flet} or
-@code{labels} with a bound declaration @code{dynamic-extent}.
-Closed-over variables, which are assigned (either inside or outside
-the closure) are still allocated on the heap. Blocks and tags are also
-allocated on the heap, unless all non-local control transfers to them
-are compiled with zero @code{safety}.
-
-@end itemize
 
 Future plans include
 
 @itemize
 
 @item
-Stack allocation of closures, where these are declared
-@code{dynamic-extent};
-
-@item
-Stack allocation of @code{list}, @code{list*} and @code{cons}
-(including following chains during initialization, and also for
-binding mutation), where the allocation is declared
-@code{dynamic-extent};
+Stack allocation of assigned-to closed-over variables, where these are
+declared @code{dynamic-extent};
 
 @item
 Automatic detection of the common idiom of applying a function to some
@@ -276,3 +165,118 @@ combinations; and @code{ash} with the positive second
 argument. ``Good'' widths are 32 on HPPA, MIPS, PPC, Sparc and x86 and
 64 on Alpha.  While it is possible to support smaller widths as well,
 currently this is not implemented.
+
+@node  Miscellaneous Efficiency Issues
+@comment  node-name,  next,  previous,  up
+@section Miscellaneous Efficiency Issues
+
+FIXME: The material in the CMUCL manual about getting good
+performance from the compiler should be reviewed, reformatted in
+Texinfo, lightly edited for SBCL, and substituted into this
+manual. In the meantime, the original CMUCL manual is still 95+%
+correct for the SBCL version of the Python compiler. See the
+sections
+
+@itemize
+@item Advanced Compiler Use and Efficiency Hints
+@item Advanced Compiler Introduction
+@item More About Types in Python
+@item Type Inference
+@item Source Optimization
+@item Tail Recursion
+@item Local Call
+@item Block Compilation
+@item Inline Expansion
+@item Object Representation
+@item Numbers
+@item General Efficiency Hints
+@item Efficiency Notes
+@end itemize
+
+Besides this information from the CMUCL manual, there are a few other
+points to keep in mind.
+
+@itemize
+
+@item
+The CMUCL manual doesn't seem to state it explicitly, but Python has a
+mental block about type inference when assignment is involved. Python
+is very aggressive and clever about inferring the types of values
+bound with @code{let}, @code{let*}, inline function call, and so
+forth. However, it's much more passive and dumb about inferring the
+types of values assigned with @code{setq}, @code{setf}, and
+friends. It would be nice to fix this, but in the meantime don't
+expect that just because it's very smart about types in most respects
+it will be smart about types involved in assignments.  (This doesn't
+affect its ability to benefit from explicit type declarations
+involving the assigned variables, only its ability to get by without
+explicit type declarations.)
+
+@c <!-- FIXME: Python dislikes assignments, but not in type
+@c     inference. The real problems are loop induction, closed over
+@c     variables and aliases. -->
+
+@item
+Since the time the CMUCL manual was written, CMUCL (and thus SBCL) has
+gotten a generational garbage collector. This means that there are
+some efficiency implications of various patterns of memory usage which
+aren't discussed in the CMUCL manual. (Some new material should be
+written about this.)
+
+@item
+SBCL has some important known efficiency problems.  Perhaps the most
+important are
+
+@itemize @minus
+
+@item
+The garbage collector is not particularly efficient, at least on
+platforms without the generational collector (as of SBCL 0.8.9, all
+except x86).
+
+@item
+Various aspects of the PCL implementation of CLOS are more inefficient
+than necessary.
+
+@end itemize
+
+@end itemize
+
+Finally, note that Common Lisp defines many constructs which, in
+the infamous phrase, ``could be compiled efficiently by a
+sufficiently smart compiler''. The phrase is infamous because
+making a compiler which actually is sufficiently smart to find all
+these optimizations systematically is well beyond the state of the art
+of current compiler technology. Instead, they're optimized on a
+case-by-case basis by hand-written code, or not optimized at all if
+the appropriate case hasn't been hand-coded. Some cases where no such
+hand-coding has been done as of SBCL version 0.6.3 include
+
+@itemize
+
+@item
+@code{(reduce #'f x)} where the type of @code{x} is known at compile
+time
+
+@item
+various bit vector operations, e.g.  @code{(position 0
+some-bit-vector)}
+
+@item
+specialized sequence idioms, e.g.  @code{(remove item list :count 1)}
+
+@item
+cases where local compilation policy does not require excessive type
+checking, e.g.  @code{(locally (declare (safety 1)) (assoc item
+list))} (which currently performs safe @code{endp} checking internal
+to assoc).
+
+@end itemize
+
+If your system's performance is suffering because of some construct
+which could in principle be compiled efficiently, but which the SBCL
+compiler can't in practice compile efficiently, consider writing a
+patch to the compiler and submitting it for inclusion in the main
+sources. Such code is often reasonably straightforward to write;
+search the sources for the string ``@code{deftransform}'' to find many
+examples (some straightforward, some less so).

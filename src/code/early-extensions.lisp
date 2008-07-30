@@ -1225,53 +1225,19 @@ to :INTERPRET, an interpreter will be used.")
 
 ;;; Helper for making the DX closure allocation in macros expanding
 ;;; to CALL-WITH-FOO less ugly.
-;;;
-;;; This expands to something like
-;;;
-;;;  (flet ((foo (...) <body-of-foo>))
-;;;     (declare (optimize stack-allocate-dynamic-extent))
-;;;     (flet ((foo (...)
-;;;              (foo ...))
-;;;        (declare (dynamic-extent #'foo))
-;;;        <body-of-dx-flet>)))
-;;;
-;;; The outer FLETs are inlined into the inner ones, and the inner ones
-;;; are DX-allocated. The double-fletting is done to keep the bodies of
-;;; the functions in an environment with correct policy: we don't want
-;;; to force DX allocation in their bodies, which would be bad eg.
-;;; in safe code.
 (defmacro dx-flet (functions &body forms)
-  (let ((names (mapcar #'car functions)))
-    `(flet ,functions
-       #-sb-xc-host
-       (declare (optimize sb!c::stack-allocate-dynamic-extent))
-       (flet ,(mapcar
-               (lambda (f)
-                 (let ((args (cadr f))
-                       (name (car f)))
-                   (when (intersection args sb!xc:lambda-list-keywords)
-                     ;; No fundamental reason not to support them, but we
-                     ;; don't currently need them here.
-                     (error "Non-required arguments not implemented for DX-FLET."))
-                   `(,name ,args
-                      (,name ,@args))))
-               functions)
-         (declare (dynamic-extent ,@(mapcar (lambda (x) `(function ,x)) names)))
-         ,@forms))))
+  `(flet ,functions
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
+               ,@(mapcar (lambda (func) `(function ,(car func))) functions)))
+     ,@forms))
 
-;;; Another similar one -- but actually touches the policy of the body,
-;;; so take care with this one...
+;;; Another similar one.
 (defmacro dx-let (bindings &body forms)
-  `(locally
-       (declare (optimize #-sb-xc-host sb!c::stack-allocate-dynamic-extent
-                          #-sb-xc-host sb!c::stack-allocate-value-cells))
-     (let ,bindings
-       (declare (dynamic-extent ,@(mapcar (lambda (bind)
-                                            (if (consp bind)
-                                                (car bind)
-                                                bind))
-                                          bindings)))
-       ,@forms)))
+  `(let ,bindings
+     (declare (#+sb-xc-host dynamic-extent #-sb-xc-host truly-dynamic-extent
+               ,@(mapcar (lambda (bind) (if (consp bind) (car bind) bind))
+                         bindings)))
+     ,@forms))
 
 (in-package "SB!KERNEL")
 

@@ -43,7 +43,7 @@
              (setf (car args) nil)))
   (values))
 
-(defun handle-nested-dynamic-extent-lvars (lvar)
+(defun handle-nested-dynamic-extent-lvars (dx lvar)
   (let ((uses (lvar-uses lvar)))
     ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
     ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
@@ -55,26 +55,26 @@
     (flet ((recurse (use)
              (etypecase use
                (cast
-                (handle-nested-dynamic-extent-lvars (cast-value use)))
+                (handle-nested-dynamic-extent-lvars dx (cast-value use)))
                (combination
                 (loop for arg in (combination-args use)
-                      when (lvar-good-for-dx-p arg)
-                      append (handle-nested-dynamic-extent-lvars arg))))))
+                      when (lvar-good-for-dx-p arg dx)
+                      append (handle-nested-dynamic-extent-lvars dx arg))))))
       (cons lvar
             (if (listp uses)
                 (loop for use in uses
-                      when (use-good-for-dx-p use)
+                      when (use-good-for-dx-p use dx)
                       nconc (recurse use))
-                (when (use-good-for-dx-p uses)
+                (when (use-good-for-dx-p uses dx)
                   (recurse uses)))))))
 
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
-        and var in (lambda-vars fun)
-        when (and arg (lambda-var-dynamic-extent var)
-                  (not (lvar-dynamic-extent arg)))
-        append (handle-nested-dynamic-extent-lvars arg) into dx-lvars
+        for var in (lambda-vars fun)
+        for dx = (lambda-var-dynamic-extent var)
+        when (and dx arg (not (lvar-dynamic-extent arg)))
+        append (handle-nested-dynamic-extent-lvars dx arg) into dx-lvars
         finally (when dx-lvars
                   ;; Stack analysis requires that the CALL ends the block, so
                   ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.

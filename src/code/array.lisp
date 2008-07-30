@@ -527,17 +527,17 @@ of specialized arrays is supported."
       t))
 
 (defun array-row-major-index (array &rest subscripts)
-  (declare (dynamic-extent subscripts))
+  (declare (truly-dynamic-extent subscripts))
   (%array-row-major-index array subscripts))
 
 (defun aref (array &rest subscripts)
   #!+sb-doc
   "Return the element of the ARRAY specified by the SUBSCRIPTS."
-  (declare (dynamic-extent subscripts))
+  (declare (truly-dynamic-extent subscripts))
   (row-major-aref array (%array-row-major-index array subscripts)))
 
 (defun %aset (array &rest stuff)
-  (declare (dynamic-extent stuff))
+  (declare (truly-dynamic-extent stuff))
   (let ((subscripts (butlast stuff))
         (new-value (car (last stuff))))
     (setf (row-major-aref array (%array-row-major-index array subscripts))
@@ -570,7 +570,7 @@ of specialized arrays is supported."
 
 #!-sb-fluid (declaim (inline (setf aref)))
 (defun (setf aref) (new-value array &rest subscripts)
-  (declare (dynamic-extent subscripts))
+  (declare (truly-dynamic-extent subscripts))
   (declare (type array array))
   (setf (row-major-aref array (%array-row-major-index array subscripts))
         new-value))

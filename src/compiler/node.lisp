@@ -634,8 +634,8 @@
   ;; true if there was ever a REF or SET node for this leaf. This may
   ;; be true when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type boolean)
-  ;; is it declared dynamic-extent?
-  (dynamic-extent nil :type boolean)
+  ;; is it declared dynamic-extent, or truly-dynamic-extent?
+  (dynamic-extent nil :type (member nil t :truly))
   ;; some kind of info used by the back end
   (info nil))
 

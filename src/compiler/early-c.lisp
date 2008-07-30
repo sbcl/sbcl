@@ -111,6 +111,13 @@
 (defvar *warnings-p*)
 (defvar *lambda-conversions*)
 
+(defvar *stack-allocate-dynamic-extent* t
+  "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
+and stack allocates otherwise inaccessible parts of the object whenever
+possible. Potentially long (over one page in size) vectors are, however, not
+stack allocated except in zero SAFETY code, as such a vector could overflow
+the stack without triggering overflow protection.")
+
 ;;; This lock is seized in the compiler, and related areas: the
 ;;; compiler is not presently thread-safe
 (defvar *big-compiler-lock*

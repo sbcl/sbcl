@@ -92,7 +92,7 @@
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (/show0 "enable-interrupt")
   (flet ((run-handler (&rest args)
-           (declare (dynamic-extent args))
+           (declare (truly-dynamic-extent args))
            (in-interruption ()
              (apply handler args))))
     (without-gcing

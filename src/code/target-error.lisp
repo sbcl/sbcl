@@ -56,7 +56,6 @@ restarts associated with CONDITION (or with no condition) will be returned."
           (setq other (append (cdr alist) other))))
     (collect ((res))
       (let ((stack *restart-test-stack*))
-        (declare (optimize sb!c::stack-allocate-dynamic-extent))
         (dolist (restart-cluster *restart-clusters*)
           (dolist (restart restart-cluster)
             (when (and (or (not condition)
@@ -69,7 +68,7 @@ restarts associated with CONDITION (or with no condition) will be returned."
                        ;; duraction of the test call.
                        (not (memq restart stack))
                        (let ((*restart-test-stack* (cons restart stack)))
-                         (declare (dynamic-extent *restart-test-stack*))
+                         (declare (truly-dynamic-extent *restart-test-stack*))
                          (funcall (restart-test-function restart) condition)))
              (res restart)))))
       (res))))

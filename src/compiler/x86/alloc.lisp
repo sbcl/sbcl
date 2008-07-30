@@ -12,13 +12,6 @@
 (in-package "SB!VM")
 
 ;;;; CONS, LIST and LIST*
-(defoptimizer (cons stack-allocate-result) ((&rest args))
-  t)
-(defoptimizer (list stack-allocate-result) ((&rest args))
-  (not (null args)))
-(defoptimizer (list* stack-allocate-result) ((&rest args))
-  (not (null (rest args))))
-
 (define-vop (list-or-list*)
   (:args (things :more t))
   (:temporary (:sc unsigned-reg) ptr temp)
@@ -158,41 +151,6 @@
     (inst xor zero zero)
     (inst rep)
     (inst stos zero)))
-
-(in-package "SB!C")
-
-(defoptimizer (allocate-vector stack-allocate-result)
-    ((type length words) node)
-  (ecase (policy node stack-allocate-vector)
-    (0 nil)
-    ((1 2)
-     ;; a vector object should fit in one page
-     (values-subtypep (lvar-derived-type words)
-                      (load-time-value
-                       (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-size*
-                                                          sb!vm:n-word-bytes)
-                                                       sb!vm:vector-data-offset))))))
-    (3 t)))
-
-(defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
-  (let ((args (basic-combination-args call))
-        (template (template-or-lose (if (awhen (node-lvar call)
-                                          (lvar-dynamic-extent it))
-                                        'sb!vm::allocate-vector-on-stack
-                                        'sb!vm::allocate-vector-on-heap))))
-    (dolist (arg args)
-      (setf (lvar-info arg)
-            (make-ir2-lvar (primitive-type (lvar-type arg)))))
-    (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
-      (ltn-default-call call)
-      (return-from allocate-vector-ltn-annotate-optimizer (values)))
-    (setf (basic-combination-info call) template)
-    (setf (node-tail-p call) nil)
-
-    (dolist (arg args)
-      (annotate-1-value-lvar arg))))
-
-(in-package "SB!VM")
 
 ;;;
 (define-vop (allocate-code-object)

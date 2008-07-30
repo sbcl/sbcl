@@ -1150,9 +1150,6 @@ default-value-8
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
 
 ;;; Turn more arg (context, count) into a list.
-(defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args))
-  t)
-
 (define-vop (listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))

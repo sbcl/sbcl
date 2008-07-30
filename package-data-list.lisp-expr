@@ -584,6 +584,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*GC-RUN-TIME*"
                "PURIFY"
 
+               ;; Stack allocation control
+               "*STACK-ALLOCATE-DYNAMIC-EXTENT*"
+
                ;; Customizing printing of compiler and debugger messages
                "*COMPILER-PRINT-VARIABLE-ALIST*"
                "*DEBUG-PRINT-VARIABLE-ALIST*"
@@ -799,6 +802,9 @@ possibly temporariliy, because it might be used internally."
                ;; utilities for floating point zero handling
                "FP-ZERO-P"
                "NEG-FP-ZERO"
+
+               ;; Stack allocation without any questions asked
+               "TRULY-DYNAMIC-EXTENT"
 
                ;; generic set implementation
                "ADD-TO-XSET"

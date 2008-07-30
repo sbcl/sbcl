@@ -27,9 +27,7 @@
        ;; sbcl-internal optimization declarations:
        ;;
        ;; never insert stepper conditions
-       (sb!c:insert-step-conditions 0)
-       ;; always stack-allocate if requested
-       (sb!c::stack-allocate-dynamic-extent 3)))))
+       (sb!c:insert-step-conditions 0)))))
 (compile 'proclaim-target-optimization)
 
 (defun in-target-cross-compilation-mode (fun)

@@ -295,7 +295,7 @@
 (defun values (&rest values)
   #!+sb-doc
   "Return all arguments, in order, as values."
-  (declare (dynamic-extent values))
+  (declare (truly-dynamic-extent values))
   (values-list values))
 
 (defun values-list (list)

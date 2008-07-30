@@ -216,7 +216,7 @@
               (,setf (new-value) (funcall ,nsetf new-value ,s ,nstate))
               (,index () (funcall ,nindex ,s ,nstate))
               (,copy () (funcall ,ncopy ,s ,nstate)))
-         (declare (dynamic-extent #',step #',endp #',elt
+         (declare (truly-dynamic-extent #',step #',endp #',elt
                                   #',setf #',index #',copy))
          ,@body))))
 
@@ -479,7 +479,7 @@
   (:argument-precedence-order sequence new old))
 (defmethod sequence:substitute (new old (sequence sequence) &rest args &key
                                 (start 0) end from-end test test-not count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore start end from-end test test-not count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute new old result args)))
@@ -489,7 +489,7 @@
   (:argument-precedence-order sequence new predicate))
 (defmethod sequence:substitute-if (new predicate (sequence sequence) &rest args
                                    &key (start 0) end from-end count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore start end from-end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute-if new predicate result args)))
@@ -500,7 +500,7 @@
 (defmethod sequence:substitute-if-not
     (new predicate (sequence sequence) &rest args &key
      (start 0) end from-end count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore start end from-end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:nsubstitute-if-not new predicate result args)))
@@ -670,7 +670,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (dynamic-extent #'finish))
+          (declare (truly-dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -710,7 +710,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (dynamic-extent #'finish))
+          (declare (truly-dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -750,7 +750,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (dynamic-extent #'finish))
+          (declare (truly-dynamic-extent #'finish))
           (do ()
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
             (let ((e (funcall elt2 sequence state2)))
@@ -774,7 +774,7 @@
   (:argument-precedence-order sequence item))
 (defmethod sequence:remove (item (sequence sequence) &rest args &key
                             from-end test test-not (start 0) end count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore from-end test test-not start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete item result args)))
@@ -784,7 +784,7 @@
   (:argument-precedence-order sequence predicate))
 (defmethod sequence:remove-if (predicate (sequence sequence) &rest args &key
                                from-end (start 0) end count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore from-end start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-if predicate result args)))
@@ -794,7 +794,7 @@
   (:argument-precedence-order sequence predicate))
 (defmethod sequence:remove-if-not (predicate (sequence sequence) &rest args
                                    &key from-end (start 0) end count key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore from-end start end count key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-if-not predicate result args)))
@@ -820,7 +820,7 @@
                        (replace sequence sequence :start2 end :start1 (- end c)
                                 :end1 (- (length sequence) c))))
                  (sequence:adjust-sequence sequence (- (length sequence) c))))
-          (declare (dynamic-extent #'finish))
+          (declare (truly-dynamic-extent #'finish))
           (do ((end (or end (length sequence)))
                (step 0 (1+ step)))
               ((funcall endp2 sequence state2 limit2 from-end2) (finish))
@@ -849,14 +849,14 @@
     (sequence &key from-end test test-not start end key))
 (defmethod sequence:remove-duplicates
     ((sequence sequence) &rest args &key from-end test test-not (start 0) end key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore from-end test test-not start end key))
   (let ((result (copy-seq sequence)))
     (apply #'sequence:delete-duplicates result args)))
 
 (defgeneric sequence:sort (sequence predicate &key key))
 (defmethod sequence:sort ((sequence sequence) predicate &rest args &key key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore key))
   (let* ((length (length sequence))
          (vector (make-array length)))
@@ -879,7 +879,7 @@
 (defgeneric sequence:stable-sort (sequence predicate &key key))
 (defmethod sequence:stable-sort
     ((sequence sequence) predicate &rest args &key key)
-  (declare (dynamic-extent args))
+  (declare (truly-dynamic-extent args))
   (declare (ignore key))
   (let* ((length (length sequence))
          (vector (make-array length)))

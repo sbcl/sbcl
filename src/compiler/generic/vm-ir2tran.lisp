@@ -13,7 +13,8 @@
            sb!vm:instance-header-widetag sb!vm:instance-pointer-lowtag
            nil)
 
-(defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args))
+(defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args) node dx)
+  (declare (ignore node dx))
   t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
@@ -170,3 +171,57 @@
                      (lvar-tn node block symbol) value-tn)
                 (move-lvar-result
                  node block (list value-tn) (node-lvar node))))))))
+
+;;; Stack allocation optimizers per platform support
+;;;
+;;; Platforms with stack-allocatable vectors
+#!+(or x86 x86-64)
+(progn
+  (defoptimizer (allocate-vector stack-allocate-result)
+      ((type length words) node dx)
+    (or (eq dx :truly)
+        (zerop (policy node safety))
+        ;; a vector object should fit in one page -- otherwise it might go past
+        ;; stack guard pages.
+        (values-subtypep (lvar-derived-type words)
+                         (load-time-value
+                          (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-size*
+                                                             sb!vm:n-word-bytes)
+                                                          sb!vm:vector-data-offset)))))))
+
+  (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
+    (let ((args (basic-combination-args call))
+          (template (template-or-lose (if (awhen (node-lvar call)
+                                            (lvar-dynamic-extent it))
+                                          'sb!vm::allocate-vector-on-stack
+                                          'sb!vm::allocate-vector-on-heap))))
+      (dolist (arg args)
+        (setf (lvar-info arg)
+              (make-ir2-lvar (primitive-type (lvar-type arg)))))
+      (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
+        (ltn-default-call call)
+        (return-from allocate-vector-ltn-annotate-optimizer (values)))
+      (setf (basic-combination-info call) template)
+      (setf (node-tail-p call) nil)
+
+      (dolist (arg args)
+        (annotate-1-value-lvar arg)))))
+
+;;; ...lists
+#!+(or alpha mips ppc sparc x86 x86-64)
+(progn
+  (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore node dx))
+    (not (null args)))
+  (defoptimizer (list* stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore node dx))
+    (not (null (rest args))))
+  (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore node dx))
+    t))
+
+;;; ...conses
+#!+(or x86 x86-64)
+(defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
+  (declare (ignore node dx))
+  t)

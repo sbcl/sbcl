@@ -14,13 +14,12 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:quit :unix-status 104))
 
-(setq sb-c::*check-consistency* t)
+(setq sb-c::*check-consistency* t
+      sb-ext:*stack-allocate-dynamic-extent* t)
 
 (defmacro defun-with-dx (name arglist &body body)
-  `(locally
-     (declare (optimize sb-c::stack-allocate-dynamic-extent))
-     (defun ,name ,arglist
-       ,@body)))
+  `(defun ,name ,arglist
+     ,@body))
 
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x)
@@ -129,11 +128,10 @@
 ;;; value-cells
 
 (defun-with-dx dx-value-cell (x)
-  (declare (optimize sb-c::stack-allocate-value-cells))
   ;; Not implemented everywhere, yet.
   #+(or x86 x86-64 mips)
   (let ((cell x))
-    (declare (dynamic-extent cell))
+    (declare (sb-int:truly-dynamic-extent cell))
     (flet ((f ()
              (incf cell)))
       (declare (dynamic-extent #'f))
@@ -385,7 +383,8 @@
 ;;; handler-case and handler-bind should use DX internally
 
 (defun dx-handler-bind (x)
-  (handler-bind ((error (lambda (c) (break "OOPS: ~S caused ~S" x c)))
+  (handler-bind ((error
+                  (lambda (c) (break "OOPS: ~S caused ~S" x c)))
                  ((and serious-condition (not error))
                   #'(lambda (c) (break "OOPS2: ~S did ~S" x c))))
     (/ 2 x)))
@@ -397,13 +396,19 @@
                    (:no-error (res)
                      (1- res))))))
 
-;;; with-spinlock should use DX and not cons
+;;; with-spinlock and with-mutex should use DX and not cons
 
 (defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
 
 (defun test-spinlock ()
   (sb-thread::with-spinlock (*slock*)
     (true *slock*)))
+
+(defvar *mutex* (sb-thread::make-mutex :name "mutexlock"))
+
+(defun test-mutex ()
+  (sb-thread:with-mutex (*mutex*)
+    (true *mutex*)))
 
 ;;; not really DX, but GETHASH and (SETF GETHASH) should not cons
 
@@ -466,7 +471,9 @@
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread
-  (assert-no-consing (test-spinlock)))
+  (progn
+    (assert-no-consing (test-spinlock))
+    (assert-no-consing (test-mutex))))
 
 
 ;;; Bugs found by Paul F. Dietz
