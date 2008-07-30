@@ -32,7 +32,7 @@
   #!+sb-doc
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))
-  (about-to-modify-symbol-value symbol "set SYMBOL-VALUE of ~S")
+  (about-to-modify-symbol-value symbol "set SYMBOL-VALUE of ~S" new-value)
   (%set-symbol-value symbol new-value))
 
 (defun %set-symbol-value (symbol new-value)

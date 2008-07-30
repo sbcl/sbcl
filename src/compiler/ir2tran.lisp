@@ -1430,17 +1430,23 @@
              (progn
                (labels ((,unbind (vars)
                           (declare (optimize (speed 2) (debug 0)))
-                          (dolist (var vars)
-                            (%primitive bind nil var)
-                            (makunbound var)))
+                          (let ((unbound-marker (%primitive make-other-immediate-type
+                                                            0 sb!vm:unbound-marker-widetag)))
+                            (dolist (var vars)
+                              ;; CLHS says "bound and then made to have no value" -- user
+                              ;; should not be able to tell the difference between that and this.
+                              (about-to-modify-symbol-value var "bind ~S")
+                              (%primitive bind unbound-marker var))))
                         (,bind (vars vals)
                           (declare (optimize (speed 2) (debug 0)))
                           (cond ((null vars))
                                 ((null vals) (,unbind vars))
-                                (t (%primitive bind
-                                               (car vals)
-                                               (car vars))
-                                   (,bind (cdr vars) (cdr vals))))))
+                                (t
+                                 (let ((val (car vals))
+                                       (var (car vars)))
+                                   (about-to-modify-symbol-value var "bind ~S" val)
+                                   (%primitive bind val var))
+                                 (,bind (cdr vars) (cdr vals))))))
                  (,bind ,vars ,vals))
                nil
                ,@body)

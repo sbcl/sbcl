@@ -928,6 +928,13 @@
     (eval '(labels ((%f (&key x) x)) (%f nil nil)))
   (error (c) :good)
   (:no-error (val) (error "no error: ~S" val)))
+
+;;; PROGV must not bind constants, or violate declared types -- ditto for SET.
+(assert (raises-error? (set pi 3)))
+(assert (raises-error? (progv '(pi s) '(3 pi) (symbol-value x))))
+(declaim (cons *special-cons*))
+(assert (raises-error? (set '*special-cons* "nope") type-error))
+(assert (raises-error? (progv '(*special-cons*) '("no hope") (car *special-cons*)) type-error))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

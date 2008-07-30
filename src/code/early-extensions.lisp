@@ -767,7 +767,7 @@
 ;;;   foo => 13, (constantp 'foo) => t
 ;;;
 ;;; ...in which case you frankly deserve to lose.
-(defun about-to-modify-symbol-value (symbol action)
+(defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep))
   (declare (symbol symbol))
   (multiple-value-bind (what continue)
       (when (eq :constant (info :variable :kind symbol))
@@ -782,7 +782,18 @@
     (when what
       (if continue
           (cerror "Modify the constant." what action symbol)
-          (error what action symbol))))
+          (error what action symbol)))
+    (when valuep
+      ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
+      ;; check.
+      (let ((type (info :variable :type symbol)))
+        (unless (sb!kernel::%%typep new-value type)
+          (let ((spec (type-specifier type)))
+            (error 'simple-type-error
+                   :format-control "Cannot ~@? to ~S (not of type ~S.)"
+                   :format-arguments (list action symbol new-value spec)
+                   :datum new-value
+                   :expected-type spec))))))
   (values))
 
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
