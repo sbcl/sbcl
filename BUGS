@@ -1916,3 +1916,7 @@ generally try to check returns in safe code, so we should here too.)
 
  reported by Stelian Ionescu on sbcl-devel.
 
+428: TIMER SCHEDULE-STRESS in timer.impure.lisp fails
+
+ Failure modes vary. Core problem seems to be (?) recursive entry to
+ RUN-EXPIRED-TIMERS.
