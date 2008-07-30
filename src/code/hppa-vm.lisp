@@ -18,8 +18,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
-   (let* ((sap (truly-the system-area-pointer
-                          (%primitive sb!kernel::code-instructions code)))
+   (let* ((sap (%primitive sb!kernel::code-instructions code))
           (inst (sap-ref-32 sap offset)))
      (setf (sap-ref-32 sap offset)
            (ecase kind

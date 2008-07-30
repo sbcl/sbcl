@@ -595,61 +595,49 @@
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
                              test-ref () node t)))
 
-;;; Return a list of primitive-types that we can pass to
-;;; LVAR-RESULT-TNS describing the result types we want for a
-;;; template call. We duplicate here the determination of output type
-;;; that was done in initially selecting the template, so we know that
-;;; the types we find are allowed by the template output type
-;;; restrictions.
-(defun find-template-result-types (call template rtypes)
-  (declare (type combination call)
-           (type template template) (list rtypes))
-  (declare (ignore template))
-  (let* ((dtype (node-derived-type call))
-         (type dtype)
-         (types (mapcar #'primitive-type
-                        (if (values-type-p type)
-                            (append (values-type-required type)
-                                    (values-type-optional type))
-                            (list type)))))
-    (let ((nvals (length rtypes))
-          (ntypes (length types)))
-      (cond ((< ntypes nvals)
-             (append types
-                     (make-list (- nvals ntypes)
-                                :initial-element *backend-t-primitive-type*)))
-            ((> ntypes nvals)
-             (subseq types 0 nvals))
-            (t
-             types)))))
+;;; Return a list of primitive-types that we can pass to LVAR-RESULT-TNS
+;;; describing the result types we want for a template call. We are really
+;;; only interested in the number of results required: in normal case
+;;; TEMPLATE-RESULTS-OK has already checked them.
+(defun find-template-result-types (call rtypes)
+  (let* ((type (node-derived-type call))
+         (types
+          (mapcar #'primitive-type
+                  (if (values-type-p type)
+                      (append (args-type-required type)
+                              (args-type-optional type))
+                      (list type))))
+         (primitive-t *backend-t-primitive-type*))
+    (loop for rtype in rtypes
+          for type = (or (pop types) primitive-t)
+          collect type)))
 
-;;; Return a list of TNs usable in a CALL to TEMPLATE delivering
-;;; values to LVAR. As an efficiency hack, we pick off the common case
-;;; where the LVAR is fixed values and has locations that satisfy the
-;;; result restrictions. This can fail when there is a type check or a
-;;; values count mismatch.
-(defun make-template-result-tns (call lvar template rtypes)
+;;; Return a list of TNs usable in a CALL to TEMPLATE delivering values to
+;;; LVAR. As an efficiency hack, we pick off the common case where the LVAR is
+;;; fixed values and has locations that satisfy the result restrictions. This
+;;; can fail when there is a type check or a values count mismatch.
+(defun make-template-result-tns (call lvar rtypes)
   (declare (type combination call) (type (or lvar null) lvar)
-           (type template template) (list rtypes))
+           (list rtypes))
   (let ((2lvar (when lvar (lvar-info lvar))))
     (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :fixed))
         (let ((locs (ir2-lvar-locs 2lvar)))
           (if (and (= (length rtypes) (length locs))
                    (do ((loc locs (cdr loc))
-                        (rtype rtypes (cdr rtype)))
+                        (rtypes rtypes (cdr rtypes)))
                        ((null loc) t)
                      (unless (operand-restriction-ok
-                              (car rtype)
+                              (car rtypes)
                               (tn-primitive-type (car loc))
                               :t-ok nil)
                        (return nil))))
               locs
               (lvar-result-tns
                lvar
-               (find-template-result-types call template rtypes))))
+               (find-template-result-types call rtypes))))
         (lvar-result-tns
          lvar
-         (find-template-result-types call template rtypes)))))
+         (find-template-result-types call rtypes)))))
 
 ;;; Get the operands into TNs, make TN-REFs for them, and then call
 ;;; the template emit function.
@@ -664,7 +652,7 @@
       (if (eq rtypes :conditional)
           (ir2-convert-conditional call block template args info-args
                                    (lvar-dest lvar) nil)
-          (let* ((results (make-template-result-tns call lvar template rtypes))
+          (let* ((results (make-template-result-tns call lvar rtypes))
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)
                      (template-info-arg-count template)))
@@ -688,7 +676,7 @@
          (info (lvar-value info))
          (lvar (node-lvar call))
          (rtypes (template-result-types template))
-         (results (make-template-result-tns call lvar template rtypes))
+         (results (make-template-result-tns call lvar rtypes))
          (r-refs (reference-tn-list results t)))
     (multiple-value-bind (args info-args)
         (reference-args call block (cddr (combination-args call)) template)
@@ -702,6 +690,12 @@
 
       (move-lvar-result call block results lvar)))
   (values))
+
+(defoptimizer (%%primitive derive-type) ((template info &rest args))
+  (let ((type (template-type (lvar-value template))))
+    (if (fun-type-p type)
+        (fun-type-returns type)
+        *wild-type*)))
 
 ;;;; local call
 

@@ -203,4 +203,11 @@
          (error ()
            :ok)))))
 
+;;; Unused local alien caused a compiler error
+(with-test (:name unused-local-alien)
+  (let ((fun `(lambda ()
+                (sb-alien:with-alien ((alien1923 (array (sb-alien:unsigned 8) 72)))
+                  (values)))))
+    (assert (not (funcall (compile nil fun))))))
+
 ;;; success

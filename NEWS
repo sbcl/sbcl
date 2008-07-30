@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.20 relative to 1.0.19:
+  * bug fix: fixed #427: unused local aliens no longer cause compiler
+    breakage. (reported by Stelian Ionescu, Andy Hefner and Stanislaw
+    Halik)
+
 changes in sbcl-1.0.19 relative to 1.0.18:
   * new feature: user-customizable variable SB-EXT:*MUFFLED-WARNINGS*;
     warnings that go otherwise unhandled will be muffled if they are

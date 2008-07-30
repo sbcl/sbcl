@@ -518,8 +518,7 @@
      (lambda (obj type size)
        (when (eql type code-header-widetag)
          (let ((words (truly-the fixnum (%code-code-size obj)))
-               (sap (truly-the system-area-pointer
-                               (%primitive code-instructions obj)))
+               (sap (%primitive code-instructions obj))
                (size size))
            (declare (fixnum size))
            (incf total-bytes size)

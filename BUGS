@@ -1907,15 +1907,6 @@ generally try to check returns in safe code, so we should here too.)
  call for functions already inline converted there, but he is not sure
  if this has adverse effects elsewhere.
 
-427: ANY-REG not good for primitive type T
-
- ...which is true, of course, but the following should not complain
- about it (on x86 and x86-64):
-
-  (sb-alien:with-alien ((buf (array (sb-alien:signed 8) 16))))
-
- reported by Stelian Ionescu on sbcl-devel.
-
 428: TIMER SCHEDULE-STRESS in timer.impure.lisp fails
 
  Failure modes vary. Core problem seems to be (?) recursive entry to

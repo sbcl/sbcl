@@ -42,8 +42,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
-   (let ((sap (truly-the system-area-pointer
-                         (%primitive sb!kernel::code-instructions code))))
+   (let ((sap (%primitive sb!kernel::code-instructions code)))
      (ecase kind
        (:b
         (error "Can't deal with CALL fixups, yet."))

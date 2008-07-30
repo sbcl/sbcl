@@ -349,28 +349,26 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
-      #!+(or x86 x86-64)
-      `(truly-the system-area-pointer
-                  (%primitive alloc-alien-stack-space
-                              ,(ceiling (alien-type-bits alien-type)
-                                        sb!vm:n-byte-bits)))
-      #!-(or x86 x86-64)
-      `(truly-the system-area-pointer
-                  (%primitive alloc-number-stack-space
-                              ,(ceiling (alien-type-bits alien-type)
-                                        sb!vm:n-byte-bits)))
-      (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
-             (alien-rep-type (specifier-type alien-rep-type-spec)))
-        (cond ((csubtypep (specifier-type 'system-area-pointer)
-                          alien-rep-type)
-               '(int-sap 0))
-              ((ctypep 0 alien-rep-type) 0)
-              ((ctypep 0.0f0 alien-rep-type) 0.0f0)
-              ((ctypep 0.0d0 alien-rep-type) 0.0d0)
-              (t
-               (compiler-error
-                "Aliens of type ~S cannot be represented immediately."
-                (unparse-alien-type alien-type))))))))
+        #!+(or x86 x86-64)
+        `(%primitive alloc-alien-stack-space
+                     ,(ceiling (alien-type-bits alien-type)
+                               sb!vm:n-byte-bits))
+        #!-(or x86 x86-64)
+        `(%primitive alloc-number-stack-space
+                     ,(ceiling (alien-type-bits alien-type)
+                               sb!vm:n-byte-bits))
+        (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
+               (alien-rep-type (specifier-type alien-rep-type-spec)))
+          (cond ((csubtypep (specifier-type 'system-area-pointer)
+                            alien-rep-type)
+                 '(int-sap 0))
+                ((ctypep 0 alien-rep-type) 0)
+                ((ctypep 0.0f0 alien-rep-type) 0.0f0)
+                ((ctypep 0.0d0 alien-rep-type) 0.0d0)
+                (t
+                 (compiler-error
+                  "Aliens of type ~S cannot be represented immediately."
+                  (unparse-alien-type alien-type))))))))
 
 (deftransform note-local-alien-type ((info var) * * :important t)
   ;; FIXME: This test and error occur about a zillion times. They

@@ -28,8 +28,7 @@
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
-   (let ((sap (truly-the system-area-pointer
-                         (%primitive code-instructions code))))
+   (let ((sap (%primitive code-instructions code)))
      (ecase kind
        (:jmp-hint
         (aver (zerop (ldb (byte 2 0) value)))
