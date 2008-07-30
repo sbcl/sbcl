@@ -16,7 +16,7 @@
 ;;; not sure this is the right place, but where else?
 (defun style-warn (datum &rest arguments)
   (/show0 "entering STYLE-WARN")
-  (/show format-control format-arguments)
+  (/show datum arguments)
   (if (stringp datum)
       (with-sane-io-syntax
         (warn 'simple-style-warning

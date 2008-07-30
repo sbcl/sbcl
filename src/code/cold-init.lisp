@@ -339,14 +339,20 @@ systems, UNIX-STATUS is used as the status code."
 
 #!+sb-show
 (defun cold-print (x)
-  (typecase x
-    (simple-string (sb!sys:%primitive print x))
-    (symbol (sb!sys:%primitive print (symbol-name x)))
-    (list (let ((count 0))
-            (sb!sys:%primitive print "list:")
-            (dolist (i x)
-              (when (>= (incf count) 4)
-                (sb!sys:%primitive print "...")
-                (return))
-              (cold-print i))))
-    (t (sb!sys:%primitive print (hexstr x)))))
+  (labels ((%cold-print (obj depthoid)
+             (if (> depthoid 4)
+                 (sb!sys:%primitive print "...")
+                 (typecase obj
+                   (simple-string
+                    (sb!sys:%primitive print obj))
+                   (symbol
+                    (sb!sys:%primitive print (symbol-name obj)))
+                   (cons
+                    (sb!sys:%primitive print "cons:")
+                    (let ((d (1+ depthoid)))
+                      (%cold-print (car obj) d)
+                      (%cold-print (cdr obj) d)))
+                   (t
+                    (sb!sys:%primitive print (hexstr x)))))))
+    (%cold-print x 0))
+  (values))
