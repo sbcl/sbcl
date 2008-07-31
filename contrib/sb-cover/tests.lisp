@@ -28,10 +28,17 @@
 (load (compile-file (merge-pathnames #p"test-data-1.lisp" *path*)))
 (report-expect-failure)
 
-;;; Instrument the file, try again
+;;; Instrument the file, try again -- first with a non-directory pathname
 
 (proclaim '(optimize sb-cover:store-coverage-data))
 (load (compile-file (merge-pathnames #p"test-data-1.lisp" *path*)))
+
+(catch 'ok
+  (handler-case
+      (sb-cover:report #p"/tmp/foo")
+    (error ()
+      (throw 'ok nil)))
+  (error "REPORT with a non-pathname directory did not signal an error."))
 
 (report)
 

@@ -79,6 +79,19 @@ result to RESTORE-COVERAGE."
         (restore-coverage (read stream))))
     (values)))
 
+(defun pathname-as-directory (pathname &optional (errorp t))
+  (let ((pathname (merge-pathnames pathname)))
+    (if (and (member (pathname-name pathname) '(nil :unspecific))
+             (member (pathname-type pathname) '(nil :unspecific)))
+        pathname
+        (if errorp
+            (error "~S does not designate a directory" pathname)
+            (make-pathname :directory (append (or (pathname-directory pathname)
+                                                  (list :relative))
+                                              (list (file-namestring pathname)))
+                           :name nil :type nil
+                           :defaults pathname)))))
+
 (defun report (directory &key ((:form-mode *source-path-mode*) :whole)
                (external-format :default))
   "Print a code coverage report of all instrumented files into DIRECTORY.
@@ -92,7 +105,7 @@ it has the value :WHOLE the whole form will be annotated (the default).
 The former mode shows explicitly which forms were instrumented, while the
 latter mode is generally easier to read."
   (let ((paths)
-        (*default-pathname-defaults* (merge-pathnames (pathname directory))))
+        (*default-pathname-defaults* (pathname-as-directory directory)))
     (ensure-directories-exist *default-pathname-defaults*)
     (maphash (lambda (k v)
                (declare (ignore v))

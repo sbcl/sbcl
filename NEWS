@@ -16,6 +16,8 @@ changes in sbcl-1.0.20 relative to 1.0.19:
   * bug fix: restart computation during the execution of a restart
     test function no longer causes infinite recursion. (reported by
     Michael Weber)
+  * bug fix: calling SB-COVER:REPORT with a non-directory pathname now
+    signals an error. (thanks to Pierre Mai)
 
 changes in sbcl-1.0.19 relative to 1.0.18:
   * new feature: user-customizable variable SB-EXT:*MUFFLED-WARNINGS*;
