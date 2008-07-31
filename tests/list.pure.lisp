@@ -183,7 +183,6 @@
     (test nil (member -1.0 numbers :key #'- :test 'eql))))
 
 ;;; assoc
-
 (macrolet ((test  (expected form)
              (let ((numbers '((1 a) (2 b)))
                    (tricky '(nil (a . b) nil (nil . c) (c . d))))
@@ -228,6 +227,96 @@
     ;; Bug reported by Paul Dietz: ASSOC should ignore NIL elements in a
     ;; alist
     (test (nil . c) (assoc nil tricky :test #'eq))))
+
+;;; rassoc
+(macrolet ((test  (expected form)
+             (let ((numbers '((a . 1) (b . 2)))
+                   (tricky '(nil (b . a) nil (c . nil) (d . c))))
+               `(progn
+                  (assert (equal ',expected (let ((numbers ',numbers)
+                                                  (tricky ',tricky))
+                                              (funcall fun ,@(cdr form)))))
+                  (assert (equal ',expected (funcall (lambda ()
+                                                       (declare (optimize speed))
+                                                       (let ((numbers ',numbers)
+                                                             (tricky ',tricky))
+                                                         ,form)))))
+                  (assert (equal ',expected (funcall (lambda ()
+                                                       (declare (optimize space))
+                                                       (let ((numbers ',numbers)
+                                                             (tricky ',tricky))
+                                                        ,form)))))))))
+  (let ((fun (car (list 'rassoc))))
+    (test (a . 1) (rassoc 1 numbers))
+    (test (b . 2) (rassoc 2 numbers))
+    (test (a . 1) (rassoc 1 numbers :key 'identity))
+    (test (b . 2) (rassoc 2 numbers :key #'identity))
+    (test nil (rassoc 1.0 numbers))
+
+    (test (a . 1) (rassoc 1.0 numbers :test #'=))
+    (test (a . 1) (rassoc 1.0 numbers :test #'= :key nil))
+    (test (b . 2) (rassoc 2.0 numbers :test '=))
+    (test nil (rassoc 0 numbers :test '=))
+
+    (test (a . 1) (rassoc 0 numbers :test-not #'>))
+    (test (b . 2) (rassoc 1 numbers :test-not 'eql))
+    (test nil (rassoc 0 numbers :test-not '<))
+
+    (test (a . 1) (rassoc -1 numbers :key #'-))
+    (test (b . 2) (rassoc -2 numbers :key '-))
+    (test nil (rassoc -1.0 numbers :key #'-))
+
+    (test (a . 1) (rassoc -1.0 numbers :key #'- :test '=))
+    (test (b . 2) (rassoc -2.0 numbers :key #'- :test '=))
+    (test nil (rassoc -1.0 numbers :key #'- :test 'eql))
+
+    (test (c . nil) (rassoc nil tricky :test #'eq))))
+
+;;;; member-if & assoc-if & rassoc-if
+(macrolet ((test (value form)
+             `(let ((* ,value))
+                (assert (eval ,form))
+                (assert (funcall (compile nil (lambda () ,form)))))))
+  (test 'evenp
+        (equal '(2 3 4) (member-if * (list 1 2 3 4))))
+  (test 'evenp
+        (equal '(2 3 4) (locally (declare (optimize speed))
+                          (member-if * '(1 2 3 4)))))
+  (test 'evenp
+        (equal '(3 4) (member-if * (list 1 2 3 4) :key (lambda (x) (if (= 3 x) 2 1)))))
+  (test 'evenp
+        (equal '(2 :two) (assoc-if * (list (list 1 :one) (list 3 :three) (list 2 :two) (list 4 :four)))))
+  (test 'evenp
+        (equal '(3 :three) (assoc-if * (list (list 1 :one) (list 3 :three) (list 2 :two) (list 4 :four))
+                                   :key (lambda (x) (if (= 3 x) 2 1)))))
+  (test 'evenp
+        (equal '(:two . 2) (rassoc-if * (list '(:one . 1) '(:three . 3) '(:two . 2) '(:four . 4)))))
+  (test (list 1 2 3 4)
+        (equal '(2 3 4) (member-if 'evenp *)))
+  (test (list (cons 1 'a) (cons 2 'b) (cons 3 'c))
+        (equal (cons 2 'b) (assoc-if 'evenp *))))
+
+;;;; member-if-not & assoc-if-not
+(macrolet ((test (value form)
+             `(let ((* ,value))
+                (assert (eval ,form))
+                (assert (funcall (compile nil (lambda () ,form)))))))
+  (test 'oddp
+        (equal '(2 3 4) (member-if-not * (list 1 2 3 4))))
+  (test 'oddp
+        (equal '(2 3 4) (locally (declare (optimize speed))
+                          (member-if-not * '(1 2 3 4)))))
+  (test 'oddp
+        (equal '(3 4) (member-if-not * (list 1 2 3 4) :key (lambda (x) (if (= 3 x) 2 1)))))
+  (test 'oddp
+        (equal '(2 :two) (assoc-if-not * (list (list 1 :one) (list 3 :three) (list 2 :two) (list 4 :four)))))
+  (test 'oddp
+        (equal '(3 :three) (assoc-if-not * (list (list 1 :one) (list 3 :three) (list 2 :two) (list 4 :four))
+                                         :key (lambda (x) (if (= 3 x) 2 1)))))
+  (test (list 1 2 3 4)
+        (equal '(2 3 4) (member-if-not 'oddp *)))
+  (test (list (cons 1 'a) (cons 2 'b) (cons 3 'c))
+        (equal (cons 2 'b) (assoc-if-not 'oddp *))))
 
 ;;; bug reported by Dan Corkill: *PRINT-CASE* affected the compiler transforms
 ;;; for ASSOC & MEMBER

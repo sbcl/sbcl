@@ -1926,14 +1926,14 @@
                (setf (block-reoptimize (node-block node)) t)
                (reoptimize-component (node-component node) :maybe)))))))
 
-;;; True if LVAR is for 'NAME, or #'NAME (global, not local)
-(defun lvar-for-named-function (lvar name)
-  (if (constant-lvar-p lvar)
-      (eq name (lvar-value lvar))
-      (let ((use (lvar-uses lvar)))
-        (and (not (listp use))
-             (ref-p use)
-             (let ((leaf (ref-leaf use)))
-               (and (global-var-p leaf)
-                    (eq :global-function (global-var-kind leaf))
-                    (eq name (leaf-source-name leaf))))))))
+;;; Return true if LVAR's only use is a non-NOTINLINE reference to a
+;;; global function with one of the specified NAMES.
+(defun lvar-fun-is (lvar names)
+  (declare (type lvar lvar) (list names))
+  (let ((use (lvar-uses lvar)))
+    (and (ref-p use)
+         (let ((leaf (ref-leaf use)))
+           (and (global-var-p leaf)
+                (eq (global-var-kind leaf) :global-function)
+                (not (null (member (leaf-source-name leaf) names
+                                   :test #'equal))))))))

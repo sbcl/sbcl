@@ -19,10 +19,10 @@
 
 (declaim (maybe-inline
           tree-equal nth %setnth nthcdr make-list
-          member-if member-if-not tailp union
+          tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
-          assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
+          subst subst-if
           subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
 ;;; These functions perform basic list operations.
@@ -801,41 +801,45 @@
 
 ;;;; functions for using lists as sets
 
-(defun member (item list &key key (test #'eql testp) (test-not #'eql notp))
+(defun member (item list &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the tail of LIST beginning with first element satisfying EQLity,
    :TEST, or :TEST-NOT with the given ITEM."
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
-        (test (if testp (%coerce-callable-to-fun test) test))
-        (test-not (if notp (%coerce-callable-to-fun test-not) test-not)))
-    (declare (type function test test-not))
-    (do ((list list (cdr list)))
-        ((null list) nil)
-      (let ((car (car list)))
-        (when (satisfies-the-test item car)
-          (return list))))))
+        (test (and testp (%coerce-callable-to-fun test)))
+        (test-not (and notp (%coerce-callable-to-fun test-not))))
+    (cond (test
+           (if key
+               (%member-key-test item list key test)
+               (%member-test item list test)))
+          (test-not
+           (if key
+               (%member-key-test-not item list key test-not)
+               (%member-test-not item list test-not)))
+          (t
+           (if key
+               (%member-key item list key)
+               (%member item list))))))
 
 (defun member-if (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element satisfying TEST."
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
-    (do ((list list (cdr list)))
-        ((endp list) nil)
-      (if (funcall test (apply-key key (car list)))
-          (return list)))))
+    (if key
+        (%member-if-key test list key)
+        (%member-if test list))))
 
 (defun member-if-not (test list &key key)
   #!+sb-doc
   "Return tail of LIST beginning with first element not satisfying TEST."
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
-    (do ((list list (cdr list)))
-        ((endp list) ())
-      (if (not (funcall test (apply-key key (car list))))
-          (return list)))))
+    (if key
+        (%member-if-not-key test list key)
+        (%member-if-not test list))))
 
 (defun tailp (object list)
   #!+sb-doc
@@ -851,13 +855,21 @@
   "Add ITEM to LIST unless it is already a member"
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  (let ((key (and key (%coerce-callable-to-fun key))))
-    (if (let ((key-val (apply-key key item)))
-          (if notp
-              (member key-val list :test-not test-not :key key)
-              (member key-val list :test test :key key)))
-        list
-        (cons item list))))
+  (let ((key (and key (%coerce-callable-to-fun key)))
+        (test (and testp (%coerce-callable-to-fun test)))
+        (test-not (and notp (%coerce-callable-to-fun test-not))))
+    (cond (test
+           (if key
+               (%adjoin-key-test item list key test)
+               (%adjoin-test item list test)))
+          (test-not
+           (if key
+               (%adjoin-key-test-not item list key test-not)
+               (%adjoin-test-not item list test-not)))
+          (t
+           (if key
+               (%adjoin-key item list key)
+               (%adjoin item list))))))
 
 (defconstant +list-based-union-limit+ 80)
 
@@ -1132,15 +1144,6 @@
         (error "The lists of keys and data are of unequal length."))
     (setq alist (acons (car x) (car y) alist))))
 
-;;; This is defined in the run-time environment, not just the compile-time
-;;; environment (i.e. not wrapped in EVAL-WHEN (COMPILE EVAL)) because it
-;;; can appear in inline expansions.
-(defmacro assoc-guts (test-expr)
-  `(do ((alist alist (cdr alist)))
-       ((endp alist))
-    (when (and (car alist) ,test-expr)
-      (return (car alist)))))
-
 (defun assoc (item alist &key key (test nil testp) (test-not nil notp))
   #!+sb-doc
   "Return the cons in ALIST whose car is equal (by a given test or EQL) to
@@ -1152,17 +1155,16 @@
         (test-not (and notp (%coerce-callable-to-fun test-not))))
     (cond (test
            (if key
-               (assoc-guts (funcall test item (funcall key (caar alist))))
-               (assoc-guts (funcall test item (caar alist)))))
+               (%assoc-key-test item alist key test)
+               (%assoc-test item alist test)))
           (test-not
            (if key
-               (assoc-guts (not (funcall test-not item
-                                         (funcall key (caar alist)))))
-               (assoc-guts (not (funcall test-not item (caar alist))))))
+               (%assoc-key-test-not item alist key test-not)
+               (%assoc-test-not item alist test-not)))
           (t
            (if key
-               (assoc-guts (eql item (funcall key (caar alist))))
-               (assoc-guts (eql item (caar alist))))))))
+               (%assoc-key item alist key)
+               (%assoc item alist))))))
 
 (defun assoc-if (predicate alist &key key)
   #!+sb-doc
@@ -1171,8 +1173,8 @@
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
-        (assoc-guts (funcall predicate (funcall key (caar alist))))
-        (assoc-guts (funcall predicate (caar alist))))))
+        (%assoc-if-key predicate alist key)
+        (%assoc-if predicate alist))))
 
 (defun assoc-if-not (predicate alist &key key)
   #!+sb-doc
@@ -1181,8 +1183,8 @@
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
-        (assoc-guts (not (funcall predicate (funcall key (caar alist)))))
-        (assoc-guts (not (funcall predicate (caar alist)))))))
+        (%assoc-if-not-key predicate alist key)
+        (%assoc-if-not predicate alist))))
 
 (defun rassoc (item alist &key key (test nil testp) (test-not nil notp))
   (declare (list alist))
@@ -1196,17 +1198,16 @@
         (test-not (and notp (%coerce-callable-to-fun test-not))))
     (cond (test
            (if key
-               (assoc-guts (funcall test item (funcall key (cdar alist))))
-               (assoc-guts (funcall test item (cdar alist)))))
+               (%rassoc-key-test item alist key test)
+               (%rassoc-test item alist test)))
           (test-not
            (if key
-               (assoc-guts (not (funcall test-not item
-                                         (funcall key (cdar alist)))))
-               (assoc-guts (not (funcall test-not item (cdar alist))))))
+               (%rassoc-key-test-not item alist key test-not)
+               (%rassoc-test-not item alist test-not)))
           (t
            (if key
-               (assoc-guts (eql item (funcall key (cdar alist))))
-               (assoc-guts (eql item (cdar alist))))))))
+               (%rassoc-key item alist key)
+               (%rassoc item alist))))))
 
 (defun rassoc-if (predicate alist &key key)
   #!+sb-doc
@@ -1215,8 +1216,8 @@
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
-        (assoc-guts (funcall predicate (funcall key (cdar alist))))
-        (assoc-guts (funcall predicate (cdar alist))))))
+        (%rassoc-if-key predicate alist key)
+        (%rassoc-if predicate alist))))
 
 (defun rassoc-if-not (predicate alist &key key)
   #!+sb-doc
@@ -1225,8 +1226,8 @@
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
-        (assoc-guts (not (funcall predicate (funcall key (cdar alist)))))
-        (assoc-guts (not (funcall predicate (cdar alist)))))))
+        (%rassoc-if-not-key predicate alist key)
+        (%rassoc-if-not predicate alist))))
 
 ;;;; mapping functions
 
@@ -1292,73 +1293,96 @@
 
 ;;;; Specialized versions
 
-;;; %ADJOIN-*, %ASSOC-*, and %MEMBER-* functions. Deftransforms
-;;; delegate to TRANSFORM-LIST-ITEM-SEEK which picks the appropriate
-;;; version. These win because they have only positional arguments,
-;;; the TEST, TEST-NOT & KEY functions are known to exist (or not),
-;;; and are known to be functions instead of function designators. We
-;;; are also able to transform many common cases to -EQ versions,
-;;; which are substantially faster then EQL using ones.
+;;; %ADJOIN-*, %ASSOC-*, %MEMBER-*, and %RASSOC-* functions. Deftransforms
+;;; delegate to TRANSFORM-LIST-PRED-SEEK and TRANSFORM-LIST-ITEM-SEEK which
+;;; pick the appropriate versions. These win because they have only positional
+;;; arguments, the TEST, TEST-NOT & KEY functions are known to exist (or not),
+;;; and are known to be functions instead of function designators. We are also
+;;; able to transform many common cases to -EQ versions, which are
+;;; substantially faster then EQL using ones.
 (macrolet
     ((def (funs form &optional variant)
-       (flet ((%def (name)
+       (flet ((%def (name &optional conditional)
                 (let* ((body-loop
                         `(do ((list list (cdr list)))
                              ((null list) nil)
                            (declare (list list))
                            (let ((this (car list)))
-                             ,(ecase name
-                                     (assoc
-                                      (if funs
-                                          `(when this
-                                             (let ((target (car this)))
-                                               (when ,form
-                                                 (return this))))
-                                          ;; If there is no TEST/TEST-NOT or
-                                          ;; KEY, do the EQ/EQL test first,
-                                          ;; before checking for NIL.
-                                          `(let ((target (car this)))
-                                             (when (and ,form this)
-                                               (return this)))))
-                                     (member
-                                      `(let ((target this))
-                                         (when ,form
-                                           (return list))))
-                                     (adjoin
-                                      `(let ((target this))
-                                         (when ,form
-                                           (return t))))))))
+                             ,(let ((cxx (if (char= #\A (char (string name) 0))
+                                             'car    ; assoc, assoc-if, assoc-if-not
+                                             'cdr))) ; rassoc, rassoc-if, rassoc-if-not
+                                   (ecase name
+                                      ((assoc rassoc)
+                                       (if funs
+                                           `(when this
+                                              (let ((target (,cxx this)))
+                                                (when ,form
+                                                  (return this))))
+                                           ;; If there is no TEST/TEST-NOT or
+                                           ;; KEY, do the EQ/EQL test first,
+                                           ;; before checking for NIL.
+                                           `(let ((target (,cxx this)))
+                                              (when (and ,form this)
+                                                (return this)))))
+                                 ((assoc-if assoc-if-not rassoc-if rassoc-if-not)
+                                  (aver (equal '(eql x) (subseq form 0 2)))
+                                  `(when this
+                                     (let ((target (,cxx this)))
+                                       (,conditional (funcall ,@(cdr form))
+                                                     (return this)))))
+                                 (member
+                                  `(let ((target this))
+                                     (when ,form
+                                       (return list))))
+                                 ((member-if member-if-not)
+                                  (aver (equal '(eql x) (subseq form 0 2)))
+                                  `(let ((target this))
+                                     (,conditional (funcall ,@(cdr form))
+                                                   (return list))))
+                                 (adjoin
+                                  `(let ((target this))
+                                     (when ,form
+                                       (return t)))))))))
                        (body (if (eq 'adjoin name)
                                  `(if (let ,(when (member 'key funs)
-                                                  `((item (funcall key item))))
+                                                  `((x (funcall key x))))
                                         ,body-loop)
                                       list
-                                      (cons item list))
+                                      (cons x list))
                                  body-loop)))
                   `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
-                       (item list ,@funs)
+                       (x list ,@funs)
                      (declare (optimize speed (sb!c::verify-arg-count 0)))
                      ,@(when funs `((declare (function ,@funs))))
+                     ,@(unless (member name '(member assoc adjoin rassoc)) `((declare (function x))))
                      ,body))))
          `(progn
             ,(%def 'adjoin)
             ,(%def 'assoc)
-            ,(%def 'member)))))
+            ,(%def 'member)
+            ,(%def 'rassoc)
+            ,@(when (and (not variant) (member funs '(() (key)) :test #'equal))
+                    (list (%def 'member-if 'when)
+                          (%def 'member-if-not 'unless)
+                          (%def 'assoc-if 'when)
+                          (%def 'assoc-if-not 'unless)
+                          (%def 'rassoc-if 'when)
+                          (%def 'rassoc-if-not 'unless)))))))
   (def ()
-      (eql item target))
+      (eql x target))
   (def ()
-      (eq item target)
+      (eq x target)
     eq)
   (def (key)
-      (eql item (funcall key target)))
+      (eql x (funcall key target)))
   (def (key)
-      (eq item (funcall key target))
+      (eq x (funcall key target))
     eq)
   (def (key test)
-      (funcall test item (funcall key target)))
+      (funcall test x (funcall key target)))
   (def (key test-not)
-      (not (funcall test-not item (funcall key target))))
+      (not (funcall test-not x (funcall key target))))
   (def (test)
-      (funcall test item target))
+      (funcall test x target))
   (def (test-not)
-      (not (funcall test-not item target))))
+      (not (funcall test-not x target))))

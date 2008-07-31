@@ -291,7 +291,7 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(defun specialized-list-seek-function-name (function-name key-functions variant)
+(defun specialized-list-seek-function-name (function-name key-functions &optional variant)
   (or (find-symbol (with-output-to-string (s)
                      ;; Write "%NAME-FUN1-FUN2-FUN3", etc. Not only is
                      ;; this ever so slightly faster then FORMAT, this
@@ -311,10 +311,10 @@
 
 (defun transform-list-item-seek (name item list key test test-not node)
   ;; If TEST is EQL, drop it.
-  (when (and test (lvar-for-named-function test 'eql))
+  (when (and test (lvar-fun-is test '(eql)))
     (setf test nil))
   ;; Ditto for KEY IDENTITY.
-  (when (and key (lvar-for-named-function key 'identity))
+  (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
@@ -331,7 +331,7 @@
                                #'identity)))
                 (t
                  (values key '(%coerce-callable-to-fun key))))))
-    (let* ((c-test (cond ((and test (lvar-for-named-function test 'eq))
+    (let* ((c-test (cond ((and test (lvar-fun-is test '(eq)))
                           (setf test nil)
                           'eq)
                          ((and (not test) (not test-not))
@@ -348,14 +348,15 @@
                  (when tail
                    `(if (let ((this ',(car tail)))
                           ,(ecase name
-                                  (assoc
-                                   `(and this (let ((target (car this)))
-                                                ,test-expr)))
+                                  ((assoc rassoc)
+                                   (let ((cxx (if (eq name 'assoc) 'car 'cdr)))
+                                     `(and this (let ((target (,cxx this)))
+                                                  ,test-expr))))
                                   (member
                                    `(let ((target this))
                                       ,test-expr))))
                         ',(ecase name
-                                 (assoc (car tail))
+                                 ((assoc rassoc) (car tail))
                                  (member tail))
                         ,(open-code (cdr tail)))))
                (ensure-fun (fun)
@@ -364,7 +365,7 @@
                      `(%coerce-callable-to-fun ,fun))))
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
-          (cond ((and cp c-list (member name '(assoc member))
+          (cond ((and cp c-list (member name '(assoc rassoc member))
                       (policy node (>= speed space)))
                  `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
                     ,(open-code c-list)))
@@ -378,14 +379,77 @@
                  `(,(specialized-list-seek-function-name name funs c-test)
                     item list ,@(mapcar #'ensure-fun funs)))))))))
 
-(deftransform member ((item list &key key test test-not) * * :node node)
-  (transform-list-item-seek 'member item list key test test-not node))
+(defun transform-list-pred-seek (name pred list key node)
+  ;; If KEY is IDENTITY, drop it.
+  (when (and key (lvar-fun-is key '(identity)))
+    (setf key nil))
+  ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
+  ;; not there at all. If it might be NIL, make up a form to that
+  ;; ensures it is a function.
+  (multiple-value-bind (key key-form)
+      (when key
+        (let ((key-type (lvar-type key))
+              (null-type (specifier-type 'null)))
+          (cond ((csubtypep key-type null-type)
+                 (values nil nil))
+                ((csubtypep null-type key-type)
+                 (values key '(if key
+                               (%coerce-callable-to-fun key)
+                               #'identity)))
+                (t
+                 (values key '(%coerce-callable-to-fun key))))))
+    (let ((test-expr `(%funcall pred ,(if key '(%funcall key target) 'target)))
+          (pred-expr (if (csubtypep (lvar-type pred) (specifier-type 'function))
+                         'pred
+                         '(%coerce-callable-to-fun pred))))
+      (when (member name '(member-if-not assoc-if-not rassoc-if-not))
+        (setf test-expr `(not ,test-expr)))
+      (labels ((open-code (tail)
+                 (when tail
+                   `(if (let ((this ',(car tail)))
+                          ,(ecase name
+                                  ((assoc-if assoc-if-not rassoc-if rassoc-if-not)
+                                   (let ((cxx (if (member name '(assoc-if assoc-if-not)) 'car 'cdr)))
+                                     `(and this (let ((target (,cxx this)))
+                                                  ,test-expr))))
+                                  ((member-if member-if-not)
+                                   `(let ((target this))
+                                      ,test-expr))))
+                        ',(ecase name
+                                 ((assoc-if assoc-if-not rassoc-if rassoc-if-not)
+                                  (car tail))
+                                 ((member-if member-if-not)
+                                  tail))
+                        ,(open-code (cdr tail))))))
+        (let* ((cp (constant-lvar-p list))
+               (c-list (when cp (lvar-value list))))
+          (cond ((and cp c-list (policy node (>= speed space)))
+                 `(let ((pred ,pred-expr)
+                        ,@(when key `((key ,key-form))))
+                    ,(open-code c-list)))
+                ((and cp (not c-list))
+                 ;; constant nil list -- nothing to find!
+                 nil)
+                (t
+                 ;; specialized out-of-line version
+                 `(,(specialized-list-seek-function-name name (when key '(key)))
+                    ,pred-expr list ,@(when key (list key-form))))))))))
 
-(deftransform assoc ((item list &key key test test-not) * * :node node)
-  (transform-list-item-seek 'assoc item list key test test-not node))
-
-(deftransform adjoin ((item list &key key test test-not) * * :node node)
-  (transform-list-item-seek 'adjoin item list key test test-not node))
+(macrolet ((def (name &optional if/if-not)
+             `(progn
+                (deftransform ,name ((item list &key key test test-not) * * :node node)
+                  (transform-list-item-seek ',name item list key test test-not node))
+                ,@(when if/if-not
+                   (let ((if-name (symbolicate name "-IF"))
+                         (if-not-name (symbolicate name "-IF-NOT")))
+                     `((deftransform ,if-name ((pred list &key key) * * :node node)
+                         (transform-list-pred-seek ',if-name pred list key node))
+                       (deftransform ,if-not-name ((pred list &key key) * * :node node)
+                         (transform-list-pred-seek ',if-not-name pred list key node))))))))
+  (def adjoin)
+  (def assoc  t)
+  (def member t)
+  (def rassoc t))
 
 (deftransform memq ((item list) (t (constant-arg list)))
   (labels ((rec (tail)
@@ -470,18 +534,6 @@
                      :end (%check-generic-sequence-bounds seq start end)))
 
 ;;;; utilities
-
-;;; Return true if LVAR's only use is a non-NOTINLINE reference to a
-;;; global function with one of the specified NAMES.
-(defun lvar-fun-is (lvar names)
-  (declare (type lvar lvar) (list names))
-  (let ((use (lvar-uses lvar)))
-    (and (ref-p use)
-         (let ((leaf (ref-leaf use)))
-           (and (global-var-p leaf)
-                (eq (global-var-kind leaf) :global-function)
-                (not (null (member (leaf-source-name leaf) names
-                                   :test #'equal))))))))
 
 ;;; If LVAR is a constant lvar, the return the constant value. If it
 ;;; is null, then return default, otherwise quietly give up the IR1
