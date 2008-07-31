@@ -390,3 +390,18 @@ currently compiles to code that ensures the TLS index at runtime, which
 is both a decently large chunk of code and unnecessary, as we could ensure
 the TLS index at load-time as well.
 
+--------------------------------------------------------------------------------
+#40
+
+When FTYPE is declared -- to say (function (t t t t t) t), and
+function has a compiler-macro,
+
+  (apply #'foo 'x1 x2 'x3 more)
+
+can be transformed into
+
+  (apply (lambda (x2 x4 x5) (foo 'x1 x2 'x3 x4 x5)) x2 more)
+
+which allows compiler-macro-expansion for FOO. (Only constant
+arguments can be moved inside the new lambda -- otherwise evaluation
+order is altered.)

@@ -540,9 +540,40 @@ be a lambda expression."
 
 (defun constant-global-fun-name (thing)
   (let ((constantp (sb!xc:constantp thing)))
-    (and constantp
-         (let ((name (constant-form-value thing)))
-           (and (legal-fun-name-p name) name)))))
+    (when constantp
+      (let ((name (constant-form-value thing)))
+        (when (legal-fun-name-p name)
+          name)))))
+
+(defun lvar-constant-global-fun-name (lvar)
+  (when (constant-lvar-p lvar)
+    (let ((name (lvar-value lvar)))
+      (when (legal-fun-name-p name)
+        name))))
+
+(defun ensure-source-fun-form (source &optional give-up)
+  (let ((op (when (consp source) (car source))))
+    (cond ((eq op '%coerce-callable-to-fun)
+           (ensure-source-fun-form (second source)))
+          ((member op '(function global-function lambda named-lambda))
+           (values source nil))
+          (t
+           (let ((cname (constant-global-fun-name source)))
+             (if cname
+                 (values `(global-function ,cname) nil)
+                 (values `(%coerce-callable-to-fun ,source) give-up)))))))
+
+(defun ensure-lvar-fun-form (lvar lvar-name &optional give-up)
+  (aver (and lvar-name (symbolp lvar-name)))
+  (if (csubtypep (lvar-type lvar) (specifier-type 'function))
+      lvar-name
+      (let ((cname (lvar-constant-global-fun-name lvar)))
+        (cond (cname
+               `(global-function ,cname))
+              (give-up
+               (give-up-ir1-transform give-up))
+              (t
+               `(%coerce-callable-to-fun ,lvar-name))))))
 
 ;;;; FUNCALL
 
@@ -552,45 +583,35 @@ be a lambda expression."
 (deftransform funcall ((function &rest args) * *)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (function ,@arg-names)
-       (%funcall ,(if (csubtypep (lvar-type function)
-                                 (specifier-type 'function))
-                      'function
-                      '(%coerce-callable-to-fun function))
-                 ,@arg-names))))
+       (declare (ignorable function))
+       `(%funcall ,(ensure-lvar-fun-form function 'function) ,@arg-names))))
 
 (def-ir1-translator %funcall ((function &rest args) start next result)
-  (cond ((and (consp function) (eq (car function) 'function))
-         (with-fun-name-leaf (leaf (second function) start)
-           (ir1-convert start next result `(,leaf ,@args))))
-        ((and (consp function) (eq (car function) 'global-function))
-         (with-fun-name-leaf (leaf (second function) start :global t)
-           (ir1-convert start next result `(,leaf ,@args))))
-        (t
-         (let ((ctran (make-ctran))
-               (fun-lvar (make-lvar)))
-           (ir1-convert start ctran fun-lvar `(the function ,function))
-           (ir1-convert-combination-args fun-lvar ctran next result args)))))
+  (let ((op (when (consp function) (car function))))
+    (cond ((eq op 'function)
+           (with-fun-name-leaf (leaf (second function) start)
+             (ir1-convert start next result `(,leaf ,@args))))
+          ((eq op 'global-function)
+           (with-fun-name-leaf (leaf (second function) start :global t)
+             (ir1-convert start next result `(,leaf ,@args))))
+          (t
+           (let ((ctran (make-ctran))
+                 (fun-lvar (make-lvar)))
+             (ir1-convert start ctran fun-lvar `(the function ,function))
+             (ir1-convert-combination-args fun-lvar ctran next result args))))))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
 (define-source-transform funcall (function &rest args)
-  (if (and (consp function) (member (car function) '(function lambda)))
-      `(%funcall ,function ,@args)
-      (let ((name (constant-global-fun-name function)))
-        (if name
-            `(%funcall (global-function ,name) ,@args)
-            (values nil t)))))
+  `(%funcall ,(ensure-source-fun-form function) ,@args))
 
-(deftransform %coerce-callable-to-fun ((thing) (function) *)
-  "optimize away possible call to FDEFINITION at runtime"
-  'thing)
+(deftransform %coerce-callable-to-fun ((thing) * *)
+  (ensure-lvar-fun-form thing 'thing "optimize away possible call to FDEFINITION at runtime"))
 
 (define-source-transform %coerce-callable-to-fun (thing)
-  (if (and (consp thing) (member (car thing) '(function lambda)))
-      thing
-      (values nil t)))
+  (ensure-source-fun-form thing t))
 
 ;;;; LET and LET*
 ;;;;
@@ -1094,13 +1115,7 @@ values from the first VALUES-FORM making up the first argument, etc."
                    ;; important for simplifying compilation of
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
-    (ir1-convert start ctran fun-lvar
-                 (if (and (consp fun) (eq (car fun) 'function))
-                     fun
-                     (let ((name (constant-global-fun-name fun)))
-                       (if name
-                           `(global-function ,name)
-                           `(%coerce-callable-to-fun ,fun)))))
+    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))
