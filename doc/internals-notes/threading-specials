@@ -15,13 +15,12 @@ The goals are
 
 	When looking at a particular symbol, please annotate it in
 	this file when you figure out what it's for and how it's
-	changed.  To give us some confidence that we have reasonable
-	coverage, please don't just delete it if it looks ok.  Symbols
+	changed. To give us some confidence that we have reasonable
+	coverage, please don't just delete it if it looks ok. Symbols
 	shoud only be deleted here if they're obviously not specials
 	at all (e.g. functions with * in their names), or if the same
-	commit actually rids SBCL of the symbol itself (as we may soon
-	do for e.g. SB-SYS:*TASK-SELF*).  Otherwise, just add a
-	comment saying "read-only" or "unused" or whatever.
+	commit actually rids SBCL of the symbol itself. Otherwise,
+	just add a comment saying "read-only" or "unused" or whatever.
 
 	(3) anything else that comes to mind as potential trouble
         spots.  Global state in closures, etc etc
@@ -910,15 +909,6 @@ SB-VM::*WORD-REG-NAMES*
 SB-KERNEL::*BUILT-IN-CLASSES* 
 
 = dead stuff
-
-SB-SYS:*TASK-NOTIFY*    ; unused
-SB-SYS:*TASK-SELF*      ; unused
-SB-SYS:*TASK-DATA*      ; unused
-SB-SYS:*TYPESCRIPTPORT* ' unused
-SB-THREAD::*FOREGROUND-THREAD-STACK*    ; unused, I think
-
-
-
 
 ------------------------------------------------------------------------
 
