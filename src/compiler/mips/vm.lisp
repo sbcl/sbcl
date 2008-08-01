@@ -306,7 +306,7 @@
          (sc-number-or-lose 'immediate)
          nil))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-         system-area-pointer character)
+         character)
      (sc-number-or-lose 'immediate))
     (system-area-pointer
      (sc-number-or-lose 'immediate))

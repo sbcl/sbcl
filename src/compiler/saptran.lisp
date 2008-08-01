@@ -48,7 +48,7 @@
 
 (defknown sap-int (system-area-pointer)
   (unsigned-byte #.sb!vm::n-machine-word-bits)
-  (movable flushable))
+  (movable flushable foldable))
 (defknown int-sap ((unsigned-byte #.sb!vm::n-machine-word-bits))
   system-area-pointer (movable))
 

@@ -428,7 +428,7 @@
 (!def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-         #-sb-xc-host system-area-pointer character)
+         character)
      (sc-number-or-lose 'immediate))
     (symbol
      (when (static-symbol-p value)

@@ -317,7 +317,7 @@
     (null
      (sc-number-or-lose 'null))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-         system-area-pointer character)
+         character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)

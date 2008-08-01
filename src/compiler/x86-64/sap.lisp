@@ -190,7 +190,7 @@
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg)))
                     (:arg-types system-area-pointer
-                                (:constant (signed-byte 64)))
+                                (:constant (signed-byte 32)))
                     (:info offset)
                     ,@(unless (eq size :qword)
                         `((:temporary (:sc ,temp-sc
@@ -240,7 +240,7 @@
                                                'result
                                                'temp)))
                     (:arg-types system-area-pointer
-                                (:constant (signed-byte 64)) ,type)
+                                (:constant (signed-byte 32)) ,type)
                     (:info offset)
                     ,@(unless (eq size :qword)
                         `((:temporary (:sc ,temp-sc :offset rax-offset
@@ -295,7 +295,7 @@
   (:translate sap-ref-double)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 64)))
+  (:arg-types system-area-pointer (:constant (signed-byte 32)))
   (:info offset)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
@@ -320,7 +320,7 @@
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to (:eval 0))
          (value :scs (double-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 64)) double-float)
+  (:arg-types system-area-pointer (:constant (signed-byte 32)) double-float)
   (:info offset)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
