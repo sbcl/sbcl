@@ -45,11 +45,13 @@
               (destructuring-bind (quality raw-value) q-and-v-or-just-q
                 (values quality raw-value)))
         (cond ((not (policy-quality-name-p quality))
-               (compiler-warn "ignoring unknown optimization quality ~
-                               ~S in ~S"
-                               quality spec))
+               (let ((deprecation-warning (policy-quality-deprecation-warning quality spec)))
+                 (if deprecation-warning
+                     (compiler-warn deprecation-warning)
+                     (compiler-warn "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
+                                    quality spec))))
               ((not (typep raw-value 'policy-quality))
-               (compiler-warn "ignoring bad optimization value ~S in ~S"
+               (compiler-warn "~@<Ignoring bad optimization value ~S in:~_ ~S~:>"
                               raw-value spec))
               (t
                ;; we can't do this yet, because CLOS macros expand

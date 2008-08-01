@@ -72,6 +72,16 @@ EXPERIMENTAL INTERFACE: Subject to change."
   (or (memq x *policy-qualities*)
       (assq x *policy-dependent-qualities*)))
 
+;;; Is it deprecated?
+(defun policy-quality-deprecation-warning (quality spec)
+  (when (member quality '(stack-allocate-dynamic-extent stack-allocate-vector
+                          stack-allocate-value-cells))
+    (make-instance 'simple-reference-warning
+                   :format-control "~@<Ignoring deprecated optimization quality ~S in:~_ ~S~:>"
+                   :format-arguments (list quality spec)
+                   :references (list '(:sbcl :variable *stack-allocate-dynamic-extent*)
+                                     '(:sbcl :node "Dynamic-extent allocation")))))
+
 ;;; *POLICY* holds the current global compiler policy information, as
 ;;; an alist mapping from optimization quality name to quality value.
 ;;; Inside the scope of declarations, new entries are added at the
