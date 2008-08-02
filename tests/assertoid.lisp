@@ -14,7 +14,7 @@
 
 (cl:defpackage "ASSERTOID"
   (:use "CL")
-  (:export "GRAB-CONDITION" "RAISES-ERROR?" "ASSERTOID"))
+  (:export "GRAB-CONDITION" "RAISES-ERROR?" "IS" "ASSERTOID"))
 
 (cl:in-package "ASSERTOID")
 
@@ -113,3 +113,14 @@
 ;;; not implemented yet:
 #+nil (assertoid (length (eval (find-package :cl)))
                  :expected-error-type 'type-error)
+
+(defmacro is (form)
+  (if (consp form)
+      (destructuring-bind (op expected real) form
+        `(let ((expected-value ,expected)
+               (real-value ,real))
+           (unless (,op expected-value real-value)
+             (error "Wanted ~S, got ~S:~% ~S"
+                    expected-value real-value ',form))))
+      `(unless ,form
+         (error "~S evaluated to NIL" ',form))))

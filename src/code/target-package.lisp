@@ -837,7 +837,7 @@ implementation it is ~S." *default-package-use-list*)
   (restart-case
       (error 'name-conflict :package package :symbols symbols
              :function function :datum datum)
-    (resolve-conflict (s)
+    (resolve-conflict (chosen-symbol)
       :report "Resolve conflict."
       :interactive
       (lambda ()
@@ -858,102 +858,32 @@ implementation it is ~S." *default-package-use-list*)
            (let ((i (parse-integer (read-line *query-io*) :junk-allowed t)))
              (when (and i (<= 1 i len))
                (return (list (nth (1- i) symbols))))))))
-      (multiple-value-bind (symbol status)
-          (find-symbol (symbol-name s) package)
-        (declare (ignore status)) ; FIXME: is that true?
-        (case function
-          ((export)
-           (if (eq symbol s)
-               (shadow symbol package)
-               (unintern symbol package)))
-          ((unintern)
-           (shadowing-import s package))
-          ((import)
-           (if (eq symbol s)
-               nil ; do nothing
-               (shadowing-import s package)))
-          ((use-package)
-           (if (eq symbol s)
-               (shadow s package)
-               (shadowing-import s package))))))))
-
-#+nil ; this solution gives a variable number of restarts instead, but
-      ; no good way of programmatically choosing between them.
-(defun name-conflict (package function datum &rest symbols)
-  (let ((condition (make-condition 'name-conflict
-                                   :package package :symbols symbols
-                                   :function function :datum datum)))
-    ;; this is a gross violation of modularity, but I can't see any
-    ;; other way to have a variable number of restarts.
-    (let ((*restart-clusters*
-           (cons
-            (mapcan
-             (lambda (s)
-               (multiple-value-bind (accessible-symbol status)
-                   (find-symbol (symbol-name s) package)
-                 (cond
-                   ;; difficult case
-                   ((eq s accessible-symbol)
-                    (ecase status
-                      ((:inherited)
-                       (list (make-restart
-                              :name (make-symbol "SHADOWING-IMPORT")
-                              :function (lambda ()
-                                          (shadowing-import s package)
-                                          (return-from name-conflict))
-                              :report-function
-                              (lambda (stream)
-                                (format stream "Shadowing-import ~S into ~A."
-                                        s (package-%name package))))))
-                      ((:internal :external)
-                       (aver (= (length symbols) 2))
-                       ;; ARGH! FIXME: this unintern restart can
-                       ;; _still_ leave the system in an
-                       ;; unsatisfactory state: if the symbol is a
-                       ;; external symbol of a package which is
-                       ;; already used by this package, and has also
-                       ;; been imported, then uninterning it from this
-                       ;; package will still leave it visible!
-                       ;;
-                       ;; (DEFPACKAGE "FOO" (:EXPORT "SYM"))
-                       ;; (DEFPACKAGE "BAR" (:EXPORT "SYM"))
-                       ;; (DEFPACKAGE "BAZ" (:USE "FOO"))
-                       ;; (IMPORT 'FOO:SYM "BAZ")
-                       ;; (USE-PACKAGE "BAR" "BAZ")
-                       ;;
-                       ;; Now (UNINTERN 'FOO:SYM "BAZ") doesn't
-                       ;; resolve the conflict. :-(
-                       ;;
-                       ;; -- CSR, 2004-10-20
-                       (list (make-restart
-                              :name (make-symbol "UNINTERN")
-                              :function (lambda ()
-                                          (unintern s package)
-                                          (import
-                                           (find s symbols :test-not #'eq)
-                                           package)
-                                          (return-from name-conflict))
-                              :report-function
-                              (lambda (stream)
-                                (format stream
-                                        "Unintern ~S from ~A and import ~S."
-                                        s
-                                        (package-%name package)
-                                        (find s symbols :test-not #'eq))))))))
-                   (t (list (make-restart
-                             :name (make-symbol "SHADOWING-IMPORT")
-                             :function (lambda ()
-                                         (shadowing-import s package)
-                                         (return-from name-conflict))
-                             :report-function
-                             (lambda (stream)
-                               (format stream "Shadowing-import ~S into ~A."
-                                       s (package-%name package)))))))))
-             symbols)
-            *restart-clusters*)))
-      (with-condition-restarts condition (car *restart-clusters*)
-        (with-simple-restart (abort "Leave action undone.")
-          (error condition))))))
+      (multiple-value-bind (package-symbol status)
+          (find-symbol (symbol-name chosen-symbol) package)
+        (let* ((accessiblep status)     ; never NIL here
+               (presentp (and accessiblep
+                              (not (eq :inherited status)))))
+          (ecase function
+            ((unintern)
+             (if presentp
+                 (if (eq package-symbol chosen-symbol)
+                     (shadow (list package-symbol) package)
+                     (shadowing-import (list chosen-symbol) package))
+                 (shadowing-import (list chosen-symbol) package)))
+            ((use-package export)
+             (if presentp
+                 (if (eq package-symbol chosen-symbol)
+                     (shadow (list package-symbol) package) ; CLHS 11.1.1.2.5
+                     (if (eq (symbol-package package-symbol) package)
+                         (unintern package-symbol package) ; CLHS 11.1.1.2.5
+                         (shadowing-import (list chosen-symbol) package)))
+                 (shadowing-import (list chosen-symbol) package)))
+            ((import)
+             (if presentp
+                 (if (eq package-symbol chosen-symbol)
+                     nil                ; re-importing the same symbol
+                     (shadowing-import (list chosen-symbol) package))
+                 (shadowing-import chosen-symbol package)))))))))
 
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
@@ -1048,8 +978,7 @@ uninterned."
           (assert-package-unlocked package "exporting symbol~P ~{~A~^, ~}"
                                    (length syms) syms))
         ;; Find symbols and packages with conflicts.
-        (let ((used-by (package-%used-by-list package))
-              (cset ()))
+        (let ((used-by (package-%used-by-list package)))
           (dolist (sym syms)
             (let ((name (symbol-name sym)))
               (dolist (p used-by)
@@ -1059,10 +988,7 @@ uninterned."
                              (not (member s (package-%shadowing-symbols p))))
                     ;; Beware: the name conflict is in package P, not in
                     ;; PACKAGE.
-                    (name-conflict p 'export sym sym s)
-                    (pushnew sym cset))))))
-          (when cset
-            (setq syms (set-difference syms cset))))
+                    (name-conflict p 'export sym sym s)))))))
         ;; Check that all symbols are accessible. If not, ask to import them.
         (let ((missing ())
               (imports ()))

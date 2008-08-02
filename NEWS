@@ -23,6 +23,13 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     Michael Weber)
   * bug fix: calling SB-COVER:REPORT with a non-directory pathname now
     signals an error. (thanks to Pierre Mai)
+  * bug fix: EXPORT left symbol unexported in conflict situations.
+    (thanks to Michael Weber)
+  * bug fix: correctly handle name conflicts involving CL:NIL.
+    (thanks to Michael Weber)
+  * bug fix: RESOLVE-CONFLICT restart for name conflicts handles
+    conflicts arising from USEing package with conflicting symbols
+    correctly. (thanks to Michael Weber)
 
 changes in sbcl-1.0.19 relative to 1.0.18:
   * new feature: user-customizable variable SB-EXT:*MUFFLED-WARNINGS*;
