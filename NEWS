@@ -9,6 +9,8 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     as ASSOC and MEMEBER.
   * optimization: runtime lookup of function definitions can be
     elided in more cases, eg: (let ((x 'foo)) (funcall foo)).
+  * optimization: compiler is able to derive the return type of
+    (AREF (THE STRING X) Y) as being CHARACTER.
   * bug fix: fixed #427: unused local aliens no longer cause compiler
     breakage. (reported by Stelian Ionescu, Andy Hefner and Stanislaw
     Halik)

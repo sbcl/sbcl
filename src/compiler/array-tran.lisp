@@ -24,8 +24,11 @@
          "upgraded array element type not known at compile time")
         element-type-specifier)))
 
-;;; Array access functions return an object from the array, hence its
-;;; type is going to be the array upgraded element type.
+;;; Array access functions return an object from the array, hence its type is
+;;; going to be the array upgraded element type. Secondary return value is the
+;;; known supertype of the upgraded-array-element-type, if if the exact
+;;; U-A-E-T is not known. (If it is NIL, the primary return value is as good
+;;; as it gets.)
 (defun extract-upgraded-element-type (array)
   (let ((type (lvar-type array)))
     (cond
@@ -34,27 +37,28 @@
       ;; we can have values declared e.g. (AND SIMPLE-VECTOR UNKNOWN-TYPE),
       ;; which are represented in the compiler as INTERSECTION-TYPE, not
       ;; array type.
-      ((array-type-p type) (array-type-specialized-element-type type))
-      ;; fix for bug #396.  This type logic corresponds to the special
-      ;; case for strings in HAIRY-DATA-VECTOR-REF
-      ;; (generic/vm-tran.lisp)
-      ((csubtypep type (specifier-type 'simple-string))
+      ((array-type-p type)
+       (values (array-type-specialized-element-type type) nil))
+      ;; fix for bug #396. This type logic corresponds to the special case for
+      ;; strings in HAIRY-DATA-VECTOR-REF (generic/vm-tran.lisp)
+      ((csubtypep type (specifier-type 'string))
        (cond
-         ((csubtypep type (specifier-type '(simple-array character (*))))
-          (specifier-type 'character))
+         ((csubtypep type (specifier-type '(array character (*))))
+          (values (specifier-type 'character) nil))
          #!+sb-unicode
-         ((csubtypep type (specifier-type '(simple-array base-char (*))))
-          (specifier-type 'base-char))
-         ((csubtypep type (specifier-type '(simple-array nil (*))))
-          *empty-type*)
-         ;; see KLUDGE below.
-         (t *wild-type*)))
+         ((csubtypep type (specifier-type '(array base-char (*))))
+          (values (specifier-type 'base-char) nil))
+         ((csubtypep type (specifier-type '(array nil (*))))
+          (values *empty-type* nil))
+         (t
+          ;; See KLUDGE below.
+          (values *wild-type* (specifier-type 'character)))))
       (t
        ;; KLUDGE: there is no good answer here, but at least
        ;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be
        ;; erroneously optimized (see generic/vm-tran.lisp) -- CSR,
        ;; 2002-08-21
-       *wild-type*))))
+       (values *wild-type* nil)))))
 
 (defun extract-declared-element-type (array)
   (let ((type (lvar-type array)))
@@ -100,13 +104,17 @@
    (specifier-type `(array * ,(make-list rank :initial-element '*)))
    (lexenv-policy (node-lexenv (lvar-dest array)))))
 
+(defun derive-aref-type (array)
+  (multiple-value-bind (uaet other) (extract-upgraded-element-type array)
+    (or other uaet)))
+
 (defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
   *universal-type*)
 
 (defoptimizer (aref derive-type) ((array &rest indices) node)
   (assert-array-rank array (length indices))
-  (extract-upgraded-element-type array))
+  (derive-aref-type array))
 
 (defoptimizer (%aset derive-type) ((array &rest stuff))
   (assert-array-rank array (1- (length stuff)))
@@ -114,14 +122,14 @@
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index))
-                (extract-upgraded-element-type array))))
+                (derive-aref-type array))))
   (define hairy-data-vector-ref)
   (define hairy-data-vector-ref/check-bounds)
   (define data-vector-ref))
 
 #!+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
-  (extract-upgraded-element-type array))
+  (derive-aref-type array))
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index new-value))
@@ -153,7 +161,7 @@
   *universal-type*)
 
 (defoptimizer (row-major-aref derive-type) ((array index))
-  (extract-upgraded-element-type array))
+  (derive-aref-type array))
 
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
   (assert-new-value-type new-value array))

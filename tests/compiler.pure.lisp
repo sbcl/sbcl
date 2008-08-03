@@ -11,6 +11,16 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(cl:in-package :sb-c)
+
+(defknown compiler-derived-type (t) (values t t) (movable flushable unsafe))
+
+(deftransform compiler-derived-type ((x))
+ `(values ',(type-specifier (lvar-type x)) t))
+
+(defun compiler-derived-type (x)
+  (values t nil))
+
 (cl:in-package :cl-user)
 
 ;; The tests in this file assume that EVAL will use the compiler
@@ -2570,3 +2580,17 @@
                         (type (member integer values) p2))
                        (coerce 2 p2))))
            (funcall (compile nil form) 'integer))))
+
+(with-test (:name :string-aref-type)
+ (assert (eq 'character
+             (funcall (compile nil
+                               '(lambda (s)
+                                 (sb-c::compiler-derived-type (aref (the string s) 0))))
+                      "foo"))))
+
+(with-test (:name :base-string-aref-type)
+ (assert (eq 'base-char
+             (funcall (compile nil
+                               '(lambda (s)
+                                 (sb-c::compiler-derived-type (aref (the base-string s) 0))))
+                      (coerce "foo" 'base-string)))))

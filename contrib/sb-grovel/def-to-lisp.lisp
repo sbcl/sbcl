@@ -16,6 +16,7 @@
 
 (defun c-escape (string &optional (dangerous-chars '(#\")) (escape-char #\\))
   "Escape DANGEROUS-CHARS in STRING, with ESCAPE-CHAR."
+  (declare (simple-string string))
   (coerce (loop for c across string
                 if (member c dangerous-chars) collect escape-char
                 collect c)
