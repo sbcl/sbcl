@@ -1214,6 +1214,16 @@
           (*print-length* (or (true *print-length*) 12)))
       (funcall function))))
 
+;;; Returns a list of members of LIST. Useful for dealing with circular lists.
+;;; For a dotted list returns a secondary value of T -- in which case the
+;;; primary return value does not include the dotted tail.
+(defun list-members (list)
+  (when list
+    (do ((tail (cdr list) (cdr tail))
+         (members (list (car list)) (cons (car tail) members)))
+        ((or (not (consp tail)) (eq tail list))
+         (values members (not (listp tail)))))))
+
 ;;; Default evaluator mode (interpeter / compiler)
 
 (declaim (type (member :compile #!+sb-eval :interpret) *evaluator-mode*))

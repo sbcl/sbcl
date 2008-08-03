@@ -2594,3 +2594,35 @@
                                '(lambda (s)
                                  (sb-c::compiler-derived-type (aref (the base-string s) 0))))
                       (coerce "foo" 'base-string)))))
+
+(with-test (:name :dolist-constant-type-derivation)
+  (assert (equal '(integer 1 3)
+                 (funcall (compile nil
+                                   '(lambda (x)
+                                     (dolist (y '(1 2 3))
+                                       (when x
+                                         (return (sb-c::compiler-derived-type y))))))
+                          t))))
+
+(with-test (:name :dolist-simple-list-type-derivation)
+  (assert (equal '(integer 1 3)
+                 (funcall (compile nil
+                                   '(lambda (x)
+                                     (dolist (y (list 1 2 3))
+                                       (when x
+                                         (return (sb-c::compiler-derived-type y))))))
+                          t))))
+
+(with-test (:name :dolist-dotted-constant-list-type-derivation)
+  (let* ((warned nil)
+         (fun (handler-bind ((style-warning (lambda (c) (push c warned))))
+                (compile nil
+                         '(lambda (x)
+                           (dolist (y '(1 2 3 . 4) :foo)
+                             (when x
+                               (return (sb-c::compiler-derived-type y)))))))))
+    (assert (equal '(integer 1 3) (funcall fun t)))
+    (assert (= 1 (length warned)))
+    (multiple-value-bind (res err) (ignore-errors (funcall fun nil))
+      (assert (not res))
+      (assert (typep err 'type-error)))))

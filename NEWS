@@ -7,6 +7,10 @@ changes in sbcl-1.0.20 relative to 1.0.19:
   * optimization: ASSOC-IF, ASSOC-IF-NOT, MEMBER-IF, MEMBER-IF-NOT,
     RASSOC, RASSOC-IF, and RASSOC-IF-NOT are now equally efficient
     as ASSOC and MEMEBER.
+  * optimization: enhanced derivation of DOLIST iteration variable type
+    for constant lists.
+  * optimization: constant folding of simple (LIST ...) forms as DOLIST
+    arguments.
   * optimization: runtime lookup of function definitions can be
     elided in more cases, eg: (let ((x 'foo)) (funcall foo)).
   * optimization: compiler is able to derive the return type of

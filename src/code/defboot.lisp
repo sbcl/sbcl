@@ -345,7 +345,7 @@ evaluated as a PROGN."
                        (type integer ,c))
               ,@body)))))
 
-(defmacro-mundanely dolist ((var list &optional (result nil)) &body body)
+(defmacro-mundanely dolist ((var list &optional (result nil)) &body body &environment env)
   ;; We repeatedly bind the var instead of setting it so that we never
   ;; have to give the var an arbitrary value such as NIL (which might
   ;; conflict with a declaration). If there is a result form, we
@@ -355,28 +355,47 @@ evaluated as a PROGN."
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (let ((n-list (gensym "N-LIST"))
-          (start (gensym "START")))
-      `(block nil
-         (let ((,n-list ,list))
-           (tagbody
-              ,start
-              (unless (endp ,n-list)
-                (let ((,var (car ,n-list)))
-                  ,@decls
-                  (setq ,n-list (cdr ,n-list))
-                  (tagbody ,@forms))
-                (go ,start))))
-         ,(if result
-              `(let ((,var nil))
-                 ;; Filter out TYPE declarations (VAR gets bound to NIL,
-                 ;; and might have a conflicting type declaration) and
-                 ;; IGNORE (VAR might be ignored in the loop body, but
-                 ;; it's used in the result form).
-                 ,@(filter-dolist-declarations decls)
-                 ,var
-                 ,result)
-               nil)))))
+    (let* ((n-list (gensym "N-LIST"))
+           (start (gensym "START"))
+           (tmp (gensym "TMP")))
+      (multiple-value-bind (clist members clist-ok)
+          (cond ((sb!xc:constantp list env)
+                 (let ((value (constant-form-value list env)))
+                   (multiple-value-bind (all dot) (list-members value)
+                     (when dot
+                       ;; Full warning is too much: the user may terminate the loop
+                       ;; early enough. Contents are still right, though.
+                       (style-warn "Dotted list ~S in DOLIST." value))
+                     (values value all t))))
+                ((and (consp list) (eq 'list (car list))
+                      (every (lambda (arg) (sb!xc:constantp arg env)) (cdr list)))
+                 (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
+                   (values values values t)))
+                (t
+                 (values nil nil nil)))
+        `(block nil
+           (let ((,n-list ,(if clist-ok (list 'quote clist) list)))
+             (tagbody
+                ,start
+                (unless (endp ,n-list)
+                  (let* (,@(if clist-ok
+                               `((,tmp (truly-the (member ,@members) (car ,n-list)))
+                                 (,var ,tmp))
+                               `((,var (car ,n-list)))))
+                    ,@decls
+                    (setq ,n-list (cdr ,n-list))
+                    (tagbody ,@forms))
+                  (go ,start))))
+           ,(if result
+                `(let ((,var nil))
+                   ;; Filter out TYPE declarations (VAR gets bound to NIL,
+                   ;; and might have a conflicting type declaration) and
+                   ;; IGNORE (VAR might be ignored in the loop body, but
+                   ;; it's used in the result form).
+                   ,@(filter-dolist-declarations decls)
+                   ,var
+                   ,result)
+                nil))))))
 
 ;;;; conditions, handlers, restarts
 
