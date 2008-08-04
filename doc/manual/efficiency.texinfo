@@ -4,10 +4,67 @@
 @cindex Efficiency
 
 @menu
-* Dynamic-extent allocation::
-* Modular arithmetic::
-* Miscellaneous Efficiency Issues::
+* Slot access::                 
+* Dynamic-extent allocation::   
+* Modular arithmetic::          
+* Miscellaneous Efficiency Issues::  
 @end menu
+
+@node  Slot access
+@comment  node-name,  next,  previous,  up
+@section Slot access
+@cindex Slot access
+
+@subsection Structure object slot access
+
+Structure slot accessors are efficient only if the compiler is able to
+open code them: compiling a call to a structure slot accessor before
+the structure is defined, declaring one @code{notinline}, or passing
+it as a functional argument to another function causes severe
+perfomance degradation.
+
+@subsection Standard object slot access
+
+The most efficient way to access a slot of a @code{standard-object} is
+by using @code{slot-value} with a constant slot name argument inside a
+@code{defmethod} body, where the variable holding the instance is a
+specializer parameter of the method and is never assigned to. The cost
+is roughly 1.6 times that of an open coded structure slot accessor.
+
+Second most efficient way is to use a CLOS slot accessor, or
+@code{slot-value} with a constant slot name argument, but in
+circumstances other than specified above. This may be up to 3 times as
+slow as the method described above.
+
+Example:
+
+@lisp
+(defclass foo () ((bar)))
+
+;; Fast: specializer and never assigned to
+(defmethod quux ((foo foo) new)
+  (let ((old (slot-value foo 'bar)))
+    (setf (slot-value foo 'bar) new)
+    old))
+
+;; Slow: not a specializer
+(defmethod quux ((foo foo) new)
+  (let* ((temp foo)
+         (old (slot-value temp 'bar)))
+    (setf (slot-value temp 'bar) new)
+    old))
+
+;; Slow: assignment to FOO
+(defmethod quux ((foo foo) new)
+  (let ((old (slot-value foo 'bar)))
+    (setf (slot-value foo 'bar) new)
+    (setf foo new)
+    old))
+@end lisp
+
+Note that when profiling code such as this, the first few calls to the
+generic function are not representative, as the dispatch mechanism is
+lazily set up during those calls.
 
 @node  Dynamic-extent allocation
 @comment  node-name,  next,  previous,  up

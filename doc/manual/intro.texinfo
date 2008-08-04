@@ -494,7 +494,7 @@ freely available at @uref{http://www.lisp.org/mop/}.
 @comment  node-name,  next,  previous,  up
 @section History and Implementation of SBCL
 
-You can work productively with SBCL without knowing anything
+You can work productively with SBCL without knowing or
 understanding anything about where it came from, how it is
 implemented, or how it extends the ANSI Common Lisp standard. However,
 a little knowledge can be helpful in order to understand error
@@ -544,7 +544,7 @@ can't be used interactively, and in fact the change is largely invisible
 to the casual user, since SBCL still can and does execute code
 interactively by compiling it on the fly. (It is visible if you know how
 to look, like using @code{compiled-function-p}; and it is visible in the
-way that that SBCL doesn't have many bugs which behave differently in
+way that SBCL doesn't have many bugs which behave differently in
 interpreted code than in compiled code.) What it means is that in SBCL,
 the @code{eval} function only truly ``interprets'' a few easy kinds of
 forms, such as symbols which are @code{boundp}. More complicated forms

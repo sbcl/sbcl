@@ -4,6 +4,8 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT, SB-C::STACK-ALLOCATE-VECTOR,
     and SB-C::STACK-ALLOCATE-VALUE-CELLS no longer exist. See documentation
     and SB-EXT:*STACK-ALLOCATE-DYNAMIC-EXTENT* for details.
+  * documentation: some slot access efficiency guidelines have been
+    added to the user manual.
   * optimization: ASSOC-IF, ASSOC-IF-NOT, MEMBER-IF, MEMBER-IF-NOT,
     RASSOC, RASSOC-IF, and RASSOC-IF-NOT are now equally efficient
     as ASSOC and MEMEBER.

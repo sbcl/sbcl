@@ -516,22 +516,26 @@ selectable via @code{optimize} declarations.
 
 @item Full Type Checks
 All declarations are considered assertions to be checked at runtime,
-and all type checks are precise.
+and all type checks are precise. The default compilation policy
+provides full type checks.
 
-Used when @code{(and (< 0 safety) (or (>= safety 2) (>= safety speed)))}. The
-default compilation policy provides full type checks.
+Used when @code{(or (>= safety 2) (>= safety speed 1))}.
 
 @item Weak Type Checks
-Any or all type declarations may be believed without runtime
-assertions, and assertions that are done may be imprecise. It should
-be noted that it is relatively easy to corrupt the heap when weak type
-checks are used, and type-errors are introduced into the program.
+Declared types may be simplified into faster to check supertypes: for example,
+@code{(and unsigned-byte fixnum)} is simplified into @code{fixnum}.
+
+@strong{Note}: it is relatively easy to corrupt the heap when weak
+type checks are used if the program contains type-errors.
 
 Used when @code{(and (< safety 2) (< safety speed))}
 
 @item No Type Checks
 All declarations are believed without assertions. Also disables
 argument count and array bounds checking.
+
+@strong{Note}: any type errors in code where type checks are not
+performed are liable to corrupt the heap.
 
 Used when @code{(= safety 0)}.
 
