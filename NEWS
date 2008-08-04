@@ -7,6 +7,8 @@ changes in sbcl-1.0.20 relative to 1.0.19:
   * optimization: ASSOC-IF, ASSOC-IF-NOT, MEMBER-IF, MEMBER-IF-NOT,
     RASSOC, RASSOC-IF, and RASSOC-IF-NOT are now equally efficient
     as ASSOC and MEMEBER.
+  * optimization: calls to ASSOC, MEMBER, and RASSOC can be transformed
+    to more efficient EQ-comparison versions more often.
   * optimization: enhanced derivation of DOLIST iteration variable type
     for constant lists.
   * optimization: constant folding of simple (LIST ...) forms as DOLIST

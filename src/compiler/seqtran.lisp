@@ -291,6 +291,13 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
+(deftype eq-comparable-type ()
+  '(or fixnum (not number)))
+
+;;; True if EQL comparisons involving type can be simplified to EQ.
+(defun eq-comparable-type-p (type)
+  (csubtypep type (specifier-type 'eq-comparable-type)))
+
 (defun specialized-list-seek-function-name (function-name key-functions &optional variant)
   (or (find-symbol (with-output-to-string (s)
                      ;; Write "%NAME-FUN1-FUN2-FUN3", etc. Not only is
@@ -330,15 +337,16 @@
                                (%coerce-callable-to-fun key)
                                #'identity)))
                 (t
-                 (values key '(%coerce-callable-to-fun key))))))
+                 (values key (ensure-lvar-fun-form key 'key))))))
     (let* ((c-test (cond ((and test (lvar-fun-is test '(eq)))
                           (setf test nil)
                           'eq)
                          ((and (not test) (not test-not))
                           (when (eq-comparable-type-p (lvar-type item))
                             'eq))))
-           (funs (remove nil (list (and key 'key) (cond (test 'test)
-                                                        (test-not 'test-not)))))
+           (funs (delete nil (list (when key (list key 'key))
+                                   (when test (list test 'test))
+                                   (when test-not (list test-not 'test-not)))))
            (target-expr (if key '(%funcall key target) 'target))
            (test-expr (cond (test `(%funcall test item ,target-expr))
                             (test-not `(not (%funcall test-not item ,target-expr)))
@@ -359,15 +367,15 @@
                                  ((assoc rassoc) (car tail))
                                  (member tail))
                         ,(open-code (cdr tail)))))
-               (ensure-fun (fun)
-                 (if (eq 'key fun)
+               (ensure-fun (args)
+                 (if (eq 'key (second args))
                      key-form
-                     `(%coerce-callable-to-fun ,fun))))
+                     (apply #'ensure-lvar-fun-form args))))
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
           (cond ((and cp c-list (member name '(assoc rassoc member))
                       (policy node (>= speed space)))
-                 `(let ,(mapcar (lambda (fun) `(,fun ,(ensure-fun fun))) funs)
+                 `(let ,(mapcar (lambda (fun) `(,(second fun) ,(ensure-fun fun))) funs)
                     ,(open-code c-list)))
                 ((and cp (not c-list))
                  ;; constant nil list
@@ -376,7 +384,7 @@
                      nil))
                 (t
                  ;; specialized out-of-line version
-                 `(,(specialized-list-seek-function-name name funs c-test)
+                 `(,(specialized-list-seek-function-name name (mapcar #'second funs) c-test)
                     item list ,@(mapcar #'ensure-fun funs)))))))))
 
 (defun transform-list-pred-seek (name pred list key node)
@@ -397,11 +405,9 @@
                                (%coerce-callable-to-fun key)
                                #'identity)))
                 (t
-                 (values key '(%coerce-callable-to-fun key))))))
+                 (values key (ensure-lvar-fun-form key 'key))))))
     (let ((test-expr `(%funcall pred ,(if key '(%funcall key target) 'target)))
-          (pred-expr (if (csubtypep (lvar-type pred) (specifier-type 'function))
-                         'pred
-                         '(%coerce-callable-to-fun pred))))
+          (pred-expr (ensure-lvar-fun-form pred 'pred)))
       (when (member name '(member-if-not assoc-if-not rassoc-if-not))
         (setf test-expr `(not ,test-expr)))
       (labels ((open-code (tail)
@@ -436,16 +442,24 @@
                     ,pred-expr list ,@(when key (list key-form))))))))))
 
 (macrolet ((def (name &optional if/if-not)
-             `(progn
-                (deftransform ,name ((item list &key key test test-not) * * :node node)
-                  (transform-list-item-seek ',name item list key test test-not node))
-                ,@(when if/if-not
-                   (let ((if-name (symbolicate name "-IF"))
-                         (if-not-name (symbolicate name "-IF-NOT")))
-                     `((deftransform ,if-name ((pred list &key key) * * :node node)
-                         (transform-list-pred-seek ',if-name pred list key node))
-                       (deftransform ,if-not-name ((pred list &key key) * * :node node)
-                         (transform-list-pred-seek ',if-not-name pred list key node))))))))
+             (let ((basic (symbolicate "%" name))
+                   (basic-eq (symbolicate "%" name "-EQ"))
+                   (basic-key (symbolicate "%" name "-KEY"))
+                   (basic-key-eq (symbolicate "%" name "-KEY-EQ")))
+               `(progn
+                  (deftransform ,name ((item list &key key test test-not) * * :node node)
+                    (transform-list-item-seek ',name item list key test test-not node))
+                  (deftransform ,basic ((item list) (eq-comparable-type t))
+                    `(,',basic-eq item list))
+                  (deftransform ,basic-key ((item list) (eq-comparable-type t))
+                    `(,',basic-key-eq item list))
+                  ,@(when if/if-not
+                          (let ((if-name (symbolicate name "-IF"))
+                                (if-not-name (symbolicate name "-IF-NOT")))
+                            `((deftransform ,if-name ((pred list &key key) * * :node node)
+                                (transform-list-pred-seek ',if-name pred list key node))
+                              (deftransform ,if-not-name ((pred list &key key) * * :node node)
+                                (transform-list-pred-seek ',if-not-name pred list key node)))))))))
   (def adjoin)
   (def assoc  t)
   (def member t)

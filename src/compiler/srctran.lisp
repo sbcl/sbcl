@@ -3392,10 +3392,6 @@
   (def eq)
   (def char=))
 
-;;; True if EQL comparisons involving type can be simplified to EQ.
-(defun eq-comparable-type-p (type)
-  (csubtypep type (specifier-type '(or fixnum (not number)))))
-
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
 ;;; -- If both args are characters, convert to CHAR=. This is better than

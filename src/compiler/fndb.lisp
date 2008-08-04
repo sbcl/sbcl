@@ -1482,6 +1482,15 @@
   function
   (flushable foldable))
 
+(defknown %adjoin     (t list)          list (explicit-check foldable flushable))
+(defknown %adjoin-key (t list function) list (explicit-check foldable flushable call))
+(defknown %assoc      (t list)          list (explicit-check foldable flushable))
+(defknown %assoc-key  (t list function) list (explicit-check foldable flushable call))
+(defknown %member     (t list)          list (explicit-check foldable flushable))
+(defknown %member-key (t list function) list (explicit-check foldable flushable call))
+(defknown %rassoc     (t list)          list (explicit-check foldable flushable))
+(defknown %rassoc-key (t list function) list (explicit-check foldable flushable call))
+
 (defknown %check-vector-sequence-bounds (vector index sequence-end)
   index
   (unwind))
