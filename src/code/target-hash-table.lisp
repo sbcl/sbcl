@@ -816,40 +816,41 @@ there was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
            (values (member t nil)))
   (with-hash-table-locks (hash-table :inline (%remhash) :pin (key))
-  ;; For now, just clear the cache
-  (setf (hash-table-cache hash-table) nil)
+    ;; For now, just clear the cache
+    (setf (hash-table-cache hash-table) nil)
     (%remhash key hash-table)))
 
 (defun clrhash (hash-table)
   #!+sb-doc
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
-  (with-hash-table-locks (hash-table)
-    (let* ((kv-vector (hash-table-table hash-table))
-           (next-vector (hash-table-next-vector hash-table))
-           (hash-vector (hash-table-hash-vector hash-table))
-           (size (length next-vector))
-           (index-vector (hash-table-index-vector hash-table)))
-      ;; Disable GC tricks.
-      (set-header-data kv-vector sb!vm:vector-normal-subtype)
-      ;; Mark all slots as empty by setting all keys and values to magic
-      ;; tag.
-      (aver (eq (aref kv-vector 0) hash-table))
-      (fill kv-vector +empty-ht-slot+ :start 2)
-      ;; Set up the free list, all free.
-      (do ((i 1 (1+ i)))
-          ((>= i (1- size)))
-        (setf (aref next-vector i) (1+ i)))
-      (setf (aref next-vector (1- size)) 0)
-      (setf (hash-table-next-free-kv hash-table) 1)
-      ;; Clear the index-vector.
-      (fill index-vector 0)
-      ;; Clear the hash-vector.
-      (when hash-vector
-        (fill hash-vector +magic-hash-vector-value+)))
-    (setf (hash-table-cache hash-table) nil)
-    (setf (hash-table-number-entries hash-table) 0)
-    hash-table))
+  (when (plusp (hash-table-number-entries hash-table))
+    (with-hash-table-locks (hash-table)
+      (let* ((kv-vector (hash-table-table hash-table))
+             (next-vector (hash-table-next-vector hash-table))
+             (hash-vector (hash-table-hash-vector hash-table))
+             (size (length next-vector))
+             (index-vector (hash-table-index-vector hash-table)))
+        ;; Disable GC tricks.
+        (set-header-data kv-vector sb!vm:vector-normal-subtype)
+        ;; Mark all slots as empty by setting all keys and values to magic
+        ;; tag.
+        (aver (eq (aref kv-vector 0) hash-table))
+        (fill kv-vector +empty-ht-slot+ :start 2)
+        ;; Set up the free list, all free.
+        (do ((i 1 (1+ i)))
+            ((>= i (1- size)))
+          (setf (aref next-vector i) (1+ i)))
+        (setf (aref next-vector (1- size)) 0)
+        (setf (hash-table-next-free-kv hash-table) 1)
+        ;; Clear the index-vector.
+        (fill index-vector 0)
+        ;; Clear the hash-vector.
+        (when hash-vector
+          (fill hash-vector +magic-hash-vector-value+)))
+      (setf (hash-table-cache hash-table) nil)
+      (setf (hash-table-number-entries hash-table) 0)))
+  hash-table)
 
 
 ;;;; MAPHASH
