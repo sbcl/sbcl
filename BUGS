@@ -1858,30 +1858,6 @@ generally try to check returns in safe code, so we should here too.)
 
  (Test-case adapted from CL-PPCRE.)
 
-425: reading from closed streams
-
- Reported by Damien Cassou on sbcl-devel. REPL transcript follows:
-
-  * (open ".bashrc" :direction :input)
-  #<SB-SYS:FD-STREAM for "file /home/cassou/.bashrc" {A6ADFC9}>
-  * (defparameter *s* *)
-  *S*
-  * (read-line *s*)
-  "# -*- Mode: Sh -*-"
-  * (read-line *s*)
-  "# Files you make look like rw-r--r--"
-  * (open-stream-p *s*)
-  T
-  * (close *s*)
-  T
-  * (open-stream-p *s*)
-  NIL
-  * (read-line *s*)
-  "umask 022"
-
- The problem is with the fast path using ansi-stream-cin-buffer not hitting
- closed-flame.
-
 426: inlining failure involving multiple nested calls
 
    (declaim (inline foo))

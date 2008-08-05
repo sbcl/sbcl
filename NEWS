@@ -21,6 +21,9 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     (AREF (THE STRING X) Y) as being CHARACTER.
   * optimization: CLRHASH on empty hash-tables no longer does pointless
     work. (thanks to Alec Berryman)
+  * bug fix: fixed #425; CLOSE drops input buffers from streams, so
+    READ-LINE &co can no longer read from them afterwards. (reported
+    by Damien Cassou)
   * bug fix: fixed #427: unused local aliens no longer cause compiler
     breakage. (reported by Stelian Ionescu, Andy Hefner and Stanislaw
     Halik)

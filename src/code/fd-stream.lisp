@@ -2042,7 +2042,12 @@
      (setf (fd-stream-unread fd-stream) arg1)
      (setf (fd-stream-listen fd-stream) t))
     (:close
-     (cond (arg1                    ; We got us an abort on our hands.
+     ;; Drop input buffers
+     (setf (ansi-stream-in-index fd-stream) +ansi-stream-in-buffer-length+
+           (ansi-stream-cin-buffer fd-stream) nil
+           (ansi-stream-in-buffer fd-stream) nil)
+     (cond (arg1
+            ;; We got us an abort on our hands.
             (let ((outputp (fd-stream-obuf fd-stream))
                   (file (fd-stream-file fd-stream))
                   (orig (fd-stream-original fd-stream)))

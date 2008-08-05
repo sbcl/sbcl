@@ -859,6 +859,7 @@ possibly temporariliy, because it might be used internally."
                "*SETF-FDEFINITION-HOOK*"
 
                ;; error-reporting facilities
+               "CLOSED-STREAM-ERROR"
                "COMPILED-PROGRAM-ERROR"
                "ENCAPSULATED-CONDITION"
                "INTERPRETED-PROGRAM-ERROR"

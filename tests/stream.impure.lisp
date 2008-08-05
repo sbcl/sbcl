@@ -497,5 +497,24 @@
                         (multiple-value-list (read-line in nil nil))))))
     (delete-file pathname)
     (assert (equal result '(("a" nil) ("b" t) (nil t))))))
+
+;;; READ-LINE used to work on closed streams because input buffers were left in place
+(with-test (:name :bug-425)
+  ;; Normal close
+  (let ((f (open "stream.impure.lisp" :direction :input)))
+    (assert (stringp (read-line f)))
+    (close f)
+    (assert (eq :fii
+                (handler-case
+                    (read-line f)
+                  (sb-int:closed-stream-error () :fii)))))
+  ;; Abort
+  (let ((f (open "stream.impure.lisp" :direction :input)))
+    (assert (stringp (read-line f nil nil)))
+    (close f :abort t)
+    (assert (eq :faa
+                (handler-case
+                    (read-line f)
+                  (sb-int:closed-stream-error () :faa))))))
 
 ;;; success

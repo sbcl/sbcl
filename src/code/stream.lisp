@@ -53,7 +53,7 @@
          :format-arguments (list stream)))
 (defun closed-flame (stream &rest ignore)
   (declare (ignore ignore))
-  (error "~S is closed." stream))
+  (error 'closed-stream-error :stream stream))
 (defun no-op-placeholder (&rest ignore)
   (declare (ignore ignore)))
 

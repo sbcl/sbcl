@@ -648,6 +648,11 @@
              "end of file on ~S"
              (stream-error-stream condition)))))
 
+(define-condition closed-stream-error (stream-error) ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~S is closed" (stream-error-stream condition)))))
+
 (define-condition file-error (error)
   ((pathname :reader file-error-pathname :initarg :pathname))
   (:report
