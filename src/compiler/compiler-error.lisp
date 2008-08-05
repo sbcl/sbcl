@@ -100,14 +100,12 @@
       (signal-error ()
         (error condition)))))
 
-(declaim (ftype (function (string &rest t) (values))
-                compiler-warn compiler-style-warn))
-(defun compiler-warn (format-string &rest format-args)
-  (apply #'warn format-string format-args)
+(defun compiler-warn (datum &rest arguments)
+  (apply #'warn datum arguments)
   (values))
 
-(defun compiler-style-warn (format-string &rest format-args)
-  (apply #'style-warn format-string format-args)
+(defun compiler-style-warn (datum &rest arguments)
+  (apply #'style-warn datum arguments)
   (values))
 
 (defun make-compiler-error-form (condition source)
