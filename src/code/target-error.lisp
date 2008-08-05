@@ -19,12 +19,13 @@
 ;;; associated with Condition
 (defvar *condition-restarts* ())
 
+(defun muffle-warning-p (warning)
+  (declare (special *muffled-warnings*))
+  (typep warning *muffled-warnings*))
+
 (defun initial-handler-clusters ()
   `(((warning . ,#'(lambda (warning)
-                     (when (typep warning
-                                  (locally
-                                      (declare (special sb!ext:*muffled-warnings*))
-                                    sb!ext:*muffled-warnings*))
+                     (when (muffle-warning-p warning)
                        (muffle-warning warning)))))))
 
 (defvar *handler-clusters* (initial-handler-clusters))
