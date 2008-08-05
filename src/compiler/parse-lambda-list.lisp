@@ -34,7 +34,7 @@
 ;;; arg specifiers are just passed through untouched. If something is
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
-(declaim (ftype (sfunction (list)
+(declaim (ftype (sfunction (list &key (:silent boolean))
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t boolean))
                 parse-lambda-list-like-thing))
@@ -42,7 +42,7 @@
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t))
                 parse-lambda-list))
-(defun parse-lambda-list-like-thing (list)
+(defun parse-lambda-list-like-thing (list &key silent)
   (collect ((required)
             (optional)
             (keys)
@@ -86,8 +86,9 @@
                  (compiler-error "misplaced &KEY in lambda list: ~S" list))
                #-sb-xc-host
                (when (optional)
-                 (compiler-style-warn
-                  "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
+                 (unless silent
+                   (compiler-style-warn
+                    "&OPTIONAL and &KEY found in the same lambda list: ~S" list)))
                (setq keyp t
                      state :key))
               (&allow-other-keys
@@ -127,8 +128,9 @@
                   (when (and (plusp (length name))
                              (char= (char name 0) #\&))
                     ;; Should this be COMPILER-STYLE-WARN?
-                    (style-warn
-                     "suspicious variable in lambda list: ~S." arg))))
+                    (unless silent
+                      (style-warn
+                       "suspicious variable in lambda list: ~S." arg)))))
               (case state
                 (:required (required arg))
                 (:optional (optional arg))

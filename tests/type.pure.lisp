@@ -396,3 +396,7 @@ ACTUAL ~D DERIVED ~D~%"
   (let ((bignum1 (+ 12 most-positive-fixnum))
         (bignum2 (- (+ 15 most-positive-fixnum) 3)))
     (assert (eval `(typep ,bignum1 '(member ,bignum2))))))
+
+(with-test (:name :opt+rest+key-canonicalization)
+  (let ((type '(function (&optional t &rest t &key (:x t) (:y t)) *)))
+    (assert (equal type (sb-kernel:type-specifier (sb-kernel:specifier-type type))))))

@@ -63,7 +63,7 @@
   ;; true if other &KEY arguments are allowed
   (allowp nil :type boolean))
 
-(defun canonicalize-args-type-args (required optional rest)
+(defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
     ;; or vice-versa?
     (setq rest nil))
@@ -72,19 +72,20 @@
         for opt in optional
         do (cond ((eq opt *empty-type*)
                   (return (values required (subseq optional i) rest)))
-                 ((neq opt rest)
+                 ((and (not keyp) (neq opt rest))
                   (setq last-not-rest i)))
         finally (return (values required
-                                (if last-not-rest
-                                    (subseq optional 0 (1+ last-not-rest))
-                                    nil)
+                                (cond (keyp
+                                       optional)
+                                      (last-not-rest
+                                       (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
 (defun args-types (lambda-list-like-thing)
   (multiple-value-bind
         (required optional restp rest keyp keys allowp auxp aux
                   morep more-context more-count llk-p)
-      (parse-lambda-list-like-thing lambda-list-like-thing)
+      (parse-lambda-list-like-thing lambda-list-like-thing :silent t)
     (declare (ignore aux morep more-context more-count))
     (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list-like-thing))
@@ -106,7 +107,7 @@
                    :type (single-value-specifier-type (second key))))))
              (key-info))))
       (multiple-value-bind (required optional rest)
-          (canonicalize-args-type-args required optional rest)
+          (canonicalize-args-type-args required optional rest keyp)
         (values required optional rest keyp keywords allowp llk-p)))))
 
 (defstruct (values-type

@@ -21,6 +21,11 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     (AREF (THE STRING X) Y) as being CHARACTER.
   * optimization: CLRHASH on empty hash-tables no longer does pointless
     work. (thanks to Alec Berryman)
+  * bug fix: bogus odd-number-of-keywords STYLE-WARNINGs from calls to
+    functions with an odd number of &OPTIONAL arguments, a &REST
+    argument, and one or more &KEY arguments at the call site.
+  * bug fix: STYLE-WARNINGs for functions with both &OPTIONAL and &KEY
+    arguments appeared at call sites as well.
   * bug fix: fixed #425; CLOSE drops input buffers from streams, so
     READ-LINE &co can no longer read from them afterwards. (reported
     by Damien Cassou)

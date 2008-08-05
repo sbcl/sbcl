@@ -935,6 +935,13 @@
 (declaim (cons *special-cons*))
 (assert (raises-error? (set '*special-cons* "nope") type-error))
 (assert (raises-error? (progv '(*special-cons*) '("no hope") (car *special-cons*)) type-error))
+
+;;; No bogus warnings for calls to functions with complex lambda-lists.
+(defun complex-function-signature (&optional x &rest y &key z1 z2)
+  (cons x y))
+(with-test (:name :complex-call-doesnt-warn)
+  (handler-bind ((warning #'error))
+    (compile nil '(lambda (x) (complex-function-signature x :z1 1 :z2 2)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
