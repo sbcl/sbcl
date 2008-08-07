@@ -204,8 +204,9 @@ in future versions."
         (error "Recursive lock attempt on ~S." spinlock))
       #!+sb-thread
       (flet ((cas ()
-               (unless (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
-                 (return-from get-spinlock t))))
+               (if (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
+                   (thread-yield)
+                   (return-from get-spinlock t))))
         (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
             ;; If interrupts are enabled, but we are allowed to enabled them,
             ;; check for pending interrupts every once in a while.
