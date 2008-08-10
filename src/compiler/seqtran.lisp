@@ -547,22 +547,6 @@
                      :start start
                      :end (%check-generic-sequence-bounds seq start end)))
 
-;;;; utilities
-
-;;; If LVAR is a constant lvar, the return the constant value. If it
-;;; is null, then return default, otherwise quietly give up the IR1
-;;; transform.
-;;;
-;;; ### Probably should take an ARG and flame using the NAME.
-(defun constant-value-or-lose (lvar &optional default)
-  (declare (type (or lvar null) lvar))
-  (cond ((not lvar) default)
-        ((constant-lvar-p lvar)
-         (lvar-value lvar))
-        (t
-         (give-up-ir1-transform))))
-
-
 ;;;; hairy sequence transforms
 
 ;;; FIXME: no hairy sequence transforms in SBCL?
@@ -698,51 +682,44 @@
                             (,sequence-type1 ,sequence-type2 &rest t)
                             ,sequence-type1
                             :node node)
-       ,(cond
-         ((and saetp (valid-bit-bash-saetp-p saetp)) nil)
-         ;; If the sequence types are different, SEQ1 and SEQ2 must
-         ;; be distinct arrays, and we can open code the copy loop.
-         ((not (eql sequence-type1 sequence-type2)) nil)
-         ;; If we're not bit-bashing, only allow cases where we
-         ;; can determine the order of copying up front.  (There
-         ;; are actually more cases we can handle if we know the
-         ;; amount that we're copying, but this handles the
-         ;; common cases.)
-         (t '(unless (= (constant-value-or-lose start1 0)
-                      (constant-value-or-lose start2 0))
-              (give-up-ir1-transform))))
        `(let* ((len1 (length seq1))
                (len2 (length seq2))
                (end1 (or end1 len1))
                (end2 (or end2 len2))
-               (replace-len1 (- end1 start1))
-               (replace-len2 (- end2 start2)))
+               (replace-len (min (- end1 start1) (- end2 start2))))
           ,(unless (policy node (= safety 0))
              `(progn
-                 (unless (<= 0 start1 end1 len1)
-                   (sequence-bounding-indices-bad-error seq1 start1 end1))
-                 (unless (<= 0 start2 end2 len2)
-                   (sequence-bounding-indices-bad-error seq2 start2 end2))))
+                (unless (<= 0 start1 end1 len1)
+                  (sequence-bounding-indices-bad-error seq1 start1 end1))
+                (unless (<= 0 start2 end2 len2)
+                  (sequence-bounding-indices-bad-error seq2 start2 end2))))
           ,',(cond
-              ((and saetp (valid-bit-bash-saetp-p saetp))
-               (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
-                      (bash-function (intern (format nil "UB~D-BASH-COPY"
-                                                     n-element-bits)
-                                             (find-package "SB!KERNEL"))))
-                 `(funcall (function ,bash-function) seq2 start2
-                           seq1 start1 (min replace-len1 replace-len2))))
-              (t
-               ;; We can expand the loop inline here because we
-               ;; would have given up the transform (see above)
-               ;; if we didn't have constant matching start
-               ;; indices.
-               '(do ((i start1 (1+ i))
-                     (j start2 (1+ j))
-                     (end (+ start1
-                             (min replace-len1 replace-len2))))
-                 ((>= i end))
-                 (declare (optimize (insert-array-bounds-checks 0)))
-                 (setf (aref seq1 i) (aref seq2 j)))))
+               ((and saetp (valid-bit-bash-saetp-p saetp))
+                (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
+                       (bash-function (intern (format nil "UB~D-BASH-COPY"
+                                                      n-element-bits)
+                                              (find-package "SB!KERNEL"))))
+                  `(funcall (function ,bash-function) seq2 start2
+                    seq1 start1 replace-len)))
+               (t
+                `(if (and
+                      ;; If the sequence types are different, SEQ1 and
+                      ;; SEQ2 must be distinct arrays.
+                      ,(eql sequence-type1 sequence-type2)
+                      (eq seq1 seq2) (> start1 start2))
+                     (do ((i (truly-the index (+ start1 replace-len -1))
+                             (1- i))
+                          (j (truly-the index (+ start2 replace-len -1))
+                             (1- j)))
+                         ((< i start1))
+                       (declare (optimize (insert-array-bounds-checks 0)))
+                       (setf (aref seq1 i) (aref seq2 j)))
+                     (do ((i start1 (1+ i))
+                          (j start2 (1+ j))
+                          (end (+ start1 replace-len)))
+                         ((>= i end))
+                       (declare (optimize (insert-array-bounds-checks 0)))
+                       (setf (aref seq1 i) (aref seq2 j))))))
           seq1))))
 
 (macrolet
