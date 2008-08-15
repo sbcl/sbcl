@@ -176,6 +176,13 @@ page_address(page_index_t page_num)
     return (heap_base + (page_num * PAGE_BYTES));
 }
 
+/* Calculate the address where the allocation region associated with the page starts. */
+inline void *
+page_region_start(page_index_t page_index)
+{
+    return page_address(page_index)+page_table[page_index].first_object_offset;
+}
+
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
 inline page_index_t
@@ -2115,8 +2122,7 @@ search_dynamic_space(void *pointer)
     if ((page_index == -1) ||
         (page_table[page_index].allocated == FREE_PAGE_FLAG))
         return NULL;
-    start = (lispobj *)((void *)page_address(page_index)
-                        + page_table[page_index].first_object_offset);
+    start = (lispobj *)page_region_start(page_index);
     return (gc_search_space(start,
                             (((lispobj *)pointer)+2)-start,
                             (lispobj *)pointer));
@@ -2647,9 +2653,7 @@ preserve_pointer(void *addr)
 #if 0
     /* I think this'd work just as well, but without the assertions.
      * -dan 2004.01.01 */
-    first_page=
-        find_page_index(page_address(addr_page_index)+
-                        page_table[addr_page_index].first_object_offset);
+    first_page = find_page_index(page_region_start(addr_page_index))
 #else
     first_page = addr_page_index;
     while (page_table[first_page].first_object_offset != 0) {
@@ -2986,9 +2990,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
                         - page_table[i].first_object_offset)/N_WORD_BYTES;
                 new_areas_ignore_page = last_page;
 
-                scavenge(page_address(i) +
-                         page_table[i].first_object_offset,
-                         size);
+                scavenge(page_region_start(i), size);
 
             }
             i = last_page;
