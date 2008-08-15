@@ -38,7 +38,6 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "arch.h"
-#include "fixnump.h"
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
@@ -2184,20 +2183,8 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
             return 0;
         }
         /* Is it plausible cons? */
-        if ((is_lisp_pointer(start_addr[0])
-            || (fixnump(start_addr[0]))
-            || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
-#if N_WORD_BITS == 64
-            || (widetag_of(start_addr[0]) == SINGLE_FLOAT_WIDETAG)
-#endif
-            || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
-           && (is_lisp_pointer(start_addr[1])
-               || (fixnump(start_addr[1]))
-               || (widetag_of(start_addr[1]) == CHARACTER_WIDETAG)
-#if N_WORD_BITS == 64
-               || (widetag_of(start_addr[1]) == SINGLE_FLOAT_WIDETAG)
-#endif
-               || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
+        if ((is_lisp_pointer(start_addr[0]) || is_lisp_immediate(start_addr[0])) &&
+            (is_lisp_pointer(start_addr[1]) || is_lisp_immediate(start_addr[1])))
             break;
         else {
             if (gencgc_verbose)

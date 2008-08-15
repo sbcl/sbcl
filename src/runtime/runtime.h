@@ -123,6 +123,21 @@ is_lisp_pointer(lispobj obj)
     return obj & 1;
 }
 
+#include "fixnump.h"
+
+/* Is the Lisp object obj something with immediate nature (e.g. a
+ * fixnum or character or unbound marker)? */
+static inline int
+is_lisp_immediate(lispobj obj)
+{
+    return (fixnump(obj)
+            || (widetag_of(obj) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+            || (widetag_of(obj) == SINGLE_FLOAT_WIDETAG)
+#endif
+            || (widetag_of(obj) == UNBOUND_MARKER_WIDETAG));
+}
+
 /* Convert from a lispobj with type bits to a native (ordinary
  * C/assembly) pointer to the beginning of the object. */
 static inline lispobj *

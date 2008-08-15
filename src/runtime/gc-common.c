@@ -37,7 +37,6 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "arch.h"
-#include "fixnump.h"
 #include "gc.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
@@ -2371,13 +2370,7 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
         lispobj thing = *start;
 
         /* If thing is an immediate then this is a cons. */
-        if (is_lisp_pointer(thing)
-            || (fixnump(thing))
-            || (widetag_of(thing) == CHARACTER_WIDETAG)
-#if N_WORD_BITS == 64
-            || (widetag_of(thing) == SINGLE_FLOAT_WIDETAG)
-#endif
-            || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
+        if (is_lisp_pointer(thing) || is_lisp_immediate(thing))
             count = 2;
         else
             count = (sizetab[widetag_of(thing)])(start);

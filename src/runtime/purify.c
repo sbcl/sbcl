@@ -27,7 +27,6 @@
 #include "interrupt.h"
 #include "purify.h"
 #include "interr.h"
-#include "fixnump.h"
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
