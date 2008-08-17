@@ -51,6 +51,8 @@
                                       :error-fun error-fun
                                       :anonymousp anonymousp)
         (values `(let* (,@(nreverse *system-lets*))
+                   #-sb-xc-host
+                   (declare (muffle-conditions sb!ext:code-deletion-note))
                    ,@(when *ignorable-vars*
                        `((declare (ignorable ,@*ignorable-vars*))))
                    ,@*arg-tests*

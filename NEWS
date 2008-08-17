@@ -23,6 +23,9 @@ changes in sbcl-1.0.20 relative to 1.0.19:
     work. (thanks to Alec Berryman)
   * optimization: REPLACE deftransforms don't punt when :START1 or
     :START2 is given
+  * bug fix: compiling DESTRUCTURING-BIND on constant list arguments
+    no longer emits a code deletion note. (reported by Andrew
+    Gasparovic)
   * bug fix: bogus odd-number-of-keywords STYLE-WARNINGs from calls to
     functions with an odd number of &OPTIONAL arguments, a &REST
     argument, and one or more &KEY arguments at the call site.

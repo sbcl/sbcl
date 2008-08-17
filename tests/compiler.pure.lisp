@@ -2626,3 +2626,21 @@
     (multiple-value-bind (res err) (ignore-errors (funcall fun nil))
       (assert (not res))
       (assert (typep err 'type-error)))))
+
+(with-test (:name :constant-list-destructuring)
+  (handler-bind ((sb-ext:compiler-note #'error))
+    (progn
+      (assert (= 10
+                 (funcall
+                  (compile nil
+                           '(lambda ()
+                             (destructuring-bind (a (b c) d) '(1 (2 3) 4)
+                               (+ a b c d)))))))
+      (assert (eq :feh
+                  (funcall
+                   (compile nil
+                            '(lambda (x)
+                              (or x
+                               (destructuring-bind (a (b c) d) '(1 "foo" 4)
+                                 (+ a b c d)))))
+                   :feh))))))
