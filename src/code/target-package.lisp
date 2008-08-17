@@ -883,7 +883,7 @@ implementation it is ~S." *default-package-use-list*)
                  (if (eq package-symbol chosen-symbol)
                      nil                ; re-importing the same symbol
                      (shadowing-import (list chosen-symbol) package))
-                 (shadowing-import chosen-symbol package)))))))))
+                 (shadowing-import (list chosen-symbol) package)))))))))
 
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
