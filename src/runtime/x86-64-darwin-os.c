@@ -359,6 +359,10 @@ catch_exception_raise(mach_port_t exception_port,
 
             backup_thread_state = thread_state;
             open_stack_allocation(&thread_state);
+            /* Reserve a 256 byte zone for signal handlers
+             * to use on the interrupted thread stack.
+             */
+            stack_allocate(&thread_state, 256);
 
             /* Save thread state */
             target_thread_state =
@@ -399,6 +403,7 @@ catch_exception_raise(mach_port_t exception_port,
                  addr < undefined_alien_address + os_vm_page_size) {
             backup_thread_state = thread_state;
             open_stack_allocation(&thread_state);
+            stack_allocate(&thread_state, 256);
 
             /* Save thread state */
             target_thread_state =
@@ -428,6 +433,7 @@ catch_exception_raise(mach_port_t exception_port,
 
             backup_thread_state = thread_state;
             open_stack_allocation(&thread_state);
+            stack_allocate(&thread_state, 256);
 
             /* Save thread state */
             target_thread_state =
@@ -504,6 +510,7 @@ catch_exception_raise(mach_port_t exception_port,
 
             backup_thread_state = thread_state;
             open_stack_allocation(&thread_state);
+            stack_allocate(&thread_state, 256);
 
             /* Save thread state */
             target_thread_state =

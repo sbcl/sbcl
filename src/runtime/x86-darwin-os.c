@@ -312,6 +312,7 @@ void call_handler_on_thread(mach_port_t thread,
     /* Initialize the new state */
     new_state = *thread_state;
     open_stack_allocation(&new_state);
+    stack_allocate(&new_state, 256);
     /* Save old state */
     save_thread_state = (x86_thread_state32_t *)stack_allocate(&new_state, sizeof(*save_thread_state));
     *save_thread_state = *thread_state;
@@ -451,27 +452,6 @@ catch_exception_raise(mach_port_t exception_port,
         if (os_trunc_to_page(addr) == CONTROL_STACK_RETURN_GUARD_PAGE(th)) {
             protect_control_stack_guard_page_thread(1, th);
             protect_control_stack_return_guard_page_thread(0, th);
-            break;
-        }
-        /* Get vm_region info */
-        region_addr = (vm_address_t)code_vector[1];
-        info_count = VM_REGION_BASIC_INFO_COUNT;
-        if ((ret = vm_region(mach_task_self(),
-                             &region_addr,
-                             &region_size,
-                             VM_REGION_BASIC_INFO,
-                             (vm_region_info_t)&region_info,
-                             &info_count,
-                             &region_name)))
-            lose("vm_region (VM_REGION_BASIC_INFO) failed failed %d\n", ret);
-        /* Check if still protected */
-        if ((region_info.protection & OS_VM_PROT_ALL) == 0) {
-          /* KLUDGE:
-           * If two threads fault on the same page, the protection
-           * is cleared as the first thread runs memory_fault_handler.
-           * Grep for "not marked as write-protected" in gencgc.c
-           */
-            ret = KERN_SUCCESS;
             break;
         }
         /* Regular memory fault */
