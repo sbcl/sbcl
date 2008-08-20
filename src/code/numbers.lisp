@@ -238,7 +238,7 @@
 (defun realpart (number)
   #!+sb-doc
   "Extract the real part of a number."
-  (typecase number
+  (etypecase number
     #!+long-float
     ((complex long-float)
      (truly-the long-float (realpart number)))
@@ -248,13 +248,13 @@
      (truly-the single-float (realpart number)))
     ((complex rational)
      (sb!kernel:%realpart number))
-    (t
+    (number
      number)))
 
 (defun imagpart (number)
   #!+sb-doc
   "Extract the imaginary part of a number."
-  (typecase number
+  (etypecase number
     #!+long-float
     ((complex long-float)
      (truly-the long-float (imagpart number)))
@@ -266,13 +266,14 @@
      (sb!kernel:%imagpart number))
     (float
      (* 0 number))
-    (t
+    (number
      0)))
 
 (defun conjugate (number)
   #!+sb-doc
   "Return the complex conjugate of NUMBER. For non-complex numbers, this is
   an identity."
+  (declare (type number number))
   (if (complexp number)
       (complex (realpart number) (- (imagpart number)))
       number))

@@ -855,6 +855,8 @@
     (setf (lambda-physenv clambda) home-physenv)
 
     (when physenv
+      (unless home-physenv
+        (setf home-physenv (get-lambda-physenv home)))
       (setf (physenv-nlx-info home-physenv)
             (nconc (physenv-nlx-info physenv)
                    (physenv-nlx-info home-physenv))))
