@@ -36,14 +36,14 @@
              (:include host
                        (parse #'parse-logical-namestring)
                        (parse-native
-                        (lambda (x)
+                        (lambda (&rest x)
                           (error "called PARSE-NATIVE-NAMESTRING using a ~
-                                  logical host: ~S" x)))
+                                  logical host: ~S" (first x))))
                        (unparse #'unparse-logical-namestring)
                        (unparse-native
-                        (lambda (x)
+                        (lambda (&rest x)
                           (error "called NATIVE-NAMESTRING using a ~
-                                  logical host: ~S" x)))
+                                  logical host: ~S" (first x))))
                        (unparse-host
                         (lambda (x)
                           (logical-host-name (%pathname-host x))))
