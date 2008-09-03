@@ -78,7 +78,8 @@
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
 ;;; for each element read
 (declaim (ftype (function (stream simple-string &optional index) (values))
-                read-string-as-bytes #!+sb-unicode read-string-as-words))
+                read-string-as-bytes
+                #!+sb-unicode read-string-as-unsigned-byte-32))
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
     (setf (aref string i)
@@ -91,13 +92,13 @@
   ;; it as an alternate definition, protected with #-SB-XC-HOST.
   (values))
 #!+sb-unicode
-(defun read-string-as-words (stream string &optional (length (length string)))
-  #+sb-xc-host (bug "READ-STRING-AS-WORDS called")
+(defun read-string-as-unsigned-byte-32
+    (stream string &optional (length (length string)))
+  #+sb-xc-host (bug "READ-STRING-AS-UNSIGNED-BYTE-32 called")
   (dotimes (i length)
     (setf (aref string i)
           (let ((code 0))
-            ;; FIXME: is this the same as READ-WORD-ARG?
-            (dotimes (k sb!vm:n-word-bytes (sb!xc:code-char code))
+            (dotimes (k 4 (sb!xc:code-char code))
               (setf code (logior code (ash (read-byte stream)
                                            (* k sb!vm:n-byte-bits))))))))
   (values))
@@ -210,7 +211,7 @@
                                               ,n-buffer
                                               ,n-size)
                         #-sb-xc-host
-                        (#!+sb-unicode read-string-as-words
+                        (#!+sb-unicode read-string-as-unsigned-byte-32
                          #!-sb-unicode read-string-as-bytes
                          *fasl-input-stream*
                          ,n-buffer
@@ -264,7 +265,7 @@
     #!-sb-unicode
     (read-string-as-bytes *fasl-input-stream* res)
     #!+sb-unicode
-    (read-string-as-words *fasl-input-stream* res)
+    (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
 (define-fop (fop-package 14)
@@ -392,7 +393,7 @@
   (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
     (let* ((arg (clone-arg))
            (res (make-string arg)))
-      (read-string-as-words *fasl-input-stream* res)
+      (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
       res)))
 
 (define-cloned-fops (fop-vector 39) (fop-small-vector 40)

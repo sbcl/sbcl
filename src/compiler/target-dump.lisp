@@ -20,7 +20,7 @@
 (defun dump-characters-of-string (s fasl-output)
   (declare (type string s) (type fasl-output fasl-output))
   (dovector (c s)
-    (dump-word (char-code c) fasl-output))
+    (dump-unsigned-byte-32 (char-code c) fasl-output))
   (values))
 #!+sb-unicode
 (defun dump-simple-character-string (s file)
