@@ -11,6 +11,10 @@
 (setf *host-obj-prefix* "obj/from-host/")
 (load "src/cold/set-up-cold-packages.lisp")
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
+
+(set-dispatch-macro-character #\# #\+ #'she-reader)
+(set-dispatch-macro-character #\# #\- #'she-reader)
+
 (load-or-cload-xcompiler #'host-cload-stem)
 
 ;;; Let's check that the type system, and various other things, are

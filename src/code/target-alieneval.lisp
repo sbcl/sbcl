@@ -180,10 +180,10 @@
     `(symbol-macrolet ((&auxiliary-type-definitions&
                         ,(append *new-auxiliary-types*
                                  (auxiliary-type-definitions env))))
-       #+(or x86 x86-64)
+       #!+(or x86 x86-64)
        (let ((sb!vm::*alien-stack* sb!vm::*alien-stack*))
          ,@body)
-       #-(or x86 x86-64)
+       #!-(or x86 x86-64)
        ,@body)))
 
 ;;;; runtime C values that don't correspond directly to Lisp types

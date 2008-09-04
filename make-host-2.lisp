@@ -50,6 +50,9 @@
     ;; toplevel forms in the xcompiler backq.lisp file?
     (set-macro-character #\` #'sb!impl::backquote-macro)
     (set-macro-character #\, #'sb!impl::comma-macro)
+
+    (set-dispatch-macro-character #\# #\+ #'she-reader)
+    (set-dispatch-macro-character #\# #\- #'she-reader)
     ;; Control optimization policy.
     (proclaim-target-optimization)
     ;; Specify where target machinery lives.

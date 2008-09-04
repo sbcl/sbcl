@@ -3384,9 +3384,9 @@ register."
     ;; sense in signaling the condition.
     (when step-info
       (let ((*step-frame*
-             #+(or x86 x86-64)
+             #!+(or x86 x86-64)
              (signal-context-frame (sb!alien::alien-sap context))
-             #-(or x86 x86-64)
+             #!-(or x86 x86-64)
              ;; KLUDGE: Use the first non-foreign frame as the
              ;; *STACK-TOP-HINT*. Getting the frame from the signal
              ;; context as on x86 would be cleaner, but

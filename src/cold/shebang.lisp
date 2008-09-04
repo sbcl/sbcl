@@ -61,6 +61,45 @@
 (compile 'shebang-reader)
 
 (set-dispatch-macro-character #\# #\! #'shebang-reader)
+;;; while we are at it, let us write something which helps us sanity
+;;; check our own code; it is too easy to write #+ when meaning #!+,
+;;; and such mistakes can go undetected for a while.
+;;;
+;;; ideally we wouldn't use *SHEBANG-FEATURES* but
+;;; *ALL-POSSIBLE-SHEBANG-FEATURES*, but maintaining that variable
+;;; will not be easy.
+(defun checked-feature-in-features-list-p (feature list)
+  (etypecase feature
+    (symbol (unless (member feature '(:ansi-cl :common-lisp :ieee-floating-point))
+              (when (member feature *shebang-features* :test #'eq)
+                (error "probable XC bug in host read-time conditional")))
+            (member feature list :test #'eq))
+    (cons (flet ((subfeature-in-list-p (subfeature)
+                   (checked-feature-in-features-list-p subfeature list)))
+            (ecase (first feature)
+              (:or  (some  #'subfeature-in-list-p (rest feature)))
+              (:and (every #'subfeature-in-list-p (rest feature)))
+              (:not (let ((rest (cdr feature)))
+                      (if (or (null (car rest)) (cdr rest))
+                        (error "wrong number of terms in compound feature ~S"
+                               feature)
+                        (not (subfeature-in-list-p (second feature)))))))))))
+(compile 'checked-feature-in-features-list-p)
+
+(defun she-reader (stream sub-character infix-parameter)
+  (when infix-parameter
+    (error "illegal read syntax: #~D~C" infix-parameter sub-character))
+  (when (let* ((*package* (find-package "KEYWORD"))
+               (*read-suppress* nil)
+               (notp (eql sub-character #\-))
+               (feature (read stream)))
+          (if (checked-feature-in-features-list-p feature *features*)
+              notp
+              (not notp)))
+    (let ((*read-suppress* t))
+      (read stream t nil t)))
+  (values))
+(compile 'she-reader)
 
 ;;;; variables like *SHEBANG-FEATURES* but different
 
