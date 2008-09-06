@@ -16,6 +16,12 @@
 ;;; -- documentation
 ;;;
 ;;; -- MV-BIND, :ASSIGNMENT
+;;;
+;;; Note: The functions in this file that accept constraint sets are
+;;; actually receiving the constraint sets associated with nodes,
+;;; blocks, and lambda-vars.  It might be make CP easier to understand
+;;; and work on if these functions traded in nodes, blocks, and
+;;; lambda-vars directly.
 
 ;;; Problems:
 ;;;
@@ -489,13 +495,10 @@
 ;;;    constraint.]
 ;;; -- For any LAMBDA-VAR set, delete all constraints on that var; add
 ;;;    a type constraint based on the new value type.
-(declaim (ftype (function (cblock sset
-                           &key (:ref-preprocessor (or null function))
-                                (:set-preprocessor (or null function)))
+(declaim (ftype (function (cblock sset boolean)
                           sset)
                 constraint-propagate-in-block))
-(defun constraint-propagate-in-block (block gen &key
-                                            ref-preprocessor set-preprocessor)
+(defun constraint-propagate-in-block (block gen preprocess-refs-p)
   (do-nodes (node lvar block)
     (typecase node
       (bind
@@ -513,8 +516,10 @@
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
-         (when ref-preprocessor
-           (funcall ref-preprocessor node gen))))
+         (when preprocess-refs-p
+           (let* ((var (ref-leaf node))
+                  (con (lambda-var-constraints var)))
+             (constrain-ref-type node con gen)))))
       (cast
        (let ((lvar (cast-value node)))
          (let ((var (ok-lvar-lambda-var lvar gen)))
@@ -527,8 +532,6 @@
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
                   (cons (lambda-var-constraints var) :exit-if-null))
-         (when set-preprocessor
-           (funcall set-preprocessor var))
          (sset-difference gen cons)
          (let* ((type (single-value-type (node-derived-type node)))
                 (con (find-or-create-constraint 'typep var type nil)))
@@ -543,22 +546,17 @@
         (when (node-p use)
           (add-test-constraints use node gen))))))
 
-(defun constrain-node (node cons)
-  (let* ((var (ref-leaf node))
-         (con (lambda-var-constraints var)))
-    (constrain-ref-type node con cons)))
-
 ;;; Starting from IN compute OUT and (consequent/alternative
 ;;; constraints if the block ends with and IF). Return the list of
 ;;; successors that may need to be recomputed.
-(defun find-block-type-constraints (block &key final-pass-p)
+(defun find-block-type-constraints (block final-pass-p)
   (declare (type cblock block))
   (let ((gen (constraint-propagate-in-block
               block
               (if final-pass-p
                   (block-in block)
                   (copy-sset (block-in block)))
-              :ref-preprocessor (if final-pass-p #'constrain-node nil))))
+              final-pass-p)))
     (setf (block-gen block) gen)
     (multiple-value-bind (consequent-constraints alternative-constraints)
         (constraint-propagate-if block gen)
@@ -601,8 +599,7 @@
 ;;; block.
 (defun use-result-constraints (block)
   (declare (type cblock block))
-  (constraint-propagate-in-block block (block-in block)
-                                 :ref-preprocessor #'constrain-node))
+  (constraint-propagate-in-block block (block-in block) t))
 
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected
@@ -714,19 +711,19 @@
         ;; USE-RESULT-CONSTRAINTS later.
         (dolist (block leading-blocks)
           (setf (block-in block) (compute-block-in block))
-          (find-block-type-constraints block :final-pass-p t))
+          (find-block-type-constraints block t))
         (setq blocks-to-process (copy-list rest-of-blocks))
         ;; The rest of the blocks.
         (dolist (block rest-of-blocks)
           (aver (eq block (pop blocks-to-process)))
           (setf (block-in block) (compute-block-in block))
-          (enqueue (find-block-type-constraints block)))
+          (enqueue (find-block-type-constraints block nil)))
         ;; Propagate constraints
         (loop for block = (pop blocks-to-process)
               while block do
               (unless (eq block (component-tail component))
                 (when (update-block-in block)
-                  (enqueue (find-block-type-constraints block)))))
+                  (enqueue (find-block-type-constraints block nil)))))
         rest-of-blocks))))
 
 (defun constraint-propagate (component)
