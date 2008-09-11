@@ -149,16 +149,9 @@
             :type simple-bit-vector)
     ;; Bit-vectors win over lightweight hashes for copy, union,
     ;; intersection, difference, but lose for iteration if you iterate
-    ;; over the whole vector.  Under some measurements in 2008, it
-    ;; turned out that constraint sets elements were normally clumped
-    ;; together: for compiling SBCL, the average difference between
-    ;; the maximum and minimum constraint-number was 90 (with the
-    ;; average constraint set having around 25 elements).  So using
-    ;; the minimum and maximum constraint-number for iteration bounds
-    ;; makes iteration over a subrange of the bit-vector comparable to
-    ;; iteration across the hash storage.  Note that the CONSET-MIN is
-    ;; NIL when the set is known to be empty.  CONSET-MAX is a normal
-    ;; end bounding index.
+    ;; over the whole vector.  Tracking extrema helps a bit.  Note
+    ;; that the CONSET-MIN is NIL when the set is known to be empty.
+    ;; CONSET-MAX is a normal end bounding index.
     (min nil :type (or fixnum null))
     (max 0 :type fixnum))
 
@@ -288,12 +281,14 @@
                                 (or (conset-min conset-2)
                                     most-positive-fixnum)))
                          ((conset-intersection)
-                          `(position 1 (conset-vector conset-1)
-                                     :start
-                                     (max (or (conset-min conset-1) 0)
-                                          (or (conset-min conset-2) 0))
-                                     :end (min (conset-max conset-1)
-                                               (conset-max conset-1))))
+                          `(let ((start (max (or (conset-min conset-1) 0)
+                                             (or (conset-min conset-2) 0)))
+                                 (end (min (conset-max conset-1)
+                                           (conset-max conset-1))))
+                             (if (> start end)
+                                 nil
+                                 (position 1 (conset-vector conset-1)
+                                           :start start :end end))))
                          ((conset-difference)
                           `(position 1 (conset-vector conset-1)
                                      :start (or (conset-min conset-1) 0)
@@ -305,29 +300,29 @@
                           `(max (conset-max conset-1)
                                 (conset-max conset-2)))
                          ((conset-intersection)
-                          `(let ((position
-                                  (position
-                                   1 (conset-vector conset-1)
-                                   :start (let ((max
-                                                 (min (conset-max conset-1)
-                                                      (conset-max conset-2))))
-                                            (if (plusp max)
-                                                (1- max)
-                                                0))
-                                   :end (conset-min conset-1)
-                                   :from-end t)))
-                             (if position
-                                 (1+ position)
-                                 0)))
+                          `(let ((start (max (or (conset-min conset-1) 0)
+                                             (or (conset-min conset-2) 0)))
+                                 (end (let ((minimum-maximum
+                                             (min (conset-max conset-1)
+                                                  (conset-max conset-2))))
+                                        (if (plusp minimum-maximum)
+                                            (1- minimum-maximum)
+                                            0))))
+                             (if (> start end)
+                                 0
+                                 (let ((position
+                                        (position
+                                         1 (conset-vector conset-1)
+                                         :start start :end end :from-end t)))
+                                   (if position
+                                       (1+ position)
+                                       0)))))
                          ((conset-difference)
                           `(let ((position
                                   (position
                                    1 (conset-vector conset-1)
-                                   :start (let ((max (conset-max conset-1)))
-                                            (if (plusp max)
-                                                (1- max)
-                                                0))
-                                   :end (or (conset-min conset-1) 0)
+                                   :start (or (conset-min conset-1) 0)
+                                   :end (conset-max conset-1)
                                    :from-end t)))
                              (if position
                                  (1+ position)
