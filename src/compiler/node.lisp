@@ -1116,7 +1116,7 @@
   ;; propagation. This is left null by the lambda pre-pass if it
   ;; determine that this is a set closure variable, and is thus not a
   ;; good subject for flow analysis.
-  (constraints nil :type (or sset null))
+  (constraints nil :type (or null t #| FIXME: conset |#))
   ;; Initial type of a LET variable as last seen by PROPAGATE-FROM-SETS.
   (last-initial-type *universal-type* :type ctype)
   ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
@@ -1172,9 +1172,9 @@
   ;; the blocks that we execute next in true and false case,
   ;; respectively (may be the same)
   (consequent (missing-arg) :type cblock)
-  (consequent-constraints nil :type (or null sset))
+  (consequent-constraints nil :type (or null t #| FIXME: conset |#))
   (alternative (missing-arg) :type cblock)
-  (alternative-constraints nil :type (or null sset)))
+  (alternative-constraints nil :type (or null t #| FIXME: conset |#)))
 (defprinter (cif :conc-name if- :identity t)
   (test :prin1 (lvar-uses test))
   consequent

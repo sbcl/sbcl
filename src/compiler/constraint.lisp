@@ -48,6 +48,11 @@
 
 (in-package "SB!C")
 
+;;; *CONSTRAINT-UNIVERSE* gets bound in IR1-PHASES to a fresh,
+;;; zero-length, non-zero-total-size vector-with-fill-pointer.
+(declaim (type (and vector (not simple-vector)) *constraint-universe*))
+(defvar *constraint-universe*)
+
 (deftype constraint-y () '(or ctype lvar lambda-var constant))
 
 (defstruct (constraint
@@ -74,27 +79,281 @@
   ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
   (not-p nil :type boolean))
+
+;;; Historically, CMUCL and SBCL have used a sparse set implementation
+;;; for which most operations are O(n) (see sset.lisp), but at the
+;;; cost of at least a full word of pointer for each constraint set
+;;; element.  Using bit-vectors instead of pointer structures saves a
+;;; lot of space and thus GC time (particularly on 64-bit machines),
+;;; and saves time on copy, union, intersection, and difference
+;;; operations; but makes iteration slower.  Circa September 2008,
+;;; switching to bit-vectors gave a modest (5-10%) improvement in real
+;;; compile time for most Lisp systems, and as much as 20-30% for some
+;;; particularly CP-dependent systems.
 
-(defvar *constraint-number*)
-(declaim (type (integer 0) *constraint-number*))
+;;; It's bad to leave commented code in files, but if some clever
+;;; person comes along and makes SSETs better than bit-vectors as sets
+;;; for constraint propagation, or if bit-vectors on some XC host
+;;; really lose compared to SSETs, here's the conset API as a wrapper
+;;; around SSETs:
+#+nil
+(progn
+  (deftype conset () 'sset)
+  (declaim (ftype (sfunction (conset) boolean) conset-empty))
+  (declaim (ftype (sfunction (conset) conset) copy-conset))
+  (declaim (ftype (sfunction (constraint conset) boolean) conset-member))
+  (declaim (ftype (sfunction (constraint conset) boolean) conset-adjoin))
+  (declaim (ftype (sfunction (conset conset) boolean) conset=))
+  (declaim (ftype (sfunction (conset conset) (values)) conset-union))
+  (declaim (ftype (sfunction (conset conset) (values)) conset-intersection))
+  (declaim (ftype (sfunction (conset conset) (values)) conset-difference))
+  (defun make-conset () (make-sset))
+  (defmacro do-conset-elements ((constraint conset &optional result) &body body)
+    `(do-sset-elements (,constraint ,conset ,result) ,@body))
+  (defmacro do-conset-intersection
+      ((constraint conset1 conset2 &optional result) &body body)
+    `(do-conset-elements (,constraint ,conset1 ,result)
+       (when (conset-member ,constraint ,conset2)
+         ,@body)))
+  (defun conset-empty (conset) (sset-empty conset))
+  (defun copy-conset (conset) (copy-sset conset))
+  (defun conset-member (constraint conset) (sset-member constraint conset))
+  (defun conset-adjoin (constraint conset) (sset-adjoin constraint conset))
+  (defun conset= (conset1 conset2) (sset= conset1 conset2))
+  ;; Note: CP doesn't ever care whether union, intersection, and
+  ;; difference change the first set.  (This is an important degree of
+  ;; freedom, since some ways of implementing sets lose a great deal
+  ;; when these operations are required to track changes.)
+  (defun conset-union (conset1 conset2)
+    (sset-union conset1 conset2) (values))
+  (defun conset-intersection (conset1 conset2)
+    (sset-intersection conset1 conset2) (values))
+  (defun conset-difference (conset1 conset2)
+    (sset-difference conset1 conset2) (values)))
 
+(locally
+    ;; This is performance critical for the compiler, and benefits
+    ;; from the following declarations.  Probably you'll want to
+    ;; disable these declarations when debugging consets.
+    (declare #-sb-xc-host (optimize (speed 3) (safety 0) (space 0)))
+  (declaim (inline constraint-number))
+  (defun constraint-number (constraint)
+    (sset-element-number constraint))
+  (defstruct (conset
+              (:constructor make-conset ())
+              (:copier %copy-conset))
+    (vector (make-array
+             ;; FIXME: make POWER-OF-TWO-CEILING available earlier?
+             (ash 1 (integer-length (1- (length *constraint-universe*))))
+             :element-type 'bit :initial-element 0)
+            :type simple-bit-vector)
+    ;; Bit-vectors win over lightweight hashes for copy, union,
+    ;; intersection, difference, but lose for iteration if you iterate
+    ;; over the whole vector.  Under some measurements in 2008, it
+    ;; turned out that constraint sets elements were normally clumped
+    ;; together: for compiling SBCL, the average difference between
+    ;; the maximum and minimum constraint-number was 90 (with the
+    ;; average constraint set having around 25 elements).  So using
+    ;; the minimum and maximum constraint-number for iteration bounds
+    ;; makes iteration over a subrange of the bit-vector comparable to
+    ;; iteration across the hash storage.  Note that the CONSET-MIN is
+    ;; NIL when the set is known to be empty.  CONSET-MAX is a normal
+    ;; end bounding index.
+    (min nil :type (or fixnum null))
+    (max 0 :type fixnum))
+
+  (defmacro do-conset-elements ((constraint conset &optional result) &body body)
+    (with-unique-names (vector index start end
+                               ignore constraint-universe-end)
+      (let* ((constraint-universe #+sb-xc-host '*constraint-universe*
+                                  #-sb-xc-host (gensym))
+             (with-array-data
+                #+sb-xc-host '(progn)
+                #-sb-xc-host `(with-array-data
+                                  ((,constraint-universe *constraint-universe*)
+                                   (,ignore 0) (,constraint-universe-end nil)
+                                   :check-fill-pointer t)
+                                (declare (ignore ,ignore))
+                                (aver (<= ,end ,constraint-universe-end)))))
+        `(let* ((,vector (conset-vector ,conset))
+               (,start (or (conset-min ,conset) 0))
+               (,end (min (conset-max ,conset) (length ,vector))))
+          (,@with-array-data
+            (do ((,index ,start (1+ ,index))) ((>= ,index ,end) ,result)
+              (when (plusp (sbit ,vector ,index))
+                (let ((,constraint (elt ,constraint-universe ,index)))
+                  ,@body))))))))
+
+  ;; Oddly, iterating just between the maximum of the two sets' minima
+  ;; and the minimum of the sets' maxima slowed down CP.
+  (defmacro do-conset-intersection
+      ((constraint conset1 conset2 &optional result) &body body)
+    `(do-conset-elements (,constraint ,conset1 ,result)
+       (when (conset-member ,constraint ,conset2)
+         ,@body)))
+
+  (defun conset-empty (conset)
+    (or (null (conset-min conset))
+        ;; TODO: I bet FIND on bit-vectors can be optimized, if it
+        ;; isn't.
+        (not (find 1 (conset-vector conset)
+                   :start (conset-min conset)
+                   ;; By inspection, supplying :END here breaks the
+                   ;; build with a "full call to
+                   ;; DATA-VECTOR-REF-WITH-OFFSET" in the
+                   ;; cross-compiler.  If that should change, add
+                   ;; :end (conset-max conset)
+                   ))))
+
+  (defun copy-conset (conset)
+    (let ((ret (%copy-conset conset)))
+      (setf (conset-vector ret) (copy-seq (conset-vector conset)))
+      ret))
+
+  (defun %conset-grow (conset new-size)
+    (declare (index new-size))
+    (setf (conset-vector conset)
+          (replace (the simple-bit-vector
+                     (make-array
+                      (ash 1 (integer-length (1- new-size)))
+                      :element-type 'bit
+                      :initial-element 0))
+                   (the simple-bit-vector
+                     (conset-vector conset)))))
+
+  (declaim (inline conset-grow))
+  (defun conset-grow (conset new-size)
+    (declare (index new-size))
+    (when (< (length (conset-vector conset)) new-size)
+      (%conset-grow conset new-size))
+    (values))
+
+  (defun conset-member (constraint conset)
+    (let ((number (constraint-number constraint))
+          (vector (conset-vector conset)))
+      (when (< number (length vector))
+        (plusp (sbit vector number)))))
+
+  (defun conset-adjoin (constraint conset)
+    (prog1
+      (not (conset-member constraint conset))
+      (let ((number (constraint-number constraint)))
+        (conset-grow conset (1+ number))
+        (setf (sbit (conset-vector conset) number) 1)
+        (setf (conset-min conset) (min number (or (conset-min conset)
+                                                  most-positive-fixnum)))
+        (when (>= number (conset-max conset))
+          (setf (conset-max conset) (1+ number))))))
+
+  (defun conset= (conset1 conset2)
+    (let* ((vector1 (conset-vector conset1))
+           (vector2 (conset-vector conset2))
+           (length1 (length vector1))
+           (length2 (length vector2)))
+      (if (= length1 length2)
+          ;; When the lengths are the same, we can rely on EQUAL being
+          ;; nicely optimized on bit-vectors.
+          (equal vector1 vector2)
+          (multiple-value-bind (shorter longer)
+              (if (< length1 length2)
+                  (values vector1 vector2)
+                  (values vector2 vector1))
+            ;; FIXME: make MISMATCH fast on bit-vectors.
+            (dotimes (index (length shorter))
+              (when (/= (sbit vector1 index) (sbit vector2 index))
+                (return-from conset= nil)))
+            (if (find 1 longer :start (length shorter))
+                nil
+                t)))))
+
+  (macrolet
+      ((defconsetop (name bit-op)
+           `(defun ,name (conset-1 conset-2)
+              (declare (optimize (speed 3) (safety 0)))
+              (let* ((size-1 (length (conset-vector conset-1)))
+                     (size-2 (length (conset-vector conset-2)))
+                     (new-size (max size-1 size-2)))
+                (conset-grow conset-1 new-size)
+                (conset-grow conset-2 new-size))
+              (let ((vector1 (conset-vector conset-1))
+                    (vector2 (conset-vector conset-2)))
+                (declare (simple-bit-vector vector1 vector2))
+                (setf (conset-vector conset-1) (,bit-op vector1 vector2 t))
+                ;; Update the extrema.
+                (setf (conset-min conset-1)
+                      ,(ecase name
+                         ((conset-union)
+                          `(min (or (conset-min conset-1)
+                                    most-positive-fixnum)
+                                (or (conset-min conset-2)
+                                    most-positive-fixnum)))
+                         ((conset-intersection)
+                          `(position 1 (conset-vector conset-1)
+                                     :start
+                                     (max (or (conset-min conset-1) 0)
+                                          (or (conset-min conset-2) 0))
+                                     :end (min (conset-max conset-1)
+                                               (conset-max conset-1))))
+                         ((conset-difference)
+                          `(position 1 (conset-vector conset-1)
+                                     :start (or (conset-min conset-1) 0)
+                                     :end (conset-max conset-1)
+                                     )))
+                      (conset-max conset-1)
+                      ,(ecase name
+                         ((conset-union)
+                          `(max (conset-max conset-1)
+                                (conset-max conset-2)))
+                         ((conset-intersection)
+                          `(let ((position
+                                  (position
+                                   1 (conset-vector conset-1)
+                                   :start (let ((max
+                                                 (min (conset-max conset-1)
+                                                      (conset-max conset-2))))
+                                            (if (plusp max)
+                                                (1- max)
+                                                0))
+                                   :end (conset-min conset-1)
+                                   :from-end t)))
+                             (if position
+                                 (1+ position)
+                                 0)))
+                         ((conset-difference)
+                          `(let ((position
+                                  (position
+                                   1 (conset-vector conset-1)
+                                   :start (let ((max (conset-max conset-1)))
+                                            (if (plusp max)
+                                                (1- max)
+                                                0))
+                                   :end (or (conset-min conset-1) 0)
+                                   :from-end t)))
+                             (if position
+                                 (1+ position)
+                                 0))))))
+              (values))))
+    (defconsetop conset-union bit-ior)
+    (defconsetop conset-intersection bit-and)
+    (defconsetop conset-difference bit-andc2)))
+
 (defun find-constraint (kind x y not-p)
   (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
   (etypecase y
     (ctype
-     (do-sset-elements (con (lambda-var-constraints x) nil)
+     (do-conset-elements (con (lambda-var-constraints x) nil)
        (when (and (eq (constraint-kind con) kind)
                   (eq (constraint-not-p con) not-p)
                   (type= (constraint-y con) y))
          (return con))))
     ((or lvar constant)
-     (do-sset-elements (con (lambda-var-constraints x) nil)
+     (do-conset-elements (con (lambda-var-constraints x) nil)
        (when (and (eq (constraint-kind con) kind)
                   (eq (constraint-not-p con) not-p)
                   (eq (constraint-y con) y))
          (return con))))
     (lambda-var
-     (do-sset-elements (con (lambda-var-constraints x) nil)
+     (do-conset-elements (con (lambda-var-constraints x) nil)
        (when (and (eq (constraint-kind con) kind)
                   (eq (constraint-not-p con) not-p)
                   (let ((cx (constraint-x con)))
@@ -111,10 +370,13 @@
 (defun find-or-create-constraint (kind x y not-p)
   (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
   (or (find-constraint kind x y not-p)
-      (let ((new (make-constraint (incf *constraint-number*) kind x y not-p)))
-        (sset-adjoin new (lambda-var-constraints x))
+      (let ((new (make-constraint (length *constraint-universe*)
+                                  kind x y not-p)))
+        (vector-push-extend new *constraint-universe*
+                            (* 2 (length *constraint-universe*)))
+        (conset-adjoin new (lambda-var-constraints x))
         (when (lambda-var-p y)
-          (sset-adjoin new (lambda-var-constraints y)))
+          (conset-adjoin new (lambda-var-constraints y)))
         new)))
 
 ;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
@@ -136,7 +398,7 @@
            (let ((lambda-var (ok-ref-lambda-var use)))
              (when lambda-var
                (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
-                 (when (and constraint (sset-member constraint constraints))
+                 (when (and constraint (conset-member constraint constraints))
                    lambda-var)))))
           ((cast-p use)
            (ok-lvar-lambda-var (cast-value use) constraints)))))
@@ -147,7 +409,7 @@
        (flet ((body-fun ()
                 ,@body))
          (body-fun)
-         (do-sset-elements (con ,constraints ,result)
+         (do-conset-elements (con ,constraints ,result)
            (let ((other (and (eq (constraint-kind con) 'eql)
                              (eq (constraint-not-p con) nil)
                              (cond ((eq ,var (constraint-x con))
@@ -172,7 +434,7 @@
         (t
          (do-eql-vars (x (x constraints))
            (let ((con (find-or-create-constraint fun x y not-p)))
-             (sset-adjoin con target)))))
+             (conset-adjoin con target)))))
   (values))
 
 ;;; Add complementary constraints to the consequent and alternative
@@ -196,13 +458,13 @@
   ;; can't guarantee that the optimization will be done, so we still
   ;; need to avoid barfing on this case.
   (unless (eq (if-consequent if) (if-alternative if))
-    (let ((consequent-constraints (make-sset))
-          (alternative-constraints (make-sset)))
+    (let ((consequent-constraints (make-conset))
+          (alternative-constraints (make-conset)))
       (macrolet ((add (fun x y not-p)
                    `(add-complement-constraints ,fun ,x ,y ,not-p
-                     constraints
-                     consequent-constraints
-                     alternative-constraints)))
+                                                constraints
+                                                consequent-constraints
+                                                alternative-constraints)))
         (typecase use
           (ref
            (add 'typep (ok-lvar-lambda-var (ref-lvar use) constraints)
@@ -357,7 +619,7 @@
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
 (defun constrain-ref-type (ref constraints in)
-  (declare (type ref ref) (type sset constraints in))
+  (declare (type ref ref) (type conset constraints in))
   ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
   ;; cons up endless union types when propagating large number of EQL
   ;; constraints -- eg. from large CASE forms -- instead we just
@@ -379,51 +641,53 @@
                  (push x not-fpz)
                  (when (or constrain-symbols (null x) (not (symbolp x)))
                    (add-to-xset x not-set)))))
-      (do-sset-elements (con constraints)
-        (when (sset-member con in)
-          (let* ((x (constraint-x con))
-                 (y (constraint-y con))
-                 (not-p (constraint-not-p con))
-                 (other (if (eq x leaf) y x))
-                 (kind (constraint-kind con)))
-            (case kind
-              (typep
-               (if not-p
-                   (if (member-type-p other)
-                       (mapc-member-type-members #'note-not other)
-                       (setq not-res (type-union not-res other)))
-                   (setq res (type-approx-intersection2 res other))))
-              (eql
-               (unless (lvar-p other)
-                 (let ((other-type (leaf-type other)))
-                   (if not-p
-                       (when (and (constant-p other)
-                                  (member-type-p other-type))
-                         (note-not (constant-value other)))
-                       (let ((leaf-type (leaf-type leaf)))
-                         (cond
-                           ((or (constant-p other)
-                                (and (leaf-refs other) ; protect from
+      ;; KLUDGE: the implementations of DO-CONSET-INTERSECTION will
+      ;; probably run faster when the smaller set comes first, so
+      ;; don't change the order here.
+      (do-conset-intersection (con constraints in)
+        (let* ((x (constraint-x con))
+               (y (constraint-y con))
+               (not-p (constraint-not-p con))
+               (other (if (eq x leaf) y x))
+               (kind (constraint-kind con)))
+          (case kind
+            (typep
+             (if not-p
+                 (if (member-type-p other)
+                     (mapc-member-type-members #'note-not other)
+                     (setq not-res (type-union not-res other)))
+                 (setq res (type-approx-intersection2 res other))))
+            (eql
+             (unless (lvar-p other)
+               (let ((other-type (leaf-type other)))
+                 (if not-p
+                     (when (and (constant-p other)
+                                (member-type-p other-type))
+                       (note-not (constant-value other)))
+                     (let ((leaf-type (leaf-type leaf)))
+                       (cond
+                         ((or (constant-p other)
+                              (and (leaf-refs other) ; protect from
                                         ; deleted vars
-                                     (csubtypep other-type leaf-type)
-                                     (not (type= other-type leaf-type))))
-                            (change-ref-leaf ref other)
-                            (when (constant-p other) (return)))
-                           (t
-                            (setq res (type-approx-intersection2
-                                       res other-type)))))))))
-              ((< >)
-               (cond
-                 ((and (integer-type-p res) (integer-type-p y))
-                  (let ((greater (eq kind '>)))
-                    (let ((greater (if not-p (not greater) greater)))
-                      (setq res
-                            (constrain-integer-type res y greater not-p)))))
-                 ((and (float-type-p res) (float-type-p y))
-                  (let ((greater (eq kind '>)))
-                    (let ((greater (if not-p (not greater) greater)))
-                      (setq res
-                            (constrain-float-type res y greater not-p))))))))))))
+                                   (csubtypep other-type leaf-type)
+                                   (not (type= other-type leaf-type))))
+                          (change-ref-leaf ref other)
+                          (when (constant-p other) (return)))
+                         (t
+                          (setq res (type-approx-intersection2
+                                     res other-type)))))))))
+            ((< >)
+             (cond
+               ((and (integer-type-p res) (integer-type-p y))
+                (let ((greater (eq kind '>)))
+                  (let ((greater (if not-p (not greater) greater)))
+                    (setq res
+                          (constrain-integer-type res y greater not-p)))))
+               ((and (float-type-p res) (float-type-p y))
+                (let ((greater (eq kind '>)))
+                  (let ((greater (if not-p (not greater) greater)))
+                    (setq res
+                          (constrain-float-type res y greater not-p)))))))))))
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))
@@ -445,13 +709,13 @@
   (let ((lvar (ref-lvar ref))
         (leaf (ref-leaf ref)))
     (when (and (lambda-var-p leaf) lvar)
-      (sset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
-                   gen))))
+      (conset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
+                     gen))))
 
 ;;; Copy all CONSTRAINTS involving FROM-VAR - except the (EQL VAR
 ;;; LVAR) ones - to all of the variables in the VARS list.
 (defun inherit-constraints (vars from-var constraints target)
-  (do-sset-elements (con constraints)
+  (do-conset-elements (con constraints)
     ;; Constant substitution is controversial.
     (unless (constant-p (constraint-y con))
       (dolist (var vars)
@@ -459,19 +723,19 @@
               (eq-y (eq from-var (constraint-y con))))
           (when (or (and eq-x (not (lvar-p (constraint-y con))))
                     eq-y)
-            (sset-adjoin (find-or-create-constraint
-                          (constraint-kind con)
-                          (if eq-x var (constraint-x con))
-                          (if eq-y var (constraint-y con))
-                          (constraint-not-p con))
-                         target)))))))
+            (conset-adjoin (find-or-create-constraint
+                            (constraint-kind con)
+                            (if eq-x var (constraint-x con))
+                            (if eq-y var (constraint-y con))
+                            (constraint-not-p con))
+                           target)))))))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
 (defun add-eql-var-var-constraint (var1 var2 constraints
                                    &optional (target constraints))
   (let ((con (find-or-create-constraint 'eql var1 var2 nil)))
-    (when (sset-adjoin con target)
+    (when (conset-adjoin con target)
       (collect ((eql1) (eql2))
         (do-eql-vars (var1 (var1 constraints))
           (eql1 var1))
@@ -495,8 +759,8 @@
 ;;;    constraint.]
 ;;; -- For any LAMBDA-VAR set, delete all constraints on that var; add
 ;;;    a type constraint based on the new value type.
-(declaim (ftype (function (cblock sset boolean)
-                          sset)
+(declaim (ftype (function (cblock conset boolean)
+                          conset)
                 constraint-propagate-in-block))
 (defun constraint-propagate-in-block (block gen preprocess-refs-p)
   (do-nodes (node lvar block)
@@ -511,7 +775,7 @@
                  do (let* ((type (lvar-type val))
                            (con (find-or-create-constraint 'typep var type
                                                            nil)))
-                      (sset-adjoin con gen))
+                      (conset-adjoin con gen))
                  (maybe-add-eql-var-var-constraint var val gen)))))
       (ref
        (when (ok-ref-lambda-var node)
@@ -527,15 +791,15 @@
              (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
                (do-eql-vars (var (var gen))
                  (let ((con (find-or-create-constraint 'typep var atype nil)))
-                   (sset-adjoin con gen))))))))
+                   (conset-adjoin con gen))))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
                   (cons (lambda-var-constraints var) :exit-if-null))
-         (sset-difference gen cons)
+         (conset-difference gen cons)
          (let* ((type (single-value-type (node-derived-type node)))
                 (con (find-or-create-constraint 'typep var type nil)))
-           (sset-adjoin con gen))
+           (conset-adjoin con gen))
          (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
   gen)
 
@@ -555,7 +819,7 @@
               block
               (if final-pass-p
                   (block-in block)
-                  (copy-sset (block-in block)))
+                  (copy-conset (block-in block)))
               final-pass-p)))
     (setf (block-gen block) gen)
     (multiple-value-bind (consequent-constraints alternative-constraints)
@@ -566,30 +830,30 @@
                  (old-alternative-constraints (if-alternative-constraints node))
                  (succ ()))
             ;; Add the consequent and alternative constraints to GEN.
-            (cond ((sset-empty consequent-constraints)
+            (cond ((conset-empty consequent-constraints)
                    (setf (if-consequent-constraints node) gen)
                    (setf (if-alternative-constraints node) gen))
                   (t
-                   (setf (if-consequent-constraints node) (copy-sset gen))
-                   (sset-union (if-consequent-constraints node)
-                               consequent-constraints)
+                   (setf (if-consequent-constraints node) (copy-conset gen))
+                   (conset-union (if-consequent-constraints node)
+                                 consequent-constraints)
                    (setf (if-alternative-constraints node) gen)
-                   (sset-union (if-alternative-constraints node)
-                               alternative-constraints)))
+                   (conset-union (if-alternative-constraints node)
+                                 alternative-constraints)))
             ;; Has the consequent been changed?
             (unless (and old-consequent-constraints
-                         (sset= (if-consequent-constraints node)
-                                old-consequent-constraints))
+                         (conset= (if-consequent-constraints node)
+                                  old-consequent-constraints))
               (push (if-consequent node) succ))
             ;; Has the alternative been changed?
             (unless (and old-alternative-constraints
-                         (sset= (if-alternative-constraints node)
-                                old-alternative-constraints))
+                         (conset= (if-alternative-constraints node)
+                                  old-alternative-constraints))
               (push (if-alternative node) succ))
             succ)
           ;; There is no IF.
           (unless (and (block-out block)
-                       (sset= gen (block-out block)))
+                       (conset= gen (block-out block)))
             (setf (block-out block) gen)
             (block-succ block))))))
 
@@ -613,7 +877,7 @@
                (unless (lambda-var-constraints var)
                  (when (or (null (lambda-var-sets var))
                            (not (closure-var-p var)))
-                   (setf (lambda-var-constraints var) (make-sset)))))))
+                   (setf (lambda-var-constraints var) (make-conset)))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
         (frob let)))))
@@ -639,13 +903,13 @@
       (let ((out (block-out-for-successor pred block)))
         (when out
           (if in
-              (sset-intersection in out)
-              (setq in (copy-sset out))))))
-    (or in (make-sset))))
+              (conset-intersection in out)
+              (setq in (copy-conset out))))))
+    (or in (make-conset))))
 
 (defun update-block-in (block)
   (let ((in (compute-block-in block)))
-    (cond ((and (block-in block) (sset= in (block-in block)))
+    (cond ((and (block-in block) (conset= in (block-in block)))
            nil)
           (t
            (setf (block-in block) in)))))
@@ -731,7 +995,7 @@
   (init-var-constraints component)
 
   (unless (block-out (component-head component))
-    (setf (block-out (component-head component)) (make-sset)))
+    (setf (block-out (component-head component)) (make-conset)))
 
   (dolist (block (find-and-propagate-constraints component))
     (unless (block-delete-p block)

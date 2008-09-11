@@ -88,7 +88,7 @@
 (defvar *compiler-style-warning-count*)
 (defvar *compiler-note-count*)
 (defvar *compiler-trace-output*)
-(defvar *constraint-number*)
+(defvar *constraint-universe*)
 (defvar *count-vop-usages*)
 (defvar *current-path*)
 (defvar *current-component*)
