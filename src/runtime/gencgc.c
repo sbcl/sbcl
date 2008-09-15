@@ -1113,76 +1113,82 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
 page_index_t
 gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
 {
-    page_index_t first_page;
-    page_index_t last_page;
-    long region_size;
-    page_index_t restart_page=*restart_page_ptr;
-    long bytes_found;
-    long num_pages;
-    int large_p=(nbytes>=large_object_size);
+    page_index_t first_page, last_page;
+    page_index_t restart_page = *restart_page_ptr;
+    long bytes_found = 0;
+    long most_bytes_found = 0;
     /* FIXME: assert(free_pages_lock is held); */
 
-    /* Search for a contiguous free space of at least nbytes. If it's
-     * a large object then align it on a page boundary by searching
-     * for a free page. */
-
+    /* Toggled by gc_and_save for heap compaction, normally -1. */
     if (gencgc_alloc_start_page != -1) {
         restart_page = gencgc_alloc_start_page;
     }
 
-    do {
-        first_page = restart_page;
-        if (large_p)
-            while ((first_page < page_table_pages)
-                   && (page_table[first_page].allocated != FREE_PAGE_FLAG))
+    if (nbytes>=PAGE_BYTES) {
+        /* Search for a contiguous free space of at least nbytes,
+         * aligned on a page boundary. The page-alignment is strictly
+         * speaking needed only for objects at least large_object_size
+         * bytes in size. */
+        do {
+            first_page = restart_page;
+            while ((first_page < page_table_pages) &&
+                   (page_table[first_page].allocated != FREE_PAGE_FLAG))
                 first_page++;
-        else
-            while (first_page < page_table_pages) {
-                if(page_table[first_page].allocated == FREE_PAGE_FLAG)
-                    break;
-                if((page_table[first_page].allocated ==
-                    (unboxed ? UNBOXED_PAGE_FLAG : BOXED_PAGE_FLAG)) &&
-                   (page_table[first_page].large_object == 0) &&
-                   (page_table[first_page].gen == gc_alloc_generation) &&
-                   (page_table[first_page].bytes_used < (PAGE_BYTES-32)) &&
-                   (page_table[first_page].write_protected == 0) &&
-                   (page_table[first_page].dont_move == 0)) {
+
+            last_page = first_page;
+            bytes_found = PAGE_BYTES;
+            while ((bytes_found < nbytes) &&
+                   (last_page < (page_table_pages-1)) &&
+                   (page_table[last_page+1].allocated == FREE_PAGE_FLAG)) {
+                last_page++;
+                bytes_found += PAGE_BYTES;
+                gc_assert(page_table[last_page].write_protected == 0);
+            }
+            if (bytes_found > most_bytes_found)
+                most_bytes_found = bytes_found;
+            restart_page = last_page + 1;
+        } while ((restart_page < page_table_pages) && (bytes_found < nbytes));
+
+    } else {
+        /* Search for a page with at least nbytes of space. We prefer
+         * not to split small objects on multiple pages, to reduce the
+         * number of contiguous allocation regions spaning multiple
+         * pages: this helps avoid excessive conservativism. */
+        first_page = restart_page;
+        while (first_page < page_table_pages) {
+            if (page_table[first_page].allocated == FREE_PAGE_FLAG)
+                {
+                    bytes_found = PAGE_BYTES;
                     break;
                 }
-                first_page++;
-            }
-
-        if (first_page >= page_table_pages)
-            gc_heap_exhausted_error_or_lose(0, nbytes);
-
-        gc_assert(page_table[first_page].write_protected == 0);
-
-        last_page = first_page;
-        bytes_found = PAGE_BYTES - page_table[first_page].bytes_used;
-        num_pages = 1;
-        while (((bytes_found < nbytes)
-                || (!large_p && (num_pages < 2)))
-               && (last_page < (page_table_pages-1))
-               && (page_table[last_page+1].allocated == FREE_PAGE_FLAG)) {
-            last_page++;
-            num_pages++;
-            bytes_found += PAGE_BYTES;
-            gc_assert(page_table[last_page].write_protected == 0);
+            else if ((page_table[first_page].allocated ==
+                      (unboxed ? UNBOXED_PAGE_FLAG : BOXED_PAGE_FLAG)) &&
+                     (page_table[first_page].large_object == 0) &&
+                     (page_table[first_page].gen == gc_alloc_generation) &&
+                     (page_table[first_page].write_protected == 0) &&
+                     (page_table[first_page].dont_move == 0))
+                {
+                    bytes_found = PAGE_BYTES - page_table[first_page].bytes_used;
+                    if (bytes_found > most_bytes_found)
+                        most_bytes_found = bytes_found;
+                    if (bytes_found >= nbytes)
+                        break;
+                }
+            first_page++;
         }
-
-        region_size = (PAGE_BYTES - page_table[first_page].bytes_used)
-            + PAGE_BYTES*(last_page-first_page);
-
-        gc_assert(bytes_found == region_size);
-        restart_page = last_page + 1;
-    } while ((restart_page < page_table_pages) && (bytes_found < nbytes));
+        last_page = first_page;
+        restart_page = first_page + 1;
+    }
 
     /* Check for a failure */
-    if ((restart_page >= page_table_pages) && (bytes_found < nbytes))
-        gc_heap_exhausted_error_or_lose(bytes_found, nbytes);
+    if (bytes_found < nbytes) {
+        gc_assert(restart_page >= page_table_pages);
+        gc_heap_exhausted_error_or_lose(most_bytes_found, nbytes);
+    }
 
-    *restart_page_ptr=first_page;
+    gc_assert(page_table[first_page].write_protected == 0);
 
+    *restart_page_ptr = first_page;
     return last_page;
 }
 

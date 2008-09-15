@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
+  * reduced conservativism on GENCGC platforms: on average 45% less
+    pages pinned (measured from SBCL self build).
+
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities
     SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT, SB-C::STACK-ALLOCATE-VECTOR,
