@@ -75,3 +75,32 @@
     (ignore-errors (compare-and-swap (svref "foo" 1) 1 2))
     (assert (not res))
     (assert (typep err 'type-error)))
+
+;; Check that we don't modify constants
+(defconstant +a-constant+ 42)
+(assert
+ (eq :error
+     (handler-case
+         (sb-ext:compare-and-swap (symbol-value '+a-constant+) 42 13)
+       (error () :error))))
+(let ((name '+a-constant+))
+  (assert
+   (eq :error
+       (handler-case
+           (sb-ext:compare-and-swap (symbol-value name) 42 13)
+         (error () :error)))))
+
+;; Check that we don't mess declaimed types
+(declaim (boolean *a-boolean*))
+(defparameter *a-boolean* t)
+(assert
+ (eq :error
+     (handler-case
+         (sb-ext:compare-and-swap (symbol-value '*a-boolean*) t 42)
+       (error () :error))))
+(let ((name '*a-boolean*))
+  (assert
+   (eq :error
+       (handler-case
+           (sb-ext:compare-and-swap (symbol-value name) t 42)
+         (error () :error)))))

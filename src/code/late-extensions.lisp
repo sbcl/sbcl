@@ -66,7 +66,7 @@
              (- (* ,(+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
                 sb!vm:instance-pointer-lowtag)))))))
 
-(defmacro compare-and-swap (place old new)
+(defmacro compare-and-swap (place old new &environment env)
   "Atomically stores NEW in PLACE if OLD matches the current value of PLACE.
 Two values are considered to match if they are EQ. Returns the previous value
 of PLACE: if the returned value if EQ to OLD, the swap was carried out.
@@ -92,9 +92,26 @@ EXPERIMENTAL: Interface subject to change."
       ((cdr rest)
        `(%compare-and-swap-cdr (the cons ,@args) ,old ,new))
       (symbol-plist
-       `(%compare-and-swap-symbol-plist (the symbol ,@args) ,old ,new))
+       `(%compare-and-swap-symbol-plist (the symbol ,@args) ,old (the list ,new)))
       (symbol-value
-       `(%compare-and-swap-symbol-value (the symbol ,@args) ,old ,new))
+       (destructuring-bind (name) args
+         (flet ((slow (symbol)
+                  (with-unique-names (n-symbol n-old n-new)
+                    `(let ((,n-symbol ,symbol)
+                           (,n-old ,old)
+                           (,n-new ,new))
+                       (declare (symbol ,n-symbol))
+                       (about-to-modify-symbol-value ,n-symbol "compare-and-swap SYMBOL-VALUE of ~S" ,n-new)
+                       (%compare-and-swap-symbol-value ,n-symbol ,n-old ,n-new)))))
+           (if (sb!xc:constantp name env)
+               (let ((cname (constant-form-value name env)))
+                 (if (eq :special (info :variable :kind cname))
+                     ;; Since we know the symbol is a special, we can just generate
+                     ;; the type check.
+                     `(%compare-and-swap-symbol-value
+                       ',cname ,old (the ,(info :variable :type cname) ,new))
+                     (slow (list 'quote cname))))
+               (slow name)))))
       (svref
        (let ((vector (car args))
              (index (cadr args)))

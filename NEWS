@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
-  * reduced conservativism on GENCGC platforms: on average 45% less
-    pages pinned (measured from SBCL self build).
+  * enhancement: reduced conservativism on GENCGC platforms: on
+    average 45% less pages pinned (measured from SBCL self build).
+  * bug fix: SB-EXT:COMPARE-AND-SWAP on SYMBOL-VALUE can no longer
+    mutate constant symbols or violate declaimed type of the symbol.
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities
