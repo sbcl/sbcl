@@ -153,8 +153,11 @@
 (defknown %raw-instance-set/complex-double
     (instance index (complex double-float))
   (complex double-float)
-  (unsafe always-translatable))
-)
+  (unsafe always-translatable)))
+
+#!+(or x86 x86-64)
+(defknown %raw-instance-atomic-incf/word (instance index sb!vm:signed-word) sb!vm:word
+    (unsafe always-translatable))
 
 ;;; %RAW-{REF,SET}-FOO VOPs should be declared as taking a RAW-VECTOR
 ;;; as their first argument (clarity and to match these DEFKNOWNs).

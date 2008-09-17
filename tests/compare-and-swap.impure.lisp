@@ -104,3 +104,36 @@
        (handler-case
            (sb-ext:compare-and-swap (symbol-value name) t 42)
          (error () :error)))))
+
+;;;; ATOMIC-INCF (we should probably rename this file atomic-ops...)
+
+(defstruct box
+  (word 0 :type sb-vm:word))
+
+(defun inc-box (box n)
+  (declare (fixnum n) (box box))
+  (loop repeat n
+        do (sb-ext:atomic-incf (box-word box))))
+
+(defun dec-box (box n)
+  (declare (fixnum n) (box box))
+  (loop repeat n
+        do (sb-ext:atomic-incf (box-word box) -1)))
+
+(let ((box (make-box)))
+  (inc-box box 10000)
+  (assert (= 10000 (box-word box)))
+  (dec-box box 10000)
+  (assert (= 0 (box-word box))))
+
+#+sb-thread
+(let* ((box (make-box))
+       (threads (loop repeat 64
+                      collect (sb-thread:make-thread (lambda ()
+                                                       (inc-box box 1000)
+                                                       (dec-box box 10000)
+                                                       (inc-box box 10000)
+                                                       (dec-box box 1000))
+                                                     :name "inc/dec thread"))))
+  (mapc #'sb-thread:join-thread threads)
+  (assert (= 0 (box-word box))))

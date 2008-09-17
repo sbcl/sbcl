@@ -576,6 +576,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "POSIX-GETENV" "POSIX-ENVIRON"
 
                "COMPARE-AND-SWAP"
+               "ATOMIC-INCF"
 
                ;; People have various good reasons to mess with the GC.
                "*AFTER-GC-HOOKS*"
@@ -1266,6 +1267,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%RAW-SET-COMPLEX-DOUBLE" "%RAW-SET-COMPLEX-LONG"
                "%RAW-SET-COMPLEX-SINGLE" "%RAW-SET-DOUBLE"
                "%RAW-SET-LONG" "%RAW-SET-SINGLE" "%SCALB" "%SCALBN"
+               #!+(or x86 x86-64)
+               "%RAW-INSTANCE-ATOMIC-INCF/WORD"
                "%RAW-INSTANCE-REF/WORD" "%RAW-INSTANCE-SET/WORD"
                "%RAW-INSTANCE-REF/SINGLE" "%RAW-INSTANCE-SET/SINGLE"
                "%RAW-INSTANCE-REF/DOUBLE" "%RAW-INSTANCE-SET/DOUBLE"

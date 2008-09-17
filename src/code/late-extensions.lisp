@@ -160,6 +160,61 @@ EXPERIMENTAL: Interface subject to change."
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
 
+(defmacro atomic-incf (place &optional (diff 1) &environment env)
+  #!+sb-doc
+  "Atomically increments PLACE by DIFF, and returns the value of PLACE before
+the increment.
+
+The incrementation is done using word-size modular arithmetic: on 32 bit
+platforms ATOMIC-INCF of #xFFFFFFFF by one results in #x0 being stored in
+PLACE.
+
+PLACE must be an accessor form whose CAR is the name of a DEFSTRUCT accessor
+whose declared type is (UNSIGNED-BYTE 32) on 32 bit platforms,
+and (UNSIGNED-BYTE 64) on 64 bit platforms.
+
+DIFF defaults to 1, and must be a (SIGNED-BYTE 32) on 32 bit platforms,
+and (SIGNED-BYTE 64) on 64 bit platforms.
+
+EXPERIMENTAL: Interface subject to change."
+  (flet ((invalid-place ()
+           (error "Invalid first argument to ATOMIC-INCF: ~S" place)))
+    (let ((place (macroexpand place env)))
+      (unless (consp place)
+        (invalid-place))
+      (destructuring-bind (op &rest args) place
+        (when (cdr args)
+          (invalid-place))
+        (let ((dd (info :function :structure-accessor op)))
+          (if dd
+              (let* ((structure (dd-name dd))
+                     (slotd (find op (dd-slots dd) :key #'dsd-accessor-name))
+                     (index (dsd-index slotd))
+                     (type (dsd-type slotd)))
+                (declare (ignorable index))
+                (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
+                             (type= (specifier-type type) (specifier-type 'sb!vm:word)))
+                  (error "ATOMIC-INCF requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
+                         sb!vm:n-word-bits type place))
+                (when (dsd-read-only slotd)
+                  (error "Cannot use ATOMIC-INCF with structure accessor for a read-only slot: ~S"
+                         place))
+                #!+(or x86 x86-64)
+                `(truly-the sb!vm:word
+                            (%raw-instance-atomic-incf/word (the ,structure ,@args)
+                                                            ,index
+                                                            (the sb!vm:signed-word ,diff)))
+                ;; No threads outside x86 and x86-64 for now, so this is easy...
+                #!-(or x86 x86-64)
+                (with-unique-names (structure old)
+                  `(sb!sys:without-interrupts
+                     (let* ((,structure ,@args)
+                            (,old (,op ,structure)))
+                       (setf (,op ,structure) (logand #.(1- (ash 1 sb!vm:n-word-bits))
+                                                      (+ ,old (the sb!vm:signed-word ,diff))))
+                       ,old))))
+              (invalid-place)))))))
+
 (defun call-hooks (kind hooks &key (on-error :error))
   (dolist (hook hooks)
     (handler-case

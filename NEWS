@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
+  * new feature: SB-EXT:ATOMIC-INCF allows atomic incrementation of
+    appropriately typed structure slots without locking.
   * enhancement: reduced conservativism on GENCGC platforms: on
     average 45% less pages pinned (measured from SBCL self build).
   * bug fix: SB-EXT:COMPARE-AND-SWAP on SYMBOL-VALUE can no longer
