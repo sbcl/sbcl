@@ -310,6 +310,11 @@
                            :accessor-name '%raw-instance-ref/complex-long
                            :init-vop 'sb!vm::raw-instance-init/complex-long
                            :n-words #!+x86 6 #!+sparc 8)))))
+(defun raw-slot-words (type)
+  (let ((rsd (find type *raw-slot-data-list* :key #'raw-slot-data-raw-type)))
+    (if rsd
+        (raw-slot-data-n-words rsd)
+        (error "Invalid raw slot type: ~S" type))))
 
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
