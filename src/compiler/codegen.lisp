@@ -102,14 +102,14 @@
 
 (defun init-assembler ()
   (setf *code-segment*
-        (sb!assem:make-segment :name "regular"
+        (sb!assem:make-segment :type :regular
                                :run-scheduler (default-segment-run-scheduler)
                                :inst-hook (default-segment-inst-hook)))
   #!+sb-dyncount
   (setf (sb!assem:segment-collect-dynamic-statistics *code-segment*)
         *collect-dynamic-statistics*)
   (setf *elsewhere*
-        (sb!assem:make-segment :name "elsewhere"
+        (sb!assem:make-segment :type :elsewhere
                                :run-scheduler (default-segment-run-scheduler)
                                :inst-hook (default-segment-inst-hook)))
   (values))

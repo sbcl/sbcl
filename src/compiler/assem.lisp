@@ -26,8 +26,8 @@
 
 ;;; This structure holds the state of the assembler.
 (defstruct (segment (:copier nil))
-  ;; the name of this segment (for debugging output and stuff)
-  (name "unnamed" :type simple-string)
+  ;; the type of this segment (for debugging output and stuff)
+  (type :regular :type (member :regular :elsewhere))
   ;; Ordinarily this is a vector where instructions are written. If
   ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
   ;; vector can be replaced by NIL. This used to be an adjustable
@@ -1290,7 +1290,11 @@
     (setf (segment-postits segment) (segment-postits other-segment))
     (dolist (postit postits)
       (emit-back-patch segment 0 postit)))
-  (emit-alignment segment nil max-alignment #!+(or x86-64 x86) #x90)
+  #!-(or x86 x86-64)
+  (emit-alignment segment nil max-alignment)
+  #!+(or x86 x86-64)
+  (unless (eq :elsewhere (segment-type other-segment))
+    (emit-alignment segment nil max-alignment))
   (let ((segment-current-index-0 (segment-current-index segment))
         (segment-current-posn-0  (segment-current-posn  segment)))
     (incf (segment-current-index segment)
@@ -1310,8 +1314,8 @@
         ;; worth enough in efficiency to justify it? -- WHN 19990322
         (let ((last (segment-last-annotation segment)))
           (if last
-            (setf (cdr last) other-annotations)
-            (setf (segment-annotations segment) other-annotations)))
+              (setf (cdr last) other-annotations)
+              (setf (segment-annotations segment) other-annotations)))
         (setf (segment-last-annotation segment)
               (segment-last-annotation other-segment)))))
   (values))
