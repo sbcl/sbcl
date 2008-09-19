@@ -875,11 +875,11 @@
       (funcall hook segment vop :label label)))
   (emit-annotation segment label))
 
-;;; Called by the ALIGN macro to emit an alignment note. We check to
-;;; see if we can guarantee the alignment restriction by just
-;;; outputting a fixed number of bytes. If so, we do so. Otherwise, we
-;;; create and emit an alignment note.
-(defun emit-alignment (segment vop bits &optional (fill-byte 0))
+;;; Called by the EMIT-ALIGNMENT macro to emit an alignment note. We check to
+;;; see if we can guarantee the alignment restriction by just outputting a
+;;; fixed number of bytes. If so, we do so. Otherwise, we create and emit an
+;;; alignment note.
+(defun %emit-alignment (segment vop bits &optional (fill-byte 0))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
   (let ((hook (segment-inst-hook segment)))
@@ -999,8 +999,8 @@
               (let ((index (alignment-index note)))
                 (with-modified-segment-index-and-posn (segment index posn)
                   (setf (segment-last-annotation segment) prev)
-                  (emit-alignment segment nil (alignment-bits note)
-                                  (alignment-fill-byte note))
+                  (%emit-alignment segment nil (alignment-bits note)
+                                   (alignment-fill-byte note))
                   (let* ((new-index (segment-current-index segment))
                          (size (- new-index index))
                          (old-size (alignment-size note))
@@ -1263,13 +1263,10 @@
 ;;; Note: The need to capture SYMBOL-MACROLET bindings of
 ;;; **CURRENT-SEGMENT* and (%%CURRENT-VOP%%) prevents this from being an
 ;;; ordinary function.
-(defmacro align (bits &optional (fill-byte 0))
+(defmacro emit-alignment (bits &optional (fill-byte 0))
   #!+sb-doc
   "Emit an alignment restriction to the current segment."
-  `(emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,fill-byte))
-;;; FIXME: By analogy with EMIT-LABEL and EMIT-POSTIT, this should be
-;;; called EMIT-ALIGNMENT, and the function that it calls should be
-;;; called %EMIT-ALIGNMENT.
+  `(%emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,fill-byte))
 
 (defun label-position (label &optional if-after delta)
   #!+sb-doc
@@ -1291,10 +1288,10 @@
     (dolist (postit postits)
       (emit-back-patch segment 0 postit)))
   #!-(or x86 x86-64)
-  (emit-alignment segment nil max-alignment)
+  (%emit-alignment segment nil max-alignment)
   #!+(or x86 x86-64)
   (unless (eq :elsewhere (segment-type other-segment))
-    (emit-alignment segment nil max-alignment))
+    (%emit-alignment segment nil max-alignment))
   (let ((segment-current-index-0 (segment-current-index segment))
         (segment-current-posn-0  (segment-current-posn  segment)))
     (incf (segment-current-index segment)

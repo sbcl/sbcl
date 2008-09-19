@@ -123,7 +123,7 @@
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)
   (:generator 1
-    (align n-lowtag-bits)
+    (emit-alignment n-lowtag-bits)
     (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Skip space for the function header.

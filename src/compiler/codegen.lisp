@@ -68,7 +68,7 @@
 (defun trace-instruction (segment vop inst args)
   (let ((*standard-output* *compiler-trace-output*))
     (unless (eq *prev-segment* segment)
-      (format t "in the ~A segment:~%" (sb!assem:segment-name segment))
+      (format t "in the ~A segment:~%" (sb!assem:segment-type segment))
       (setf *prev-segment* segment))
     (unless (eq *prev-vop* vop)
       (when vop

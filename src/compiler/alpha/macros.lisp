@@ -108,7 +108,7 @@
   "Emit a return-pc header word.  LABEL is the label to use for this
    return-pc."
   `(progn
-     (align n-lowtag-bits)
+     (emit-alignment n-lowtag-bits)
      (emit-label ,label)
      (inst lra-header-word)))
 
@@ -207,7 +207,7 @@
           (inst byte (length ,vector))
           (dotimes (i (length ,vector))
             (inst byte (aref ,vector i))))
-        (align word-shift)))))
+        (emit-alignment word-shift)))))
 
 (defmacro error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
