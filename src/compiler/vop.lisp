@@ -430,7 +430,7 @@
   ;;
   ;;    :STRANGE
   ;;        A segment of a "strange loop" in a non-reducible flow graph.
-  (kind (required-argument) :type (member :outer :natural :strange))
+  (kind (missing-arg) :type (member :outer :natural :strange))
   ;; The first and last blocks in the loop.  There may be more than one tail,
   ;; since there may be multiple back branches to the same head.
   (head nil :type (or cblock null))
@@ -446,7 +446,9 @@
   (depth 0 :type fixnum)
   ;; The head of the list of blocks directly within this loop.  We must recurse
   ;; on INFERIORS to find all the blocks.
-  (blocks nil :type (or null cblock)))
+  (blocks nil :type (or null cblock))
+  ;; Backend saves the first emitted block of each loop here.
+  (info nil))
 
 (defprinter (cloop :conc-name loop-)
   kind

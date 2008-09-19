@@ -133,6 +133,18 @@
         (when (and (eq (block-info 1block) block)
                    (block-start 1block))
           (sb!assem:assemble (*code-segment*)
+            ;; Align first emitted block of each loop: x86 and x86-64 both
+            ;; like 16 byte alignment, however, since x86 aligns code objects
+            ;; on 8 byte boundaries we cannot guarantee proper loop alignment
+            ;; there (yet.)
+            #!+x86-64
+            (let ((cloop (sb!c::block-loop 1block)))
+              (when (and cloop
+                         (sb!c::loop-tail cloop)
+                         (not (sb!c::loop-info cloop)))
+                (sb!assem:align sb!vm:n-lowtag-bits #x90)
+                ;; Mark the loop as aligned by saving the IR1 block aligned.
+                (setf (sb!c::loop-info cloop) 1block)))
             (sb!assem:emit-label (block-label 1block)))
           (let ((env (block-physenv 1block)))
             (unless (eq env prev-env)
