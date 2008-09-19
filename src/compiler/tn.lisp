@@ -442,8 +442,7 @@
 ;;; Return the value of an immediate constant TN.
 (defun tn-value (tn)
   (declare (type tn tn))
-  ;; FIXME: What is :CACHED-CONSTANT?
-  (aver (member (tn-kind tn) '(:constant :cached-constant)))
+  (aver (eq (tn-kind tn) :constant))
   (constant-value (tn-leaf tn)))
 
 ;;; Force TN to be allocated in a SC that doesn't need to be saved: an
