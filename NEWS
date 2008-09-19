@@ -5,6 +5,12 @@
     average 45% less pages pinned (measured from SBCL self build).
   * bug fix: SB-EXT:COMPARE-AND-SWAP on SYMBOL-VALUE can no longer
     mutate constant symbols or violate declaimed type of the symbol.
+  * bug fix: SB-THREAD:SIGNAL-SEMAPHORE could fail to wakeup threads
+    sleeping on the semaphore in heavily contested semaphores.
+  * bug fix: semaphores and condition variables were not interrupt
+    safe.
+  * bug fix: SB-THREAD:CONDITION-WAIT doesn't allow waits on mutexes
+    owned by other threads anymore.
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities

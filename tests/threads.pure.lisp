@@ -84,3 +84,58 @@
                                                    (setf oops t))))))))
     (mapcar #'sb-thread:join-thread threads)
     (assert (not oops))))
+
+#+sb-thread
+(with-test (:name :semaphore-multiple-waiters)
+  (let ((semaphore (make-semaphore :name "test sem")))
+    (labels ((make-readers (n i)
+               (values
+                (loop for r from 0 below n
+                      collect
+                      (let ((r r))
+                        (sb-thread:make-thread (lambda ()
+                                                 (let ((sem semaphore))
+                                                   (dotimes (s i)
+                                                     (sb-thread:wait-on-semaphore sem))))
+                                               :name "reader")))
+                (* n i)))
+             (make-writers (n readers i)
+               (let ((j (* readers i)))
+                 (multiple-value-bind (k rem) (truncate j n)
+                   (values
+                    (let ((writers
+                           (loop for w from 0 below n
+                                 collect
+                                 (let ((w w))
+                                   (sb-thread:make-thread (lambda ()
+                                                            (let ((sem semaphore))
+                                                              (dotimes (s k)
+                                                                (sb-thread:signal-semaphore sem))))
+                                                          :name "writer")))))
+                      (assert (zerop rem))
+                      writers)
+                    (+ rem (* n k))))))
+             (test (r w n)
+               (multiple-value-bind (readers x) (make-readers r n)
+                 (assert (= (length readers) r))
+                 (multiple-value-bind (writers y) (make-writers w r n)
+                   (assert (= (length writers) w))
+                   (assert (= x y))
+                   (mapc #'sb-thread:join-thread writers)
+                   (mapc #'sb-thread:join-thread readers)
+                   (assert (zerop (sb-thread:semaphore-count semaphore)))
+                   (values)))))
+      (assert
+       (eq :ok
+           (handler-case
+               (sb-ext:with-timeout 10
+                 (test 1 1 100)
+                 (test 2 2 10000)
+                 (test 4 2 10000)
+                 (test 4 2 10000)
+                 (test 10 10 10000)
+                 (test 10 1 10000)
+                 :ok)
+             (sb-ext:timeout ()
+               :timeout)))))))
+
