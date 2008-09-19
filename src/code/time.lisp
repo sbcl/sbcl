@@ -263,6 +263,43 @@ format."
    GET-INTERNAL-RUN-TIME)")
 (declaim (type index *gc-run-time*))
 
+(defun print-time (&key real-time-ms user-run-time-us system-run-time-us
+                   gc-run-time-ms processor-cycles eval-calls
+                   lambda-conversions page-faults bytes-consed
+                   aborted)
+  (let ((total-run-time-us (+ user-run-time-us system-run-time-us)))
+    (format *trace-output*
+            "~&Evaluation took:~%~
+                         ~@<  ~@;~/sb-impl::format-milliseconds/ of real time~%~
+                                 ~/sb-impl::format-microseconds/ of total run time ~
+                                  (~@/sb-impl::format-microseconds/ user, ~@/sb-impl::format-microseconds/ system)~%~
+                                 ~[[ Run times consist of ~/sb-impl::format-milliseconds/ GC time, ~
+                                                      and ~/sb-impl::format-milliseconds/ non-GC time. ]~%~;~2*~]~
+                                 ~,2F% CPU~%~
+                                 ~@[~:D form~:P interpreted~%~]~
+                                 ~@[~:D lambda~:P converted~%~]~
+                                 ~@[~:D processor cycles~%~]~
+                                 ~@[~:D page fault~:P~%~]~
+                                 ~:D bytes consed~%~
+                                 ~@[~%before it was aborted by a non-local transfer of control.~%~]~:>~%"
+            real-time-ms
+            total-run-time-us
+            user-run-time-us
+            system-run-time-us
+            (if (zerop gc-run-time-ms) 1 0)
+            gc-run-time-ms
+            ;; Round up so we don't mislead by saying 0.0 seconds of non-GC time...
+            (- (ceiling total-run-time-us 1000) gc-run-time-ms)
+            (if (zerop real-time-ms)
+                100.0
+                (float (* 100 (/ (round total-run-time-us 1000) real-time-ms))))
+            eval-calls
+            lambda-conversions
+            processor-cycles
+            page-faults
+            bytes-consed
+            aborted)))
+
 (defmacro time (form)
   #!+sb-doc
   "Execute FORM and print timing information on *TRACE-OUTPUT*.
@@ -280,13 +317,12 @@ reads of the cycle counter, the results will be completely bogus.
 Finally, the counter is cycle counter, incremented by the hardware
 even when the process is halted -- which is to say that cycles pass
 normally during operations like SLEEP."
-  `(%time (lambda () ,form)))
+  `(call-with-timing #'print-time (lambda () ,form)))
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
   (multiple-value-bind (user sys faults) (sb!sys:get-system-info)
     (values user sys faults (get-bytes-consed))))
-
 
 (defun elapsed-cycles (h0 l0 h1 l1)
   (declare (ignorable h0 l0 h1 l1))
@@ -351,13 +387,50 @@ normally during operations like SLEEP."
              (multiple-value-bind (whole fraction) (floor number scale)
                (format stream "~D." whole)
                (%fraction fraction))))))
-
   nil)
 
 ;;; The guts of the TIME macro. Compute overheads, run the (compiled)
 ;;; function, report the times.
-(defun %time (fun)
-  (declare (type function fun))
+(defun call-with-timing (timer function &rest arguments)
+  #!+sb-doc
+  "Calls FUNCTION with ARGUMENTS, and gathers timing infomation about it.
+Then calls TIMER with keyword arguments describing the information collected.
+Calls TIMER even if FUNCTION performs a non-local transfer of control. Finally
+returns values returned by FUNCTION.
+
+  :USER-RUN-TIME-US
+      User run time in microseconds.
+
+  :SYSTEM-RUN-TIME-US
+      System run time in microseconds.
+
+  :REAL-TIME-MS
+      Real time in milliseconds.
+
+  :GC-RUN-TIME-MS
+      GC run time in milliseconds (included in user and system run time.)
+
+  :PROCESSOR-CYCLES
+      Approximate number of processor cycles used. (Omitted  if not supported on
+      the platform -- currently available on x86 and x86-64 only.)
+
+  :EVAL-CALLS
+      Number of calls to EVAL. (Omitted if zero.)
+
+  :LAMBDAS-CONVERTED
+      Number of lambdas converted. (Omitted if zero.)
+
+  :PAGE-FAULTS
+      Number of page faults. (Omitted if zero.)
+
+  :BYTES-CONSED
+      Approximate number of bytes consed.
+
+  :ABORTED
+      True if FUNCTION caused a non-local transfer of control. (Omitted if
+      NIL.)
+
+EXPERIMENTAL: Interface subject to change."
   (let (old-run-utime
         new-run-utime
         old-run-stime
@@ -372,7 +445,9 @@ normally during operations like SLEEP."
         page-faults-overhead
         old-bytes-consed
         new-bytes-consed
-        cons-overhead)
+        cons-overhead
+        (fun (if (functionp function) function (fdefinition function))))
+    (declare (function fun))
     ;; Calculate the overhead...
     (multiple-value-setq
         (old-run-utime old-run-stime old-page-faults old-bytes-consed)
@@ -399,12 +474,13 @@ normally during operations like SLEEP."
     (setq old-real-time (get-internal-real-time))
     (let ((start-gc-internal-run-time *gc-run-time*)
           (*eval-calls* 0)
-          (sb!c::*lambda-conversions* 0))
+          (sb!c::*lambda-conversions* 0)
+          (aborted t))
       (declare (special *eval-calls* sb!c::*lambda-conversions*))
       (multiple-value-bind (h0 l0) (read-cycle-counter)
-        (multiple-value-prog1
-            ;; Execute the form and return its values.
-            (funcall fun)
+        (unwind-protect
+             (multiple-value-prog1 (apply fun arguments)
+               (setf aborted nil))
           (multiple-value-bind (h1 l1) (read-cycle-counter)
             (let ((stop-gc-internal-run-time *gc-run-time*))
               (multiple-value-setq
@@ -415,35 +491,20 @@ normally during operations like SLEEP."
                      (real-time (max (- new-real-time old-real-time) 0))
                      (user-run-time (max (- new-run-utime old-run-utime) 0))
                      (system-run-time (max (- new-run-stime old-run-stime) 0))
-                     (total-run-time (+ user-run-time system-run-time))
                      (cycles (elapsed-cycles h0 l0 h1 l1))
                      (page-faults (max (- new-page-faults old-page-faults) 0)))
-                (format *trace-output*
-                        "~&Evaluation took:~%~
-                         ~@<  ~@;~/sb-impl::format-milliseconds/ of real time~%~
-                                 ~/sb-impl::format-microseconds/ of total run time ~
-                                  (~@/sb-impl::format-microseconds/ user, ~@/sb-impl::format-microseconds/ system)~%~
-                                 ~[[ Run times consist of ~/sb-impl::format-milliseconds/ GC time, ~
-                                                      and ~/sb-impl::format-milliseconds/ non-GC time. ]~%~;~2*~]~
-                                 ~,2F% CPU~%~
-                                 ~@[~:D form~:P interpreted~%~]~
-                                 ~@[~:D lambda~:P converted~%~]~
-                                 ~@[~:D processor cycles~%~]~
-                                 ~@[~:D page fault~:P~%~]~
-                                 ~:D bytes consed~:>~%"
-                        real-time
-                        total-run-time
-                        user-run-time
-                        system-run-time
-                        (if (zerop gc-internal-run-time) 1 0)
-                        gc-internal-run-time
-                        ;; Round up so we don't mislead by saying 0.0 seconds of non-GC time...
-                        (- (ceiling total-run-time 1000) gc-internal-run-time)
-                        (if (zerop real-time)
-                            100.0
-                            (float (* 100 (/ (round total-run-time 1000) real-time))))
-                        (unless (zerop *eval-calls*) *eval-calls*)
-                        (unless (zerop sb!c::*lambda-conversions*) sb!c::*lambda-conversions*)
-                        cycles
-                        (unless (zerop page-faults) page-faults)
-                        (max (- new-bytes-consed old-bytes-consed) 0))))))))))
+                (let (plist)
+                  (flet ((note (name value &optional test)
+                           (unless (and test (funcall test value))
+                             (setf plist (list* name value plist)))))
+                    (note :aborted aborted #'not)
+                    (note :bytes-consed (max (- new-bytes-consed old-bytes-consed) 0))
+                    (note :page-faults page-faults #'zerop)
+                    (note :processor-cycles cycles #'zerop)
+                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop)
+                    (note :eval-calls *eval-calls* #'zerop)
+                    (note :gc-run-time-ms gc-internal-run-time)
+                    (note :system-run-time-us system-run-time)
+                    (note :user-run-time-us user-run-time)
+                    (note :real-time-ms real-time))
+                  (apply timer plist))))))))))

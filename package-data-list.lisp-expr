@@ -575,8 +575,12 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*POSIX-ARGV*" "*CORE-PATHNAME*"
                "POSIX-GETENV" "POSIX-ENVIRON"
 
+               ;; Atomic operations
                "COMPARE-AND-SWAP"
                "ATOMIC-INCF"
+
+               ;; Timing information
+               "CALL-WITH-TIMING"
 
                ;; People have various good reasons to mess with the GC.
                "*AFTER-GC-HOOKS*"
