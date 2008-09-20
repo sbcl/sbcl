@@ -142,7 +142,7 @@
               (when (and cloop
                          (sb!c::loop-tail cloop)
                          (not (sb!c::loop-info cloop)))
-                (sb!assem:align sb!vm:n-lowtag-bits #x90)
+                (sb!assem:emit-alignment sb!vm:n-lowtag-bits #x90)
                 ;; Mark the loop as aligned by saving the IR1 block aligned.
                 (setf (sb!c::loop-info cloop) 1block)))
             (sb!assem:emit-label (block-label 1block)))

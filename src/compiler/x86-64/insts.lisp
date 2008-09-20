@@ -1814,11 +1814,12 @@
    (emit-byte segment #b10001101)
    (emit-ea segment src (reg-tn-encoding dst))))
 
-(define-instruction cmpxchg (segment dst src)
+(define-instruction cmpxchg (segment dst src &optional prefix)
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (register-p src))
+   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst src)
@@ -1827,11 +1828,6 @@
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 
-
-(define-instruction fs-segment-prefix (segment)
-  (:emitter
-   (emit-byte segment #x64)))
-
 ;;;; flag control instructions
 
 ;;; CLC -- Clear Carry Flag.
@@ -1960,9 +1956,11 @@
       (rex-reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))))
   )
 
-(define-instruction add (segment dst src)
+(define-instruction add (segment dst src &optional prefix)
   (:printer-list (arith-inst-printer-list #b000))
-  (:emitter (emit-random-arith-inst "ADD" segment dst src #b000)))
+  (:emitter
+   (emit-prefix segment prefix)
+   (emit-random-arith-inst "ADD" segment dst src #b000)))
 
 (define-instruction adc (segment dst src)
   (:printer-list (arith-inst-printer-list #b010))
@@ -2141,11 +2139,12 @@
    (maybe-emit-rex-prefix segment :qword nil nil nil)
    (emit-byte segment #b10011001)))
 
-(define-instruction xadd (segment dst src)
+(define-instruction xadd (segment dst src &optional prefix)
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (register-p src))
+   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst src)
@@ -2771,10 +2770,20 @@
   (:emitter
    (emit-byte segment #b10011011)))
 
+(defun emit-prefix (segment name)
+  (declare (ignorable segment))
+  (ecase name
+    ((nil))
+    (:lock
+     #!+sb-thread
+     (emit-byte segment #xf0))))
+
+;;; FIXME: It would be better to make the disassembler understand the prefix as part
+;;; of the instructions...
 (define-instruction lock (segment)
   (:printer byte ((op #b11110000)))
   (:emitter
-   (emit-byte segment #b11110000)))
+   (bug "LOCK prefix used as a standalone instruction")))
 
 ;;;; miscellaneous hackery
 

@@ -920,7 +920,7 @@
 
 ;;;; general data transfer
 
-(define-instruction mov (segment dst src)
+(define-instruction mov (segment dst src &optional prefix)
   ;; immediate to register
   (:printer reg ((op #b1011) (imm nil :type 'imm-data))
             '(:name :tab reg ", " imm))
@@ -933,6 +933,7 @@
   (:printer reg/mem-imm ((op '(#b1100011 #b000))))
 
   (:emitter
+   (emit-prefix segment prefix)
    (let ((size (matching-operand-size dst src)))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
@@ -1004,7 +1005,7 @@
   (:printer ext-reg-reg/mem ((op #b1011011) (reg nil :type 'word-reg)))
   (:emitter (emit-move-with-extension segment dst src #b10110110)))
 
-(define-instruction push (segment src)
+(define-instruction push (segment src &optional prefix)
   ;; register
   (:printer reg-no-width ((op #b01010)))
   ;; register/memory
@@ -1017,6 +1018,7 @@
   ;; ### segment registers?
 
   (:emitter
+   (emit-prefix segment prefix)
    (cond ((integerp src)
           (cond ((<= -128 src 127)
                  (emit-byte segment #b01101010)
@@ -1096,11 +1098,12 @@
    (emit-byte segment #b10001101)
    (emit-ea segment src (reg-tn-encoding dst))))
 
-(define-instruction cmpxchg (segment dst src)
+(define-instruction cmpxchg (segment dst src &optional prefix)
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (register-p src))
+   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment #b00001111)
@@ -1108,16 +1111,26 @@
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 
+(defun emit-prefix (segment name)
+  (ecase name
+    ((nil))
+    (:lock
+     #!+sb-thread
+     (emit-byte segment #xf0))
+    (:fs
+     (emit-byte segment #x64))
+    (:gs
+     (emit-byte segment #x65))))
 
 (define-instruction fs-segment-prefix (segment)
   (:printer byte ((op #b01100100)))
   (:emitter
-   (emit-byte segment #x64)))
+   (bug "FS emitted as a separate instruction!")))
 
 (define-instruction gs-segment-prefix (segment)
   (:printer byte ((op #b01100101)))
   (:emitter
-   (emit-byte segment #x65)))
+   (bug "GS emitted as a separate instruction!")))
 
 ;;;; flag control instructions
 
@@ -1190,7 +1203,7 @@
 ;;;; arithmetic
 
 (defun emit-random-arith-inst (name segment dst src opcode
-                                    &optional allow-constants)
+                               &optional allow-constants)
   (let ((size (matching-operand-size dst src)))
     (maybe-emit-operand-size-prefix segment size)
     (cond
@@ -1235,25 +1248,31 @@
       (reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))))
   )
 
-(define-instruction add (segment dst src)
+(define-instruction add (segment dst src &optional prefix)
   (:printer-list (arith-inst-printer-list #b000))
-  (:emitter (emit-random-arith-inst "ADD" segment dst src #b000)))
+  (:emitter
+   (emit-prefix segment prefix)
+   (emit-random-arith-inst "ADD" segment dst src #b000)))
 
 (define-instruction adc (segment dst src)
   (:printer-list (arith-inst-printer-list #b010))
   (:emitter (emit-random-arith-inst "ADC" segment dst src #b010)))
 
-(define-instruction sub (segment dst src)
+(define-instruction sub (segment dst src &optional prefix)
   (:printer-list (arith-inst-printer-list #b101))
-  (:emitter (emit-random-arith-inst "SUB" segment dst src #b101)))
+  (:emitter
+   (emit-prefix segment prefix)
+   (emit-random-arith-inst "SUB" segment dst src #b101)))
 
 (define-instruction sbb (segment dst src)
   (:printer-list (arith-inst-printer-list #b011))
   (:emitter (emit-random-arith-inst "SBB" segment dst src #b011)))
 
-(define-instruction cmp (segment dst src)
+(define-instruction cmp (segment dst src &optional prefix)
   (:printer-list (arith-inst-printer-list #b111))
-  (:emitter (emit-random-arith-inst "CMP" segment dst src #b111 t)))
+  (:emitter
+   (emit-prefix segment prefix)
+   (emit-random-arith-inst "CMP" segment dst src #b111 t)))
 
 (define-instruction inc (segment dst)
   ;; Register.
@@ -1410,11 +1429,12 @@
    (maybe-emit-operand-size-prefix segment :dword)
    (emit-byte segment #b10011001)))
 
-(define-instruction xadd (segment dst src)
+(define-instruction xadd (segment dst src &optional prefix)
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (register-p src))
+   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (emit-byte segment #b00001111)
@@ -1584,16 +1604,18 @@
     (t
      (inst test x y))))
 
-(define-instruction or (segment dst src)
+(define-instruction or (segment dst src &optional prefix)
   (:printer-list
    (arith-inst-printer-list #b001))
   (:emitter
+   (emit-prefix segment prefix)
    (emit-random-arith-inst "OR" segment dst src #b001)))
 
-(define-instruction xor (segment dst src)
+(define-instruction xor (segment dst src &optional prefix)
   (:printer-list
    (arith-inst-printer-list #b110))
   (:emitter
+   (emit-prefix segment prefix)
    (emit-random-arith-inst "XOR" segment dst src #b110)))
 
 (define-instruction not (segment dst)
@@ -2071,10 +2093,12 @@
   (:emitter
    (emit-byte segment #b10011011)))
 
+;;; FIXME: It would be better to make the disassembler understand the prefix as part
+;;; of the instructions...
 (define-instruction lock (segment)
   (:printer byte ((op #b11110000)))
   (:emitter
-   (emit-byte segment #b11110000)))
+   (bug "LOCK prefix used as a standalone instruction")))
 
 ;;;; miscellaneous hackery
 

@@ -83,8 +83,7 @@
             block catch-block-entry-pc-slot)
     #!+win32
     (progn
-      (inst fs-segment-prefix)
-      (inst mov temp (make-ea :dword :disp 0))
+      (inst mov temp (make-ea :dword :disp 0) :fs)
       (storew temp block unwind-block-next-seh-frame-slot))))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
@@ -104,8 +103,7 @@
             block catch-block-entry-pc-slot)
     #!+win32
     (progn
-      (inst fs-segment-prefix)
-      (inst mov temp (make-ea :dword :disp 0))
+      (inst mov temp (make-ea :dword :disp 0) :fs)
       (storew temp block unwind-block-next-seh-frame-slot))
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
@@ -126,8 +124,7 @@
       (inst lea seh-frame
             (make-ea-for-object-slot new-uwp
                                      unwind-block-next-seh-frame-slot 0))
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :disp 0) seh-frame))
+      (inst mov (make-ea :dword :disp 0) seh-frame :fs))
     (store-tl-symbol-value new-uwp *current-unwind-protect-block* tls)))
 
 (define-vop (unlink-catch-block)
@@ -149,8 +146,7 @@
     #!+win32
     (progn
       (loadw seh-frame block unwind-block-next-seh-frame-slot)
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :disp 0) seh-frame))
+      (inst mov (make-ea :dword :disp 0) seh-frame :fs))
     (loadw block block unwind-block-current-uwp-slot)
     (store-tl-symbol-value block *current-unwind-protect-block* tls)))
 

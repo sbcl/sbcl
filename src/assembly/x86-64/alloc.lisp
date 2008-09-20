@@ -94,8 +94,7 @@
                (emit-label get-tls-index-lock)
                (inst mov target 1)
                (zeroize rax-tn)
-               (inst lock)
-               (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) target)
+               (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*) target :lock)
                (inst jmp :ne get-tls-index-lock)
                ;; The symbol is now in OTHER.
                (inst pop other)

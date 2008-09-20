@@ -267,8 +267,7 @@
   (:arg-types unsigned-num)
   (:policy :fast-safe)
   (:generator 2
-    (inst fs-segment-prefix)
-    (inst mov sap (make-ea :dword :disp 0 :index n :scale 4))))
+    (inst mov sap (make-ea :dword :disp 0 :index n :scale 4) :fs)))
 
 (define-vop (halt)
   (:generator 1

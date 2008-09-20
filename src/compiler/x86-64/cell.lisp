@@ -59,11 +59,9 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 5
      (move rax old)
-     #!+sb-thread
-     (inst lock)
      (inst cmpxchg (make-ea :qword :base object
                             :disp (- (* offset n-word-bytes) lowtag))
-           new)
+           new :lock)
      (move result rax)))
 
 ;;;; symbol hacking VOPs
@@ -95,13 +93,12 @@
               new)
         (inst cmp rax no-tls-value-marker-widetag)
         (inst jmp :ne check)
-        (move rax old)
-        (inst lock))
+        (move rax old))
       (inst cmpxchg (make-ea :qword :base symbol
                              :disp (- (* symbol-value-slot n-word-bytes)
                                       other-pointer-lowtag)
                              :scale 1)
-            new)
+            new :lock)
       (emit-label check)
       (move result rax)
       (inst cmp result unbound-marker-widetag)
@@ -214,11 +211,10 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst lock)
     (inst add (make-ea :qword :base object
                        :disp (- (* symbol-value-slot n-word-bytes)
                                 other-pointer-lowtag))
-          value)))
+          value :lock)))
 
 #!+sb-thread
 (define-vop (boundp)
@@ -640,9 +636,7 @@
   (:generator 4
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    #!+sb-thread
-    (inst lock)
-    (inst xadd (make-ea-for-raw-slot object index tmp) diff)
+    (inst xadd (make-ea-for-raw-slot object index tmp) diff :lock)
     (move result diff)))
 
 (define-vop (raw-instance-ref/single)

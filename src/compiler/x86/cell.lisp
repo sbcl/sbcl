@@ -42,11 +42,9 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 5
      (move eax old)
-     #!+sb-thread
-     (inst lock)
      (inst cmpxchg (make-ea :dword :base object
                             :disp (- (* offset n-word-bytes) lowtag))
-           new)
+           new :lock)
      (move result eax)))
 
 ;;;; symbol hacking VOPs
@@ -73,16 +71,14 @@
       (progn
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
         ;; Thread-local area, no LOCK needed.
-        (inst fs-segment-prefix)
-        (inst cmpxchg (make-ea :dword :base tls) new)
+        (inst cmpxchg (make-ea :dword :base tls) new :fs)
         (inst cmp eax no-tls-value-marker-widetag)
         (inst jmp :ne check)
-        (move eax old)
-        (inst lock))
+        (move eax old))
       (inst cmpxchg (make-ea :dword :base symbol
                              :disp (- (* symbol-value-slot n-word-bytes)
                                       other-pointer-lowtag))
-            new)
+            new :lock)
       (emit-label check)
       (move result eax)
       (inst cmp result unbound-marker-widetag)
@@ -103,11 +99,9 @@
     (let ((global-val (gen-label))
           (done (gen-label)))
       (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst cmp (make-ea :dword :base tls) no-tls-value-marker-widetag)
+      (inst cmp (make-ea :dword :base tls) no-tls-value-marker-widetag :fs)
       (inst jmp :z global-val)
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :base tls) value)
+      (inst mov (make-ea :dword :base tls) value :fs)
       (inst jmp done)
       (emit-label global-val)
       (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -133,8 +127,7 @@
            (err-lab (generate-error-code vop 'unbound-symbol-error object))
            (ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :base value))
+      (inst mov value (make-ea :dword :base value) :fs)
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -155,8 +148,7 @@
   (:generator 8
     (let ((ret-lab (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :base value))
+      (inst mov value (make-ea :dword :base value) :fs)
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne ret-lab)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -195,10 +187,9 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst lock)
     (inst add (make-ea-for-object-slot object symbol-value-slot
                                        other-pointer-lowtag)
-          value)))
+          value :lock)))
 
 #!+sb-thread
 (define-vop (boundp)
@@ -211,8 +202,7 @@
   (:generator 9
     (let ((check-unbound-label (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst fs-segment-prefix)
-      (inst mov value (make-ea :dword :base value))
+      (inst mov value (make-ea :dword :base value) :fs)
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -331,12 +321,10 @@
                     (#.esi-offset 'alloc-tls-index-in-esi))
                   :assembly-routine))
       (emit-label tls-index-valid)
-      (inst fs-segment-prefix)
-      (inst push (make-ea :dword :base tls-index))
+      (inst push (make-ea :dword :base tls-index) :fs)
       (popw bsp (- binding-value-slot binding-size))
       (storew symbol bsp (- binding-symbol-slot binding-size))
-      (inst fs-segment-prefix)
-      (inst mov (make-ea :dword :base tls-index) val))))
+      (inst mov (make-ea :dword :base tls-index) val :fs))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -362,8 +350,7 @@
     (loadw tls-index temp symbol-tls-index-slot other-pointer-lowtag)
     ;; Load VALUE from stack, then restore it to the TLS area.
     (loadw temp bsp (- binding-value-slot binding-size))
-    (inst fs-segment-prefix)
-    (inst mov (make-ea :dword :base tls-index) temp)
+    (inst mov (make-ea :dword :base tls-index) temp :fs)
     ;; Zero out the stack.
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (storew 0 bsp (- binding-value-slot binding-size))
@@ -404,8 +391,7 @@
 
     #!+sb-thread (loadw
                   tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-    #!+sb-thread (inst fs-segment-prefix)
-    #!+sb-thread (inst mov (make-ea :dword :base tls-index) value)
+    #!+sb-thread (inst mov (make-ea :dword :base tls-index) value :fs)
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
@@ -589,9 +575,7 @@
     (when (sc-is index any-reg)
       (inst shl tmp 2)
       (inst sub tmp index))
-    #!+sb-thread
-    (inst lock)
-    (inst xadd (make-ea-for-raw-slot object index tmp 1) diff)
+    (inst xadd (make-ea-for-raw-slot object index tmp 1) diff :lock)
     (move result diff)))
 
 (define-vop (raw-instance-ref/single)

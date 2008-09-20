@@ -112,8 +112,7 @@
 (defmacro load-tl-symbol-value (reg symbol)
   `(progn
     (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
-    (inst fs-segment-prefix)
-    (inst mov ,reg (make-ea :dword :base ,reg))))
+    (inst mov ,reg (make-ea :dword :base ,reg) :fs)))
 #!-sb-thread
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
@@ -121,8 +120,7 @@
 (defmacro store-tl-symbol-value (reg symbol temp)
   `(progn
     (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
-    (inst fs-segment-prefix)
-    (inst mov (make-ea :dword :base ,temp) ,reg)))
+    (inst mov (make-ea :dword :base ,temp) ,reg :fs)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
@@ -131,19 +129,18 @@
 (defmacro load-binding-stack-pointer (reg)
   #!+sb-thread
   `(progn
-     (inst fs-segment-prefix)
      (inst mov ,reg (make-ea :dword
-                             :disp (* 4 thread-binding-stack-pointer-slot))))
+                             :disp (* 4 thread-binding-stack-pointer-slot))
+           :fs))
   #!-sb-thread
   `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
   #!+sb-thread
   `(progn
-     (inst fs-segment-prefix)
      (inst mov (make-ea :dword
                         :disp (* 4 thread-binding-stack-pointer-slot))
-           ,reg))
+           ,reg :fs))
   #!-sb-thread
   `(store-symbol-value ,reg *binding-stack-pointer*))
 
@@ -226,10 +223,8 @@
                   :scale 1)))   ; thread->alloc_region.end_addr
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst add alloc-tn free-pointer)
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst cmp alloc-tn end-addr)
+    (inst add alloc-tn free-pointer #!+sb-thread :fs)
+    (inst cmp alloc-tn end-addr #!+sb-thread :fs)
     (inst jmp :be ok)
     (let ((dst (ecase (tn-offset alloc-tn)
                  (#.eax-offset "alloc_overflow_eax")
@@ -244,16 +239,12 @@
     ;; Swap ALLOC-TN and FREE-POINTER
     (cond ((and (tn-p size) (location= alloc-tn size))
            ;; XCHG is extremely slow, use the xor swap trick
-           #!+sb-thread (inst fs-segment-prefix)
-           (inst xor alloc-tn free-pointer)
-           #!+sb-thread (inst fs-segment-prefix)
-           (inst xor free-pointer alloc-tn)
-           #!+sb-thread (inst fs-segment-prefix)
-           (inst xor alloc-tn free-pointer))
+           (inst xor alloc-tn free-pointer #!+sb-thread :fs)
+           (inst xor free-pointer alloc-tn #!+sb-thread :fs)
+           (inst xor alloc-tn free-pointer #!+sb-thread :fs))
           (t
            ;; It's easier if SIZE is still available.
-           #!+sb-thread (inst fs-segment-prefix)
-           (inst mov free-pointer alloc-tn)
+           (inst mov free-pointer alloc-tn #!+sb-thread :fs)
            (inst sub alloc-tn size)))
     (emit-label done))
   (values))
@@ -363,13 +354,11 @@
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-       (inst fs-segment-prefix)
        (inst or (make-ea :byte :disp (* 4 thread-pseudo-atomic-bits-slot))
-            (fixnumize 1))
+             (fixnumize 1) :fs)
        ,@forms
-       (inst fs-segment-prefix)
        (inst xor (make-ea :byte :disp (* 4 thread-pseudo-atomic-bits-slot))
-             (fixnumize 1))
+             (fixnumize 1) :fs)
        (inst jmp :z ,label)
        ;; if PAI was set, interrupts were disabled at the same
        ;; time using the process signal mask.
@@ -410,8 +399,6 @@
        (:result-types ,el-type)
        (:generator 5
          (move eax old-value)
-         #!+sb-thread
-         (inst lock)
          (let ((ea (sc-case index
                      (immediate
                       (make-ea :dword :base object
@@ -426,7 +413,7 @@
                       (make-ea :dword :base object :index index
                                :disp (- (* ,offset n-word-bytes)
                                         ,lowtag))))))
-           (inst cmpxchg ea new-value))
+           (inst cmpxchg ea new-value :lock))
          (move value eax)))))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)

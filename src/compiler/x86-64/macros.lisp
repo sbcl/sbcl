@@ -356,11 +356,9 @@
        (:result-types ,el-type)
        (:generator 5
          (move rax old-value)
-         #!+sb-thread
-         (inst lock)
          (inst cmpxchg (make-ea :qword :base object :index index
                                 :disp (- (* ,offset n-word-bytes) ,lowtag))
-               new-value)
+               new-value :lock)
          (move value rax)))))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type &optional translate)

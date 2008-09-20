@@ -300,8 +300,7 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst mov temp
               (make-ea-for-symbol-tls-index *alien-stack*))
-        (inst fs-segment-prefix)
-        (inst sub (make-ea :dword :base temp) delta)))
+        (inst sub (make-ea :dword :base temp) delta :fs)))
     (load-tl-symbol-value result *alien-stack*))
   #!-sb-thread
   (:generator 0
@@ -321,8 +320,7 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
         (inst mov temp
               (make-ea-for-symbol-tls-index *alien-stack*))
-        (inst fs-segment-prefix)
-        (inst add (make-ea :dword :base temp) delta))))
+        (inst add (make-ea :dword :base temp) delta :fs))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)

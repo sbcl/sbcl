@@ -1461,10 +1461,9 @@
   ;; register on -SB-THREAD.
   #!+sb-thread
   (progn
-    (inst fs-segment-prefix)
     (inst cmp (make-ea :dword
                        :disp (* thread-stepping-slot n-word-bytes))
-          nil-value))
+          nil-value :fs))
   #!-sb-thread
   (inst cmp (make-ea-for-symbol-value sb!impl::*stepping*)
         nil-value))
