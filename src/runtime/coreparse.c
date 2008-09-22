@@ -342,7 +342,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             size_t fdoffset = (*(ptr+1) + 1) * (os_vm_page_size);
             size_t offset = 0;
             long bytes_read;
-            long data[4096];
+            unsigned long data[4096];
             lseek(fd, fdoffset + file_offset, SEEK_SET);
             while ((bytes_read = read(fd, data, (size < 4096 ? size : 4096 )))
                     > 0)
@@ -357,7 +357,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                      * elements than the page table.
                      */
                     if (data[i]) {
-                        page_table[offset].first_object_offset = data[i];
+                        page_table[offset].region_start_offset = data[i];
                     }
                     i++;
                     offset++;

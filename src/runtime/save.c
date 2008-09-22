@@ -283,12 +283,12 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     {
         size_t size = (last_free_page*sizeof(long)+os_vm_page_size-1)
             &~(os_vm_page_size-1);
-        long *data = calloc(size, 1);
+        unsigned long *data = calloc(size, 1);
         if (data) {
             long offset;
             int i;
             for (i = 0; i < last_free_page; i++) {
-                data[i] = page_table[i].first_object_offset;
+                data[i] = page_table[i].region_start_offset;
             }
             write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
             write_lispobj(4, file);
