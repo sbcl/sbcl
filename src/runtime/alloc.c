@@ -118,7 +118,8 @@ alloc_vector(int type, int length, int size)
 lispobj
 alloc_cons(lispobj car, lispobj cdr)
 {
-    struct cons *ptr = (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)));
+    struct cons *ptr =
+        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)));
 
     ptr->car = car;
     ptr->cdr = cdr;

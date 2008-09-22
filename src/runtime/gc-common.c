@@ -723,8 +723,7 @@ scav_fdefn(lispobj *where, lispobj object)
     /* FSHOW((stderr, "scav_fdefn, function = %p, raw_addr = %p\n",
        fdefn->fun, fdefn->raw_addr)); */
 
-    if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET)
-        == (char *)((unsigned long)(fdefn->raw_addr))) {
+    if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET) == fdefn->raw_addr) {
         scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
 
         /* Don't write unnecessarily. */
@@ -1925,7 +1924,8 @@ gc_init_tables(void)
         /* skipping OTHER_IMMEDIATE_0_LOWTAG */
         scavtab[LIST_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_list_pointer;
         scavtab[ODD_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_immediate;
-        scavtab[INSTANCE_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_instance_pointer;
+        scavtab[INSTANCE_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] =
+            scav_instance_pointer;
         /* skipping OTHER_IMMEDIATE_1_LOWTAG */
         scavtab[OTHER_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_other_pointer;
     }

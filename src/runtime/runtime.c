@@ -121,19 +121,6 @@ copied_existing_filename_or_null(char *filename)
         return copied_string(filename);
     }
 }
-
-/* Convert a null-terminated array of null-terminated strings (e.g.
- * argv or envp) into a Lisp list of Lisp base-strings. */
-static lispobj
-alloc_base_string_list(char *array_ptr[])
-{
-    if (*array_ptr) {
-        return alloc_cons(alloc_base_string(*array_ptr),
-                          alloc_base_string_list(1 + array_ptr));
-    } else {
-        return NIL;
-    }
-}
 
 /* miscellaneous chattiness */
 

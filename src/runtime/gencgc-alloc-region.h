@@ -22,7 +22,4 @@ extern struct alloc_region  unboxed_region;
 extern generation_index_t from_space, new_space;
 extern struct weak_pointer *weak_pointers;
 
-extern void *current_region_free_pointer;
-extern void *current_region_end_addr;
-
 #endif /*  _GENCGC_ALLOC_REGION_H_ */
