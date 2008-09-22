@@ -1882,7 +1882,23 @@ generally try to check returns in safe code, so we should here too.)
  call for functions already inline converted there, but he is not sure
  if this has adverse effects elsewhere.
 
-428: TIMER SCHEDULE-STRESS in timer.impure.lisp fails
+428: TIMER SCHEDULE-STRESS and PARALLEL-UNSCHEDULE in
+     timer.impure.lisp fails
 
  Failure modes vary. Core problem seems to be (?) recursive entry to
  RUN-EXPIRED-TIMERS.
+
+429: compiler hangs
+
+  Compiling a file with this contents makes the compiler loop in
+  ORDER-UVL-SETS:
+
+  (declaim (inline storage))
+  (defun storage (x)
+    (the (simple-array flt (*)) (unknown x)))
+
+  (defun test1 (lumps &key cg)
+    (let ((nodes (map 'list (lambda (lump) (storage lump))
+                      lumps)))
+      (setf (aref nodes 0) 2)
+      (assert (every #'~= (apply #'concatenate 'list nodes) '(2 3 6 9)))))
