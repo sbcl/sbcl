@@ -12,8 +12,8 @@ struct alloc_region {
     void  *end_addr; /* pointer to the byte after the last usable byte */
 
     /* These are needed when closing the region. */
-    long  first_page;
-    long  last_page;
+    page_index_t  first_page;
+    page_index_t  last_page;
     void  *start_addr;
 };
 

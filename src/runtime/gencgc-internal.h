@@ -110,14 +110,18 @@ void gc_set_region_empty(struct alloc_region *region);
 /*
  * predicates
  */
+
 static inline boolean
 space_matches_p(lispobj obj, generation_index_t space)
 {
-    page_index_t page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
-    return ((page_index >= 0)
-            && ((page_index =
-                 ((unsigned long)page_index)/PAGE_BYTES) < page_table_pages)
-            && (page_table[page_index].gen == space));
+    if (obj >= DYNAMIC_SPACE_START) {
+        page_index_t page_index=((pointer_sized_uint_t)obj
+                                 - DYNAMIC_SPACE_START) / PAGE_BYTES;
+        return ((page_index < page_table_pages) &&
+                (page_table[page_index].gen == space));
+    } else {
+        return 0;
+    }
 }
 
 static inline boolean
