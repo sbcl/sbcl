@@ -282,7 +282,7 @@ issues manually:
  .msg                    -- holds the commit message
 
 Finally, delete the foo-hacks-to-cvs branch after you've committed
-code to CVS. Of course, instead of using git-cvexportcommit you can
+code to CVS. Of course, instead of using git-cvsexportcommit you can
 also manually make and apply patches, etc. For hairier cases it may
 even be easier in the end:
 
@@ -306,6 +306,10 @@ from, do
   git pull
 
 on the branch you want to update on your private repository.
+
+Note that if you edit version.lisp-expr in the CVS tree and not before
+then the cvs commit command that git-cvsexportcommit prints does not
+list version.lisp-expr, so don't copy paste it.
 
 This completes our whirlwind tour. I'm not saying this makes you
 proficient in using Git, but at least you should be up and walking.
