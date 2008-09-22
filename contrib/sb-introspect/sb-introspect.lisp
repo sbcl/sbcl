@@ -224,11 +224,12 @@ If an unsupported TYPE is requested, the function will return NIL.
               (find-definition-source class)))))
        ((:method-combination)
         (let ((combination-fun
-               (ignore-errors (find-method #'sb-mop:find-method-combination
-                                           nil
-                                           (list (find-class 'generic-function)
-                                                 (list 'eql name)
-                                                 t)))))
+               (find-method #'sb-mop:find-method-combination
+                            nil
+                            (list (find-class 'generic-function)
+                                  (list 'eql name)
+                                  t)
+                            nil)))
           (when combination-fun
             (find-definition-source combination-fun))))
        ((:package)
