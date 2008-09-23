@@ -416,6 +416,8 @@ WORKAROUND:
   isn't too surprising since there are many differences in stack
   implementation and GC conservatism between the X86 and other ports.)
 
+  (Can't reproduce on x86 linux as of 1.0.20.23 - MGL)
+
   This is probably the same bug as 216
 
 173:
@@ -626,6 +628,8 @@ WORKAROUND:
   It's as though the process of working with the uninitialized slot in
   the bad VECTOR-PUSH-EXTEND frame causes GC problems, though that may
   not be the actual problem. (CMU CL 18c doesn't have problems with this.)
+
+  (Can't reproduce on x86 linux as of 1.0.20.22 - MGL)
 
   This is probably the same bug as 162
 
@@ -1046,7 +1050,7 @@ WORKAROUND:
     (open "/dev/zero" :element-type '(unsigned-byte 1025))
   gives an error in sbcl-0.8.10.
 
-325: "CLOSE :ABORT T on supeseding streams"
+325: "CLOSE :ABORT T on superseding streams"
   Closing a stream opened with :IF-EXISTS :SUPERSEDE with :ABORT T leaves no
   file on disk, even if one existed before opening.
 
@@ -1511,6 +1515,8 @@ WORKAROUND:
 385:
   (format nil "~4,1F" 0.001) => "0.00" (should be " 0.0");
   (format nil "~4,1@F" 0.001) => "+.00" (should be "+0.0").
+  (format nil "~E" 0.01) => "10.e-3" (should be "1.e-2");
+  (format nil "~G" 0.01) => "10.e-3" (should be "1.e-2");
 
 386: SunOS/x86 stack exhaustion handling broken
   According to <http://alfa.s145.xrea.com/sbcl/solaris-x86.html>, the
@@ -1772,13 +1778,6 @@ WORKAROUND:
   This gives a type error (#:G1 is not a (NOT SYMBOL)) because of the
   implementation of read circularity, using a symbol as a marker for
   the previously-referenced object.
-
-415: Issues creating large arrays on x86-64/Linux and x86/Darwin
-
-   (make-array (1- array-dimension-limit))
-
-   causes a GC invariant violation on x86-64/Linux, and
-   an unhandled SIGILL on x86/Darwin.
 
 416: backtrace confusion
 
