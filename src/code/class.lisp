@@ -367,7 +367,7 @@
                 (when diff
                   (warn
                    "in class ~S:~%  ~
-                    ~:(~A~) definition of superclass ~S is incompatible with~%  ~
+                    ~@(~A~) definition of superclass ~S is incompatible with~%  ~
                     ~A definition."
                    name
                    old-context
@@ -421,8 +421,7 @@
     ;; priority. (3) We now have the ability to rebuild the SBCL
     ;; system from scratch, so we no longer need this functionality in
     ;; order to maintain the SBCL system by modifying running images.
-    (error "The class ~S was not changed, and there's no guarantee that~@
-            the loaded code (which expected another layout) will work."
+    (error "The loaded code expects an incompatible layout for class ~S."
            (layout-proper-name layout)))
   (values))
 

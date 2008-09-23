@@ -741,4 +741,301 @@
 ;;; bug reported by John Morrison, 2008-07-22 on sbcl-devel
 (defstruct (raw-slot-struct-with-unknown-init (:constructor make-raw-slot-struct-with-unknown-init ()))
  (x (#:unknown-function) :type double-float))
+
+;;; Some checks for the behavior of incompatibly redefining structure
+;;; classes.  We don't actually check that our detection of
+;;; "incompatible" is comprehensive, only that if an incompatible
+;;; definition is processed, we do various things.
+(defmacro with-files ((&rest vars) &body body)
+  "Evaluate BODY with VARS bound to a number of filenames, then
+delete the files at the end."
+  (let* ((paths (loop for var in vars
+                      as index upfrom 0
+                      collect (make-pathname
+                                   :case :common
+                                   :name (format nil
+                                                 "DEFSTRUCT-REDEF-TEST-~D"
+                                                 index)
+                                   :type "LISP")))
+         (binding-spec (mapcar
+                        (lambda (var path) `(,var ,path)) vars paths)))
+    (labels ((frob (n)
+               `((unwind-protect
+                     (progn
+                       ,@(if (plusp n)
+                             (frob (1- n))
+                             body))
+                   (delete-file ,(elt paths n))))))
+      `(let ,binding-spec
+         ,@(frob (1- (length vars)))))))
+
+(defun noclobber (pathspec &rest forms)
+  "Write FORMS to the file named by PATHSPEC, erroring if
+PATHSPEC already names an existing file."
+  (with-open-file (*standard-output* pathspec :direction :output
+                                     :if-exists :error)
+    (print '(in-package "CL-USER"))
+    (mapc #'print forms)))
+
+(defun compile-file-assert (file &optional (want-error-p t) (want-warning-p t))
+  "Compile FILE and assert some things about the results."
+  (multiple-value-bind (fasl errors-p warnings-p)
+      (compile-file file)
+    (assert fasl)
+    (assert (eq errors-p want-error-p))
+    (assert (eq warnings-p want-warning-p))
+    fasl))
+
+(defun continue-from-incompatible-defstruct-error (error)
+  "Invoke the CONTINUE restart for an incompatible DEFSTRUCT
+redefinition."
+  ;; FIXME: want distinct error type for incompatible defstruct.
+  (when (search "attempt to redefine" (simple-condition-format-control error))
+    (when (find-restart 'continue)
+      (invoke-restart 'continue))))
+
+(defun recklessly-continue-from-incompatible-defstruct-error (error)
+  "Invoke the RECKLESSLY-CONTINUE restart for an incompatible DEFSTRUCT
+redefinition."
+  ;; FIXME: want distinct error type for incompatible defstruct.
+  (when (search "attempt to redefine" (simple-condition-format-control error))
+    (when (find-restart 'sb-kernel::recklessly-continue)
+      (invoke-restart 'sb-kernel::recklessly-continue))))
+
+(defun assert-is (predicate instance)
+  (assert (funcall predicate instance)))
+
+(defun assert-invalid (predicate instance)
+  (assert (typep (nth-value 1 (ignore-errors (funcall predicate instance)))
+                 'sb-kernel::layout-invalid)))
+
+;; Don't try to understand this macro; just look at its expansion.
+(defmacro with-defstruct-redefinition-test (name
+                                            (&rest defstruct-form-bindings)
+                                            (&rest path-form-specs)
+                                            handler-function
+                                            &body body)
+  (labels ((make-defstruct-form (&key class-name super-name slots)
+             (let* ((predicate-name
+                     (read-from-string (format nil "~A-p" class-name)))
+                    (constructor-name
+                     (read-from-string (format nil "make-~A" class-name))))
+               `(values
+                 '(defstruct (,class-name
+                             (:constructor ,constructor-name)
+                             ,@(when super-name
+                                 `((:include ,super-name))))
+                    ,@slots)
+                 ',constructor-name
+                 ',predicate-name)))
+           (frob (bindspecs classno)
+             (if bindspecs
+                 `((multiple-value-bind ,(first (first bindspecs))
+                       ,(apply #'make-defstruct-form (rest (first bindspecs)))
+                     (declare (ignorable ,@(first (first bindspecs))))
+                     ,@(frob (rest bindspecs) (1+ classno))))
+                 `((with-files ,(mapcar #'first path-form-specs)
+                     ,@(mapcar (lambda (path-form) `(noclobber ,@path-form))
+                               path-form-specs)
+                     (handler-bind
+                         ((simple-error ',handler-function))
+                       ,@body))))))
+    `(with-test (:name ,name)
+      ,(first (frob defstruct-form-bindings 0)))))
+
+;; When eyeballing these, it's helpful to see when various things are
+;; happening.
+(setq *compile-verbose* t *load-verbose* t)
+
+;;; Tests begin.
+;; Base case: recklessly-continue.
+(with-defstruct-redefinition-test defstruct/recklessly
+    (((defstruct ctor pred) :class-name redef-test-1 :slots (a))
+     ((defstruct*) :class-name redef-test-1 :slots (a b)))
+    ((path1 defstruct)
+     (path2 defstruct*))
+    recklessly-continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load path2)
+    (assert-is pred instance)))
+
+;; Base case: continue (i.e., invalidate instances).
+(with-defstruct-redefinition-test defstruct/continue
+    (((defstruct ctor pred) :class-name redef-test-2 :slots (a))
+     ((defstruct*) :class-name redef-test-2 :slots (a b)))
+    ((path1 defstruct)
+     (path2 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load path2)
+    (assert-invalid pred instance)))
+
+;; Compiling a file with an incompatible defstruct should emit a
+;; warning and an error, but the fasl should be loadable.
+(with-defstruct-redefinition-test defstruct/compile-file-should-warn
+    (((defstruct) :class-name redef-test-3 :slots (a))
+     ((defstruct*) :class-name redef-test-3 :slots (a b)))
+    ((path1 defstruct)
+     (path2 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (load (compile-file-assert path2)))
+
+;; After compiling a file with an incompatible DEFSTRUCT, load the
+;; fasl and ensure that an old instance remains valid.
+(with-defstruct-redefinition-test defstruct/compile-file-reckless
+    (((defstruct ctor pred) :class-name redef-test-4 :slots (a))
+     ((defstruct*) :class-name redef-test-4 :slots (a b)))
+    ((path1 defstruct)
+     (path2 defstruct*))
+    recklessly-continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path2))
+    (assert-is pred instance)))
+
+;; After compiling a file with an incompatible DEFSTRUCT, load the
+;; fasl and ensure that an old instance has become invalid.
+(with-defstruct-redefinition-test defstruct/compile-file-continue
+    (((defstruct ctor pred) :class-name redef-test-5 :slots (a))
+     ((defstruct*) :class-name redef-test-5 :slots (a b)))
+    ((path1 defstruct)
+     (path2 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path2))
+    (assert-invalid pred instance)))
+
+;;; Subclasses.
+;; Ensure that recklessly continuing DT(expected)T to instances of
+;; subclasses.  (This is a case where recklessly continuing is
+;; actually dangerous, but we don't care.)
+(with-defstruct-redefinition-test defstruct/subclass-reckless
+    (((defstruct ignore pred1) :class-name redef-test-6 :slots (a))
+     ((substruct ctor pred2) :class-name redef-test-6-sub
+                             :super-name redef-test-6 :slots (z))
+     ((defstruct*) :class-name redef-test-6 :slots (a b)))
+    ((path1 defstruct substruct)
+     (path2 defstruct* substruct))
+    recklessly-continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path2))
+    (assert-is pred1 instance)
+    (assert-is pred2 instance)))
+
+;; Ensure that continuing invalidates instances of subclasses.
+(with-defstruct-redefinition-test defstruct/subclass-continue
+    (((defstruct) :class-name redef-test-7 :slots (a))
+     ((substruct ctor pred) :class-name redef-test-7-sub
+                            :super-name redef-test-7 :slots (z))
+     ((defstruct*) :class-name redef-test-7 :slots (a b)))
+    ((path1 defstruct substruct)
+     (path2 defstruct* substruct))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path2))
+    (assert-invalid pred instance)))
+
+;; Reclkessly continuing doesn't invalidate instances of subclasses.
+(with-defstruct-redefinition-test defstruct/subclass-in-other-file-reckless
+    (((defstruct ignore pred1) :class-name redef-test-8 :slots (a))
+     ((substruct ctor pred2) :class-name redef-test-8-sub
+                             :super-name redef-test-8 :slots (z))
+     ((defstruct*) :class-name redef-test-8 :slots (a b)))
+    ((path1 defstruct)
+     (path2 substruct)
+     (path3 defstruct*))
+    recklessly-continue-from-incompatible-defstruct-error
+  (load path1)
+  (load path2)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path3))
+    (assert-is pred1 instance)
+    (assert-is pred2 instance)))
+
+;; This is an icky case: when a subclass is defined in a separate
+;; file, CONTINUE'ing from LOAD of a file containing an incompatible
+;; superclass definition leaves the predicates and accessors into the
+;; subclass in a bad way until the subclass form is evaluated.
+(with-defstruct-redefinition-test defstruct/subclass-in-other-file-continue
+    (((defstruct ignore pred1) :class-name redef-test-9 :slots (a))
+     ((substruct ctor pred2) :class-name redef-test-9-sub
+                             :super-name redef-test-9 :slots (z))
+     ((defstruct*) :class-name redef-test-9 :slots (a b)))
+    ((path1 defstruct)
+     (path2 substruct)
+     (path3 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (load path2)
+  (let ((instance (funcall ctor)))
+    (load (compile-file-assert path3))
+    ;; At this point, the instance of the subclass will not count as
+    ;; an instance of the superclass or of the subclass, but PRED2's
+    ;; predicate will error with "an obsolete structure accessor
+    ;; function was called".
+    (assert-invalid pred1 instance)
+    (format t "~&~A~%" (nth-value 1 (ignore-errors (funcall pred2 instance))))
+    ;; After loading PATH2, we'll get the desired LAYOUT-INVALID error.
+    (load path2)
+    (assert-invalid pred2 instance)))
+
+;; Some other subclass wrinkles have to do with splitting definitions
+;; accross files and compiling and loading things in a funny order.
+(with-defstruct-redefinition-test
+    defstruct/subclass-in-other-file-funny-operation-order-continue
+    (((defstruct ignore pred1) :class-name redef-test-10 :slots (a))
+     ((substruct ctor pred2) :class-name redef-test-10-sub
+                             :super-name redef-test-10 :slots (z))
+     ((defstruct*) :class-name redef-test-10 :slots (a b)))
+    ((path1 defstruct)
+     (path2 substruct)
+     (path3 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (load path2)
+  (let ((instance (funcall ctor)))
+    ;; First we clobber the compiler's layout for the superclass.
+    (compile-file-assert path3)
+    ;; Then we recompile the subclass definition (which generates a
+    ;; warning about the compiled layout for the superclass being
+    ;; incompatible with the loaded layout, because we haven't loaded
+    ;; path3 since recompiling).
+    (compile-file path2)
+    ;; Ugh.  I don't want to think about loading these in the wrong
+    ;; order.
+    (load (compile-file-pathname path3))
+    (load (compile-file-pathname path2))
+    (assert-invalid pred1 instance)
+    (assert-invalid pred2 instance)))
+
+(with-defstruct-redefinition-test
+    defstruct/subclass-in-other-file-funny-operation-order-continue
+    (((defstruct ignore pred1) :class-name redef-test-11 :slots (a))
+     ((substruct ctor pred2) :class-name redef-test-11-sub
+                             :super-name redef-test-11 :slots (z))
+     ((defstruct*) :class-name redef-test-11 :slots (a b)))
+    ((path1 defstruct)
+     (path2 substruct)
+     (path3 defstruct*))
+    continue-from-incompatible-defstruct-error
+  (load path1)
+  (load path2)
+  (let ((instance (funcall ctor)))
+    ;; This clobbers the compiler's layout for REDEF-TEST-11.
+    (compile-file-assert path3)
+    ;; This recompiles REDEF-TEST-11-SUB, using the new REDEF-TEST-11
+    ;; compiler-layout.
+    (load (compile-file-pathname path2))
+    ;; Note that because we haven't loaded PATH3, we haven't clobbered
+    ;; the class's layout REDEF-TEST-11, so REDEF-11's predicate will
+    ;; still work.  That's probably bad.
+    (assert-is pred1 instance)
+    (assert-is pred2 instance)))
+
 
