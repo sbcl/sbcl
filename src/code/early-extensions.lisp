@@ -843,9 +843,9 @@
           (unless (proper-list-of-length-p spec 2)
             (error "malformed ONCE-ONLY binding spec: ~S" spec))
           (let* ((name (first spec))
-                 (exp-temp (gensym (symbol-name name))))
+                 (exp-temp (gensym "ONCE-ONLY")))
             `(let ((,exp-temp ,(second spec))
-                   (,name (gensym "ONCE-ONLY-")))
+                   (,name (gensym ,(symbol-name name))))
                `(let ((,,name ,,exp-temp))
                   ,,(frob (rest specs) body))))))))
 
