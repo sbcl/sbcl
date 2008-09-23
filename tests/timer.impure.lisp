@@ -165,7 +165,9 @@
         (loop
            (assert (eq wanted (subtypep type1 type2))))))))
 
-#+sb-thread
+;;; Disabled. Hangs occasionally at least on x86. See comment before
+;;; the next test case.
+#+(and nil sb-thread)
 (with-test (:name (:timer :parallel-unschedule))
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
