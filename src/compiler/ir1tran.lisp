@@ -87,6 +87,12 @@
         (eq (defined-fun-inlinep fun) :notinline)
         (eq (info :function :inlinep name) :notinline))))
 
+;; This will get redefined in PCL boot.
+(declaim (notinline update-info-for-gf))
+(defun maybe-update-info-for-gf (name)
+  (declare (ignorable name))
+  (values))
+
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
 (defun find-global-fun (name latep)
@@ -112,11 +118,13 @@
      :%source-name name
      :type (if (and (not latep)
                     (or *derive-function-types*
-                        (eq where :declared)
+                        (member where '(:declared :defined-method))
                         (and (member name *fun-names-in-this-file*
                                      :test #'equal)
                              (not (fun-lexically-notinline-p name)))))
-               (info :function :type name)
+               (progn
+                 (maybe-update-info-for-gf name)
+                 (info :function :type name))
                (specifier-type 'function))
      :defined-type (if (eq where :defined)
                        (info :function :type name)

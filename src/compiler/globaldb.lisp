@@ -953,15 +953,18 @@
 ;;; where this information came from:
 ;;;    :ASSUMED  = from uses of the object
 ;;;    :DEFINED  = from examination of the definition
+;;;    :DEFINED-METHOD = implicit, incremental declaration by CLOS.
 ;;;    :DECLARED = from a declaration
-;;; :DEFINED trumps :ASSUMED, and :DECLARED trumps :DEFINED.
+;;; :DEFINED trumps :ASSUMED, :DEFINED-METHOD trumps :DEFINED,
+;;; and :DECLARED trumps :DEFINED-METHOD.
 ;;; :DEFINED and :ASSUMED are useful for issuing compile-time warnings,
-;;; and :DECLARED is useful for ANSIly specializing code which
-;;; implements the function, or which uses the function's return values.
+;;; :DEFINED-METHOD and :DECLARED are useful for ANSIly specializing
+;;; code which implements the function, or which uses the function's
+;;; return values.
 (define-info-type
   :class :function
   :type :where-from
-  :type-spec (member :declared :assumed :defined)
+  :type-spec (member :declared :defined-method :assumed :defined)
   :default
   ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
   ;; not clear how to generalize the FBOUNDP expression to the

@@ -560,6 +560,7 @@
                               :generic-function generic-function
                               :method method)
                 (update-dfun generic-function))
+              (setf (gf-info-needs-update generic-function) t)
               (map-dependents generic-function
                               (lambda (dep)
                                 (update-dependent generic-function
@@ -587,11 +588,54 @@
                         :generic-function generic-function
                         :method method)
           (update-dfun generic-function)
+          (setf (gf-info-needs-update generic-function) t)
           (map-dependents generic-function
                           (lambda (dep)
                             (update-dependent generic-function
                                               dep 'remove-method method)))))))
   generic-function)
+
+
+;; Tell INFO about the generic function's methods' keys so that the
+;; compiler doesn't complain that the keys defined for some method are
+;; unrecognized.
+(sb-ext:without-package-locks
+  (defun sb-c::maybe-update-info-for-gf (name)
+    (let ((gf (if (fboundp name) (fdefinition name))))
+      (when (and gf (generic-function-p gf) (not (early-gf-p gf))
+                 (not (eq :declared (info :function :where-from name)))
+                 (gf-info-needs-update gf))
+        (let* ((methods (generic-function-methods gf))
+               (gf-lambda-list (generic-function-lambda-list gf))
+               (tfun (constantly t))
+               keysp)
+          (multiple-value-bind
+              (gf.required gf.optional gf.rest ignore gf.allowp)
+              (%split-arglist gf-lambda-list)
+            (declare (ignore ignore))
+            (setf (info :function :type name)
+                  (specifier-type
+                   `(function
+                     (,@(mapcar tfun gf.required)
+                        ,@(if gf.optional
+                              `(&optional ,@(mapcar tfun gf.optional)))
+                        ,@(if gf.rest
+                              `(&rest t))
+                        ,@(let ((all-keys
+                                 (mapcar
+                                  (lambda (x)
+                                    (list x t))
+                                  (remove-duplicates
+                                   (mapcan #'function-keywords methods)))))
+                            (when all-keys
+                              (setq keysp t)
+                              `(&key ,@all-keys)))
+                        ,@(if (and keysp gf.allowp)
+                              `(&allow-other-keys)))
+                     *))
+                  (info :function :where-from name) :defined-method
+                  (gf-info-needs-update gf) nil)))))
+    (values)))
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types

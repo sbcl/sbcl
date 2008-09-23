@@ -624,11 +624,12 @@
   ;;  :DECLARED, from a declaration.
   ;;  :ASSUMED, from uses of the object.
   ;;  :DEFINED, from examination of the definition.
+  ;;  :DEFINED-METHOD, implicit, piecemeal declarations from CLOS.
   ;; FIXME: This should be a named type. (LEAF-WHERE-FROM? Or
   ;; perhaps just WHERE-FROM, since it's not just used in LEAF,
   ;; but also in various DEFINE-INFO-TYPEs in globaldb.lisp,
   ;; and very likely elsewhere too.)
-  (where-from :assumed :type (member :declared :assumed :defined))
+  (where-from :assumed :type (member :declared :assumed :defined :defined-method))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
   ;; true if there was ever a REF or SET node for this leaf. This may

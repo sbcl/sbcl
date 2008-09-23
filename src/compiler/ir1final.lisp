@@ -77,7 +77,7 @@
                (setf (info :function :type source-name) defined-ftype)
                (setf (info :function :assumed-type source-name) nil))
              (setf (info :function :where-from source-name) :defined))
-            (:declared
+            ((:declared :defined-method)
              (let ((declared-ftype (info :function :type source-name)))
                (unless (defined-ftype-matches-declared-ftype-p
                          defined-ftype declared-ftype)

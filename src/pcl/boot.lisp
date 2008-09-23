@@ -1701,9 +1701,6 @@ bootstrapping.
                                     (when (or allow-other-keys-p old-allowp)
                                       '(&allow-other-keys)))))
                  *))))
-
-(defun defgeneric-declaration (spec lambda-list)
-  `(ftype ,(ftype-declaration-from-lambda-list lambda-list spec) ,spec))
 
 ;;;; early generic function support
 
@@ -2096,7 +2093,10 @@ bootstrapping.
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
       (when lambda-list-p
-        (proclaim (defgeneric-declaration spec lambda-list))
+        (setf (info :function :type spec)
+              (specifier-type
+               (ftype-declaration-from-lambda-list lambda-list spec))
+              (info :function :where-from spec) :defined-method)
         (if argument-precedence-order
             (set-arg-info fin
                           :lambda-list lambda-list
@@ -2216,7 +2216,10 @@ bootstrapping.
   (prog1
       (apply #'reinitialize-instance existing all-keys)
     (when lambda-list-p
-      (proclaim (defgeneric-declaration fun-name lambda-list)))))
+      (setf (info :function :type fun-name)
+            (specifier-type
+             (ftype-declaration-from-lambda-list lambda-list fun-name))
+            (info :function :where-from fun-name) :defined-method))))
 
 (defun real-ensure-gf-using-class--null
        (existing
@@ -2232,7 +2235,10 @@ bootstrapping.
             (apply #'make-instance generic-function-class
                    :name fun-name all-keys))
     (when lambda-list-p
-      (proclaim (defgeneric-declaration fun-name lambda-list)))))
+      (setf (info :function :type fun-name)
+            (specifier-type
+             (ftype-declaration-from-lambda-list lambda-list fun-name))
+            (info :function :where-from fun-name) :defined-method))))
 
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)

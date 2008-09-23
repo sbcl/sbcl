@@ -120,3 +120,27 @@
 (with-test (:name (no-next-method :gf-name-changed))
   (new-nnm-tester 1)
   (assert (= *nnm-count* 2)))
+
+;;; Tests the compiler's incremental rejiggering of GF types.
+(fmakunbound 'foo)
+(with-test (:name keywords-supplied-in-methods-ok-1)
+  (assert
+   (null
+    (nth-value
+     1
+     (progn
+       (defgeneric foo (x &key))
+       (defmethod foo ((x integer) &key bar) (list x bar))
+       (compile nil '(lambda () (foo (read) :bar 10))))))))
+
+(fmakunbound 'foo)
+(with-test (:name keywords-supplied-in-methods-ok-2)
+  (assert
+   (nth-value
+    1
+    (progn
+      (defgeneric foo (x &key))
+      (defmethod foo ((x integer) &key bar) (list x bar))
+      ;; On second thought...
+      (remove-method #'foo (find-method #'foo () '(integer)))
+      (compile nil '(lambda () (foo (read) :bar 10)))))))

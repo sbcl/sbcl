@@ -360,7 +360,12 @@
    ;; Used to make DFUN-STATE & FIN-FUNCTION updates atomic.
    (%lock
     :initform (sb-thread::make-spinlock :name "GF lock")
-    :reader gf-lock))
+    :reader gf-lock)
+   ;; Set to true by ADD-METHOD, REMOVE-METHOD; to false by
+   ;; MAYBE-UPDATE-INFO-FOR-GF.
+   (info-needs-update
+    :initform nil
+    :accessor gf-info-needs-update))
   (:metaclass funcallable-standard-class)
   (:default-initargs :method-class *the-class-standard-method*
                      :method-combination *standard-method-combination*))
