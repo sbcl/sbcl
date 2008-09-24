@@ -768,31 +768,37 @@ of specialized arrays is supported."
   (declare (array array))
   (and (array-header-p array) (%array-fill-pointer-p array)))
 
+(defun fill-pointer-error (vector arg)
+  (cond (arg
+         (aver (array-has-fill-pointer-p vector))
+         (let ((max (%array-available-elements vector)))
+           (error 'simple-type-error
+                  :datum arg
+                  :expected-type (list 'integer 0 max)
+                  :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
+                  arg max)))
+        (t
+         (error 'simple-type-error
+                :datum vector
+                :expected-type '(and vector (satisfies array-has-fill-pointer-p))
+                :format-control "~S is not an array with a fill pointer."
+                :format-arguments (list vector)))))
+
 (defun fill-pointer (vector)
   #!+sb-doc
   "Return the FILL-POINTER of the given VECTOR."
-  (declare (vector vector))
-  (if (and (array-header-p vector) (%array-fill-pointer-p vector))
+  (if (array-has-fill-pointer-p vector)
       (%array-fill-pointer vector)
-      (error 'simple-type-error
-             :datum vector
-             :expected-type '(and vector (satisfies array-has-fill-pointer-p))
-             :format-control "~S is not an array with a fill pointer."
-             :format-arguments (list vector))))
+      (fill-pointer-error vector nil)))
 
 (defun %set-fill-pointer (vector new)
-  (declare (vector vector) (fixnum new))
-  (if (and (array-header-p vector) (%array-fill-pointer-p vector))
-      (if (> new (%array-available-elements vector))
-        (error
-         "The new fill pointer, ~S, is larger than the length of the vector."
-         new)
-        (setf (%array-fill-pointer vector) new))
-      (error 'simple-type-error
-             :datum vector
-             :expected-type '(and vector (satisfies array-has-fill-pointer-p))
-             :format-control "~S is not an array with a fill pointer."
-             :format-arguments (list vector))))
+  (flet ((oops (x)
+           (fill-pointer-error vector x)))
+    (if (array-has-fill-pointer-p vector)
+        (if (> new (%array-available-elements vector))
+            (oops new)
+            (setf (%array-fill-pointer vector) new))
+        (oops nil))))
 
 ;;; FIXME: It'd probably make sense to use a MACROLET to share the
 ;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
@@ -811,7 +817,8 @@ of specialized arrays is supported."
     (cond ((= fill-pointer (%array-available-elements array))
            nil)
           (t
-           (setf (aref array fill-pointer) new-el)
+           (locally (declare (optimize (safety 0)))
+             (setf (aref array fill-pointer) new-el))
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
