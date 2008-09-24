@@ -16,7 +16,7 @@ clone. At the time of writing there are two Git mirrors for the CVS
 history:
 
  git://sbcl.boinkor.net/sbcl.git
- 
+
 and
 
  git://repo.or.cz/sbcl.git
@@ -228,7 +228,7 @@ along the lines of "My private SBCL tree. Pulls from main sbcl.git
 repository, and trickles changes back to upstream CVS manually --
 from where they end up in sbcl.git. Turtles, you see." in the comment
 box. Then you will be directed to set up an account, which you will
-then have to add as a "pusher" to your SBCL fork. 
+then have to add as a "pusher" to your SBCL fork.
 
 Finally, add the following snippet (adjusting for your own name) in
 ~/sbcl-git/.git/config
@@ -250,29 +250,44 @@ and you can publish your own hacks on it via git-push.
 
 Since we're not (yet?) officially using Git, we want to get our
 changes back into the CVS. git-cvsexport is the perfect tool for this.
-This assumes that you have a developer CVS checkout in ~/sbcl-cvs, and
-wish to commit the changes you have wrought on branch foo-hacks
-(compared to master):
 
- git checkout -b foo-hacks-to-cvs master
- git merge --squash foo-hacks
- edit version.lisp-expr to be "CVS ready"
- git commit -a               # edit the message to be "CVS ready"
- cd ~/sbcl-cvs
- GIT_DIR=~/sbcl-git/.git git cvsexportcommit -v foo-hacks-to-cvs
- review, fix any problems
- cvs commit -F .msg
-
-To make things a bit easier, add eg. this stanza to ~/sbcl-git/.git/config:
+First, to make things a bit easier, we add a command of our own to
+Git, by adding the following to ~/sbcl-git/.git/config:
 
  [alias]
-    sbcl-export = ! cd ~/sbcl-cvs && GIT_DIR=~/sbcl-git/.git git-cvsexportcommit -v
+        sbcl-export = cvsexportcommit -w /home/yourname/sbcl-cvs -v
 
-Then you can just run
+This assumes that you have a developer CVS checkout in ~/sbcl-cvs.
 
- git sbcl-export foo-hacks-to-cvs
+To commit the the changes you have wrought on branch foo-hacks
+(compared to master):
 
-from inside ~/sbcl-git/, and have it prepare your CVS tree for commit.
+ # These three steps could be replaced by any other sequence that
+ # ends with all the changes you want to export to CVS at the top
+ # of the current branch (so that the final commit introduces all
+ # the changes.)
+ #
+ # In practice for small changes you may eg. just want to
+ #
+ #    git checkout -b wip-fix-bug-xxx master
+ #    ...fix bug on the branch...
+ #    git commit -a
+ #
+ git checkout -b foo-hacks-to-cvs master
+ git merge --squash foo-hacks
+ git commit -a
+
+ # This exports our stuff to the CVS tree. HEAD can be any <<commit id>>,
+ # so if you have a large number of commits on a branch that you want to
+ # commit to CVS one by one, you do that as well.
+ git sbcl-export HEAD
+
+ cd ../sbcl-cvs
+
+ Review, fix problems, etc. Edit version.lisp-expr, and add the
+ version number to .msg (which contains the commit message from Git.)
+
+ cvs commit -F .msg
 
 git-cvsexportcommit is fairly conservative by default, and will fail
 if the patch doens't apply cleanly. If that happens, you can fix the
@@ -296,9 +311,36 @@ foo-hacks, naming them
   ...
 
 Due to, among other things, the cvs->git synchronization lag it is
-easy to get conflicts on version.lisp-expr so you may want to delay
-finalizing version.lisp-expr and the .msg file that cvsexportcommit
-produced by bumping the version and adding it to the commit message.
+easy to get conflicts on version.lisp-expr so generally speaking you
+never want to edit version-lisp.expr in Git, and only edit it (and add
+the version to the commit message) just when you are about to commit
+to CVS. It is, however, nice to have an idea how a given image came to
+be, which you can take care of by putting the following code in
+branch-version.lisp-expr:
+
+ #.(flet ((git (command &rest args)
+            (with-output-to-string (s)
+              ;; Adjust for your git installation location...
+              (sb-ext:run-program (merge-pathnames "bin/git" (user-homedir-pathname))
+                                  (cons command args) :output s))))
+     (format nil "~A.~A~@[-dirty~]"
+             (with-input-from-string (s (git "branch"))
+               (loop for line = (read-line s)
+                     when (eql #\* (char line 0))
+                     return (subseq line 2)))
+             (count #\newline (git "rev-list" "HEAD...master"))
+             (plusp (length (git "diff" "HEAD")))))
+
+which leads to your Git tree build to have version names like
+
+  1.0.20.28.master.0-dirty
+
+    1.0.20.28 on branch master, uncommitted changes
+
+  1.0.20.19.wip-foo.4
+
+    1.0.20.19 on branch wip-foo, 4 commits between current HEAD and
+    master, no uncommitted changes.
 
 To get latest changes from the CVS Git mirror you originally cloned
 from, do
@@ -318,10 +360,12 @@ Reading
  http://eagain.net/articles/git-for-computer-scientists/
  http://www.kernel.org/pub/software/scm/git/docs/everyday.html
  http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
- 
+
 and various Git manual pages is a good idea.
 
-One command I can in particular recommend getting familiar with is
-git-rebase. git-gui, git-citool, and gitk provide graphical interfaces
-for working with Git -- particularly gitk is an invaluable tool for
+Two commands I can in particular recommend getting familiar with are
+git-rebase and git-cherry-pick.
+
+git-gui, git-citool, and gitk provide graphical interfaces for
+working with Git -- particularly gitk is an invaluable tool for
 visualizing history.

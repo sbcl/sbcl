@@ -370,3 +370,5 @@
   (test '((42)) '((42)) '((42)) :key #'car)
   (test '((42)) '((42)) '((42)) :key #'car :test-not #'<))
 
+;;; FIND on lists should not call key outside the specified subsquence.
+(assert (not (find :a '(0 (:c) 1) :start 1 :end 2 :key #'car)))

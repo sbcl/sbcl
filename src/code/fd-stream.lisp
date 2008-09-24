@@ -821,10 +821,10 @@
 ;;; correct on win32.  However, none of the places that use it require
 ;;; further assurance than "may" versus "will definitely not".
 (defun sysread-may-block-p (stream)
-  #+win32
+  #!+win32
   ;; This answers T at EOF on win32, I think.
   (not (sb!win32:fd-listen (fd-stream-fd stream)))
-  #-win32
+  #!-win32
   (sb!unix:with-restarted-syscall (count errno)
     (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
       (sb!unix:fd-zero read-fds)

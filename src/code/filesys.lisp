@@ -702,8 +702,8 @@ or if PATHSPEC is a wild pathname."
     ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
     (when (and sbcl-home (not (string= sbcl-home "")))
       (parse-native-namestring sbcl-home
-                               #-win32 sb!impl::*unix-host*
-                               #+win32 sb!impl::*win32-host*
+                               #!-win32 sb!impl::*unix-host*
+                               #!+win32 sb!impl::*win32-host*
                                *default-pathname-defaults*
                                :as-directory t))))
 
@@ -727,8 +727,8 @@ system."
           ;; What?! -- RMK, 2007-12-31
           (return-from user-homedir-pathname
             (sb!win32::get-folder-pathname sb!win32::csidl_profile)))
-      #-win32 sb!impl::*unix-host*
-      #+win32 sb!impl::*win32-host*
+      #!-win32 sb!impl::*unix-host*
+      #!+win32 sb!impl::*win32-host*
       *default-pathname-defaults*
       :as-directory t))))
 

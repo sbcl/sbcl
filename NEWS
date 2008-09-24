@@ -16,6 +16,8 @@
     safe.
   * bug fix: SB-THREAD:CONDITION-WAIT doesn't allow waits on mutexes
     owned by other threads anymore.
+  * bug fix: FIND on lists called KEY outside the specified
+    subsequence. (reported by budden)
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities
