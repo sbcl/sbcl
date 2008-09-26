@@ -335,11 +335,19 @@
   "Return the logarithm of NUMBER in the base BASE, which defaults to e."
   (if base-p
       (cond
-        ((zerop base) 0f0) ; FIXME: type
+        ((zerop base)
+         (if (or (typep number 'double-float) (typep base 'double-float))
+             0.0d0
+             0.0f0))
         ((and (typep number '(integer (0) *))
               (typep base '(integer (0) *)))
          (coerce (/ (log2 number) (log2 base)) 'single-float))
-        (t (/ (log number) (log base))))
+        ((or (and (typep number 'integer) (typep base 'double-float))
+             (and (typep number 'double-float) (typep base 'integer)))
+         ;; No single float intermediate result
+         (/ (log2 number) (log base 2.0d0)))
+        (t
+         (/ (log number) (log base))))
       (number-dispatch ((number number))
         (((foreach fixnum bignum))
          (if (minusp number)

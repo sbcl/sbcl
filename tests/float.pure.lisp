@@ -202,3 +202,30 @@
       (test (not (> nan nan)))
       (test (not (> -1.0 nan)))
       (test (not (> nan 1.0))))))
+
+(with-test (:name :log-int/double-accuracy)
+  ;; we used to use single precision for intermediate results
+  (assert (eql 2567.6046442221327d0
+               (log (loop for n from 1 to 1000 for f = 1 then (* f n)
+                          finally (return f))
+                    10d0))))
+
+(with-test (:name :log-base-zero-return-type)
+  (assert (eql 0.0f0 (log 123 (eval 0))))
+  (assert (eql 0.0d0 (log 123.0d0 (eval 0))))
+  (assert (eql 0.0d0 (log 123 (eval 0.0d0))))
+  (let ((f (compile nil '(lambda (x y)
+                          (declare (optimize speed))
+                          (etypecase x
+                            (single-float
+                             (etypecase y
+                               (single-float (log x y))
+                               (double-float (log x y))))
+                            (double-float
+                             (etypecase y
+                               (single-float (log x y))
+                               (double-float (log x y)))))))))
+    (assert (eql 0.0f0 (funcall f 123.0 0.0)))
+    (assert (eql 0.0d0 (funcall f 123.0d0 0.0)))
+    (assert (eql 0.0d0 (funcall f 123.0d0 0.0d0)))
+    (assert (eql 0.0d0 (funcall f 123.0 0.0d0)))))

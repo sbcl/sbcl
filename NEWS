@@ -18,6 +18,10 @@
     owned by other threads anymore.
   * bug fix: FIND on lists called KEY outside the specified
     subsequence. (reported by budden)
+  * bug fix: LOG doesn't use single-float intermediate results when
+    given mixed integer and double-float arguments, leading to better
+    precision. (reported by Bob Felts)
+  * bug fix: LOG with base zero returned values of inconsistent type.
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities
