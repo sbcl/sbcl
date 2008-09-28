@@ -144,3 +144,43 @@
       ;; On second thought...
       (remove-method #'foo (find-method #'foo () '(integer)))
       (compile nil '(lambda () (foo (read) :bar 10)))))))
+
+;; If the GF has &REST with no &KEY, not all methods are required to
+;; parse the tail of the arglist as keywords, so we don't treat the
+;; function type as having &KEY in it.
+(fmakunbound 'foo)
+(with-test (:name gf-rest-method-key)
+  (defgeneric foo (x &rest y))
+  (defmethod foo ((i integer) &key w) (list i w))
+  ;; 1.0.20.30 failed here.
+  (assert
+   (null (nth-value 1 (compile nil '(lambda () (foo 5 :w 10 :foo 15))))))
+  (assert
+   (not (sb-kernel::args-type-keyp (sb-c::info :function :type 'foo)))))
+
+;; If the GF has &KEY and &ALLOW-OTHER-KEYS, the methods' keys can be
+;; anything, and we don't warn about unrecognized keys.
+(fmakunbound 'foo)
+(with-test (:name gf-allow-other-keys)
+  (defgeneric foo (x &key &allow-other-keys))
+  (defmethod foo ((i integer) &key y z) (list i y z))
+  (assert
+   (null (nth-value 1 (compile nil '(lambda () (foo 5 :z 10 :y 15))))))
+  (assert
+   (null (nth-value 1 (compile nil '(lambda () (foo 5 :z 10 :foo 15))))))
+  (assert
+   (sb-kernel::args-type-keyp (sb-c::info :function :type 'foo)))
+  (assert
+   (sb-kernel::args-type-allowp (sb-c::info :function :type 'foo))))
+
+;; If any method has &ALLOW-OTHER-KEYS, 7.6.4 point 5 seems to say the
+;; GF should be construed to have &ALLOW-OTHER-KEYS.
+(fmakunbound 'foo)
+(with-test (:name method-allow-other-keys)
+  (defgeneric foo (x &key))
+  (defmethod foo ((x integer) &rest y &key &allow-other-keys) (list x y))
+  (assert (null (nth-value 1 (compile nil '(lambda () (foo 10 :foo 20))))))
+  (assert (sb-kernel::args-type-keyp (sb-c::info :function :type 'foo)))
+  (assert (sb-kernel::args-type-allowp (sb-c::info :function :type 'foo))))
+
+

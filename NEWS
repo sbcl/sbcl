@@ -22,6 +22,8 @@
     given mixed integer and double-float arguments, leading to better
     precision. (reported by Bob Felts)
   * bug fix: LOG with base zero returned values of inconsistent type.
+  * new feature: have the compiler track the effective type of a generic
+    function across method addition and removal.
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities

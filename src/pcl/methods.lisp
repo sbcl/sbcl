@@ -609,32 +609,44 @@
                (gf-lambda-list (generic-function-lambda-list gf))
                (tfun (constantly t))
                keysp)
-          (multiple-value-bind
-              (gf.required gf.optional gf.rest ignore gf.allowp)
-              (%split-arglist gf-lambda-list)
-            (declare (ignore ignore))
-            (setf (info :function :type name)
-                  (specifier-type
-                   `(function
-                     (,@(mapcar tfun gf.required)
-                        ,@(if gf.optional
-                              `(&optional ,@(mapcar tfun gf.optional)))
-                        ,@(if gf.rest
-                              `(&rest t))
-                        ,@(let ((all-keys
-                                 (mapcar
-                                  (lambda (x)
-                                    (list x t))
-                                  (remove-duplicates
-                                   (mapcan #'function-keywords methods)))))
-                            (when all-keys
-                              (setq keysp t)
-                              `(&key ,@all-keys)))
-                        ,@(if (and keysp gf.allowp)
+          (multiple-value-bind (gf.required gf.optional gf.restp gf.rest
+                                            gf.keyp gf.keys gf.allowp)
+              (parse-lambda-list gf-lambda-list)
+            (declare (ignore gf.rest))
+            ;; 7.6.4 point 5 probably entails that if any method says
+            ;; &allow-other-keys then the gf should be construed to
+            ;; accept any key.
+            (let ((allowp (or gf.allowp
+                              (find '&allow-other-keys methods
+                                    :test #'find
+                                    :key #'method-lambda-list))))
+              (setf (info :function :type name)
+                    (specifier-type
+                     `(function
+                       (,@(mapcar tfun gf.required)
+                          ,@(if gf.optional
+                                `(&optional ,@(mapcar tfun gf.optional)))
+                          ,@(if gf.restp
+                                `(&rest t))
+                          ,@(when gf.keyp
+                              (let ((all-keys
+                                     (mapcar
+                                      (lambda (x)
+                                        (list x t))
+                                      (remove-duplicates
+                                       (nconc
+                                        (mapcan #'function-keywords methods)
+                                        (mapcar #'keywordicate gf.keys))))))
+                                (when all-keys
+                                  (setq keysp t)
+                                  `(&key ,@all-keys))))
+                          ,@(when (and (not keysp) allowp)
+                              `(&key))
+                          ,@(when allowp
                               `(&allow-other-keys)))
-                     *))
-                  (info :function :where-from name) :defined-method
-                  (gf-info-needs-update gf) nil)))))
+                       *))
+                    (info :function :where-from name) :defined-method
+                    (gf-info-needs-update gf) nil))))))
     (values)))
 
 (defun compute-applicable-methods-function (generic-function arguments)
@@ -1663,11 +1675,11 @@
 
 (defmethod function-keywords ((method standard-method))
   (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
-                        keywords keyword-parameters)
+                        keywords)
       (analyze-lambda-list (if (consp method)
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
-    (declare (ignore nreq nopt keysp restp keywords))
+    (declare (ignore nreq nopt keysp restp))
     (values keywords allow-other-keys-p)))
 
 (defmethod function-keyword-parameters ((method standard-method))
