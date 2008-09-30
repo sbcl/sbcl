@@ -208,7 +208,9 @@
   (assert (eql 2567.6046442221327d0
                (log (loop for n from 1 to 1000 for f = 1 then (* f n)
                           finally (return f))
-                    10d0))))
+                    10d0)))
+  ;; both ways
+  (assert (eql (log 123123123.0d0 10) (log 123123123 10.0d0))))
 
 (with-test (:name :log-base-zero-return-type)
   (assert (eql 0.0f0 (log 123 (eval 0))))

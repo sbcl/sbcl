@@ -342,10 +342,11 @@
         ((and (typep number '(integer (0) *))
               (typep base '(integer (0) *)))
          (coerce (/ (log2 number) (log2 base)) 'single-float))
-        ((or (and (typep number 'integer) (typep base 'double-float))
-             (and (typep number 'double-float) (typep base 'integer)))
+        ((and (typep number 'integer) (typep base 'double-float))
          ;; No single float intermediate result
          (/ (log2 number) (log base 2.0d0)))
+        ((and (typep number 'double-float) (typep base 'integer))
+         (/ (log number 2.0d0) (log2 base)))
         (t
          (/ (log number) (log base))))
       (number-dispatch ((number number))

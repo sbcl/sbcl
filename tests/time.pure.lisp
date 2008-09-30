@@ -27,3 +27,6 @@
                           (when (>= time time1)
                             (return)))))))
          3)
+
+(with-test (:name :time/lambdas-converted)
+  (time (compile nil '(lambda () 42))))

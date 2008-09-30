@@ -265,7 +265,7 @@ format."
 
 (defun print-time (&key real-time-ms user-run-time-us system-run-time-us
                    gc-run-time-ms processor-cycles eval-calls
-                   lambda-conversions page-faults bytes-consed
+                   lambdas-converted page-faults bytes-consed
                    aborted)
   (let ((total-run-time-us (+ user-run-time-us system-run-time-us)))
     (format *trace-output*
@@ -294,7 +294,7 @@ format."
                 100.0
                 (float (* 100 (/ (round total-run-time-us 1000) real-time-ms))))
             eval-calls
-            lambda-conversions
+            lambdas-converted
             processor-cycles
             page-faults
             bytes-consed
