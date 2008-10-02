@@ -500,8 +500,10 @@ EXPERIMENTAL: Interface subject to change."
                     (note :aborted aborted #'not)
                     (note :bytes-consed (max (- new-bytes-consed old-bytes-consed) 0))
                     (note :page-faults page-faults #'zerop)
-                    (note :processor-cycles cycles #'zerop)
-                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop)
+                    ;; cycle counting isn't supported everywhere.
+                    (when cycles
+                      (note :processor-cycles cycles #'zerop)
+                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop))
                     (note :eval-calls *eval-calls* #'zerop)
                     (note :gc-run-time-ms gc-internal-run-time)
                     (note :system-run-time-us system-run-time)
