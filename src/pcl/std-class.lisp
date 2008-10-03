@@ -658,7 +658,11 @@
 (defun make-defstruct-allocation-function (name)
   ;; FIXME: Why don't we go class->layout->info == dd
   (let ((dd (find-defstruct-description name)))
-    (%make-structure-instance-allocator dd nil)))
+    (ecase (dd-type dd)
+      (structure
+       (%make-structure-instance-allocator dd nil))
+      (funcallable-structure
+       (%make-funcallable-structure-instance-allocator dd nil)))))
 
 (defmethod shared-initialize :after
     ((class structure-class) slot-names &key

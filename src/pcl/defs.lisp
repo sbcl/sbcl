@@ -680,15 +680,9 @@
 (defclass condition-class (slot-class) ())
 
 (defclass structure-class (slot-class)
-  ((defstruct-form
-     :initform ()
-     :accessor class-defstruct-form)
-   (defstruct-constructor
-     :initform nil
-     :accessor class-defstruct-constructor)
-   (from-defclass-p
-    :initform nil
-    :initarg :from-defclass-p)))
+  ((defstruct-form :initform () :accessor class-defstruct-form)
+   (defstruct-constructor :initform nil :accessor class-defstruct-constructor)
+   (from-defclass-p :initform nil :initarg :from-defclass-p)))
 
 (defclass definition-source-mixin (standard-object)
   ((source

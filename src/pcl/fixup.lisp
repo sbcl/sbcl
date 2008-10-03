@@ -26,7 +26,7 @@
 (!fix-early-generic-functions)
 (!fix-ensure-accessor-specializers)
 (compute-standard-slot-locations)
-(dolist (s '(condition structure-object))
+(dolist (s '(condition function structure-object))
   (dohash ((k v) (classoid-subclasses (find-classoid s)))
     (find-class (classoid-name k))))
 (setq *boot-state* 'complete)
@@ -34,4 +34,3 @@
 (defun print-std-instance (instance stream depth)
   (declare (ignore depth))
   (print-object instance stream))
-

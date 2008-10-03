@@ -47,11 +47,24 @@
                                    ,@slot-vars))))))
 
 (declaim (ftype (sfunction (defstruct-description list) function)
-                %Make-structure-instance-allocator))
+                %make-structure-instance-allocator))
 (defun %make-structure-instance-allocator (dd slot-specs)
   (let ((vars (make-gensym-list (length slot-specs))))
     (values (compile nil `(lambda (,@vars)
                             (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
+
+(defun %make-funcallable-structure-instance-allocator (dd slot-specs)
+  (when slot-specs
+    (bug "funcallable-structure-instance allocation with slots unimplemented"))
+  (let ((name (dd-name dd))
+        (length (dd-length dd))
+        (nobject (gensym "OBJECT")))
+    (values
+     (compile nil `(lambda ()
+                     (let ((,nobject (%make-funcallable-instance ,length)))
+                       (setf (%funcallable-instance-layout ,nobject)
+                             (%delayed-get-compiler-layout ,name))
+                       ,nobject))))))
 
 ;;; Delay looking for compiler-layout until the constructor is being
 ;;; compiled, since it doesn't exist until after the EVAL-WHEN
@@ -1701,6 +1714,8 @@
       (eval-when (:compile-toplevel :load-toplevel :execute)
         (%compiler-set-up-layout ',dd ',(inherits-for-structure dd))))))
 
+(sb!xc:proclaim '(special *defstruct-hooks*))
+
 (sb!xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key
                 (slot-names (missing-arg))
@@ -1795,7 +1810,11 @@
              ;; code, which knows how to generate inline type tests
              ;; for the whole CMU CL INSTANCE menagerie.
              `(defun ,predicate (,object-gensym)
-                (typep ,object-gensym ',class-name)))))))
+                (typep ,object-gensym ',class-name)))
+
+         (when (boundp '*defstruct-hooks*)
+           (dolist (fun *defstruct-hooks*)
+             (funcall fun (find-classoid ',(dd-name dd)))))))))
 
 ;;;; finalizing bootstrapping
 

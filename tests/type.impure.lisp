@@ -435,6 +435,12 @@
 (with-test (:name (:ctor :functionp))
   (assert (functionp (sb-pcl::ensure-ctor
                       (list 'sb-pcl::ctor (gensym)) nil nil nil))))
+;;; some new (2008-10-03) ways of going wrong...
+(with-test (:name (:ctor-allocate-instance :typep-function))
+  (assert (eval '(typep (allocate-instance (find-class 'sb-pcl::ctor))
+                        'function))))
+(with-test (:name (:ctor-allocate-instance :functionp))
+  (assert (functionp (allocate-instance (find-class 'sb-pcl::ctor)))))
 
 ;;; from PFD ansi-tests
 (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
