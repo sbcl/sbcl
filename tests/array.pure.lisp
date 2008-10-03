@@ -210,14 +210,19 @@
                            'bit-vector)
           do (assert (bit-vector-equal r1 r2)))))
 
-;;; CLHS, ADJUST-ARRAY: An error of type error is signaled if
-;;; fill-pointer is supplied and non-nil but array has no fill pointer.
-(assert (eq :good
-            (handler-case
-                (let ((array (make-array 12)))
-                  (assert (not (array-has-fill-pointer-p array)))
-                  (adjust-array array 12 :fill-pointer t)
-                  array)
-              (type-error ()
-                :good))))
+(with-test (:name (adjust-array fill-pointer)) 
+  ;; CLHS, ADJUST-ARRAY: An error of type error is signaled if
+  ;; fill-pointer is supplied and non-nil but array has no fill pointer.
+  (assert (eq :good
+              (handler-case
+                  (let ((array (make-array 12)))
+                    (assert (not (array-has-fill-pointer-p array)))
+                    (adjust-array array 12 :fill-pointer t)
+                    array)
+                (type-error ()
+                  :good)))))
 
+(with-test (:name (adjust-array multidimensional))
+  (let ((ary (make-array '(2 2))))
+    ;; SBCL used to give multidimensional arrays a bogus fill-pointer
+    (assert (not (array-has-fill-pointer-p (adjust-array ary '(2 2)))))))

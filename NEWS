@@ -1,4 +1,12 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.22 relative to 1.0.21:
+  * bug fix: ADJUST-ARRAY on multidimensional arrays used bogusly give
+    them a fill pointer unless :DISPLACED-TO or :INITIAL-CONTENTS were
+    provided. (reported by Cedric St-Jean)
+
+changes in sbcl-1.0.21 relative to 1.0.20:
+  * new feature: the compiler is able to track the effective type of a
+    generic function across method addition and removal.
   * new feature: SB-EXT:ATOMIC-INCF allows atomic incrementation of
     appropriately typed structure slots without locking.
   * new feature: SB-EXT:CALL-WITH-TIMING provides access to timing
@@ -22,8 +30,6 @@
     given mixed integer and double-float arguments, leading to better
     precision. (reported by Bob Felts)
   * bug fix: LOG with base zero returned values of inconsistent type.
-  * new feature: have the compiler track the effective type of a generic
-    function across method addition and removal.
 
 changes in sbcl-1.0.20 relative to 1.0.19:
   * minor incompatible change: OPTIMIZE qualities

@@ -979,12 +979,12 @@ of specialized arrays is supported."
                                        initial-element-p))
                    (if (adjustable-array-p array)
                        (set-array-header array new-data new-length
-                                         new-length 0 dimensions nil)
+                                         nil 0 dimensions nil)
                        (let ((new-array
                               (make-array-header
                                sb!vm:simple-array-widetag array-rank)))
                          (set-array-header new-array new-data new-length
-                                           new-length 0 dimensions nil)))))))))))
+                                           nil 0 dimensions nil)))))))))))
 
 
 (defun get-new-fill-pointer (old-array new-array-size fill-pointer)
