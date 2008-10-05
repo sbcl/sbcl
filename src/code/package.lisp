@@ -295,10 +295,10 @@ of :INHERITED :EXTERNAL :INTERNAL."
                       :INHERITED must be supplied."))
            ,(dolist (symbol symbol-types)
               (unless (member symbol '(:internal :external :inherited))
-                (error 'program-error
+                (error 'simple-program-error
                        :format-control
                        "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
-                       :format-argument symbol)))
+                       :format-arguments (list symbol))))
            (,init-macro ,(car ordered-types))
            (flet ((,real-symbol-p (number)
                     (> number 1)))

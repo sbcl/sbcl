@@ -255,3 +255,15 @@ if a restart was invoked."
       (is restartedp)
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
+
+;;; WITH-PACKAGE-ITERATOR error signalling had problems
+(with-test (:name with-package-itarator.error)
+  (assert (eq :good
+              (handler-case
+                  (progn
+                    (eval '(with-package-iterator (sym :cl-user :foo)
+                            (sym)))
+                    :bad)
+                ((and simple-condition program-error) (c)
+                  (assert (equal (list :foo) (simple-condition-format-arguments c)))
+                  :good)))))
