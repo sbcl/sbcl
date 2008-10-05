@@ -1038,4 +1038,14 @@ redefinition."
     (assert-is pred1 instance)
     (assert-is pred2 instance)))
 
-
+(with-test (:name :raw-slot/circle-subst)
+  ;; CIRCLE-SUBSTS used %INSTANCE-REF on raw slots
+  (multiple-value-bind (list n)
+      (eval '(progn
+              (defstruct raw-slot/circle-subst
+                (x 0.0 :type single-float))
+              (read-from-string "((#1=#S(raw-slot/circle-subst :x 2.7158911)))")))
+    (destructuring-bind ((struct)) list
+      (assert (raw-slot/circle-subst-p struct))
+      (assert (eql 2.7158911 (raw-slot/circle-subst-x struct)))
+      (assert (eql 45 n)))))

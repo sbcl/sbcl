@@ -210,7 +210,7 @@
                            'bit-vector)
           do (assert (bit-vector-equal r1 r2)))))
 
-(with-test (:name (adjust-array fill-pointer)) 
+(with-test (:name (adjust-array fill-pointer))
   ;; CLHS, ADJUST-ARRAY: An error of type error is signaled if
   ;; fill-pointer is supplied and non-nil but array has no fill pointer.
   (assert (eq :good

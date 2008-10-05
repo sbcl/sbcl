@@ -414,7 +414,7 @@
     (when (layout-invalid layout)
       (error "attempt to copy an obsolete structure:~%  ~S" structure))
 
-    ;; Copy ordinary slots.
+    ;; Copy ordinary slots and layout.
     (dotimes (i (- len nuntagged))
       (declare (type index i))
       (setf (%instance-ref res i)
