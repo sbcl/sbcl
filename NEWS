@@ -7,6 +7,8 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     provided. (reported by Cedric St-Jean)
   * bug fix: circularity handling in the reader did not treat raw
     structure slots correctly. (reported by Cedric St-Jean)
+  * bug fix: SERVE-EVENT occasionally signaled an error about bogus
+    file descriptors when there were none.
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a

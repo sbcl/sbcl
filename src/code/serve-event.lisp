@@ -119,19 +119,20 @@
                   (sb!unix:unix-fstat (handler-descriptor handler)))
         (setf (handler-bogus handler) t)
         (push handler bogus-handlers)))
-    (restart-case (error "~S ~[have~;has a~:;have~] bad file descriptor~:P."
-                         bogus-handlers (length bogus-handlers))
-      (remove-them ()
-        :report "Remove bogus handlers."
-        (with-descriptor-handlers
-          (setf *descriptor-handlers*
-                (delete-if #'handler-bogus *descriptor-handlers*))))
-      (retry-them ()
-        :report "Retry bogus handlers."
-       (dolist (handler bogus-handlers)
-         (setf (handler-bogus handler) nil)))
-      (continue ()
-        :report "Go on, leaving handlers marked as bogus.")))
+    (when bogus-handlers
+      (restart-case (error "~S ~[have~;has a~:;have~] bad file descriptor~:P."
+                           bogus-handlers (length bogus-handlers))
+        (remove-them ()
+          :report "Remove bogus handlers."
+          (with-descriptor-handlers
+            (setf *descriptor-handlers*
+                  (delete-if #'handler-bogus *descriptor-handlers*))))
+        (retry-them ()
+          :report "Retry bogus handlers."
+          (dolist (handler bogus-handlers)
+            (setf (handler-bogus handler) nil)))
+        (continue ()
+          :report "Go on, leaving handlers marked as bogus."))))
   nil)
 
 
@@ -273,9 +274,14 @@ Shared between all threads, unless locally bound. EXPERIMENTAL.")
                ;; FIXME: Check for other errnos. Why do we return true
                ;; when interrupted?
                #!-win32
-               (if (eql err sb!unix:eintr)
-                   t
-                 (handler-descriptors-error))
+               (case err
+                 (#.sb!unix:ebadf
+                  (handler-descriptors-error))
+                 (#.sb!unix:eintr
+                  t)
+                 (otherwise
+                  (with-simple-restart (continue "Ignore failure and continue.")
+                    (simple-perror "Unix system call select() failed" :errno err))))
                #!+win32
                (handler-descriptors-error))
               ((plusp value)

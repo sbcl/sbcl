@@ -305,6 +305,7 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; error numbers\n");
+    deferrno("ebadf", EBADF);
     deferrno("enoent", ENOENT);
     deferrno("eintr", EINTR);
     deferrno("eio", EIO);
