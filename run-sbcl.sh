@@ -30,7 +30,7 @@ if [ -f sbcl-pwd.sh -a -x src/runtime/sbcl -a -f output/sbcl.core ]; then
     . ./sbcl-pwd.sh
     sbcl_pwd
     echo "(running SBCL from: $SBCL_PWD)"
-    SBCL_HOME=$SBCL_PWD/contrib src/runtime/sbcl --core output/sbcl.core $@
+    SBCL_HOME=$SBCL_PWD/contrib src/runtime/sbcl --core output/sbcl.core "$@"
 elif [ -f run-sbcl.sh -a -f version.lisp-expr ]; then
     echo "No built SBCL here ($(pwd)): run 'sh make.sh' first!"
     exit 1
