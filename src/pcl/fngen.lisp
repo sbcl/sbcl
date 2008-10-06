@@ -111,7 +111,9 @@
 
 (defun get-new-fun-generator (lambda test code-converter)
   (multiple-value-bind (code gensyms) (compute-code lambda code-converter)
-    (let ((generator-lambda `(lambda ,gensyms (function ,code))))
+    (let ((generator-lambda `(lambda ,gensyms
+                               (declare (muffle-conditions compiler-note))
+                               (function ,code))))
       (let ((generator (compile nil generator-lambda)))
         (ensure-fgen test gensyms generator generator-lambda nil)
         generator))))

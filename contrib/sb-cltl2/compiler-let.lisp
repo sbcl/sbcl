@@ -44,6 +44,6 @@
                 finally (return
                           (let ((new-env (sb-eval::make-env
                                           :parent env
-                                          :vars (sb-eval::special-bindings vars))))
+                                          :vars (sb-eval::special-bindings vars env))))
                             (progv vars values
                               (sb-eval::eval-progn body new-env))))))))

@@ -29,9 +29,14 @@
   ;; to be careful about not muffling warnings arising from inner
   ;; evaluations/compilations, though [e.g. the ignored variable in
   ;; (DEFUN FOO (X) 1)].  -- CSR, 2003-05-13
+  ;;
+  ;; As of 1.0.21.6 we muffle compiler notes lexically here, which seems
+  ;; always safe. --NS
   (let* (;; why PROGN?  So that attempts to eval free declarations
          ;; signal errors rather than return NIL.  -- CSR, 2007-05-01
-         (lambda `(lambda () (progn ,expr)))
+         (lambda `(lambda ()
+                    (declare (muffle-conditions compiler-note))
+                    (progn ,expr)))
          (fun (sb!c:compile-in-lexenv nil lambda lexenv)))
     (funcall fun)))
 

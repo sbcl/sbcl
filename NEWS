@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.22 relative to 1.0.21:
+  * enhancement: inoccous calls to EVAL or generic functions dispatching
+    on subclasses of eg. STREAM no longer cause compiler notes to appear.
   * bug fix: ADJUST-ARRAY on multidimensional arrays used bogusly give
     them a fill pointer unless :DISPLACED-TO or :INITIAL-CONTENTS were
     provided. (reported by Cedric St-Jean)

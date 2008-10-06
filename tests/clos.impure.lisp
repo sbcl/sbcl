@@ -1619,5 +1619,25 @@
 (handler-bind ((warning #'error))
   (assert (= 123 (slot-value (provoke-ctor-default-initarg-problem) 'slot))))
 
+;;;; discriminating net on streams used to generate code deletion notes on
+;;;; first call
+(defgeneric stream-fd (stream direction))
+(defmethod stream-fd ((stream sb-sys:fd-stream) direction)
+  (declare (ignore direction))
+  (sb-sys:fd-stream-fd stream))
+(defmethod stream-fd ((stream synonym-stream) direction)
+  (stream-fd (symbol-value (synonym-stream-symbol stream)) direction))
+(defmethod stream-fd ((stream two-way-stream) direction)
+  (ecase direction
+    (:input
+     (stream-fd
+      (two-way-stream-input-stream stream) direction))
+    (:output
+     (stream-fd
+      (two-way-stream-output-stream stream) direction))))
+(with-test (:name (:discriminating-name :code-deletion-note))
+  (handler-bind ((compiler-note #'error))
+    (stream-fd sb-sys:*stdin* :output)
+    (stream-fd sb-sys:*stdin* :output)))
 
 ;;;; success

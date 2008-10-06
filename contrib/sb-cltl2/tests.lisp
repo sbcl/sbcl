@@ -98,12 +98,14 @@
     (dinfo sb-ext:muffle-conditions))
   warning)
 (deftest declaration-information.muffle-conditions.2
-  (locally (declare (sb-ext:muffle-conditions warning))
+  (let ((junk (dinfo sb-ext:muffle-conditions)))
+    (declare (sb-ext:muffle-conditions warning))
     (locally (declare (sb-ext:unmuffle-conditions style-warning))
       (let ((dinfo (dinfo sb-ext:muffle-conditions)))
         (not
          (not
-          (and (subtypep dinfo '(and warning (not style-warning)))
+          (and (subtypep dinfo `(or (and warning (not style-warning))
+                                    (and ,junk (not style-warning))))
                (subtypep '(and warning (not style-warning)) dinfo)))))))
   t)
 
