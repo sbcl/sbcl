@@ -327,65 +327,59 @@ command-line.")
     (force-output (symbol-value name)))
   (values))
 
-(defun process-init-file (specified-pathname default-function)
-  (restart-case
-      (let ((cookie (list)))
-        (flet ((process-stream (stream &optional pathname)
-                 (loop
-                    (restart-case
-                        (handler-bind
-                            ((error (lambda (e)
-                                      (error "Error during processing of ~
-                                             initialization file ~A:~%~%  ~A"
-                                             (or pathname stream) e))))
-                          (let ((form (read stream nil cookie)))
-                            (if (eq cookie form)
-                                (return-from process-init-file nil)
-                                (eval form))))
-                      (continue ()
-                        :report "Ignore and continue processing.")))))
-          (if specified-pathname
-              (with-open-file (stream (parse-native-namestring specified-pathname)
-                                      :if-does-not-exist nil)
-                (if stream
-                    (process-stream stream (pathname stream))
-                    (error "The specified init file ~S was not found."
-                           specified-pathname)))
-              (let ((default (funcall default-function)))
-                (when default
-                  (with-open-file (stream (pathname default) :if-does-not-exist nil)
-                    (when stream
-                      (process-stream stream (pathname stream)))))))))
-    (abort ()
-      :report "Skip this initialization file.")))
+(defun process-init-file (specified-pathname kind)
+  (multiple-value-bind (context default-function)
+      (ecase kind
+        (:system
+         (values "sysinit" *sysinit-pathname-function*))
+        (:user
+         (values "userinit" *userinit-pathname-function*)))
+    (flet ((process-stream (stream pathname)
+             (with-simple-restart (abort "Skip rest of ~A file ~S."
+                                         context (native-namestring pathname))
+               (loop
+                 (with-simple-restart
+                     (continue "Ignore error and continue processing ~A file ~S."
+                               context (native-namestring pathname))
+                   (let ((form (read stream nil stream)))
+                     (if (eq stream form)
+                         (return-from process-init-file nil)
+                         (eval form))))))))
+      (if specified-pathname
+          (with-open-file (stream (parse-native-namestring specified-pathname)
+                                  :if-does-not-exist nil)
+            (if stream
+                (process-stream stream (pathname stream))
+                (cerror "Ignore missing init file"
+                        "The specified ~A file ~A was not found."
+                        context specified-pathname)))
+          (let ((default (funcall default-function)))
+            (when default
+              (with-open-file (stream (pathname default) :if-does-not-exist nil)
+                (when stream
+                  (process-stream stream (pathname stream))))))))))
 
-(defun process-eval-options (eval-strings-or-forms)
-  (/show0 "handling --eval options")
-  (flet ((process-1 (string-or-form)
-           (etypecase string-or-form
-             (string
-              (multiple-value-bind (expr pos) (read-from-string string-or-form)
-                (unless (eq string-or-form
-                            (read-from-string string-or-form nil string-or-form
-                                              :start pos))
-                  (error "More than one expression in ~S" string-or-form))
-                (eval expr)
-                (flush-standard-output-streams)))
-             (cons (eval string-or-form) (flush-standard-output-streams)))))
-    (restart-case
-        (dolist (expr-as-string-or-form eval-strings-or-forms)
-          (/show0 "handling one --eval option")
-          (restart-case
-              (handler-bind
-                  ((error (lambda (e)
-                            (error "Error during processing of --eval ~
-                                    option ~S:~%~%  ~A"
-                                   expr-as-string-or-form e))))
-                (process-1 expr-as-string-or-form))
-            (continue ()
-              :report "Ignore and continue with next --eval option.")))
-      (abort ()
-        :report "Skip rest of --eval options."))))
+(defun process-eval/load-options (options)
+  (/show0 "handling --eval and --load options")
+  (flet ((process-1 (cons)
+           (destructuring-bind (opt . value) cons
+             (ecase opt
+               (:eval
+                (with-simple-restart (continue "Ignore runtime option --eval ~S."
+                                               value)
+                  (multiple-value-bind (expr pos) (read-from-string value)
+                    (if (eq value (read-from-string value nil value :start pos))
+                        (eval expr)
+                        (error "Multiple expressions in --eval option: ~S"
+                               value)))))
+               (:load
+                (with-simple-restart (continue "Ignore runtime option --load ~S."
+                                               value)
+                  (load (native-pathname value))))))
+           (flush-standard-output-streams)))
+    (with-simple-restart (abort "Skip rest of --eval and --load options.")
+      (dolist (option options)
+        (process-1 option)))))
 
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
@@ -410,16 +404,15 @@ command-line.")
         (userinit nil)
         ;; t if --no-userinit option given
         (no-userinit nil)
-        ;; values of --eval options, in reverse order; and also any
-        ;; other options (like --load) which're translated into --eval
-        ;;
-        ;; The values are stored as strings, so that they can be
-        ;; passed to READ only after their predecessors have been
-        ;; EVALed, so that things work when e.g. REQUIRE in one EVAL
-        ;; form creates a package referred to in the next EVAL form,
-        ;; except for forms transformed from syntactically-sugary
-        ;; switches like --load and --disable-debugger.
-        (reversed-evals nil)
+        ;; t if --disable-debugger option given
+        (disable-debugger nil)
+        ;; list of (<kind> . <string>) conses representing --eval and --load
+        ;; options. options. --eval options are stored as strings, so that
+        ;; they can be passed to READ only after their predecessors have been
+        ;; EVALed, so that things work when e.g. REQUIRE in one EVAL form
+        ;; creates a package referred to in the next EVAL form. Storing the
+        ;; original string also makes for easier debugging.
+        (reversed-options nil)
         ;; Has a --noprint option been seen?
         (noprint nil)
         ;; everything in *POSIX-ARGV* except for argv[0]=programname
@@ -461,18 +454,16 @@ command-line.")
                     (setf no-userinit t))
                    ((string= option "--eval")
                     (pop-option)
-                    (push (pop-option) reversed-evals))
+                    (push (cons :eval (pop-option)) reversed-options))
                    ((string= option "--load")
                     (pop-option)
-                    (push
-                     (list 'cl:load (native-pathname (pop-option)))
-                     reversed-evals))
+                    (push (cons :load (pop-option)) reversed-options))
                    ((string= option "--noprint")
                     (pop-option)
                     (setf noprint t))
                    ((string= option "--disable-debugger")
                     (pop-option)
-                    (push (list 'sb!ext:disable-debugger) reversed-evals))
+                    (setf disable-debugger t))
                    ((string= option "--end-toplevel-options")
                     (pop-option)
                     (return))
@@ -498,6 +489,10 @@ command-line.")
     ;; user-level options are left visible to user code.
     (setf (rest *posix-argv*) options)
 
+    ;; Disable debugger before processing initialization files & co.
+    (when disable-debugger
+      (sb!ext:disable-debugger))
+
     ;; Handle initialization files.
     (/show0 "handling initialization files in TOPLEVEL-INIT")
     ;; This CATCH is needed for the debugger command TOPLEVEL to
@@ -518,10 +513,10 @@ command-line.")
       (restart-case
           (progn
             (unless no-sysinit
-              (process-init-file sysinit *sysinit-pathname-function*))
+              (process-init-file sysinit :system))
             (unless no-userinit
-              (process-init-file userinit *userinit-pathname-function*))
-            (process-eval-options (nreverse reversed-evals)))
+              (process-init-file userinit :user))
+            (process-eval/load-options (nreverse reversed-options)))
         (abort ()
           :report "Skip to toplevel READ/EVAL/PRINT loop."
           (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
