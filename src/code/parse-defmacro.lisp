@@ -109,7 +109,7 @@
     ;; Special case compiler-macros: if car of the form is FUNCALL,
     ;; skip over it for destructuring, pretending cdr of the form is
     ;; the actual form. Save original for &WHOLE.
-    (when (eq context 'define-compiler-macro)
+    (when (and (not sublist) (eq context 'define-compiler-macro))
       (push-let-binding compiler-macro-whole whole-var :system t)
       (push compiler-macro-whole *ignorable-vars*)
       (push-let-binding whole-var whole-var

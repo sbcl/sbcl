@@ -1286,20 +1286,21 @@
 
 ;;; FUNCALL forms in compiler macros, lambda-list parsing
 (define-compiler-macro test-cmacro-1
-    (&whole whole a &optional b &rest c &key d)
-  (list whole a b c d))
+    (&whole whole a (a2) &optional b &rest c &key d)
+  (list whole a a2 b c d))
 
-(macrolet ((test (form a b c d)
+(macrolet ((test (form a a2 b c d)
              `(let ((form ',form))
-                (destructuring-bind (whole a b c d)
+                (destructuring-bind (whole a a2 b c d)
                     (funcall (compiler-macro-function 'test-cmacro-1) form nil)
                   (assert (equal whole form))
                   (assert (eql a ,a))
+                  (assert (eql a2 ,a2))
                   (assert (eql b ,b))
                   (assert (equal c ,c))
                   (assert (eql d ,d))))) )
-  (test (funcall 'test-cmacro-1 1 2 :d 3) 1 2 '(:d 3) 3)
-  (test (test-cmacro-1 11 12 :d 13) 11 12 '(:d 13) 13))
+  (test (funcall 'test-cmacro-1 1 (x) 2 :d 3) 1 'x 2 '(:d 3) 3)
+  (test (test-cmacro-1 11 (y) 12 :d 13) 11 'y 12 '(:d 13) 13))
 
 ;;; FUNCALL forms in compiler macros, expansions
 (define-compiler-macro test-cmacro-2 () ''ok)

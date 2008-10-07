@@ -1901,3 +1901,20 @@ generally try to check returns in safe code, so we should here too.)
                       lumps)))
       (setf (aref nodes 0) 2)
       (assert (every #'~= (apply #'concatenate 'list nodes) '(2 3 6 9)))))
+
+430: nested structure constructors do not stack allocate
+
+  (defun nada (x) (declare (ignore x)) nil)
+
+  (declaim (inline make-foo))
+  (defstruct foo bar)
+
+  (defun foo ()
+    (let ((x (list (make-foo))))
+      (declare (dynamic-extent x))
+      (nada x)))
+
+ Result of MAKE-FOO not stack allocated in FOO, because the function
+ HANDLE-NESTED-DYNAMIC-EXTENT-LVARS sees is not
+ %MAKE-STRUCTURE-INSTANCE, but no-yet-eliminated (VARARGS-ENTRY
+ MAKE-FOO).
