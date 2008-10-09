@@ -25,11 +25,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#ifdef MAC_OS_X_VERSION_10_5
+#if __DARWIN_UNIX03
 #include <sys/_structs.h>
 #endif
 
-#ifdef MAC_OS_X_VERSION_10_5
+#if __DARWIN_UNIX03
 
 typedef struct __darwin_ucontext darwin_ucontext;
 typedef struct __darwin_mcontext64 darwin_mcontext;

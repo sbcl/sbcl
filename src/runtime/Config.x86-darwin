@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
+CFLAGS = -g -Wall -O2 -fdollars-in-identifiers -mmacosx-version-min=10.4
 OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-dlshim.c darwin-langinfo.c
 OS_LIBS = -lSystem -lc -ldl
 ifdef LISP_FEATURE_SB_THREAD

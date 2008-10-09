@@ -10,10 +10,10 @@ static inline os_context_t *arch_os_get_context(void **void_context)
     return (os_context_t *) *void_context;
 }
 
-#ifdef MAC_OS_X_VERSION_10_5
+#if __DARWIN_UNIX03
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->__ss.__##stem
 #else
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
-#endif
+#endif /* __DARWIN_UNIX03 */
 
 #endif /* _X86_64_DARWIN_OS_H */

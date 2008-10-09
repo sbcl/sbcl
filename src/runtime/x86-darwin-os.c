@@ -254,18 +254,10 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
      */
 
     os_context_t *context;
-#if MAC_OS_X_VERSION_10_5
-    struct __darwin_mcontext32 *regs;
-#else
-    struct mcontext *regs;
-#endif
+    mcontext_t *regs;
 
     context = (os_context_t*) os_validate(0, sizeof(os_context_t));
-#if MAC_OS_X_VERSION_10_5
-    regs = (struct __darwin_mcontext32*) os_validate(0, sizeof(struct __darwin_mcontext32));
-#else
-    regs = (struct mcontext*) os_validate(0, sizeof(struct mcontext));
-#endif
+    regs = (mcontext_t*) os_validate(0, sizeof(mcontext_t));
     context->uc_mcontext = regs;
 
     /* when BSD signals are fired, they mask they signals in sa_mask
@@ -285,11 +277,7 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
     update_thread_state_from_context(thread_state, float_state, context);
 
     os_invalidate((os_vm_address_t)context, sizeof(os_context_t));
-#if MAC_OS_X_VERSION_10_5
-    os_invalidate((os_vm_address_t)regs, sizeof(struct __darwin_mcontext32));
-#else
-    os_invalidate((os_vm_address_t)regs, sizeof(struct mcontext));
-#endif
+    os_invalidate((os_vm_address_t)regs, sizeof(mcontext_t));
 
     /* Trap to restore the signal context. */
     asm volatile ("movl %0, %%eax; movl %1, %%ebx; .long 0xffff0b0f"

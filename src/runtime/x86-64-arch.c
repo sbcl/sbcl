@@ -63,11 +63,7 @@ context_eflags_addr(os_context_t *context)
 #elif defined __FreeBSD__
     return &context->uc_mcontext.mc_rflags;
 #elif defined LISP_FEATURE_DARWIN
-#ifdef MAC_OS_X_VERSION_10_5
-    return &context->uc_mcontext->__ss.__rflags;
-#else
-    return &context->uc_mcontext->ss.rflags;
-#endif
+    return CONTEXT_ADDR_FROM_STEM(rflags);
 #elif defined __OpenBSD__
     return &context->sc_eflags;
 #else
