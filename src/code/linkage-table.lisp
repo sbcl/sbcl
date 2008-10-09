@@ -19,8 +19,6 @@
 
 (in-package "SB!IMPL")
 
-(defvar *shared-object-lock*) ; initialized in foreign-load.lisp
-
 (define-alien-routine arch-write-linkage-table-jmp void
   (table-address system-area-pointer)
   (real-address system-area-pointer))

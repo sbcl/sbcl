@@ -6,6 +6,9 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     --eval toplevel arguments as SIMPLE-ERRORS, which caused restarts
     associated with the original error to be lost. (thanks to Ariel
     Badichi)
+  * enhancement: :DONT-SAVE keyword argument has been added to
+    LOAD-SHARED-OBJECT for controlling interaction with
+    SAVE-LISP-AND-DIE.
   * bug fix: ADJUST-ARRAY on multidimensional arrays used bogusly give
     them a fill pointer unless :DISPLACED-TO or :INITIAL-CONTENTS were
     provided. (reported by Cedric St-Jean)

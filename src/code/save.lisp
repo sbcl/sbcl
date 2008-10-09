@@ -83,12 +83,8 @@ The save/load process changes the values of some global variables:
     This is reinitialized to reflect the working directory where the
     saved core is loaded.
 
-Foreign objects loaded with SB-ALIEN:LOAD-SHARED-OBJECT are automatically
-reloaded on startup, but references to foreign symbols do not survive intact
-on all platforms: in this case a WARNING is signalled when saving the core. If
-no warning is signalled, then the foreign symbol references will remain
-intact. Platforms where this is currently the case are x86/FreeBSD, x86/Linux,
-x86/NetBSD, sparc/Linux, sparc/SunOS, and ppc/Darwin.
+SAVE-LISP-AND-DIE interacts with SB-ALIEN:LOAD-FOREIGN-OBJECT: see its
+documentation for details.
 
 On threaded platforms only a single thread may remain running after
 SB-EXT:*SAVE-HOOKS* have run. Applications using multiple threads can
