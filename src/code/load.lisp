@@ -230,8 +230,8 @@
                      position ~A: Expected ~A, got ~A.~:@>"
              (invalid-fasl-stream condition)
              (invalid-fasl-byte-nr condition)
-             (invalid-fasl-byte condition)
-             (invalid-fasl-expected condition)))))
+             (invalid-fasl-expected condition)
+             (invalid-fasl-byte condition)))))
 
 (define-condition invalid-fasl-version (invalid-fasl)
   ((version :reader invalid-fasl-version :initarg :version))
@@ -290,7 +290,7 @@
         (unless (= byte (char-code (schar fhsss 0)))
           (error 'invalid-fasl-header
                  :stream stream
-                 :first-byte-p t
+                 :byte-nr 0
                  :byte byte
                  :expected (char-code (schar fhsss 0))))
         (do ((byte (read-byte stream) (read-byte stream))
