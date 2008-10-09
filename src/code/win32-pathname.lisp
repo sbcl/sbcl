@@ -278,9 +278,10 @@
          (write-string device s)
          (write-char #\: s))
        (tagbody
-          (ecase (pop directory)
-            (:absolute (write-char #\\ s))
-            (:relative))
+          (when directory
+            (ecase (pop directory)
+              (:absolute (write-char #\\ s))
+              (:relative)))
           (unless directory (go :done))
         :subdir
           (let ((piece (pop directory)))

@@ -14,7 +14,9 @@ changes in sbcl-1.0.22 relative to 1.0.21:
   * bug fix: SERVE-EVENT occasionally signaled an error about bogus
     file descriptors when there were none.
   * bug fix: DEFINE-COMPILER-MACRO support of destructuring lambda-lists
-    was broken. (reported by Willem Broekema)
+    was broken. (reporteed by Willem Broekema)
+  * bug fix: SB-EXT:NATIVE-NAMESTRING on Windows did not work on
+    pathnames without a directory.
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a
