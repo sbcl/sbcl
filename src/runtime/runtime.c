@@ -219,6 +219,7 @@ main(int argc, char *argv[], char *envp[])
 
     /* other command line options */
     boolean noinform = 0;
+    char *script = 0;
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
@@ -235,7 +236,15 @@ main(int argc, char *argv[], char *envp[])
         int argi = 1;
         while (argi < argc) {
             char *arg = argv[argi];
-            if (0 == strcmp(arg, "--noinform")) {
+            if (0 == strcmp(arg, "--script")) {
+                /* This is both a runtime and a toplevel option. As a
+                 * runtime option, it is equivalent to --noinform.
+                 * This exits, and does not increment argi, so that
+                 * TOPLEVEL-INIT sees the option. */
+                noinform = 1;
+                end_runtime_options = 1;
+                break;
+            } else if (0 == strcmp(arg, "--noinform")) {
                 noinform = 1;
                 ++argi;
             } else if (0 == strcmp(arg, "--core")) {

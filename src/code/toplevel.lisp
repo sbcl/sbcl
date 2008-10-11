@@ -381,6 +381,30 @@ command-line.")
       (dolist (option options)
         (process-1 option)))))
 
+;;; Skips past the shebang line on stream, if any.
+(defun maybe-skip-shebang-line (stream)
+  (let ((p (file-position stream)))
+    (flet ((next () (read-byte stream nil)))
+      (unwind-protect
+           (when (and (eq (next) (char-code #\#))
+                      (eq (next) (char-code #\!)))
+             (setf p nil)
+             (loop for x = (next)
+                   until (or (not x) (eq x (char-code #\newline)))))
+        (when p
+          (file-position stream p))))
+    t))
+
+(defun process-script (script)
+  (let ((pathname (native-pathname script))
+        (ok nil))
+    (unwind-protect
+         (with-open-file (f pathname :element-type :default)
+           (maybe-skip-shebang-line f)
+           (load f :verbose nil :print nil)
+           (setf ok t))
+      (quit :unix-status (if ok 0 1)))))
+
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
 ;; go into the Lisp debugger would get into various annoying issues of
@@ -415,6 +439,8 @@ command-line.")
         (reversed-options nil)
         ;; Has a --noprint option been seen?
         (noprint nil)
+        ;; Has a --script option been seen?
+        (script nil)
         ;; everything in *POSIX-ARGV* except for argv[0]=programname
         (options (rest *posix-argv*)))
 
@@ -436,7 +462,14 @@ command-line.")
                         (pop options)
                         (startup-error
                          "unexpected end of command line options"))))
-             (cond ((string= option "--sysinit")
+             (cond ((string= option "--script")
+                    (pop-option)
+                    (setf disable-debugger t
+                          no-userinit t
+                          no-sysinit t
+                          script (pop-option))
+                    (return))
+                   ((string= option "--sysinit")
                     (pop-option)
                     (if sysinit
                         (startup-error "multiple --sysinit options")
@@ -516,13 +549,23 @@ command-line.")
               (process-init-file sysinit :system))
             (unless no-userinit
               (process-init-file userinit :user))
-            (process-eval/load-options (nreverse reversed-options)))
+            (process-eval/load-options (nreverse reversed-options))
+            (when script
+              (process-script script)
+              (bug "PROCESS-SCRIPT returned")))
         (abort ()
-          :report "Skip to toplevel READ/EVAL/PRINT loop."
+          :report (lambda (s)
+                    (write-string
+                     (if script
+                         ;; In case script calls (enable-debugger)!
+                         "Abort script, exiting lisp."
+                         "Skip to toplevel READ/EVAL/PRINT loop.")
+                     s))
           (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
           (values))                     ; (no-op, just fall through)
         (quit ()
           :report "Quit SBCL (calling #'QUIT, killing the process)."
+          :test (lambda (c) (declare (ignore c)) (not script))
           (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
           (quit :unix-status 1))))
 

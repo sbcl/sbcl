@@ -66,12 +66,31 @@ Integration}.
 @node Shebang Scripts
 @comment  node-name,  next,  previous,  up
 @subsection Shebang Scripts
+@vindex sb-ext:*posix-argv*
+@vindex *posix-argv*
 
-SBCL doesn't come with built-in support for shebang-line execution,
-but this can be provided with a shell trampoline, or by dispatching
-from initialization files (@pxref{Unix-style Command Line Protocol} for
-an example.)
+Standard Unix tools that are interpreters follow a common command line
+protocol that is necessary to work with ``shebang scripts''. SBCL supports
+this via the @code{--script} command line option.
 
+Example file (@file{hello.lisp}):
+
+@lisp
+#!/usr/local/bin/sbcl --script
+(write-line "Hello, World!")
+@end lisp
+
+Usage examples:
+
+@smallexample
+$ ./hello.lisp
+Hello, World!
+@end smallexample
+
+@smallexample
+$ sbcl --script hello.lisp
+Hello, World!
+@end smallexample
 
 @node Stopping SBCL
 @comment  node-name,  next,  previous,  up
@@ -195,6 +214,11 @@ startup. This makes it easier to write Lisp programs which work
 cleanly in Unix pipelines. See also the @code{--noprint} and
 @code{--disable-debugger} options.
 
+@item --script @var{filename}
+As a runtime option this is equivalent to @code{--noinform}
+@code{--end-runtime-options} @code{--script} @var{filename}. See the
+description of @code{--script} as a toplevel option below.
+
 @item --help
 Print some basic information about SBCL, then exit.
 
@@ -260,6 +284,14 @@ before loading of initialization files or processing @code{--eval} and
 @code{--load} options. See @code{sb-ext:disable-debugger} for details.
 @xref{Debugger Entry}.
 
+@item --script @var{filename}
+Implies @code{--no-userinit} @code{--no-sysinit}
+@code{--disable-debugger} @code{--end-toplevel-options}.
+
+Causes the system to load the specified file instead of entering the
+read-eval-print-loop, and exit afterwards. If the file begins with a
+shebang line, it is ignored.
+
 @end table
 
 
@@ -313,70 +345,8 @@ Some examples of what you may consider doing in the initialization
 files follow.
 
 @menu
-* Unix-style Command Line Protocol::
 * Automatic Recompilation of Stale Fasls::
 @end menu
-
-@node Unix-style Command Line Protocol
-@comment  node-name,  next,  previous,  up
-@subsubsection Unix-style Command Line Protocol
-@vindex sb-ext:*posix-argv*
-@vindex *posix-argv*
-
-Standard Unix tools that are interpreters follow a common command line
-protocol that is necessary to work with ``shebang scripts''. SBCL
-doesn't do this by default, but adding the following snippet to an
-initialization file does the trick:
-
-@lisp
-;;; If the first user-processable command-line argument is a filename,
-;;; disable the debugger, load the file handling shebang-line and quit.
-(let ((script (and (second *posix-argv*)
-                   (probe-file (second *posix-argv*)))))
-   (when script
-      ;; Handle shebang-line
-      (set-dispatch-macro-character #\# #\!
-                                    (lambda (stream char arg)
-                                       (declare (ignore char arg))
-                                       (read-line stream)))
-      ;; Disable debugger
-      (setf *invoke-debugger-hook*
-            (lambda (condition hook)
-              (declare (ignore hook))
-              ;; Uncomment to get backtraces on errors
-              ;; (sb-debug:backtrace 20)
-              (format *error-output* "Error: ~A~%" condition)
-              (quit)))
-      (load script)
-      (quit)))
-@end lisp
-
-Example file (@file{hello.lisp}):
-
-@lisp
-#!/usr/local/bin/sbcl --noinform
-(write-line "Hello, World!")
-@end lisp
-
-Usage examples:
-
-@smallexample
-$ ./hello.lisp
-Hello, World!
-@end smallexample
-
-@smallexample
-$ sbcl hello.lisp
-This is SBCL 0.8.13.70, an implementation of ANSI Common Lisp.
-More information about SBCL is available at <http://www.sbcl.org/>.
-
-SBCL is free software, provided as is, with absolutely no warranty.
-It is mostly in the public domain; some portions are provided under
-BSD-style licenses.  See the CREDITS and COPYING files in the
-distribution for more information.
-Hello, World!
-@end smallexample
-
 
 @node Automatic Recompilation of Stale Fasls
 @comment  node-name,  next,  previous,  up

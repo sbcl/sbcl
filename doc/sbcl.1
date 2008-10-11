@@ -269,6 +269,11 @@ startup. (This makes it easier to write Lisp programs which work
 cleanly in Unix pipelines. See also the "\-\-noprint" and
 "\-\-disable\-debugger" options.)
 .TP 3
+.B \-\-script <filename>
+As a runtime option equivalent to \-\-noinform
+\-\-end\-toplevel\-options \-\-script <filename>. See the description
+of \-\-script as a toplevel option below.
+.TP 3
 .B \-\-help
 Print some basic information about SBCL, then exit.
 .TP 3
@@ -325,6 +330,13 @@ debugger, allowing interactive diagnosis and possible intercession.
 This option disables the debugger, causing errors to print a backtrace
 and exit with status 1 instead -- which is a mode of operation better suited
 for batch processing. See the user manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
+.B \-\-script <filename>
+Implies \-\-no-sysinit \-\-no-userinit \-\-disable-debugger
+\-\-end\-toplevel\-options.
+
+Causes the system to load the specified file and exit immediately
+afterwards, instead of entering the readl-eval-print loop. If the file
+begins with a shebang line, it is ignored.
 .PP
 
 Regardless of the order in which toplevel options appear on the command
@@ -341,7 +353,12 @@ Any user initialization file is loaded, unless prohibited.
 \-\-eval and \-\-load options are processed in the order given.
 .PP
 
-Finally, the read-eval-print loop is entered.
+Finally, either the read-eval-print loop is entered or the file
+specified with \-\-script option is loaded.
+
+When running in the read-eval-print loop the system exits on end of
+file. Similarly, the system exits immediately after processing the
+file specified with \-\-script.
 
 Note that when running SBCL with the \-\-core option, using a core
 file created by a user call to the
