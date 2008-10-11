@@ -320,30 +320,28 @@ makes it easier to write Lisp "scripts" which work cleanly in Unix
 pipelines.
 .TP 3
 .B \-\-disable\-debugger
-This is equivalent to \-\-eval \(aq(sb\-ext:disable\-debugger)\(aq. By
-default, a Common Lisp system tries to ask the programmer for help
-when it gets in trouble (by printing a debug prompt, then listening,
-on \f(CR*DEBUG\-IO*\fR). However, this is not useful behavior for a system
-running with no programmer available, and this option tries to set up
-more appropriate behavior for that situation. This is implemented by
-redefining \f(CRINVOKE\-DEBUGGER\fR so that any call exits the process with a
-failure code after printing a backtrace. (Note that because it is
-implemented by modifying special variables and \f(CRFDEFINITION\fRs, its
-effects persist in .core files created by
-\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR.  If you want to undo its
-effects, \fIe.g.\fR if you build a system unattended and then want to
-operate a derived system interactively, see the
-\f(CRSB\-EXT:ENABLE\-DEBUGGER\fR command.)
+By default when SBCL encounters an error, it enters the builtin
+debugger, allowing interactive diagnosis and possible intercession.
+This option disables the debugger, causing errors to print a backtrace
+and exit with status 1 instead -- which is a mode of operation better suited
+for batch processing. See the user manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
 .PP
 
-Regardless of the order in which \-\-sysinit, \-\-userinit, and
-\-\-eval options appear on the command line, the sysinit file, if it
-exists, is loaded first; then the userinit file, if it exists, is
-loaded; then any \-\-eval commands are read and executed in sequence;
-then the read-eval-print loop is started on standard input. At any
-step, error conditions or commands such as \f(CRSB\-EXT:QUIT\fR can
-cause execution to be terminated before proceeding to subsequent
-steps.
+Regardless of the order in which toplevel options appear on the command
+line, the order of actions is:
+
+.nr step 1 1
+.IP \n[step]. 3
+Debugger is disabled, if requested.
+.IP \n+[step].
+Any system initialization file is loaded, unless prohibited.
+.IP \n+[step].
+Any user initialization file is loaded, unless prohibited.
+.IP \n+[step].
+\-\-eval and \-\-load options are processed in the order given.
+.PP
+
+Finally, the read-eval-print loop is entered.
 
 Note that when running SBCL with the \-\-core option, using a core
 file created by a user call to the

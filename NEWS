@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.22 relative to 1.0.21:
+  * minor incompatible change: --disable-debugger toplevel option now takes
+    effect before processing of initialization files and --eval or --load
+    options.
   * enhancement: inoccous calls to EVAL or generic functions dispatching
     on subclasses of eg. STREAM no longer cause compiler notes to appear.
   * enhancement: the system no longer resignals errors from --load and

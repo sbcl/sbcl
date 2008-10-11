@@ -252,7 +252,12 @@ option, this makes it easier to write Lisp "scripts" which work
 cleanly in Unix pipelines.
 
 @item --disable-debugger
-This is equivalent to @code{--eval '(sb-ext:disable-debugger)'}.
+By default when SBCL encounters an error, it enters the builtin
+debugger, allowing interactive diagnosis and possible intercession.
+This option disables the debugger, causing errors to print a backtrace
+and exit with status 1 instead. When given, this option takes effect
+before loading of initialization files or processing @code{--eval} and
+@code{--load} options. See @code{sb-ext:disable-debugger} for details.
 @xref{Debugger Entry}.
 
 @end table
