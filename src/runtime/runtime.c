@@ -219,7 +219,6 @@ main(int argc, char *argv[], char *envp[])
 
     /* other command line options */
     boolean noinform = 0;
-    char *script = 0;
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
