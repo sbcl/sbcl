@@ -418,12 +418,14 @@
 
 (defun stream-decoding-error (stream octets)
   (error 'stream-decoding-error
+         :external-format (stream-external-format stream)
          :stream stream
          ;; FIXME: dunno how to get at OCTETS currently, or even if
          ;; that's the right thing to report.
          :octets octets))
 (defun stream-encoding-error (stream code)
   (error 'stream-encoding-error
+         :external-format (stream-external-format stream)
          :stream stream
          :code code))
 

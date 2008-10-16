@@ -104,7 +104,8 @@
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
 (define-condition simple-parse-error   (simple-condition parse-error)   ())
 
-(define-condition character-coding-error (error) ())
+(define-condition character-coding-error (error)
+  ((external-format :initarg :external-format :reader character-coding-error-external-format)))
 (define-condition character-encoding-error (character-coding-error)
   ((code :initarg :code :reader character-encoding-error-code)))
 (define-condition character-decoding-error (character-coding-error)
@@ -117,7 +118,8 @@
            (code (character-encoding-error-code c)))
        (format s "~@<encoding error on stream ~S (~S ~S): ~2I~_~
                   the character with code ~D cannot be encoded.~@:>"
-               stream ':external-format (stream-external-format stream)
+               stream ':external-format
+               (character-coding-error-external-format c)
                code)))))
 (define-condition stream-decoding-error (stream-error character-decoding-error)
   ()
@@ -127,25 +129,26 @@
            (octets (character-decoding-error-octets c)))
        (format s "~@<decoding error on stream ~S (~S ~S): ~2I~_~
                   the octet sequence ~S cannot be decoded.~@:>"
-               stream ':external-format (stream-external-format stream)
+               stream ':external-format
+               (character-coding-error-external-format c)
                octets)))))
 
 (define-condition c-string-encoding-error (character-encoding-error)
-  ((external-format :initarg :external-format :reader c-string-encoding-error-external-format))
+  ()
   (:report
    (lambda (c s)
      (format s "~@<c-string encoding error (:external-format ~S): ~2I~_~
                   the character with code ~D cannot be encoded.~@:>"
-               (c-string-encoding-error-external-format c)
+               (character-coding-error-external-format c)
                (character-encoding-error-code c)))))
 
 (define-condition c-string-decoding-error (character-decoding-error)
-  ((external-format :initarg :external-format :reader c-string-decoding-error-external-format))
+  ()
   (:report
    (lambda (c s)
      (format s "~@<c-string decoding error (:external-format ~S): ~2I~_~
                   the octet sequence ~S cannot be decoded.~@:>"
-             (c-string-decoding-error-external-format c)
+             (character-coding-error-external-format c)
              (character-decoding-error-octets c)))))
 
 (define-condition control-stack-exhausted (storage-condition)

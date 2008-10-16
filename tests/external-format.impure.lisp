@@ -287,6 +287,23 @@
     (values)))
 (delete-file *test-path*)
 
+;;; We used to call STREAM-EXTERNAL-FORMAT on the stream in the error
+;;; when printing a coding error, but that didn't work if the stream
+;;; was closed by the time the error was printed.  See sbcl-devel
+;;; "Subject: Printing coding errors for closed streams" by Zach Beane
+;;; on 2008-10-16 for more info.
+(with-test (:name (:character-coding-error-stream-external-format))
+  (flet ((first-file-character ()
+           (with-open-file (stream *test-file* :external-format :utf-8)
+             (read-char stream))))
+    (with-open-file (stream *test-file*
+                            :direction :output
+                            :if-exists :supersede
+                            :element-type '(unsigned-byte 8))
+      (write-byte 192 stream))
+    (princ-to-string (nth-value 1 (ignore-errors (first-file-character))))))
+(delete-file *test-path*)
+
 ;;; External format support in SB-ALIEN
 
 (with-test (:name (:sb-alien :vanilla))
