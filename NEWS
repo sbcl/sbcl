@@ -26,6 +26,9 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     was broken. (reporteed by Willem Broekema)
   * bug fix: SB-EXT:NATIVE-NAMESTRING on Windows did not work on
     pathnames without a directory.
+  * bug fix: COMPILE-FILE did not warn about undefined variable
+    references at toplevel, and LOAD of the resulting fasl did
+    not signal an error.
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a

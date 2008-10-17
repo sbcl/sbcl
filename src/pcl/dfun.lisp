@@ -1790,6 +1790,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; I'm aware of, but they look like they might be useful for
 ;;; debugging or performance tweaking or something, so I've just
 ;;; commented them out instead of deleting them. -- WHN 2001-03-28
+#||
 (defun list-dfun (gf)
   (let* ((sym (type-of (gf-dfun-info gf)))
          (a (assq sym *dfun-list*)))

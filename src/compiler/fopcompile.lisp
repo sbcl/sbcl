@@ -258,21 +258,21 @@
                      ;; Special variable
                      (fopcompile `(symbol-value ',form) path for-value-p)
                      ;; Lexical
-                     (when for-value-p
-                       (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
-                              (handle (when lambda-var
-                                        (lambda-var-fop-value lambda-var))))
-                         (if handle
-                             (sb!fasl::dump-push handle
-                                                 *compile-object*)
-                             (progn
-                               ;; Undefined variable. Signal a warning, and
-                               ;; treat it as a special variable reference,
-                               ;; like the real compiler does.
-                               (note-undefined-reference form :variable)
-                               (fopcompile `(symbol-value ',form)
-                                           path
-                                           for-value-p))))))))))
+                     (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
+                            (handle (when lambda-var
+                                      (lambda-var-fop-value lambda-var))))
+                       (if handle
+                           (when for-value-p
+                             (sb!fasl::dump-push handle *compile-object*))
+                           (progn
+                             ;; Undefined variable. Signal a warning, and
+                             ;; treat it as a special variable reference, like
+                             ;; the real compiler does -- do not elide even if
+                             ;; the value is unused.
+                             (note-undefined-reference form :variable)
+                             (fopcompile `(symbol-value ',form)
+                                         path
+                                         for-value-p)))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
              (sb!xc:macroexpand form *lexenv*)

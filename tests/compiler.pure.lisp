@@ -2589,7 +2589,8 @@
                       "foo"))))
 
 (with-test (:name :base-string-aref-type)
- (assert (eq 'base-char
+ (assert (eq #+sb-unicode 'base-char
+             #-sb-unicode 'character
              (funcall (compile nil
                                '(lambda (s)
                                  (sb-c::compiler-derived-type (aref (the base-string s) 0))))

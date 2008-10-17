@@ -348,6 +348,13 @@ EOF
 expect_failed_compile $tmpfilename
 
 cat > $tmpfilename <<EOF
+x
+y
+z
+EOF
+expect_failed_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
 (declaim (optimize (speed 3) (space 0) (safety 0)))
 
 (defun foo (bar)
