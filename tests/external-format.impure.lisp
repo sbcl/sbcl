@@ -294,9 +294,9 @@
 ;;; on 2008-10-16 for more info.
 (with-test (:name (:character-coding-error-stream-external-format))
   (flet ((first-file-character ()
-           (with-open-file (stream *test-file* :external-format :utf-8)
+           (with-open-file (stream *test-path* :external-format :utf-8)
              (read-char stream))))
-    (with-open-file (stream *test-file*
+    (with-open-file (stream *test-path*
                             :direction :output
                             :if-exists :supersede
                             :element-type '(unsigned-byte 8))
