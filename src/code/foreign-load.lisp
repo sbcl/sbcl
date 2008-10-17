@@ -69,7 +69,9 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
                         :test #'equal))
              (obj (or old (make-shared-object
                            :pathname pathname
-                           :namestring (native-namestring pathname :as-file t)))))
+                           :namestring (native-namestring 
+                                        (translate-logical-pathname pathname)
+                                        :as-file t)))))
         (setf (shared-object-dont-save obj) dont-save)
         ;; FIXME: Why doesn's dlopen-or-lose on already loaded stuff work on
         ;; Windows?
