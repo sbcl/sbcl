@@ -38,6 +38,27 @@
 #include "genesis/lutex.h"
 #endif
 
+/* write_runtime_options uses a simple serialization scheme that
+ * consists of one word of magic, one word indicating whether options
+ * are actually saved, and one word per struct field. */
+static void
+write_runtime_options(FILE *file, struct runtime_options *options)
+{
+    size_t optarray[RUNTIME_OPTIONS_WORDS];
+
+    memset(&optarray, 0, sizeof(optarray));
+    optarray[0] = RUNTIME_OPTIONS_MAGIC;
+
+    if (options != NULL) {
+        /* optarray[1] is a flag indicating that options are present */
+        optarray[1] = 1;
+        optarray[2] = options->dynamic_space_size;
+        optarray[3] = options->thread_control_stack_size;
+    }
+
+    fwrite(optarray, sizeof(size_t), RUNTIME_OPTIONS_WORDS, file);
+}
+
 static void
 write_lispobj(lispobj obj, FILE *file)
 {
@@ -192,10 +213,11 @@ open_core_for_saving(char *filename)
 
 boolean
 save_to_filehandle(FILE *file, char *filename, lispobj init_function,
-                   boolean make_executable)
+                   boolean make_executable,
+                   boolean save_runtime_options)
 {
     struct thread *th;
-    os_vm_offset_t core_start_pos, core_end_pos, core_size;
+    os_vm_offset_t core_start_pos;
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
@@ -323,10 +345,16 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
      * This is used to locate the start of the core when the runtime is
      * prepended to it. */
     fseek(file, 0, SEEK_END);
-    core_end_pos = ftell(file);
-    core_size = core_end_pos - core_start_pos;
 
-    fwrite(&core_size, sizeof(os_vm_offset_t), 1, file);
+    /* If NULL runtime options are passed to write_runtime_options,
+     * command-line processing is performed as normal in the SBCL
+     * executable. Otherwise, the saved runtime options are used and
+     * all command-line arguments are available to Lisp in
+     * SB-EXT:*POSIX-ARGV*. */
+    write_runtime_options(file,
+                          (save_runtime_options ? runtime_options : NULL));
+
+    fwrite(&core_start_pos, sizeof(os_vm_offset_t), 1, file);
     write_lispobj(CORE_MAGIC, file);
     fclose(file);
 
@@ -434,7 +462,8 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
 }
 
 boolean
-save(char *filename, lispobj init_function, boolean prepend_runtime)
+save(char *filename, lispobj init_function, boolean prepend_runtime,
+     boolean save_runtime_options)
 {
     FILE *file;
     void *runtime_bytes = NULL;
@@ -447,5 +476,6 @@ save(char *filename, lispobj init_function, boolean prepend_runtime)
     if (prepend_runtime)
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size);
 
-    return save_to_filehandle(file, filename, init_function, prepend_runtime);
+    return save_to_filehandle(file, filename, init_function, prepend_runtime,
+                              save_runtime_options);
 }

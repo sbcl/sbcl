@@ -18,7 +18,7 @@ extern FILE* open_core_for_saving(char *filename);
 extern void *load_runtime(char *runtime_path, size_t *size_out);
 extern FILE *prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes, size_t *runtime_size);
 extern boolean save_runtime_to_filehandle(FILE *output, void *runtime_bytes, size_t runtime_size);
-extern boolean save_to_filehandle(FILE *file, char *filename, lispobj initfun, int make_executable);
-extern boolean save(char *filename, lispobj initfun, boolean prepend_runtime);
+extern boolean save_to_filehandle(FILE *file, char *filename, lispobj initfun, boolean make_executable, boolean keep_runtime_options);
+extern boolean save(char *filename, lispobj initfun, boolean prepend_runtime, boolean keep_runtime_options);
 
 #endif

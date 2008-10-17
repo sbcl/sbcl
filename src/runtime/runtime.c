@@ -202,6 +202,8 @@ search_for_core ()
 char **posix_argv;
 char *core_string;
 
+struct runtime_options *runtime_options;
+
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -216,6 +218,7 @@ main(int argc, char *argv[], char *envp[])
     char *core = 0;
     char **sbcl_argv = 0;
     os_vm_offset_t embedded_core_offset = 0;
+    char *runtime_path = 0;
 
     /* other command line options */
     boolean noinform = 0;
@@ -229,10 +232,34 @@ main(int argc, char *argv[], char *envp[])
 
     setlocale(LC_ALL, "");
 
+    runtime_options = NULL;
+
+    /* Check early to see if this executable has an embedded core,
+     * which also populates runtime_options if the core has runtime
+     * options */
+    runtime_path = os_get_runtime_executable_path();
+    if (runtime_path) {
+        os_vm_offset_t offset = search_for_embedded_core(runtime_path);
+        if (offset != -1) {
+            embedded_core_offset = offset;
+            core = runtime_path;
+        } else {
+            free(runtime_path);
+        }
+    }
+
+
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
-    {
+    if (runtime_options != NULL) {
+        dynamic_space_size = runtime_options->dynamic_space_size;
+        thread_control_stack_size = runtime_options->thread_control_stack_size;
+        sbcl_argv = argv;
+    } else {
         int argi = 1;
+
+        runtime_options = successful_malloc(sizeof(struct runtime_options));
+
         while (argi < argc) {
             char *arg = argv[argi];
             if (0 == strcmp(arg, "--script")) {
@@ -341,6 +368,10 @@ main(int argc, char *argv[], char *envp[])
     dynamic_space_size &= ~(PAGE_BYTES-1);
     thread_control_stack_size &= ~(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
+    /* Preserve the runtime options for possible future core saving */
+    runtime_options->dynamic_space_size = dynamic_space_size;
+    runtime_options->thread_control_stack_size = thread_control_stack_size;
+
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
      * it must follow os_init(). -- WHN 2000-01-26 */
@@ -351,21 +382,7 @@ main(int argc, char *argv[], char *envp[])
 
     /* If no core file was specified, look for one. */
     if (!core) {
-       char *runtime_path = os_get_runtime_executable_path();
-
-       if (runtime_path) {
-          os_vm_offset_t offset = search_for_embedded_core(runtime_path);
-
-          if (offset != -1) {
-             embedded_core_offset = offset;
-             core = runtime_path;
-          } else {
-             free(runtime_path);
-             core = search_for_core();
-          }
-       } else {
-          core = search_for_core();
-       }
+        core = search_for_core();
     }
 
     /* Make sure that SBCL_HOME is set and not the empty string,

@@ -35,6 +35,8 @@ extern int foreign_function_call_active;
 extern size_t dynamic_space_size;
 extern size_t thread_control_stack_size;
 
+extern struct runtime_options *runtime_options;
+
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
 #else

@@ -4848,7 +4848,8 @@ prepare_for_final_gc ()
  * function being set to the value of the static symbol
  * SB!VM:RESTART-LISP-FUNCTION */
 void
-gc_and_save(char *filename, int prepend_runtime)
+gc_and_save(char *filename, boolean prepend_runtime,
+            boolean save_runtime_options)
 {
     FILE *file;
     void *runtime_bytes = NULL;
@@ -4883,7 +4884,7 @@ gc_and_save(char *filename, int prepend_runtime)
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
     save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0),
-                       prepend_runtime);
+                       prepend_runtime, save_runtime_options);
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's

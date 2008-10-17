@@ -20,22 +20,25 @@
 (define-alien-routine "save" (boolean)
   (file c-string)
   (initial-fun (unsigned #.sb!vm:n-word-bits))
-  (prepend-runtime int))
+  (prepend-runtime int)
+  (save-runtime-options int))
 
 #!+gencgc
 (define-alien-routine "gc_and_save" void
   (file c-string)
-  (prepend-runtime int))
+  (prepend-runtime int)
+  (save-runtime-options int))
 
 #!+gencgc
 (defvar sb!vm::*restart-lisp-function*)
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
+                                         (executable nil)
+                                         (save-runtime-options nil)
                                          (purify t)
                                          (root-structures ())
-                                         (environment-name "auxiliary")
-                                         (executable nil))
+                                         (environment-name "auxiliary"))
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
@@ -52,7 +55,16 @@ The following &KEY arguments are defined:
   :EXECUTABLE
      If true, arrange to combine the SBCL runtime and the core image
      to create a standalone executable.  If false (the default), the
-     core image will not be executable on its own.
+     core image will not be executable on its own. Executable images
+     always behave as if they were passed the --noinform runtime option.
+
+  :SAVE-RUNTIME-OPTIONS
+     If true, values of runtime options --dynamic-space-size and
+     --control-stack-size that were used to start SBCL are stored in
+     the standalone executable, and restored when the executable is
+     run. This also inhibits normal runtime option processing, causing
+     all command line arguments to be passed to the toplevel.
+     Meaningless if :EXECUTABLE is NIL.
 
   :PURIFY
      If true (the default on cheneygc), do a purifying GC which moves all
@@ -114,6 +126,8 @@ sufficiently motivated to do lengthy fixes."
              (handling-end-of-the-world
                (reinit)
                (funcall toplevel)))
+           (foreign-bool (value)
+             (if value 1 0))
            (save-core (gc)
              (when gc
                #!-gencgc (gc)
@@ -122,11 +136,13 @@ sufficiently motivated to do lengthy fixes."
                ;; (over 50% on x86). This needs to be done by a single function
                ;; since the GC will invalidate the stack.
                #!+gencgc (gc-and-save (unix-namestring core-file-name nil)
-                                      (if executable 1 0)))
+                                      (foreign-bool executable)
+                                      (foreign-bool save-runtime-options))
              (without-gcing
               (save (unix-namestring core-file-name nil)
                     (get-lisp-obj-address #'restart-lisp)
-                    (if executable 1 0)))))
+                    (foreign-bool executable)
+                    (foreign-bool save-runtime-options))))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
     #!+gencgc

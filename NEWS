@@ -6,6 +6,10 @@ changes in sbcl-1.0.22 relative to 1.0.21:
   * new feature: new commandline argument: --script, which supports
     shebang lines. See documentation for details. (based on work by
     Kevin Reid)
+  * new feature: SAVE-LISP-AND-DIE can save current values of
+    --dynamic-space-size and --control-stack-size in the executable core,
+    causing it to skip normal runtime option processing. See documentation
+    for details. (thanks to Zach Beane)
   * enhancement: inoccous calls to EVAL or generic functions dispatching
     on subclasses of eg. STREAM no longer cause compiler notes to appear.
   * enhancement: the system no longer resignals errors from --load and

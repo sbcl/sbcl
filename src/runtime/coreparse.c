@@ -56,11 +56,47 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
+
+static struct runtime_options *
+read_runtime_options(int fd)
+{
+    size_t optarray[RUNTIME_OPTIONS_WORDS];
+    struct runtime_options *options = NULL;
+
+    if (read(fd, optarray, RUNTIME_OPTIONS_WORDS * sizeof(size_t)) !=
+        RUNTIME_OPTIONS_WORDS * sizeof(size_t)) {
+        return NULL;
+    }
+
+    if ((RUNTIME_OPTIONS_MAGIC != optarray[0]) || (0 == optarray[1])) {
+        return NULL;
+    }
+
+    options = successful_malloc(sizeof(struct runtime_options));
+
+    options->dynamic_space_size = optarray[2];
+    options->thread_control_stack_size = optarray[3];
+
+    return options;
+}
+
+void
+maybe_initialize_runtime_options(int fd)
+{
+    off_t end_offset = sizeof(lispobj) +
+        sizeof(os_vm_offset_t) +
+        (RUNTIME_OPTIONS_WORDS * sizeof(size_t));
+
+    lseek(fd, -end_offset, SEEK_END);
+    runtime_options = read_runtime_options(fd);
+}
+
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
- * end of the file, a trailer containing the size of the core (an
- * os_vm_offset_t) and a final signature word (the lispobj
- * CORE_MAGIC).  If this trailer is found at the end of the file, the
- * start of the core can be determined from the core size.
+ * end of the file, a trailer containing optional saved runtime
+ * options, the start of the core (an os_vm_offset_t), and a final
+ * signature word (the lispobj CORE_MAGIC).  If this trailer is found
+ * at the end of the file, the start of the core can be determined
+ * from the core size.
  *
  * If an embedded core is present, this returns the offset into the
  * file to load the core from, or -1 if no core is present. */
@@ -70,7 +106,7 @@ search_for_embedded_core(char *filename)
     lispobj header;
     os_vm_offset_t lispobj_size = sizeof(lispobj);
     os_vm_offset_t trailer_size = lispobj_size + sizeof(os_vm_offset_t);
-    os_vm_offset_t core_size, pos;
+    os_vm_offset_t core_start, pos;
     int fd = -1;
 
     if ((fd = open_binary(filename, O_RDONLY)) < 0)
@@ -83,10 +119,10 @@ search_for_embedded_core(char *filename)
     if (header == CORE_MAGIC) {
         if (lseek(fd, -trailer_size, SEEK_END) < 0)
             goto lose;
-        if (read(fd, &core_size, sizeof(os_vm_offset_t)) < 0)
+        if (read(fd, &core_start, sizeof(os_vm_offset_t)) < 0)
             goto lose;
 
-        if (lseek(fd, -(core_size + trailer_size), SEEK_END) < 0)
+        if (lseek(fd, core_start, SEEK_SET) < 0)
             goto lose;
         pos = lseek(fd, 0, SEEK_CUR);
 
@@ -95,6 +131,8 @@ search_for_embedded_core(char *filename)
 
         if (header != CORE_MAGIC)
             goto lose;
+
+        maybe_initialize_runtime_options(fd);
 
         close(fd);
         return pos;
