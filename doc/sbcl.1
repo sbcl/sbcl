@@ -20,17 +20,15 @@ SBCL -- Steel Bank Common Lisp
 
 .SH DESCRIPTION
 
-SBCL is a free Common Lisp programming environment. It is derived from
-the free CMU CL programming environment. (The name is intended to
-acknowledge the connection: steel and banking are the industries where
-Carnegie and Mellon made the big bucks.)
-
-.SH LICENSING
+SBCL is an implementation of ANSI Common Lisp, featuring a
+high-performance native compiler, native threads on several platforms,
+a socket interface, a source-level debugger, a statistical profiler,
+and much more.
 
 It is free software, mostly in the public domain, but with some
-subsystems under BSD-style licenses which allow modification and
-reuse as long as credit is given. It is provided "as is", with no
-warranty of any kind.
+subsystems under BSD-style licenses which allow modification and reuse
+as long as credit is given. It is provided "as is", with no warranty
+of any kind.
 
 For more information about license issues, see the COPYING file in
 the distribution. For more information about history, see the 
@@ -38,217 +36,55 @@ CREDITS file in the distribution.
 
 .SH RUNNING SBCL
 
-To run SBCL, type "sbcl" at the command line with no arguments. (SBCL
-understands command line arguments, but you probably won't need to use
-them unless you're a fairly advanced user. If you are, you should read
-the COMMAND LINE SYNTAX section, below.) You should see some startup
-messages, then a prompt ("\f(CR*\fR").  Type a Lisp expression at the prompt,
-and SBCL will read it, execute it, print any values returned, give you
-another prompt, and wait for your next input.  For example,
-\f(CR
+To run SBCL, type "sbcl". After startup messages a prompt
+("\f(CR*\fR") appears. Enter a Lisp expression, and SBCL will read and
+execute it, print any values returned, give you another prompt, and
+wait for your next input.
+
+\f(C
+  $ sbcl
+  ...[startup messages elided]...
   * (+ 1 2 3)
 
   6
-  * (funcall (lambda (x y) (list x y y)) :toy :choo)
-
-  (:TOY :CHOO :CHOO)
-  * "Hello World"
-
-  "Hello World"
-  *
+  * (quit)
 \fR
 
-Many people like to run SBCL, like other Lisp systems, as a subprocess
-under Emacs. The Emacs "Slime" and "ilisp" modes provide many
-convenient features, like command line editing, tab completion, and
-various kinds of coupling between Common Lisp source files and the
-interactive SBCL subprocess, but they can be somewhat fragile with
-respect to packages and readtables, in which case SBCL in the Emacs
-"shell" mode can be a useful substitute.
+Most people like to run SBCL as a subprocess under Emacs. The Emacs
+"Slime" mode provides many convenient features, like command line
+editing, tab completion, and various kinds of coupling between Common
+Lisp source files and the interactive SBCL subprocess.
 
-.SH OVERVIEW
-
-SBCL compiles Common Lisp to native code. (Even today, some 30 years
-after the MacLisp compiler, people will tell you that Lisp is an
-interpreted language. Ignore them.)
-
-SBCL aims for but has not completely achieved compliance with the ANSI
-standard for Common Lisp. More information about this is available in
-the BUGS section below.
-
-SBCL also includes various non-ANSI extensions, described more fully
-in the User Manual.  Some of these are in the base system and others
-are "contrib" modules loaded on request using \f(CRREQUIRE\fR.  For
-example, to load the \f(CRSB\-BSD\-SOCKETS\fR module that provides
-TCP/IP connectivity,
-\f(CR
-   * (require \(aqasdf)
-   * (require \(aqsb\-bsd\-sockets)
-\fR
-
-Many Lispy extensions have been retained from CMU CL:
-.TP 3
-\--
-CMU-CL-style safe implementation of type declarations:
-"Declarations are assertions."
-.TP 3
-\--
-the source level debugger (very similar to CMU CL's)
-.TP 3
-\--
-the profiler (now somewhat different from CMU CL's)
-.TP 3
-\--
-saving the state of the running SBCL process, producing a
-"core" file which can be restarted later
-.TP 3
-\--
-Gray streams (a de-facto standard system of overloadable CLOS classes
-whose instances can be used wherever ordinary ANSI streams can be used)
-.TP 3
-\--
-weak pointers and finalization
-.PP
-
-Fundamental system interface extensions are also provided:
-.TP 3
-\--
-calling out to C code (a.k.a. FFI, foreign function interface,
-with very nearly the same interface as CMU CL)
-.TP 3
-\--
-some simple support for operations with a "scripting language" flavor,
-\fIe.g.\fR reading POSIX \f(CRargc\fR and \f(CRargv\fR, or executing a
-subprogram
-.PP
-
-.SH DIFFERENCES FROM CMU CL
-
-SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
-system and a C compiler, and all of its properties are specified by
-the version of the source code that it was created from. This clean
-bootstrappability was the immediate motivation for forking off of the
-CMU CL development tree. A variety of implementation differences are
-motivated by this design goal.
-
-Maintenance work in SBCL since the fork has diverged somewhat from the
-maintenance work in CMU CL. Many but not all bug fixes and
-improvements have been shared between the two projects, and sometimes
-the two projects disagree about what would be an improvement.
-
-Most extensions supported by CMU CL have been unbundled from SBCL,
-including Motif support, the Hemlock editor, search paths, the
-low-level Unix interface, the WIRE protocol, various user-level macros
-and functions (\fIe.g.\fR \f(CRLETF\fR, \f(CRITERATE\fR, \f(CRMEMQ\fR,
-\f(CRREQUIRED\-ARGUMENT\fR), and many others.
-
-SBCL implements multithreading, but in a completely different fashion
-from CMU CL: see the User Manual for details. As of 1.0.13 this is
-still considered beta-quality and must be explicitly enabled at build
-time.
-
-SBCL has retained some extensions from its parent CMU CL. Many of the
-retained extensions are in these categories:
-.TP 3
-\--
-things which might be in the new ANSI spec, \fIe.g.\fR safe type
-declarations, weak pointers, finalization, foreign function
-interface to C, and Gray streams;
-.TP 3
-\--
-things which are universally available in Unix scripting languages,
-\fIe.g.\fR \f(CRRUN\-PROGRAM\fR and POSIX \f(CRargv\fR and \f(CRgetenv\fR;
-.TP 3
-\--
-hooks into the low level workings of the system which can be useful
-for debugging, \fIe.g.\fR requesting that a particular function be executed
-whenever GC occurs, or tuning compiler diagnostic output;
-.TP 3
-\--
-unportable performance hacks, \fIe.g.\fR \f(CRFREEZE\-TYPE\fR and
-\f(CRPURIFY\fR. For more information about these, look at the online
-documentation for symbols in the \f(CRSB\-EXT\fR package, and look at the user
-manual.
-.PP
-
-There are also a few retained extensions which don't fall into any
-particular category, \fIe.g.\fR the ability to save running Lisp images as
-executable files.
-
-Some of the retained extensions have new names and/or different
-options than their CMU CL counterparts. For example, the SBCL function
-which saves a Lisp image to disk and kills the running process is
-called \f(CRSAVE\-LISP\-AND\-DIE\fR instead of \f(CRSAVE\-LISP\fR, and
-SBCL's \f(CRSAVE\-LISP\-AND\-DIE\fR supports fewer keyword options
-than CMU CL's \f(CRSAVE\-LISP\fR does.
-
-(Why doesn't SBCL support more extensions natively?  Why drop all
-those nice extensions from CMU CL when the code already exists? This
-is a frequently asked question on the mailing list.  There are two
-principal reasons.  First, it's a design philosophy issue: arguably
-SBCL has done its job by supplying a stable FFI, and the right design
-decision is to move functionality derived from that, like socket
-support, into separate libraries.  Some of these are distributed with
-SBCL as "contrib" modules, others are distributed as separate software
-packages by separate maintainers. Second, it's a practical decision -
-focusing on a smaller number of things will, we hope, let us do a
-better job on them.)
-
-.SH THE COMPILER
-
-SBCL inherits from CMU CL the "Python" native code compiler. (Though
-we often avoid that name in order to avoid confusion with the
-scripting language also called Python.) This compiler is very clever
-about understanding the type system of Common Lisp and using it to
-optimize code, and about producing notes to let the user know when the
-compiler doesn't have enough type information to produce efficient
-code. It also tries (almost always successfully) to follow the unusual
-but very useful principle that "declarations are assertions", \fIi.e.\fR
-type declarations should be checked at runtime unless the user
-explicitly tells the system that speed is more important than safety.
-
-The compiled code uses garbage collection to automatically
-manage memory. The garbage collector implementation varies considerably
-from CPU to CPU. In particular, on some CPUs the GC is nearly exact,
-while on others it's more conservative, and on some CPUs the GC
-is generational, while on others simpler stop and copy strategies
-are used.
-
-For more information about the compiler, see the user manual.
+For information on creating "standalone executables" using SBCL, see
+\f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR in the User Manual.
 
 .SH COMMAND LINE SYNTAX
 
-Command line syntax can be considered an advanced topic; for ordinary
-interactive use, no command line arguments should be necessary.
+For ordinary interactive use, no command line arguments should be
+necessary.
 
-In order to understand the command line argument syntax for SBCL, it
-is helpful to understand that the SBCL system is implemented as two
-components, a low-level runtime environment written in C and a
-higher-level system written in Common Lisp itself. Some command line
-arguments are processed during the initialization of the low-level
-runtime environment, some command line arguments are processed during
-the initialization of the Common Lisp system, and any remaining
+In order to understand the SBCL command line syntax, it is helpful to
+understand that the system is composed of two parts: a runtime
+environment, and the Common Lisp system it supports. Some command line
+arguments are processed during the initialization of the runtime, and
+some during the initialization of the Lisp system -- any remaining
 command line arguments are passed on to user code.
 
-The full, unambiguous syntax for invoking SBCL at the command line is
+The overall command line syntax is:
 .TP 3
 .B sbcl [runtime options] \-\-end\-runtime\-options [toplevel options] \-\-end\-toplevel\-options [user options]
 .PP
 
-For convenience, the \-\-end\-runtime\-options and \-\-end\-toplevel\-options
-elements can be omitted. Omitting these elements can be convenient
-when you are running the program interactively, and you can see that
-no ambiguities are possible with the option values you are using.
-Omitting these elements is probably a bad idea for any batch file
-where any of the options are under user control, since it makes it
-impossible for SBCL to detect erroneous command line input, so that
-erroneous command line arguments will be passed on to the user program
-even if they was intended for the runtime system or the Lisp system.
+Both \-\-end\-runtime\-options and \-\-end\-toplevel\-options are
+optional, and may be omitted. They are intended for use in situations
+where any command line options are under user control (eg. in batch
+files): by using them you can prevent options intended for your
+program being accidentally processed by SBCL.
 
 Supported runtime options are
 .TP 3
 .B \-\-core <corefilename>
-Run the specified Lisp core file instead of the default. (See the FILES
+Use the specified Lisp core file instead of the default. (See the FILES
 section for the standard core, or the system documentation for
 \f(CRSB\-EXT:SAVE\-LISP\-AND\-DIE\fR for information about how to create a 
 custom core.) Note that if the Lisp core file is a user-created core
@@ -329,7 +165,7 @@ By default when SBCL encounters an error, it enters the builtin
 debugger, allowing interactive diagnosis and possible intercession.
 This option disables the debugger, causing errors to print a backtrace
 and exit with status 1 instead -- which is a mode of operation better suited
-for batch processing. See the user manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
+for batch processing. See the User Manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
 .B \-\-script <filename>
 Implies \-\-no-sysinit \-\-no-userinit \-\-disable-debugger
 \-\-end\-toplevel\-options.
@@ -373,11 +209,62 @@ involved) toplevel options and any \-\-end\-toplevel\-options option are
 stripped out of the command line argument list before user code gets a
 chance to see it.
 
+.SH OVERVIEW
+
+SBCL is derived from the CMU CL. (The name is intended to acknowledge
+the connection: steel and banking are the industries where Carnegie
+and Mellon made the big bucks.)
+
+SBCL compiles by default: even functions entered in the
+read-eval-print loop are compiled to native code, unless the evaluator
+has been explicitly turned on. (Even today, some 30 years after the
+MacLisp compiler, people will tell you that Lisp is an interpreted
+language. Ignore them.)
+
+SBCL aims for but has not completely achieved compliance with the ANSI
+standard for Common Lisp. More information about this is available in
+the BUGS section below.
+
+SBCL also includes various non-ANSI extensions, described more fully
+in the User Manual.  Some of these are in the base system and others
+are "contrib" modules loaded on request using \f(CRREQUIRE\fR.  For
+example, to load the \f(CRSB\-BSD\-SOCKETS\fR module that provides
+TCP/IP connectivity,
+\f(CR
+   * (require \(aqasdf)
+   * (require \(aqsb\-bsd\-sockets)
+\fR
+
+For more information, see the User Manual.
+.PP
+
+.SH THE COMPILER
+
+SBCL inherits from CMU CL the "Python" native code compiler. (Though
+we often avoid that name in order to avoid confusion with the
+scripting language also called Python.) This compiler is very clever
+about understanding the type system of Common Lisp and using it to
+optimize code, and about producing notes to let the user know when the
+compiler doesn't have enough type information to produce efficient
+code. It also tries (almost always successfully) to follow the unusual
+but very useful principle that "declarations are assertions", \fIi.e.\fR
+type declarations should be checked at runtime unless the user
+explicitly tells the system that speed is more important than safety.
+
+The compiled code uses garbage collection to automatically manage
+memory. The garbage collector implementation varies considerably from
+CPU to CPU. In particular, on some CPUs the GC is nearly exact, while
+on others it's more conservative, and on some CPUs the GC is
+generational, while on others simpler stop and copy strategies are
+used.
+
+For more information about the compiler, see the user manual.
+
 .SH SYSTEM REQUIREMENTS
 
 SBCL currently runs on X86 (Linux, FreeBSD, OpenBSD, and NetBSD),
 X86-64 (Linux), Alpha (Linux, Tru64), PPC (Linux, Darwin/MacOS X),
-SPARC (Linux and Solaris 2.x), and MIPS (Linux).  For information on
+SPARC (Linux and Solaris 2.x), and MIPS (Linux). For information on
 other ongoing and possible ports, see the sbcl\-devel mailing list,
 and/or the web site.
 
@@ -416,12 +303,6 @@ Multidimensional arrays are inefficient, especially
 multidimensional arrays of floating point numbers.
 .TP 3
 \--
-CLOS isn't particularly efficient. (In part, CLOS is so dynamic
-that it's slow for fundamental reasons, but beyond that, the
-SBCL implementation of CLOS doesn't do some important known
-optimizations.)
-.TP 3
-\--
 SBCL, like most (maybe all?) implementations of Common Lisp on stock
 hardware, has trouble passing floating point numbers around
 efficiently, because a floating point number, plus a few extra bits to
@@ -455,11 +336,49 @@ execute \f(CR(TAN LEAST\-NEGATIVE\-SINGLE\-FLOAT)\fR interactively on
 sbcl-1.2.3 on my Linux 4.5 X86 box, I get an \f(CRUNBOUND\-VARIABLE\fR
 error."
 
+.SH DIFFERENCES FROM CMU CL
+
+SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
+system and a C compiler, and all of its properties are specified by
+the version of the source code that it was created from. This clean
+bootstrappability was the immediate motivation for forking off of the
+CMU CL development tree. A variety of implementation differences are
+motivated by this design goal.
+
+Maintenance work in SBCL since the fork has diverged somewhat from the
+maintenance work in CMU CL. Many but not all bug fixes and
+improvements have been shared between the two projects, and sometimes
+the two projects disagree about what would be an improvement.
+
+Most extensions supported by CMU CL have been unbundled from SBCL,
+including Motif support, the Hemlock editor, search paths, the WIRE
+protocol, various user-level macros and functions (\fIe.g.\fR
+\f(CRLETF\fR, \f(CRITERATE\fR, \f(CRMEMQ\fR, \f(CRREQUIRED\-ARGUMENT\fR),
+and many others.
+
+(Why doesn't SBCL support more extensions natively? Why drop all those
+nice extensions from CMU CL when the code already exists? This is a
+frequently asked question on the mailing list. There are two principal
+reasons. First, it's a design philosophy issue: arguably SBCL has done
+its job by supplying a stable FFI, and the right design decision is to
+move functionality derived from that, like socket support, into
+separate libraries. Some of these are distributed with SBCL as
+"contrib" modules, others are distributed as separate software
+packages by separate maintainers. Second, it's a practical decision -
+focusing on a smaller number of things will, we hope, let us do a
+better job on them.)
+
 .SH SUPPORT
 
 Various information about SBCL is available at
 <\f(CRhttp://www.sbcl.org/\fR>. The mailing lists there are the recommended
 place to look for support.
+
+.SH AUTHORS
+
+Dozens of people have made substantial contributions to SBCL and its
+subsystems, and to the CMU CL system on which it was based, over the
+years. See the CREDITS file in the distribution for more information.
 
 .SH ENVIRONMENT
 
@@ -491,12 +410,6 @@ option.
 .I .sbclrc
 optional per-user customizable startup script (in user's home
 directory, or as specified by  \f(CR\-\-userinit\fR)
-
-.SH AUTHORS
-
-Dozens of people have made substantial contributions to SBCL and its
-subsystems, and to the CMU CL system on which it was based, over the
-years. See the CREDITS file in the distribution for more information.
 
 .SH SEE ALSO
 
