@@ -19,4 +19,4 @@
            #:flock-pid))
 
 #+win32
-(load-shared-object "msvcrt.dll")
+(sb-alien:load-shared-object "msvcrt.dll")
