@@ -248,6 +248,13 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
     (load-shared-object (truename "$TEST_FILESTEM-c.so"))
     (assert (= 43 late-foo))
     (assert (= 14 (late-bar)))
+    (unload-shared-object (truename "$TEST_FILESTEM-c.so"))
+    (multiple-value-bind (val err) (ignore-errors late-foo)
+      (assert (not val))
+      (assert (typep err 'undefined-alien-error)))
+    (multiple-value-bind (val err) (ignore-errors (late-bar))
+      (assert (not val))
+      (assert (typep err 'undefined-alien-error)))
     (note "/linkage table ok"))
 
   (sb-ext:quit :unix-status $EXIT_LISP_WIN) ; success convention for Lisp program

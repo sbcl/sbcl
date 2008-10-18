@@ -35,6 +35,7 @@
 (defstruct shared-object pathname namestring handle dont-save)
 
 (defun load-shared-object (pathname &key dont-save)
+  #!+sb-doc
   "Load a shared library / dynamic shared object file / similar foreign
 container specified by designated PATHNAME, such as a .so on an ELF platform.
 
@@ -90,6 +91,23 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
           (update-linkage-table))))
     pathname))
 
+(defun unload-shared-object (pathname)
+  #!+sb-doc
+  "Unloads the shared object loaded earlier using the designated PATHNAME with
+LOAD-SHARED-OBJECT, to the degree supported on the platform.
+
+Experimental."
+  (let ((pathname (pathname pathname)))
+    (sb!thread:with-mutex (*shared-objects-lock*)
+      (let ((old (find pathname *shared-objects*
+                       :key #'shared-object-pathname
+                       :test #'equal)))
+        (when old
+          (dlclose-or-lose old)
+          (setf *shared-objects* (remove old *shared-objects*))
+          #!+(and linkage-table (not win32))
+          (update-linkage-table))))))
+
 (defun try-reopen-shared-object (obj)
   (declare (type shared-object obj))
   (tagbody :dlopen
@@ -112,8 +130,10 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
               (unless (pathnamep pathname)
                 (format *query-io* "~&Error: invalid pathname.~%")
                 (go :query))
-              (setf (shared-object-pathname obj) pathname
-                    (shared-object-namestring obj) (native-namestring pathname :as-file t))))
+              (setf (shared-object-pathname obj) pathname)
+              (setf (shared-object-namestring obj)
+                    (native-namestring (translate-logical-pathname pathname)
+                                       :as-file t))))
          (go :dlopen))))
   obj)
 

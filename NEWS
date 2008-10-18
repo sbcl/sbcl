@@ -22,7 +22,8 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     Badichi)
   * enhancement: :DONT-SAVE keyword argument has been added to
     LOAD-SHARED-OBJECT for controlling interaction with
-    SAVE-LISP-AND-DIE.
+    SAVE-LISP-AND-DIE, and UNLOAD-SHARED-OBJECT can be used to undo
+    the effects of an earlier LOAD-SHARED-OBJECT call.
   * bug fix: ADJUST-ARRAY on multidimensional arrays used bogusly give
     them a fill pointer unless :DISPLACED-TO or :INITIAL-CONTENTS were
     provided. (reported by Cedric St-Jean)
