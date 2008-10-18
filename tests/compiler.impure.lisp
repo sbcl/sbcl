@@ -942,6 +942,17 @@
 (with-test (:name :complex-call-doesnt-warn)
   (handler-bind ((warning #'error))
     (compile nil '(lambda (x) (complex-function-signature x :z1 1 :z2 2)))))
+
+(with-test (:name :non-required-args-update-info)
+  (let ((name (gensym "NON-REQUIRE-ARGS-TEST"))
+        (*evaluator-mode* :compile))
+    (eval `(defun ,name (x) x))
+    (assert (equal '(function (t) (values t &optional))
+                   (sb-kernel:type-specifier (sb-int:info :function :type name))))
+    (eval `(defun ,name (x &optional y) (or x y)))
+    (assert (equal '(function (t &optional t) (values t &optional))
+                   (sb-kernel:type-specifier (sb-int:info :function :type name))))))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

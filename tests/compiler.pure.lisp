@@ -2645,3 +2645,9 @@
                                (destructuring-bind (a (b c) d) '(1 "foo" 4)
                                  (+ a b c d)))))
                    :feh))))))
+
+;;; Functions with non-required arguments used to end up with
+;;; (&OPTIONAL-DISPATCH ...) as their names.
+(with-test (:name :hairy-function-name)
+  (assert (eq 'read-line (nth-value 2 (function-lambda-expression #'read-line))))
+  (assert (equal "#<FUNCTION READ-LINE>" (princ-to-string #'read-line))))

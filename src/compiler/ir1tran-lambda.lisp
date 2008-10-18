@@ -868,8 +868,7 @@
                                      :allowp allowp
                                      :keyp keyp
                                      :%source-name source-name
-                                     :%debug-name (debug-name '&optional-dispatch
-                                                              (or debug-name source-name))
+                                     :%debug-name debug-name
                                      :plist `(:ir1-environment
                                               (,*lexenv*
                                                ,*current-path*))))

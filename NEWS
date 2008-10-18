@@ -37,6 +37,10 @@ changes in sbcl-1.0.22 relative to 1.0.21:
   * bug fix: COMPILE-FILE did not warn about undefined variable
     references at toplevel, and LOAD of the resulting fasl did
     not signal an error.
+  * bug fix: functions with non-required arguments used to end up with
+    (SB-C::&OPTIONAL-DISPATCH ...) as their name.
+  * bug fix: redefining a function with non-required arguments didn't
+    update the system's knowledge about its call signature properly.
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a
