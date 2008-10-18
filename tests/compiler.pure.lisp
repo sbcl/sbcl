@@ -2651,3 +2651,16 @@
 (with-test (:name :hairy-function-name)
   (assert (eq 'read-line (nth-value 2 (function-lambda-expression #'read-line))))
   (assert (equal "#<FUNCTION READ-LINE>" (princ-to-string #'read-line))))
+
+;;; PROGV + RESTRICT-COMPILER-POLICY
+(with-test (:name :progv-and-restrict-compiler-policy)
+  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+    (restrict-compiler-policy 'debug 3)
+    (let ((fun (compile nil '(lambda (x)
+                              (let ((i x))
+                                (declare (special i))
+                                (list i
+                                      (progv '(i) (list (+ i 1))
+                                        i)
+                                      i))))))
+      (assert (equal '(1 2 1) (funcall fun 1))))))

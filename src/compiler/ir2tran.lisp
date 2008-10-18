@@ -1437,7 +1437,8 @@
                               (about-to-modify-symbol-value var "bind ~S")
                               (%primitive bind unbound-marker var))))
                         (,bind (vars vals)
-                          (declare (optimize (speed 2) (debug 0)))
+                          (declare (optimize (speed 2) (debug 0)
+                                             (insert-debug-catch 0)))
                           (cond ((null vars))
                                 ((null vals) (,unbind vars))
                                 (t

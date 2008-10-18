@@ -44,6 +44,9 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     update the system's knowledge about its call signature properly.
   * bug fix: fixed #431; incompatible alien record type redefinitions
     are detected and handled. (reported by Neil Haven)
+  * bug fix: using RESTRICT-COMPILER-POLICY with DEBUG 3 could cause
+    PROGV miscompilation. (reported by Matthias Benkard, patch by Juho
+    Snellman)
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a
