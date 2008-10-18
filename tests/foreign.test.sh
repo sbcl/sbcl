@@ -127,8 +127,8 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (handler-case
         (progn
-          (load-shared-object "$TEST_FILESTEM.so")
-          (load-shared-object "$TEST_FILESTEM-b.so"))
+          (load-shared-object (truename "$TEST_FILESTEM.so"))
+          (load-shared-object (truename "$TEST_FILESTEM-b.so")))
       (sb-int:unsupported-operator ()
         ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
         ;; supported on every OS. In that case, there's nothing to test,
@@ -224,7 +224,7 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   (note "/original definitions ok")
   (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
   (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
-  (load-shared-object "$TEST_FILESTEM-b.so")
+  (load-shared-object (truename "$TEST_FILESTEM-b.so"))
   (note "/reloading ok")
   (assert (= 42 foo))
   (assert (= 13 (bar)))
@@ -245,7 +245,7 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
     (multiple-value-bind (val err) (ignore-errors (late-bar))
       (assert (not val))
       (assert (typep err 'undefined-alien-error)))
-    (load-shared-object "$TEST_FILESTEM-c.so")
+    (load-shared-object (truename "$TEST_FILESTEM-c.so"))
     (assert (= 43 late-foo))
     (assert (= 14 (late-bar)))
     (note "/linkage table ok"))
@@ -325,7 +325,7 @@ EOF
 build_so $TEST_FILESTEM.addr.heap
 
 run_sbcl <<EOF
-  (load-shared-object "$TEST_FILESTEM.addr.heap.so")
+  (load-shared-object (truename "$TEST_FILESTEM.addr.heap.so"))
   (define-alien-type foo (struct foo (x int) (y int)))
 
   (define-alien-variable a foo)

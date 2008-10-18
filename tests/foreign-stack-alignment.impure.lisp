@@ -60,7 +60,7 @@
      #+darwin "-bundle" #-darwin "-shared"
      "-o" "stack-alignment-offset.so")
 
-(load-shared-object "stack-alignment-offset.so")
+(load-shared-object (truename "stack-alignment-offset.so"))
 
 (define-alien-routine stack-alignment-offset int (alignment int))
 (define-alien-routine trampoline int (callback (function int)))

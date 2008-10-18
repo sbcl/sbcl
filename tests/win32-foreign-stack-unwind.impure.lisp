@@ -30,7 +30,7 @@
 
 (run-compiler)
 
-(load-shared-object "win32-stack-unwind.dll")
+(load-shared-object (truename "win32-stack-unwind.dll"))
 
 
 (defvar *current-test-callback*)

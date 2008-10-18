@@ -69,7 +69,7 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
                         :test #'equal))
              (obj (or old (make-shared-object
                            :pathname pathname
-                           :namestring (native-namestring 
+                           :namestring (native-namestring
                                         (translate-logical-pathname pathname)
                                         :as-file t)))))
         (setf (shared-object-dont-save obj) dont-save)

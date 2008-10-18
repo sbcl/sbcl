@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
 changes in sbcl-1.0.22 relative to 1.0.21:
+  * minor incompatible change: LOAD-SHARED-OBJECT no longer by default looks
+    for the shared object in the current directory, but passes the native
+    namestring of the designated pathname to the operation system's shared
+    object loading function as-it.
   * minor incompatible change: --disable-debugger toplevel option now takes
     effect before processing of initialization files and --eval or --load
     options.
