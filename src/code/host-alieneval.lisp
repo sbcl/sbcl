@@ -962,41 +962,45 @@
 ;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
 (defun parse-alien-record-type (kind name fields env)
   (declare (type (or sb!kernel:lexenv null) env))
-  (cond (fields
-         (let* ((old (and name (auxiliary-alien-type kind name env)))
-                (old-fields (and old (alien-record-type-fields old))))
-           ;; KLUDGE: We can't easily compare the new fields
-           ;; against the old fields, since the old fields have
-           ;; already been parsed into an internal
-           ;; representation, so we just punt, assuming that
-           ;; they're consistent. -- WHN 200000505
-           #|
-             (unless (equal fields old-fields)
-               ;; FIXME: Perhaps this should be a warning, and we
-               ;; should overwrite the old definition and proceed?
-               (error "mismatch in fields for ~S~%  old ~S~%  new ~S"
-                      name old-fields fields))
-           |#
-           (if old-fields
-               old
-               (let ((type (or old (make-alien-record-type :name name :kind kind))))
-                 (when (and name (not old))
-                   (setf (auxiliary-alien-type kind name env) type))
-                 (parse-alien-record-fields type fields env)
-                 type))))
-        (name
-         (or (auxiliary-alien-type kind name env)
-             (setf (auxiliary-alien-type kind name env)
-                   (make-alien-record-type :name name :kind kind))))
-        (t
-         (make-alien-record-type :kind kind))))
+  (flet ((frob-type (type new-fields alignment bits)
+           (setf (alien-record-type-fields type) new-fields
+                 (alien-record-type-alignment type) alignment
+                 (alien-record-type-bits type) bits)))
+      (cond (fields
+             (multiple-value-bind (new-fields alignment bits)
+                 (parse-alien-record-fields kind fields env)
+               (let* ((old (and name (auxiliary-alien-type kind name env)))
+                      (old-fields (and old (alien-record-type-fields old))))
+                 (when (and old-fields
+                            (notevery #'record-fields-match-p old-fields new-fields))
+                   (cerror "Continue, clobbering the old definition."
+                           "Incompatible alien record type definition~%Old: ~S~%New: ~S"
+                           (unparse-alien-type old)
+                           `(,(unparse-alien-record-kind kind)
+                              ,name
+                              ,@(mapcar #'unparse-alien-record-field new-fields)))
+                   (frob-type old new-fields alignment bits))
+                 (if old-fields
+                     old
+                     (let ((type (or old (make-alien-record-type :name name :kind kind))))
+                       (when (and name (not old))
+                         (setf (auxiliary-alien-type kind name env) type))
+                       (frob-type type new-fields alignment bits)
+                       type)))))
+            (name
+             (or (auxiliary-alien-type kind name env)
+                 (setf (auxiliary-alien-type kind name env)
+                       (make-alien-record-type :name name :kind kind))))
+            (t
+             (make-alien-record-type :kind kind)))))
 
-;;; This is used by PARSE-ALIEN-TYPE to parse the fields of struct and
-;;; union types. RESULT holds the record type we are paring the fields
-;;; of, and FIELDS is the list of field specifications.
-(defun parse-alien-record-fields (result fields env)
-  (declare (type alien-record-type result)
-           (type list fields))
+;;; This is used by PARSE-ALIEN-TYPE to parse the fields of struct and union
+;;; types. KIND is the kind we are paring the fields of, and FIELDS is the
+;;; list of field specifications.
+;;;
+;;; Result is a list of field objects, overall alignment, and number of bits
+(defun parse-alien-record-fields (kind fields env)
+  (declare (type list fields))
   (let ((total-bits 0)
         (overall-alignment 1)
         (parsed-fields nil))
@@ -1015,33 +1019,36 @@
           (when (null alignment)
             (error "unknown alignment: ~S" (unparse-alien-type field-type)))
           (setf overall-alignment (max overall-alignment alignment))
-          (ecase (alien-record-type-kind result)
+          (ecase kind
             (:struct
              (let ((offset (align-offset total-bits alignment)))
                (setf (alien-record-field-offset parsed-field) offset)
                (setf total-bits (+ offset bits))))
             (:union
              (setf total-bits (max total-bits bits)))))))
-    (let ((new (nreverse parsed-fields)))
-      (setf (alien-record-type-fields result) new))
-    (setf (alien-record-type-alignment result) overall-alignment)
-    (setf (alien-record-type-bits result)
-          (align-offset total-bits overall-alignment))))
+    (values (nreverse parsed-fields)
+            overall-alignment
+            (align-offset total-bits overall-alignment))))
 
 (define-alien-type-method (record :unparse) (type)
-  `(,(case (alien-record-type-kind type)
-       (:struct 'struct)
-       (:union 'union)
-       (t '???))
+  `(,(unparse-alien-record-kind (alien-record-type-kind type))
     ,(alien-record-type-name type)
     ,@(unless (member type *record-types-already-unparsed* :test #'eq)
         (push type *record-types-already-unparsed*)
-        (mapcar (lambda (field)
-                  `(,(alien-record-field-name field)
-                    ,(%unparse-alien-type (alien-record-field-type field))
-                    ,@(if (alien-record-field-bits field)
-                          (list (alien-record-field-bits field)))))
+        (mapcar #'unparse-alien-record-field
                 (alien-record-type-fields type)))))
+
+(defun unparse-alien-record-kind (kind)
+  (case kind
+    (:struct 'struct)
+    (:union 'union)
+    (t '???)))
+
+(defun unparse-alien-record-field (field)
+  `(,(alien-record-field-name field)
+     ,(%unparse-alien-type (alien-record-field-type field))
+     ,@(when (alien-record-field-bits field)
+             (list (alien-record-field-bits field)))))
 
 ;;; Test the record fields. Keep a hashtable table of already compared
 ;;; types to detect cycles.

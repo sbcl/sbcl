@@ -42,6 +42,8 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     (SB-C::&OPTIONAL-DISPATCH ...) as their name.
   * bug fix: redefining a function with non-required arguments didn't
     update the system's knowledge about its call signature properly.
+  * bug fix: fixed #431; incompatible alien record type redefinitions
+    are detected and handled. (reported by Neil Haven)
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a

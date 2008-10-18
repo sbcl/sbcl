@@ -1920,25 +1920,4 @@ generally try to check returns in safe code, so we should here too.)
  MAKE-FOO).
 
 431: alien strucure redefinition doesn't work as expected
-
-  (define-alien-type nil (struct mystruct (myshort short) (mychar char)))
-
-  (with-alien ((myst (struct mystruct)))
-    (with-alien ((mysh short (slot myst 'myshort)))
-      (integerp mysh)))
-
-  (define-alien-type nil (struct mystruct (myint int) (mychar char)))
-
-  (with-alien ((myst (struct mystruct)))
-    (with-alien ((myin int (slot myst 'myint)))
-      (integerp myin)))
-
-  results in error:
-
-   There is no slot named MYINT in
-     #<SB-ALIEN-INTERNALS:ALIEN-RECORD-TYPE (STRUCT MYSTRUCT
-                                             (MYSHORT (SIGNED 16))
-                                             (MYCHAR (SIGNED 8)))>.
-   [Condition of type SIMPLE-ERROR]
-
-  reported by Neil Haven on sbcl-devel.
+  fixed in 1.0.21.29

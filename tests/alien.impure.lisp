@@ -226,4 +226,23 @@
     (loop repeat 1024
           do (try-to-leak-alien-stack t))))
 
+;;; bug 431
+(with-test (:name :alien-struct-redefinition)
+  (eval '(progn
+          (define-alien-type nil (struct mystruct (myshort short) (mychar char)))
+          (with-alien ((myst (struct mystruct)))
+            (with-alien ((mysh short (slot myst 'myshort)))
+              (assert (integerp mysh))))))
+  (let ((restarted 0))
+    (handler-bind ((error (lambda (e)
+                            (let ((cont (find-restart 'continue e)))
+                              (when cont
+                                (incf restarted)
+                                (invoke-restart cont))))))
+      (eval '(define-alien-type nil (struct mystruct (myint int) (mychar char)))))
+    (assert (= 1 restarted)))
+  (eval '(with-alien ((myst (struct mystruct)))
+          (with-alien ((myin int (slot myst 'myint)))
+            (assert (integerp myin))))))
+
 ;;; success
