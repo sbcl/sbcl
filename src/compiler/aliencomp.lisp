@@ -613,6 +613,29 @@
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))
 
+;;; A per-thread list of frame pointer, program counter conses.
+(defvar *saved-fp-and-pcs* ())
+
+#!+:c-stack-is-control-stack
+(declaim (inline invoke-with-saved-fp-and-pc))
+#!+:c-stack-is-control-stack
+(defun invoke-with-saved-fp-and-pc (fn)
+  (let* ((fp-and-pc (multiple-value-bind (fp pc)
+                        (%caller-frame-and-pc)
+                      (cons fp pc)))
+         (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+    (declare (truly-dynamic-extent fp-and-pc *saved-fp-and-pcs*))
+    (funcall fn)))
+
+(defun find-saved-fp-and-pc (fp)
+  (dolist (x *saved-fp-and-pcs*)
+    (when (#!+:stack-grows-downward-not-upward
+           sap>
+           #!-:stack-grows-downward-not-upward
+           sap<
+           (int-sap (get-lisp-obj-address (car x))) fp)
+      (return (values (car x) (cdr x))))))
+
 (deftransform alien-funcall ((function &rest args) * * :important t)
   (let ((type (lvar-type function)))
     (unless (alien-type-type-p type)
@@ -667,6 +690,11 @@
                         `(multiple-value-bind ,(temps) ,body
                            (values ,@(results)))))
                 (setf body `(naturalize ,body ',return-type)))
+            ;; Remember this frame to make sure that we can get back
+            ;; to it later regardless of how the foreign stack looks
+            ;; like.
+            #!+:c-stack-is-control-stack
+            (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body)))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
             `(lambda (function ,@(params))
                ,body)))))))

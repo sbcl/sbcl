@@ -731,6 +731,7 @@ around and can be retrieved by JOIN-THREAD."
                    (*restart-clusters* nil)
                    (*handler-clusters* (sb!kernel::initial-handler-clusters))
                    (*condition-restarts* nil)
+                   (sb!c::*saved-fp-and-pcs* ())
                    (sb!impl::*deadline* nil)
                    (sb!impl::*step-out* nil)
                    ;; internal printer variables

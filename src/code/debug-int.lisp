@@ -674,6 +674,11 @@
       ((not (frame-p frame)))
     (setf (frame-number frame) number)))
 
+(defun find-saved-frame-down (fp up-frame)
+  (multiple-value-bind (saved-fp saved-pc) (sb!c:find-saved-fp-and-pc fp)
+    (when saved-fp
+      (compute-calling-frame (descriptor-sap saved-fp) saved-pc up-frame))))
+
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
 (defun frame-down (frame)
@@ -703,8 +708,9 @@
                      (when (control-stack-pointer-valid-p fp)
                        #!+(or x86 x86-64)
                        (multiple-value-bind (ok ra ofp) (x86-call-context fp)
-                         (and ok
-                              (compute-calling-frame ofp ra frame)))
+                         (if ok
+                             (compute-calling-frame ofp ra frame)
+                             (find-saved-frame-down fp frame)))
                        #!-(or x86 x86-64)
                        (compute-calling-frame
                         #!-alpha
