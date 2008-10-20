@@ -792,3 +792,25 @@
       (values (equal "mktemp" (pathname-name pathname))
               (not (equal "XXXXXX" (pathname-type pathname)))))
   t t)
+
+#-win32
+(deftest mkstemp.null-terminate
+    (let* ((default (make-pathname :directory '(:absolute "tmp")))
+           (filename (namestring (make-pathname :name "mkstemp-1"
+                                                :type "XXXXXX"
+                                                :defaults default)))
+           ;; The magic 64 is the filename length that happens to
+           ;; trigger the no null termination bug at least on my
+           ;; machine on a certain build.
+           (n (- 64 (length (sb-ext:string-to-octets filename)))))
+      (multiple-value-bind (fd temp)
+          (sb-posix:mkstemp (make-pathname
+                             :name "mkstemp-1"
+                             :type (format nil "~AXXXXXX"
+                                           (make-string n :initial-element #\x))
+                             :defaults default))
+        (let ((pathname (sb-ext:parse-native-namestring temp)))
+          (unwind-protect
+               (values (integerp fd) (pathname-name pathname))
+            (delete-file temp)))))
+  t "mkstemp-1")

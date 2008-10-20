@@ -169,7 +169,8 @@
                         (let* ((external-format sb-alien::*default-c-string-external-format*)
                                (arg (sb-ext:string-to-octets
                                      (filename template)
-                                     :external-format external-format)))
+                                     :external-format external-format
+                                     :null-terminate t)))
                           (sb-sys:with-pinned-objects (arg)
                             ;; accommodate for the call-by-reference
                             ;; nature of mks/dtemp's template strings.
@@ -181,7 +182,8 @@
                               ;; FIXME: We'd rather return pathnames, but other
                               ;; SB-POSIX functions like this return strings...
                               (let ((pathname (sb-ext:octets-to-string
-                                               arg :external-format external-format)))
+                                               arg :external-format external-format
+                                               :end (1- (length arg)))))
                                 ,(if values
                                      '(values result pathname)
                                      'pathname))))))

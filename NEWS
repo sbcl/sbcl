@@ -49,6 +49,7 @@ changes in sbcl-1.0.22 relative to 1.0.21:
     Snellman)
   * bug fix: on x86 and x86-64 backtraces were sometimes truncated
     after alien stack frames.
+  * bug fix: strings passed to mk{s,d}temp lacked null termination
 
 changes in sbcl-1.0.21 relative to 1.0.20:
   * new feature: the compiler is able to track the effective type of a
