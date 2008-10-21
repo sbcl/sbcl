@@ -613,8 +613,9 @@
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))
 
-;;; A per-thread list of frame pointer, program counter conses.
-(defvar *saved-fp-and-pcs* ())
+;;; Frame pointer, program counter conses. In each thread it's bound
+;;; locally or not bound at all.
+(defvar *saved-fp-and-pcs*)
 
 #!+:c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp-and-pc))
@@ -623,18 +624,21 @@
   (let* ((fp-and-pc (multiple-value-bind (fp pc)
                         (%caller-frame-and-pc)
                       (cons fp pc)))
-         (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+         (*saved-fp-and-pcs* (if (boundp '*saved-fp-and-pcs*)
+                                 (cons fp-and-pc *saved-fp-and-pcs*)
+                                 (list fp-and-pc))))
     (declare (truly-dynamic-extent fp-and-pc *saved-fp-and-pcs*))
     (funcall fn)))
 
 (defun find-saved-fp-and-pc (fp)
-  (dolist (x *saved-fp-and-pcs*)
-    (when (#!+:stack-grows-downward-not-upward
-           sap>
-           #!-:stack-grows-downward-not-upward
-           sap<
-           (int-sap (get-lisp-obj-address (car x))) fp)
-      (return (values (car x) (cdr x))))))
+  (when (boundp '*saved-fp-and-pcs*)
+    (dolist (x *saved-fp-and-pcs*)
+      (when (#!+:stack-grows-downward-not-upward
+             sap>
+             #!-:stack-grows-downward-not-upward
+             sap<
+             (int-sap (get-lisp-obj-address (car x))) fp)
+        (return (values (car x) (cdr x)))))))
 
 (deftransform alien-funcall ((function &rest args) * * :important t)
   (let ((type (lvar-type function)))
