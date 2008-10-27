@@ -137,12 +137,12 @@ sufficiently motivated to do lengthy fixes."
                ;; since the GC will invalidate the stack.
                #!+gencgc (gc-and-save (unix-namestring core-file-name nil)
                                       (foreign-bool executable)
-                                      (foreign-bool save-runtime-options))
+                                      (foreign-bool save-runtime-options)))
              (without-gcing
               (save (unix-namestring core-file-name nil)
                     (get-lisp-obj-address #'restart-lisp)
                     (foreign-bool executable)
-                    (foreign-bool save-runtime-options))))))
+                    (foreign-bool save-runtime-options)))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
     #!+gencgc
