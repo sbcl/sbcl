@@ -190,7 +190,7 @@ corresponds to NAME, or NIL if there is none."
 (defun sb-mkstemp (template-string mode)
   (declare (type string template-string)
            (type unix-file-mode mode))
-  (let ((template-buffer (string-to-octets template-string)))
+  (let ((template-buffer (string-to-octets template-string :null-terminate t)))
     (with-pinned-objects (template-buffer)
       (let ((fd (alien-funcall (extern-alien "sb_mkstemp"
                                              (function int (* char) int))
