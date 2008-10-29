@@ -21,7 +21,7 @@
 			.align 3 @ \
 _##x:
 
-#define GFUNCDEF(x)	.globl _/**/x @ \
+#define GFUNCDEF(x)	.globl _ ## x @ \
 	FUNCDEF(x)
 #else
 #define FUNCDEF(x)	.text ; \
