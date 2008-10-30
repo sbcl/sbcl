@@ -70,20 +70,32 @@
 #!-x86 (def-math-rtn "sin" 1)
 #!-x86 (def-math-rtn "cos" 1)
 #!-x86 (def-math-rtn "tan" 1)
-(def-math-rtn "asin" 1)
-(def-math-rtn "acos" 1)
 #!-x86 (def-math-rtn "atan" 1)
 #!-x86 (def-math-rtn "atan2" 2)
-(def-math-rtn "sinh" 1)
-(def-math-rtn "cosh" 1)
 #!-win32
 (progn
+  (def-math-rtn "acos" 1)
+  (def-math-rtn "asin" 1)
+  (def-math-rtn "cosh" 1)
+  (def-math-rtn "sinh" 1)
   (def-math-rtn "tanh" 1)
   (def-math-rtn "asinh" 1)
   (def-math-rtn "acosh" 1)
   (def-math-rtn "atanh" 1))
 #!+win32
 (progn
+  (declaim (inline %asin))
+  (defun %asin (number)
+    (%atan (/ number (sqrt (- 1 (* number number))))))
+  (declaim (inline %acos))
+  (defun %acos (number)
+    (- (/ pi 2) (%asin number)))
+  (declaim (inline %cosh))
+  (defun %cosh (number)
+    (/ (+ (exp number) (exp (- number))) 2))
+  (declaim (inline %sinh))
+  (defun %sinh (number)
+    (/ (- (exp number) (exp (- number))) 2))
   (declaim (inline %tanh))
   (defun %tanh (number)
     (/ (%sinh number) (%cosh number)))
@@ -107,8 +119,16 @@
 #!-x86 (def-math-rtn "log10" 1)
 #!-win32(def-math-rtn "pow" 2)
 #!-(or x86 x86-64) (def-math-rtn "sqrt" 1)
-(def-math-rtn "hypot" 2)
+#!-win32 (def-math-rtn "hypot" 2)
 #!-(or hpux x86) (def-math-rtn "log1p" 1)
+
+#!+win32
+(progn
+  ;; FIXME: libc hypot "computes the sqrt(x*x+y*y) without undue overflow or underflow"
+  ;; ...we just do the stupid simple thing.
+  (declaim (inline %hypot))
+  (defun %hypot (x y)
+    (sqrt (+ (* x x) (* y y)))))
 
 ;;;; power functions
 

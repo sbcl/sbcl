@@ -540,14 +540,9 @@ void scratch(void)
     _get_osfhandle(0);
     _pipe(0,0,0);
     access(0,0);
-    acos(0);
-    asin(0);
     close(0);
-    cosh(0);
     dup(0);
-    hypot(0, 0);
     isatty(0);
-    sinh(0);
     strerror(42);
     write(0, 0, 0);
     RtlUnwind(0, 0, 0, 0);
