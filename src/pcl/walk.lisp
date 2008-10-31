@@ -257,6 +257,11 @@
 (defun env-declarations (env)
   (caddr (env-lock env)))
 
+(defun env-var-type (var env)
+  (dolist (decl (env-declarations env) t)
+    (when (and (eq 'type (car decl)) (member var (cddr decl) :test 'eq))
+      (return (cadr decl)))))
+
 (defun env-lexical-variables (env)
   (cadddr (env-lock env)))
 
@@ -465,12 +470,17 @@
          ((not (consp newform))
           (let ((symmac (car (variable-symbol-macro-p newform env))))
             (if symmac
-                (let ((newnewform (walk-form-internal (cddr symmac)
-                                                      context
-                                                      env)))
-                  (if (eq newnewform (cddr symmac))
-                      (if *walk-form-expand-macros-p* newnewform newform)
-                      newnewform))
+                (let* ((newnewform (walk-form-internal (cddr symmac)
+                                                       context
+                                                       env))
+                       (resultform
+                        (if (eq newnewform (cddr symmac))
+                            (if *walk-form-expand-macros-p* newnewform newform)
+                            newnewform))
+                       (type (env-var-type newform env)))
+                  (if (eq t type)
+                      resultform
+                      `(the ,type ,resultform)))
                 newform)))
          (t
           (let* ((fn (car newform))
@@ -633,7 +643,7 @@
                                      ,(or (var-lexical-p name env) name)
                                      ,.args)
                                    env)
-                 (note-declaration declaration env))
+                 (note-declaration (sb!c::canonized-decl-spec declaration) env))
              (push declaration declarations)))
          (recons body
                  form
@@ -853,7 +863,10 @@
              (val (caddr form))
              (symmac (car (variable-symbol-macro-p var env))))
         (if symmac
-            (let* ((expanded `(setf ,(cddr symmac) ,val))
+            (let* ((type (env-var-type var env))
+                   (expanded (if (eq t type)
+                                 `(setf ,(cddr symmac) ,val)
+                                 `(setf ,(cddr symmac) `(the ,type ,val))))
                    (walked (walk-form-internal expanded context env)))
               (if (eq expanded walked)
                   form
