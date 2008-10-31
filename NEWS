@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; -*-
+changes in sbcl-1.0.23 relative to 1.0.22:
+  * optimization: printing with *PRINT-PRETTY* true is now more
+    efficient as long as the object being printed doesn't require
+    special handling by the pretty printer.
+
 changes in sbcl-1.0.22 relative to 1.0.21:
   * minor incompatible change: LOAD-SHARED-OBJECT no longer by default looks
     for the shared object in the current directory, but passes the native

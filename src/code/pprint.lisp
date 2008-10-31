@@ -1315,8 +1315,13 @@ line break."
 ;;; OUTPUT-PRETTY-OBJECT is called by OUTPUT-OBJECT when
 ;;; *PRINT-PRETTY* is true.
 (defun output-pretty-object (object stream)
-  (with-pretty-stream (stream)
-    (funcall (pprint-dispatch object) stream object)))
+  (multiple-value-bind (fun pretty) (pprint-dispatch object)
+    (if pretty
+        (with-pretty-stream (stream)
+          (funcall fun stream object))
+        ;; No point in consing up a pretty stream if we are not using pretty
+        ;; printing the object after all.
+        (output-ugly-object object stream))))
 
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
