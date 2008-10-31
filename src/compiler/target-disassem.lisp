@@ -1498,12 +1498,16 @@
       (error "can't compile a lexical closure"))
     (compile nil lambda)))
 
-(defun valid-extended-function-designator-for-disassemble-p (thing)
+(defun valid-extended-function-designators-for-disassemble-p (thing)
   (cond ((legal-fun-name-p thing)
-         (compiled-fun-or-lose (fdefinition thing) thing))
+         (compiled-funs-or-lose (fdefinition thing) thing))
         #!+sb-eval
         ((sb!eval:interpreted-function-p thing)
          (compile nil thing))
+        ((typep thing 'sb!pcl::%method-function)
+         ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
+         ;; we to disassemble both.
+         (list thing (sb!pcl::%method-function-fast-function thing)))
         ((functionp thing)
          thing)
         ((and (listp thing)
@@ -1511,13 +1515,13 @@
          (compile nil thing))
         (t nil)))
 
-(defun compiled-fun-or-lose (thing &optional (name thing))
-  (let ((fun (valid-extended-function-designator-for-disassemble-p thing)))
-    (if fun
-        fun
+(defun compiled-funs-or-lose (thing &optional (name thing))
+  (let ((funs (valid-extended-function-designators-for-disassemble-p thing)))
+    (if funs
+        funs
         (error 'simple-type-error
                :datum thing
-               :expected-type '(satisfies valid-extended-function-designator-for-disassemble-p)
+               :expected-type '(satisfies valid-extended-function-designators-for-disassemble-p)
                :format-control "can't make a compiled function from ~S"
                :format-arguments (list name)))))
 
@@ -1532,11 +1536,16 @@
   (declare (type (or function symbol cons) object)
            (type (or (member t) stream) stream)
            (type (member t nil) use-labels))
-  (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
-    (disassemble-fun (compiled-fun-or-lose object)
-                     :stream stream
-                     :use-labels use-labels)
-    nil))
+  (flet ((disassemble1 (fun)
+           (format stream "~&; disassembly for ~S" (sb!kernel:%fun-name fun))
+           (disassemble-fun fun
+                            :stream stream
+                            :use-labels use-labels)))
+    (let ((funs (compiled-funs-or-lose object)))
+      (if (listp funs)
+          (dolist (fun funs) (disassemble1 fun))
+          (disassemble1 funs))))
+  nil)
 
 ;;; Disassembles the given area of memory starting at ADDRESS and
 ;;; LENGTH long. Note that if CODE-COMPONENT is NIL and this memory
