@@ -564,7 +564,7 @@ if there is no such entry. Entries can be added using SETF."
                     ;; redo the lookup if the GC epoch counter has changed.
                     ;; -- JES,  2007-09-30
                     `(if (and (not ,foundp)
-                              (not (eql start-epoch sb!kernel::*gc-epoch*)))
+                              (not (eq start-epoch sb!kernel::*gc-epoch*)))
                          (go start)
                          (return-from %gethash3 (values ,value ,foundp))))
                   (overflow ()
