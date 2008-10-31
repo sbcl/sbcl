@@ -626,57 +626,46 @@
         ;; must be Gray streams FUNDAMENTAL-STREAM
         (stream-fresh-line stream))))
 
-(defun write-string (string &optional (stream *standard-output*)
-                            &key (start 0) end)
-  (declare (type string string))
-  ;; Note that even though you might expect, based on the behavior of
-  ;; things like AREF, that the correct upper bound here is
-  ;; (ARRAY-DIMENSION STRING 0), the ANSI glossary definitions for
-  ;; "bounding index" and "length" indicate that in this case (i.e.
-  ;; for the ANSI-specified functions WRITE-STRING [and WRITE-LINE]),
-  ;; (LENGTH STRING) is the required upper bound. A foolish
-  ;; consistency is the hobgoblin of lesser languages..
-  (%write-string string stream start (%check-vector-sequence-bounds
-                                      string start end))
-  string)
-
 #!-sb-fluid (declaim (inline ansi-stream-write-string))
 (defun ansi-stream-write-string (string stream start end)
-  (declare (type string string))
-  (declare (type ansi-stream stream))
-  (declare (type index start end))
   (with-array-data ((data string) (offset-start start)
                     (offset-end end)
                     :check-fill-pointer t)
     (funcall (ansi-stream-sout stream)
-             stream data offset-start offset-end))
-  string)
+             stream data offset-start offset-end)))
 
 (defun %write-string (string stream start end)
+  (let ((stream (out-synonym-of stream)))
+    (if (ansi-stream-p stream)
+        (ansi-stream-write-string string stream start end)
+        ;; must be Gray streams FUNDAMENTAL-STREAM
+        (stream-write-string stream string start end)))
+  string)
+
+(defun write-string (string &optional (stream *standard-output*)
+                            &key (start 0) end)
   (declare (type string string))
   (declare (type stream-designator stream))
-  (declare (type index start end))
-  (let ((stream (out-synonym-of stream)))
-    (if(ansi-stream-p stream)
-       (ansi-stream-write-string string stream start end)
-       ;; must be Gray streams FUNDAMENTAL-STREAM
-       (stream-write-string stream string start end))))
+  (%write-string string stream start end))
 
 ;;; A wrapper function for all those (MACROLET OUT-FUN) definitions,
-;;; which cannot deal with keyword arguments.
+;;; which cannot deal with keyword arguments. %WRITE-STRING cannot
+;;; replace this, as this needs to deal with simple-strings as well.
 (declaim (inline write-string-no-key))
 (defun write-string-no-key (string stream start end)
   (write-string string stream :start start :end end))
 
 (defun write-line (string &optional (stream *standard-output*)
-                          &key (start 0) end)
+                   &key (start 0) end)
   (declare (type string string))
-  ;; FIXME: Why is there this difference between the treatments of the
-  ;; STREAM argument in WRITE-STRING and WRITE-LINE?
-  (let ((defaulted-stream (out-synonym-of stream)))
-    (%write-string string defaulted-stream start (%check-vector-sequence-bounds
-                                                  string start end))
-    (write-char #\newline defaulted-stream))
+  (declare (type stream-designator stream))
+  (let ((stream (out-synonym-of stream)))
+    (cond ((ansi-stream-p stream)
+           (ansi-stream-write-string string stream start end)
+           (funcall (ansi-stream-out stream) stream #\newline))
+          (t
+           (stream-write-string stream string start end)
+           (stream-write-char stream #\newline))))
   string)
 
 (defun charpos (&optional (stream *standard-output*))
@@ -1672,91 +1661,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                current)))))
      (:element-type (array-element-type
                      (fill-pointer-output-stream-string stream)))))
-
-;;;; indenting streams
-
-(defstruct (indenting-stream (:include ansi-stream
-                                       (out #'indenting-out)
-                                       (sout #'indenting-sout)
-                                       (misc #'indenting-misc))
-                             (:constructor make-indenting-stream (stream))
-                             (:copier nil))
-  ;; the stream we're based on
-  stream
-  ;; how much we indent on each line
-  (indentation 0))
-
-#!+sb-doc
-(setf (fdocumentation 'make-indenting-stream 'function)
- "Return an output stream which indents its output by some amount.")
-
-;;; INDENTING-INDENT writes the correct number of spaces needed to indent
-;;; output on the given STREAM based on the specified SUB-STREAM.
-(defmacro indenting-indent (stream sub-stream)
-  ;; KLUDGE: bare magic number 60
-  `(do ((i 0 (+ i 60))
-        (indentation (indenting-stream-indentation ,stream)))
-       ((>= i indentation))
-     (%write-string
-      #.(make-string 60 :initial-element #\Space)
-      ,sub-stream
-      0
-      (min 60 (- indentation i)))))
-
-;;; INDENTING-OUT writes a character to an indenting stream.
-(defun indenting-out (stream char)
-  (let ((sub-stream (indenting-stream-stream stream)))
-    (write-char char sub-stream)
-    (if (char= char #\newline)
-        (indenting-indent stream sub-stream))))
-
-;;; INDENTING-SOUT writes a string to an indenting stream.
-(defun indenting-sout (stream string start end)
-  (declare (simple-string string) (fixnum start end))
-  (do ((i start)
-       (sub-stream (indenting-stream-stream stream)))
-      ((= i end))
-    (let ((newline (position #\newline string :start i :end end)))
-      (cond (newline
-             (%write-string string sub-stream i (1+ newline))
-             (indenting-indent stream sub-stream)
-             (setq i (+ newline 1)))
-            (t
-             (%write-string string sub-stream i end)
-             (setq i end))))))
-
-;;; INDENTING-MISC just treats just the :LINE-LENGTH message
-;;; differently. INDENTING-CHARPOS says the charpos is the charpos of
-;;; the base stream minus the stream's indentation.
-(defun indenting-misc (stream operation &optional arg1 arg2)
-  (let ((sub-stream (indenting-stream-stream stream)))
-    (if (ansi-stream-p sub-stream)
-        (let ((method (ansi-stream-misc sub-stream)))
-          (case operation
-            (:line-length
-             (let ((line-length (funcall method sub-stream operation)))
-               (if line-length
-                   (- line-length (indenting-stream-indentation stream)))))
-            (:charpos
-             (let ((charpos (funcall method sub-stream operation)))
-               (if charpos
-                   (- charpos (indenting-stream-indentation stream)))))
-            (t
-             (funcall method sub-stream operation arg1 arg2))))
-        ;; must be Gray streams FUNDAMENTAL-STREAM
-        (case operation
-          (:line-length
-           (let ((line-length (stream-line-length sub-stream)))
-             (if line-length
-                 (- line-length (indenting-stream-indentation stream)))))
-          (:charpos
-           (let ((charpos (stream-line-column sub-stream)))
-             (if charpos
-                 (- charpos (indenting-stream-indentation stream)))))
-          (t
-           (stream-misc-dispatch sub-stream operation arg1 arg2))))))
-
-(declaim (maybe-inline read-char unread-char read-byte listen))
 
 ;;;; case frobbing streams, used by FORMAT ~(...~)
 
