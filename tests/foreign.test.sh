@@ -100,6 +100,14 @@ int long_test2(int i1, int i2, int i3, int i4, int i5, int i6,
     return (l1 == (1 + powish(2,37)));
 }
 
+int long_sap_test1(int *p1, long long l1) {
+    return (l1 == (3 + powish(2,*p1)));
+}
+
+int long_sap_test2(int *p1, int i1, long long l1) {
+    return (l1 == (3 + powish(2,*p1)));
+}
+
 long long return_long_long() {
     return powish(2,33);
 }
@@ -150,6 +158,8 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   (define-alien-routine long-test8 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (long1 (integer 64)))
   (define-alien-routine long-test9 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (long1 (integer 64)) (int8 int))
   (define-alien-routine long-test2 int (int1 int) (int2 int) (int3 int) (int4 int) (int5 int) (int6 int) (int7 int) (int8 int) (int9 int) (long1 (integer 64)) (long2 (integer 64)))
+  (define-alien-routine long-sap-test1 int (ptr1 int :copy) (long1 (integer 64)))
+  (define-alien-routine long-sap-test2 int (ptr1 int :copy) (int1 int) (long1 (integer 64)))
   (define-alien-routine return-long-long (integer 64))
 
   ;; compiling this gets us the FOP-FOREIGN-DATAREF-FIXUP on
@@ -214,6 +224,8 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   (assert (= 1 (long-test8 1 2 3 4 5 6 7 (ash 1 34))))
   (assert (= 1 (long-test9 1 2 3 4 5 6 7 (ash 1 35) 8)))
   (assert (= 1 (long-test2 1 2 3 4 5 6 7 8 9 (+ 1 (ash 1 37)) 15)))
+  (assert (= 1 (long-sap-test1 38 (+ 3 (ash 1 38)))))
+  (assert (= 1 (long-sap-test2 38 1 (+ 3 (ash 1 38)))))
   (assert (= (ash 1 33) (return-long-long)))
 
   (note "/initial assertions ok")

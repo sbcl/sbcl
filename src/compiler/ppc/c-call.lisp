@@ -265,12 +265,6 @@
                      (new-arg-types (parse-alien-type
                                      '(unsigned 32)
                                      (sb!kernel:make-null-lexenv))))
-                    ((alien-integer-type-p type)
-                     (if (< gprs 8)
-                         (incf gprs 1)
-                         (incf stack 1))
-                     (new-args arg)
-                     (new-arg-types type))
                     ((alien-single-float-type-p type)
                      (if (< fprs 8)
                          (incf fprs)
@@ -285,7 +279,10 @@
                              (incf stack 2))) ; the stack.
                      (new-args arg)
                      (new-arg-types type))
-                    (t
+                    (t ;; integer or SAP
+                     (if (< gprs 8)
+                         (incf gprs 1)
+                         (incf stack 1))
                      (new-args arg)
                      (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
