@@ -849,14 +849,18 @@
              ((nil :maybe-inline) (policy call (zerop space))))
            (defined-fun-p leaf)
            (defined-fun-inline-expansion leaf)
-           (let ((fun (defined-fun-functional leaf)))
-             (or (not fun)
-                 (and (eq inlinep :inline) (functional-kind fun))))
            (inline-expansion-ok call))
-      (flet (;; FIXME: Is this what the old CMU CL internal documentation
-             ;; called semi-inlining? A more descriptive name would
-             ;; be nice. -- WHN 2002-01-07
-             (frob ()
+      ;; Inline: if the function has already been converted at another call
+      ;; site in this component, we point this REF to the functional. If not,
+      ;; we convert the expansion.
+      ;;
+      ;; For :INLINE case local call analysis will copy the expansion later,
+      ;; but for :MAYBE-INLINE and NIL cases we only get one copy of the
+      ;; expansion per component.
+      ;;
+      ;; FIXME: We also convert in :INLINE & FUNCTIONAL-KIND case below. What
+      ;; is it for?
+      (flet ((frob ()
                (let* ((name (leaf-source-name leaf))
                       (res (ir1-convert-inline-expansion
                             name
@@ -868,14 +872,18 @@
                  ;; following top level forms
                  (setf (defined-fun-functional leaf) res)
                  (change-ref-leaf ref res))))
-        (if ir1-converting-not-optimizing-p
-            (frob)
-            (with-ir1-environment-from-node call
-              (frob)
-              (locall-analyze-component *current-component*))))
-
-      (values (ref-leaf (lvar-uses (basic-combination-fun call)))
-              nil))
+        (let ((fun (defined-fun-functional leaf)))
+          (if (or (not fun)
+                  (and (eq inlinep :inline) (functional-kind fun)))
+              ;; Convert.
+              (if ir1-converting-not-optimizing-p
+                  (frob)
+                  (with-ir1-environment-from-node call
+                    (frob)
+                    (locall-analyze-component *current-component*)))
+              ;; If we've already converted, change ref to the converted functional.
+              (change-ref-leaf ref fun))))
+      (values (ref-leaf ref) nil))
      (t
       (let ((info (info :function :info (leaf-source-name leaf))))
         (if info

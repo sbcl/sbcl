@@ -11,6 +11,9 @@ changes in sbcl-1.0.23 relative to 1.0.22:
     now interact correctly with type declarations.
   * partial bug fix: PCL detects infinite recursion during wrapper
     validation. (thanks to Attila Lendvai)
+  * bug fix: #426; nested function calls are inlined properly.
+    Previously if FOO was an inline function, in calls of the form
+    (FOO (FOO ...)) the outer call was not inlined.
 
 changes in sbcl-1.0.22 relative to 1.0.21:
   * minor incompatible change: LOAD-SHARED-OBJECT no longer by default looks

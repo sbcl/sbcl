@@ -953,6 +953,55 @@
     (assert (equal '(function (t &optional t) (values t &optional))
                    (sb-kernel:type-specifier (sb-int:info :function :type name))))))
 
+;;;; inline & maybe inline nested calls
+
+(defun quux-marker (x) x)
+(declaim (inline foo-inline))
+(defun foo-inline (x) (quux-marker x))
+(declaim (maybe-inline foo-maybe-inline))
+(defun foo-maybe-inline (x) (quux-marker x))
+;; Pretty horrible, but does the job
+(defun count-full-calls (name function)
+  (let ((code (with-output-to-string (s)
+                (disassemble function :stream s)))
+        (n 0))
+    (with-input-from-string (s code)
+      (loop for line = (read-line s nil nil)
+            while line
+            when (search name line)
+            do (incf n)))
+    n))
+
+(with-test (:name :nested-inline-calls)
+  (let ((fun (compile nil `(lambda (x)
+                             (foo-inline (foo-inline (foo-inline x)))))))
+    (assert (= 0 (count-full-calls "FOO-INLINE" fun)))
+    (assert (= 3 (count-full-calls "QUUX-MARKER" fun)))))
+
+(with-test (:name :nested-maybe-inline-calls)
+  (let ((fun (compile nil `(lambda (x)
+                             (declare (optimize (space 0)))
+                             (foo-maybe-inline (foo-maybe-inline (foo-maybe-inline x)))))))
+    (assert (= 0 (count-full-calls "FOO-MAYBE-INLINE" fun)))
+    (assert (= 1 (count-full-calls "QUUX-MARKER" fun)))))
+
+(with-test (:name :inline-calls)
+  (let ((fun (compile nil `(lambda (x)
+                             (list (foo-inline x)
+                                   (foo-inline x)
+                                   (foo-inline x))))))
+    (assert (= 0 (count-full-calls "FOO-INLINE" fun)))
+    (assert (= 3 (count-full-calls "QUUX-MARKER" fun)))))
+
+(with-test (:name :maybe-inline-calls)
+  (let ((fun (compile nil `(lambda (x)
+                             (declare (optimize (space 0)))
+                             (list (foo-maybe-inline x)
+                                   (foo-maybe-inline x)
+                                   (foo-maybe-inline x))))))
+    (assert (= 0 (count-full-calls "FOO-MAYBE-INLINE" fun)))
+    (assert (= 1 (count-full-calls "QUUX-MARKER" fun)))))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
