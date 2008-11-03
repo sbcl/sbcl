@@ -178,6 +178,10 @@
            ;;    INSTANCE's class.  See also the comment above
            ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
            (force-cache-flushes (class-of instance))
+           ;; KLUDGE avoid an infinite recursion, it's still better to
+           ;; bail out with an AVER for server softwares. see FIXME above.
+           ;; details: http://thread.gmane.org/gmane.lisp.steel-bank.devel/10175
+           (aver (not (eq (layout-invalid (wrapper-of instance)) t)))
            (check-wrapper-validity instance))
           ((consp state)
            (ecase (car state)
