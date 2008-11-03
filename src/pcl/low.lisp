@@ -381,7 +381,7 @@
 
 #+sb-thread
 (progn
-  (defvar *pcl-lock* (sb-thread::make-spinlock))
+  (defvar *pcl-lock* (sb-thread::make-spinlock :name "PCL lock"))
 
   (defmacro with-pcl-lock (&body body)
     `(sb-thread::with-spinlock (*pcl-lock*)
