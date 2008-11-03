@@ -1173,6 +1173,19 @@
   :default (let ((class (find-classoid name nil)))
              (when class (classoid-layout class))))
 
+;;; DEFTYPE lambda-list
+(define-info-type
+   :class :type
+   :type :lambda-list
+   :type-spec list
+   :default nil)
+
+(define-info-type
+   :class :type
+   :type :source-location
+   :type-spec t
+   :default nil)
+
 (define-info-class :typed-structure)
 (define-info-type
   :class :typed-structure

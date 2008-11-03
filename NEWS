@@ -2,6 +2,8 @@
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
     for the associated fast function is also produced.
+  * enhancement: system stores DEFTYPE lambda-lists, so DESCRIBE can
+    report them.
   * optimization: printing with *PRINT-PRETTY* true is now more
     efficient as long as the object being printed doesn't require
     special handling by the pretty printer.

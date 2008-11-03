@@ -13,7 +13,7 @@
 
 (/show0 "compiler-deftype.lisp 14")
 
-(defun %compiler-deftype (name expander &optional doc)
+(defun %compiler-deftype (name lambda-list expander doc source-location)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a type specifier"))
   (ecase (info :type :kind name)
@@ -40,7 +40,10 @@
      )
     ((nil :forthcoming-defclass-type)
      (setf (info :type :kind name) :defined)))
-  (setf (info :type :expander name) expander)
+  (setf (info :type :expander name) expander
+        (info :type :lambda-list name) lambda-list)
+  (when source-location
+    (setf (info :type :source-location name) source-location))
   (when doc
     (setf (fdocumentation name 'type) doc))
   ;; ### Bootstrap hack -- we need to define types before %NOTE-TYPE-DEFINED

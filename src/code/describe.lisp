@@ -350,9 +350,13 @@
         ((fboundp x)
          (describe-symbol-fdefinition (fdefinition x) s :name x)))
 
+  ;; Describe deftype lambda-list and doc
+  (when (info :type :expander x)
+    (format s "~&DEFTYPE lambda-list: ~A" (info :type :lambda-list x))
+    (%describe-doc x s 'type "Type"))
+
   ;; Print other documentation.
   (%describe-doc x s 'structure "Structure")
-  (%describe-doc x s 'type "Type")
   (%describe-doc x s 'setf "Setf macro")
   (dolist (assoc (info :random-documentation :stuff x))
     (let ((type (car assoc)))

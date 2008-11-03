@@ -186,9 +186,13 @@ If an unsupported TYPE is requested, the function will return NIL.
                       (not (eq type :generic-function)))
               (find-definition-source fun)))))
        ((:type)
-        (let ((expander-fun (sb-int:info :type :expander name)))
-          (when expander-fun
-            (find-definition-source expander-fun))))
+        ;; Source locations for types are saved separately when the expander
+        ;; is a closure without a good source-location.
+        (let ((loc (sb-int:info :type :source-location name)))
+          (if loc
+              (translate-source-location loc)
+              (let ((expander-fun (sb-int:info :type :expander name)))
+                (find-definition-source expander-fun)))))
        ((:method)
         (when (fboundp name)
           (let ((fun (real-fdefinition name)))
