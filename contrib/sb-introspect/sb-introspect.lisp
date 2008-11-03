@@ -192,7 +192,8 @@ If an unsupported TYPE is requested, the function will return NIL.
           (if loc
               (translate-source-location loc)
               (let ((expander-fun (sb-int:info :type :expander name)))
-                (find-definition-source expander-fun)))))
+                (when expander-fun
+                  (find-definition-source expander-fun))))))
        ((:method)
         (when (fboundp name)
           (let ((fun (real-fdefinition name)))

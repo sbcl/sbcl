@@ -119,6 +119,8 @@
   'kroolz)
 (assert (equal (function-arglist #'kroolz) '(r1 r2 &optional opt)))
 
+;;;; Test finding a type that isn't one
+(assert (not (find-definition-sources-by-name 'fboundp :type)))
 
 ;;;; Test the xref facility
 
