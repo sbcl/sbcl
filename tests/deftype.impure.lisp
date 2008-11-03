@@ -27,3 +27,7 @@
 (assert (typep 1 'key))
 (assert (typep 1 'key-singleton))
 
+;;; empty body
+(deftype deftype-with-empty-body ())
+(assert (subtypep 'deftype-with-empty-body nil))
+(assert (subtypep nil 'deftype-with-empty-body))

@@ -29,7 +29,7 @@
         (if (and (not lambda-list) (not decls) (not (cdr forms))
                  (or (member (car forms) '(t nil))
                      (eq 'quote (caar forms))))
-            (values `(constant-type-expander ,@forms) doc '(sb!c:source-location))
+            (values `(constant-type-expander ,(car forms)) doc '(sb!c:source-location))
             (with-unique-names (whole)
               (multiple-value-bind (macro-body local-decs doc)
                   (parse-defmacro lambda-list whole body name 'deftype :default-default ''*)
