@@ -246,7 +246,7 @@ LsingleValue:
 	.text
 	.globl 	GNAME(fpu_save)
 	TYPE(GNAME(fpu_save))
-	.align	2,0x90
+	.align	align_16byte,0x90
 GNAME(fpu_save):
 	fnsave	(%rdi)		# Save the NPX state. (resets NPX)
 	ret
@@ -254,7 +254,7 @@ GNAME(fpu_save):
 
 	.globl 	GNAME(fpu_restore)
 	TYPE(GNAME(fpu_restore))
-	.align	2,0x90
+	.align	align_16byte,0x90
 GNAME(fpu_restore):
 	frstor	(%rdi)		# Restore the NPX state.
 	ret
@@ -367,6 +367,7 @@ GNAME(fun_end_breakpoint_guts):
 multiple_value_return:
 	
 	.globl  GNAME(fun_end_breakpoint_trap)
+	.align	align_16byte,0x90
 GNAME(fun_end_breakpoint_trap):
 	TRAP
 	.byte 	trap_FunEndBreakpoint

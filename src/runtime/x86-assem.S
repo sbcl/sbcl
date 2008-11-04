@@ -335,7 +335,7 @@ GNAME(fpu_restore):
  * the undefined-function trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(undefined_tramp)
 	TYPE(GNAME(undefined_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
@@ -352,7 +352,7 @@ GNAME(undefined_tramp):
  * the closure trampoline
  */
 	.text
-	.align	align_4byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(closure_tramp)
 	TYPE(GNAME(closure_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
@@ -368,7 +368,7 @@ GNAME(closure_tramp):
 	SIZE(GNAME(closure_tramp))
 
 	.text
-	.align	align_4byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(funcallable_instance_tramp)
 	TYPE(GNAME(funcallable_instance_tramp))
 GNAME(funcallable_instance_tramp):
@@ -383,7 +383,7 @@ GNAME(funcallable_instance_tramp):
  */
 	.text
 	.globl	GNAME(fun_end_breakpoint_guts)
-	.align	align_4byte
+	.align	align_16byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
 	jc	multiple_value_return
@@ -410,7 +410,7 @@ GNAME(fun_end_breakpoint_end):
 
 	.globl	GNAME(do_pending_interrupt)
 	TYPE(GNAME(do_pending_interrupt))
-	.align	align_4byte,0x90
+	.align	align_16byte,0x90
 GNAME(do_pending_interrupt):
 	TRAP
 	.byte 	trap_PendingInterrupt
@@ -451,7 +451,7 @@ GNAME(do_pending_interrupt):
 #define DEFINE_ALLOC_TO_EAX(name,size)                          \
         .globl  GNAME(name);                                    \
         TYPE(GNAME(name));                                      \
-        .align  align_4byte,0x90;                               \
+        .align  align_16byte,0x90;                              \
 GNAME(name):                                                    \
         pushl   %ecx;              /* Save ECX and EDX       */ \
         pushl   %edx;                                           \
@@ -464,7 +464,7 @@ GNAME(name):                                                    \
 #define DEFINE_ALLOC_TO_ECX(name,size)                          \
         .globl  GNAME(name);                                    \
         TYPE(GNAME(name));                                      \
-        .align  align_4byte,0x90;                               \
+        .align  align_16byte,0x90;                              \
 GNAME(name):                                                    \
         pushl   %eax;              /* Save EAX and EDX       */ \
         pushl   %edx;                                           \
@@ -478,7 +478,7 @@ GNAME(name):                                                    \
 #define DEFINE_ALLOC_TO_EDX(name,size)                          \
         .globl  GNAME(name);                                    \
         TYPE(GNAME(name));                                      \
-        .align  align_4byte,0x90;                               \
+        .align  align_16byte,0x90;                              \
 GNAME(name):                                                    \
         pushl   %eax;               /* Save EAX and ECX      */ \
         pushl   %ecx;                                           \
@@ -492,7 +492,7 @@ GNAME(name):                                                    \
 #define DEFINE_ALLOC_TO_REG(name,reg,size)                      \
         .globl  GNAME(name);                                    \
         TYPE(GNAME(name));                                      \
-        .align  align_4byte,0x90;                               \
+        .align  align_16byte,0x90;                              \
 GNAME(name):                                                    \
         pushl   %eax;              /* Save EAX, ECX, and EDX */ \
         pushl   %ecx;                                           \
@@ -547,7 +547,7 @@ DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16)
 
 /* This routine handles an overflow with eax=crfp+size. So the
    size=eax-crfp. */
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_eax)
 	TYPE(GNAME(alloc_overflow_eax))
 GNAME(alloc_overflow_eax):
@@ -559,7 +559,7 @@ GNAME(alloc_overflow_eax):
         ret
         SIZE(GNAME(alloc_overflow_eax))
 
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_ecx)
 	TYPE(GNAME(alloc_overflow_ecx))
 GNAME(alloc_overflow_ecx):
@@ -572,7 +572,7 @@ GNAME(alloc_overflow_ecx):
         ret
         SIZE(GNAME(alloc_overflow_ecx))
 
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_edx)
         TYPE(GNAME(alloc_overflow_edx))
 GNAME(alloc_overflow_edx):
@@ -587,7 +587,7 @@ GNAME(alloc_overflow_edx):
 
 /* This routine handles an overflow with ebx=crfp+size. So the
    size=ebx-crfp. */
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_ebx)
         TYPE(GNAME(alloc_overflow_ebx))
 GNAME(alloc_overflow_ebx):
@@ -604,7 +604,7 @@ GNAME(alloc_overflow_ebx):
 
 /* This routine handles an overflow with esi=crfp+size. So the
    size=esi-crfp. */
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_esi)
         TYPE(GNAME(alloc_overflow_esi))
 GNAME(alloc_overflow_esi):
@@ -619,7 +619,7 @@ GNAME(alloc_overflow_esi):
         ret
         SIZE(GNAME(alloc_overflow_esi))
 
-        .align  align_4byte
+        .align  align_16byte
         .globl  GNAME(alloc_overflow_edi)
         TYPE(GNAME(alloc_overflow_edi))
 GNAME(alloc_overflow_edi):
@@ -642,7 +642,7 @@ GNAME(alloc_overflow_edi):
 	 * and EIP from the exception context and use it to fake
 	 * up a stack frame which will skip over the system SEH
 	 * code. */
-	.align	align_4byte
+	.align	align_16byte
 	.globl	GNAME(exception_handler_wrapper)
 	TYPE(GNAME(exception_handler_wrapper))
 GNAME(exception_handler_wrapper):
@@ -673,7 +673,7 @@ GNAME(exception_handler_wrapper):
 #endif
 
 #ifdef LISP_FEATURE_DARWIN
-        .align align_4byte
+        .align align_16byte
         .globl GNAME(call_into_lisp_tramp)
         TYPE(GNAME(call_into_lisp_tramp))
 GNAME(call_into_lisp_tramp):
@@ -722,7 +722,7 @@ GNAME(call_into_lisp_tramp):
         SIZE(call_into_lisp_tramp)
 #endif
         
-	.align	align_4byte,0x90
+	.align	align_16byte,0x90
 	.globl	GNAME(post_signal_tramp)
 	TYPE(GNAME(post_signal_tramp))
 GNAME(post_signal_tramp):
@@ -747,7 +747,7 @@ GNAME(post_signal_tramp):
 
 	.globl GNAME(fast_bzero_pointer)
 	.data
-        .align  align_4byte
+        .align  align_16byte
 GNAME(fast_bzero_pointer):
         /* Variable containing a pointer to the bzero function to use.
          * Initially points to a basic function.  Change this variable
@@ -755,7 +755,7 @@ GNAME(fast_bzero_pointer):
         .long GNAME(fast_bzero_base)
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
 GNAME(fast_bzero):        
@@ -765,7 +765,7 @@ GNAME(fast_bzero):
         
       
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_detect)
 	TYPE(GNAME(fast_bzero_detect))
 GNAME(fast_bzero_detect):
@@ -803,7 +803,7 @@ Lrestore:
         
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_sse)
 	TYPE(GNAME(fast_bzero_sse))
         
@@ -849,7 +849,7 @@ Lend_sse:
                 
 
 	.text
-	.align	align_8byte,0x90
+	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_base)
 	TYPE(GNAME(fast_bzero_base))
         
