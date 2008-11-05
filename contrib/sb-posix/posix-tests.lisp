@@ -765,7 +765,8 @@
           (delete-file temp))))
   t "mkstemp-1")
 
-#-win32
+#-(or win32 sunos)
+;;; mkdtemp is unimplemented on at least Solaris 10
 (deftest mkdtemp.1
     (let ((pathname
            (sb-ext:parse-native-namestring
