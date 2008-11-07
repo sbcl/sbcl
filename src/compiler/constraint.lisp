@@ -136,8 +136,8 @@
     ;; from the following declarations.  Probably you'll want to
     ;; disable these declarations when debugging consets.
     (declare #-sb-xc-host (optimize (speed 3) (safety 0) (space 0)))
-  (declaim (inline constraint-number))
-  (defun constraint-number (constraint)
+  (declaim (inline %constraint-number))
+  (defun %constraint-number (constraint)
     (sset-element-number constraint))
   (defstruct (conset
               (:constructor make-conset ())
@@ -222,7 +222,7 @@
     (values))
 
   (defun conset-member (constraint conset)
-    (let ((number (constraint-number constraint))
+    (let ((number (%constraint-number constraint))
           (vector (conset-vector conset)))
       (when (< number (length vector))
         (plusp (sbit vector number)))))
@@ -230,7 +230,7 @@
   (defun conset-adjoin (constraint conset)
     (prog1
       (not (conset-member constraint conset))
-      (let ((number (constraint-number constraint)))
+      (let ((number (%constraint-number constraint)))
         (conset-grow conset (1+ number))
         (setf (sbit (conset-vector conset) number) 1)
         (setf (conset-min conset) (min number (or (conset-min conset)
