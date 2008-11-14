@@ -209,6 +209,7 @@ main(int argc, char *argv[])
     defconstant("enoent", ENOENT);
     defconstant("eexist", EEXIST);
     defconstant("eintr", EINTR);
+    defconstant("eagain", EAGAIN);
 
     defconstant("s-ifmt",  S_IFMT);
     defconstant("s-ifdir", S_IFDIR);
@@ -308,6 +309,7 @@ main(int argc, char *argv[])
     deferrno("ebadf", EBADF);
     deferrno("enoent", ENOENT);
     deferrno("eintr", EINTR);
+    deferrno("eagain", EAGAIN);
     deferrno("eio", EIO);
     deferrno("eexist", EEXIST);
     deferrno("eloop", ELOOP);

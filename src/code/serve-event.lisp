@@ -277,11 +277,12 @@ Shared between all threads, unless locally bound. EXPERIMENTAL.")
                (case err
                  (#.sb!unix:ebadf
                   (handler-descriptors-error))
-                 (#.sb!unix:eintr
+                 ((#.sb!unix:eintr #.sb!unix:eagain)
                   t)
                  (otherwise
                   (with-simple-restart (continue "Ignore failure and continue.")
-                    (simple-perror "Unix system call select() failed" :errno err))))
+                    (simple-perror "Unix system call select() failed"
+                                   :errno err))))
                #!+win32
                (handler-descriptors-error))
               ((plusp value)
