@@ -1,6 +1,6 @@
 ;;; -*-  Lisp -*-
 
-(defpackage #:asdf-install-system 
+(defpackage #:asdf-install-system
   (:use #:cl #:asdf))
 
 (in-package #:asdf-install-system)
@@ -11,8 +11,8 @@
   #+sb-building-contrib :pathname
   #+sb-building-contrib "SYS:CONTRIB;ASDF-INSTALL;"
   :components ((:file "defpackage")
-	       (:file "installer" :depends-on ("defpackage"))))
-	       
+               (:file "installer" :depends-on ("defpackage"))))
+
 (defmethod perform :after ((o load-op) (c (eql (find-system :asdf-install))))
   (provide 'asdf-install))
 

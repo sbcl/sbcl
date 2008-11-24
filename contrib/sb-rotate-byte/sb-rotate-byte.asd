@@ -1,6 +1,6 @@
 ;;; -*-  Lisp -*-
 
-(cl:defpackage #:sb-rotate-byte-system 
+(cl:defpackage #:sb-rotate-byte-system
   (:use #:asdf #:cl))
 (cl:in-package #:sb-rotate-byte-system)
 
@@ -8,20 +8,20 @@
   :version "0.1"
   #+sb-building-contrib :pathname
   #+sb-building-contrib "SYS:CONTRIB;SB-ROTATE-BYTE;"
-  :components 
+  :components
   ((:file "package")
    (:file "compiler" :depends-on ("package"))
    (:module "vm"
-	    :depends-on ("compiler")
-	    :components 
-	    ((:file "x86-vm"
-		    :in-order-to ((compile-op (feature :x86))))
-	     (:file "ppc-vm"
-		    :in-order-to ((compile-op (feature :ppc)))))
-	    :pathname
-	    #+sb-building-contrib "SYS:CONTRIB;SB-ROTATE-BYTE;"
-	    #-sb-building-contrib #.(make-pathname :directory '(:relative))
-	    :if-component-dep-fails :ignore)
+            :depends-on ("compiler")
+            :components
+            ((:file "x86-vm"
+                    :in-order-to ((compile-op (feature :x86))))
+             (:file "ppc-vm"
+                    :in-order-to ((compile-op (feature :ppc)))))
+            :pathname
+            #+sb-building-contrib "SYS:CONTRIB;SB-ROTATE-BYTE;"
+            #-sb-building-contrib #.(make-pathname :directory '(:relative))
+            :if-component-dep-fails :ignore)
    (:file "rotate-byte" :depends-on ("compiler"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-rotate-byte))))

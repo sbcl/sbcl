@@ -1,6 +1,6 @@
 ;;; -*-  Lisp -*-
 
-(defpackage #:sb-md5-system 
+(defpackage #:sb-md5-system
   (:use #:cl #:asdf))
 
 (in-package #:sb-md5-system)
@@ -27,4 +27,3 @@
 (defmethod perform ((o test-op) (c (eql (find-system :sb-md5-tests))))
   (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))
-			    

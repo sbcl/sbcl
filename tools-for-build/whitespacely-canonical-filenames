@@ -9,7 +9,7 @@
 # glob patterns for source files in languages for which the
 # canonicalization is safe (not affecting meaning, at least given the
 # conservative syntax used in SBCL sources)
-source_extensions='.lisp .lisp-expr .c .h'
+source_extensions='.lisp .lisp-expr .c .h .asd'
 # other candidates:
 #   .sh: if ./make.sh is altered, Bad Things happen
 #   ?

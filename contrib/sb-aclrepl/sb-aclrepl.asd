@@ -9,9 +9,9 @@
     #+sb-building-contrib :pathname
     #+sb-building-contrib "SYS:CONTRIB;SB-ACLREPL;"
     :components ((:file "toplevel")
-		 (:file "repl" :depends-on ("toplevel"))
-		 (:file "inspect" :depends-on ("repl"))
-		 (:file "debug" :depends-on ("repl"))))
+                 (:file "repl" :depends-on ("toplevel"))
+                 (:file "inspect" :depends-on ("repl"))
+                 (:file "debug" :depends-on ("repl"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-aclrepl))))
   (provide 'sb-aclrepl))

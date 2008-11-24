@@ -10,35 +10,35 @@
     #+sb-building-contrib :pathname
     #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
-		 (:file "split" :depends-on ("defpackage"))
+                 (:file "split" :depends-on ("defpackage"))
                  #+win32
-		 (:file "win32-lib")
-		 #-win32 (sb-grovel:grovel-constants-file
-			  "constants"
-			  :package :sockint
+                 (:file "win32-lib")
+                 #-win32 (sb-grovel:grovel-constants-file
+                          "constants"
+                          :package :sockint
                           :do-not-grovel #.(progn #-sb-building-contrib t)
-			  :depends-on  ("defpackage"))
-		 #+win32 (sb-grovel:grovel-constants-file
-			  "win32-constants"
-			  :package :sockint
+                          :depends-on  ("defpackage"))
+                 #+win32 (sb-grovel:grovel-constants-file
+                          "win32-constants"
+                          :package :sockint
                           :do-not-grovel #.(progn #-sb-building-contrib t)
-			  :depends-on  ("defpackage" "win32-lib"))
+                          :depends-on  ("defpackage" "win32-lib"))
                  #+win32 (:file "win32-sockets"
-				:depends-on ("win32-constants"))
-		 (:file "sockets"
+                                :depends-on ("win32-constants"))
+                 (:file "sockets"
                         :depends-on #-win32 ("constants")
                                     #+win32 ("win32-sockets"))
-		 (:file "sockopt" :depends-on ("sockets"))
+                 (:file "sockopt" :depends-on ("sockets"))
                  (:file "inet" :depends-on ("sockets" "split"))
                  (:file "local" :depends-on ("sockets" "split"))
                  (:file "name-service" :depends-on ("sockets"))
                  (:file "misc" :depends-on ("sockets"))
 
-		 (:static-file "NEWS")
-		 ;; (:static-file "INSTALL")
-		 ;; (:static-file "README")
-		 ;; (:static-file "index" :pathname "index.html")
-		 (:static-file "TODO")))
+                 (:static-file "NEWS")
+                 ;; (:static-file "INSTALL")
+                 ;; (:static-file "README")
+                 ;; (:static-file "index" :pathname "index.html")
+                 (:static-file "TODO")))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-bsd-sockets))))
   (provide 'sb-bsd-sockets))

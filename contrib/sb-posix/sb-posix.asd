@@ -9,13 +9,13 @@
     #+sb-building-contrib :pathname
     #+sb-building-contrib "SYS:CONTRIB;SB-POSIX;"
     :components ((:file "defpackage")
-		 (:file "designator" :depends-on ("defpackage"))
-		 (:file "macros" :depends-on ("designator"))
-		 (sb-grovel:grovel-constants-file
-		  "constants"
+                 (:file "designator" :depends-on ("defpackage"))
+                 (:file "macros" :depends-on ("designator"))
+                 (sb-grovel:grovel-constants-file
+                  "constants"
                   :do-not-grovel #.(progn #-sb-building-contrib t)
-		  :package :sb-posix :depends-on  ("defpackage"))
-		 (:file "interface" :depends-on ("constants" "macros" "designator"))))
+                  :package :sb-posix :depends-on  ("defpackage"))
+                 (:file "interface" :depends-on ("constants" "macros" "designator"))))
 
 (defsystem sb-posix-tests
     :depends-on (sb-rt)
@@ -31,9 +31,9 @@
 (defmethod perform ((o test-op) (c (eql (find-system :sb-posix-tests))))
   (funcall (intern "DO-TESTS" (find-package "SB-RT")))
   (let ((failures (funcall (intern "PENDING-TESTS" "SB-RT")))
-	(ignored-failures (loop for sym being the symbols of :sb-posix-tests
-			        if (search ".ERROR" (symbol-name sym))
-			        collect sym)))
+        (ignored-failures (loop for sym being the symbols of :sb-posix-tests
+                                if (search ".ERROR" (symbol-name sym))
+                                collect sym)))
     (cond
       ((null failures)
        t)

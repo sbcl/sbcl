@@ -8,7 +8,7 @@
     #+sb-building-contrib :pathname
     #+sb-building-contrib "SYS:CONTRIB;SB-CLTL2;"
     :components ((:file "defpackage")
-		 (:file "compiler-let" :depends-on ("defpackage"))
+                 (:file "compiler-let" :depends-on ("defpackage"))
                  (:file "macroexpand" :depends-on ("defpackage"))
                  (:file "env" :depends-on ("defpackage"))))
 
