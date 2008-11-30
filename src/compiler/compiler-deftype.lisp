@@ -22,7 +22,8 @@
        (error "illegal to redefine standard type: ~S" name)))
     (:instance
      (warn "The class ~S is being redefined to be a DEFTYPE." name)
-     (undefine-structure (layout-info (classoid-layout (find-classoid name))))
+     (undeclare-structure (find-classoid name) t)
+     ;; FIXME: shouldn't this happen only at eval-time?
      (setf (classoid-cell-classoid (find-classoid-cell name :create t)) nil)
      (setf (info :type :compiler-layout name) nil)
      (setf (info :type :kind name) :defined))

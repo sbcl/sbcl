@@ -992,6 +992,46 @@
        ,(funcall (nth-value 1 (slot-accessor-transforms dd dsd))
                  '(dummy new-value instance)))))
 
+;;; Blow away all the compiler info for the structure CLASS. Iterate
+;;; over this type, clearing the compiler structure type info, and
+;;; undefining all the associated functions.  If SUBCLASSES-P, also do
+;;; the same for subclasses.  FIXME: maybe rename UNDEFINE-FUN-NAME to
+;;; UNDECLARE-FUNCTION-NAME?
+(defun undeclare-structure (classoid subclasses-p)
+  (let ((info (layout-info (classoid-layout classoid))))
+    (when (defstruct-description-p info)
+      (let ((type (dd-name info)))
+        (remhash type *typecheckfuns*)
+        (setf (info :type :compiler-layout type) nil)
+        (undefine-fun-name (dd-copier-name info))
+        (undefine-fun-name (dd-predicate-name info))
+        (dolist (slot (dd-slots info))
+          (let ((fun (dsd-accessor-name slot)))
+            (unless (accessor-inherited-data fun info)
+              (undefine-fun-name fun)
+              (unless (dsd-read-only slot)
+                (undefine-fun-name `(setf ,fun)))))))
+      ;; Clear out the SPECIFIER-TYPE cache so that subsequent
+      ;; references are unknown types.
+      (values-specifier-type-cache-clear)))
+  (when subclasses-p
+    (let ((subclasses (classoid-subclasses classoid)))
+      (when subclasses
+        (collect ((subs))
+          (dohash ((classoid layout)
+                   subclasses
+                   :locked t)
+            (declare (ignore layout))
+            (undeclare-structure classoid nil)
+            (subs (classoid-proper-name classoid)))
+          ;; Is it really necessary to warn about
+          ;; undeclaring functions for subclasses?
+          (when (subs)
+            (warn "undeclaring functions for old subclasses ~
+                               of ~S:~%  ~S"
+                  (classoid-name classoid)
+                  (subs))))))))
+
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
 (defun %compiler-set-up-layout (dd
@@ -1019,53 +1059,15 @@
                                 "the most recently loaded"
                                 :compiler-layout clayout))
     (cond (old-layout
-           (labels
-               ;; Blow away all the compiler info for the structure
-               ;; CLASS. Iterate over this type, clearing the compiler
-               ;; structure type info, and undefining all the
-               ;; associated functions.  FIXME: maybe rename
-               ;; UNDEFINE-FUN-NAME to UNDECLARE-FUNCTION-NAME?
-               ((undeclare-structure (classoid subclasses-p)
-                  (let ((info (layout-info (classoid-layout classoid))))
-                    (when (defstruct-description-p info)
-                      (let ((type (dd-name info)))
-                        (remhash type *typecheckfuns*)
-                        (setf (info :type :compiler-layout type) nil)
-                        (undefine-fun-name (dd-copier-name info))
-                        (undefine-fun-name (dd-predicate-name info))
-                        (dolist (slot (dd-slots info))
-                          (let ((fun (dsd-accessor-name slot)))
-                            (unless (accessor-inherited-data fun info)
-                              (undefine-fun-name fun)
-                              (unless (dsd-read-only slot)
-                                (undefine-fun-name `(setf ,fun)))))))
-                      ;; Clear out the SPECIFIER-TYPE cache so that subsequent
-                      ;; references are unknown types.
-                      (values-specifier-type-cache-clear)))
-                  (when subclasses-p
-                    (collect ((subs))
-                      (dohash ((classoid layout)
-                               (classoid-subclasses classoid)
-                               :locked t)
-                        (declare (ignore layout))
-                        (undeclare-structure classoid nil)
-                        (subs (classoid-proper-name classoid)))
-                      ;; Is it really necessary to warn about
-                      ;; undeclaring functions for subclasses?
-                      (when (subs)
-                        (warn "undeclaring functions for old subclasses ~
-                               of ~S:~%  ~S"
-                              (classoid-name classoid)
-                              (subs)))))))
-             (undeclare-structure (layout-classoid old-layout)
-                                  (and (classoid-subclasses classoid)
-                                       (not (eq layout old-layout))))
-             (setf (layout-invalid layout) nil)
-             ;; FIXME: it might be polite to hold onto old-layout and
-             ;; restore it at the end of the file.  -- RMK 2008-09-19
-             ;; (International Talk Like a Pirate Day).
-             (warn "~@<Clobbering the compiler's idea of the layout of ~A.~:@>"
-                   classoid)))
+           (undeclare-structure (layout-classoid old-layout)
+                                (and (classoid-subclasses classoid)
+                                     (not (eq layout old-layout))))
+           (setf (layout-invalid layout) nil)
+           ;; FIXME: it might be polite to hold onto old-layout and
+           ;; restore it at the end of the file.  -- RMK 2008-09-19
+           ;; (International Talk Like a Pirate Day).
+           (warn "~@<Clobbering the compiler's idea of the layout of ~A.~:@>"
+                 classoid))
           (t
            (unless (eq (classoid-layout classoid) layout)
              (register-layout layout :invalidate nil))

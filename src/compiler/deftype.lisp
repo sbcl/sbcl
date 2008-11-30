@@ -16,6 +16,9 @@
         (sb!kernel::arg-count-error 'deftype (car whole) (cdr whole) nil 0 0)
         expansion)))
 
+(defun %deftype (name)
+  (setf (classoid-cell-pcl-class (find-classoid-cell name :create t)) nil))
+
 (def!macro sb!xc:deftype (name lambda-list &body body)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
@@ -38,9 +41,12 @@
                            ,macro-body)
                         doc
                         nil)))))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%compiler-deftype ',name
-                          ',lambda-list
-                          ,expander-form
-                          ,doc
-                          ,source-location-form))))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (%compiler-deftype ',name
+                            ',lambda-list
+                            ,expander-form
+                            ,doc
+                            ,source-location-form))
+       (eval-when (:load-toplevel :execute)
+         (%deftype ',name)))))

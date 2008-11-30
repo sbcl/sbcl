@@ -31,3 +31,10 @@
 (deftype deftype-with-empty-body ())
 (assert (subtypep 'deftype-with-empty-body nil))
 (assert (subtypep nil 'deftype-with-empty-body))
+
+;; Ensure that DEFTYPE can successfully replace a DEFSTRUCT type
+;; definition.
+(defstruct foo)
+(assert (progn (deftype foo () 'integer)
+               (null (find-class 'foo nil))
+               t))
