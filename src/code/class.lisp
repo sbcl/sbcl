@@ -765,7 +765,9 @@
              (error "Cannot redefine standard type ~S." name))
             (:defined
              (warn "Redefining DEFTYPE type to be a class: ~S" name)
-                (setf (info :type :expander name) nil)))
+                (setf (info :type :expander name) nil
+                      (info :type :lambda-list name) nil
+                      (info :type :source-location name) nil)))
 
           (remhash name table)
           (%note-type-defined name)

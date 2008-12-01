@@ -43,7 +43,7 @@
      (setf (info :type :kind name) :defined)))
   (setf (info :type :expander name) expander
         (info :type :lambda-list name) lambda-list)
-  (when source-location
+  (sb!c:with-source-location (source-location)
     (setf (info :type :source-location name) source-location))
   (when doc
     (setf (fdocumentation name 'type) doc))

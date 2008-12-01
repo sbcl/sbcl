@@ -38,3 +38,9 @@
 (assert (progn (deftype foo () 'integer)
                (null (find-class 'foo nil))
                t))
+
+;; Ensure that DEFCLASS after DEFTYPE nukes the lambda-list.
+(deftype bar (x) `(integer ,x))
+(assert (equal '(x) (sb-int:info :type :lambda-list 'bar)))
+(defclass bar () ())
+(assert (not (sb-int:info :type :lambda-list 'bar)))
