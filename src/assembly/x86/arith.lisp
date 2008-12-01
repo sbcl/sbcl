@@ -28,15 +28,16 @@
                  (:res res (descriptor-reg any-reg) edx-offset)
 
                  (:temp eax unsigned-reg eax-offset)
-                 (:temp ebx unsigned-reg ebx-offset)
                  (:temp ecx unsigned-reg ecx-offset))
 
-                (declare (ignorable ebx))
-
-                (inst test x 3)  ; fixnum?
+                (inst mov ecx x)
+                (inst or ecx y)
+                (inst test ecx 3)            ; both fixnums?
                 (inst jmp :nz DO-STATIC-FUN) ; no - do generic
-                (inst test y 3)  ; fixnum?
-                (inst jmp :z DO-BODY)   ; yes - doit here
+
+                ,@body
+                (inst clc) ; single-value return
+                (inst ret)
 
                 DO-STATIC-FUN
                 (inst pop eax)
@@ -51,10 +52,7 @@
                       (make-ea :dword
                                :disp (+ nil-value
                                         (static-fun-offset
-                                         ',(symbolicate "TWO-ARG-" fun)))))
-
-                DO-BODY
-                ,@body)))
+                                         ',(symbolicate "TWO-ARG-" fun))))))))
 
   (define-generic-arith-routine (+ 10)
     (move res x)

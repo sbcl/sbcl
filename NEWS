@@ -1,4 +1,5 @@
 ;;;; -*- coding: utf-8; -*-
+  * optimization: faster generic arithmetic dispatch on x86 and x86-64.
   * bug fix: lexical type declarations are now correctly reported by
     SB-CLTL2. (reported by Larry D'Anna)
   * bug fix: STRING-TO-OCTETS did not handle :START properly when

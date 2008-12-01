@@ -28,15 +28,16 @@
                  (:res res (descriptor-reg any-reg) rdx-offset)
 
                  (:temp rax unsigned-reg rax-offset)
-                 (:temp rbx unsigned-reg rbx-offset)
                  (:temp rcx unsigned-reg rcx-offset))
 
-                (declare (ignorable rbx))
-
-                (inst test x 7)  ; fixnum?
+                (inst mov rcx x)
+                (inst or rcx y)
+                (inst test rcx 7)            ; both fixnums?
                 (inst jmp :nz DO-STATIC-FUN) ; no - do generic
-                (inst test y 7)  ; fixnum?
-                (inst jmp :z DO-BODY)   ; yes - doit here
+
+                ,@body
+                (inst clc)
+                (inst ret)
 
                 DO-STATIC-FUN
                 (inst pop rax)
@@ -51,10 +52,7 @@
                       (make-ea :qword
                                :disp (+ nil-value
                                         (static-fun-offset
-                                         ',(symbolicate "TWO-ARG-" fun)))))
-
-                DO-BODY
-                ,@body)))
+                                         ',(symbolicate "TWO-ARG-" fun))))))))
 
   (define-generic-arith-routine (+ 10)
     (move res x)
