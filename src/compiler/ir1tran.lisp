@@ -1146,7 +1146,9 @@
                                  (type-specifier old-type)
                                  (type-specifier type)
                                  var-name))))
-                            (bound-var (setf (leaf-type bound-var) int))
+                            (bound-var
+                             (setf (leaf-type bound-var) int
+                                   (leaf-where-from bound-var) :declared))
                             (t
                              (restr (cons var int)))))))
                (process-var var bound-var)

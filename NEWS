@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; -*-
+  * bug fix: lexical type declarations are now correctly reported by
+    SB-CLTL2. (reported by Larry D'Anna)
+
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
     for the associated fast function is also produced.

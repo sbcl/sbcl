@@ -168,6 +168,26 @@
       (var-info x))
   (:lexical t nil))
 
+(deftest variable-info.lexical.type
+    (let ((x 42))
+      (declare (fixnum x))
+      (var-info x))
+  (:lexical t ((type . fixnum))))
+
+(deftest variable-info.lexical.type.2
+    (let ((x 42))
+      (prog1
+          (var-info x)
+        (locally (declare (fixnum x))
+          (assert (plusp x)))))
+  (:lexical t nil))
+
+(deftest variable-info.lexical.type.2
+    (let ((x 42))
+      (locally (declare (fixnum x))
+        (var-info x)))
+  (:lexical t ((type . fixnum))))
+
 (deftest variable-info.ignore
     (let ((x 8))
       (declare (ignore x))
