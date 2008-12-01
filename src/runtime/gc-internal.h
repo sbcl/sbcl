@@ -77,7 +77,26 @@ NWORDS(unsigned long x, unsigned long n_bits)
 #define ALLOC_UNBOXED 1
 #define ALLOC_QUICK 1
 
-void *gc_general_alloc(long nbytes,int unboxed_p,int quick_p);
+#ifdef LISP_FEATURE_GENCGC
+void *
+gc_alloc_with_region(long nbytes,int page_type_flag, struct alloc_region *my_region,
+                     int quick_p);
+static inline void *
+gc_general_alloc(long nbytes, int page_type_flag, int quick_p)
+{
+    struct alloc_region *my_region;
+    if (UNBOXED_PAGE_FLAG == page_type_flag) {
+        my_region = &unboxed_region;
+    } else if (BOXED_PAGE_FLAG == page_type_flag) {
+        my_region = &boxed_region;
+    } else {
+        lose("bad page type flag: %d", page_type_flag);
+    }
+    return gc_alloc_with_region(nbytes, page_type_flag, my_region, quick_p);
+}
+#else
+void *gc_general_alloc(long nbytes,int page_type_flag,int quick_p);
+#endif
 
 extern long (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);

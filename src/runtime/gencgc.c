@@ -57,7 +57,7 @@
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
-                                    int unboxed);
+                                    int page_type_flag);
 
 
 /*
@@ -613,7 +613,7 @@ static generation_index_t gc_alloc_generation;
  * are allocated, although they will initially be empty.
  */
 static void
-gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
+gc_alloc_new_region(long nbytes, int page_type_flag, struct alloc_region *alloc_region)
 {
     page_index_t first_page;
     page_index_t last_page;
@@ -633,14 +633,16 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
               && (alloc_region->free_pointer == alloc_region->end_addr));
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
-    if (unboxed) {
+    if (UNBOXED_PAGE_FLAG == page_type_flag) {
         first_page =
             generations[gc_alloc_generation].alloc_unboxed_start_page;
-    } else {
+    } else if (BOXED_PAGE_FLAG == page_type_flag) {
         first_page =
             generations[gc_alloc_generation].alloc_start_page;
+    } else {
+        lose("bad page_type_flag: %d", page_type_flag);
     }
-    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed);
+    last_page=gc_find_freeish_pages(&first_page, nbytes, page_type_flag);
     bytes_found=(PAGE_BYTES - page_table[first_page].bytes_used)
             + npage_bytes(last_page-first_page);
 
@@ -656,29 +658,20 @@ gc_alloc_new_region(long nbytes, int unboxed, struct alloc_region *alloc_region)
 
     /* The first page may have already been in use. */
     if (page_table[first_page].bytes_used == 0) {
-        if (unboxed)
-            page_table[first_page].allocated = UNBOXED_PAGE_FLAG;
-        else
-            page_table[first_page].allocated = BOXED_PAGE_FLAG;
+        page_table[first_page].allocated = page_type_flag;
         page_table[first_page].gen = gc_alloc_generation;
         page_table[first_page].large_object = 0;
         page_table[first_page].region_start_offset = 0;
     }
 
-    if (unboxed)
-        gc_assert(page_table[first_page].allocated == UNBOXED_PAGE_FLAG);
-    else
-        gc_assert(page_table[first_page].allocated == BOXED_PAGE_FLAG);
+    gc_assert(page_table[first_page].allocated == page_type_flag);
     page_table[first_page].allocated |= OPEN_REGION_PAGE_FLAG;
 
     gc_assert(page_table[first_page].gen == gc_alloc_generation);
     gc_assert(page_table[first_page].large_object == 0);
 
     for (i = first_page+1; i <= last_page; i++) {
-        if (unboxed)
-            page_table[i].allocated = UNBOXED_PAGE_FLAG;
-        else
-            page_table[i].allocated = BOXED_PAGE_FLAG;
+        page_table[i].allocated = page_type_flag;
         page_table[i].gen = gc_alloc_generation;
         page_table[i].large_object = 0;
         /* This may not be necessary for unboxed regions (think it was
@@ -829,7 +822,7 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  * it is safe to try to re-update the page table of this reset
  * alloc_region. */
 void
-gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
+gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region)
 {
     int more;
     page_index_t first_page;
@@ -869,10 +862,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
             gc_assert(page_table[first_page].region_start_offset == 0);
         page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 
-        if (unboxed)
-            gc_assert(page_table[first_page].allocated == UNBOXED_PAGE_FLAG);
-        else
-            gc_assert(page_table[first_page].allocated == BOXED_PAGE_FLAG);
+        gc_assert(page_table[first_page].allocated == page_type_flag);
         gc_assert(page_table[first_page].gen == gc_alloc_generation);
         gc_assert(page_table[first_page].large_object == 0);
 
@@ -896,10 +886,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
          * region, and set the bytes_used. */
         while (more) {
             page_table[next_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
-            if (unboxed)
-                gc_assert(page_table[next_page].allocated==UNBOXED_PAGE_FLAG);
-            else
-                gc_assert(page_table[next_page].allocated == BOXED_PAGE_FLAG);
+            gc_assert(page_table[next_page].allocated==page_type_flag);
             gc_assert(page_table[next_page].bytes_used == 0);
             gc_assert(page_table[next_page].gen == gc_alloc_generation);
             gc_assert(page_table[next_page].large_object == 0);
@@ -930,15 +917,16 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
         /* Set the generations alloc restart page to the last page of
          * the region. */
-        if (unboxed)
+        if (UNBOXED_PAGE_FLAG == page_type_flag) {
             generations[gc_alloc_generation].alloc_unboxed_start_page =
                 next_page-1;
-        else
+        } else if (BOXED_PAGE_FLAG == page_type_flag) {
             generations[gc_alloc_generation].alloc_start_page = next_page-1;
-
-        /* Add the region to the new_areas if requested. */
-        if (!unboxed)
+            /* Add the region to the new_areas if requested. */
             add_new_area(first_page,orig_first_page_bytes_used, region_size);
+        } else {
+            lose("bad page type flag: %d", page_type_flag);
+        }
 
         /*
         FSHOW((stderr,
@@ -971,7 +959,7 @@ static inline void *gc_quick_alloc(long nbytes);
 
 /* Allocate a possibly large object. */
 void *
-gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
+gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_region)
 {
     page_index_t first_page;
     page_index_t last_page;
@@ -985,20 +973,23 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
 
-    if (unboxed) {
+    if (UNBOXED_PAGE_FLAG == page_type_flag) {
         first_page =
             generations[gc_alloc_generation].alloc_large_unboxed_start_page;
+    } else if (BOXED_PAGE_FLAG == page_type_flag) {
+        first_page =
+            generations[gc_alloc_generation].alloc_large_start_page;
     } else {
-        first_page = generations[gc_alloc_generation].alloc_large_start_page;
+        lose("bad page type flag: %d", page_type_flag);
     }
     if (first_page <= alloc_region->last_page) {
         first_page = alloc_region->last_page+1;
     }
 
-    last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed);
+    last_page=gc_find_freeish_pages(&first_page,nbytes, page_type_flag);
 
     gc_assert(first_page > alloc_region->last_page);
-    if (unboxed)
+    if (UNBOXED_PAGE_FLAG == page_type_flag)
         generations[gc_alloc_generation].alloc_large_unboxed_start_page =
             last_page;
     else
@@ -1010,19 +1001,13 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     /* If the first page was free then set up the gen, and
      * region_start_offset. */
     if (page_table[first_page].bytes_used == 0) {
-        if (unboxed)
-            page_table[first_page].allocated = UNBOXED_PAGE_FLAG;
-        else
-            page_table[first_page].allocated = BOXED_PAGE_FLAG;
+        page_table[first_page].allocated = page_type_flag;
         page_table[first_page].gen = gc_alloc_generation;
         page_table[first_page].region_start_offset = 0;
         page_table[first_page].large_object = 1;
     }
 
-    if (unboxed)
-        gc_assert(page_table[first_page].allocated == UNBOXED_PAGE_FLAG);
-    else
-        gc_assert(page_table[first_page].allocated == BOXED_PAGE_FLAG);
+    gc_assert(page_table[first_page].allocated == page_type_flag);
     gc_assert(page_table[first_page].gen == gc_alloc_generation);
     gc_assert(page_table[first_page].large_object == 1);
 
@@ -1046,10 +1031,7 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     while (more) {
         gc_assert(page_table[next_page].allocated == FREE_PAGE_FLAG);
         gc_assert(page_table[next_page].bytes_used == 0);
-        if (unboxed)
-            page_table[next_page].allocated = UNBOXED_PAGE_FLAG;
-        else
-            page_table[next_page].allocated = BOXED_PAGE_FLAG;
+        page_table[next_page].allocated = page_type_flag;
         page_table[next_page].gen = gc_alloc_generation;
         page_table[next_page].large_object = 1;
 
@@ -1076,7 +1058,7 @@ gc_alloc_large(long nbytes, int unboxed, struct alloc_region *alloc_region)
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
     /* Add the region to the new_areas if requested. */
-    if (!unboxed)
+    if (BOXED_PAGE_FLAG == page_type_flag)
         add_new_area(first_page,orig_first_page_bytes_used,nbytes);
 
     /* Bump up last_free_page */
@@ -1137,7 +1119,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
 }
 
 page_index_t
-gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
+gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int page_type_flag)
 {
     page_index_t first_page, last_page;
     page_index_t restart_page = *restart_page_ptr;
@@ -1168,7 +1150,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
                    (page_table[last_page+1].allocated == FREE_PAGE_FLAG)) {
                 last_page++;
                 bytes_found += PAGE_BYTES;
-                gc_assert(page_table[last_page].write_protected == 0);
+                gc_assert(0 == page_table[last_page].bytes_used);
+                gc_assert(0 == page_table[last_page].write_protected);
             }
             if (bytes_found > most_bytes_found)
                 most_bytes_found = bytes_found;
@@ -1184,11 +1167,11 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
         while (first_page < page_table_pages) {
             if (page_table[first_page].allocated == FREE_PAGE_FLAG)
                 {
+                    gc_assert(0 == page_table[first_page].bytes_used);
                     bytes_found = PAGE_BYTES;
                     break;
                 }
-            else if ((page_table[first_page].allocated ==
-                      (unboxed ? UNBOXED_PAGE_FLAG : BOXED_PAGE_FLAG)) &&
+            else if ((page_table[first_page].allocated == page_type_flag) &&
                      (page_table[first_page].large_object == 0) &&
                      (page_table[first_page].gen == gc_alloc_generation) &&
                      (page_table[first_page].write_protected == 0) &&
@@ -1223,13 +1206,13 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int unboxed)
  * functions will eventually call this  */
 
 void *
-gc_alloc_with_region(long nbytes,int unboxed_p, struct alloc_region *my_region,
+gc_alloc_with_region(long nbytes,int page_type_flag, struct alloc_region *my_region,
                      int quick_p)
 {
     void *new_free_pointer;
 
     if (nbytes>=large_object_size)
-        return gc_alloc_large(nbytes,unboxed_p,my_region);
+        return gc_alloc_large(nbytes, page_type_flag, my_region);
 
     /* Check whether there is room in the current alloc region. */
     new_free_pointer = my_region->free_pointer + nbytes;
@@ -1247,9 +1230,9 @@ gc_alloc_with_region(long nbytes,int unboxed_p, struct alloc_region *my_region,
         if (!quick_p &&
             void_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
             /* If so, finished with the current region. */
-            gc_alloc_update_page_tables(unboxed_p, my_region);
+            gc_alloc_update_page_tables(page_type_flag, my_region);
             /* Set up a new region. */
-            gc_alloc_new_region(32 /*bytes*/, unboxed_p, my_region);
+            gc_alloc_new_region(32 /*bytes*/, page_type_flag, my_region);
         }
 
         return((void *)new_obj);
@@ -1258,51 +1241,43 @@ gc_alloc_with_region(long nbytes,int unboxed_p, struct alloc_region *my_region,
     /* Else not enough free space in the current region: retry with a
      * new region. */
 
-    gc_alloc_update_page_tables(unboxed_p, my_region);
-    gc_alloc_new_region(nbytes, unboxed_p, my_region);
-    return gc_alloc_with_region(nbytes,unboxed_p,my_region,0);
+    gc_alloc_update_page_tables(page_type_flag, my_region);
+    gc_alloc_new_region(nbytes, page_type_flag, my_region);
+    return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
 }
 
 /* these are only used during GC: all allocation from the mutator calls
  * alloc() -> gc_alloc_with_region() with the appropriate per-thread
  * region */
 
-void *
-gc_general_alloc(long nbytes,int unboxed_p,int quick_p)
-{
-    struct alloc_region *my_region =
-      unboxed_p ? &unboxed_region : &boxed_region;
-    return gc_alloc_with_region(nbytes,unboxed_p, my_region,quick_p);
-}
-
 static inline void *
 gc_quick_alloc(long nbytes)
 {
-    return gc_general_alloc(nbytes,ALLOC_BOXED,ALLOC_QUICK);
+    return gc_general_alloc(nbytes, BOXED_PAGE_FLAG, ALLOC_QUICK);
 }
 
 static inline void *
 gc_quick_alloc_large(long nbytes)
 {
-    return gc_general_alloc(nbytes,ALLOC_BOXED,ALLOC_QUICK);
+    return gc_general_alloc(nbytes, BOXED_PAGE_FLAG ,ALLOC_QUICK);
 }
 
 static inline void *
 gc_alloc_unboxed(long nbytes)
 {
-    return gc_general_alloc(nbytes,ALLOC_UNBOXED,0);
+    return gc_general_alloc(nbytes, UNBOXED_PAGE_FLAG, 0);
 }
 
 static inline void *
 gc_quick_alloc_unboxed(long nbytes)
 {
-    return gc_general_alloc(nbytes,ALLOC_UNBOXED,ALLOC_QUICK);
+    return gc_general_alloc(nbytes, UNBOXED_PAGE_FLAG, ALLOC_QUICK);
 }
 
 static inline void *
 gc_quick_alloc_large_unboxed(long nbytes)
 {
-    return gc_general_alloc(nbytes,ALLOC_UNBOXED,ALLOC_QUICK);
+    return gc_general_alloc(nbytes, UNBOXED_PAGE_FLAG, ALLOC_QUICK);
 }
 
 
@@ -4692,7 +4667,7 @@ alloc(long nbytes)
               set_pseudo_atomic_interrupted(thread);
         }
     }
-    new_obj = gc_alloc_with_region(nbytes,0,region,0);
+    new_obj = gc_alloc_with_region(nbytes, BOXED_PAGE_FLAG, region, 0);
 
 #ifndef LISP_FEATURE_WIN32
     alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
@@ -4787,9 +4762,9 @@ void gc_alloc_update_all_page_tables(void)
     /* Flush the alloc regions updating the tables. */
     struct thread *th;
     for_each_thread(th)
-        gc_alloc_update_page_tables(0, &th->alloc_region);
-    gc_alloc_update_page_tables(1, &unboxed_region);
-    gc_alloc_update_page_tables(0, &boxed_region);
+        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    gc_alloc_update_page_tables(UNBOXED_PAGE_FLAG, &unboxed_region);
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
 }
 
 void

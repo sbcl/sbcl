@@ -228,7 +228,7 @@
     (assert (not (array-has-fill-pointer-p (adjust-array ary '(2 2)))))))
 
 (with-test (:name %set-fill-pointer/error)
-  (let ((v (make-array 3 :fill-pointer 0))) 
+  (let ((v (make-array 3 :fill-pointer 0)))
     (handler-case
         (progn
           (setf (fill-pointer v) 12)

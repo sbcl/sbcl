@@ -112,7 +112,7 @@ copy_object(lispobj object, long nwords)
     tag = lowtag_of(object);
 
     /* Allocate space. */
-    new = gc_general_alloc(nwords*N_WORD_BYTES,ALLOC_BOXED,ALLOC_QUICK);
+    new = gc_general_alloc(nwords*N_WORD_BYTES, BOXED_PAGE_FLAG, ALLOC_QUICK);
 
     /* Copy the object. */
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
@@ -552,7 +552,7 @@ trans_list(lispobj object)
 
     /* Copy 'object'. */
     new_cons = (struct cons *)
-        gc_general_alloc(sizeof(struct cons),ALLOC_BOXED,ALLOC_QUICK);
+        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
     new_cons->car = cons->car;
     new_cons->cdr = cons->cdr; /* updated later */
     new_list_pointer = make_lispobj(new_cons,lowtag_of(object));
@@ -577,7 +577,7 @@ trans_list(lispobj object)
 
         /* Copy 'cdr'. */
         new_cdr_cons = (struct cons*)
-            gc_general_alloc(sizeof(struct cons),ALLOC_BOXED,ALLOC_QUICK);
+            gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
         new_cdr_cons->car = cdr_cons->car;
         new_cdr_cons->cdr = cdr_cons->cdr;
         new_cdr = make_lispobj(new_cdr_cons, lowtag_of(cdr));

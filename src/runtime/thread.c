@@ -279,7 +279,7 @@ new_thread_trampoline(struct thread *th)
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
-    gc_alloc_update_page_tables(0, &th->alloc_region);
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
