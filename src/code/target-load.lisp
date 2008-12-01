@@ -200,7 +200,7 @@
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
   (with-fop-stack t
-    (let ((code (%primitive sb!c:allocate-code-object box-num code-length))
+    (let ((code (sb!c:allocate-code-object box-num code-length))
           (index (+ sb!vm:code-trace-table-offset-slot box-num)))
       (declare (type index index))
       (setf (%code-debug-info code) (pop-stack))
@@ -246,9 +246,7 @@
                       tto)
               (format t "   loading to the dynamic space~%"))
 
-        (let ((code (%primitive sb!c:allocate-code-object
-                                box-num
-                                code-length))
+        (let ((code (sb!c:allocate-code-object box-num code-length))
               (index (+ sb!vm:code-trace-table-offset-slot box-num)))
           (declare (type index index))
           (when *load-code-verbose*

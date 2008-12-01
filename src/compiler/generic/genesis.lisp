@@ -2705,7 +2705,7 @@ core and return a descriptor to it."
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)
               (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
               (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-              (maybe-record-with-translated-name '("-START" "-END" "-SIZE") 6)
+              (maybe-record-with-translated-name '("-START" "-END" "-SIZE" "-SHIFT") 6)
               (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 7)
               (maybe-record-with-translated-name '("-CORE-SPACE-ID") 8))))))
     ;; KLUDGE: these constants are sort of important, but there's no

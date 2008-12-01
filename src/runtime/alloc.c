@@ -28,6 +28,7 @@
 #include "genesis/cons.h"
 #include "genesis/bignum.h"
 #include "genesis/sap.h"
+#include "genesis/code.h"
 
 #define ALIGNED_SIZE(n) ((n) + LOWTAG_MASK) & ~LOWTAG_MASK
 
@@ -164,4 +165,24 @@ alloc_sap(void *ptr)
         alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
     sap->pointer = ptr;
     return make_lispobj(sap,OTHER_POINTER_LOWTAG);
+}
+
+lispobj
+alloc_code_object (unsigned boxed, unsigned unboxed) {
+    struct code * code;
+    unsigned size;
+    boxed = make_fixnum(boxed + 1 + 4); /* 4 == trace_table_offset offset in words */
+    boxed &= ~LOWTAG_MASK;
+
+    unboxed += LOWTAG_MASK;
+    unboxed &= ~LOWTAG_MASK;
+
+    code = (struct code *) pa_alloc(ALIGNED_SIZE((boxed + unboxed) * sizeof(lispobj)));
+
+    boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
+    code->header = boxed | CODE_HEADER_WIDETAG;
+    code->code_size = unboxed;
+    code->entry_points = NIL;
+    code->debug_info = NIL;
+    return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }

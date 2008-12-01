@@ -152,33 +152,6 @@
     (inst rep)
     (inst stos zero)))
 
-;;;
-(define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (any-reg) :target boxed)
-         (unboxed-arg :scs (any-reg) :target unboxed))
-  (:results (result :scs (descriptor-reg) :from :eval))
-  (:temporary (:sc unsigned-reg :from (:argument 0)) boxed)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) unboxed)
-  (:node-var node)
-  (:generator 100
-    (move boxed boxed-arg)
-    (inst add boxed (fixnumize (1+ code-trace-table-offset-slot)))
-    (inst and boxed (lognot lowtag-mask))
-    (move unboxed unboxed-arg)
-    (inst shr unboxed word-shift)
-    (inst add unboxed lowtag-mask)
-    (inst and unboxed (lognot lowtag-mask))
-    (inst mov result boxed)
-    (inst add result unboxed)
-    (pseudo-atomic
-     (allocation result result node)
-     (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-     (inst shl boxed (- n-widetag-bits word-shift))
-     (inst or boxed code-header-widetag)
-     (storew boxed result 0 other-pointer-lowtag)
-     (storew unboxed result code-code-size-slot other-pointer-lowtag)
-     (storew nil-value result code-entry-points-slot other-pointer-lowtag))
-    (storew nil-value result code-debug-info-slot other-pointer-lowtag)))
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)

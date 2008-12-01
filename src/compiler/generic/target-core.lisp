@@ -16,6 +16,17 @@
 
 (in-package "SB!C")
 
+(declaim (ftype (function (fixnum fixnum) (values code-component &optional))
+                allocate-code-object))
+(defun allocate-code-object (boxed unboxed)
+  #!+gencgc
+  (without-gcing
+    (%make-lisp-obj
+     (alien-funcall (extern-alien "alloc_code_object" (function unsigned-long unsigned unsigned))
+                    boxed unboxed)))
+  #!-gencgc
+  (%primitive allocate-code-object boxed unboxed))
+
 ;;; Make a function entry, filling in slots from the ENTRY-INFO.
 (defun make-fun-entry (entry-info code-obj object)
   (declare (type entry-info entry-info) (type core-object object))
@@ -51,8 +62,7 @@
            (total-length (+ length
                             (ceiling trace-table-bits sb!vm:n-byte-bits)))
            (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
-           (code-obj
-            (%primitive allocate-code-object box-num total-length))
+           (code-obj (allocate-code-object box-num total-length))
            (fill-ptr (code-instructions code-obj)))
       (declare (type index box-num total-length))
 
