@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; -*-
   * bug fix: lexical type declarations are now correctly reported by
     SB-CLTL2. (reported by Larry D'Anna)
+  * bug fix: STRING-TO-OCTETS did not handle :START properly when
+    using UTF-8 as external format. (thanks to Luis Oliveira)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

@@ -219,3 +219,7 @@
   )
 
 )
+
+;; regression test: STRING->UTF8 didn't properly handle a non-zero
+;; START argument.
+(assert (equalp #(50) (string-to-octets "42" :start 1 :external-format :utf-8)))

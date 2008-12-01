@@ -402,8 +402,9 @@ one-past-the-end"
   (macrolet ((ascii-bash ()
                '(let ((array (make-array (+ null-padding (- send sstart))
                                          :element-type '(unsigned-byte 8))))
-                 (loop for i from sstart below send
-                       do (setf (aref array i) (char-code (char string i))))
+                 (loop for i from 0
+                       and j from sstart below send
+                       do (setf (aref array i) (char-code (char string j))))
                  array)))
     (etypecase string
       ((simple-array character (*))
