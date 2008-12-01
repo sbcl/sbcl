@@ -589,6 +589,51 @@ struct alloc_region unboxed_region;
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
 
+static inline page_index_t
+generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large)
+{
+    if (large) {
+        if (UNBOXED_PAGE_FLAG == page_type_flag) {
+            return generations[generation].alloc_large_unboxed_start_page;
+        } else if (BOXED_PAGE_FLAG == page_type_flag) {
+            return generations[generation].alloc_large_start_page;
+        } else {
+            lose("bad page type flag: %d", page_type_flag);
+        }
+    } else {
+        if (UNBOXED_PAGE_FLAG == page_type_flag) {
+            return generations[generation].alloc_unboxed_start_page;
+        } else if (BOXED_PAGE_FLAG == page_type_flag) {
+            return generations[generation].alloc_start_page;
+        } else {
+            lose("bad page_type_flag: %d", page_type_flag);
+        }
+    }
+}
+
+static inline void
+set_generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large,
+                                page_index_t page)
+{
+    if (large) {
+        if (UNBOXED_PAGE_FLAG == page_type_flag) {
+            generations[generation].alloc_large_unboxed_start_page = page;
+        } else if (BOXED_PAGE_FLAG == page_type_flag) {
+            generations[generation].alloc_large_start_page = page;
+        } else {
+            lose("bad page type flag: %d", page_type_flag);
+        }
+    } else {
+        if (UNBOXED_PAGE_FLAG == page_type_flag) {
+            generations[generation].alloc_unboxed_start_page = page;
+        } else if (BOXED_PAGE_FLAG == page_type_flag) {
+            generations[generation].alloc_start_page = page;
+        } else {
+            lose("bad page type flag: %d", page_type_flag);
+        }
+    }
+}
+
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -633,15 +678,7 @@ gc_alloc_new_region(long nbytes, int page_type_flag, struct alloc_region *alloc_
               && (alloc_region->free_pointer == alloc_region->end_addr));
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
-    if (UNBOXED_PAGE_FLAG == page_type_flag) {
-        first_page =
-            generations[gc_alloc_generation].alloc_unboxed_start_page;
-    } else if (BOXED_PAGE_FLAG == page_type_flag) {
-        first_page =
-            generations[gc_alloc_generation].alloc_start_page;
-    } else {
-        lose("bad page_type_flag: %d", page_type_flag);
-    }
+    first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
     last_page=gc_find_freeish_pages(&first_page, nbytes, page_type_flag);
     bytes_found=(PAGE_BYTES - page_table[first_page].bytes_used)
             + npage_bytes(last_page-first_page);
@@ -917,16 +954,11 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
 
         /* Set the generations alloc restart page to the last page of
          * the region. */
-        if (UNBOXED_PAGE_FLAG == page_type_flag) {
-            generations[gc_alloc_generation].alloc_unboxed_start_page =
-                next_page-1;
-        } else if (BOXED_PAGE_FLAG == page_type_flag) {
-            generations[gc_alloc_generation].alloc_start_page = next_page-1;
-            /* Add the region to the new_areas if requested. */
+        set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0, next_page-1);
+
+        /* Add the region to the new_areas if requested. */
+        if (BOXED_PAGE_FLAG == page_type_flag)
             add_new_area(first_page,orig_first_page_bytes_used, region_size);
-        } else {
-            lose("bad page type flag: %d", page_type_flag);
-        }
 
         /*
         FSHOW((stderr,
@@ -973,15 +1005,7 @@ gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_regio
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
 
-    if (UNBOXED_PAGE_FLAG == page_type_flag) {
-        first_page =
-            generations[gc_alloc_generation].alloc_large_unboxed_start_page;
-    } else if (BOXED_PAGE_FLAG == page_type_flag) {
-        first_page =
-            generations[gc_alloc_generation].alloc_large_start_page;
-    } else {
-        lose("bad page type flag: %d", page_type_flag);
-    }
+    first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1);
     if (first_page <= alloc_region->last_page) {
         first_page = alloc_region->last_page+1;
     }
@@ -989,11 +1013,8 @@ gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_regio
     last_page=gc_find_freeish_pages(&first_page,nbytes, page_type_flag);
 
     gc_assert(first_page > alloc_region->last_page);
-    if (UNBOXED_PAGE_FLAG == page_type_flag)
-        generations[gc_alloc_generation].alloc_large_unboxed_start_page =
-            last_page;
-    else
-        generations[gc_alloc_generation].alloc_large_start_page = last_page;
+
+    set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
 
     /* Set up the pages. */
     orig_first_page_bytes_used = page_table[first_page].bytes_used;
