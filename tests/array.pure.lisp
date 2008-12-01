@@ -226,3 +226,13 @@
   (let ((ary (make-array '(2 2))))
     ;; SBCL used to give multidimensional arrays a bogus fill-pointer
     (assert (not (array-has-fill-pointer-p (adjust-array ary '(2 2)))))))
+
+(with-test (:name %set-fill-pointer/error)
+  (let ((v (make-array 3 :fill-pointer 0))) 
+    (handler-case
+        (progn
+          (setf (fill-pointer v) 12)
+          (error "WTF"))
+      (error (e)
+        (assert (eql 12 (type-error-datum e)))
+        (assert (equal '(integer 0 3) (type-error-expected-type e)))))))

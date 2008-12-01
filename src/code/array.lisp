@@ -776,7 +776,7 @@ of specialized arrays is supported."
                   :datum arg
                   :expected-type (list 'integer 0 max)
                   :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
-                  arg max)))
+                  :format-arguments (list arg max))))
         (t
          (error 'simple-type-error
                 :datum vector

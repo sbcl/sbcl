@@ -4,6 +4,8 @@
     SB-CLTL2. (reported by Larry D'Anna)
   * bug fix: STRING-TO-OCTETS did not handle :START properly when
     using UTF-8 as external format. (thanks to Luis Oliveira)
+  * bug fix: errors from invalid fill-pointer values to (SETF FILL-POINTER)
+    are signalled correctly. (thanks to Stas Boukarev)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
