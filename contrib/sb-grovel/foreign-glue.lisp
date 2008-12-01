@@ -255,40 +255,39 @@ deeply nested structures."
 
 (defgeneric accessor-modifier-for (element-type accessor-type))
 
-(defmacro identity-1 (thing &rest ignored)
-  (declare (ignore ignored))
-  thing)
-(defun (setf identity-1) (new-thing place &rest ignored)
-  (declare (ignore ignored))
-  (setf place new-thing))
-
 (defmethod accessor-modifier-for (element-type (accessor-type (eql :getter)))
-  'identity-1)
-(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
-                                  (accessor-type (eql :getter)))
-  'c-string->lisp-string)
+  nil)
 (defmethod accessor-modifier-for (element-type (accessor-type (eql :setter)))
   nil)
+
+(defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
+                                  (accessor-type (eql :getter)))
+  'c-string-reader[1])
+
 (defmethod accessor-modifier-for ((element-type (eql 'C-STRING))
                                   (accessor-type (eql :setter)))
-  'c-string->lisp-string)
+  'c-string-writer)
 
-(defun c-string->lisp-string (string &optional limit)
+;; The "[1]" in the name c-string-reader[1] refers to the CLHS
+;; glossary entry definitions for "reader".
+(defun c-string-reader[1] (place &optional limit)
   (declare (ignore limit))
-  (cast string c-string))
+  `(cast ,place c-string))
 
-(defun (setf c-string->lisp-string) (new-string alien &optional limit)
-  (declare (string new-string))
-  (let* ((upper-bound (or limit (1+ (length new-string))))
-         (last-elt (min (1- upper-bound) (length new-string)))
-         (octets (sb-ext:string-to-octets new-string :end last-elt
-                                          :null-terminate t))
-         (alien-pointer (cast alien (* unsigned-char))))
-    (declare (cl:type (simple-array (unsigned-byte 8) (*)) octets))
-    (declare (cl:type sb-int:index last-elt))
-    (loop for i from 0 to last-elt
-          do (setf (deref alien-pointer i) (aref octets i)))
-    (subseq new-string 0 last-elt)))
+(defun c-string-writer (string alien &optional limit)
+  (sb-int:with-unique-names
+      (stringvar upper-bound last-elt octets alien-ptr index)
+    `(let* ((,stringvar ,string)
+            (,upper-bound (or ,limit (1+ (length ,stringvar))))
+            (,last-elt (min (1- ,upper-bound) (length ,stringvar)))
+            (,octets (sb-ext:string-to-octets ,stringvar :end ,last-elt
+                                              :null-terminate t))
+            (,alien-ptr (cast ,alien (* unsigned-char))))
+       (declare (cl:type (simple-array (unsigned-byte 8) (*)) ,octets))
+       (declare (cl:type sb-int:index ,last-elt))
+       (dotimes (,index ,last-elt)
+         (setf (deref ,alien-ptr ,index) (aref ,octets ,index)))
+       (subseq ,stringvar 0 ,last-elt))))
 
 (defgeneric accessors-for (struct-name element path))
 (defmethod accessors-for (struct-name (root structured-type) path)
@@ -296,34 +295,42 @@ deeply nested structures."
 
 
 (defmethod accessors-for (struct-name (root value-slot) path)
-  (let ((rpath (reverse path))
-        (accessor-name (format nil "~A-~A"
-                               (symbol-name struct-name)
-                               (symbol-name (name root)))))
-    (labels ((accessor (root rpath)
-               (apply #'sane-slot 'struct (mapcar 'name (append (rest rpath) (list root))))))
-      `((declaim (inline ,(intern accessor-name)
-                         (setf ,(intern accessor-name))))
-        (defun ,(intern accessor-name) (struct)
-          (declare (cl:type (alien (* ,struct-name)) struct)
-                   (optimize (speed 3)))
-          (,(accessor-modifier-for (reintern (type root) (find-package :sb-grovel))
-                                   :getter)
-            ,(accessor root rpath) ,(size root)))
-        (defun (setf ,(intern accessor-name)) (new-val struct)
-          (declare (cl:type (alien (* ,struct-name)) struct)
-                   (cl:type ,(lisp-type-for (type root) (size root)) new-val)
-                   (optimize (speed 3)))
-          ,(let* ((accessor-modifier (accessor-modifier-for (reintern (type root)
-                                                                      (find-package :sb-grovel))
-                                                            :setter))
-                  (modified-accessor (if accessor-modifier
-                                         `(,accessor-modifier ,(accessor root rpath) ,(size root))
-                                         (accessor root rpath))))
-
-             `(setf ,modified-accessor new-val)))
-        (defconstant ,(intern (format nil "OFFSET-OF-~A" accessor-name))
-          ,(offset root))))))
+  (let* ((rpath (reverse path))
+         (accessor-name (intern
+                         (format nil "~A-~A"
+                                 (symbol-name struct-name)
+                                 (symbol-name (name root)))))
+         (offset-constant-name (intern
+                                (format nil "OFFSET-OF-~A" accessor-name)))
+         (var (gensym "VAR-"))
+         (place (apply #'sane-slot 'struct
+                       (mapcar 'name (append (rest rpath) (list root)))))
+         (reader (let ((reader (accessor-modifier-for
+                                (reintern (type root)
+                                          (find-package :sb-grovel))
+                                :getter)))
+                   (if reader
+                       (funcall reader place (size root))
+                       place)))
+         (writer (let ((writer (accessor-modifier-for
+                                (reintern (type root)
+                                          (find-package :sb-grovel))
+                                :setter)))
+                   (if writer
+                       (funcall writer var place (size root))
+                       `(setf ,place ,var)))))
+    `((declaim (inline ,accessor-name (setf ,accessor-name)))
+      (defun ,accessor-name (struct)
+        (declare (cl:type (alien (* ,struct-name)) struct)
+                 (optimize (speed 3)))
+        ,reader)
+      (defun (setf ,accessor-name) (,var struct)
+        (declare (cl:type (alien (* ,struct-name)) struct)
+                 (cl:type ,(lisp-type-for (type root) (size root)) ,var)
+                 (optimize (speed 3)))
+        ,writer)
+      (defconstant ,offset-constant-name
+                   ,(offset root)))))
 
 
 
@@ -359,39 +366,51 @@ deeply nested structures."
                                             (size root)))
                                   (size root)))))
         (generate-struct-definition name root nil))
-    `(progn
-       (sb-alien:define-alien-type ,@(first struct-elements))
-       ,@accessors
-       (defmacro ,(intern (format nil "WITH-~A" name)) (var (&rest field-values) &body body)
-         (labels ((field-name (x)
-                    (intern (concatenate 'string
-                                         (symbol-name ',name) "-"
-                                         (symbol-name x))
-                            ,(symbol-package name))))
-           `(sb-alien:with-alien ((,var (* ,',name) ,'(,(intern (format nil "ALLOCATE-~A" name)))))
-              (unwind-protect
-                  (progn
-                    (progn ,@(mapcar (lambda (pair)
-                                       `(setf (,(field-name (first pair)) ,var) ,(second pair)))
-                                     field-values))
-                    ,@body)
-                (funcall ',',(intern (format nil "FREE-~A" name)) ,var)))))
-       (defconstant ,(intern (format nil "SIZE-OF-~A" name)) ,size)
-       (defun ,(intern (format nil "ALLOCATE-~A" name)) ()
-         (let* ((o (sb-alien:make-alien ,name))
-                (c-o (cast o (* (unsigned 8)))))
-           ;; we have to initialize the object to all-0 before we can
-           ;; expect to make sensible use of it - the object returned
-           ;; by make-alien is initialized to all-D0 bytes.
+    (sb-int:with-unique-names (var field-values body field-name pair
+                                   object c-object index)
+      (let ((with (intern (format nil "WITH-~A" name)))
+            (allocate (intern (format nil "ALLOCATE-~A" name)))
+            (free (intern (format nil "FREE-~A" name)))
+            (size-of (intern (format nil "SIZE-OF-~A" name))))
+        `(progn
+           (sb-alien:define-alien-type ,@(first struct-elements))
+           ,@accessors
+           (defmacro ,with (,var (&rest ,field-values) &body ,body)
+             (labels ((,field-name (,var)
+                        (intern
+                         (format nil ,(format nil "~A-~~A" (symbol-name name))
+                                 (symbol-name ,var))
+                         ,(symbol-package name))))
+               `(sb-alien:with-alien ((,,var (* ,',name) ,'(,allocate)))
+                  (unwind-protect
+                      (progn
+                        (setf ,@(mapcan
+                                 (lambda (,pair)
+                                   `((,(,field-name (first ,pair)) ,,var)
+                                     ,(second ,pair)))
+                                 ,field-values))
+                        ,@,body)
+                    (,',free ,,var)))))
+           (defconstant ,size-of ,size)
+           (defun ,allocate ()
+             (let* ((,object (sb-alien:make-alien ,name))
+                    (,c-object (cast ,object (* (unsigned 8)))))
+               ;; we have to initialize the object to all-0 before we can
+               ;; expect to make sensible use of it - the object returned
+               ;; by make-alien is initialized to all-D0 bytes.
 
-           ;; FIXME: This should be fixed in sb-alien, where better
-           ;; optimizations might be possible.
-           (loop for i from 0 below ,size
-                 do (setf (deref c-o i) 0))
-           o))
-       (defun ,(intern (format nil "FREE-~A" name)) (o)
-         (sb-alien:free-alien o)))))
+               ;; FIXME: This should be fixed in sb-alien, where better
+               ;; optimizations might be possible.
+               (dotimes (,index ,size)
+                 (setf (deref ,c-object ,index) 0))
+               ,object))
+           (defun ,free (,object)
+             (sb-alien:free-alien ,object)))))))
 
+;; FIXME: Nothing in SBCL uses this, but kept it around in case there
+;; are third-party sb-grovel clients.  It should go away eventually,
+;; on the principle that sb-grovel should only have to be loaded in
+;; order to do an actual groveling run.
 (defun foreign-nullp (c)
-  "C is a pointer to 0?"
+  "Deprecated.  Use SB-ALIEN:NULL-ALIEN instead."
   (null-alien c))

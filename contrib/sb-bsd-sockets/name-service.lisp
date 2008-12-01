@@ -20,7 +20,7 @@
   (car (host-ent-addresses host-ent)))
 
 (defun make-host-ent (h &optional errno)
-  (when (sb-grovel::foreign-nullp h)
+  (when (sb-alien:null-alien h)
     (name-service-error "gethostbyname" errno))
   (let* ((length (sockint::hostent-length h))
          (aliases (loop for i = 0 then (1+ i)
