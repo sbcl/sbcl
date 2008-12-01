@@ -78,6 +78,7 @@ NWORDS(unsigned long x, unsigned long n_bits)
 #define ALLOC_QUICK 1
 
 #ifdef LISP_FEATURE_GENCGC
+#include "gencgc-alloc-region.h"
 void *
 gc_alloc_with_region(long nbytes,int page_type_flag, struct alloc_region *my_region,
                      int quick_p);

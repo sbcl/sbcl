@@ -14,9 +14,10 @@
 
 #include "sbcl.h"
 #include "runtime.h"
+#include "gc-internal.h"
 
 #ifdef LISP_FEATURE_GENCGC
-extern lispobj *alloc(long bytes);
+extern lispobj *general_alloc(long bytes, int page_type_flag);
 #endif
 
 extern lispobj alloc_cons(lispobj car, lispobj cdr);
@@ -24,5 +25,6 @@ extern lispobj alloc_number(long n);
 extern lispobj alloc_string(char *str);
 extern lispobj alloc_sap(void *ptr);
 extern lispobj alloc_base_string(char *str);
+extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed);
 
 #endif /* _ALLOC_H_ */

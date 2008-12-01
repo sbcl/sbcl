@@ -294,15 +294,16 @@ generation_index_t gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
  * integrated with the Lisp code. */
 page_index_t last_free_page;
 
+#ifdef LISP_FEATURE_SB_THREAD
 /* This lock is to prevent multiple threads from simultaneously
  * allocating new regions which overlap each other.  Note that the
  * majority of GC is single-threaded, but alloc() may be called from
  * >1 thread at a time and must be thread-safe.  This lock must be
  * seized before all accesses to generations[] or to parts of
  * page_table[] that other threads may want to see */
-
-#ifdef LISP_FEATURE_SB_THREAD
 static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
+/* This lock is used to protect non-thread-local allocation. */
+static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 
@@ -4606,8 +4607,6 @@ gc_initialize_pointers(void)
 {
     gencgc_pickup_dynamic();
 }
-
-
 
 
 /* alloc(..) is the external interface for memory allocation. It
@@ -4622,16 +4621,10 @@ gc_initialize_pointers(void)
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
-lispobj *
-alloc(long nbytes)
+static inline lispobj *
+general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *region,
+                       struct thread *thread)
 {
-    struct thread *thread=arch_os_get_current_thread();
-    struct alloc_region *region=
-#ifdef LISP_FEATURE_SB_THREAD
-        thread ? &(thread->alloc_region) : &boxed_region;
-#else
-        &boxed_region;
-#endif
 #ifndef LISP_FEATURE_WIN32
     lispobj alloc_signal;
 #endif
@@ -4644,25 +4637,8 @@ alloc(long nbytes)
     gc_assert((((unsigned long)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
 
-#if 0
-    if(all_threads)
-        /* there are a few places in the C code that allocate data in the
-         * heap before Lisp starts.  This is before interrupts are enabled,
-         * so we don't need to check for pseudo-atomic */
-#ifdef LISP_FEATURE_SB_THREAD
-        if(!get_psuedo_atomic_atomic(th)) {
-            register u32 fs;
-            fprintf(stderr, "fatal error in thread 0x%x, tid=%ld\n",
-                    th,th->os_thread);
-            __asm__("movl %fs,%0" : "=r" (fs)  : );
-            fprintf(stderr, "fs is %x, th->tls_cookie=%x \n",
-                    debug_get_fs(),th->tls_cookie);
-            lose("If you see this message before 2004.01.31, mail details to sbcl-devel\n");
-        }
-#else
-    gc_assert(get_pseudo_atomic_atomic(th));
-#endif
-#endif
+    /* Must be inside a PA section. */
+    gc_assert(get_pseudo_atomic_atomic(thread));
 
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
@@ -4672,11 +4648,10 @@ alloc(long nbytes)
         return(new_obj);        /* yup */
     }
 
-    /* we have to go the long way around, it seems.  Check whether
-     * we should GC in the near future
+    /* we have to go the long way around, it seems. Check whether we
+     * should GC in the near future
      */
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-        gc_assert(get_pseudo_atomic_atomic(thread));
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */
@@ -4688,7 +4663,7 @@ alloc(long nbytes)
               set_pseudo_atomic_interrupted(thread);
         }
     }
-    new_obj = gc_alloc_with_region(nbytes, BOXED_PAGE_FLAG, region, 0);
+    new_obj = gc_alloc_with_region(nbytes, page_type_flag, region, 0);
 
 #ifndef LISP_FEATURE_WIN32
     alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
@@ -4709,6 +4684,37 @@ alloc(long nbytes)
 #endif
 
     return (new_obj);
+}
+
+lispobj *
+general_alloc(long nbytes, int page_type_flag)
+{
+    struct thread *thread = arch_os_get_current_thread();
+    /* Select correct region, and call general_alloc_internal with it.
+     * For other then boxed allocation we must lock first, since the
+     * region is shared. */
+    if (BOXED_PAGE_FLAG == page_type_flag) {
+#ifdef LISP_FEATURE_SB_THREAD
+        struct alloc_region *region = (thread ? &(thread->alloc_region) : &boxed_region);
+#else
+        struct alloc_region *region = &boxed_region;
+#endif
+        return general_alloc_internal(nbytes, page_type_flag, region, thread);
+    } else if (UNBOXED_PAGE_FLAG == page_type_flag) {
+        lispobj * obj;
+        gc_assert(0 == thread_mutex_lock(&allocation_lock));
+        obj = general_alloc_internal(nbytes, page_type_flag, &unboxed_region, thread);
+        gc_assert(0 == thread_mutex_unlock(&allocation_lock));
+        return obj;
+    } else {
+        lose("bad page type flag: %d", page_type_flag);
+    }
+}
+
+lispobj *
+alloc(long nbytes)
+{
+    general_alloc(nbytes, BOXED_PAGE_FLAG);
 }
 
 /*

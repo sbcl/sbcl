@@ -102,8 +102,7 @@ void sniff_code_object(struct code *code, unsigned long displacement);
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
 long update_dynamic_space_free_pointer(void);
-void gc_alloc_update_page_tables(int page_type_flag,
-                                 struct alloc_region *alloc_region);
+void gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(void);
 void gc_set_region_empty(struct alloc_region *region);
 

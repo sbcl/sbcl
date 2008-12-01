@@ -33,20 +33,16 @@
 #define ALIGNED_SIZE(n) ((n) + LOWTAG_MASK) & ~LOWTAG_MASK
 
 #ifdef LISP_FEATURE_GENCGC
-extern lispobj *alloc(long bytes);
-#endif
-
 static lispobj *
-pa_alloc(int bytes)
+pa_alloc(int bytes, int page_type_flag)
 {
     lispobj *result;
-#ifdef LISP_FEATURE_GENCGC
     struct thread *th = arch_os_get_current_thread();
 
     /* FIXME: OOAO violation: see arch_pseudo_* */
     clear_pseudo_atomic_interrupted(th);
     set_pseudo_atomic_atomic(th);
-    result = alloc(bytes);
+    result = general_alloc(bytes, page_type_flag);
     clear_pseudo_atomic_atomic(th);
 
     if (get_pseudo_atomic_interrupted(th)) {
@@ -71,7 +67,12 @@ pa_alloc(int bytes)
         result = (lispobj *) *current_control_stack_pointer;
 #endif
     }
+    return result;
+}
 #else
+static lispobj *
+pa_alloc(int bytes, int page_type_flag)
+{
     /* FIXME: this is not pseudo atomic at all, but is called only from
      * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
     result = dynamic_space_free_pointer;
@@ -87,28 +88,27 @@ pa_alloc(int bytes)
         set_auto_gc_trigger((char *)dynamic_space_free_pointer
                             - (char *)current_dynamic_space);
     }
-#endif
     return result;
 }
-
+#endif
 
 lispobj *
 alloc_unboxed(int type, int words)
 {
     lispobj *result;
 
-    result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
+    result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)), UNBOXED_PAGE_FLAG);
     *result = (lispobj) (words << N_WIDETAG_BITS) | type;
     return result;
 }
 
 static lispobj
-alloc_vector(int type, int length, int size)
+alloc_vector(int type, int length, int size, int page_type_flag)
 {
     struct vector *result;
 
     result = (struct vector *)
-      pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)));
+        pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)), page_type_flag);
 
     result->header = type;
     result->length = make_fixnum(length);
@@ -120,7 +120,7 @@ lispobj
 alloc_cons(lispobj car, lispobj cdr)
 {
     struct cons *ptr =
-        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)));
+        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)), BOXED_PAGE_FLAG);
 
     ptr->car = car;
     ptr->cdr = cdr;
@@ -148,7 +148,7 @@ lispobj
 alloc_base_string(char *str)
 {
     int len = strlen(str);
-    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8);
+    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8, UNBOXED_PAGE_FLAG);
     struct vector *vec = (struct vector *)native_pointer(result);
 
     vec->length = make_fixnum(len);
@@ -177,7 +177,8 @@ alloc_code_object (unsigned boxed, unsigned unboxed) {
     unboxed += LOWTAG_MASK;
     unboxed &= ~LOWTAG_MASK;
 
-    code = (struct code *) pa_alloc(ALIGNED_SIZE((boxed + unboxed) * sizeof(lispobj)));
+    code = (struct code *) pa_alloc(ALIGNED_SIZE((boxed + unboxed) * sizeof(lispobj)),
+                                    BOXED_PAGE_FLAG);
 
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;
