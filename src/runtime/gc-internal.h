@@ -72,6 +72,7 @@ NWORDS(unsigned long x, unsigned long n_bits)
 #define BOXED_PAGE_FLAG 1
 #define UNBOXED_PAGE_FLAG 2
 #define OPEN_REGION_PAGE_FLAG 4
+#define CODE_PAGE_FLAG        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
 
 #define ALLOC_BOXED 0
 #define ALLOC_UNBOXED 1
@@ -88,7 +89,7 @@ gc_general_alloc(long nbytes, int page_type_flag, int quick_p)
     struct alloc_region *my_region;
     if (UNBOXED_PAGE_FLAG == page_type_flag) {
         my_region = &unboxed_region;
-    } else if (BOXED_PAGE_FLAG == page_type_flag) {
+    } else if (BOXED_PAGE_FLAG & page_type_flag) {
         my_region = &boxed_region;
     } else {
         lose("bad page type flag: %d", page_type_flag);
@@ -116,6 +117,7 @@ lispobj  copy_large_unboxed_object(lispobj object, long nwords);
 lispobj  copy_unboxed_object(lispobj object, long nwords);
 lispobj  copy_large_object(lispobj object, long nwords);
 lispobj  copy_object(lispobj object, long nwords);
+lispobj  copy_code_object(lispobj object, long nwords);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);

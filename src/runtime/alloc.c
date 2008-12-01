@@ -178,7 +178,7 @@ alloc_code_object (unsigned boxed, unsigned unboxed) {
     unboxed &= ~LOWTAG_MASK;
 
     code = (struct code *) pa_alloc(ALIGNED_SIZE((boxed + unboxed) * sizeof(lispobj)),
-                                    BOXED_PAGE_FLAG);
+                                    CODE_PAGE_FLAG);
 
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;

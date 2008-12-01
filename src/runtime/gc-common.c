@@ -96,10 +96,9 @@ unsigned long bytes_consed_between_gcs = 12*1024*1024;
 /*
  * copying objects
  */
-
-/* to copy a boxed object */
+static
 lispobj
-copy_object(lispobj object, long nwords)
+gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 {
     int tag;
     lispobj *new;
@@ -112,11 +111,24 @@ copy_object(lispobj object, long nwords)
     tag = lowtag_of(object);
 
     /* Allocate space. */
-    new = gc_general_alloc(nwords*N_WORD_BYTES, BOXED_PAGE_FLAG, ALLOC_QUICK);
+    new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
 
     /* Copy the object. */
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
     return make_lispobj(new,tag);
+}
+
+/* to copy a boxed object */
+lispobj
+copy_object(lispobj object, long nwords)
+{
+    return gc_general_copy_object(object, nwords, BOXED_PAGE_FLAG);
+}
+
+lispobj
+copy_code_object(lispobj object, long nwords)
+{
+    return gc_general_copy_object(object, nwords, CODE_PAGE_FLAG);
 }
 
 static long scav_lose(lispobj *where, lispobj object); /* forward decl */
@@ -268,7 +280,7 @@ trans_code(struct code *code)
     nwords = ncode_words + nheader_words;
     nwords = CEILING(nwords, 2);
 
-    l_new_code = copy_object(l_code, nwords);
+    l_new_code = copy_code_object(l_code, nwords);
     new_code = (struct code *) native_pointer(l_new_code);
 
 #if defined(DEBUG_CODE_GC)

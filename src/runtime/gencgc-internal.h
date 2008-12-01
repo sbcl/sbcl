@@ -66,10 +66,14 @@ struct page {
          * OSes). This is useful for re-scavenging pages that are
          * written during a GC. */
         write_protected_cleared :1,
-        /* the region the page is allocated to: 0 for a free page; 1
-         * for boxed objects; 2 for unboxed objects. If the page is
-         * free the following slots are invalid (well the bytes_used
-         * must be 0). */
+        /*  000 free
+         *  10? boxed data
+         *  11? boxed code
+         *  01? unboxed data
+         *  ??1 open region
+         *
+         * If the page is free the following slots are invalid, except
+         * for the bytes_used which must be zero. */
         allocated :3,
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
