@@ -97,7 +97,7 @@ gc_general_alloc(long nbytes, int page_type_flag, int quick_p)
     return gc_alloc_with_region(nbytes, page_type_flag, my_region, quick_p);
 }
 #else
-void *gc_general_alloc(long nbytes,int page_type_flag,int quick_p);
+extern void *gc_general_alloc(long nbytes,int page_type_flag,int quick_p);
 #endif
 
 extern long (*scavtab[256])(lispobj *where, lispobj object);

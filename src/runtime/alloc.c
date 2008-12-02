@@ -172,7 +172,6 @@ alloc_sap(void *ptr)
 lispobj
 alloc_code_object (unsigned boxed, unsigned unboxed) {
     struct code * code;
-    unsigned size;
     boxed = make_fixnum(boxed + 1 + 4); /* 4 == trace_table_offset offset in words */
     boxed &= ~LOWTAG_MASK;
 

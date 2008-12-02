@@ -86,7 +86,7 @@ zero_stack(void)
 }
 
 
-static void *
+void *
 gc_general_alloc(long bytes, int page_type_flag, int quick_p) {
     lispobj *new=new_space_free_pointer;
     new_space_free_pointer+=(bytes/N_WORD_BYTES);
