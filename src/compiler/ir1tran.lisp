@@ -116,12 +116,13 @@
     (make-global-var
      :kind :global-function
      :%source-name name
-     :type (if (and (not latep)
-                    (or *derive-function-types*
-                        (member where '(:declared :defined-method))
-                        (and (member name *fun-names-in-this-file*
-                                     :test #'equal)
-                             (not (fun-lexically-notinline-p name)))))
+     :type (if (or (eq where :declared)
+                   (and (not latep)
+                        (or *derive-function-types*
+                            (eq where :defined-method)
+                            (and (not (fun-lexically-notinline-p name))
+                                 (member name *fun-names-in-this-file*
+                                         :test #'equal)))))
                (progn
                  (maybe-update-info-for-gf name)
                  (info :function :type name))

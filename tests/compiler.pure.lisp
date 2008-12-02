@@ -2664,3 +2664,9 @@
                                         i)
                                       i))))))
       (assert (equal '(1 2 1) (funcall fun 1))))))
+
+;;; It used to be possible to confuse the compiler into
+;;; IR2-converting such a call to CONS
+(with-test (:name :late-bound-primitive)
+  (compile nil `(lambda ()
+                  (funcall 'cons 1))))
