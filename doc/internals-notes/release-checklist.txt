@@ -1,0 +1,107 @@
+Review "cvs log" to see whether there's anything missing in NEWS or
+CREDITS.
+
+Check .sbclrc and /etc/sbclrc and any other relevant local machinery
+like it (e.g. ~/lib/lisp/sbcl-patches.lisp for WHN) to make sure that
+any local mutations you've been experimenting with locally are either
+integrated into the system already or commented out while you build
+and test it. (Or alternatively, set up your scripts to build and test
+SBCL in a way which instructs it to ignore .sbclrc.)
+
+Do basic tests on the system. Some useful tests are:
+ * built-in tests, o' course
+  ** cd tests && sh ./run-tests.sh
+ * gcl ANSI test suite
+ * Build and run your apps and their test suites under the system.
+ * similarly on any other computers I have handy
+
+Bump version number up to a release version number, so that
+e.g. 1.2.3.45 becomes 1.2.4.
+
+Check again: "cvs diff" to make sure this isn't some mutant...
+
+Check that things are up to date:
+ * TODO
+ * man page and user manual (e.g. in referring to bugs)
+
+Create the distribution files:
+      * Move customize-target-features.lisp out of the way (and
+        anything else nuked by distclean.sh).
+      * Run clean.sh.
+      * Run make.sh to build the system with the final version number.
+      * (Install on my system. Do final tests.)
+      * Run make-doc.sh to format the documentation.
+        -- fundamental hack to make things work on my old Debian
+           system with newer texinfo in /usr/local/bin:
+             $ (cd doc/manual/ ; PATH=/usr/local/bin:$PATH make html)
+           or
+             $ (cd doc/ ; PATH=/usr/local/bin:$PATH sh make-doc.sh)
+      * Now that it's been verified to build itself,
+        ** Commit the system to CVS
+              $ cvs commit
+           with commit log a la
+              "release, will be tagged as sbcl_0_7_8"
+        ** Tag the system in CVS, e.g.
+              $ cvs tag sbcl_1_0_3
+      * Copy sbcl/ to sbcl-x.y.z/. (on OpenBSD "cp -pR ...", on
+              Linux "cp -a")
+        ** In sbcl/,
+           *** Restore my customize-target-features.lisp.
+        ** In sbcl/../,
+           *** Run "ln -s sbcl-x.y.z sbcl-x.y.z-<arch>-<os>"
+           *** Run "sh sbcl-x.y.z/binary-distribution.sh sbcl-x.y.z-<arch>-<os>".
+           *** Run "sh sbcl-x.y.z/html-distribution.sh sbcl-x.y.z".
+           *** (In sbcl-x.y.z/, run clean.sh and/or distclean.sh to
+               clean up.)
+           *** Run "sh sbcl-x.y.z/source-distribution.sh sbcl-x.y.z".
+      * Run "md5sum > sbcl-x.y.z-$sfuserid" on the renamed tar files.
+        (On *BSD, it's "md5" instead of "md5sum".)
+      * Edit the digest file to add
+        "The MD5 checksums of the following distribution files are:"
+        (or "The MD5 checksum of the source distribution tarball is")
+        (or "The MD5 checksum of the following distribution file is:")
+      * Run bzip2 on the renamed tar files.
+      * Run "pgp -sta sbcl-x.y.z-$sfuserid" with appropriate numeric
+        values for x, y, and z.
+Now we have e.g.:
+      * sbcl-0.7.0-source.tar.bz2
+      * sbcl-0.7.0-x86-openbsd-binary.tar.bz2
+      * sbcl-0.7.0-html.tar.bz2
+      * sbcl-0.7.0-wnewman.asc
+
+for sf anonymous ftp:
+ # no longer possible now that sf doesn't provide anonftp:
+ # cd /usr/stuff/
+ # scp sbcl-x.y.z-* shell1.sourceforge.net:/home/groups/ftp/pub/sbcl/
+ # cd /usr/stuff/sbcl/
+ # for stem in NEWS README INSTALL; do
+ #   scp $stem shell1.sourceforge.net:/home/groups/ftp/pub/sbcl/$stem-x.y.z
+ # done
+for sf 'module release' system:
+ * Upload the distribution files via anonymous ftp to
+  upload.sourceforge.net in the /incoming directory.
+ * possible shortcuts:
+    <https://sourceforge.net/project/admin/?group_id=1373>
+    <https://sourceforge.net/project/admin/editpackages.php?group_id=1373>
+    <https://sourceforge.net/project/admin/newrelease.php?package_id=1354&group_id=1373>
+ * Do the misbegotten^Wunscriptable HTTPforms thing on the sourceforge
+  project home to make the distribution files visible.
+  ** (from "Admin", then "File Releases")
+  ** "Add release" for package "sbcl", "release name"="x.y.z". (not
+     "release name"="sbcl-x.y.z")
+  ** boilerplate for "Release Notes":
+      For information about this release, see the NEWS file
+      in the distribution. The information is also available
+      in the "Change Log"/"Changes" section of the SourceForge
+      webbed description of this release.
+
+For a new port (e.g. OpenBSD in sbcl-0.6.7) it's particularly good to
+upload the appropriate binary distribution.
+
+Make an announcement to sbcl-announce@lists.sourceforge.net (including
+going to the sbcl-announce admin page to let it through the antispam
+policy).
+
+It's often a good idea to make a copy for me, too. (sbcl-x.y.z.tar.bz2)
+
+Review the SourceForge web page.
