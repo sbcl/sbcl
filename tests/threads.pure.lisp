@@ -20,6 +20,24 @@
 
 (use-package :test-util)
 
+(with-test (:name mutex-owner)
+  ;; Make sure basics are sane on unithreaded ports as well
+  (let ((mutex (make-mutex)))
+    (get-mutex mutex)
+    (assert (eq *current-thread* (mutex-value mutex)))
+    (handler-bind ((warning #'error))
+      (release-mutex mutex))
+    (assert (not (mutex-value mutex)))))
+
+(with-test (:name spinlock-owner)
+  ;; Make sure basics are sane on unithreaded ports as well
+  (let ((spinlock (sb-thread::make-spinlock)))
+    (sb-thread::get-spinlock spinlock)
+    (assert (eq *current-thread* (sb-thread::spinlock-value spinlock)))
+    (handler-bind ((warning #'error))
+      (sb-thread::release-spinlock spinlock))
+    (assert (not (sb-thread::spinlock-value spinlock)))))
+
 ;;; Terminating a thread that's waiting for the terminal.
 
 #+sb-thread

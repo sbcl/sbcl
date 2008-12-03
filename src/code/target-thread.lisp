@@ -266,8 +266,13 @@ directly."
            #!-sb-thread (ignore waitp))
   (unless new-owner
     (setq new-owner *current-thread*))
-  (when (eql new-owner (mutex-%owner mutex))
-    (error "Recursive lock attempt ~S." mutex))
+  (let ((old (mutex-%owner mutex)))
+    (when (eq new-owner old)
+      (error "Recursive lock attempt ~S." mutex))
+    #!-sb-thread
+    (if old
+        (error "Strange deadlock on ~S in an unithreaded build?" mutex)
+        (setf (mutex-%owner mutex) new-owner)))
   #!+sb-thread
   (progn
     ;; FIXME: Lutexes do not currently support deadlines, as at least
