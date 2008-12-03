@@ -74,7 +74,7 @@ static lispobj *
 pa_alloc(int bytes, int page_type_flag)
 {
     lispobj *result;
-    
+
     /* FIXME: this is not pseudo atomic at all, but is called only from
      * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
     result = dynamic_space_free_pointer;

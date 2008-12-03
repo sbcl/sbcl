@@ -32,8 +32,8 @@
 
                 (inst mov rcx x)
                 (inst or rcx y)
-                (inst test rcx 7)            ; both fixnums?
-                (inst jmp :nz DO-STATIC-FUN) ; no - do generic
+                (inst test rcx fixnum-tag-mask) ; both fixnums?
+                (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
                 (inst clc)
@@ -46,7 +46,7 @@
                       rbp-tn
                       (make-ea :qword :base rsp-tn :disp n-word-bytes))
                 (inst sub rsp-tn (fixnumize 2))
-                (inst push rax)  ; callers return addr
+                (inst push rax)              ; callers return addr
                 (inst mov rcx (fixnumize 2)) ; arg count
                 (inst jmp
                       (make-ea :qword
@@ -83,16 +83,13 @@
     OKAY)
 
   (define-generic-arith-routine (* 30)
-    (move rax x)                   ; must use eax for 64-bit result
-    (inst sar rax 3)               ; remove *4 fixnum bias
-    (inst imul y)                  ; result in edx:eax
-    (inst jmp :no OKAY)            ; still fixnum
+    (move rax x)                     ; must use eax for 64-bit result
+    (inst sar rax n-fixnum-tag-bits) ; remove *8 fixnum bias
+    (inst imul y)                    ; result in edx:eax
+    (inst jmp :no OKAY)              ; still fixnum
 
-    ;; zzz jrd changed edx to ebx in here, as edx isn't listed as a temp, above
-    ;;     pfw says that loses big -- edx is target for arg x and result res
-    ;;     note that 'edx' is not defined -- using x
-    (inst shrd rax x 3)            ; high bits from edx
-    (inst sar x 3)                 ; now shift edx too
+    (inst shrd rax x n-fixnum-tag-bits) ; high bits from edx
+    (inst sar x n-fixnum-tag-bits)      ; now shift edx too
 
     (move rcx x)                   ; save high bits from cqo
     (inst cqo)                     ; edx:eax <- sign-extend of eax
@@ -127,7 +124,7 @@
 
                           (:temp rax unsigned-reg rax-offset)
                           (:temp rcx unsigned-reg rcx-offset))
-  (inst test x 7)
+  (inst test x fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
   (inst pop rax)
@@ -143,7 +140,7 @@
   (move res x)
   (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
   (inst jmp :no OKAY)
-  (inst shr res 3)                    ; sign bit is data - remove type bits
+  (inst shr res n-fixnum-tag-bits)      ; sign bit is data - remove type bits
   (move rcx res)
 
   (with-fixed-allocation (res bignum-widetag (1+ bignum-digits-offset))
@@ -168,16 +165,19 @@
                  (:temp eax unsigned-reg rax-offset)
                  (:temp ecx unsigned-reg rcx-offset))
 
-                ;; KLUDGE: The "3" here is a mask for the bits which will be
-                ;; zero in a fixnum. It should have a symbolic name. (Actually,
-                ;; it might already have a symbolic name which the coder
-                ;; couldn't be bothered to use..) -- WHN 19990917
-                (inst test x 7)
-                (inst jmp :nz TAIL-CALL-TO-STATIC-FN)
-                (inst test y 7)
-                (inst jmp :z INLINE-FIXNUM-COMPARE)
+                (inst mov ecx x)
+                (inst or ecx y)
+                (inst test ecx fixnum-tag-mask)
+                (inst jmp :nz DO-STATIC-FUN)
 
-                TAIL-CALL-TO-STATIC-FN
+                (inst cmp x y)
+                (load-symbol res t)
+                (inst mov eax nil-value)
+                (inst cmov ,test res eax)
+                (inst clc)   ; single-value return
+                (inst ret)
+
+                DO-STATIC-FUN
                 (inst pop eax)
                 (inst push rbp-tn)
                 (inst lea rbp-tn (make-ea :qword
@@ -191,16 +191,7 @@
                                         ; should be named parallelly.
                 (inst jmp (make-ea :qword
                                    :disp (+ nil-value
-                                            (static-fun-offset ',static-fn))))
-
-                INLINE-FIXNUM-COMPARE
-                (inst cmp x y)
-                (inst mov res nil-value)
-                (inst jmp ,test RETURN-FALSE)
-                RETURN-TRUE
-                (load-symbol res t)
-                RETURN-FALSE
-                DONE)))
+                                            (static-fun-offset ',static-fn)))))))
 
   (define-cond-assem-rtn generic-< < two-arg-< :ge)
   (define-cond-assem-rtn generic-> > two-arg-> :le))
@@ -216,32 +207,30 @@
 
                           (:res res descriptor-reg rdx-offset)
 
-                          (:temp eax unsigned-reg rax-offset)
-                          (:temp ecx unsigned-reg rcx-offset))
+                          (:temp rax unsigned-reg rax-offset)
+                          (:temp rcx unsigned-reg rcx-offset))
+  (inst mov rcx x)
+  (inst and rcx y)
+  (inst test rcx fixnum-tag-mask)
+  (inst jmp :nz DO-STATIC-FUN)
+
+  ;; At least one fixnum
   (inst cmp x y)
-  (inst jmp :e RETURN-T)
-  (inst test x 7)
-  (inst jmp :z RETURN-NIL)
-  (inst test y 7)
-  (inst jmp :nz DO-STATIC-FN)
+  (load-symbol res t)
+  (inst mov rax nil-value)
+  (inst cmov :ne res rax)
+  (inst clc)
+  (inst ret)
 
-  RETURN-NIL
-  (inst mov res nil-value)
-  (inst jmp DONE)
-
-  DO-STATIC-FN
-  (inst pop eax)
+  DO-STATIC-FUN
+  (inst pop rax)
   (inst push rbp-tn)
   (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp n-word-bytes))
   (inst sub rsp-tn (fixnumize 2))
-  (inst push eax)
-  (inst mov ecx (fixnumize 2))
+  (inst push rax)
+  (inst mov rcx (fixnumize 2))
   (inst jmp (make-ea :qword
-                     :disp (+ nil-value (static-fun-offset 'eql))))
-
-  RETURN-T
-  (load-symbol res t)
-  DONE)
+                     :disp (+ nil-value (static-fun-offset 'eql)))))
 
 (define-assembly-routine (generic-=
                           (:cost 10)
@@ -254,31 +243,29 @@
 
                           (:res res descriptor-reg rdx-offset)
 
-                          (:temp eax unsigned-reg rax-offset)
-                          (:temp ecx unsigned-reg rcx-offset)
-                          )
-  (inst test x 7)                      ; descriptor?
-  (inst jmp :nz DO-STATIC-FN)          ; yes, do it here
-  (inst test y 7)                      ; descriptor?
-  (inst jmp :nz DO-STATIC-FN)
+                          (:temp rax unsigned-reg rax-offset)
+                          (:temp rcx unsigned-reg rcx-offset))
+  (inst mov rcx x)
+  (inst or rcx y)
+  (inst test rcx fixnum-tag-mask)
+  (inst jmp :nz DO-STATIC-FUN)
+
+  ;; Both fixnums
   (inst cmp x y)
-  (inst jmp :e RETURN-T)                ; ok
+  (load-symbol res t)
+  (inst mov rax nil-value)
+  (inst cmov :ne res rax)
+  (inst clc)
+  (inst ret)
 
-  (inst mov res nil-value)
-  (inst jmp DONE)
-
-  DO-STATIC-FN
-  (inst pop eax)
+  DO-STATIC-FUN
+  (inst pop rax)
   (inst push rbp-tn)
   (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp n-word-bytes))
   (inst sub rsp-tn (fixnumize 2))
-  (inst push eax)
-  (inst mov ecx (fixnumize 2))
+  (inst push rax)
+  (inst mov rcx (fixnumize 2))
   (inst jmp (make-ea :qword
-                     :disp (+ nil-value (static-fun-offset 'two-arg-=))))
-
-  RETURN-T
-  (load-symbol res t)
-  DONE)
+                     :disp (+ nil-value (static-fun-offset 'two-arg-=)))))
 
 
