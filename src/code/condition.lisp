@@ -1185,6 +1185,14 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                (simple-condition-format-arguments condition)
                (reader-impossible-number-error-error condition))))))
 
+(define-condition standard-readtable-modified-error (reference-condition error)
+  ((operation :initarg :operation :reader standard-readtable-modified-operation))
+  (:report (lambda (condition stream)
+             (format stream "~S would modify the standard readtable."
+                     (standard-readtable-modified-operation condition))))
+  (:default-initargs :references `((:ansi-cl :section (2 1 1 2))
+                                   (:ansi-cl :glossary "standard readtable"))))
+
 (define-condition timeout (serious-condition)
   ((seconds :initarg :seconds :initform nil :reader timeout-seconds))
   (:report (lambda (condition stream)

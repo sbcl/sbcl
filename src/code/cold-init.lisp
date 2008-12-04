@@ -240,10 +240,14 @@
   ;; The reader and printer are initialized very late, so that they
   ;; can do hairy things like invoking the compiler as part of their
   ;; initialization.
-  (show-and-call !reader-cold-init)
-  (let ((*readtable* *standard-readtable*))
+  (let ((*readtable* (make-readtable)))
+    (show-and-call !reader-cold-init)
     (show-and-call !sharpm-cold-init)
-    (show-and-call !backq-cold-init))
+    (show-and-call !backq-cold-init)
+    ;; The *STANDARD-READTABLE* is assigned at last because the above
+    ;; functions would operate on the standard readtable otherwise---
+    ;; which would result in an error.
+    (setf *standard-readtable* *readtable*))
   (setf *readtable* (copy-readtable *standard-readtable*))
   (setf sb!debug:*debug-readtable* (copy-readtable *standard-readtable*))
   (sb!pretty:!pprint-cold-init)

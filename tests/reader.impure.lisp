@@ -125,13 +125,35 @@
   (funcall fun)
   (assert (equal '(:ok) (read-from-string "{:ok)"))))
 
+(with-test (:name standard-readtable-modified)
+  (macrolet ((test (form &optional op)
+               `(assert
+                 (eq :error
+                     (handler-case
+                         (progn ,form t)
+                       (sb-int:standard-readtable-modified-error (e)
+                         ,@(when op
+                            `((assert
+                               (equal ,op (sb-kernel::standard-readtable-modified-operation e)))))
+                         :error))))))
+    (let ((rt *readtable*))
+     (with-standard-io-syntax
+       (let ((srt *readtable*))
+         (test (setf (readtable-case srt) :preserve) '(setf readtable-case))
+         (test (copy-readtable rt srt) 'copy-readtable)
+         (test (set-syntax-from-char #\a #\a srt rt) 'set-syntax-from-char)
+         (test (set-macro-character #\a (constantly t) t srt) 'set-macro-character)
+         (test (make-dispatch-macro-character #\! t srt))
+         (test (set-dispatch-macro-character #\# #\a (constantly t) srt) 'set-dispatch-macro-character))))))
+
 ;;; THIS SHOULD BE LAST as it frobs the standard readtable
 (with-test (:name set-macro-character-nil)
-  (let ((fun (lambda (&rest args) 'ok)))
-    ;; NIL means the standard readtable.
-    (assert (eq t (set-macro-character #\~ fun nil nil)))
-    (assert (eq fun (get-macro-character #\~ nil)))
-    (assert (eq t (set-dispatch-macro-character #\# #\~ fun nil)))
-    (assert (eq fun (get-dispatch-macro-character #\# #\~ nil)))))
+  (handler-bind ((sb-int:standard-readtable-modified-error #'continue))
+    (let ((fun (lambda (&rest args) 'ok)))
+      ;; NIL means the standard readtable.
+      (assert (eq t (set-macro-character #\~ fun nil nil)))
+      (assert (eq fun (get-macro-character #\~ nil)))
+      (assert (eq t (set-dispatch-macro-character #\# #\~ fun nil)))
+      (assert (eq fun (get-dispatch-macro-character #\# #\~ nil))))))
 
 ;;; success

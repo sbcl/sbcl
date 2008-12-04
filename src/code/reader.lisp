@@ -26,10 +26,10 @@
 (setf (fdocumentation '*readtable* 'variable)
       "Variable bound to current readtable.")
 
-;;; a standard Lisp readtable. This is for recovery from broken
-;;; read-tables (and for WITH-STANDARD-IO-SYNTAX), and should not
-;;; normally be user-visible.
-(defvar *standard-readtable*)
+;;; A standard Lisp readtable (once cold-init is through). This is for
+;;; recovery from broken read-tables (and for
+;;; WITH-STANDARD-IO-SYNTAX), and should not normally be user-visible.
+(defvar *standard-readtable* nil)
 
 (defvar *old-package* nil
   #!+sb-doc
@@ -192,13 +192,25 @@
       (elt *constituent-trait-table* (char-code char))
       +char-attr-constituent+))
 
-;;;; readtable operations
+;;;; Readtable Operations
+
+(defun assert-not-standard-readtable (readtable operation)
+  (when (eq readtable *standard-readtable*)
+    (cerror "Frob it anyway!" 'standard-readtable-modified-error
+            :operation operation)))
+
+(defun readtable-case (readtable)
+  (%readtable-case readtable))
+
+(defun (setf readtable-case) (case readtable)
+  (assert-not-standard-readtable readtable '(setf readtable-case))
+  (setf (%readtable-case readtable) case))
 
 (defun shallow-replace/eql-hash-table (to from)
   (maphash (lambda (k v) (setf (gethash k to) v)) from))
 
-(defun copy-readtable (&optional (from-readtable *readtable*)
-                                 to-readtable)
+(defun copy-readtable (&optional (from-readtable *readtable*) to-readtable)
+  (assert-not-standard-readtable to-readtable 'copy-readtable)
   (let ((really-from-readtable (or from-readtable *standard-readtable*))
         (really-to-readtable (or to-readtable (make-readtable))))
     (replace (character-attribute-array really-to-readtable)
@@ -223,11 +235,12 @@
     really-to-readtable))
 
 (defun set-syntax-from-char (to-char from-char &optional
-                             (to-readtable *readtable*) (from-readtable ()))
+                             (to-readtable *readtable*) (from-readtable nil))
   #!+sb-doc
   "Causes the syntax of TO-CHAR to be the same as FROM-CHAR in the optional
 readtable (defaults to the current readtable). The FROM-TABLE defaults to the
 standard Lisp readtable when NIL."
+  (assert-not-standard-readtable to-readtable 'set-syntax-from-char)
   (let ((really-from-readtable (or from-readtable *standard-readtable*)))
     (let ((att (get-cat-entry from-char really-from-readtable))
           (mac (get-raw-cmt-entry from-char really-from-readtable))
@@ -252,12 +265,13 @@ standard Lisp readtable when NIL."
 
 (defun set-macro-character (char function &optional
                                  (non-terminatingp nil)
-                                 (readtable *readtable*))
+                                 (rt-designator *readtable*))
   #!+sb-doc
   "Causes CHAR to be a macro character which invokes FUNCTION when seen
    by the reader. The NON-TERMINATINGP flag can be used to make the macro
    character non-terminating, i.e. embeddable in a symbol name."
-  (let ((designated-readtable (or readtable *standard-readtable*)))
+  (let ((designated-readtable (or rt-designator *standard-readtable*)))
+    (assert-not-standard-readtable designated-readtable 'set-macro-character)
     (set-cat-entry char (if non-terminatingp
                             +char-attr-constituent+
                             +char-attr-terminating-macro+)
@@ -265,13 +279,13 @@ standard Lisp readtable when NIL."
     (set-cmt-entry char function designated-readtable)
     t)) ; (ANSI-specified return value)
 
-(defun get-macro-character (char &optional (readtable *readtable*))
+(defun get-macro-character (char &optional (rt-designator *readtable*))
   #!+sb-doc
   "Return the function associated with the specified CHAR which is a macro
   character, or NIL if there is no such function. As a second value, return
   T if CHAR is a macro character which is non-terminating, i.e. which can
   be embedded in a symbol name."
-  (let* ((designated-readtable (or readtable *standard-readtable*))
+  (let* ((designated-readtable (or rt-designator *standard-readtable*))
          ;; the first return value: a FUNCTION if CHAR is a macro
          ;; character, or NIL otherwise
          (fun-value (get-raw-cmt-entry char designated-readtable)))
@@ -285,6 +299,61 @@ standard Lisp readtable when NIL."
                 ;; I.e. this value means not just "non-terminating
                 ;; character?" but "non-terminating macro character?".
                 nil))))
+
+
+(defun make-char-dispatch-table ()
+  (make-hash-table))
+
+(defun make-dispatch-macro-character (char &optional
+                                      (non-terminating-p nil)
+                                      (rt *readtable*))
+  #!+sb-doc
+  "Cause CHAR to become a dispatching macro character in readtable (which
+   defaults to the current readtable). If NON-TERMINATING-P, the char will
+   be non-terminating."
+  ;; Checks already for standard readtable modification.
+  (set-macro-character char #'read-dispatch-char non-terminating-p rt)
+  (let* ((dalist (dispatch-tables rt))
+         (dtable (cdr (find char dalist :test #'char= :key #'car))))
+    (cond (dtable
+           (error "The dispatch character ~S already exists." char))
+          (t
+           (setf (dispatch-tables rt)
+                 (push (cons char (make-char-dispatch-table)) dalist)))))
+  t)
+
+(defun set-dispatch-macro-character (disp-char sub-char function
+                                     &optional (rt-designator *readtable*))
+  #!+sb-doc
+  "Cause FUNCTION to be called whenever the reader reads DISP-CHAR
+   followed by SUB-CHAR."
+  ;; Get the dispatch char for macro (error if not there), diddle
+  ;; entry for sub-char.
+  (let* ((sub-char (char-upcase sub-char))
+         (readtable (or rt-designator *standard-readtable*)))
+    (assert-not-standard-readtable readtable 'set-dispatch-macro-character)
+    (when (digit-char-p sub-char)
+      (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
+    (let ((dpair (find disp-char (dispatch-tables readtable)
+                       :test #'char= :key #'car)))
+      (if dpair
+          (setf (gethash sub-char (cdr dpair)) (coerce function 'function))
+          (error "~S is not a dispatch char." disp-char))))
+  t)
+
+(defun get-dispatch-macro-character (disp-char sub-char
+                                     &optional (rt-designator *readtable*))
+  #!+sb-doc
+  "Return the macro character function for SUB-CHAR under DISP-CHAR
+   or NIL if there is no associated function."
+  (let* ((sub-char  (char-upcase sub-char))
+         (readtable (or rt-designator *standard-readtable*))
+         (dpair     (find disp-char (dispatch-tables readtable)
+                          :test #'char= :key #'car)))
+    (if dpair
+        (values (gethash sub-char (cdr dpair)))
+        (error "~S is not a dispatch char." disp-char))))
+
 
 ;;;; definitions to support internal programming conventions
 
@@ -328,44 +397,45 @@ standard Lisp readtable when NIL."
 
 ;;;; temporary initialization hack
 
+;; Install the (easy) standard macro-chars into *READTABLE*.
 (defun !cold-init-standard-readtable ()
-  (setq *standard-readtable* (make-readtable))
+  (/show0 "entering !cold-init-standard-readtable")
   ;; All characters get boring defaults in MAKE-READTABLE. Now we
   ;; override the boring defaults on characters which need more
   ;; interesting behavior.
-  (let ((*readtable* *standard-readtable*))
+  (flet ((whitespaceify (char)
+           (set-cmt-entry char nil)
+           (set-cat-entry char +char-attr-whitespace+)))
+    (whitespaceify (code-char tab-char-code))
+    (whitespaceify #\Newline)
+    (whitespaceify #\Space)
+    (whitespaceify (code-char form-feed-char-code))
+    (whitespaceify (code-char return-char-code)))
 
-    (flet ((whitespaceify (char)
-             (set-cmt-entry char nil)
-             (set-cat-entry char +char-attr-whitespace+)))
-      (whitespaceify (code-char tab-char-code))
-      (whitespaceify #\Newline)
-      (whitespaceify #\Space)
-      (whitespaceify (code-char form-feed-char-code))
-      (whitespaceify (code-char return-char-code)))
+  (set-cat-entry #\\ +char-attr-single-escape+)
+  (set-cmt-entry #\\ nil)
 
-    (set-cat-entry #\\ +char-attr-single-escape+)
-    (set-cmt-entry #\\ nil)
+  (set-cat-entry #\| +char-attr-multiple-escape+)
+  (set-cmt-entry #\| nil)
 
-    (set-cat-entry #\| +char-attr-multiple-escape+)
-    (set-cmt-entry #\| nil)
+  ;; Easy macro-character definitions are in this source file.
+  (set-macro-character #\" #'read-string)
+  (set-macro-character #\' #'read-quote)
+  (set-macro-character #\( #'read-list)
+  (set-macro-character #\) #'read-right-paren)
+  (set-macro-character #\; #'read-comment)
+  ;; (The hairier macro-character definitions, for #\# and #\`, are
+  ;; defined elsewhere, in their own source files.)
 
-    ;; Easy macro-character definitions are in this source file.
-    (set-macro-character #\" #'read-string)
-    (set-macro-character #\' #'read-quote)
-    (set-macro-character #\( #'read-list)
-    (set-macro-character #\) #'read-right-paren)
-    (set-macro-character #\; #'read-comment)
-    ;; (The hairier macro-character definitions, for #\# and #\`, are
-    ;; defined elsewhere, in their own source files.)
+  ;; all constituents
+  (do ((ichar 0 (1+ ichar))
+       (char))
+      ((= ichar base-char-code-limit))
+    (setq char (code-char ichar))
+    (when (constituentp char)
+      (set-cmt-entry char nil)))
 
-    ;; all constituents
-    (do ((ichar 0 (1+ ichar))
-         (char))
-        ((= ichar base-char-code-limit))
-      (setq char (code-char ichar))
-      (when (constituentp char *standard-readtable*)
-        (set-cmt-entry char nil)))))
+  (/show0 "leaving !cold-init-standard-readtable"))
 
 ;;;; implementation of the read buffer
 
@@ -1416,10 +1486,7 @@ variables to allow for nested and thread safe reading."
                           :format-control "failed to build ratio")))))
       (if negative-number (- num) num))))
 
-;;;; cruft for dispatch macros
-
-(defun make-char-dispatch-table ()
-  (make-hash-table))
+;;;; General reader for dispatch macros
 
 (defun dispatch-char-error (stream sub-char ignore)
   (declare (ignore ignore))
@@ -1428,54 +1495,6 @@ variables to allow for nested and thread safe reading."
       (simple-reader-error stream
                            "no dispatch function defined for ~S"
                            sub-char)))
-
-(defun make-dispatch-macro-character (char &optional
-                                           (non-terminating-p nil)
-                                           (rt *readtable*))
-  #!+sb-doc
-  "Cause CHAR to become a dispatching macro character in readtable (which
-   defaults to the current readtable). If NON-TERMINATING-P, the char will
-   be non-terminating."
-  (set-macro-character char #'read-dispatch-char non-terminating-p rt)
-  (let* ((dalist (dispatch-tables rt))
-         (dtable (cdr (find char dalist :test #'char= :key #'car))))
-    (cond (dtable
-           (error "The dispatch character ~S already exists." char))
-          (t
-           (setf (dispatch-tables rt)
-                 (push (cons char (make-char-dispatch-table)) dalist)))))
-  t)
-
-(defun set-dispatch-macro-character (disp-char sub-char function
-                                               &optional (rt *readtable*))
-  #!+sb-doc
-  "Cause FUNCTION to be called whenever the reader reads DISP-CHAR
-   followed by SUB-CHAR."
-  ;; Get the dispatch char for macro (error if not there), diddle
-  ;; entry for sub-char.
-  (when (digit-char-p sub-char)
-    (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
-  (let* ((sub-char (char-upcase sub-char))
-         (rt (or rt *standard-readtable*))
-         (dpair (find disp-char (dispatch-tables rt)
-                      :test #'char= :key #'car)))
-    (if dpair
-        (setf (gethash sub-char (cdr dpair)) (coerce function 'function))
-        (error "~S is not a dispatch char." disp-char))
-    t))
-
-(defun get-dispatch-macro-character (disp-char sub-char
-                                     &optional (rt *readtable*))
-  #!+sb-doc
-  "Return the macro character function for SUB-CHAR under DISP-CHAR
-   or NIL if there is no associated function."
-  (let* ((sub-char (char-upcase sub-char))
-         (rt (or rt *standard-readtable*))
-         (dpair (find disp-char (dispatch-tables rt)
-                      :test #'char= :key #'car)))
-    (if dpair
-        (values (gethash sub-char (cdr dpair)))
-        (error "~S is not a dispatch char." disp-char))))
 
 (defun read-dispatch-char (stream char)
   ;; Read some digits.

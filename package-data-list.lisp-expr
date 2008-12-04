@@ -885,6 +885,7 @@ possibly temporariliy, because it might be used internally."
                "TRY-RESTART"
 
                ;; error-signalling facilities
+               "STANDARD-READTABLE-MODIFIED-ERROR"
                "ARRAY-BOUNDING-INDICES-BAD-ERROR"
                "SEQUENCE-BOUNDING-INDICES-BAD-ERROR"
 

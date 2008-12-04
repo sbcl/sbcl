@@ -83,4 +83,4 @@
   ;; an alist from dispatch characters to hash-tables akin to
   ;; CHARACTER-MACRO-HASH-TABLE.
   (dispatch-tables () :type list)
-  (readtable-case :upcase :type (member :upcase :downcase :preserve :invert)))
+  (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert)))
