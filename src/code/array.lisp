@@ -1083,6 +1083,31 @@ of specialized arrays is supported."
       (setf (%array-dimension array 0) dimensions))
   (setf (%array-displaced-p array) displacedp)
   array)
+
+;;; User visible extension
+(declaim (ftype (function (simple-array) (values (simple-array * (*)) &optional))
+                simple-array-vector))
+(defun simple-array-vector (array)
+  "Returns the one-dimensional SIMPLE-ARRAY corresponding to ARRAY.
+
+The ARRAY must be a SIMPLE-ARRAY. If ARRAY is multidimensional, returns the
+underlying one-dimensional SIMPLE-ARRAY which shares storage with ARRAY.
+Otherwise returns ARRAY.
+
+Currently in SBCL a multidimensional SIMPLE-ARRAY has an underlying
+one-dimensional SIMPLE-ARRAY, which holds the data in row major order. This
+function provides access to that vector.
+
+Important note: the underlying vector is an implementation detail. Even though
+this function exposes it, changes in the implementation may cause this
+function to be removed without further warning."
+  ;; KLUDGE: Without TRULY-THE the system is not smart enough to figure out that
+  ;; (1) SIMPLE-ARRAY without ARRAY-HEADER-P is a vector (2) the data vector of
+  ;; a SIMPLE-ARRAY is a vector.
+  (truly-the (simple-array * (*))
+             (if (array-header-p array)
+                 (%array-data-vector array)
+                 array)))
 
 ;;;; used by SORT
 

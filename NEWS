@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; -*-
+  * new feature: SIMPLE-ARRAY-VECTOR provides access to the underlying
+    data vector of an multidimensional SIMPLE-ARRAY.
   * optimization: faster generic arithmetic dispatch on x86 and x86-64.
   * bug fix: lexical type declarations are now correctly reported by
     SB-CLTL2. (reported by Larry D'Anna)

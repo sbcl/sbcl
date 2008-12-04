@@ -7,14 +7,15 @@ ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
 
 @menu
-* Garbage Collection::          
-* Metaobject Protocol::         
-* Support For Unix::            
-* Customization Hooks for Users::  
-* Tools To Help Developers::    
-* Resolution of Name Conflicts::  
-* Stale Extensions::            
-* Efficiency Hacks::            
+* Garbage Collection::
+* Metaobject Protocol::
+* Support For Unix::
+* Customization Hooks for Users::
+* Tools To Help Developers::
+* Resolution of Name Conflicts::
+* Miscellaneous Extensions::
+* Stale Extensions::
+* Efficiency Hacks::
 @end menu
 
 @node  Garbage Collection
@@ -43,7 +44,7 @@ with AMOP; present exceptions to this (as distinct from current bugs)
 are:
 
 @itemize
-  
+
 @item
 @findex compute-effective-method
 @findex sb-mop:compute-effective-method
@@ -67,7 +68,7 @@ the standardized classes before @code{t} appearing in the class
 precedence list of @code{generic-function} and
 @code{standard-generic-function}, as required by section 1.4.4.5 of the
 ANSI specification.
-  
+
 @item
 @findex ensure-generic-function
 @findex generic-function-declarations
@@ -261,7 +262,7 @@ between classes and proper names and between lists of the form
 @vindex *posix-argv*
 
 The UNIX command line can be read from the variable
-@code{sb-ext:*posix-argv*}. 
+@code{sb-ext:*posix-argv*}.
 
 @node Querying the process environment
 @subsection Querying the process environment
@@ -375,6 +376,12 @@ the @code{sb-ext:resolve-conflict} restart should be invoked with one
 argument, which should be a member of the list returned by the condition
 accessor @code{sb-ext:name-conflict-symbols}.
 
+@node    Miscellaneous Extensions
+@comment  node-name,  next,  previous,  up
+@section Miscellaneous Extensions
+
+@include fun-sb-ext-simple-array-vector.texinfo
+
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up
 @section Stale Extensions
@@ -431,5 +438,5 @@ to it. This is appropriate for functions like @code{sqrt}, but
 is @emph{not} appropriate for functions like @code{aref},
 which can change their return values when the underlying data are
 changed.
-@c <!-- FIXME: This declaration does not seem to be supported in the 
+@c <!-- FIXME: This declaration does not seem to be supported in the
 @c      current compiler. -->
