@@ -24,7 +24,7 @@
 (declaim (type readtable *readtable*))
 #!+sb-doc
 (setf (fdocumentation '*readtable* 'variable)
-       "Variable bound to current readtable.")
+      "Variable bound to current readtable.")
 
 ;;; a standard Lisp readtable. This is for recovery from broken
 ;;; read-tables (and for WITH-STANDARD-IO-SYNTAX), and should not
@@ -59,33 +59,34 @@
 
 ;;;; macros and functions for character tables
 
-;;; FIXME: could be SB!XC:DEFMACRO inside EVAL-WHEN (COMPILE EVAL)
-(defmacro get-cat-entry (char rt)
-  ;; KLUDGE: Only give this side-effect-free args.
-  ;; FIXME: should probably become inline function
-  `(if (typep ,char 'base-char)
-       (elt (character-attribute-array ,rt) (char-code ,char))
-       (gethash ,char (character-attribute-hash-table ,rt)
-        +char-attr-constituent+)))
+(defun get-cat-entry (char rt)
+  (declare (readtable rt))
+  (if (typep char 'base-char)
+      (elt (character-attribute-array rt) (char-code char))
+      (values (gethash char (character-attribute-hash-table rt)
+                       +char-attr-constituent+))))
 
 (defun set-cat-entry (char newvalue &optional (rt *readtable*))
+  (declare (readtable rt))
   (if (typep char 'base-char)
       (setf (elt (character-attribute-array rt) (char-code char)) newvalue)
-      ;; FIXME: could REMHASH if we're setting to
-      ;; +CHAR-ATTR-CONSTITUENT+
-      (setf (gethash char (character-attribute-hash-table rt)) newvalue)))
+      (if (= newvalue +char-attr-constituent+)
+          ;; Default value for the C-A-HASH-TABLE is +CHAR-ATTR-CONSTITUENT+.
+          (%remhash char (character-attribute-hash-table rt))
+          (setf (gethash char (character-attribute-hash-table rt)) newvalue)))
+  (values))
 
 ;;; the value actually stored in the character macro table. As per
 ;;; ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER, this can
 ;;; be either a function or NIL.
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro get-raw-cmt-entry (char readtable)
-    `(if (typep ,char 'base-char)
-         (svref (character-macro-array ,readtable) (char-code ,char))
-         ;; Note: DEFAULT here is NIL, not #'UNDEFINED-MACRO-CHAR, so
-         ;; that everything above the base-char range is a non-macro
-         ;; constituent by default.
-         (gethash ,char (character-macro-hash-table ,readtable) nil))))
+(defun get-raw-cmt-entry (char readtable)
+  (declare (readtable readtable))
+  (if (typep char 'base-char)
+      (svref (character-macro-array readtable) (char-code char))
+      ;; Note: DEFAULT here is NIL, not #'UNDEFINED-MACRO-CHAR, so
+      ;; that everything above the base-char range is a non-macro
+      ;; constituent by default.
+      (values (gethash char (character-macro-hash-table readtable) nil))))
 
 ;;; the value represented by whatever is stored in the character macro
 ;;; table. As per ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER,
@@ -114,29 +115,35 @@
 
 ;;; predicates for testing character attributes
 
+#!-sb-fluid
+(progn
+  (declaim (inline whitespace[1]p whitespace[2]p))
+  (declaim (inline constituentp terminating-macrop))
+  (declaim (inline single-escape-p multiple-escape-p))
+  (declaim (inline token-delimiterp)))
+
 ;;; the [1] and [2] here refer to ANSI glossary entries for
 ;;; "whitespace".
-#!-sb-fluid (declaim (inline whitespace[1]p whitespace[2]p))
 (defun whitespace[1]p (char)
   (test-attribute char +char-attr-whitespace+ *standard-readtable*))
 (defun whitespace[2]p (char &optional (rt *readtable*))
   (test-attribute char +char-attr-whitespace+ rt))
 
-(defmacro constituentp (char &optional (rt '*readtable*))
-  `(test-attribute ,char +char-attr-constituent+ ,rt))
+(defun constituentp (char &optional (rt *readtable*))
+  (test-attribute char +char-attr-constituent+ rt))
 
-(defmacro terminating-macrop (char &optional (rt '*readtable*))
-  `(test-attribute ,char +char-attr-terminating-macro+ ,rt))
+(defun terminating-macrop (char &optional (rt *readtable*))
+  (test-attribute char +char-attr-terminating-macro+ rt))
 
-(defmacro single-escape-p (char &optional (rt '*readtable*))
-  `(test-attribute ,char +char-attr-single-escape+ ,rt))
+(defun single-escape-p (char &optional (rt *readtable*))
+  (test-attribute char +char-attr-single-escape+ rt))
 
-(defmacro multiple-escape-p (char &optional (rt '*readtable*))
-  `(test-attribute ,char +char-attr-multiple-escape+ ,rt))
+(defun multiple-escape-p (char &optional (rt *readtable*))
+  (test-attribute char +char-attr-multiple-escape+ rt))
 
-(defmacro token-delimiterp (char &optional (rt '*readtable*))
-  ;; depends on actual attribute numbering above.
-  `(<= (get-cat-entry ,char ,rt) +char-attr-terminating-macro+))
+(defun token-delimiterp (char &optional (rt *readtable*))
+  ;; depends on actual attribute numbering in readtable.lisp.
+  (<= (get-cat-entry char rt) +char-attr-terminating-macro+))
 
 ;;;; constituent traits (see ANSI 2.1.4.2)
 
@@ -179,10 +186,11 @@
                    return-char-code rubout-char-code))
     (!set-constituent-trait (code-char c) +char-attr-invalid+)))
 
-(defmacro get-constituent-trait (char)
-  `(if (typep ,char 'base-char)
-       (elt *constituent-trait-table* (char-code ,char))
-       +char-attr-constituent+))
+(declaim (inline get-constituent-trait))
+(defun get-constituent-trait (char)
+  (if (typep char 'base-char)
+      (elt *constituent-trait-table* (char-code char))
+      +char-attr-constituent+))
 
 ;;;; readtable operations
 
@@ -280,8 +288,9 @@ standard Lisp readtable when NIL."
 
 ;;;; definitions to support internal programming conventions
 
-(defmacro eofp (char)
-  `(eq ,char *eof-object*))
+(declaim (inline eofp))
+(defun eofp (char)
+  (eq char *eof-object*))
 
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
@@ -366,39 +375,26 @@ standard Lisp readtable when NIL."
 ;;; separate variable instead of just calculating it on the fly as
 ;;; (LENGTH *READ-BUFFER*)?
 
-(defvar *inch-ptr*)
-(defvar *ouch-ptr*)
+(defvar *inch-ptr*) ; *OUCH-PTR* always points to next char to write.
+(defvar *ouch-ptr*) ; *INCH-PTR* always points to next char to read.
 
 (declaim (type index *read-buffer-length* *inch-ptr* *ouch-ptr*))
 (declaim (type (simple-array character (*)) *read-buffer*))
 
-(defmacro reset-read-buffer ()
+(declaim (inline reset-read-buffer))
+(defun reset-read-buffer ()
   ;; Turn *READ-BUFFER* into an empty read buffer.
-  `(progn
-     ;; *OUCH-PTR* always points to next char to write.
-     (setq *ouch-ptr* 0)
-     ;; *INCH-PTR* always points to next char to read.
-     (setq *inch-ptr* 0)))
+  (setq *ouch-ptr* 0)
+  (setq *inch-ptr* 0))
 
-;;; FIXME I removed "THE FIXNUM"'s from OUCH-READ-BUFFER and
-;;; OUCH-UNREAD-BUFFER, check to make sure that Python really is smart
-;;; enough to make good code without them. And while I'm at it,
-;;; converting them from macros to inline functions might be good,
-;;; too.
-
-(defmacro ouch-read-buffer (char)
-  `(progn
-     ;; When buffer overflow
-     (when (>= *ouch-ptr* *read-buffer-length*)
-       ;; Size should be doubled.
-       (grow-read-buffer))
-     (setf (elt (the simple-string *read-buffer*) *ouch-ptr*) ,char)
-     (setq *ouch-ptr* (1+ *ouch-ptr*))))
-
-;;; macro to move *ouch-ptr* back one.
-(defmacro ouch-unread-buffer ()
-  '(when (> *ouch-ptr* *inch-ptr*)
-     (setq *ouch-ptr* (1- (the fixnum *ouch-ptr*)))))
+(declaim (inline ouch-read-buffer))
+(defun ouch-read-buffer (char)
+  ;; When buffer overflow
+  (when (>= *ouch-ptr* *read-buffer-length*)
+    ;; Size should be doubled.
+    (grow-read-buffer))
+  (setf (elt *read-buffer* *ouch-ptr*) char)
+  (setq *ouch-ptr* (1+ *ouch-ptr*)))
 
 (defun grow-read-buffer ()
   (let* ((rbl (length *read-buffer*))
@@ -407,11 +403,6 @@ standard Lisp readtable when NIL."
     (setq *read-buffer* (replace new-buffer *read-buffer*))
     (setq *read-buffer-length* new-length)))
 
-(defun inchpeek-read-buffer ()
-  (if (>= (the fixnum *inch-ptr*) (the fixnum *ouch-ptr*))
-      *eof-object*
-      (elt *read-buffer* *inch-ptr*)))
-
 (defun inch-read-buffer ()
   (if (>= *inch-ptr* *ouch-ptr*)
       *eof-object*
@@ -419,9 +410,11 @@ standard Lisp readtable when NIL."
           (elt *read-buffer* *inch-ptr*)
         (incf *inch-ptr*))))
 
-(defmacro unread-buffer ()
-  `(decf *inch-ptr*))
+(declaim (inline unread-buffer))
+(defun unread-buffer ()
+  (decf *inch-ptr*))
 
+(declaim (inline read-unwind-read-buffer))
 (defun read-unwind-read-buffer ()
   ;; Keep contents, but make next (INCH..) return first character.
   (setq *inch-ptr* 0))
