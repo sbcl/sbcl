@@ -982,7 +982,7 @@
   (character character &optional readtable (or readtable null)) (eql t)
   ())
 
-(defknown set-macro-character (character callable &optional t readtable)
+(defknown set-macro-character (character callable &optional t (or readtable null))
   (eql t)
   (unsafe))
 (defknown get-macro-character (character &optional (or readtable null))
@@ -991,7 +991,7 @@
 (defknown make-dispatch-macro-character (character &optional t readtable)
   (eql t) ())
 (defknown set-dispatch-macro-character
-  (character character callable &optional readtable) function
+  (character character callable &optional (or readtable null)) (eql t)
   (unsafe))
 (defknown get-dispatch-macro-character
   (character character &optional (or readtable null)) (or callable null)

@@ -97,13 +97,11 @@
         #'read-token)))
 
 (defun set-cmt-entry (char new-value-designator &optional (rt *readtable*))
-  (if (typep char 'base-char)
-      (setf (svref (character-macro-array rt) (char-code char))
-            (and new-value-designator
-                 (%coerce-callable-to-fun new-value-designator)))
-      (setf (gethash char (character-macro-hash-table rt))
-        (and new-value-designator
-                 (%coerce-callable-to-fun new-value-designator)))))
+  (let ((new (when new-value-designator
+               (%coerce-callable-to-fun new-value-designator))))
+    (if (typep char 'base-char)
+        (setf (svref (character-macro-array rt) (char-code char)) new)
+        (setf (gethash char (character-macro-hash-table rt)) new))))
 
 (defun undefined-macro-char (stream char)
   (unless *read-suppress*
@@ -1470,7 +1468,8 @@ variables to allow for nested and thread safe reading."
                       :test #'char= :key #'car)))
     (if dpair
         (setf (gethash sub-char (cdr dpair)) (coerce function 'function))
-        (error "~S is not a dispatch char." disp-char))))
+        (error "~S is not a dispatch char." disp-char))
+    t))
 
 (defun get-dispatch-macro-character (disp-char sub-char
                                      &optional (rt *readtable*))

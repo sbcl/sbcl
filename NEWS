@@ -8,6 +8,11 @@
     using UTF-8 as external format. (thanks to Luis Oliveira)
   * bug fix: errors from invalid fill-pointer values to (SETF FILL-POINTER)
     are signalled correctly. (thanks to Stas Boukarev)
+  * bug fix: SET-MACRO-CHARACTER accepts NIL as the readtable
+    designator. (thanks to Tobias Ritterweiler)
+  * bug fix: SET-DISPATCH-MACRO-CHARACTER accepts NIL as the readtable
+    designator, and returns T instead of the function. (thanks to
+    Tobias Ritterweiler)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

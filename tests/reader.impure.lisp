@@ -125,4 +125,13 @@
   (funcall fun)
   (assert (equal '(:ok) (read-from-string "{:ok)"))))
 
+;;; THIS SHOULD BE LAST as it frobs the standard readtable
+(with-test (:name set-macro-character-nil)
+  (let ((fun (lambda (&rest args) 'ok)))
+    ;; NIL means the standard readtable.
+    (assert (eq t (set-macro-character #\~ fun nil nil)))
+    (assert (eq fun (get-macro-character #\~ nil)))
+    (assert (eq t (set-dispatch-macro-character #\# #\~ fun nil)))
+    (assert (eq fun (get-dispatch-macro-character #\# #\~ nil)))))
+
 ;;; success
