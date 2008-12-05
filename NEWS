@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; -*-
-  * new feature: SIMPLE-ARRAY-VECTOR provides access to the underlying
+  * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying
     data vector of an multidimensional SIMPLE-ARRAY.
   * new feature: the system now signals a continuable error if standard
     readtable modification is attempted.

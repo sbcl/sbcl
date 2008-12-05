@@ -1085,28 +1085,27 @@ of specialized arrays is supported."
   array)
 
 ;;; User visible extension
-(declaim (ftype (function (simple-array) (values (simple-array * (*)) &optional))
-                simple-array-vector))
-(defun simple-array-vector (array)
-  "Returns the one-dimensional SIMPLE-ARRAY corresponding to ARRAY.
+(declaim (ftype (function (array) (values (simple-array * (*)) &optional))
+                array-storage-vector))
+(defun array-storage-vector (array)
+  "Returns the underlying storage vector of ARRAY, which must be a non-displaced array.
 
-The ARRAY must be a SIMPLE-ARRAY. If ARRAY is multidimensional, returns the
-underlying one-dimensional SIMPLE-ARRAY which shares storage with ARRAY.
-Otherwise returns ARRAY.
-
-Currently in SBCL a multidimensional SIMPLE-ARRAY has an underlying
-one-dimensional SIMPLE-ARRAY, which holds the data in row major order. This
-function provides access to that vector.
+In SBCL, if ARRAY is a of type \(SIMPLE-ARRAY * \(*)), it is its own storage
+vector. Multidimensional arrays, arrays with fill pointers, and adjustable
+arrays have an underlying storage vector with the same ARRAY-ELEMENT-TYPE as
+ARRAY, which this function returns.
 
 Important note: the underlying vector is an implementation detail. Even though
 this function exposes it, changes in the implementation may cause this
 function to be removed without further warning."
   ;; KLUDGE: Without TRULY-THE the system is not smart enough to figure out that
-  ;; (1) SIMPLE-ARRAY without ARRAY-HEADER-P is a vector (2) the data vector of
-  ;; a SIMPLE-ARRAY is a vector.
+  ;; the return value is always of the known type.
   (truly-the (simple-array * (*))
              (if (array-header-p array)
-                 (%array-data-vector array)
+                 (if (%array-displaced-p array)
+                     (error "~S cannot be used with displaced arrays. Use ~S instead."
+                            'array-storage-vector 'array-displacement)
+                     (%array-data-vector array))
                  array)))
 
 ;;;; used by SORT

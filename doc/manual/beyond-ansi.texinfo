@@ -380,7 +380,7 @@ accessor @code{sb-ext:name-conflict-symbols}.
 @comment  node-name,  next,  previous,  up
 @section Miscellaneous Extensions
 
-@include fun-sb-ext-simple-array-vector.texinfo
+@include fun-sb-ext-array-storage-vector.texinfo
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up

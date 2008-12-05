@@ -237,12 +237,15 @@
         (assert (eql 12 (type-error-datum e)))
         (assert (equal '(integer 0 3) (type-error-expected-type e)))))))
 
-(with-test (:name simple-array-vector)
+(with-test (:name array-storage-vector)
   (let ((vec (vector 1 2 3)))
-    (assert (eq vec (sb-ext:simple-array-vector vec)))
+    (assert (eq vec (sb-ext:array-storage-vector vec)))
     (assert (equalp (vector 1 2 3 4)
-                    (sb-ext:simple-array-vector
+                    (sb-ext:array-storage-vector
                      (make-array '(2 2) :initial-contents '((1 2) (3 4))))))
     (assert (eq 'fixnum (array-element-type
-                         (sb-ext:simple-array-vector (make-array '(3 4 5)
-                                                                 :element-type 'fixnum)))))))
+                         (sb-ext:array-storage-vector (make-array '(3 4 5)
+                                                                 :element-type 'fixnum)))))
+    (assert (equalp (vector 1 2 3 4 0)
+                    (sb-ext:array-storage-vector
+                     (make-array 5 :fill-pointer 4))))))
