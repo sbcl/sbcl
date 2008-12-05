@@ -676,7 +676,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "TRULY-THE"
 
                ;; Misc. array and vector tools.
-               "SIMPLE-ARRAY-VECTOR"
+               "ARRAY-STORAGE-VECTOR"
 
                ;; This is something which must exist inside any Common
                ;; Lisp implementation, and which someone writing a
