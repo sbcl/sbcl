@@ -221,7 +221,7 @@
     t))
 
 ;;; ...conses
-#!+(or x86 x86-64)
+#!+(or mips x86 x86-64)
 (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
   (declare (ignore node dx))
   t)
