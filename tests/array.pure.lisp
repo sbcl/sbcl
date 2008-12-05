@@ -246,6 +246,6 @@
     (assert (eq 'fixnum (array-element-type
                          (sb-ext:array-storage-vector (make-array '(3 4 5)
                                                                  :element-type 'fixnum)))))
-    (assert (equalp (vector 1 2 3 4 0)
-                    (sb-ext:array-storage-vector
-                     (make-array 5 :fill-pointer 4))))))
+    (assert (not (array-has-fill-pointer-p
+                  (sb-ext::array-storage-vector
+                   (make-array 5 :fill-pointer 4)))))))
