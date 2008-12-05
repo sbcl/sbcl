@@ -492,17 +492,24 @@ standard Lisp readtable when NIL."
 (defun read-buffer-to-string ()
   (subseq *read-buffer* 0 *ouch-ptr*))
 
-(defmacro with-reader ((&optional recursive-p) &body body)
-  #!+sb-doc
-  "If RECURSIVE-P is NIL, bind *READER-BUFFER* and its subservient
-variables to allow for nested and thread safe reading."
-  `(if ,recursive-p
-       (progn ,@body)
-       (let* ((*read-buffer* (make-string 128))
-              (*read-buffer-length* 128)
-              (*ouch-ptr* 0)
-              (*inch-ptr* 0))
-         ,@body)))
+(defmacro with-read-buffer (() &body body)
+  `(let* ((*read-buffer* (make-string 128))
+          (*read-buffer-length* 128)
+          (*ouch-ptr* 0)
+          (*inch-ptr* 0))
+     ,@body))
+
+(defun check-for-recursive-read (recursive-p operator-name)
+  (when (and recursive-p
+             (not (and (boundp '*read-buffer*)
+                       (boundp '*read-buffer-length*)
+                       (boundp '*ouch-ptr*)
+                       (boundp '*inch-ptr*))))
+    (error 'simple-reader-error
+           :format-control "~A was invoked with RECURSIVE-P being true outside ~
+                            of a recursive read operation."
+           :format-arguments `(,operator-name))))
+
 
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
@@ -518,17 +525,10 @@ variables to allow for nested and thread safe reading."
 
 (declaim (special *standard-input*))
 
-;;; READ-PRESERVING-WHITESPACE behaves just like READ, only it makes
-;;; sure to leave terminating whitespace in the stream. (This is a
-;;; COMMON-LISP exported symbol.)
-(defun read-preserving-whitespace (&optional (stream *standard-input*)
-                                             (eof-error-p t)
-                                             (eof-value nil)
-                                             (recursivep nil))
-  #!+sb-doc
-  "Read from STREAM and return the value read, preserving any whitespace
-   that followed the object."
-  (if recursivep
+;;; Like READ-PRESERVING-WHITESPACE, but doesn't check the read buffer
+;;; for being set up properly.
+(defun %read-preserving-whitespace (stream eof-error-p eof-value recursive-p)
+  (if recursive-p
       ;; a loop for repeating when a macro returns nothing
       (loop
        (let ((char (read-char stream eof-error-p *eof-object*)))
@@ -541,9 +541,22 @@ variables to allow for nested and thread safe reading."
                   ;; Repeat if macro returned nothing.
                   (when result
                     (return (unless *read-suppress* (car result)))))))))
-      (with-reader ()
-        (let ((*sharp-equal-alist* nil))
-          (read-preserving-whitespace stream eof-error-p eof-value t)))))
+      (let ((*sharp-equal-alist* nil))
+        (with-read-buffer ()
+          (%read-preserving-whitespace stream eof-error-p eof-value t)))))
+
+;;; READ-PRESERVING-WHITESPACE behaves just like READ, only it makes
+;;; sure to leave terminating whitespace in the stream. (This is a
+;;; COMMON-LISP exported symbol.)
+(defun read-preserving-whitespace (&optional (stream *standard-input*)
+                                             (eof-error-p t)
+                                             (eof-value nil)
+                                             (recursive-p nil))
+  #!+sb-doc
+  "Read from STREAM and return the value read, preserving any whitespace
+   that followed the object."
+  (check-for-recursive-read recursive-p 'read-preserving-whitespace)
+  (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
 
 ;;; Return NIL or a list with one thing, depending.
 ;;;
@@ -558,18 +571,17 @@ variables to allow for nested and thread safe reading."
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
-                       (eof-value ())
-                       (recursivep ()))
+                       (eof-value nil)
+                       (recursive-p nil))
   #!+sb-doc
   "Read the next Lisp value from STREAM, and return it."
-  (let ((result (read-preserving-whitespace stream
-                                            eof-error-p
-                                            eof-value
-                                            recursivep)))
+  (check-for-recursive-read recursive-p 'read)
+  (let ((result (%read-preserving-whitespace stream eof-error-p eof-value
+                                             recursive-p)))
     ;; This function generally discards trailing whitespace. If you
     ;; don't want to discard trailing whitespace, call
     ;; CL:READ-PRESERVING-WHITESPACE instead.
-    (unless (or (eql result eof-value) recursivep)
+    (unless (or (eql result eof-value) recursive-p)
       (let ((next-char (read-char stream nil nil)))
         (unless (or (null next-char)
                     (whitespace[2]p next-char))
@@ -583,12 +595,20 @@ variables to allow for nested and thread safe reading."
   #!+sb-doc
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
-  (with-reader (recursive-p)
-    (do ((char (flush-whitespace input-stream)
-               (flush-whitespace input-stream))
-         (retlist ()))
-        ((char= char endchar) (unless *read-suppress* (nreverse retlist)))
-      (setq retlist (nconc (read-maybe-nothing input-stream char) retlist)))))
+  (check-for-recursive-read recursive-p 'read-delimited-list)
+  (flet ((%read-delimited-list (endchar input-stream)
+           (do ((char (flush-whitespace input-stream)
+                      (flush-whitespace input-stream))
+                (retlist ()))
+               ((char= char endchar)
+                (unless *read-suppress* (nreverse retlist)))
+             (setq retlist (nconc (read-maybe-nothing input-stream char)
+                                  retlist)))))
+    (declare (inline %read-delimited-list))
+    (if recursive-p
+        (%read-delimited-list endchar input-stream)
+        (with-read-buffer ()
+          (%read-delimited-list endchar input-stream)))))
 
 ;;;; basic readmacro definitions
 ;;;;
@@ -1538,7 +1558,7 @@ variables to allow for nested and thread safe reading."
                     :check-fill-pointer t)
     (let ((stream (make-string-input-stream string start end)))
       (values (if preserve-whitespace
-                  (read-preserving-whitespace stream eof-error-p eof-value)
+                  (%read-preserving-whitespace stream eof-error-p eof-value nil)
                   (read stream eof-error-p eof-value))
               (- (string-input-stream-current stream) offset)))))
 

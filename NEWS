@@ -11,10 +11,10 @@
   * bug fix: errors from invalid fill-pointer values to (SETF FILL-POINTER)
     are signalled correctly. (thanks to Stas Boukarev)
   * bug fix: SET-MACRO-CHARACTER accepts NIL as the readtable
-    designator. (thanks to Tobias Ritterweiler)
+    designator. (thanks to Tobias Rittweiler)
   * bug fix: SET-DISPATCH-MACRO-CHARACTER accepts NIL as the readtable
     designator, and returns T instead of the function. (thanks to
-    Tobias Ritterweiler)
+    Tobias Rittweiler)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
@@ -297,7 +297,7 @@ changes in sbcl-1.0.16 relative to 1.0.15:
   * minor incompatible change: SB-BSD-SOCKETS:NAME-SERVICE-ERROR now
     inherits from ERROR instead of just CONDITION.
   * new feature: SB-INTROSPECT can provide source locations for instances
-    as well. (thanks to Tobian Ritterweiler)
+    as well. (thanks to Tobias Rittweiler)
   * optimization: binding special variables now generates smaller code
     on threaded platforms.
   * optimization: MEMBER and ASSOC are over 50% faster for :TEST #'EQ

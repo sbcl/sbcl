@@ -125,6 +125,15 @@
   (funcall fun)
   (assert (equal '(:ok) (read-from-string "{:ok)"))))
 
+(with-test (:name bad-recursive-read)
+  ;; This use to signal an unbound-variable error instead.
+  (assert (eq :error
+              (handler-case
+                  (with-input-from-string (s "42")
+                    (read s t nil t))
+                (reader-error (e)
+                  :error)))))
+
 (with-test (:name standard-readtable-modified)
   (macrolet ((test (form &optional op)
                `(assert
