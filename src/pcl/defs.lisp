@@ -668,10 +668,14 @@
   ())
 
 (defclass standard-class (std-class)
-  ())
+  ()
+  (:default-initargs
+   :direct-superclasses (list *the-class-standard-object*)))
 
 (defclass funcallable-standard-class (std-class)
-  ())
+  ()
+  (:default-initargs
+   :direct-superclasses (list *the-class-funcallable-standard-object*)))
 
 (defclass forward-referenced-class (pcl-class) ())
 

@@ -15,6 +15,9 @@
   * bug fix: SET-DISPATCH-MACRO-CHARACTER accepts NIL as the readtable
     designator, and returns T instead of the function. (thanks to
     Tobias Rittweiler)
+  * bug fix: direct superclasses of STANDARD-CLASS and
+    FUNCALLABLE-STANDARD-CLASS now default to STANDARD-OBJECT and
+    FUNCALLABLE-STANDARD-OBJECT as required by AMOP.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

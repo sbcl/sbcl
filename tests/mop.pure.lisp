@@ -79,3 +79,9 @@
           for class = (find-class class-name)
           for results = (test-class-slots class)
           when results do (cerror "continue" "~A" results))))
+
+;;; AMOP says these are the defaults
+(assert (equal (list (find-class 'standard-object))
+               (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
+(assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
+               (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class))))
