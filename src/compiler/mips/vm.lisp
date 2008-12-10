@@ -108,7 +108,6 @@
                 (list* `(define-storage-class ,sc-name ,index
                           ,@(cdr class))
                        `(def!constant ,constant-name ,index)
-                       `(export ',constant-name)
                        forms)))
        (index 0 (1+ index))
        (classes classes (cdr classes)))
