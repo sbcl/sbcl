@@ -168,8 +168,8 @@
     (inst addu csp-tn count)
     LOOP
     (inst lw temp src)
-    (inst addu src 4)
-    (inst addu dst 4)
+    (inst addu src n-word-bytes)
+    (inst addu dst n-word-bytes)
     (inst bne dst csp-tn loop)
-    (inst sw temp dst -4)
+    (inst sw temp dst (- n-word-bytes))
     DONE))

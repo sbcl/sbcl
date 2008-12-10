@@ -367,9 +367,9 @@ default-value-8
 
     (when lra-label
       (inst compute-code-from-lra code-tn code-tn lra-label temp))
-    (inst addu csp-tn csp-tn 4)
+    (inst addu csp-tn csp-tn n-word-bytes)
     (storew (first *register-arg-tns*) csp-tn -1)
-    (inst addu start csp-tn -4)
+    (inst addu start csp-tn (- n-word-bytes))
     (inst li count (fixnumize 1))
 
     (emit-label done)
