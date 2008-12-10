@@ -168,12 +168,12 @@
 
 ;;;; Constants used by instruction emitters.
 
-(defconstant special-op #b000000)
-(defconstant bcond-op #b000001)
-(defconstant cop0-op #b010000)
-(defconstant cop1-op #b010001)
-(defconstant cop2-op #b010010)
-(defconstant cop3-op #b010011)
+(def!constant special-op #b000000)
+(def!constant bcond-op #b000001)
+(def!constant cop0-op #b010000)
+(def!constant cop1-op #b010001)
+(def!constant cop2-op #b010010)
+(def!constant cop3-op #b010011)
 
 
 
