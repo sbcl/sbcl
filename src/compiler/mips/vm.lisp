@@ -70,10 +70,10 @@
   (defreg lip 31) ; Lisp interior pointer
 
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 cfunc nargs)
+      nl0 nl1 nl2 nl3 nl4 cfunc nargs nfp)
 
   (defregset descriptor-regs
-      a0 a1 a2 a3 a4 a5 fdefn lexenv nfp ocfp lra l0 l1)
+      a0 a1 a2 a3 a4 a5 fdefn lexenv ocfp lra l0 l1)
 
   (defregset *register-arg-offsets*
       a0 a1 a2 a3 a4 a5)
