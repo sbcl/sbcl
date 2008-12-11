@@ -12,29 +12,4 @@
 
 (in-package "SB!VM")
 
-(define-assembly-routine (allocate-vector
-                          (:policy :fast-safe)
-                          (:translate allocate-vector)
-                          (:arg-types positive-fixnum
-                                      positive-fixnum
-                                      positive-fixnum))
-                         ((:arg type any-reg a0-offset)
-                          (:arg length any-reg a1-offset)
-                          (:arg words any-reg a2-offset)
-                          (:res result descriptor-reg a0-offset)
-
-                          (:temp ndescr non-descriptor-reg nl0-offset)
-                          (:temp pa-flag non-descriptor-reg nl4-offset))
-  ;; This is kinda sleezy, changing words like this.  But we can because
-  ;; the vop thinks it is temporary.
-  (inst addu words (+ lowtag-mask
-                      (* vector-data-offset n-word-bytes)))
-  (inst srl ndescr type word-shift)
-  (inst srl words n-lowtag-bits)
-  (inst sll words n-lowtag-bits)
-
-  (pseudo-atomic (pa-flag)
-    (inst or result alloc-tn other-pointer-lowtag)
-    (inst addu alloc-tn words)
-    (storew ndescr result 0 other-pointer-lowtag)
-    (storew length result vector-length-slot other-pointer-lowtag)))
+;;;; Note: ALLOCATE-VECTOR is now implemented as a VOP.

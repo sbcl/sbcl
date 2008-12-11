@@ -175,7 +175,7 @@
 ;;; Stack allocation optimizers per platform support
 ;;;
 ;;; Platforms with stack-allocatable vectors
-#!+(or x86 x86-64)
+#!+(or mips x86 x86-64)
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)

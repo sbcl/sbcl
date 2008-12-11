@@ -77,6 +77,61 @@
 
 ;;;; Special purpose inline allocators.
 
+;;; ALLOCATE-VECTOR
+(define-vop (allocate-vector-on-heap)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:temporary (:sc non-descriptor-reg :offset nl0-offset) bytes)
+  (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:policy :fast-safe)
+  (:generator 100
+    (inst addu bytes words (+ lowtag-mask
+                              (* vector-data-offset n-word-bytes)))
+    (inst srl bytes n-lowtag-bits)
+    (inst sll bytes n-lowtag-bits)
+    (pseudo-atomic (pa-flag)
+      (inst or result alloc-tn other-pointer-lowtag)
+      (inst addu alloc-tn bytes)
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag))))
+
+(define-vop (allocate-vector-on-stack)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:temporary (:sc non-descriptor-reg :offset nl0-offset) bytes)
+  (:temporary (:sc non-descriptor-reg :offset nl1-offset) temp)
+  (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:policy :fast-safe)
+  (:generator 100
+    (inst addu bytes words (+ lowtag-mask
+                              (* vector-data-offset n-word-bytes)))
+    (inst srl bytes n-lowtag-bits)
+    (inst sll bytes n-lowtag-bits)
+    ;; FIXME: It would be good to check for stack overflow here.
+    (pseudo-atomic (pa-flag)
+      (align-csp temp)
+      (inst or result csp-tn other-pointer-lowtag)
+      (inst addu temp csp-tn (* vector-data-offset n-word-bytes))
+      (inst addu csp-tn bytes)
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag)
+      (let ((loop (gen-label)))
+        (emit-label loop)
+        (storew zero-tn temp 0)
+        (inst bne temp csp-tn loop)
+        (inst addu temp n-word-bytes))
+      (align-csp temp))))
+
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
          (unboxed-arg :scs (any-reg)))
