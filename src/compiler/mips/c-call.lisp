@@ -452,7 +452,15 @@ and a pointer to the arguments."
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static
       ;; vector we can point foreign code to.
-      (let ((buffer (sb!assem::segment-buffer segment)))
-        (make-static-vector (length buffer)
-                            :element-type '(unsigned-byte 8)
-                            :initial-contents buffer)))))
+      (let* ((buffer (sb!assem::segment-buffer segment))
+             (vector (make-static-vector (length buffer)
+                                         :element-type '(unsigned-byte 8)
+                                         :initial-contents buffer))
+             (sap (sb!sys:vector-sap vector)))
+        (sb!alien:alien-funcall
+         (sb!alien:extern-alien "os_flush_icache"
+                                (function void
+                                          system-area-pointer
+                                          unsigned-long))
+         sap (length buffer))
+        vector))))
