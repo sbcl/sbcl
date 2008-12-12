@@ -1097,13 +1097,13 @@
           (setq name (slot-definition-name slotd)
                 namep t))
         (unless initp
-          (when (slot-definition-initfunction slotd)
+          (awhen (slot-definition-initfunction slotd)
             (setq initform (slot-definition-initform slotd)
-                  initfunction (slot-definition-initfunction slotd)
+                  initfunction it
                   initp t)))
         (unless documentationp
-          (when (%slot-definition-documentation slotd)
-            (setq documentation (%slot-definition-documentation slotd)
+          (awhen (%slot-definition-documentation slotd)
+            (setq documentation it
                   documentationp t)))
         (unless allocp
           (setq allocation (slot-definition-allocation slotd)
@@ -1115,6 +1115,7 @@
             (setf type-check-function
                   (if type-check-function
                       (let ((old-function type-check-function))
+                        (declare (function old-function fun))
                         (lambda (value)
                           (funcall old-function value)
                           (funcall fun value)))

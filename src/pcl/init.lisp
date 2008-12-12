@@ -108,27 +108,27 @@
          (initialize-slot-from-initfunction (class instance slotd)
            ;; CLHS: If a before method stores something in a slot,
            ;; that slot won't be initialized from its :INITFORM, if any.
-           (if (typep instance 'structure-object)
-               (when (eq (funcall
-                          ;; not SLOT-VALUE-USING-CLASS, as that
-                          ;; throws an error if the value is the
-                          ;; unbound marker.
-                          (slot-definition-internal-reader-function slotd)
-                          instance)
-                         +slot-unbound+)
-                 (setf (slot-value-using-class class instance slotd)
-                       (let ((initfn (slot-definition-initfunction slotd)))
-                         (when initfn
-                           (funcall initfn)))))
-               (unless (or (null (slot-definition-initfunction slotd))
-                           (slot-boundp-using-class class instance slotd))
-                 (setf (slot-value-using-class class instance slotd)
-                       (funcall (slot-definition-initfunction slotd)))))))
+           (let ((initfun (slot-definition-initfunction slotd)))
+             (if (typep instance 'structure-object)
+                 (when (eq (funcall
+                            ;; not SLOT-VALUE-USING-CLASS, as that
+                            ;; throws an error if the value is the
+                            ;; unbound marker.
+                            (slot-definition-internal-reader-function slotd)
+                            instance)
+                           +slot-unbound+)
+                   (setf (slot-value-using-class class instance slotd)
+                         (when initfun
+                           (funcall initfun))))
+                 (unless (or (not initfun)
+                             (slot-boundp-using-class class instance slotd))
+                  (setf (slot-value-using-class class instance slotd)
+                        (funcall initfun)))))))
     (let* ((class (class-of instance))
            (initfn-slotds
             (loop for slotd in (class-slots class)
                   unless (initialize-slot-from-initarg class instance slotd)
-                    collect slotd)))
+                  collect slotd)))
       (dolist (slotd initfn-slotds)
         (if (eq (slot-definition-allocation slotd) :class)
             (when (or (eq t slot-names)

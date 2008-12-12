@@ -64,7 +64,10 @@
                       (ensure-accessor 'reader ',reader-name ',slot-name))))
       (declare (ignore .ignore.))
       (truly-the (values t &optional)
-                 (funcall #',reader-name ,object)))))
+                 ;; Don't give a style-warning about undefined function here.
+                 (funcall (locally (declare (muffle-conditions style-warning))
+                            #',reader-name)
+                          ,object)))))
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
   (aver (constantp slot-name env))

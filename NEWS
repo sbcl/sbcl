@@ -18,6 +18,9 @@
   * bug fix: direct superclasses of STANDARD-CLASS and
     FUNCALLABLE-STANDARD-CLASS now default to STANDARD-OBJECT and
     FUNCALLABLE-STANDARD-OBJECT as required by AMOP.
+  * bug fix: compiling a call to SLOT-VALUE with a constant slot-name
+    when no class with the named slot yet exists no longer causes a
+    compile-time style-warning.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
