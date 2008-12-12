@@ -216,7 +216,9 @@ os_init(char *argv[], char *envp[])
          /* Some old kernels will apparently lose unsupported personality flags
           * on exec() */
          && ((minor_version == 6 && patch_version >= 11)
-             || (minor_version > 6)))
+             || (minor_version > 6)
+             /* This is what RHEL 3 reports */
+             || (minor_version == 4 && patch_version > 20)))
         || major_version >= 3)
     {
         int pers = personality(0xffffffffUL);
