@@ -176,7 +176,7 @@
               (*compiler-note-count* 0)
               (*undefined-warnings* nil)
               (*in-compilation-unit* t))
-          (sb!thread:with-recursive-lock (*big-compiler-lock*)
+          (with-world-lock ()
             (handler-bind ((parse-unknown-type
                             (lambda (c)
                               (note-undefined-reference

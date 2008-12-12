@@ -101,6 +101,7 @@
 ;;; cold-load time.
 (defvar *forward-referenced-layouts*)
 (!cold-init-forms
+  ;; Protected by *WORLD-LOCK*
   (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
@@ -254,7 +255,7 @@
   ;; it thread-safe all the same. We need to lock *F-R-L* before doing
   ;; FIND-CLASSOID in case (SETF FIND-CLASSOID) happens in parallel.
   (let ((table *forward-referenced-layouts*))
-    (with-locked-hash-table (table)
+    (with-world-lock ()
       (let ((classoid (find-classoid name nil)))
         (or (and classoid (classoid-layout classoid))
             (gethash name table)
@@ -273,8 +274,8 @@
 (declaim (ftype (function (layout classoid index simple-vector layout-depthoid
                                   index)
                           layout)
-                init-or-check-layout))
-(defun init-or-check-layout
+                %init-or-check-layout))
+(defun %init-or-check-layout
     (layout classoid length inherits depthoid nuntagged)
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
@@ -329,12 +330,12 @@
      `(find-layout ',name)
      ;; "initialization" form (which actually doesn't initialize
      ;; preexisting LAYOUTs, just checks that they're consistent).
-     `(init-or-check-layout ',layout
-                            ',(layout-classoid layout)
-                            ',(layout-length layout)
-                            ',(layout-inherits layout)
-                            ',(layout-depthoid layout)
-                            ',(layout-n-untagged-slots layout)))))
+     `(%init-or-check-layout ',layout
+                             ',(layout-classoid layout)
+                             ',(layout-length layout)
+                             ',(layout-inherits layout)
+                             ',(layout-depthoid layout)
+                             ',(layout-n-untagged-slots layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
@@ -435,14 +436,15 @@
                           layout)
                 find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid nuntagged)
-  (let ((layout (find-layout name)))
-    (init-or-check-layout layout
-                          (or (find-classoid name nil)
-                              (layout-classoid layout))
-                          length
-                          inherits
-                          depthoid
-                          nuntagged)))
+  (with-world-lock ()
+    (let ((layout (find-layout name)))
+      (%init-or-check-layout layout
+                             (or (find-classoid name nil)
+                                 (layout-classoid layout))
+                             length
+                             inherits
+                             depthoid
+                             nuntagged))))
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -456,58 +458,59 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun register-layout (layout &key (invalidate t) destruct-layout)
   (declare (type layout layout) (type (or layout null) destruct-layout))
-  (let* ((classoid (layout-classoid layout))
-         (classoid-layout (classoid-layout classoid))
-         (subclasses (classoid-subclasses classoid)))
+  (with-world-lock ()
+    (let* ((classoid (layout-classoid layout))
+           (classoid-layout (classoid-layout classoid))
+           (subclasses (classoid-subclasses classoid)))
 
-    ;; Attempting to register ourselves with a temporary undefined
-    ;; class placeholder is almost certainly a programmer error. (I
-    ;; should know, I did it.) -- WHN 19990927
-    (aver (not (undefined-classoid-p classoid)))
+      ;; Attempting to register ourselves with a temporary undefined
+      ;; class placeholder is almost certainly a programmer error. (I
+      ;; should know, I did it.) -- WHN 19990927
+      (aver (not (undefined-classoid-p classoid)))
 
-    ;; This assertion dates from classic CMU CL. The rationale is
-    ;; probably that calling REGISTER-LAYOUT more than once for the
-    ;; same LAYOUT is almost certainly a programmer error.
-    (aver (not (eq classoid-layout layout)))
+      ;; This assertion dates from classic CMU CL. The rationale is
+      ;; probably that calling REGISTER-LAYOUT more than once for the
+      ;; same LAYOUT is almost certainly a programmer error.
+      (aver (not (eq classoid-layout layout)))
 
-    ;; Figure out what classes are affected by the change, and issue
-    ;; appropriate warnings and invalidations.
-    (when classoid-layout
-      (modify-classoid classoid)
-      (when subclasses
-        (dohash ((subclass subclass-layout) subclasses :locked t)
-          (modify-classoid subclass)
-          (when invalidate
-            (invalidate-layout subclass-layout))))
-      (when invalidate
-        (invalidate-layout classoid-layout)
-        (setf (classoid-subclasses classoid) nil)))
+      ;; Figure out what classes are affected by the change, and issue
+      ;; appropriate warnings and invalidations.
+      (when classoid-layout
+        (%modify-classoid classoid)
+        (when subclasses
+          (dohash ((subclass subclass-layout) subclasses :locked t)
+            (%modify-classoid subclass)
+            (when invalidate
+              (%invalidate-layout subclass-layout))))
+        (when invalidate
+          (%invalidate-layout classoid-layout)
+          (setf (classoid-subclasses classoid) nil)))
 
-    (if destruct-layout
-        (setf (layout-invalid destruct-layout) nil
-              (layout-inherits destruct-layout) (layout-inherits layout)
-              (layout-depthoid destruct-layout)(layout-depthoid layout)
-              (layout-length destruct-layout) (layout-length layout)
-              (layout-n-untagged-slots destruct-layout) (layout-n-untagged-slots layout)
-              (layout-info destruct-layout) (layout-info layout)
-              (classoid-layout classoid) destruct-layout)
-        (setf (layout-invalid layout) nil
-              (classoid-layout classoid) layout))
+      (if destruct-layout
+          (setf (layout-invalid destruct-layout) nil
+                (layout-inherits destruct-layout) (layout-inherits layout)
+                (layout-depthoid destruct-layout)(layout-depthoid layout)
+                (layout-length destruct-layout) (layout-length layout)
+                (layout-n-untagged-slots destruct-layout) (layout-n-untagged-slots layout)
+                (layout-info destruct-layout) (layout-info layout)
+                (classoid-layout classoid) destruct-layout)
+          (setf (layout-invalid layout) nil
+                (classoid-layout classoid) layout))
 
-    (dovector (super-layout (layout-inherits layout))
-      (let* ((super (layout-classoid super-layout))
-             (subclasses (or (classoid-subclasses super)
-                             (setf (classoid-subclasses super)
-                                   (make-hash-table :test 'eq
-                                                    #-sb-xc-host #-sb-xc-host
-                                                    :synchronized t)))))
-        (when (and (eq (classoid-state super) :sealed)
-                   (not (gethash classoid subclasses)))
-          (warn "unsealing sealed class ~S in order to subclass it"
-                (classoid-name super))
-          (setf (classoid-state super) :read-only))
-        (setf (gethash classoid subclasses)
-              (or destruct-layout layout)))))
+      (dovector (super-layout (layout-inherits layout))
+        (let* ((super (layout-classoid super-layout))
+               (subclasses (or (classoid-subclasses super)
+                               (setf (classoid-subclasses super)
+                                     (make-hash-table :test 'eq
+                                                      #-sb-xc-host #-sb-xc-host
+                                                      :synchronized t)))))
+          (when (and (eq (classoid-state super) :sealed)
+                     (not (gethash classoid subclasses)))
+            (warn "unsealing sealed class ~S in order to subclass it"
+                  (classoid-name super))
+            (setf (classoid-state super) :read-only))
+          (setf (gethash classoid subclasses)
+                (or destruct-layout layout))))))
 
   (values))
 ); EVAL-WHEN
@@ -693,6 +696,7 @@
   ;; PCL class, if any
   (pcl-class nil))
 
+;;; Protected by the hash-table lock, used only in FIND-CLASSOID-CELL.
 (defvar *classoid-cells*)
 (!cold-init-forms
   (setq *classoid-cells* (make-hash-table :test 'eq)))
@@ -720,13 +724,11 @@
     (let ((cell (find-classoid-cell name :errorp errorp)))
       (when cell (classoid-cell-classoid cell))))
 
-  ;; This is definitely not thread safe with itself -- but should be
-  ;; OK with parallel FIND-CLASSOID & FIND-LAYOUT.
   (defun (setf find-classoid) (new-value name)
     #-sb-xc (declare (type (or null classoid) new-value))
     (aver new-value)
     (let ((table *forward-referenced-layouts*))
-      (with-locked-hash-table (table)
+      (with-world-lock ()
         (let ((cell (find-classoid-cell name :create t)))
           (ecase (info :type :kind name)
             ((nil))
@@ -791,7 +793,7 @@
                   (classoid-layout new-value))))))
     new-value)
 
-  (defun clear-classoid (name cell)
+  (defun %clear-classoid (name cell)
     (ecase (info :type :kind name)
       ((nil))
       (:defined)
@@ -850,29 +852,30 @@
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
-(defun ensure-classoid-valid (classoid layout)
+(defun %ensure-classoid-valid (classoid layout)
   (aver (eq classoid (layout-classoid layout)))
   (when (layout-invalid layout)
     (if (typep classoid 'standard-classoid)
         (let ((class (classoid-pcl-class classoid)))
           (cond
             ((sb!pcl:class-finalized-p class)
-             (sb!pcl::force-cache-flushes class))
+             (sb!pcl::%force-cache-flushes class))
             ((sb!pcl::class-has-a-forward-referenced-superclass-p class)
              (error "Invalid, unfinalizeable class ~S (classoid ~S)."
                     class classoid))
-            (t (sb!pcl:finalize-inheritance class))))
+            (t
+             (sb!pcl:finalize-inheritance class))))
         (error "Don't know how to ensure validity of ~S (not ~
                 a STANDARD-CLASSOID)." classoid))))
 
-(defun ensure-both-classoids-valid (class1 class2)
+(defun %ensure-both-classoids-valid (class1 class2)
   (do ((layout1 (classoid-layout class1) (classoid-layout class1))
        (layout2 (classoid-layout class2) (classoid-layout class2))
        (i 0 (+ i 1)))
       ((and (not (layout-invalid layout1)) (not (layout-invalid layout2))))
     (aver (< i 2))
-    (ensure-classoid-valid class1 layout1)
-    (ensure-classoid-valid class2 layout2)))
+    (%ensure-classoid-valid class1 layout1)
+    (%ensure-classoid-valid class2 layout2)))
 
 (defun update-object-layout-or-invalid (object layout)
   (if (typep (classoid-of object) 'standard-classoid)
@@ -888,11 +891,12 @@
 
 (!define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
-  (ensure-both-classoids-valid class1 class2)
-  (let ((subclasses (classoid-subclasses class2)))
-    (if (and subclasses (gethash class1 subclasses))
-        (values t t)
-        (values nil t))))
+  (with-world-lock ()
+    (%ensure-both-classoids-valid class1 class2)
+    (let ((subclasses (classoid-subclasses class2)))
+      (if (and subclasses (gethash class1 subclasses))
+          (values t t)
+          (values nil t)))))
 
 ;;; When finding the intersection of a sealed class and some other
 ;;; class (not hierarchically related) the intersection is the union
@@ -912,33 +916,34 @@
 
 (!define-type-method (classoid :simple-intersection2) (class1 class2)
   (declare (type classoid class1 class2))
-  (ensure-both-classoids-valid class1 class2)
-  (cond ((eq class1 class2)
-         class1)
-        ;; If one is a subclass of the other, then that is the
-        ;; intersection.
-        ((let ((subclasses (classoid-subclasses class2)))
-           (and subclasses (gethash class1 subclasses)))
-         class1)
-        ((let ((subclasses (classoid-subclasses class1)))
-           (and subclasses (gethash class2 subclasses)))
-         class2)
-        ;; Otherwise, we can't in general be sure that the
-        ;; intersection is empty, since a subclass of both might be
-        ;; defined. But we can eliminate it for some special cases.
-        ((or (structure-classoid-p class1)
-             (structure-classoid-p class2))
-         ;; No subclass of both can be defined.
-         *empty-type*)
-        ((eq (classoid-state class1) :sealed)
-         ;; checking whether a subclass of both can be defined:
-         (sealed-class-intersection2 class1 class2))
-        ((eq (classoid-state class2) :sealed)
-         ;; checking whether a subclass of both can be defined:
-         (sealed-class-intersection2 class2 class1))
-        (t
-         ;; uncertain, since a subclass of both might be defined
-         nil)))
+  (with-world-lock ()
+    (%ensure-both-classoids-valid class1 class2)
+    (cond ((eq class1 class2)
+           class1)
+          ;; If one is a subclass of the other, then that is the
+          ;; intersection.
+          ((let ((subclasses (classoid-subclasses class2)))
+             (and subclasses (gethash class1 subclasses)))
+           class1)
+          ((let ((subclasses (classoid-subclasses class1)))
+             (and subclasses (gethash class2 subclasses)))
+           class2)
+          ;; Otherwise, we can't in general be sure that the
+          ;; intersection is empty, since a subclass of both might be
+          ;; defined. But we can eliminate it for some special cases.
+          ((or (structure-classoid-p class1)
+               (structure-classoid-p class2))
+           ;; No subclass of both can be defined.
+           *empty-type*)
+          ((eq (classoid-state class1) :sealed)
+           ;; checking whether a subclass of both can be defined:
+           (sealed-class-intersection2 class1 class2))
+          ((eq (classoid-state class2) :sealed)
+           ;; checking whether a subclass of both can be defined:
+           (sealed-class-intersection2 class2 class1))
+          (t
+           ;; uncertain, since a subclass of both might be defined
+           nil))))
 
 ;;; KLUDGE: we need this to deal with the special-case INSTANCE and
 ;;; FUNCALLABLE-INSTANCE types (which used to be CLASSOIDs until CSR
@@ -1481,7 +1486,7 @@
 ;;;; class definition/redefinition
 
 ;;; This is to be called whenever we are altering a class.
-(defun modify-classoid (classoid)
+(defun %modify-classoid (classoid)
   (clear-type-caches)
   (when (member (classoid-state classoid) '(:read-only :frozen))
     ;; FIXME: This should probably be CERROR.
@@ -1496,14 +1501,14 @@
 ;;; nominal superclasses.)  We set the layout-clos-hash slots to 0 to
 ;;; invalidate the wrappers for specialized dispatch functions, which
 ;;; use those slots as indexes into tables.
-(defun invalidate-layout (layout)
+(defun %invalidate-layout (layout)
   (declare (type layout layout))
   (setf (layout-invalid layout) t
         (layout-depthoid layout) -1)
   (setf (layout-clos-hash layout) 0)
   (let ((inherits (layout-inherits layout))
         (classoid (layout-classoid layout)))
-    (modify-classoid classoid)
+    (%modify-classoid classoid)
     (dovector (super inherits)
       (let ((subs (classoid-subclasses (layout-classoid super))))
         (when subs

@@ -41,39 +41,30 @@
 (defmethod raw-instance-allocator ((class standard-class))
   'allocate-standard-instance)
 
-;;; These four functions work on std-instances and fsc-instances. These are
+;;; These three functions work on std-instances and fsc-instances. These are
 ;;; instances for which it is possible to change the wrapper and the slots.
 ;;;
 ;;; For these kinds of instances, most specified methods from the instance
 ;;; structure protocol are promoted to the implementation-specific class
 ;;; std-class. Many of these methods call these four functions.
 
-(defun set-wrapper (inst new)
-  (cond ((std-instance-p inst)
-         (setf (std-instance-wrapper inst) new))
-        ((fsc-instance-p inst)
-         (setf (fsc-instance-wrapper inst) new))
+(defun %swap-wrappers-and-slots (i1 i2)
+  (cond ((std-instance-p i1)
+         (let ((w1 (std-instance-wrapper i1))
+               (s1 (std-instance-slots i1)))
+           (setf (std-instance-wrapper i1) (std-instance-wrapper i2))
+           (setf (std-instance-slots i1) (std-instance-slots i2))
+           (setf (std-instance-wrapper i2) w1)
+           (setf (std-instance-slots i2) s1)))
+        ((fsc-instance-p i1)
+         (let ((w1 (fsc-instance-wrapper i1))
+               (s1 (fsc-instance-slots i1)))
+           (setf (fsc-instance-wrapper i1) (fsc-instance-wrapper i2))
+           (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
+           (setf (fsc-instance-wrapper i2) w1)
+           (setf (fsc-instance-slots i2) s1)))
         (t
          (error "unrecognized instance type"))))
-
-(defun swap-wrappers-and-slots (i1 i2)
-  (with-pcl-lock                        ;FIXME is this sufficient?
-   (cond ((std-instance-p i1)
-          (let ((w1 (std-instance-wrapper i1))
-                (s1 (std-instance-slots i1)))
-            (setf (std-instance-wrapper i1) (std-instance-wrapper i2))
-            (setf (std-instance-slots i1) (std-instance-slots i2))
-            (setf (std-instance-wrapper i2) w1)
-            (setf (std-instance-slots i2) s1)))
-         ((fsc-instance-p i1)
-          (let ((w1 (fsc-instance-wrapper i1))
-                (s1 (fsc-instance-slots i1)))
-            (setf (fsc-instance-wrapper i1) (fsc-instance-wrapper i2))
-            (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
-            (setf (fsc-instance-wrapper i2) w1)
-            (setf (fsc-instance-slots i2) s1)))
-         (t
-          (error "unrecognized instance type")))))
 
 ;;;; STANDARD-INSTANCE-ACCESS
 

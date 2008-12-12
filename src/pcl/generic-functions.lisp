@@ -363,8 +363,6 @@
 
 (defgeneric unparse-specializer-using-class (generic-function specializer))
 
-(defgeneric update-gf-dfun (class gf))
-
 (defgeneric validate-superclass (class superclass))
 
 (defgeneric (setf documentation) (new-value slotd doc-type)

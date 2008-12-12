@@ -97,19 +97,11 @@ SB-LOOP::*LOOP-BIND-STACK*
 
 = PCL
 
-The PCL authors thought a bit about thread safety, adding
-(without-interrupts ...) in some places to protect critical forms.
-We've implemented their without-interrupts macro as an acquitision of
-*pcl-lock*, so we hope they've done it properly.
-
-Largish parts of PCL should also be protected by the compiler lock,
-but sometimes it can be hard to tell...
-
-The most suspicious parts should probably be tested by asserting
-at various sites that the *PCL-LOCK* is held.
+Critical parts of PCL are protected by *world-lock* (particularly
+those dealing with class graph changes), and some with finer-grained locks.
 
 accesses locked with a nice granularity
-   SB-PCL::*FIND-CLASS*
+   SB-PCL::*CLASSOID-CELLS*
 
 read-only & safe:
    SB-PCL::*BUILT-IN-TYPEP-COST* 

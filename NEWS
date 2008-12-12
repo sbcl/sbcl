@@ -4,6 +4,8 @@
   * new feature: the system now signals a continuable error if standard
     readtable modification is attempted.
   * optimization: faster generic arithmetic dispatch on x86 and x86-64.
+  * bug fix: DEFCLASS and ENSURE-CLASS-USING-CLASS are now expected to
+    be thread safe.
   * bug fix: lexical type declarations are now correctly reported by
     SB-CLTL2. (reported by Larry D'Anna)
   * bug fix: STRING-TO-OCTETS did not handle :START properly when

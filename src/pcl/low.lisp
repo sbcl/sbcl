@@ -365,28 +365,4 @@
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
-
-;;; WITH-PCL-LOCK is used around some forms that were previously
-;;; protected by WITHOUT-INTERRUPTS, but in a threaded SBCL we don't
-;;; have a useful WITHOUT-INTERRUPTS.  In an unthreaded SBCL I'm not
-;;; sure what the desired effect is anyway: should we be protecting
-;;; against the possibility of recursive calls into these functions
-;;; or are we using WITHOUT-INTERRUPTS as WITHOUT-SCHEDULING?
-;;;
-;;; Users: FORCE-CACHE-FLUSHES, MAKE-INSTANCES-OBSOLETE.  Note that
-;;; it's not all certain this is sufficent for threadsafety: do we
-;;; just have to protect against simultaneous calls to these mutators,
-;;; or actually to stop normal slot access etc at the same time as one
-;;; of them runs
 
-#+sb-thread
-(progn
-  (defvar *pcl-lock* (sb-thread::make-spinlock :name "PCL lock"))
-
-  (defmacro with-pcl-lock (&body body)
-    `(sb-thread::with-spinlock (*pcl-lock*)
-      ,@body)))
-
-#-sb-thread
-(defmacro with-pcl-lock (&body body)
-  `(progn ,@body))

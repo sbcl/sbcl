@@ -629,7 +629,8 @@
 
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
-(defun update-lisp-class-layout (class layout)
+(defun %update-lisp-class-layout (class layout)
+  ;; Protected by *world-lock* in callers.
   (let ((classoid (layout-classoid layout))
         (olayout (class-wrapper class)))
     (unless (eq (classoid-layout classoid) layout)
@@ -649,7 +650,7 @@
         (when (and name (symbolp name) (eq name (classoid-name classoid)))
           (setf (find-classoid name) classoid))))))
 
-(defun set-class-type-translation (class classoid)
+(defun %set-class-type-translation (class classoid)
   (when (not (typep classoid 'classoid))
     (setq classoid (find-classoid classoid nil)))
   (etypecase classoid
@@ -686,14 +687,14 @@
           (aver (eq class lclass-pcl-class))
           (setf (classoid-pcl-class lclass) class))
 
-      (update-lisp-class-layout class layout)
+      (%update-lisp-class-layout class layout)
 
       (cond (olclass
              (aver (eq lclass olclass)))
             (t
              (setf (find-classoid name) lclass)))
 
-      (set-class-type-translation class name))))
+      (%set-class-type-translation class name))))
 
 (setq *boot-state* 'braid)
 

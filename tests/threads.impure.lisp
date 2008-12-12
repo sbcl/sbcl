@@ -11,8 +11,9 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "SB-THREAD") ; this is white-box testing, really
+; WHITE-BOX TESTS
 
+(in-package "SB-THREAD")
 (use-package :test-util)
 (use-package "ASSERTOID")
 
@@ -997,5 +998,53 @@
 (with-test (:name '(:hash-cache :subtypep))
   (dotimes (i 10)
     (sb-thread:make-thread #'subtypep-hash-cache-test)))
-
 (format t "hash-cache tests done~%")
+
+;;;; BLACK BOX TESTS
+
+(in-package :cl-user)
+(use-package :test-util)
+(use-package "ASSERTOID")
+
+(format t "parallel defclass test -- WARNING, WILL HANG ON FAILURE!~%")
+(with-test (:name :parallel-defclass)
+  (defclass test-1 () ((a :initform :orig-a)))
+  (defclass test-2 () ((b :initform :orig-b)))
+  (defclass test-3 (test-1 test-2) ((c :initform :orig-c)))
+  (let* ((run t)
+         (d1 (sb-thread:make-thread (lambda ()
+                                      (loop while run
+                                            do (defclass test-1 () ((a :initform :new-a)))
+                                            (write-char #\1)
+                                            (force-output)))
+                                    :name "d1"))
+         (d2 (sb-thread:make-thread (lambda ()
+                                      (loop while run
+                                            do (defclass test-2 () ((b :initform :new-b)))
+                                               (write-char #\2)
+                                               (force-output)))
+                                    :name "d2"))
+         (d3 (sb-thread:make-thread (lambda ()
+                                      (loop while run
+                                            do (defclass test-3 (test-1 test-2) ((c :initform :new-c)))
+                                               (write-char #\3)
+                                               (force-output)))
+                                    :name "d3"))
+         (i (sb-thread:make-thread (lambda ()
+                                     (loop while run
+                                           do (let ((i (make-instance 'test-3)))
+                                                (assert (member (slot-value i 'a) '(:orig-a :new-a)))
+                                                (assert (member (slot-value i 'b) '(:orig-b :new-b)))
+                                                (assert (member (slot-value i 'c) '(:orig-c :new-c))))
+                                              (write-char #\i)
+                                              (force-output)))
+                                   :name "i")))
+    (format t "~%sleeping!~%")
+    (sleep 2.0)
+    (format t "~%stopping!~%")
+    (setf run nil)
+    (mapc (lambda (th)
+            (sb-thread:join-thread th)
+            (format t "~%joined ~S~%" (sb-thread:thread-name th)))
+          (list d1 d2 d3 i))))
+(format t "parallel defclass test done~%")

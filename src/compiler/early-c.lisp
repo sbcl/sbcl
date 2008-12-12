@@ -118,10 +118,17 @@ possible. Potentially long (over one page in size) vectors are, however, not
 stack allocated except in zero SAFETY code, as such a vector could overflow
 the stack without triggering overflow protection.")
 
-;;; This lock is seized in the compiler, and related areas: the
-;;; compiler is not presently thread-safe
-(defvar *big-compiler-lock*
-  (sb!thread:make-mutex :name "big compiler lock"))
+(!begin-collecting-cold-init-forms)
+;;; This lock is seized in the compiler, and related areas -- like the
+;;; classoid/layout/class system.
+(defvar *world-lock*)
+(!cold-init-forms
+ (setf *world-lock* (sb!thread:make-mutex :name "World Lock")))
+(!defun-from-collected-cold-init-forms !world-lock-cold-init)
+
+(defmacro with-world-lock (() &body body)
+  `(sb!thread:with-recursive-lock (*world-lock*)
+     ,@body))
 
 (declaim (type fixnum *compiler-sset-counter*))
 (defvar *compiler-sset-counter* 0)

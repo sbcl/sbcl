@@ -1650,16 +1650,6 @@
             (make-initial-dfun gf))))
         (function dfun-state)
         (cons (car dfun-state))))))
-
-(defmethod update-gf-dfun ((class std-class) gf)
-  (let ((*new-class* class)
-        (arg-info (gf-arg-info gf)))
-    (cond
-      ((special-case-for-compute-discriminating-function-p gf))
-      ((gf-precompute-dfun-and-emf-p arg-info)
-       (multiple-value-bind (dfun cache info)
-           (make-final-dfun-internal gf)
-         (update-dfun gf dfun cache info))))))
 
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (wrapper-classoid (class-wrapper class))))

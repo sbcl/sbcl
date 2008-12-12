@@ -141,6 +141,7 @@
   ;; forms run.
   (show-and-call !type-class-cold-init)
   (show-and-call !typedefs-cold-init)
+  (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)

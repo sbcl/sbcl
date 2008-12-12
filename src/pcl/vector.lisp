@@ -57,7 +57,7 @@
 
 ;;; ...and one lock to rule them. Spinlock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
-;;; -- and mostly this is already under the *big-compiler-lock*.
+;;; -- and mostly this is already under the *world-lock*
 (defvar *pv-lock*
   (sb-thread::make-spinlock :name "pv table index lock"))
 

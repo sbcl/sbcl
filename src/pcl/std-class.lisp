@@ -336,33 +336,40 @@
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
 (defun ensure-class (name &rest args)
-  (apply #'ensure-class-using-class
-         (let ((class (find-class name nil)))
-           (when (and class (eq name (class-name class)))
-             ;; NAME is the proper name of CLASS, so redefine it
-             class))
-         name
-         args))
+  (with-world-lock ()
+    (apply #'ensure-class-using-class
+           (let ((class (find-class name nil)))
+             (when (and class (eq name (class-name class)))
+               ;; NAME is the proper name of CLASS, so redefine it
+               class))
+           name
+           args)))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
-  (multiple-value-bind (meta initargs)
-      (frob-ensure-class-args args)
-    (setf class (apply #'make-instance meta :name name initargs))
-    (without-package-locks
-      (setf (find-class name) class))
-    (set-class-type-translation class name)
-    class))
+  (with-world-lock ()
+    (multiple-value-bind (meta initargs)
+        (frob-ensure-class-args args)
+      (setf class (apply #'make-instance meta :name name initargs))
+      (without-package-locks
+        (setf (find-class name) class))))
+  ;; After boot (SETF FIND-CLASS) does this.
+  (unless (eq *boot-state* 'complete)
+    (%set-class-type-translation class name))
+  class)
 
 (defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
-  (multiple-value-bind (meta initargs)
-      (frob-ensure-class-args args)
-    (unless (eq (class-of class) meta)
-      (apply #'change-class class meta initargs))
-    (apply #'reinitialize-instance class initargs)
-    (without-package-locks
-      (setf (find-class name) class))
-    (set-class-type-translation class name)
-    class))
+  (with-world-lock ()
+    (multiple-value-bind (meta initargs)
+        (frob-ensure-class-args args)
+      (unless (eq (class-of class) meta)
+        (apply #'change-class class meta initargs))
+      (apply #'reinitialize-instance class initargs)
+      (without-package-locks
+        (setf (find-class name) class))))
+  ;; After boot (SETF FIND-CLASS) does this.
+  (unless (eq *boot-state* 'complete)
+    (%set-class-type-translation class name))
+  class)
 
 (defun frob-ensure-class-args (args)
   (let (metaclass metaclassp reversed-plist)
@@ -472,24 +479,25 @@
   (flet ((compute-preliminary-cpl (root)
            (let ((*allow-forward-referenced-classes-in-cpl-p* t))
              (compute-class-precedence-list root))))
-    (without-package-locks
-     (unless (class-finalized-p class)
-       (let ((name (class-name class)))
-         ;; KLUDGE: This is fairly horrible.  We need to make a
-         ;; full-fledged CLASSOID here, not just tell the compiler that
-         ;; some class is forthcoming, because there are legitimate
-         ;; questions one can ask of the type system, implemented in
-         ;; terms of CLASSOIDs, involving forward-referenced classes. So.
-         (let ((layout (make-wrapper 0 class)))
-           (setf (slot-value class 'wrapper) layout)
-           (let ((cpl (compute-preliminary-cpl class)))
-             (setf (layout-inherits layout)
-                   (order-layout-inherits
-                    (map 'simple-vector #'class-wrapper
-                         (reverse (rest cpl))))))
-           (register-layout layout :invalidate t)
-           (set-class-type-translation class (layout-classoid layout)))))
-     (mapc #'make-preliminary-layout (class-direct-subclasses class)))))
+    (with-world-lock ()
+      (without-package-locks
+        (unless (class-finalized-p class)
+          (let ((name (class-name class)))
+            ;; KLUDGE: This is fairly horrible.  We need to make a
+            ;; full-fledged CLASSOID here, not just tell the compiler that
+            ;; some class is forthcoming, because there are legitimate
+            ;; questions one can ask of the type system, implemented in
+            ;; terms of CLASSOIDs, involving forward-referenced classes. So.
+            (let ((layout (make-wrapper 0 class)))
+              (setf (slot-value class 'wrapper) layout)
+              (let ((cpl (compute-preliminary-cpl class)))
+                (setf (layout-inherits layout)
+                      (order-layout-inherits
+                       (map 'simple-vector #'class-wrapper
+                            (reverse (rest cpl))))))
+              (register-layout layout :invalidate t)
+              (%set-class-type-translation class (layout-classoid layout)))))
+        (mapc #'make-preliminary-layout (class-direct-subclasses class))))))
 
 
 (defmethod shared-initialize :before ((class class) slot-names &key name)
@@ -808,16 +816,17 @@
 ;;; or reinitialized. The class may or may not be finalized.
 (defun update-class (class finalizep)
   (without-package-locks
-    (when (or finalizep (class-finalized-p class))
-      (update-cpl class (compute-class-precedence-list class))
-      ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-      ;; class.
-      (update-slots class (compute-slots class))
-      (update-gfs-of-class class)
-      (update-initargs class (compute-default-initargs class))
-      (update-ctors 'finalize-inheritance :class class))
-    (dolist (sub (class-direct-subclasses class))
-      (update-class sub nil))))
+    (with-world-lock ()
+      (when (or finalizep (class-finalized-p class))
+        (%update-cpl class (compute-class-precedence-list class))
+        ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
+        ;; class.
+        (%update-slots class (compute-slots class))
+        (update-gfs-of-class class)
+        (setf (plist-value class 'default-initargs) (compute-default-initargs class))
+        (update-ctors 'finalize-inheritance :class class))
+      (dolist (sub (class-direct-subclasses class))
+        (update-class sub nil)))))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)
@@ -835,7 +844,7 @@
              (find-class 'function)
              (cpl-protocol-violation-cpl c)))))
 
-(defun update-cpl (class cpl)
+(defun %update-cpl (class cpl)
   (when (eq (class-of class) *the-class-standard-class*)
     (when (find (find-class 'function) cpl)
       (error 'cpl-protocol-violation :class class :cpl cpl)))
@@ -849,11 +858,11 @@
                                      :key #'slot-definition-allocation)
                        (return nil))))
         ;; comment from the old CMU CL sources:
-        ;;   Need to have the cpl setup before update-lisp-class-layout
+        ;;   Need to have the cpl setup before %update-lisp-class-layout
         ;;   is called on CMU CL.
         (setf (slot-value class '%class-precedence-list) cpl)
         (setf (slot-value class 'cpl-available-p) t)
-        (force-cache-flushes class))
+        (%force-cache-flushes class))
       (progn
         (setf (slot-value class '%class-precedence-list) cpl)
         (setf (slot-value class 'cpl-available-p) t)))
@@ -869,7 +878,7 @@
 (defun class-can-precede-p (class1 class2)
   (member class2 (class-can-precede-list class1) :test #'eq))
 
-(defun update-slots (class eslotds)
+(defun %update-slots (class eslotds)
   (let ((instance-slots ())
         (class-slots    ()))
     (dolist (eslotd eslotds)
@@ -908,7 +917,7 @@
                    (make-instances-obsolete class)
                    (class-wrapper class)))))
 
-      (update-lisp-class-layout class nwrapper)
+      (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'slots) eslotds
             (wrapper-slot-table nwrapper) (make-slot-table class eslotds)
             (wrapper-instance-slots-layout nwrapper) nlayout
@@ -935,7 +944,7 @@
                      :test #'string= :key #'car))))
       (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
-        (maybe-update-standard-class-locations class)))))
+        (maybe-update-standard-slot-locations class)))))
 
 (defun compute-class-slots (eslotds)
   (let (collect)
@@ -945,6 +954,15 @@
                           (slot-definition-allocation-class eslotd)))))
         (aver cell)
         (push cell collect)))))
+
+(defun update-gf-dfun (class gf)
+  (let ((*new-class* class)
+        (arg-info (gf-arg-info gf)))
+    (cond
+      ((special-case-for-compute-discriminating-function-p gf))
+      ((gf-precompute-dfun-and-emf-p arg-info)
+       (multiple-value-bind (dfun cache info) (make-final-dfun-internal gf)
+         (update-dfun gf dfun cache info))))))
 
 (defun update-gfs-of-class (class)
   (when (and (class-finalized-p class)
@@ -962,9 +980,6 @@
                    (declare (ignore ignore))
                    (update-gf-dfun class gf))
                  gf-table)))))
-
-(defun update-initargs (class inits)
-  (setf (plist-value class 'default-initargs) inits))
 
 (defmethod compute-default-initargs ((class slot-class))
   (let ((initargs (loop for c in (class-precedence-list class)
@@ -1280,7 +1295,7 @@
 ;;;                    :UNINITIALIZED)))
 ;;;
 ;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
-(defun force-cache-flushes (class)
+(defun %force-cache-flushes (class)
   (let* ((owrapper (class-wrapper class)))
     ;; We only need to do something if the wrapper is still valid. If
     ;; the wrapper isn't valid, state will be FLUSH or OBSOLETE, and
@@ -1301,43 +1316,38 @@
               (wrapper-class-slots owrapper))
         (setf (wrapper-slot-table nwrapper)
               (wrapper-slot-table owrapper))
-        (with-pcl-lock
-          (update-lisp-class-layout class nwrapper)
-          (setf (slot-value class 'wrapper) nwrapper)
-          ;; Use :OBSOLETE instead of :FLUSH if any superclass has
-          ;; been obsoleted.
-          (if (find-if (lambda (x)
-                         (and (consp x) (eq :obsolete (car x))))
-                       (layout-inherits owrapper)
-                       :key #'layout-invalid)
-              (invalidate-wrapper owrapper :obsolete nwrapper)
-              (invalidate-wrapper owrapper :flush nwrapper)))))))
-
-(defun flush-cache-trap (owrapper nwrapper instance)
-  (declare (ignore owrapper))
-  (set-wrapper instance nwrapper))
+        (%update-lisp-class-layout class nwrapper)
+        (setf (slot-value class 'wrapper) nwrapper)
+        ;; Use :OBSOLETE instead of :FLUSH if any superclass has
+        ;; been obsoleted.
+        (if (find-if (lambda (x)
+                       (and (consp x) (eq :obsolete (car x))))
+                     (layout-inherits owrapper)
+                     :key #'layout-invalid)
+            (%invalidate-wrapper owrapper :obsolete nwrapper)
+            (%invalidate-wrapper owrapper :flush nwrapper))))))
 
 ;;; MAKE-INSTANCES-OBSOLETE can be called by user code. It will cause
 ;;; the next access to the instance (as defined in 88-002R) to trap
 ;;; through the UPDATE-INSTANCE-FOR-REDEFINED-CLASS mechanism.
 (defmethod make-instances-obsolete ((class std-class))
-  (let* ((owrapper (class-wrapper class))
-         (nwrapper (make-wrapper (layout-length owrapper)
-                                 class)))
-    (unless (class-finalized-p class)
-      (if (class-has-a-forward-referenced-superclass-p class)
-          (return-from make-instances-obsolete class)
-          (update-cpl class (compute-class-precedence-list class))))
-    (setf (wrapper-instance-slots-layout nwrapper)
-          (wrapper-instance-slots-layout owrapper))
-    (setf (wrapper-class-slots nwrapper)
-          (wrapper-class-slots owrapper))
-    (setf (wrapper-slot-table nwrapper)
-          (wrapper-slot-table owrapper))
-    (with-pcl-lock
-        (update-lisp-class-layout class nwrapper)
+  (with-world-lock ()
+    (let* ((owrapper (class-wrapper class))
+           (nwrapper (make-wrapper (layout-length owrapper)
+                                   class)))
+      (unless (class-finalized-p class)
+        (if (class-has-a-forward-referenced-superclass-p class)
+            (return-from make-instances-obsolete class)
+            (%update-cpl class (compute-class-precedence-list class))))
+      (setf (wrapper-instance-slots-layout nwrapper)
+            (wrapper-instance-slots-layout owrapper))
+      (setf (wrapper-class-slots nwrapper)
+            (wrapper-class-slots owrapper))
+      (setf (wrapper-slot-table nwrapper)
+            (wrapper-slot-table owrapper))
+      (%update-lisp-class-layout class nwrapper)
       (setf (slot-value class 'wrapper) nwrapper)
-      (invalidate-wrapper owrapper :obsolete nwrapper)
+      (%invalidate-wrapper owrapper :obsolete nwrapper)
       class)))
 
 (defmethod make-instances-obsolete ((class symbol))
@@ -1385,12 +1395,12 @@
              "~@<obsolete structure error for a structure of type ~2I~_~S~:>"
              (type-of (obsolete-structure-datum condition))))))
 
-(defun obsolete-instance-trap (owrapper nwrapper instance)
+(defun %obsolete-instance-trap (owrapper nwrapper instance)
   (if (not (layout-for-std-class-p owrapper))
       (if *in-obsolete-instance-trap*
           *the-wrapper-of-structure-object*
-           (let ((*in-obsolete-instance-trap* t))
-             (error 'obsolete-structure :datum instance)))
+          (let ((*in-obsolete-instance-trap* t))
+            (error 'obsolete-structure :datum instance)))
       (let* ((class (wrapper-class* nwrapper))
              (copy (allocate-instance class)) ;??? allocate-instance ???
              (olayout (wrapper-instance-slots-layout owrapper))
@@ -1438,7 +1448,7 @@
                       (assq nlocal oclass-slots))
             (push nlocal added)))
 
-        (swap-wrappers-and-slots instance copy)
+        (%swap-wrappers-and-slots instance copy)
 
         (update-instance-for-redefined-class instance
                                              added
@@ -1446,7 +1456,7 @@
                                              plist)
         nwrapper)))
 
-(defun change-class-internal (instance new-class initargs)
+(defun %change-class (instance new-class initargs)
   (let* ((old-class (class-of instance))
          (copy (allocate-instance new-class))
          (new-wrapper (get-wrapper copy))
@@ -1477,63 +1487,67 @@
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.
-    (swap-wrappers-and-slots instance copy)
+    (%swap-wrappers-and-slots instance copy)
 
     (apply #'update-instance-for-different-class copy instance initargs)
+
     instance))
 
 (defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
-  (unless (class-finalized-p new-class)
-    (finalize-inheritance new-class))
-  (let ((cpl (class-precedence-list new-class)))
-    (dolist (class cpl)
-      (macrolet
-          ((frob (class-name)
-             `(when (eq class (find-class ',class-name))
-               (error 'metaobject-initialization-violation
-                :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
-                :format-arguments (list 'change-class ',class-name)
-                :references (list '(:amop :initialization ,class-name))))))
-        (frob class)
-        (frob generic-function)
-        (frob method)
-        (frob slot-definition))))
-  (change-class-internal instance new-class initargs))
+  (with-world-lock ()
+    (unless (class-finalized-p new-class)
+      (finalize-inheritance new-class))
+    (let ((cpl (class-precedence-list new-class)))
+      (dolist (class cpl)
+        (macrolet
+            ((frob (class-name)
+               `(when (eq class (find-class ',class-name))
+                  (error 'metaobject-initialization-violation
+                         :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
+                         :format-arguments (list 'change-class ',class-name)
+                         :references (list '(:amop :initialization ,class-name))))))
+          (frob class)
+          (frob generic-function)
+          (frob method)
+          (frob slot-definition))))
+    (%change-class instance new-class initargs)))
 
 (defmethod change-class ((instance forward-referenced-class)
                          (new-class standard-class) &rest initargs)
-  (let ((cpl (class-precedence-list new-class)))
-    (dolist (class cpl
-             (error 'metaobject-initialization-violation
-                    :format-control
-                    "~@<Cannot ~S ~S objects into non-~S objects.~@:>"
-                    :format-arguments
-                    (list 'change-class 'forward-referenced-class 'class)
-                    :references
-                    (list '(:amop :generic-function ensure-class-using-class)
-                          '(:amop :initialization class))))
-      (when (eq class (find-class 'class))
-        (return nil))))
-  (change-class-internal instance new-class initargs))
+  (with-world-lock ()
+    (let ((cpl (class-precedence-list new-class)))
+      (dolist (class cpl
+               (error 'metaobject-initialization-violation
+                      :format-control
+                      "~@<Cannot ~S ~S objects into non-~S objects.~@:>"
+                      :format-arguments
+                      (list 'change-class 'forward-referenced-class 'class)
+                      :references
+                      (list '(:amop :generic-function ensure-class-using-class)
+                            '(:amop :initialization class))))
+        (when (eq class (find-class 'class))
+          (return nil))))
+    (%change-class instance new-class initargs)))
 
 (defmethod change-class ((instance funcallable-standard-object)
                          (new-class funcallable-standard-class)
                          &rest initargs)
-  (let ((cpl (class-precedence-list new-class)))
-    (dolist (class cpl)
-      (macrolet
-          ((frob (class-name)
-             `(when (eq class (find-class ',class-name))
-               (error 'metaobject-initialization-violation
-                :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
-                :format-arguments (list 'change-class ',class-name)
-                :references (list '(:amop :initialization ,class-name))))))
-        (frob class)
-        (frob generic-function)
-        (frob method)
-        (frob slot-definition))))
-  (change-class-internal instance new-class initargs))
+  (with-world-lock ()
+    (let ((cpl (class-precedence-list new-class)))
+      (dolist (class cpl)
+        (macrolet
+            ((frob (class-name)
+               `(when (eq class (find-class ',class-name))
+                  (error 'metaobject-initialization-violation
+                         :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
+                         :format-arguments (list 'change-class ',class-name)
+                         :references (list '(:amop :initialization ,class-name))))))
+          (frob class)
+          (frob generic-function)
+          (frob method)
+          (frob slot-definition))))
+    (%change-class instance new-class initargs)))
 
 (defmethod change-class ((instance standard-object)
                          (new-class funcallable-standard-class)

@@ -241,22 +241,23 @@
 (defvar *the-system-si-method* nil)
 
 (defun install-optimized-constructor (ctor)
-  (let ((class (find-class (ctor-class-name ctor))))
-    (unless (class-finalized-p class)
-      (finalize-inheritance class))
-    ;; We can have a class with an invalid layout here.  Such a class
-    ;; cannot have a LAYOUT-INVALID of (:FLUSH ...) or (:OBSOLETE
-    ;; ...), because part of the deal is that those only happen from
-    ;; FORCE-CACHE-FLUSHES, which create a new valid wrapper for the
-    ;; class.  An invalid layout of T needs to be flushed, however.
-    (when (eq (layout-invalid (class-wrapper class)) t)
-      (force-cache-flushes class))
-    (setf (ctor-class ctor) class)
-    (pushnew ctor (plist-value class 'ctors) :test #'eq)
-    (setf (funcallable-instance-fun ctor)
-          (multiple-value-bind (form locations names)
-              (constructor-function-form ctor)
-            (apply (compile nil `(lambda ,names ,form)) locations)))))
+  (with-world-lock ()
+    (let ((class (find-class (ctor-class-name ctor))))
+      (unless (class-finalized-p class)
+        (finalize-inheritance class))
+      ;; We can have a class with an invalid layout here.  Such a class
+      ;; cannot have a LAYOUT-INVALID of (:FLUSH ...) or (:OBSOLETE
+      ;; ...), because part of the deal is that those only happen from
+      ;; FORCE-CACHE-FLUSHES, which create a new valid wrapper for the
+      ;; class.  An invalid layout of T needs to be flushed, however.
+      (when (eq (layout-invalid (class-wrapper class)) t)
+        (%force-cache-flushes class))
+      (setf (ctor-class ctor) class)
+      (pushnew ctor (plist-value class 'ctors) :test #'eq)
+      (setf (funcallable-instance-fun ctor)
+            (multiple-value-bind (form locations names)
+                (constructor-function-form ctor)
+              (apply (compile nil `(lambda ,names ,form)) locations))))))
 
 (defun constructor-function-form (ctor)
   (let* ((class (ctor-class ctor))

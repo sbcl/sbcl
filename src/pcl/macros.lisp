@@ -144,19 +144,20 @@
          (with-single-package-locked-error
              (:symbol name "Using ~A as the class-name argument in ~
                            (SETF FIND-CLASS)"))
-         (let ((cell (find-classoid-cell name :create new-value)))
-           (cond (new-value
-                  (setf (classoid-cell-pcl-class cell) new-value)
-                  (when (eq *boot-state* 'complete)
-                    (let ((classoid (class-classoid new-value)))
-                      (setf (find-classoid name) classoid)
-                      (set-class-type-translation new-value classoid))))
-                 (cell
-                  (clear-classoid name cell)))
-           (when (or (eq *boot-state* 'complete)
-                     (eq *boot-state* 'braid))
-             (update-ctors 'setf-find-class :class new-value :name name))
-           new-value))
+         (with-world-lock ()
+           (let ((cell (find-classoid-cell name :create new-value)))
+             (cond (new-value
+                    (setf (classoid-cell-pcl-class cell) new-value)
+                    (when (eq *boot-state* 'complete)
+                      (let ((classoid (class-classoid new-value)))
+                        (setf (find-classoid name) classoid)
+                        (%set-class-type-translation new-value classoid))))
+                   (cell
+                    (%clear-classoid name cell)))
+             (when (or (eq *boot-state* 'complete)
+                       (eq *boot-state* 'braid))
+               (update-ctors 'setf-find-class :class new-value :name name))
+             new-value)))
         (t
          (error "~S is not a legal class name." name))))
 

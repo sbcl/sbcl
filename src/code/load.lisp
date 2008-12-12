@@ -20,7 +20,7 @@
 ;;;; here: certainly enough that I (dan, 2003.1.22) don't want to mess
 ;;;; around deciding how to thread-safetify it.  So we use a Big Lock.
 ;;;; Because this code is mutually recursive with the compiler, we use
-;;;; the *big-compiler-lock*
+;;;; the *world-lock*.
 
 ;;;; miscellaneous load utilities
 
@@ -398,7 +398,7 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  (sb!thread:with-recursive-lock (sb!c::*big-compiler-lock*)
+  (with-world-lock ()
     (let* ((*fasl-input-stream* stream)
            (*fasl-symbol-buffer* (make-string 100))
            (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))

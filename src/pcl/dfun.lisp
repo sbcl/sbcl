@@ -187,17 +187,15 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defvar *standard-slot-locations* (make-hash-table :test 'equal))
 
 (defun compute-standard-slot-locations ()
-  (clrhash *standard-slot-locations*)
-  (dolist (class-name *standard-classes*)
-    (let ((class (find-class class-name)))
-      (dolist (slot (class-slots class))
-        (setf (gethash (cons class (slot-definition-name slot))
-                       *standard-slot-locations*)
-              (slot-definition-location slot))))))
+  (let ((new (make-hash-table :test 'equal)))
+    (dolist (class-name *standard-classes*)
+      (let ((class (find-class class-name)))
+        (dolist (slot (class-slots class))
+          (setf (gethash (cons class (slot-definition-name slot)) new)
+                (slot-definition-location slot)))))
+    (setf *standard-slot-locations* new)))
 
-;;; FIXME: harmonize the names between COMPUTE-STANDARD-SLOT-LOCATIONS
-;;; and MAYBE-UPDATE-STANDARD-CLASS-LOCATIONS.
-(defun maybe-update-standard-class-locations (class)
+(defun maybe-update-standard-slot-locations (class)
   (when (and (eq *boot-state* 'complete)
              (memq (class-name class) *standard-classes*))
     (compute-standard-slot-locations)))
