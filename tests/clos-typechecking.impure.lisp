@@ -242,3 +242,49 @@
     (make-instance class :slot :not-a-fixnum))
   (assert (raises-error? (make-my-instance 'my-alt-metaclass-instance-class)
                          type-error)))
+
+(with-test (:name :typecheck-class-allocation)
+    ;; :CLASS slot :INITFORMs are executed at class definition time
+  (assert (raises-error?
+           (eval `(locally (declare (optimize safety))
+                    (defclass class-allocation-test-bad ()
+                      ((slot :initform "slot"
+                             :initarg :slot
+                             :type fixnum
+                             :allocation :class)))))
+           type-error))
+  (let ((name (gensym "CLASS-ALLOCATION-TEST-GOOD")))
+    (eval `(locally (declare (optimize safety))
+             (defclass ,name ()
+               ((slot :initarg :slot
+                      :type (integer 100 200)
+                      :allocation :class)))))
+    (eval
+     `(macrolet ((check (form)
+                   `(assert (multiple-value-bind (ok err)
+                                (ignore-errors ,form)
+                              (and (not ok)
+                                   (typep err 'type-error)
+                                   (equal '(integer 100 200)
+                                          (type-error-expected-type err)))))))
+        (macrolet ((test (form)
+                     `(progn
+                        (check (eval '(locally (declare (optimize safety))
+                                       ,form)))
+                        (check (funcall (compile nil '(lambda ()
+                                                       (declare (optimize safety))
+                                                       ,form))))))
+                   (test-slot (value form)
+                     `(progn
+                        (assert (eql ,value (slot-value (eval ',form) 'slot)))
+                        (assert (eql ,value (slot-value (funcall (compile nil '(lambda () ,form)))
+                                                        'slot))))))
+          (test (make-instance ',name :slot :bad))
+          (assert (not (slot-boundp (make-instance ',name) 'slot)))
+          (let ((* (make-instance ',name :slot 101)))
+            (test-slot 101 *)
+            (test (setf (slot-value * 'slot) (list 1 2 3)))
+            (setf (slot-value * 'slot) 110)
+            (test-slot 110 *))
+          (test-slot 110 (make-instance ',name))
+          (test-slot 111 (make-instance ',name :slot 111)))))))

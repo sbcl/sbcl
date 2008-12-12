@@ -387,6 +387,15 @@
                          (find-class metaclass)))
                     (t *the-class-standard-class*))
               (nreverse reversed-plist)))))
+
+(defun call-initfun (fun slotd safe)
+  (declare (function fun))
+  (let ((value (funcall fun)))
+    (when safe
+      (let ((typecheck (slot-definition-type-check-function slotd)))
+        (when typecheck
+          (funcall (the function typecheck) value))))
+    value))
 
 (defmethod shared-initialize :after
     ((class std-class) slot-names &key
@@ -406,8 +415,8 @@
                      super-class of the class ~S, ~
                      but the meta-classes ~S and ~S are incompatible.  ~
                      Define a method for ~S to avoid this error.~@:>"
-                     superclass class (class-of superclass) (class-of class)
-                     'validate-superclass)))
+                    superclass class (class-of superclass) (class-of class)
+                    'validate-superclass)))
          (setf (slot-value class 'direct-superclasses) direct-superclasses))
         (t
          (setq direct-superclasses (slot-value class 'direct-superclasses))))
@@ -424,6 +433,7 @@
             (plist-value class 'direct-default-initargs)))
   (setf (plist-value class 'class-slot-cells)
         (let ((old-class-slot-cells (plist-value class 'class-slot-cells))
+              (safe (safe-p class))
               (collect '()))
           (dolist (dslotd direct-slots)
             (when (eq :class (slot-definition-allocation dslotd))
@@ -434,9 +444,10 @@
                         (eq t slot-names)
                         (member name slot-names :test #'eq))
                     (let* ((initfunction (slot-definition-initfunction dslotd))
-                           (value (if initfunction
-                                      (funcall initfunction)
-                                      +slot-unbound+)))
+                           (value
+                            (if initfunction
+                                (call-initfun initfunction dslotd safe)
+                                +slot-unbound+)))
                       (push (cons name value) collect))
                     (push old collect)))))
           (nreverse collect)))
@@ -1005,7 +1016,8 @@
   (std-compute-slots class))
 
 (defun std-compute-slots-around (class eslotds)
-  (let ((location -1))
+  (let ((location -1)
+        (safe (safe-p class)))
     (dolist (eslotd eslotds eslotds)
       (setf (slot-definition-location eslotd)
             (case (slot-definition-allocation eslotd)
@@ -1029,10 +1041,12 @@
                                   c))))
                  (aver (consp cell))
                  (if (eq +slot-unbound+ (cdr cell))
-                     ;; We may have inherited an initfunction
+                     ;; We may have inherited an initfunction FIXME: Is this
+                     ;; really right? Is the initialization in
+                     ;; SHARED-INITIALIZE (STD-CLASS) not enough?
                      (let ((initfun (slot-definition-initfunction eslotd)))
                        (if initfun
-                           (rplacd cell (funcall initfun))
+                           (rplacd cell (call-initfun initfun eslotd safe))
                            cell))
                      cell)))))
       (unless (slot-definition-class eslotd)
