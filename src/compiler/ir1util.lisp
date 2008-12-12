@@ -403,15 +403,14 @@
   ;; across components, or an explanation of when they do it. ...in the
   ;; meanwhile AVER that our assumption holds true.
   (aver (or (not component) (eq component (node-component use))))
-  (or (and (combination-p use)
-           (eq (combination-kind use) :known)
-           (awhen (fun-info-stack-allocate-result (combination-fun-info use))
-             (funcall it use dx))
-           t)
+  (or (dx-combination-p use dx)
       (and (cast-p use)
            (not (cast-type-check use))
-           (lvar-good-for-dx-p (cast-value use) dx component)
-           t)))
+           (lvar-good-for-dx-p (cast-value use) dx component))
+      (and (trivial-lambda-var-ref-p use)
+           (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
+             (or (eq use uses)
+                 (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx component))))))
 
 (defun lvar-good-for-dx-p (lvar dx &optional component)
   (let ((uses (lvar-uses lvar)))
@@ -420,6 +419,81 @@
                  (use-good-for-dx-p use dx component))
                uses)
         (use-good-for-dx-p uses dx component))))
+
+(defun known-dx-combination-p (use dx)
+  (and (eq (combination-kind use) :known)
+       (awhen (fun-info-stack-allocate-result (combination-fun-info use))
+         (funcall it use dx))))
+
+(defun dx-combination-p (use dx)
+  (and (combination-p use)
+       (or
+        ;; Known, and can do DX.
+        (known-dx-combination-p use dx)
+        ;; Possibly a not-yet-eliminated lambda which ends up returning the
+        ;; results of an actual known DX combination.
+        (let* ((fun (combination-fun use))
+               (ref (principal-lvar-use fun))
+               (clambda (when (ref-p ref)
+                          (ref-leaf ref)))
+               (creturn (when (lambda-p clambda)
+                          (lambda-return clambda)))
+               (result-use (when (return-p creturn)
+                             (principal-lvar-use (return-result creturn)))))
+          (when result-use
+            (if (known-dx-combination-p result-use dx)
+                (combination-args-flow-cleanly-p use result-use dx)
+                (dx-combination-p result-use dx)))))
+       t))
+
+(defun combination-args-flow-cleanly-p (combination1 combination2 dx)
+  (labels ((recurse (combination)
+             (or (eq combination combination2)
+                 (if (known-dx-combination-p combination dx)
+                     (let ((dest (lvar-dest (combination-lvar combination))))
+                       (and (combination-p dest)
+                            (recurse dest)))
+                     (let* ((fun1 (combination-fun combination))
+                            (ref1 (principal-lvar-use fun1))
+                            (clambda1 (when (ref-p ref1) (ref-leaf ref1))))
+                       (when (lambda-p clambda1)
+                         (dolist (var (lambda-vars clambda1) t)
+                           (dolist (var-ref (lambda-var-refs var))
+                             (let ((dest (lvar-dest (ref-lvar var-ref))))
+                               (unless (and (combination-p dest) (recurse dest))
+                                 (return-from combination-args-flow-cleanly-p nil)))))))))))
+    (recurse combination1)))
+
+(defun trivial-lambda-var-ref-p (use)
+  (and (ref-p use)
+       (let ((var (ref-leaf use)))
+         ;; lambda-var, no SETS
+         (when (and (lambda-var-p var) (not (lambda-var-sets var)))
+           (let ((home (lambda-var-home var))
+                 (refs (lambda-var-refs var)))
+             ;; bound by a system lambda, no other REFS
+             (when (and (lambda-system-lambda-p home)
+                        (eq use (car refs)) (not (cdr refs)))
+               ;; the LAMBDA this var is bound by has only a single REF, going
+               ;; to a combination
+               (let* ((lambda-refs (lambda-refs home))
+                      (primary (car lambda-refs)))
+                 (and (ref-p primary)
+                      (not (cdr lambda-refs))
+                      (combination-p (lvar-dest (ref-lvar primary)))))))))))
+
+(defun trivial-lambda-var-ref-lvar (use)
+  (let* ((this (ref-leaf use))
+         (home (lambda-var-home this)))
+    (multiple-value-bind (fun vars)
+        (values home (lambda-vars home))
+      (let* ((combination (lvar-dest (ref-lvar (car (lambda-refs fun)))))
+             (args (combination-args combination)))
+        (assert (= (length vars) (length args)))
+        (loop for var in vars
+              for arg in args
+              when (eq var this)
+              return arg)))))
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)

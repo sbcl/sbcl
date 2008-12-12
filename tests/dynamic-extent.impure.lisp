@@ -370,6 +370,29 @@
       (setf (car x) nil))
     nil))
 
+(defparameter *bar* nil)
+(declaim (inline make-nested-bad make-nested-good))
+(defstruct (nested (:constructor make-nested-bad (&key bar &aux (bar (setf *bar* bar))))
+                   (:constructor make-nested-good (&key bar)))
+  bar)
+
+(defun-with-dx nested-good (y)
+  (let ((x (list (list (make-nested-good :bar (list (list (make-nested-good :bar (list y)))))))))
+    (declare (dynamic-extent x))
+    (true x)))
+
+(defun-with-dx nested-bad (y)
+  (let ((x (list (list (make-nested-bad :bar (list (list (make-nested-bad :bar (list y)))))))))
+    (declare (dynamic-extent x))
+    (unless (equalp (caar x) (make-nested-good :bar *bar*))
+      (error "got ~S, wanted ~S" (caar x) (make-nested-good :bar *bar*)))
+    (caar x)))
+
+(with-test (:name :conservative-nested-dx)
+  ;; NESTED-BAD should not stack-allocate :BAR due to the SETF.
+  (assert (equalp (nested-bad 42) (make-nested-good :bar *bar*)))
+  (assert (equalp *bar* (list (list (make-nested-bad :bar (list 42)))))))
+
 ;;; multiple uses for dx lvar
 
 (defun-with-dx multiple-dx-uses ()
@@ -455,6 +478,7 @@
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-array-on-stack))
   (assert-no-consing (make-foo1-on-stack 123))
+  (assert-no-consing (nested-good 42))
   (#+raw-instance-init-vops assert-no-consing
    #-raw-instance-init-vops progn
    (make-foo2-on-stack 1.24 1.23d0))
@@ -516,16 +540,17 @@
     (assert (every (lambda (x) (eql x 0)) a))))
 (assert-no-consing (bdowning-2005-iv-16))
 
-
 (defun-with-dx let-converted-vars-dx-allocated-bug (x y z)
   (let* ((a (list x y z))
          (b (list x y z))
          (c (list a b)))
     (declare (dynamic-extent c))
     (values (first c) (second c))))
-(multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
-  (assert (and (equal i j)
-               (equal i (list 1 2 3)))))
+
+(with-test (:name :let-converted-vars-dx-allocated-bug)
+  (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
+    (assert (and (equal i j)
+                 (equal i (list 1 2 3))))))
 
 ;;; workaround for bug 419 -- real issue remains, but check that the
 ;;; bandaid holds.

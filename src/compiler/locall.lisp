@@ -58,8 +58,13 @@
                 (handle-nested-dynamic-extent-lvars dx (cast-value use)))
                (combination
                 (loop for arg in (combination-args use)
-                      when (lvar-good-for-dx-p arg dx)
-                      append (handle-nested-dynamic-extent-lvars dx arg))))))
+                      ;; deleted args show up as NIL here
+                      when (and arg (lvar-good-for-dx-p arg dx))
+                      append (handle-nested-dynamic-extent-lvars dx arg)))
+               (ref
+                (let* ((other (trivial-lambda-var-ref-lvar use)))
+                  (unless (eq other lvar)
+                    (handle-nested-dynamic-extent-lvars dx other)))))))
       (cons lvar
             (if (listp uses)
                 (loop for use in uses
@@ -240,7 +245,8 @@
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
                                    :debug-name (debug-name
-                                                'xep (leaf-debug-name fun)))))
+                                                'xep (leaf-debug-name fun))
+                                   :system-lambda t)))
       (setf (functional-kind res) :external
             (leaf-ever-used res) t
             (functional-entry-fun res) fun
@@ -595,7 +601,8 @@
                (%funcall ,entry ,@args))
             :debug-name (debug-name 'hairy-function-entry
                                     (lvar-fun-debug-name
-                                     (basic-combination-fun call)))))))
+                                     (basic-combination-fun call)))
+            :system-lambda t))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
       (convert-call-if-possible ref (lvar-dest (node-lvar ref))))))

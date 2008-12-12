@@ -1031,7 +1031,8 @@
                                            (functional-lexenv locall-fun))))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
                                     :source-name source-name
-                                    :debug-name (debug-name 'tl-xep debug-name-tail))))
+                                    :debug-name (debug-name 'tl-xep debug-name-tail)
+                                    :system-lambda t)))
       (when name
         (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun

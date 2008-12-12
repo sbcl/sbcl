@@ -68,13 +68,14 @@
 ;;; return the leaf, otherwise return NIL.
 (defun lvar-delayed-leaf (lvar)
   (declare (type lvar lvar))
-  (let ((use (lvar-uses lvar)))
-    (and (ref-p use)
-         (let ((leaf (ref-leaf use)))
-           (etypecase leaf
-             (lambda-var (if (null (lambda-var-sets leaf)) leaf nil))
-             (constant leaf)
-             ((or functional global-var) nil))))))
+  (unless (lvar-dynamic-extent lvar)
+    (let ((use (lvar-uses lvar)))
+      (and (ref-p use)
+           (let ((leaf (ref-leaf use)))
+             (etypecase leaf
+               (lambda-var (if (null (lambda-var-sets leaf)) leaf nil))
+               (constant leaf)
+               ((or functional global-var) nil)))))))
 
 ;;; Annotate a normal single-value lvar. If its only use is a ref that
 ;;; we are allowed to delay the evaluation of, then we mark the lvar

@@ -25,6 +25,7 @@
     compile-time style-warning.
   * bug fix: :ALLOCATION :CLASS slots are type-checked properly
     in safe code. (reported by Didier Verna)
+  * bug fix: #430; nested structure constructors can stack allocate.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

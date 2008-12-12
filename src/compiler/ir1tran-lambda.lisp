@@ -285,7 +285,8 @@
                                 (source-name '.anonymous.)
                                 debug-name
                                 (note-lexical-bindings t)
-                                post-binding-lexenv)
+                                post-binding-lexenv
+                                system-lambda)
   (declare (list body vars aux-vars aux-vals))
 
   ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
@@ -295,7 +296,8 @@
          (lambda (make-lambda :vars vars
                   :bind bind
                   :%source-name source-name
-                  :%debug-name debug-name))
+                  :%debug-name debug-name
+                  :system-lambda-p system-lambda))
          (result-ctran (make-ctran))
          (result-lvar (make-lvar)))
 
@@ -393,24 +395,26 @@
          (fun (collect ((default-bindings)
                         (default-vals))
                 (dolist (default defaults)
-                  (if (constantp default)
+                  (if (sb!xc:constantp default)
                       (default-vals default)
                       (let ((var (gensym)))
                         (default-bindings `(,var ,default))
                         (default-vals var))))
-                (ir1-convert-lambda-body `((let (,@(default-bindings))
-                                             (%funcall ,fun
-                                                       ,@(reverse vals)
-                                                       ,@(default-vals))))
-                                         arg-vars
-                                         ;; FIXME: Would be nice to
-                                         ;; share these names instead
-                                         ;; of consing up several
-                                         ;; identical ones. Oh well.
-                                         :debug-name (debug-name
-                                                      '&optional-processor
-                                                      name)
-                                         :note-lexical-bindings nil))))
+                (let ((bindings (default-bindings))
+                      (call `(%funcall ,fun ,@(reverse vals) ,@(default-vals))))
+                  (ir1-convert-lambda-body (if bindings
+                                               `((let (,@bindings) ,call))
+                                               `(,call))
+                                          arg-vars
+                                          ;; FIXME: Would be nice to
+                                          ;; share these names instead
+                                          ;; of consing up several
+                                          ;; identical ones. Oh well.
+                                          :debug-name (debug-name
+                                                       '&optional-processor
+                                                       name)
+                                          :note-lexical-bindings nil
+                                          :system-lambda t)))))
     (mapc (lambda (var arg-var)
             (when (cdr (leaf-refs arg-var))
               (setf (leaf-ever-used var) t)))
@@ -428,7 +432,8 @@
                                         vars supplied-p-p body
                                         aux-vars aux-vals
                                         source-name debug-name
-                                        force post-binding-lexenv)
+                                        force post-binding-lexenv
+                                        system-lambda)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals))
@@ -448,7 +453,7 @@
                   (list* t arg-name entry-vals)
                   (rest vars) t body aux-vars aux-vals
                   source-name debug-name
-                  force post-binding-lexenv)
+                  force post-binding-lexenv system-lambda)
                  (ir1-convert-hairy-args
                   res
                   (cons arg default-vars)
@@ -457,7 +462,7 @@
                   (cons arg-name entry-vals)
                   (rest vars) supplied-p-p body aux-vars aux-vals
                   source-name debug-name
-                  force post-binding-lexenv))))
+                  force post-binding-lexenv system-lambda))))
 
     ;; We want to delay converting the entry, but there exist
     ;; problems: hidden references should not be established to
@@ -521,8 +526,7 @@
                                  :type (leaf-type var)
                                  :where-from (leaf-where-from var))))
 
-    (let* ((*allow-instrumenting* nil)
-           (n-context (gensym "N-CONTEXT-"))
+    (let* ((n-context (gensym "N-CONTEXT-"))
            (context-temp (make-lambda-var :%source-name n-context))
            (n-count (gensym "N-COUNT-"))
            (count-temp (make-lambda-var :%source-name n-count
@@ -633,7 +637,8 @@
                                ,@(arg-vals))))
                  (arg-vars)
                  :debug-name (debug-name '&more-processor name)
-                 :note-lexical-bindings nil)))
+                 :note-lexical-bindings nil
+                 :system-lambda t)))
         (setf (optional-dispatch-more-entry res)
               (register-entry-point ep res)))))
 
@@ -657,9 +662,9 @@
 ;;; incoming value is NIL, so we must union NULL with the declared
 ;;; type when computing the type for the main entry's argument.
 (defun ir1-convert-more (res default-vars default-vals entry-vars entry-vals
-                             rest more-context more-count keys supplied-p-p
-                             body aux-vars aux-vals
-                             source-name debug-name post-binding-lexenv)
+                         rest more-context more-count keys supplied-p-p
+                         body aux-vars aux-vals source-name debug-name
+                         post-binding-lexenv system-lambda)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals keys body
                  aux-vars aux-vals))
@@ -715,7 +720,8 @@
                         :aux-vars (append (bind-vars) aux-vars)
                         :aux-vals (append (bind-vals) aux-vals)
                         :post-binding-lexenv post-binding-lexenv
-                        :debug-name (debug-name 'varargs-entry name)))
+                        :debug-name (debug-name 'varargs-entry name)
+                        :system-lambda system-lambda))
            (last-entry (convert-optional-entry main-entry default-vars
                                                (main-vals) () name)))
       (setf (optional-dispatch-main-entry res)
@@ -769,7 +775,8 @@
                                vars supplied-p-p body aux-vars
                                aux-vals
                                source-name debug-name
-                               force post-binding-lexenv)
+                               force post-binding-lexenv
+                               system-lambda)
   (declare (type optional-dispatch res)
            (list default-vars default-vals entry-vars entry-vals vars body
                  aux-vars aux-vals))
@@ -781,14 +788,15 @@
                                entry-vars entry-vals
                                nil nil nil vars supplied-p-p body aux-vars
                                aux-vals source-name debug-name
-                               post-binding-lexenv)
+                               post-binding-lexenv system-lambda)
              (let* ((name (or debug-name source-name))
                     (fun (ir1-convert-lambda-body
                          body (reverse default-vars)
                          :aux-vars aux-vars
                          :aux-vals aux-vals
                          :post-binding-lexenv post-binding-lexenv
-                         :debug-name (debug-name 'hairy-arg-processor name))))
+                         :debug-name (debug-name 'hairy-arg-processor name)
+                         :system-lambda system-lambda)))
 
                (setf (optional-dispatch-main-entry res) fun)
                (register-entry-point fun res)
@@ -807,7 +815,7 @@
            (ir1-convert-hairy-args res nvars nvals nvars nvals
                                    (rest vars) nil body aux-vars aux-vals
                                    source-name debug-name
-                                   nil post-binding-lexenv)))
+                                   nil post-binding-lexenv system-lambda)))
         (t
          (let* ((arg (first vars))
                 (info (lambda-var-arg-info arg))
@@ -819,7 +827,8 @@
                          entry-vars entry-vals vars supplied-p-p body
                          aux-vars aux-vals
                          source-name debug-name
-                         force post-binding-lexenv)))
+                         force post-binding-lexenv
+                         system-lambda)))
                 ;; See GENERATE-OPTIONAL-DEFAULT-ENTRY.
                 (push (if (lambda-p ep)
                           (register-entry-point
@@ -839,20 +848,20 @@
                                 arg nil nil (rest vars) supplied-p-p body
                                 aux-vars aux-vals
                                 source-name debug-name
-                                post-binding-lexenv))
+                                post-binding-lexenv system-lambda))
              (:more-context
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil arg (second vars) (cddr vars) supplied-p-p
                                 body aux-vars aux-vals
                                 source-name debug-name
-                                post-binding-lexenv))
+                                post-binding-lexenv system-lambda))
              (:keyword
               (ir1-convert-more res default-vars default-vals
                                 entry-vars entry-vals
                                 nil nil nil vars supplied-p-p body aux-vars
                                 aux-vals source-name debug-name
-                                post-binding-lexenv)))))))
+                                post-binding-lexenv system-lambda)))))))
 
 ;;; This function deals with the case where we have to make an
 ;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
@@ -861,7 +870,7 @@
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals
                                  &key post-binding-lexenv
                                  (source-name '.anonymous.)
-                                 debug-name)
+                                 debug-name system-lambda)
   (declare (list body vars aux-vars aux-vals))
   (aver (or debug-name (neq '.anonymous. source-name)))
   (let ((res (make-optional-dispatch :arglist vars
@@ -876,7 +885,8 @@
     (aver-live-component *current-component*)
     (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
-                            source-name debug-name nil post-binding-lexenv)
+                            source-name debug-name nil post-binding-lexenv
+                            system-lambda)
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
           (+ (1- (length (optional-dispatch-entry-points res))) min))
@@ -885,7 +895,8 @@
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
-                           debug-name maybe-add-debug-catch)
+                           debug-name maybe-add-debug-catch
+                           system-lambda)
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
                     (type-of form)
@@ -899,6 +910,8 @@
     (compiler-error
      "The lambda expression has a missing or non-list lambda list:~%  ~S"
      form))
+  (when (and system-lambda maybe-add-debug-catch)
+    (bug "Both SYSTEM-LAMBDA and MAYBE-ADD-DEBUG-CATCH specified"))
   (unless (or debug-name (neq '.anonymous. source-name))
     (setf debug-name (name-lambdalike form)))
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
@@ -917,19 +930,23 @@
                  (forms (if (eq result-type *wild-type*)
                             forms
                             `((the ,result-type (progn ,@forms)))))
-                 (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
-                          (ir1-convert-hairy-lambda forms vars keyp
-                                                    allow-other-keys
-                                                    aux-vars aux-vals
-                                                    :post-binding-lexenv post-binding-lexenv
-                                                    :source-name source-name
-                                                    :debug-name debug-name)
-                          (ir1-convert-lambda-body forms vars
-                                                   :aux-vars aux-vars
-                                                   :aux-vals aux-vals
-                                                   :post-binding-lexenv post-binding-lexenv
-                                                   :source-name source-name
-                                                   :debug-name debug-name))))
+                 (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
+                 (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
+                             (ir1-convert-hairy-lambda forms vars keyp
+                                                       allow-other-keys
+                                                       aux-vars aux-vals
+                                                       :post-binding-lexenv post-binding-lexenv
+                                                       :source-name source-name
+                                                       :debug-name debug-name
+                                                       :system-lambda system-lambda))
+                            (t
+                             (ir1-convert-lambda-body forms vars
+                                                      :aux-vars aux-vars
+                                                      :aux-vals aux-vals
+                                                      :post-binding-lexenv post-binding-lexenv
+                                                      :source-name source-name
+                                                      :debug-name debug-name
+                                                      :system-lambda system-lambda)))))
         (setf (functional-inline-expansion res) form)
         (setf (functional-arg-documentation res) (cadr form))
         (when (boundp '*lambda-conversions*)
@@ -1045,11 +1062,10 @@
                       ;; like a much more common case.
                       :handled-conditions (lexenv-handled-conditions *lexenv*)
                       :policy (lexenv-policy *lexenv*)))
-           (*allow-instrumenting* (and (not system-lambda)
-                                       *allow-instrumenting*))
            (clambda (ir1-convert-lambda `(lambda ,@body)
                                         :source-name source-name
-                                        :debug-name debug-name)))
+                                        :debug-name debug-name
+                                        :system-lambda system-lambda)))
       (setf (functional-inline-expanded clambda) t)
       clambda)))
 
