@@ -45,4 +45,4 @@
 
 ;;; Return the system page size.
 (defun get-page-size ()
-  sb!c:*backend-page-size*)
+  sb!c:*backend-page-bytes*)

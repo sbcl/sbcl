@@ -201,7 +201,7 @@ os_init(char *argv[], char *envp[])
      * kernel versions on some architectures (for example PPC). FIXME:
      * possibly the same should be done on other architectures too.
      */
-    os_vm_page_size = BACKEND_PAGE_SIZE;
+    os_vm_page_size = BACKEND_PAGE_BYTES;
 
     /* KLUDGE: Disable memory randomization on new Linux kernels
      * by setting a personality flag and re-executing. (We need

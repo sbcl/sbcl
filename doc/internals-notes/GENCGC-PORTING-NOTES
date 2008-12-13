@@ -137,7 +137,7 @@ File: src/code/ppc-vm.lisp
 
 File: src/compiler/ppc/parms.lisp
 
-* Add gencgc-page-size variable. Currently 4096. Bump to 32k later.
+* Add gencgc-page-bytes variable. Currently 4096. Bump to 32k later.
 
 * Added dynamic-space-start and dynamic-space-end constants for linux
   and darwin #!+gencgc. Conditionalized dynamic-0 and dynamic-1
@@ -457,7 +457,7 @@ File: src/compiler/ppc/macros.lisp
 
 File: src/compiler/ppc/parms.lisp
 
-* gencgc-page-size -> 4096
+* gencgc-page-bytes -> 4096
 
 * added pseudo-atomic-interrupted-flag and pseudo-atomic-flag
 

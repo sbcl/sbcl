@@ -10,8 +10,8 @@
   ;; find out whether using exact multiples of the page size actually
   ;; matters in the few places where that's done, or whether we could
   ;; just use 4k everywhere.
-  (setf *backend-page-size* #!+linux 65536 #!-linux 4096))
+  (setf *backend-page-bytes* #!+linux 65536 #!-linux 4096))
 
 ;;; The size in bytes of the GENCGC pages. Should be a multiple of the
 ;;; architecture page size.
-(def!constant gencgc-page-size *backend-page-size*)
+(def!constant gencgc-page-bytes *backend-page-bytes*)

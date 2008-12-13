@@ -507,7 +507,8 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
                 generations[i].num_gc,
                 gen_av_mem_age(i));
     }
-    fprintf(stderr,"   Total bytes allocated=%ld\n", bytes_allocated);
+    fprintf(stderr,"   Total bytes allocated    = %lu\n", bytes_allocated);
+    fprintf(stderr,"   Dynamic-space-size bytes = %lu\n", dynamic_space_size);
 
     fpu_restore(fpu_state);
 }

@@ -19,9 +19,9 @@
 #include "sbcl.h"
 
 #ifdef LISP_FEATURE_GENCGC
-#define PAGE_BYTES GENCGC_PAGE_SIZE
+#define PAGE_BYTES GENCGC_PAGE_BYTES
 #else
-#define PAGE_BYTES BACKEND_PAGE_SIZE
+#define PAGE_BYTES BACKEND_PAGE_BYTES
 #endif
 
 typedef signed long page_index_t;

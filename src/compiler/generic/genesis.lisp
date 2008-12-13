@@ -2667,10 +2667,11 @@ core and return a descriptor to it."
         (when (constantp symbol)
           (let ((name (symbol-name symbol)))
             (labels ( ;; shared machinery
-                     (record (string priority)
+                     (record (string priority suffix)
                        (push (list string
                                    priority
                                    (symbol-value symbol)
+                                   suffix
                                    (documentation symbol 'variable))
                              constants))
                      ;; machinery for old-style CMU CL Lisp-to-C
@@ -2682,7 +2683,8 @@ core and return a descriptor to it."
                                 'simple-string
                                 prefix
                                 (delete #\- (string-capitalize string)))
-                               priority))
+                               priority
+                               ""))
                      (maybe-record-with-munged-name (tail prefix priority)
                        (when (tailwise-equal name tail)
                          (record-with-munged-name prefix
@@ -2691,23 +2693,23 @@ core and return a descriptor to it."
                                                              (length tail)))
                                                   priority)))
                      ;; machinery for new-style SBCL Lisp-to-C naming
-                     (record-with-translated-name (priority)
-                       (record (c-name name) priority))
-                     (maybe-record-with-translated-name (suffixes priority)
+                     (record-with-translated-name (priority large)
+                       (record (c-name name) priority (if large "LU" "")))
+                     (maybe-record-with-translated-name (suffixes priority &key large)
                        (when (some (lambda (suffix)
                                      (tailwise-equal name suffix))
                                    suffixes)
-                         (record-with-translated-name priority))))
-
+                         (record-with-translated-name priority large))))
               (maybe-record-with-translated-name '("-LOWTAG") 0)
-              (maybe-record-with-translated-name '("-WIDETAG") 1)
+              (maybe-record-with-translated-name '("-WIDETAG" "-SHIFT") 1)
               (maybe-record-with-munged-name "-FLAG" "flag_" 2)
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)
               (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
               (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-              (maybe-record-with-translated-name '("-START" "-END" "-SIZE" "-SHIFT") 6)
-              (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 7)
-              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 8))))))
+              (maybe-record-with-translated-name '("-SIZE") 6)
+              (maybe-record-with-translated-name '("-START" "-END" "-PAGE-BYTES") 7 :large t)
+              (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 8)
+              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 9))))))
     ;; KLUDGE: these constants are sort of important, but there's no
     ;; pleasing way to inform the code above about them.  So we fake
     ;; it for now.  nikodemus on #lisp (2004-08-09) suggested simply
@@ -2721,6 +2723,7 @@ core and return a descriptor to it."
       (push (list (c-symbol-name c)
                   -1                    ; invent a new priority
                   (symbol-value c)
+                  ""
                   nil)
             constants))
     ;; One more symbol that doesn't fit into the code above.
@@ -2728,6 +2731,7 @@ core and return a descriptor to it."
       (push (list (c-symbol-name c)
                   9
                   (symbol-value c)
+                  "LU"
                   nil)
             constants))
     (setf constants
@@ -2738,33 +2742,13 @@ core and return a descriptor to it."
                       (< (second const1) (second const2))))))
     (let ((prev-priority (second (car constants))))
       (dolist (const constants)
-        (destructuring-bind (name priority value doc) const
+        (destructuring-bind (name priority value suffix doc) const
           (unless (= prev-priority priority)
             (terpri)
             (setf prev-priority priority))
-          (format t "#define ~A " name)
-          (format t
-                  ;; KLUDGE: We're dumping two different kinds of
-                  ;; values here, (1) small codes and (2) machine
-                  ;; addresses. The small codes can be dumped as bare
-                  ;; integer values. The large machine addresses might
-                  ;; cause problems if they're large and represented
-                  ;; as (signed) C integers, so we want to force them
-                  ;; to be unsigned by appending an U to the
-                  ;; literal. We can't dump all the values using the
-                  ;; literal-U syntax, since the assembler doesn't
-                  ;; support that syntax and some of the small
-                  ;; constants can be used in assembler files.
-                  (let ( ;; cutoff for treatment as a small code
-                        (cutoff (expt 2 16)))
-                    (cond ((minusp value)
-                           (error "stub: negative values unsupported"))
-                          ((< value cutoff)
-                           "~D")
-                          (t
-                           "~DU")))
-                  value)
-          (format t " /* 0x~X */~@[  /* ~A */~]~%" value doc))))
+          (when (minusp value)
+            (error "stub: negative values unsupported"))
+          (format t "#define ~A ~A~A /* 0x~X ~@[ -- ~A ~]*/~%" name value suffix value doc))))
     (terpri))
 
   ;; writing information about internal errors
@@ -2782,7 +2766,7 @@ core and return a descriptor to it."
   ;; I'm not really sure why this is in SB!C, since it seems
   ;; conceptually like something that belongs to SB!VM. In any case,
   ;; it's needed C-side.
-  (format t "#define BACKEND_PAGE_SIZE ~DU~%" sb!c:*backend-page-size*)
+  (format t "#define BACKEND_PAGE_BYTES ~DLU~%" sb!c:*backend-page-bytes*)
 
   (terpri)
 
@@ -2977,17 +2961,17 @@ initially undefined function references:~2%")
   (force-output *core-file*)
   (file-position *core-file*
                  (round-up (file-position *core-file*)
-                           sb!c:*backend-page-size*)))
+                           sb!c:*backend-page-bytes*)))
 
 (defun output-gspace (gspace)
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
          (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
-         (pages (ceiling bytes sb!c:*backend-page-size*))
-         (total-bytes (* pages sb!c:*backend-page-size*)))
+         (pages (ceiling bytes sb!c:*backend-page-bytes*))
+         (total-bytes (* pages sb!c:*backend-page-bytes*)))
 
     (file-position *core-file*
-                   (* sb!c:*backend-page-size* (1+ *data-page*)))
+                   (* sb!c:*backend-page-bytes* (1+ *data-page*)))
     (format t
             "writing ~S byte~:P [~S page~:P] from ~S~%"
             total-bytes
@@ -3017,7 +3001,7 @@ initially undefined function references:~2%")
     (write-word (gspace-free-word-index gspace))
     (write-word *data-page*)
     (multiple-value-bind (floor rem)
-        (floor (gspace-byte-address gspace) sb!c:*backend-page-size*)
+        (floor (gspace-byte-address gspace) sb!c:*backend-page-bytes*)
       (aver (zerop rem))
       (write-word floor))
     (write-word pages)

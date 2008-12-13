@@ -185,7 +185,7 @@
         ;; stack guard pages.
         (values-subtypep (lvar-derived-type words)
                          (load-time-value
-                          (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-size*
+                          (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-bytes*
                                                              sb!vm:n-word-bytes)
                                                           sb!vm:vector-data-offset)))))))
 

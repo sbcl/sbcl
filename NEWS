@@ -28,6 +28,8 @@
   * bug fix: :ALLOCATION :CLASS slots are type-checked properly
     in safe code. (reported by Didier Verna)
   * bug fix: #430; nested structure constructors can stack allocate.
+  * bug fix: on some 64-bit platforms dynamic space size was truncated
+    to #xffff0000 bytes. (reported by Benjamin Lambert)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

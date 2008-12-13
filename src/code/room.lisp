@@ -214,7 +214,7 @@
               ;; will be a short. On platforms with larger ones, it'll
               ;; be an int.
               (bytes-used (unsigned
-                           #.(if (typep sb!vm:gencgc-page-size
+                           #.(if (typep sb!vm:gencgc-page-bytes
                                         '(unsigned-byte 16))
                                  16
                                  32)))
@@ -259,7 +259,7 @@
                    (maybe-skip-page ()
                      #!+gencgc
                      (when (eq space :dynamic)
-                       (loop with page-mask = #.(1- sb!vm:gencgc-page-size)
+                       (loop with page-mask = #.(1- sb!vm:gencgc-page-bytes)
                              for addr of-type sb!vm:word = (sap-int current)
                              while (>= addr skip-tests-until-addr)
                              do
@@ -291,7 +291,7 @@
                                    (return-from maybe-skip-page))
                                  ;; Move CURRENT to start of next page.
                                  (setf current (int-sap (+ (logandc2 addr page-mask)
-                                                           sb!vm:gencgc-page-size)))
+                                                           sb!vm:gencgc-page-bytes)))
                                  (maybe-finish-mapping))))))
                    (maybe-map (obj obj-tag n-obj-bytes &optional (ok t))
                      (let ((next (typecase n-obj-bytes

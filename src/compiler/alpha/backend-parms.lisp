@@ -25,5 +25,4 @@
 
 ;;; XXX the C runtime gets page size using getpagesize() - can't we
 ;;; look at that instead of hardcoding it here too?
-(setf *backend-page-size* 8192)
-
+(setf *backend-page-bytes* 8192)

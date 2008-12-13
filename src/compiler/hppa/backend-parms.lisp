@@ -3,5 +3,4 @@
 (def!constant +backend-fasl-file-implementation+ :hppa)
 (setf *backend-register-save-penalty* 3)
 (setf *backend-byte-order* :big-endian)
-(setf *backend-page-size* 4096)
-
+(setf *backend-page-bytes* 4096)

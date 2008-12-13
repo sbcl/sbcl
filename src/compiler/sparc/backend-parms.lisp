@@ -23,5 +23,5 @@
 
 (setf *backend-byte-order* :big-endian)
 
-(setf *backend-page-size* 8192)
+(setf *backend-page-bytes* 8192)
 

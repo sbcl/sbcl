@@ -33,7 +33,7 @@
 ;;; compatible systems to return different values for getpagesize().
 ;;; -- JES, 2007-01-06
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf *backend-page-size* 4096))
+  (setf *backend-page-bytes* 4096))
 ;;; comment from CMU CL:
 ;;;
 ;;;   in case we ever wanted to do this for Windows NT..
@@ -43,8 +43,8 @@
 ;;;   page size is 512, but that doesn't do us a whole lot of good.
 ;;;   Effectively, the page size is 64K.
 ;;;
-;;;   would be: (setf *backend-page-size* 65536)
+;;;   would be: (setf *backend-page-bytes* 65536)
 
 ;;; The size in bytes of the GENCGC pages. Should be a multiple of the
 ;;; architecture code size.
-(def!constant gencgc-page-size *backend-page-size*)
+(def!constant gencgc-page-bytes *backend-page-bytes*)
