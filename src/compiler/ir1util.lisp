@@ -440,11 +440,9 @@
                           (lambda-return clambda)))
                (result-use (when (return-p creturn)
                              (principal-lvar-use (return-result creturn)))))
-          (when result-use
-            (if (known-dx-combination-p result-use dx)
-                (combination-args-flow-cleanly-p use result-use dx)
-                (dx-combination-p result-use dx)))))
-       t))
+          ;; FIXME: We should be able to deal with multiple uses here as well.
+          (and (dx-combination-p result-use dx)
+               (combination-args-flow-cleanly-p use result-use dx))))))
 
 (defun combination-args-flow-cleanly-p (combination1 combination2 dx)
   (labels ((recurse (combination)
