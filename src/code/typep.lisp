@@ -178,20 +178,27 @@
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
 (defun classoid-typep (obj-layout classoid object)
   (declare (optimize speed))
-  (with-world-lock ()
-    (multiple-value-bind (obj-layout layout)
-        (do ((layout (classoid-layout classoid) (classoid-layout classoid))
-             (i 0 (+ i 1))
-             (obj-layout obj-layout))
-            ((and (not (layout-invalid obj-layout))
-                  (not (layout-invalid layout)))
-             (values obj-layout layout))
-          (aver (< i 2))
-          (when (layout-invalid obj-layout)
-            (setq obj-layout (update-object-layout-or-invalid object layout)))
-          (%ensure-classoid-valid classoid layout))
-      (let ((obj-inherits (layout-inherits obj-layout)))
-        (or (eq obj-layout layout)
-            (dotimes (i (length obj-inherits) nil)
-              (when (eq (svref obj-inherits i) layout)
-                (return t))))))))
+  ;; FIXME & KLUDGE: We could like to grab the *WORLD-LOCK* here (to ensure that
+  ;; class graph doesn't change while we're doing the typep test), but in
+  ;; pratice that causes trouble -- deadlocking against the compiler
+  ;; if compiler output (or macro, or compiler-macro expansion) causes
+  ;; another thread to do stuff. Not locking is a shoddy bandaid as it is remains
+  ;; easy to trigger the same problem using a different code path -- but in practice
+  ;; locking here makes Slime unusable with :SPAWN in post *WORLD-LOCK* world. So...
+  ;; -- NS 2008-12-16
+  (multiple-value-bind (obj-layout layout)
+      (do ((layout (classoid-layout classoid) (classoid-layout classoid))
+           (i 0 (+ i 1))
+           (obj-layout obj-layout))
+          ((and (not (layout-invalid obj-layout))
+                (not (layout-invalid layout)))
+           (values obj-layout layout))
+        (aver (< i 2))
+        (when (layout-invalid obj-layout)
+          (setq obj-layout (update-object-layout-or-invalid object layout)))
+        (%ensure-classoid-valid classoid layout))
+    (let ((obj-inherits (layout-inherits obj-layout)))
+      (or (eq obj-layout layout)
+          (dotimes (i (length obj-inherits) nil)
+            (when (eq (svref obj-inherits i) layout)
+              (return t)))))))
