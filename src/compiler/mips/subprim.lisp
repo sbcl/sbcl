@@ -28,7 +28,7 @@
       (inst beq ptr null-tn done)
       (inst and temp ptr lowtag-mask)
       (inst xor temp list-pointer-lowtag)
-      (inst bne temp zero-tn not-list)
+      (inst bne temp not-list)
       (inst nop)
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)

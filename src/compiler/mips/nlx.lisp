@@ -155,7 +155,7 @@
     (cond ((zerop nvals))
           ((= nvals 1)
            (let ((no-values (gen-label)))
-             (inst beq count zero-tn no-values)
+             (inst beq count no-values)
              (move (tn-ref-tn values) null-tn t)
              (loadw (tn-ref-tn values) start)
              (emit-label no-values)))
@@ -168,7 +168,7 @@
                      (tn (tn-ref-tn tn-ref)))
                  (defaults (cons default-lab tn))
 
-                 (inst beq count zero-tn default-lab)
+                 (inst beq count default-lab)
                  (inst addu count count (fixnumize -1))
                  (sc-case tn
                           ((descriptor-reg any-reg)
@@ -222,7 +222,7 @@
       (sc-case new-start
         (any-reg (move new-start dst))
         (control-stack (store-stack-tn new-start dst)))
-      (inst beq num zero-tn done)
+      (inst beq num done)
       (inst nop)
       (sc-case new-count
         (any-reg (move new-count num))
@@ -234,7 +234,7 @@
       (inst addu src src n-word-bytes)
       (inst addu num num (fixnumize -1))
       (storew temp dst)
-      (inst bne num zero-tn loop)
+      (inst bne num loop)
       (inst addu dst dst n-word-bytes)
 
       (emit-label done)

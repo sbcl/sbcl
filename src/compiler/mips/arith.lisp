@@ -227,7 +227,7 @@
     (inst bgez amount positive)
     (inst subu ndesc zero-tn amount)
     (inst slt temp ndesc 32)
-    (inst bne temp zero-tn done)
+    (inst bne temp done)
     (inst srl result number ndesc)
     (inst b done)
     (move result zero-tn t)
@@ -253,7 +253,7 @@
     (inst bgez amount positive)
     (inst subu ndesc zero-tn amount)
     (inst slt temp ndesc 31)
-    (inst bne temp zero-tn done)
+    (inst bne temp done)
     (inst sra result number ndesc)
     (inst b done)
     (inst sra result number 31)
@@ -416,7 +416,7 @@
   (:save-p :compute-only)
   (:generator 11
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
-      (inst beq y zero-tn zero))
+      (inst beq y zero))
     (inst nop)
     (inst div x y)
     (inst mflo temp)
@@ -432,7 +432,7 @@
   (:save-p :compute-only)
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
-      (inst beq y zero-tn zero))
+      (inst beq y zero))
     (inst nop)
     (inst divu x y)
     (inst mflo q)
@@ -447,7 +447,7 @@
   (:save-p :compute-only)
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
-      (inst beq y zero-tn zero))
+      (inst beq y zero))
     (inst nop)
     (inst div x y)
     (inst mflo q)
@@ -531,8 +531,8 @@
              (inst slt temp x y)
              (inst sltu temp x y))
          (if not-p
-             (inst beq temp zero-tn target)
-             (inst bne temp zero-tn target))))
+             (inst beq temp target)
+             (inst bne temp target))))
   (inst nop))
 
 (define-conditional-vop >
@@ -546,15 +546,15 @@
                (inst slt temp x y)
                (inst sltu temp x y))
            (if not-p
-               (inst bne temp zero-tn target)
-               (inst beq temp zero-tn target))))
+               (inst bne temp target)
+               (inst beq temp target))))
         (t
          (if signed
              (inst slt temp y x)
              (inst sltu temp y x))
          (if not-p
-             (inst beq temp zero-tn target)
-             (inst bne temp zero-tn target))))
+             (inst beq temp target)
+             (inst bne temp target))))
   (inst nop))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a

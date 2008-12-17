@@ -202,8 +202,8 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:signed
         (inst slt temp x y)))
      (if not-p
-         (inst beq temp zero-tn target)
-         (inst bne temp zero-tn target)))
+         (inst beq temp target)
+         (inst bne temp target)))
     (:gt
      (ecase flavor
        (:unsigned
@@ -211,8 +211,8 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:signed
         (inst slt temp y x)))
      (if not-p
-         (inst beq temp zero-tn target)
-         (inst bne temp zero-tn target))))
+         (inst beq temp target)
+         (inst bne temp target))))
   (inst nop))
 
 

@@ -1171,7 +1171,7 @@ default-value-8
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
-      (inst beq count zero-tn done)
+      (inst beq count done)
       (move result null-tn t)
 
       ;; We need to do this atomically.
@@ -1199,7 +1199,7 @@ default-value-8
 
         ;; Dec count, and if != zero, go back for more.
         (inst addu count count (fixnumize -1))
-        (inst bne count zero-tn loop)
+        (inst bne count loop)
 
         ;; Store the value in the car (in delay slot)
         (storew temp dst 0 list-pointer-lowtag)
@@ -1248,7 +1248,7 @@ default-value-8
     (let ((err-lab
            (generate-error-code vop invalid-arg-count-error nargs)))
       (cond ((zerop count)
-             (inst bne nargs zero-tn err-lab)
+             (inst bne nargs err-lab)
              (inst nop))
             (t
              (inst li temp (fixnumize count))

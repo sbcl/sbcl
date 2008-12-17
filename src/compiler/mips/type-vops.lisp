@@ -16,15 +16,15 @@
   (assemble ()
     (inst and temp value fixnum-tag-mask)
     (if not-p
-        (inst bne temp zero-tn target)
-        (inst beq temp zero-tn target))
+        (inst bne temp target)
+        (inst beq temp target))
     (inst nop)))
 
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
       (inst and temp value fixnum-tag-mask)
-      (inst beq temp zero-tn (if not-p drop-through target)))
+      (inst beq temp (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
                    :drop-through drop-through :temp temp)))
 
@@ -33,8 +33,8 @@
     (inst and temp value widetag-mask)
     (inst xor temp immediate)
     (if not-p
-        (inst bne temp zero-tn target)
-        (inst beq temp zero-tn target))
+        (inst bne temp target)
+        (inst beq temp target))
     (inst nop)))
 
 (defun %test-lowtag (value target not-p lowtag &key temp)
@@ -42,8 +42,8 @@
     (inst and temp value lowtag-mask)
     (inst xor temp lowtag)
     (if not-p
-        (inst bne temp zero-tn target)
-        (inst beq temp zero-tn target))
+        (inst bne temp target)
+        (inst beq temp target))
     (inst nop)))
 
 (defun %test-headers (value target not-p function-p headers
@@ -71,9 +71,9 @@
                 (setf delta header)
                 (if last
                     (if not-p
-                        (inst bne temp zero-tn target)
-                        (inst beq temp zero-tn target))
-                    (inst beq temp zero-tn when-true)))
+                        (inst bne temp target)
+                        (inst beq temp target))
+                    (inst beq temp when-true)))
                (t
                 (let ((start (car header))
                       (end (cdr header)))
@@ -151,16 +151,16 @@
           (values target not-target))
     (assemble ()
       (inst and temp value fixnum-tag-mask)
-      (inst beq temp zero-tn yep)
+      (inst beq temp yep)
       (inst and temp value lowtag-mask)
       (inst xor temp other-pointer-lowtag)
-      (inst bne temp zero-tn nope)
+      (inst bne temp nope)
       (inst nop)
       (loadw temp value 0 other-pointer-lowtag)
       (inst xor temp (+ (ash 1 n-widetag-bits) bignum-widetag))
       (if not-p
-          (inst bne temp zero-tn target)
-          (inst beq temp zero-tn target))
+          (inst bne temp target)
+          (inst beq temp target))
       (inst nop)))
   (values))
 
@@ -189,27 +189,27 @@
     (assemble ()
       ;; Is it a fixnum?
       (inst and temp value fixnum-tag-mask)
-      (inst beq temp zero-tn fixnum)
+      (inst beq temp fixnum)
       (move temp value t)
 
       ;; If not, is it an other pointer?
       (inst and temp value lowtag-mask)
       (inst xor temp other-pointer-lowtag)
-      (inst bne temp zero-tn nope)
+      (inst bne temp nope)
       (inst nop)
       ;; Get the header.
       (loadw temp value 0 other-pointer-lowtag)
       ;; Is it one?
       (inst xor temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst beq temp zero-tn single-word)
+      (inst beq temp single-word)
       ;; If it's other than two, we can't be an (unsigned-byte 32)
       (inst xor temp (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
                              (+ (ash 2 n-widetag-bits) bignum-widetag)))
-      (inst bne temp zero-tn nope)
+      (inst bne temp nope)
       ;; Get the second digit.
       (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
-      (inst beq temp zero-tn yep)
+      (inst beq temp yep)
       (inst nop)
       (inst b nope)
 

@@ -48,9 +48,8 @@
   (:generator 1
     (move src last-preserved-ptr)
     (move dest last-nipped-ptr)
-    (move temp zero-tn)
     (inst sltu temp src csp-tn)
-    (inst beq temp zero-tn DONE)
+    (inst beq temp DONE)
     (inst nop) ; not strictly necessary
     LOOP
     (loadw temp src)
@@ -58,7 +57,7 @@
     (inst add src src n-word-bytes)
     (storew temp dest -1)
     (inst sltu temp src csp-tn)
-    (inst bne temp zero-tn LOOP)
+    (inst bne temp LOOP)
     (inst nop)
     DONE
     (move csp-tn dest)
@@ -134,7 +133,7 @@
     (storew temp csp-tn -1)
     (inst and ndescr list lowtag-mask)
     (inst xor ndescr list-pointer-lowtag)
-    (inst beq ndescr zero-tn loop)
+    (inst beq ndescr loop)
     (inst nop)
     (error-call vop bogus-arg-to-values-list-error list)
 
@@ -162,7 +161,7 @@
       (any-reg
        (inst addu src context skip)))
     (move count num)
-    (inst beq num zero-tn done)
+    (inst beq num done)
     (move start csp-tn t)
     (move dst csp-tn)
     (inst addu csp-tn count)

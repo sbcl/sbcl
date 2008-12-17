@@ -72,7 +72,7 @@
     (let ((error (generate-error-code vop invalid-array-index-error
                                       array bound index)))
       (inst sltu temp index bound)
-      (inst beq temp zero-tn error)
+      (inst beq temp error)
       (inst nop)
       (move result index))))
 

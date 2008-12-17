@@ -60,7 +60,7 @@
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop unbound-symbol-error obj-temp)))
       (inst xor temp value unbound-marker-widetag)
-      (inst beq temp zero-tn err-lab)
+      (inst beq temp err-lab)
       (inst nop))))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
@@ -78,8 +78,8 @@
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst xor temp value unbound-marker-widetag)
     (if not-p
-        (inst beq temp zero-tn target)
-        (inst bne temp zero-tn target))
+        (inst beq temp target)
+        (inst bne temp target))
     (inst nop)))
 
 (define-vop (fast-symbol-value cell-ref)
@@ -136,7 +136,7 @@
       (load-type type function (- fun-pointer-lowtag))
       (inst nop)
       (inst xor type simple-fun-header-widetag)
-      (inst beq type zero-tn normal-fn)
+      (inst beq type normal-fn)
       (inst addu lip function
             (- (ash simple-fun-code-offset word-shift)
                fun-pointer-lowtag))
@@ -203,7 +203,7 @@
 
       (emit-label loop)
       (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst beq symbol zero-tn skip)
+      (inst beq symbol skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (storew value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
