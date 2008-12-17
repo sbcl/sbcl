@@ -637,6 +637,11 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
 ;;; handle the Unix-style EOF-is-end-of-process convention.
 (defun repl-read-form-fun (in out)
   (declare (type stream in out) (ignore out))
+  ;; KLUDGE: *READ-SUPPRESS* makes the REPL useless, and cannot be
+  ;; recovered from -- flip it here.
+  (when *read-suppress*
+    (warn "Setting *READ-SUPPRESS* to NIL to restore toplevel usability.")
+    (setf *read-suppress* nil))
   (let* ((eof-marker (cons nil nil))
          (form (read in nil eof-marker)))
     (if (eq form eof-marker)

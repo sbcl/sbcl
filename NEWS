@@ -30,6 +30,8 @@
   * bug fix: #430; nested structure constructors can stack allocate.
   * bug fix: on some 64-bit platforms dynamic space size was truncated
     to #xffff0000 bytes. (reported by Benjamin Lambert)
+  * bug fix: setting *READ-SUPPRESS* to T no longer renders the default
+    REPL unusable. (reported by Daniel Herring)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
