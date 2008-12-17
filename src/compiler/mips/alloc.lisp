@@ -85,7 +85,7 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:temporary (:sc non-descriptor-reg :offset nl0-offset) bytes)
+  (:temporary (:sc non-descriptor-reg) bytes)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
   (:policy :fast-safe)
@@ -107,8 +107,8 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:temporary (:sc non-descriptor-reg :offset nl0-offset) bytes)
-  (:temporary (:sc non-descriptor-reg :offset nl1-offset) temp)
+  (:temporary (:sc non-descriptor-reg) bytes)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
   (:policy :fast-safe)

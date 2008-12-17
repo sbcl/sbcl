@@ -703,7 +703,7 @@ default-value-8
          '((:temporary (:scs (non-descriptor-reg)) temp)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
-     (:temporary (:sc interior-reg :offset lip-offset) entry-point)
+     (:temporary (:sc interior-reg) entry-point)
 
      (:generator ,(+ (if named 5 0)
                      (if variable 19 1)

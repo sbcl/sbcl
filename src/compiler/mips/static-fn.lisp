@@ -10,7 +10,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg)) move-temp)
   (:temporary (:sc descriptor-reg :offset lra-offset) lra)
-  (:temporary (:sc interior-reg :offset lip-offset) entry-point)
+  (:temporary (:sc interior-reg) entry-point)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) ocfp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
