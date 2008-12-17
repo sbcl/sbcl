@@ -17,19 +17,22 @@
 (define-vop (move-to-character)
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (character-reg)))
+  (:note "character untagging")
   (:generator 1
     (inst srl y x n-widetag-bits)))
+
 (define-move-vop move-to-character :move
   (any-reg descriptor-reg) (character-reg))
-
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-character)
   (:args (x :scs (character-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character tagging")
   (:generator 1
     (inst sll y x n-widetag-bits)
-    (inst or y y character-widetag)))
+    (inst or y character-widetag)))
+
 (define-move-vop move-from-character :move
   (character-reg) (any-reg descriptor-reg))
 
@@ -40,10 +43,12 @@
             :load-if (not (location= x y))))
   (:results (y :scs (character-reg)
                :load-if (not (location= x y))))
+  (:note "character move")
   (:effects)
   (:affected)
   (:generator 0
     (move y x)))
+
 (define-move-vop character-move :move
   (character-reg) (character-reg))
 
@@ -54,12 +59,14 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y character-reg))))
   (:results (y))
+  (:note "character arg move")
   (:generator 0
     (sc-case y
       (character-reg
        (move y x))
       (character-stack
        (storew x fp (tn-offset y))))))
+
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
@@ -77,7 +84,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst sll res ch 2)))
+    (inst sll res ch n-fixnum-tag-bits)))
 
 (define-vop (code-char)
   (:translate code-char)
@@ -87,11 +94,9 @@
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (inst srl res code 2)))
-
+    (inst srl res code n-fixnum-tag-bits)))
 
 ;;; Comparison of characters.
-;;;
 (define-vop (character-compare)
   (:args (x :scs (character-reg))
          (y :scs (character-reg)))
