@@ -636,7 +636,7 @@
 (progn
 
 ;;; Handle monotonic functions of a single variable whose domain is
-;;; possibly part of the real line. ARG is the variable, FCN is the
+;;; possibly part of the real line. ARG is the variable, FUN is the
 ;;; function, and DOMAIN is a specifier that gives the (real) domain
 ;;; of the function. If ARG is a subset of the DOMAIN, we compute the
 ;;; bounds directly. Otherwise, we compute the bounds for the
@@ -647,8 +647,8 @@
 ;;; DOMAIN-LOW and DOMAIN-HIGH.
 ;;;
 ;;; DEFAULT-LOW and DEFAULT-HIGH are the lower and upper bounds if we
-;;; can't compute the bounds using FCN.
-(defun elfun-derive-type-simple (arg fcn domain-low domain-high
+;;; can't compute the bounds using FUN.
+(defun elfun-derive-type-simple (arg fun domain-low domain-high
                                      default-low default-high
                                      &optional (increasingp t))
   (declare (type (or null real) domain-low domain-high))
@@ -672,9 +672,9 @@
                  ;; Process the intersection.
                  (let* ((low (interval-low intersection))
                         (high (interval-high intersection))
-                        (res-lo (or (bound-func fcn (if increasingp low high))
+                        (res-lo (or (bound-func fun (if increasingp low high))
                                     default-low))
-                        (res-hi (or (bound-func fcn (if increasingp high low))
+                        (res-hi (or (bound-func fun (if increasingp high low))
                                     default-high))
                         (format (case (numeric-type-class arg)
                                   ((integer rational) 'single-float)
@@ -1253,7 +1253,7 @@
 ;;; inputs are union types.
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
-(defun trig-derive-type-aux (arg domain fcn
+(defun trig-derive-type-aux (arg domain fun
                                  &optional def-lo def-hi (increasingp t))
   (etypecase arg
     (numeric-type
@@ -1274,8 +1274,8 @@
               ;; exactly the same way as the functions themselves do
               ;; it.
               (if (csubtypep arg domain)
-                  (let ((res-lo (bound-func fcn (numeric-type-low arg)))
-                        (res-hi (bound-func fcn (numeric-type-high arg))))
+                  (let ((res-lo (bound-func fun (numeric-type-low arg)))
+                        (res-hi (bound-func fun (numeric-type-high arg))))
                     (unless increasingp
                       (rotatef res-lo res-hi))
                     (make-numeric-type

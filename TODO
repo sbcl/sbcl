@@ -133,8 +133,7 @@ MISC CLEANUPS
    * miscellaneous simple refactoring
 	* belated renaming:
 		** rename %PRIMITIVE to %VOP
-		** A few hundred things named FN and FCN should be
-			named FUN
+		** A few hundred things named FN should be named FUN
 	* These days ANSI C has inline functions, so..
 		** redo many cpp macros as inline functions:
 			HeaderValue, Pointerp, CEILING, ALIGNED_SIZE,
