@@ -294,7 +294,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset n-word-bytes)
     (inst addu lip offset object)
@@ -315,7 +315,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset n-word-bytes)
     (inst addu lip offset object)
@@ -336,7 +336,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset n-word-bytes)
     (inst addu lip offset object)
@@ -357,7 +357,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset n-word-bytes)
     (inst addu lip offset object)
@@ -379,7 +379,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 2 n-word-bytes))
     (inst addu lip offset object)
@@ -408,7 +408,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 2 n-word-bytes))
     (inst addu lip offset object)
@@ -438,7 +438,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 2 n-word-bytes))
     (inst addu lip offset object)
@@ -467,7 +467,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 2 n-word-bytes))
     (inst addu lip offset object)
@@ -503,7 +503,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 4 n-word-bytes))
     (inst addu lip offset object)
@@ -566,7 +566,7 @@
   (:generator 5
     (loadw offset object 0 instance-pointer-lowtag)
     (inst srl offset n-widetag-bits)
-    (inst sll offset 2)
+    (inst sll offset n-fixnum-tag-bits)
     (inst subu offset index)
     (inst subu offset (* 4 n-word-bytes))
     (inst addu lip offset object)
