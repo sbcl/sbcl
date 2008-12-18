@@ -421,16 +421,7 @@
 ;;; writing looong lines. takes way too long and way too much space
 ;;; to test on 64 bit platforms
 #-#.(cl:if (cl:= sb-vm:n-word-bits 64) '(and) '(or))
-(progn
-  (defun write-n-chars (n stream)
-    (format t "~&/writing ~D chars on a single line~%" n)
-    (finish-output t)
-    (loop repeat n
-       do (write-char #\x stream))
-    (terpri stream)
-    n)
-
-  (let ((test "long-lines-write-test.tmp"))
+(let ((test "long-lines-write-test.tmp"))
     (unwind-protect
          (with-open-file (f test
                             :direction :output
@@ -438,9 +429,20 @@
                             :element-type 'character
                             :if-does-not-exist :create
                             :if-exists :supersede)
-         (write-n-chars (+ most-positive-fixnum 7) f))
+           (let* ((n (truncate most-positive-fixnum 16))
+                  (m 18)
+                  (p (* n m))
+                  (buffer (make-string n)))
+             (dotimes (i m)
+               (write-char #\.)
+               (finish-output)
+               (write-sequence buffer f))
+             (assert (= p (sb-impl::fd-stream-char-pos f)))
+             (write-char #\! f)
+             (assert (= (+ 1 p) (sb-impl::fd-stream-char-pos f)))
+             (assert (typep p 'bignum))))
       (when (probe-file test)
-        (delete-file test)))))
+        (delete-file test))))
 
 ;;; read-sequence misreported the amount read and lost position
 (let ((string (make-array (* 3 sb-impl::+ansi-stream-in-buffer-length+)
@@ -516,5 +518,13 @@
                 (handler-case
                     (read-line f)
                   (sb-int:closed-stream-error () :faa))))))
+
+(with-test (:name :regression-1.0.12.22)
+  (with-open-file (s "stream.impure.lisp" :direction :input)
+    (let ((buffer (make-string 20)))
+      (assert (= 2 (read-sequence buffer s :start 0 :end 2)))
+      (assert (= 3 (read-sequence buffer s :start 2 :end 3)))
+      (file-position s :end)
+      (assert (= 3 (read-sequence buffer s :start 3))))))
 
 ;;; success

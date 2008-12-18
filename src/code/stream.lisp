@@ -2021,14 +2021,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                              (refill-buffer))
                      (done-with-fast-read-char)
                      (return-from ansi-stream-read-string-from-frc-buffer
-                       read)))))
+                       (+ start read))))))
         (declare (inline refill-buffer))
         (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
                    (refill-buffer))
           ;; EOF had been reached before we read anything
           ;; at all. Return the EOF value or signal the error.
           (done-with-fast-read-char)
-          (return-from ansi-stream-read-string-from-frc-buffer 0))
+          (return-from ansi-stream-read-string-from-frc-buffer start))
         (loop (add-chunk))))))
 
 
