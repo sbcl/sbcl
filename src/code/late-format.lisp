@@ -483,8 +483,10 @@
         `(format-print-integer stream ,(expand-next-arg) ,colonp ,atsignp
                                ,base ,mincol ,padchar ,commachar
                                ,commainterval))
-      `(write ,(expand-next-arg) :stream stream :base ,base :radix nil
-              :escape nil)))
+      `(let ((*print-base* ,base)
+             (*print-radix* nil)
+             (*print-escape* nil))
+         (output-object ,(expand-next-arg) stream))))
 
 (def-format-directive #\D (colonp atsignp params)
   (expand-format-integer 10 colonp atsignp params))

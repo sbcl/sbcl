@@ -3816,7 +3816,7 @@
 ;;; error messages, and those don't need to be particularly fast.
 #+sb-xc
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
-                      :policy (> speed space))
+                      :policy (>= speed space))
   (unless (constant-lvar-p control)
     (give-up-ir1-transform "The control string is not a constant."))
   (let ((arg-names (make-gensym-list (length args))))
@@ -3824,15 +3824,13 @@
        (declare (ignore control))
        (format dest (formatter ,(lvar-value control)) ,@arg-names))))
 
-(deftransform format ((stream control &rest args) (stream function &rest t) *
-                      :policy (> speed space))
+(deftransform format ((stream control &rest args) (stream function &rest t))
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (stream control ,@arg-names)
        (funcall control stream ,@arg-names)
        nil)))
 
-(deftransform format ((tee control &rest args) ((member t) function &rest t) *
-                      :policy (> speed space))
+(deftransform format ((tee control &rest args) ((member t) function &rest t))
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (tee control ,@arg-names)
        (declare (ignore tee))

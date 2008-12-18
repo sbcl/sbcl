@@ -290,7 +290,10 @@
            params
          (format-print-integer stream (next-arg) colonp atsignp ,base mincol
                                padchar commachar commainterval))
-       (write (next-arg) :stream stream :base ,base :radix nil :escape nil)))
+       (let ((*print-base* ,base)
+             (*print-radix* nil)
+             (*print-escape* nil))
+         (output-object (next-arg) stream))))
 
 (def-format-interpreter #\D (colonp atsignp params)
   (interpret-format-integer 10))

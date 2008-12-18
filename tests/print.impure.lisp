@@ -414,7 +414,8 @@
 (assert (string= (format nil (formatter "~:C") #\a) "a"))
 
 ;;; This used to trigger an AVER instead.
-(assert (raises-error? (format t "~>") sb-format:format-error))
+(assert (raises-error? (eval '(formatter "~>")) sb-format:format-error))
+(assert (raises-error? (eval '(format t "~>")) sb-format:format-error))
 
 ;;; readably printing hash-tables, check for circularity
 (let ((x (cons 1 2))
