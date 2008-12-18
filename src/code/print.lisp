@@ -129,6 +129,27 @@
 
 ;;;; routines to print objects
 
+
+;;; keyword variables shared by WRITE and WRITE-TO-STRING, and
+;;; the bindings they map to.
+(eval-when (:compile-toplevel :load-toplevel)
+  (defvar *printer-keyword-variables*
+    '(:escape *print-escape*
+      :radix *print-radix*
+      :base *print-base*
+      :circle *print-circle*
+      :pretty *print-pretty*
+      :level *print-level*
+      :length *print-length*
+      :case *print-case*
+      :array *print-array*
+      :gensym *print-gensym*
+      :readably *print-readably*
+      :right-margin *print-right-margin*
+      :miser-width *print-miser-width*
+      :lines *print-lines*
+      :pprint-dispatch *print-pprint-dispatch*)))
+
 (defun write (object &key
                      ((:stream stream) *standard-output*)
                      ((:escape *print-escape*) *print-escape*)
@@ -153,6 +174,32 @@
   "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*"
   (output-object object (out-synonym-of stream))
   object)
+
+;;; Optimize common case of constant keyword arguments
+(define-compiler-macro write (&whole form object &rest keys)
+  (let (bind ignore)
+    (do ()
+        ((not (cdr keys))
+         ;; Odd number of keys, punt
+         (when keys
+           (return-from write form)))
+      (let* ((key (pop keys))
+             (value (pop keys))
+             (variable (or (getf *printer-keyword-variables* key)
+                           (when (eq :stream key)
+                             'stream)
+                           (return-from write form))))
+        (when (assoc variable bind)
+          ;; First key has precedence, but we still need to execute the
+          ;; argument, and in the right order.
+          (setf variable (gensym "IGNORE"))
+          (push variable ignore))
+        (push (list variable value) bind)))
+    (unless (assoc 'stream bind)
+      (push (list 'stream '*standard-output*) bind))
+    `(let ,(nreverse bind)
+       ,@(when ignore `((declare (ignore ,@ignore))))
+       (output-object ,object stream))))
 
 (defun prin1 (object &optional stream)
   #!+sb-doc
@@ -192,26 +239,50 @@
   (values))
 
 (defun write-to-string
-       (object &key
-               ((:escape *print-escape*) *print-escape*)
-               ((:radix *print-radix*) *print-radix*)
-               ((:base *print-base*) *print-base*)
-               ((:circle *print-circle*) *print-circle*)
-               ((:pretty *print-pretty*) *print-pretty*)
-               ((:level *print-level*) *print-level*)
-               ((:length *print-length*) *print-length*)
-               ((:case *print-case*) *print-case*)
-               ((:array *print-array*) *print-array*)
-               ((:gensym *print-gensym*) *print-gensym*)
-               ((:readably *print-readably*) *print-readably*)
-               ((:right-margin *print-right-margin*) *print-right-margin*)
-               ((:miser-width *print-miser-width*) *print-miser-width*)
-               ((:lines *print-lines*) *print-lines*)
-               ((:pprint-dispatch *print-pprint-dispatch*)
-                *print-pprint-dispatch*))
+    (object &key
+            ((:escape *print-escape*) *print-escape*)
+            ((:radix *print-radix*) *print-radix*)
+            ((:base *print-base*) *print-base*)
+            ((:circle *print-circle*) *print-circle*)
+            ((:pretty *print-pretty*) *print-pretty*)
+            ((:level *print-level*) *print-level*)
+            ((:length *print-length*) *print-length*)
+            ((:case *print-case*) *print-case*)
+            ((:array *print-array*) *print-array*)
+            ((:gensym *print-gensym*) *print-gensym*)
+            ((:readably *print-readably*) *print-readably*)
+            ((:right-margin *print-right-margin*) *print-right-margin*)
+            ((:miser-width *print-miser-width*) *print-miser-width*)
+            ((:lines *print-lines*) *print-lines*)
+            ((:pprint-dispatch *print-pprint-dispatch*)
+             *print-pprint-dispatch*))
   #!+sb-doc
   "Return the printed representation of OBJECT as a string."
   (stringify-object object))
+
+;;; Optimize common case of constant keyword arguments
+(define-compiler-macro write-to-string (&whole form object &rest keys)
+  (let (bind ignore)
+    (do ()
+        ((not (cdr keys))
+         ;; Odd number of keys, punt
+         (when keys
+           (return-from write-to-string form)))
+      (let* ((key (pop keys))
+             (value (pop keys))
+             (variable (or (getf *printer-keyword-variables* key)
+                           (return-from write-to-string form))))
+        (when (assoc variable bind)
+          ;; First key has precedence, but we still need to execute the
+          ;; argument, and in the right order.
+          (setf variable (gensym "IGNORE"))
+          (push variable ignore))
+        (push (list variable value) bind)))
+    (if bind
+        `(let ,(nreverse bind)
+           ,@(when ignore `((declare (ignore ,@ignore))))
+           (stringify-object ,object))
+        `(stringify-object ,object))))
 
 (defun prin1-to-string (object)
   #!+sb-doc
