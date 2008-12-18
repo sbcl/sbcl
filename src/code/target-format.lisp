@@ -485,62 +485,69 @@
     (format-fixed stream (next-arg) w d k ovf pad atsignp)))
 
 (defun format-fixed (stream number w d k ovf pad atsign)
-  (if (numberp number)
-      (if (floatp number)
-          (format-fixed-aux stream number w d k ovf pad atsign)
-          (if (rationalp number)
-              (format-fixed-aux stream
-                                (coerce number 'single-float)
-                                w d k ovf pad atsign)
-              (format-write-field stream
-                                  (decimal-string number)
-                                  w 1 0 #\space t)))
-      (format-princ stream number nil nil w 1 0 pad)))
+  (typecase number
+    (float
+     (format-fixed-aux stream number w d k ovf pad atsign))
+    (rational
+     (format-fixed-aux stream (coerce number 'single-float)
+                       w d k ovf pad atsign))
+    (number
+     (format-write-field stream (decimal-string number) w 1 0 #\space t))
+    (t
+     (format-princ stream number nil nil w 1 0 pad))))
 
 ;;; We return true if we overflowed, so that ~G can output the overflow char
 ;;; instead of spaces.
 (defun format-fixed-aux (stream number w d k ovf pad atsign)
   (declare (type float number))
   (cond
-   ((and (floatp number)
-         (or (float-infinity-p number)
-             (float-nan-p number)))
-    (prin1 number stream)
-    nil)
-   (t
-    (let ((spaceleft w))
-      (when (and w (or atsign (minusp (float-sign number))))
-        (decf spaceleft))
-      (multiple-value-bind (str len lpoint tpoint)
-          (sb!impl::flonum-to-string (abs number) spaceleft d k)
-        ;;if caller specifically requested no fraction digits, suppress the
-        ;;optional trailing zero
-        (when (and d (zerop d)) (setq tpoint nil))
-        (when w
-          (decf spaceleft len)
-          ;;optional leading zero
-          (when lpoint
-            (if (or (> spaceleft 0) tpoint) ;force at least one digit
-                (decf spaceleft)
-                (setq lpoint nil)))
-          ;;optional trailing zero
-          (when tpoint
-            (if (> spaceleft 0)
-                (decf spaceleft)
-                (setq tpoint nil))))
-        (cond ((and w (< spaceleft 0) ovf)
-               ;;field width overflow
-               (dotimes (i w) (write-char ovf stream))
-               t)
-              (t
-               (when w (dotimes (i spaceleft) (write-char pad stream)))
-               (if (minusp (float-sign number))
-                   (write-char #\- stream)
-                   (if atsign (write-char #\+ stream)))
-               (when lpoint (write-char #\0 stream))
-               (write-string str stream)
-               (when tpoint (write-char #\0 stream))
-               nil)))))))
+    ((or (float-infinity-p number)
+         (float-nan-p number))
+     (prin1 number stream)
+     nil)
+    (t
+     (sb!impl::string-dispatch (single-float double-float)
+         number
+       (let ((spaceleft w))
+         (when (and w (or atsign (minusp (float-sign number))))
+           (decf spaceleft))
+         (multiple-value-bind (str len lpoint tpoint)
+             (sb!impl::flonum-to-string (abs number) spaceleft d k)
+           ;; if caller specifically requested no fraction digits, suppress the
+           ;; optional trailing zero
+           (when (and d (zerop d))
+             (setq tpoint nil))
+           (when w
+             (decf spaceleft len)
+             ;; optional leading zero
+             (when lpoint
+               (if (or (> spaceleft 0) tpoint) ;force at least one digit
+                   (decf spaceleft)
+                   (setq lpoint nil)))
+             ;; optional trailing zero
+             (when tpoint
+               (if (> spaceleft 0)
+                   (decf spaceleft)
+                   (setq tpoint nil))))
+           (cond ((and w (< spaceleft 0) ovf)
+                  ;; field width overflow
+                  (dotimes (i w)
+                    (write-char ovf stream))
+                  t)
+                 (t
+                  (when w
+                    (dotimes (i spaceleft)
+                      (write-char pad stream)))
+                  (if (minusp (float-sign number))
+                      (write-char #\- stream)
+                      (when atsign
+                        (write-char #\+ stream)))
+                  (when lpoint
+                    (write-char #\0 stream))
+                  (write-string str stream)
+                  (when tpoint
+                    (write-char #\0 stream))
+                  nil))))))))
 
 (def-format-interpreter #\E (colonp atsignp params)
   (when colonp

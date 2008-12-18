@@ -4,7 +4,7 @@
   * new feature: the system now signals a continuable error if standard
     readtable modification is attempted.
   * optimization: faster generic arithmetic dispatch on x86 and x86-64.
-  * optimization: unmodified FORMAT ~D is now approximately 5% faster.
+  * optimization: FORMAT ~D and ~F are now approximately 5% faster.
   * tradeoff: constant FORMAT control strings are now compiled unless
     SPACE > SPEED (previously only when SPEED > SPACE.)
   * bug fix: Red Hat Enterprise 3 mmap randomization workaround. (thanks
