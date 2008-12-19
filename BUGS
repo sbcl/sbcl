@@ -77,13 +77,6 @@ WORKAROUND:
   Such code should compile without complaint and work correctly either
   on SBCL or on any other completely compliant Common Lisp system.
 
-  b: &AUX argument in a boa-constructor without a default value means
-     "do not initilize this slot" and does not cause type error. But
-     an error may be signalled at read time and it would be good if
-     SBCL did it.
-
-  d: (fixed in 0.8.1.5)
-
 33:
   And as long as we're wishing, it would be awfully nice if INSPECT could
   also report on closures, telling about the values of the bound variables.

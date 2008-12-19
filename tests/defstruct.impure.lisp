@@ -1049,3 +1049,15 @@ redefinition."
       (assert (raw-slot/circle-subst-p struct))
       (assert (eql 2.7158911 (raw-slot/circle-subst-x struct)))
       (assert (eql 45 n)))))
+
+(defstruct (bug-3b (:constructor make-bug-3b (&aux slot)))
+  (slot nil :type string))
+
+(with-test (:name :bug-3b)
+  (handler-case
+      (progn
+        (bug-3b-slot (make-bug-3b))
+        (error "fail"))
+    (type-error (e)
+      (assert (eq 'string (type-error-expected-type e)))
+      (assert (zerop (type-error-datum e))))))
