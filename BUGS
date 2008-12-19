@@ -841,14 +841,6 @@ WORKAROUND:
 
   (fixed in 0.8.2.51, but a test case would be good)
 
-276:
-  b. The same as in a., but using MULTIPLE-VALUE-SETQ instead of SETQ.
-  c. (defvar *faa*)
-     (defmethod faa ((*faa* double-float))
-           (set '*faa* (when (< *faa* 0) (- *faa*)))
-           (1+ *faa*))
-     (faa 1d0) => type error
-
 279: type propagation error -- correctly inferred type goes astray?
   In sbcl-0.8.3 and sbcl-0.8.1.47, the warning
        The binding of ABS-FOO is a (VALUES (INTEGER 0 0)

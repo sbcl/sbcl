@@ -590,6 +590,12 @@ bootstrapping.
   (setf (gdefinition 'make-method-lambda)
         (symbol-function 'real-make-method-lambda)))
 
+(defun declared-specials (declarations)
+  (loop for (declare . specifiers) in declarations
+        append (loop for specifier in specifiers
+                     when (eq 'special (car specifier))
+                     append (cdr specifier))))
+
 (defun make-method-lambda-internal (proto-gf proto-method method-lambda env)
   (declare (ignore proto-gf proto-method))
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
@@ -641,9 +647,12 @@ bootstrapping.
                   ;; KLUDGE: when I tried moving these to
                   ;; ADD-METHOD-DECLARATIONS, things broke.  No idea
                   ;; why.  -- CSR, 2004-06-16
-                  ,@(mapcar #'parameter-specializer-declaration-in-defmethod
-                            parameters
-                            specializers)))
+                  ,@(let ((specials (declared-specials declarations)))
+                      (mapcar (lambda (par spec)
+                                (parameter-specializer-declaration-in-defmethod
+                                 par spec specials env))
+                              parameters
+                              specializers))))
                (method-lambda
                 ;; Remove the documentation string and insert the
                 ;; appropriate class declarations. The documentation
@@ -799,8 +808,12 @@ bootstrapping.
         (symbol-function 'real-unparse-specializer-using-class)))
 
 ;;; a helper function for creating Python-friendly type declarations
-;;; in DEFMETHOD forms
-(defun parameter-specializer-declaration-in-defmethod (parameter specializer)
+;;; in DEFMETHOD forms.
+;;;
+;;; We're too lazy to cons up a new environment for this, so we just pass in
+;;; the list of locally declared specials in addition to the old environment.
+(defun parameter-specializer-declaration-in-defmethod
+    (parameter specializer specials env)
   (cond ((and (consp specializer)
               (eq (car specializer) 'eql))
          ;; KLUDGE: ANSI, in its wisdom, says that
@@ -853,16 +866,10 @@ bootstrapping.
          '(ignorable))
         ((typep specializer 'eql-specializer)
          `(type (eql ,(eql-specializer-object specializer)) ,parameter))
-        ((var-globally-special-p parameter)
-         ;; KLUDGE: Don't declare types for global special variables
-         ;; -- our rebinding magic for SETQ cases don't work right
-         ;; there.
-         ;;
-         ;; FIXME: It would be better to detect the SETQ earlier and
-         ;; skip declarations for specials only when needed, not
-         ;; always.
-         ;;
-         ;; --NS 2004-10-14
+        ((or (var-special-p parameter env) (member parameter specials))
+         ;; Don't declare types for special variables -- our rebinding magic
+         ;; for SETQ cases don't work right there as SET, (SETF SYMBOL-VALUE),
+         ;; etc. make things undecidable.
          '(ignorable))
         (t
          ;; Otherwise, we can usually make Python very happy.

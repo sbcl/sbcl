@@ -146,7 +146,7 @@
                     (slot-boundp 'boundp)))
             (var (extract-the var-form))
             (slot-name (constant-form-value slot-name-form env)))
-        (when (symbolp var)
+        (when (and (symbolp var) (not (var-special-p var env)))
           (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
                  (parameter-or-nil (car (memq (or rebound? var)
                                               required-parameters))))

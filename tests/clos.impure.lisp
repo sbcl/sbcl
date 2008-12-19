@@ -1647,5 +1647,32 @@
   (defgeneric foo-slot (x y z))
   (defclass foo ()
     ((slot :accessor foo-slot-value))))
+
+;;; SET and (SETF SYMBOL-VALUE) used to confuse permuation vector
+;;; optimizations
+(defclass fih ()
+  ((x :initform :fih)))
+(defclass fah ()
+  ((x :initform :fah)))
+(declaim (special *fih*))
+(defmethod fihfah ((*fih* fih))
+  (set '*fih* (make-instance 'fah))
+  (list (slot-value *fih* 'x)
+        (eval '(slot-value *fih* 'x))))
+(defmethod fihfah ((fah fah))
+  (declare (special fah))
+  (set 'fah (make-instance 'fih))
+  (list (slot-value fah 'x)
+        (eval '(slot-value fah 'x))))
+(with-test (:name :set-of-a-method-specializer)
+  (assert (equal '(:fah :fah) (fihfah (make-instance 'fih))))
+  (assert (equal '(:fih :fih) (fihfah (make-instance 'fah)))))
+
+(defmethod no-implicit-declarations-for-local-specials ((faax double-float))
+  (declare (special faax))
+  (set 'faax (when (< faax 0) (- faax)))
+  faax)
+(with-test (:name :no-implicit-declarations-for-local-specials)
+  (assert (not (no-implicit-declarations-for-local-specials 1.0d0))))
 
 ;;;; success
