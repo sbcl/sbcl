@@ -271,3 +271,20 @@
                                    (when (find-restart 'sb-fasl::object)
                                      (invoke-restart 'sb-fasl::object)))))
       (load-and-assert spec fasl fasl))))
+
+(with-test (:name :bug-332)
+  (flet ((stimulate-sbcl ()
+           (let ((filename (format nil "/tmp/~A.lisp" (gensym))))
+             ;; create a file which redefines a structure incompatibly
+             (with-open-file (f filename :direction :output :if-exists :supersede)
+               (print '(defstruct bug-332 foo) f)
+               (print '(defstruct bug-332 foo bar) f))
+             ;; compile and load the file, then invoke the continue restart on
+             ;; the structure redefinition error
+             (handler-bind ((error (lambda (c) (continue c))))
+               (load (compile-file filename))))))
+    (stimulate-sbcl)
+    (stimulate-sbcl)
+    (stimulate-sbcl)))
+
+

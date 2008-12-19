@@ -1133,25 +1133,6 @@ WORKAROUND:
      in the wrapper, and then to update the instance just run through
      all the old wrappers in order from oldest to newest.
 
-332: "fasl stack inconsistency in structure redefinition"
-  (reported by Tim Daly Jr sbcl-devel 2004-05-06)
-  Even though structure redefinition is undefined by the standard, the
-  following behaviour is suboptimal: running
-    (defun stimulate-sbcl ()
-      (let ((filename (format nil "/tmp/~A.lisp" (gensym))))
-        ;;create a file which redefines a structure incompatibly
-        (with-open-file (f filename :direction :output :if-exists :supersede)
-          (print '(defstruct astruct foo) f)
-          (print '(defstruct astruct foo bar) f))
-        ;;compile and load the file, then invoke the continue restart on
-        ;;the structure redefinition error
-        (handler-bind ((error (lambda (c) (continue c))))
-          (load (compile-file filename)))))
-    (stimulate-sbcl)
-  and choosing the CONTINUE restart yields the message
-    debugger invoked on a SB-INT:BUG in thread 27726:
-      fasl stack not empty when it should be
-
 336: "slot-definitions must retain the generic functions of accessors"
   reported by Tony Martinez:
     (defclass foo () ((bar :reader foo-bar)))
@@ -1396,30 +1377,6 @@ WORKAROUND:
   Expected: ERROR
   Got: #<SB-MOP:STANDARD-DIRECT-SLOT-DEFINITION FOO>
 
-369: unlike-an-intersection behavior of VALUES-TYPE-INTERSECTION
-  In sbcl-0.8.18.2, the identity $(x \cap y \cap y)=(x \cap y)$ 
-  does not hold for VALUES-TYPE-INTERSECTION, even for types which
-  can be intersected exactly, so that ASSERTs fail in this test case:
-    (in-package :cl-user)
-    (let ((types (mapcar #'sb-c::values-specifier-type 
-                         '((values (vector package) &optional)
-                           (values (vector package) &rest t)
-                           (values (vector hash-table) &rest t)
-                           (values (vector hash-table) &optional)
-                           (values t &optional)
-                           (values t &rest t)
-                           (values nil &optional)
-                           (values nil &rest t)
-                           (values sequence &optional)
-                           (values sequence &rest t)
-                           (values list &optional)
-                           (values list &rest t)))))
-       (dolist (x types)
-         (dolist (y types)
-           (let ((i (sb-c::values-type-intersection x y)))
-             (assert (sb-c::type= i (sb-c::values-type-intersection i x)))
-             (assert (sb-c::type= i (sb-c::values-type-intersection i y)))))))
-
 370: reader misbehaviour on large-exponent floats
     (read-from-string "1.0s1000000000000000000000000000000000000000")
   causes the reader to attempt to create a very large bignum (which it
@@ -1456,19 +1413,6 @@ WORKAROUND:
 
 379: TRACE :ENCAPSULATE NIL broken on ppc/darwin
   See commented-out test-case in debug.impure.lisp.
-
-380: Accessor redefinition fails because of old accessor name
-  When redefining an accessor, SB-PCL::FIX-SLOT-ACCESSORS may try to
-  find the generic function named by the old accessor name using
-  ENSURE-GENERIC-FUNCTION and then remove the old accessor's method in
-  the GF. If the old name does not name a function, or if the old name
-  does not name a generic function, no attempt to find the GF or remove
-  any methods is made.
-
-  However, if an unrelated GF with an incompatible lambda list exists,
-  the class redefinition will fail when SB-PCL::REMOVE-READER-METHOD
-  tries to find and remove a method with an incompatible lambda list
-  from the unrelated generic function.
 
 382: externalization unexpectedly changes array simplicity
   COMPILE-FILE and LOAD

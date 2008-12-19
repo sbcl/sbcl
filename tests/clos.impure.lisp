@@ -1639,5 +1639,13 @@
   (handler-bind ((compiler-note #'error))
     (stream-fd sb-sys:*stdin* :output)
     (stream-fd sb-sys:*stdin* :output)))
+
+(with-test (:name :bug-380)
+  (defclass bug-380 ()
+    ((slot :accessor bug380-slot)))
+  (fmakunbound 'foo-slot)
+  (defgeneric foo-slot (x y z))
+  (defclass foo ()
+    ((slot :accessor foo-slot-value))))
 
 ;;;; success
