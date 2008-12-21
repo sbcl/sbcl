@@ -2,7 +2,7 @@
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying
     data vector of an multidimensional SIMPLE-ARRAY.
   * new feature: the system now signals a continuable error if standard
-    readtable modification is attempted.
+    readtable modification is attempted. (thanks to Tobias Rittweiler)
   * optimization: faster generic arithmetic dispatch on x86 and x86-64.
   * optimization: FORMAT ~D and ~F are now approximately 5% faster.
   * tradeoff: constant FORMAT control strings are now compiled unless
@@ -37,7 +37,7 @@
     REPL unusable. (reported by Daniel Herring)
   * bug fix: return values of READ-SEQUENCE did not take :START into
     account on file streams, regressions since 1.0.12.22. (reported by
-    Daniel Herring, patch by Paul Huong)
+    Thomas Russ, patch by Paul Khuong)
   * bug fix: using SET or (SETF SYMBOL-VALUE) to change the value of a
     method specializer used to confuse permuation vector optimization.
   * bug fix: system inserted bogus implicit type declarations for local

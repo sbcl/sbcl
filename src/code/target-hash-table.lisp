@@ -520,22 +520,22 @@ multiple threads accessing the same hash-table without locking."
                                  &body body)
   (declare (type (member :read :write) operation))
   (with-unique-names (body-fun)
-    `(with-concurrent-access-check ,hash-table ,operation
-       (flet ((,body-fun ()
+    `(flet ((,body-fun ()
+              (with-concurrent-access-check ,hash-table ,operation
                 (locally (declare (inline ,@inline))
-                  ,@body)))
-         (if (hash-table-weakness ,hash-table)
-             (sb!thread::with-recursive-system-spinlock
-                 ((hash-table-spinlock ,hash-table) :without-gcing t)
-               (,body-fun))
-             (with-pinned-objects ,pin
-               (if ,synchronized
-                   ;; We use a "system" spinlock here because it is very
-                   ;; slightly faster, as it doesn't re-enable interrupts.
-                   (sb!thread::with-recursive-system-spinlock
-                       ((hash-table-spinlock ,hash-table))
-                     (,body-fun))
-                   (,body-fun))))))))
+                  ,@body))))
+       (if (hash-table-weakness ,hash-table)
+           (sb!thread::with-recursive-system-spinlock
+               ((hash-table-spinlock ,hash-table) :without-gcing t)
+             (,body-fun))
+           (with-pinned-objects ,pin
+             (if ,synchronized
+                 ;; We use a "system" spinlock here because it is very
+                 ;; slightly faster, as it doesn't re-enable interrupts.
+                 (sb!thread::with-recursive-system-spinlock
+                     ((hash-table-spinlock ,hash-table))
+                   (,body-fun))
+                 (,body-fun)))))))
 
 (defun gethash (key hash-table &optional default)
   #!+sb-doc
