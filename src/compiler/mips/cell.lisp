@@ -91,19 +91,17 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:temporary (:scs (any-reg)) temp)
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; cdr slot, so we have to strip off the two low bits to make sure
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
-    ;;
-    ;; wow, MIPS sucks (or I do) -- CSR, 2004-05-20
-    (inst li temp (fixnumize -1))
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst and res temp)))
+    (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
+    (inst srl temp n-fixnum-tag-bits)
+    (inst sll res temp n-fixnum-tag-bits)))
 
 ;;;; Fdefinition (fdefn) objects.
 
