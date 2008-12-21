@@ -237,4 +237,16 @@
                 (declare (optimize speed))
                 (+ x y)))))))
 
+(with-test (:name :bug-238)
+  (let ((sb-ext:*evaluator-mode* :compile))
+    (handler-bind ((sb-ext:compiler-note #'error))
+      (eval '(defclass bug-238 () ()))
+      (eval '(defmethod bug-238 ((x bug-238) (bug-238 bug-238))
+              (call-next-method)))
+      (eval '(handler-case
+              (with-input-from-string (*query-io* "    no")
+                (yes-or-no-p))
+              (simple-type-error () 'error)))
+      t)))
+
 ;;; success

@@ -257,6 +257,16 @@
   `(let ((sb-debug:*show-entry-point-details* ,bool))
      ,@body))
 
+(defun bug-354 (x)
+  (error "XEPs in backtraces: ~S" x))
+
+(with-test (:name :bug-354)
+  (with-details t
+    (assert (not (verify-backtrace (lambda () (bug-354 354))
+                                   '((bug-354 &rest)
+                                     ((sb-c::tl-xep bug-354) &rest))))))
+  (assert (verify-backtrace (lambda () (bug-354 354)) '((bug-354 354)))))
+
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
             :fails-on '(or (and :x86 (or :sunos)) (and :x86-64 :darwin)))

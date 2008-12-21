@@ -758,6 +758,14 @@
 
   (values))
 
+(defun xep-tail-combination-p (node)
+  (and (combination-p node)
+       (let* ((lvar (combination-lvar node))
+              (dest (when (lvar-p lvar) (lvar-dest lvar)))
+              (lambda (when (return-p dest) (return-lambda dest))))
+         (and (lambda-p lambda)
+              (eq :external (lambda-kind lambda))))))
+
 ;;; If NODE doesn't return (i.e. return type is NIL), then terminate
 ;;; the block there, and link it to the component tail.
 ;;;
@@ -783,7 +791,10 @@
     (declare (ignore lvar))
     (unless (or (and (eq node (block-last block)) (eq succ tail))
                 (block-delete-p block))
-      (when (eq (node-derived-type node) *empty-type*)
+      ;; Even if the combination will never return, don't terminate if this
+      ;; is the tail call of a XEP: doing that would inhibit TCO.
+      (when (and (eq (node-derived-type node) *empty-type*)
+                 (not (xep-tail-combination-p node)))
         (cond (ir1-converting-not-optimizing-p
                (cond
                  ((block-last block)

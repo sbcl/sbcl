@@ -340,28 +340,6 @@ WORKAROUND:
   forever, even when it is uninterned and all other references to it
   are lost.
 
-143:
-  (reported by Jesse Bouwman 2001-10-24 through the unfortunately
-  prominent SourceForge web/db bug tracking system, which is 
-  unfortunately not a reliable way to get a timely response from
-  the SBCL maintainers)
-      In the course of trying to build a test case for an 
-    application error, I encountered this behavior: 
-      If you start up sbcl, and then lay on CTRL-C for a 
-    minute or two, the lisp process will eventually say: 
-         %PRIMITIVE HALT called; the party is over. 
-    and throw you into the monitor. If I start up lisp, 
-    attach to the process with strace, and then do the same 
-    (abusive) thing, I get instead: 
-         access failure in heap page not marked as write-protected 
-    and the monitor again. I don't know enough to have the 
-    faintest idea of what is going on here. 
-      This is with sbcl 6.12, uname -a reports: 
-         Linux prep 2.2.19 #4 SMP Tue Apr 24 13:59:52 CDT 2001 i686 unknown 
-  I (WHN) have verified that the same thing occurs on sbcl-0.pre7.141
-  under OpenBSD 2.9 on my X86 laptop. Do be patient when you try it:
-  it took more than two minutes (but less than five) for me.
-
 145:
   a.
   ANSI allows types `(COMPLEX ,FOO) to use very hairy values for
@@ -647,32 +625,6 @@ WORKAROUND:
      about the new argument; consequently, they will not transform
      calls of the form (TYPEP 1 'INTEGER NIL), even though this is
      just as optimizeable as (TYPEP 1 'INTEGER).
-
-238: "REPL compiler overenthusiasm for CLOS code"
-  From the REPL,
-    * (defclass foo () ())
-    * (defmethod bar ((x foo) (foo foo)) (call-next-method))
-  causes approximately 100 lines of code deletion notes.  Some
-  discussion on this issue happened under the title 'Three "interesting"
-  bugs in PCL', resulting in a fix for this oververbosity from the
-  compiler proper; however, the problem persists in the interactor
-  because the notion of original source is not preserved: for the
-  compiler, the original source of the above expression is (DEFMETHOD
-  BAR ((X FOO) (FOO FOO)) (CALL-NEXT-METHOD)), while by the time the
-  compiler gets its hands on the code needing compilation from the REPL,
-  it has been macroexpanded several times.
-
-  A symptom of the same underlying problem, reported by Tony Martinez:
-    * (handler-case
-        (with-input-from-string (*query-io* "    no")
-          (yes-or-no-p))
-      (simple-type-error () 'error))
-    ; in: LAMBDA NIL
-    ;     (SB-KERNEL:FLOAT-WAIT)
-    ; 
-    ; note: deleting unreachable code
-    ; compilation unit finished
-    ;   printed 1 note
 
 242: "WRITE-SEQUENCE suboptimality"
   (observed from clx performance)
@@ -1215,21 +1167,6 @@ WORKAROUND:
  More generally, the debugger internals suffer from excessive x86/non-x86
  conditionalization and OAOOMization: refactoring the common parts would
  be good.
-
-354: XEPs in backtraces
- Under default compilation policy
-   (defun test ()
-     (throw :unknown t))
-   (test)
- Has the XEP for TEST in the backtrace, not the TEST frame itself.
- (sparc and x86 at least)
-
- Since SBCL 0.8.20.1 this is hidden unless *SHOW-ENTRY-POINT-DETAILS*
- is true (instead there appear two TEST frames at least on ppc). The
- underlying cause seems to be that SB-C::TAIL-ANNOTATE will not merge
- the tail-call for the XEP, since Python has by that time proved that
- the function can never return; same happens if the function holds an
- unconditional call to ERROR.
 
 356: PCL corruption
     (reported by Bruno Haible)

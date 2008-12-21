@@ -42,6 +42,9 @@
     method specializer used to confuse permuation vector optimization.
   * bug fix: system inserted bogus implicit type declarations for local
     special variables in DEFMETHOD bodies.
+  * bug fix: #354; duplicated frames in backtraces due to
+    non-tail-call-optimized XEPs to functions with return type NIL
+    have been elimited.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
