@@ -110,20 +110,17 @@
            ;; that slot won't be initialized from its :INITFORM, if any.
            (let ((initfun (slot-definition-initfunction slotd)))
              (if (typep instance 'structure-object)
-                 (when (eq (funcall
-                            ;; not SLOT-VALUE-USING-CLASS, as that
-                            ;; throws an error if the value is the
-                            ;; unbound marker.
-                            (slot-definition-internal-reader-function slotd)
-                            instance)
-                           +slot-unbound+)
+                 ;; We don't have a consistent unbound marker for structure
+                 ;; object slots, and structure object redefinition is not
+                 ;; really supported anyways -- so unconditionally
+                 ;; initializing the slot should be fine.
+                 (when initfun
                    (setf (slot-value-using-class class instance slotd)
-                         (when initfun
-                           (funcall initfun))))
+                         (funcall initfun)))
                  (unless (or (not initfun)
                              (slot-boundp-using-class class instance slotd))
-                  (setf (slot-value-using-class class instance slotd)
-                        (funcall initfun)))))))
+                   (setf (slot-value-using-class class instance slotd)
+                         (funcall initfun)))))))
     (let* ((class (class-of instance))
            (initfn-slotds
             (loop for slotd in (class-slots class)

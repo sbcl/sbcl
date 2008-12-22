@@ -444,7 +444,7 @@
   (let ((constructor (class-defstruct-constructor class)))
     (if constructor
         (funcall constructor)
-        (allocate-standard-instance (class-wrapper class)))))
+        (error "Don't know how to allocate ~S" class))))
 
 ;;; FIXME: It would be nicer to have allocate-instance return
 ;;; uninitialized objects for conditions as well.

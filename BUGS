@@ -1198,52 +1198,6 @@ WORKAROUND:
     (make-instance 'bar)
   ]
 
-357: defstruct inheritance of initforms
-    (reported by Bruno Haible)
-  When defstruct and defclass (with :metaclass structure-class) are mixed,
-  1. some slot initforms are ignored by the DEFSTRUCT generated constructor
-     function, and 
-  2. all slot initforms are ignored by MAKE-INSTANCE. (This can be arguably
-     OK for initforms that were given in a DEFSTRUCT form, but for those
-     given in a DEFCLASS form, I think it qualifies as a bug.)
-  Test case:
-  (defstruct structure02a
-    slot1
-    (slot2 t)
-    (slot3 (floor pi)))
-  (defclass structure02b (structure02a)
-    ((slot4 :initform -44)
-     (slot5)
-     (slot6 :initform t)
-     (slot7 :initform (floor (* pi pi)))
-     (slot8 :initform 88))
-    (:metaclass structure-class))
-  (defstruct (structure02c (:include structure02b (slot8 -88)))
-    slot9 
-    (slot10 t)
-    (slot11 (floor (exp 3))))
-  ;; 1. Form:
-  (let ((a (make-structure02c)))
-    (list (structure02c-slot4 a)
-          (structure02c-slot5 a)
-          (structure02c-slot6 a)
-          (structure02c-slot7 a)))
-  Expected: (-44 nil t 9)
-  Got: (SB-PCL::..SLOT-UNBOUND.. SB-PCL::..SLOT-UNBOUND..
-        SB-PCL::..SLOT-UNBOUND.. SB-PCL::..SLOT-UNBOUND..)
-  ;; 2. Form:
-  (let ((b (make-instance 'structure02c)))
-    (list (structure02c-slot2 b)
-          (structure02c-slot3 b)
-          (structure02c-slot4 b)
-          (structure02c-slot6 b)
-          (structure02c-slot7 b)
-          (structure02c-slot8 b)
-          (structure02c-slot10 b)
-          (structure02c-slot11 b)))
-  Expected: (t 3 -44 t 9 -88 t 20)
-  Got: (0 0 0 0 0 0 0 0)
-
 359: wrong default value for ensure-generic-function's :generic-function-class argument
     (reported by Bruno Haible)
   ANSI CL is silent on this, but the MOP's specification of ENSURE-GENERIC-FUNCTION says:

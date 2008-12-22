@@ -1674,5 +1674,38 @@
   faax)
 (with-test (:name :no-implicit-declarations-for-local-specials)
   (assert (not (no-implicit-declarations-for-local-specials 1.0d0))))
+
+(defstruct bug-357-a
+  slot1
+  (slot2 t)
+  (slot3 (coerce pi 'single-float) :type single-float))
+(defclass bug-357-b (bug-357-a)
+  ((slot2 :initform 't2)
+   (slot4 :initform -44)
+   (slot5)
+   (slot6 :initform t)
+   (slot7 :initform (floor (* pi pi)))
+   (slot8 :initform 88))
+  (:metaclass structure-class))
+(defstruct (bug-357-c (:include bug-357-b (slot8 -88) (slot5 :ok)))
+  slot9
+  (slot10 t)
+  (slot11 (floor (exp 3))))
+(with-test (:name :bug-357)
+  (flet ((slots (x)
+           (list (bug-357-c-slot1 x)
+                 (bug-357-c-slot2 x)
+                 (bug-357-c-slot3 x)
+                 (bug-357-c-slot4 x)
+                 (bug-357-c-slot5 x)
+                 (bug-357-c-slot6 x)
+                 (bug-357-c-slot7 x)
+                 (bug-357-c-slot8 x)
+                 (bug-357-c-slot9 x)
+                 (bug-357-c-slot10 x)
+                 (bug-357-c-slot11 x))))
+    (let ((base (slots (make-bug-357-c))))
+      (assert (equal base (slots (make-instance 'bug-357-c))))
+      (assert (equal base '(nil t2 3.1415927 -44 :ok t 9 -88 nil t 20))))))
 
 ;;;; success

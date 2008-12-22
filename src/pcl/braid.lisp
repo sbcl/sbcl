@@ -85,20 +85,6 @@
           (allocate-standard-funcallable-instance-slots
            wrapper slots-init-p slots-init))
     fin))
-
-(defun allocate-structure-instance (wrapper &optional
-                                            (slots-init nil slots-init-p))
-  (let* ((class (wrapper-class wrapper))
-         (constructor (class-defstruct-constructor class)))
-    (if constructor
-        (let ((instance (funcall constructor))
-              (slots (class-slots class)))
-          (when slots-init-p
-            (dolist (slot slots)
-              (setf (slot-value-using-class class instance slot)
-                    (pop slots-init))))
-          instance)
-        (error "can't allocate an instance of class ~S" (class-name class)))))
 
 ;;;; BOOTSTRAP-META-BRAID
 ;;;;

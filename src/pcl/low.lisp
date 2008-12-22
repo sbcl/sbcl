@@ -305,17 +305,23 @@
 
 ;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
 
-(defun structure-type-included-type-name (type)
-  (let ((include (dd-include (find-defstruct-description type))))
-    (if (consp include)
-        (car include)
-        include)))
-
 (defun structure-type-slot-description-list (type)
-  (nthcdr (length (let ((include (structure-type-included-type-name type)))
-                    (and include
-                         (dd-slots (find-defstruct-description include)))))
-          (dd-slots (find-defstruct-description type))))
+  (let* ((dd (find-defstruct-description type))
+         (include (dd-include dd))
+         (all-slots (dd-slots dd)))
+    (multiple-value-bind (super slot-overrides)
+        (if (consp include)
+            (values (car include) (mapcar #'car (cdr include)))
+            (values include nil))
+      (let ((included-slots
+             (when super
+               (dd-slots (find-defstruct-description super)))))
+        (loop for slot = (pop all-slots)
+              for included-slot = (pop included-slots)
+              while slot
+              when (or (not included-slot)
+                       (member (dsd-name included-slot) slot-overrides :test #'eq))
+              collect slot)))))
 
 (defun structure-slotd-name (slotd)
   (dsd-name slotd))

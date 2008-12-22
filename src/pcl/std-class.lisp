@@ -628,51 +628,59 @@
 (defun make-structure-class-defstruct-form (name direct-slots include)
   (let* ((conc-name (format-symbol *package* "~S structure class " name))
          (constructor (format-symbol *package* "~Aconstructor" conc-name))
-         (defstruct `(defstruct (,name
-                                 ,@(when include
-                                         `((:include ,(class-name include))))
-                                 (:predicate nil)
-                                 (:conc-name ,conc-name)
-                                 (:constructor ,constructor ())
-                                 (:copier nil))
-                      ,@(mapcar (lambda (slot)
-                                  `(,(slot-definition-name slot)
-                                    +slot-unbound+))
-                                direct-slots)))
-         (reader-names (mapcar (lambda (slotd)
-                                 (list 'slot-accessor name
-                                       (slot-definition-name slotd)
-                                       'reader))
-                               direct-slots))
-         (writer-names (mapcar (lambda (slotd)
-                                 (list 'slot-accessor name
-                                       (slot-definition-name slotd)
-                                       'writer))
-                               direct-slots))
-         (readers-init
-           (mapcar (lambda (slotd reader-name)
-                     (let ((accessor
+         (included-name (class-name include))
+         (included-slots
+          (when include
+            (mapcar #'dsd-name (dd-slots (find-defstruct-description included-name)))))
+         (old-slots nil)
+         (new-slots nil)
+         (reader-names nil)
+         (writer-names nil))
+    (dolist (slotd (reverse direct-slots))
+      (let* ((slot-name (slot-definition-name slotd))
+             (initform (slot-definition-initform slotd))
+             (type (slot-definition-type slotd))
+             (desc `(,slot-name ,initform :type ,type)))
+        (push `(slot-accessor ,name ,slot-name reader)
+              reader-names)
+        (push `(slot-accessor ,name ,slot-name writer)
+              writer-names)
+        (if (member slot-name included-slots :test #'eq)
+            (push desc old-slots)
+            (push desc new-slots))))
+    (let* ((defstruct `(defstruct (,name
+                                    ,@(when include
+                                            `((:include ,included-name
+                                                        ,@old-slots)))
+                                    (:constructor ,constructor ())
+                                    (:predicate nil)
+                                    (:conc-name ,conc-name)
+                                    (:copier nil))
+                         ,@new-slots))
+           (readers-init
+            (mapcar (lambda (slotd reader-name)
+                      (let ((accessor
                              (slot-definition-defstruct-accessor-symbol
                               slotd)))
-                       `(defun ,reader-name (obj)
-                         (declare (type ,name obj))
-                         (,accessor obj))))
-                   direct-slots reader-names))
-         (writers-init
-           (mapcar (lambda (slotd writer-name)
-                     (let ((accessor
+                        `(defun ,reader-name (obj)
+                           (declare (type ,name obj))
+                           (,accessor obj))))
+                    direct-slots reader-names))
+           (writers-init
+            (mapcar (lambda (slotd writer-name)
+                      (let ((accessor
                              (slot-definition-defstruct-accessor-symbol
                               slotd)))
-                       `(defun ,writer-name (nv obj)
-                         (declare (type ,name obj))
-                         (setf (,accessor obj) nv))))
-                   direct-slots writer-names))
-         (defstruct-form
-             `(progn
+                        `(defun ,writer-name (nv obj)
+                           (declare (type ,name obj))
+                           (setf (,accessor obj) nv))))
+                    direct-slots writer-names))
+           (defstruct-form
+            `(progn
                ,defstruct
                ,@readers-init ,@writers-init
                (cons nil nil))))
-    (values defstruct-form constructor reader-names writer-names)))
+      (values defstruct-form constructor reader-names writer-names))))
 
 (defun make-defstruct-allocation-function (name)
   ;; FIXME: Why don't we go class->layout->info == dd
