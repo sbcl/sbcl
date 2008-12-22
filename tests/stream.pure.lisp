@@ -332,3 +332,8 @@
                  (read-byte stream))
                (assert (not (listen stream)))))
         (ignore-errors (delete-file listen-testfile-name))))))
+
+(with-test (:name :bug-395)
+  (let ((v (make-array 5 :fill-pointer 0 :element-type 'standard-char)))
+    (format v "foo")
+    (assert (equal (coerce "foo" 'base-string) v))))

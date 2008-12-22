@@ -4073,13 +4073,15 @@
                        (specifier-type (consify element-type)))
                       (t
                        (error "can't understand type ~S~%" element-type))))))
-      (cond ((array-type-p array-type)
-             (get-element-type array-type))
-            ((union-type-p array-type)
-             (apply #'type-union
-                    (mapcar #'get-element-type (union-type-types array-type))))
-            (t
-             *universal-type*)))))
+      (labels ((recurse (type)
+                  (cond ((array-type-p type)
+                         (get-element-type type))
+                        ((union-type-p type)
+                         (apply #'type-union
+                                (mapcar #'recurse (union-type-types type))))
+                        (t
+                         *universal-type*))))
+        (recurse array-type)))))
 
 ;;; Like CMU CL, we use HEAPSORT. However, other than that, this code
 ;;; isn't really related to the CMU CL code, since instead of trying

@@ -2670,3 +2670,8 @@
 (with-test (:name :late-bound-primitive)
   (compile nil `(lambda ()
                   (funcall 'cons 1))))
+
+(with-test (:name :hairy-array-element-type-derivation)
+  (compile nil '(lambda (x)
+                 (declare (type (and simple-string (satisfies array-has-fill-pointer-p)) x))
+                 (array-element-type x))))

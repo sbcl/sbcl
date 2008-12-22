@@ -50,6 +50,11 @@
     and DEFSTRUCT forms :INCLUDEind structure classes defined using
     DEFCLASS :METACLASS STRUCTURE-CLASS now inherit their initforms.
     (reported by Bruno Haible and Stephen Wilson)
+  * bug fix: #395; fill-pointer output streams used now support
+    element-type BASE-CHAR as well.
+  * bug fix: compiler error when attempting to derive return value of
+    ARRAY-ELEMENT-TYPE when the array type was a union of intersection
+    types.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly

@@ -1557,10 +1557,10 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 ;;; the CLM, but they are required for the implementation of
 ;;; WITH-OUTPUT-TO-STRING.
 
-;;; FIXME: need to support (VECTOR BASE-CHAR) and (VECTOR NIL),
-;;; ideally without destroying all hope of efficiency.
+;;; FIXME: need to support (VECTOR NIL), ideally without destroying all hope
+;;; of efficiency.
 (deftype string-with-fill-pointer ()
-  '(and (vector character)
+  '(and (or (vector character) (vector base-char))
         (satisfies array-has-fill-pointer-p)))
 
 (defstruct (fill-pointer-output-stream
@@ -1579,53 +1579,63 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
          (current+1 (1+ current)))
     (declare (fixnum current))
     (with-array-data ((workspace buffer) (start) (end))
-      (declare (type (simple-array character (*)) workspace))
-      (let ((offset-current (+ start current)))
-        (declare (fixnum offset-current))
-        (if (= offset-current end)
-            (let* ((new-length (1+ (* current 2)))
-                   (new-workspace (make-string new-length)))
-              (declare (type (simple-array character (*)) new-workspace))
-              (replace new-workspace workspace
-                       :start2 start :end2 offset-current)
-              (setf workspace new-workspace
-                    offset-current current)
-              (set-array-header buffer workspace new-length
-                                current+1 0 new-length nil))
-            (setf (fill-pointer buffer) current+1))
-        (setf (schar workspace offset-current) character)))
+      (string-dispatch
+          ((simple-array character (*))
+           (simple-array base-char (*)))
+          workspace
+        (let ((offset-current (+ start current)))
+          (declare (fixnum offset-current))
+          (if (= offset-current end)
+              (let* ((new-length (1+ (* current 2)))
+                     (new-workspace
+                      (ecase (array-element-type workspace)
+                        (character (make-string new-length
+                                                :element-type 'character))
+                        (base-char (make-string new-length
+                                                :element-type 'base-char)))))
+                (replace new-workspace workspace :start2 start :end2 offset-current)
+                (setf workspace new-workspace
+                      offset-current current)
+                (set-array-header buffer workspace new-length
+                                  current+1 0 new-length nil))
+              (setf (fill-pointer buffer) current+1))
+          (setf (char workspace offset-current) character))))
     current+1))
 
 (defun fill-pointer-sout (stream string start end)
-  (declare (simple-string string) (fixnum start end))
-  (let* ((string (if (typep string '(simple-array character (*)))
-                     string
-                     (coerce string '(simple-array character (*)))))
-         (buffer (fill-pointer-output-stream-string stream))
-         (current (fill-pointer buffer))
-         (string-len (- end start))
-         (dst-end (+ string-len current)))
-    (declare (fixnum current dst-end string-len))
-    (with-array-data ((workspace buffer) (dst-start) (dst-length))
-      (declare (type (simple-array character (*)) workspace))
-      (let ((offset-dst-end (+ dst-start dst-end))
-            (offset-current (+ dst-start current)))
-        (declare (fixnum offset-dst-end offset-current))
-        (if (> offset-dst-end dst-length)
-            (let* ((new-length (+ (the fixnum (* current 2)) string-len))
-                   (new-workspace (make-string new-length)))
-              (declare (type (simple-array character (*)) new-workspace))
-              (replace new-workspace workspace
-                       :start2 dst-start :end2 offset-current)
-              (setf workspace new-workspace
-                    offset-current current
-                    offset-dst-end dst-end)
-              (set-array-header buffer workspace new-length
-                                dst-end 0 new-length nil))
-            (setf (fill-pointer buffer) dst-end))
-        (replace workspace string
-                 :start1 offset-current :start2 start :end2 end)))
-    dst-end))
+  (declare (fixnum start end))
+  (string-dispatch
+      ((simple-array character (*))
+       (simple-array base-char (*)))
+      string
+    (let* ((buffer (fill-pointer-output-stream-string stream))
+           (current (fill-pointer buffer))
+           (string-len (- end start))
+           (dst-end (+ string-len current)))
+      (declare (fixnum current dst-end string-len))
+      (with-array-data ((workspace buffer) (dst-start) (dst-length))
+        (let ((offset-dst-end (+ dst-start dst-end))
+              (offset-current (+ dst-start current)))
+          (declare (fixnum offset-dst-end offset-current))
+          (if (> offset-dst-end dst-length)
+              (let* ((new-length (+ (the fixnum (* current 2)) string-len))
+                     (new-workspace
+                      (ecase (array-element-type workspace)
+                        (character (make-string new-length
+                                                :element-type 'character))
+                        (base-char (make-string new-length
+                                                :element-type 'base-char)))))
+                (replace new-workspace workspace
+                         :start2 dst-start :end2 offset-current)
+                (setf workspace new-workspace
+                      offset-current current
+                      offset-dst-end dst-end)
+                (set-array-header buffer workspace new-length
+                                  dst-end 0 new-length nil))
+              (setf (fill-pointer buffer) dst-end))
+          (replace workspace string
+                   :start1 offset-current :start2 start :end2 end)))
+      dst-end)))
 
 (defun fill-pointer-misc (stream operation &optional arg1 arg2)
   (declare (ignore arg2))
@@ -1659,8 +1669,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
            (if found
                (- end (the fixnum found))
                current)))))
-     (:element-type (array-element-type
-                     (fill-pointer-output-stream-string stream)))))
+     (:element-type
+      (array-element-type
+       (fill-pointer-output-stream-string stream)))))
 
 ;;;; case frobbing streams, used by FORMAT ~(...~)
 

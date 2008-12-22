@@ -1367,20 +1367,6 @@ WORKAROUND:
     (FOO 1 2)
   gives NO-APPLICABLE-METHOD rather than an argument count error.
 
-395: Unicode and streams
-  One of the remaining problems in SBCL's Unicode support is the lack
-  of generality in certain streams.
-  a. FILL-POINTER-STREAMs: SBCL refuses to write (e.g. using FORMAT)
-     to streams made from strings that aren't character strings with
-     fill-pointers:
-       (let ((v (make-array 5 :fill-pointer 0 :element-type 'standard-char)))
-         (format v "foo")
-         v)
-     should return a non-simple base string containing "foo" but
-     instead errors.
-
-     (reported on sbcl-help by "tichy")
-
 396: block-compilation bug
     (let ((x 1))
       (dotimes (y 10)
