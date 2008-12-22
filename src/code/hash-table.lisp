@@ -95,32 +95,32 @@
 ;; the generational garbage collector needs to know it.
 (defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
 
-(defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
+(defmacro-mundanely with-hash-table-iterator ((name hash-table) &body body)
   #!+sb-doc
-  "WITH-HASH-TABLE-ITERATOR ((function hash-table) &body body)
+  "WITH-HASH-TABLE-ITERATOR ((name hash-table) &body body)
 
-Provides a method of manually looping over the elements of a hash-table.
-FUNCTION is bound to a generator-macro that, within the scope of the
-invocation, returns one or three values. The first value tells whether any
-objects remain in the hash table. When the first value is non-NIL, the second
-and third values are the key and the value of the next object.
+Provides a method of manually looping over the elements of a hash-table. NAME
+is bound to a generator-macro that, within the scope of the invocation,
+returns one or three values. The first value tells whether any objects remain
+in the hash table. When the first value is non-NIL, the second and third
+values are the key and the value of the next object.
 
-Consequences are undefined if HASH-TABLE is mutated during execution
-of BODY, except for changing or removing elements corresponding to the
-current key. The applies to all threads, not just the curren one --
-even for synchronized hash-tables. If the table may be mutated by
-another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
-to protect the WITH-HASH-TABLE-ITERATOR for."
+Consequences are undefined if HASH-TABLE is mutated during execution of BODY,
+except for changing or removing elements corresponding to the current key. The
+applies to all threads, not just the curren one -- even for synchronized
+hash-tables. If the table may be mutated by another thread during iteration,
+use eg. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
+for."
   ;; This essentially duplicates MAPHASH, so any changes here should
   ;; be reflected there as well.
-  (let ((n-function (gensym "WITH-HASH-TABLE-ITERATOR-")))
-    `(let ((,n-function
+  (let ((function (make-symbol (concatenate 'string (symbol-name name) "-FUN"))))
+    `(let ((,function
             (let* ((table ,hash-table)
                    (length (length (hash-table-next-vector table)))
                    (index 1))
               (declare (type index/2 index))
               (labels
-                  ((,function ()
+                  ((,name ()
                      ;; (We grab the table again on each iteration just in
                      ;; case it was rehashed by a PUTHASH.)
                      (let ((kv-vector (hash-table-table table)))
@@ -130,11 +130,11 @@ to protect the WITH-HASH-TABLE-ITERATOR for."
                                (value (aref kv-vector (1+ (* 2 index)))))
                            (incf index)
                            (unless (or (eq key +empty-ht-slot+)
-                                        (eq value +empty-ht-slot+))
+                                       (eq value +empty-ht-slot+))
                              (return (values t key value))))))))
-                #',function))))
-      (macrolet ((,function () '(funcall ,n-function)))
-        ,@body))))
+                #',name))))
+       (macrolet ((,name () '(funcall ,function)))
+         ,@body))))
 
 (defmacro-mundanely with-locked-hash-table ((hash-table) &body body)
   #!+sb-doc
