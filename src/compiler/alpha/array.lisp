@@ -22,7 +22,7 @@
   (:temporary (:scs (non-descriptor-reg)) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
-    (inst addq rank (+ (* array-dimensions-offset n-word-bytes)
+    (inst addq rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
                        lowtag-mask)
           bytes)
     (inst li (lognot lowtag-mask) header)

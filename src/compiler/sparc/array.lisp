@@ -24,7 +24,8 @@
   (:generator 0
     (pseudo-atomic ()
       (inst or header alloc-tn other-pointer-lowtag)
-      (inst add ndescr rank (* (1+ array-dimensions-offset) n-word-bytes))
+      (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
+                               lowtag-mask))
       (inst andn ndescr 4)
       (inst add alloc-tn ndescr)
       (inst add ndescr rank (fixnumize (1- array-dimensions-offset)))
