@@ -239,7 +239,12 @@
              (inst or result csp-tn lowtag)
              (inst addu csp-tn (pad-data-block words)))
             (t
-             (inst or result alloc-tn lowtag)))
+             ;; The pseudo-atomic bit in alloc-tn is set.  If the
+             ;; lowtag also has a 1 bit in the same position, we're all
+             ;; set.  Otherwise, we need to subtract the pseudo-atomic
+             ;; bit.
+             (inst or result alloc-tn (if (logbitp 0 lowtag) lowtag
+                                                             (1- lowtag)))))
       (when type
         (inst li temp (logior (ash (1- words) n-widetag-bits) type))
         (storew temp result 0 lowtag)))))
