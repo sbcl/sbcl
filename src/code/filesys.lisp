@@ -198,6 +198,10 @@
 
 (/show0 "filesys.lisp 498")
 
+;; TODO: the implementation !enumerate-matches is some hairy stuff
+;; that we mostly don't need.  Couldn't we use POSIX fts(3) to walk
+;; the file system and PATHNAME-MATCH-P to select matches, at least on
+;; Unices?
 (defmacro !enumerate-matches ((var pathname &optional result
                                    &key (verify-existence t)
                                    (follow-links t))
@@ -504,6 +508,14 @@
 ;;;   As realpath(3) is not atomic anyway, we only ever call it when
 ;;;   we think a file exists, so just be careful when rewriting this
 ;;;   routine.
+;;;
+;;; Given a pathname designator, some quality to query for, return one
+;;; of a pathname, a universal time, or a string (a file-author), or
+;;; NIL.  QUERY-FOR may be one of :TRUENAME, :EXISTENCE, :WRITE-DATE,
+;;; :AUTHOR.  If ERRORP is false, return NIL in case the file system
+;;; returns an error code; otherwise, signal an error.  Accepts
+;;; logical pathnames, too (but never returns LPNs).  For internal
+;;; use.
 (defun query-file-system (pathspec query-for &optional (errorp t))
   (let ((pathname (translate-logical-pathname
                    (merge-pathnames
@@ -526,6 +538,14 @@
           (declare (ignore ino nlink gid rdev size atime))
           (if existsp
               (case query-for
+                (:existence (nth-value
+                             0
+                             (parse-native-namestring
+                              filename
+                              (pathname-host pathname)
+                              (sane-default-pathname-defaults)
+                              :as-directory (eql (logand mode sb!unix:s-ifmt)
+                                                 sb!unix:s-ifdir))))
                 (:truename (nth-value
                             0
                             (parse-native-namestring
@@ -563,6 +583,11 @@
                              linkp)
                     (return-from query-file-system
                       (case query-for
+                        (:existence
+                         ;; We do this reparse so as to return a
+                         ;; normalized pathname.
+                         (parse-native-namestring
+                          filename (pathname-host pathname)))
                         (:truename
                          ;; So here's a trick: since lstat succeded,
                          ;; FILENAME exists, so its directory exists and
@@ -914,18 +939,19 @@ system."
                                            (car one) (car two)) x))
                         (intersect-directory-helper (cdr one) (cdr two)))))))))
 
-(defun directory (pathname &key)
+(defun directory (pathname &key (resolve-symlinks t))
   #!+sb-doc
   "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
    given pathname. Note that the interaction between this ANSI-specified
    TRUENAMEing and the semantics of the Unix filesystem (symbolic links..)
    means this function can sometimes return files which don't have the same
-   directory as PATHNAME."
+   directory as PATHNAME.  If :RESOLVE-SYMLINKS is NIL, don't resolve
+   symbolic links in matching filenames."
   (let (;; We create one entry in this hash table for each truename,
         ;; as an asymptotically efficient way of removing duplicates
         ;; (which can arise when e.g. multiple symlinks map to the
         ;; same truename).
-        (truenames (make-hash-table :test #'equal))
+        (filenames (make-hash-table :test #'equal))
         ;; FIXME: Possibly this MERGE-PATHNAMES call should only
         ;; happen once we get a physical pathname.
         (merged-pathname (merge-pathnames pathname)))
@@ -940,10 +966,12 @@ system."
                         ;; operation causes an error.  It's not clear
                         ;; what the right thing to do is, though.  --
                         ;; CSR, 2003-10-13
-                        (truename (probe-file match)))
-                   (when truename
-                     (setf (gethash (namestring truename) truenames)
-                           truename)))))
+                        (filename (if resolve-symlinks
+                                      (query-file-system match :truename nil)
+                                      (query-file-system match :existence nil))))
+                   (when filename
+                     (setf (gethash (namestring filename) filenames)
+                           filename)))))
              (do-directory (pathname)
                (if (logical-pathname-p pathname)
                    (let ((host (intern-logical-host (pathname-host pathname))))
@@ -960,9 +988,9 @@ system."
             ;; into some canonical order seems good just on the
             ;; grounds that the implementation should have repeatable
             ;; behavior when possible.
-            (sort (loop for name being each hash-key in truenames
-                     using (hash-value truename)
-                     collect (cons name truename))
+            (sort (loop for name being each hash-key in filenames
+                     using (hash-value filename)
+                     collect (cons name filename))
                   #'string<
                   :key #'car))))
 
