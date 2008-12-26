@@ -149,10 +149,8 @@
             :type simple-bit-vector)
     ;; Bit-vectors win over lightweight hashes for copy, union,
     ;; intersection, difference, but lose for iteration if you iterate
-    ;; over the whole vector.  Tracking extrema helps a bit.  Note
-    ;; that the CONSET-MIN is NIL when the set is known to be empty.
-    ;; CONSET-MAX is a normal end bounding index.
-    (min nil :type (or fixnum null))
+    ;; over the whole vector.  Tracking extrema helps a bit.
+    (min 0 :type fixnum)
     (max 0 :type fixnum))
 
   (defmacro do-conset-elements ((constraint conset &optional result) &body body)
@@ -169,7 +167,7 @@
                                 (declare (ignore ,ignore))
                                 (aver (<= ,end ,constraint-universe-end)))))
         `(let* ((,vector (conset-vector ,conset))
-               (,start (or (conset-min ,conset) 0))
+               (,start (conset-min ,conset))
                (,end (min (conset-max ,conset) (length ,vector))))
           (,@with-array-data
             (do ((,index ,start (1+ ,index))) ((>= ,index ,end) ,result)
@@ -186,7 +184,7 @@
          ,@body)))
 
   (defun conset-empty (conset)
-    (or (null (conset-min conset))
+    (or (= (conset-min conset) (conset-max conset))
         ;; TODO: I bet FIND on bit-vectors can be optimized, if it
         ;; isn't.
         (not (find 1 (conset-vector conset)
@@ -233,8 +231,7 @@
       (let ((number (%constraint-number constraint)))
         (conset-grow conset (1+ number))
         (setf (sbit (conset-vector conset) number) 1)
-        (setf (conset-min conset) (min number (or (conset-min conset)
-                                                  most-positive-fixnum)))
+        (setf (conset-min conset) (min number (conset-min conset)))
         (when (>= number (conset-max conset))
           (setf (conset-max conset) (1+ number))))))
 
@@ -273,41 +270,26 @@
                 (declare (simple-bit-vector vector1 vector2))
                 (setf (conset-vector conset-1) (,bit-op vector1 vector2 t))
                 ;; Update the extrema.
-                (setf (conset-min conset-1)
-                      ,(ecase name
-                         ((conset-union)
-                          `(min (or (conset-min conset-1)
-                                    most-positive-fixnum)
-                                (or (conset-min conset-2)
-                                    most-positive-fixnum)))
-                         ((conset-intersection)
-                          `(let ((start (max (or (conset-min conset-1) 0)
-                                             (or (conset-min conset-2) 0)))
-                                 (end (min (conset-max conset-1)
-                                           (conset-max conset-1))))
+                ,(ecase name
+                   ((conset-union)
+                    `(setf (conset-min conset-1)
+                           (min (conset-min conset-1)
+                                (conset-min conset-2))
+                           (conset-max conset-1)
+                           (max (conset-max conset-1)
+                                (conset-max conset-2))))
+                   ((conset-intersection)
+                    `(let ((start (max (conset-min conset-1)
+                                       (conset-min conset-2)))
+                           (end (min (conset-max conset-1)
+                                     (conset-max conset-2))))
+                       (setf (conset-min conset-1)
                              (if (> start end)
-                                 nil
-                                 (position 1 (conset-vector conset-1)
-                                           :start start :end end))))
-                         ((conset-difference)
-                          `(position 1 (conset-vector conset-1)
-                                     :start (or (conset-min conset-1) 0)
-                                     :end (conset-max conset-1)
-                                     )))
-                      (conset-max conset-1)
-                      ,(ecase name
-                         ((conset-union)
-                          `(max (conset-max conset-1)
-                                (conset-max conset-2)))
-                         ((conset-intersection)
-                          `(let ((start (max (or (conset-min conset-1) 0)
-                                             (or (conset-min conset-2) 0)))
-                                 (end (let ((minimum-maximum
-                                             (min (conset-max conset-1)
-                                                  (conset-max conset-2))))
-                                        (if (plusp minimum-maximum)
-                                            (1- minimum-maximum)
-                                            0))))
+                                 0
+                                 (or (position 1 (conset-vector conset-1)
+                                               :start start :end end)
+                                     0))
+                             (conset-max conset-1)
                              (if (> start end)
                                  0
                                  (let ((position
@@ -316,12 +298,18 @@
                                          :start start :end end :from-end t)))
                                    (if position
                                        (1+ position)
-                                       0)))))
-                         ((conset-difference)
-                          `(let ((position
+                                       0))))))
+                   ((conset-difference)
+                    `(setf (conset-min conset-1)
+                           (or (position 1 (conset-vector conset-1)
+                                         :start (conset-min conset-1)
+                                         :end (conset-max conset-1))
+                               0)
+                           (conset-max conset-1)
+                           (let ((position
                                   (position
                                    1 (conset-vector conset-1)
-                                   :start (or (conset-min conset-1) 0)
+                                   :start (conset-min conset-1)
                                    :end (conset-max conset-1)
                                    :from-end t)))
                              (if position
@@ -878,7 +866,7 @@
         (frob let)))))
 
 ;;; Return the constraints that flow from PRED to SUCC. This is
-;;; BLOCK-OUT unless PRED ends with and IF and test constraints were
+;;; BLOCK-OUT unless PRED ends with an IF and test constraints were
 ;;; added.
 (defun block-out-for-successor (pred succ)
   (declare (type cblock pred succ))
