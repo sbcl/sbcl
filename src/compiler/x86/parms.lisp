@@ -225,18 +225,18 @@
 
 #!+openbsd
 (progn
-  (def!constant read-only-space-start     #x7b000000)
-  (def!constant read-only-space-end       #x7b0ff000)
+  (def!constant read-only-space-start     #x47000000)
+  (def!constant read-only-space-end       #x470ff000)
 
-  (def!constant static-space-start        #x7b100000)
-  (def!constant static-space-end          #x7b1ff000)
+  (def!constant static-space-start        #x47100000)
+  (def!constant static-space-end          #x471ff000)
 
-  (def!constant dynamic-space-start       #x4c000000)
-  (def!constant dynamic-space-end         #x7b0ff000)
+  (def!constant dynamic-space-start       #x48000000)
+  (def!constant dynamic-space-end         #x78000000)
 
   ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #x7b200000)
-  (def!constant linkage-table-space-end   #x7b2ff000))
+  (def!constant linkage-table-space-start #x47200000)
+  (def!constant linkage-table-space-end   #x472ff000))
 
 #!+netbsd
 (progn

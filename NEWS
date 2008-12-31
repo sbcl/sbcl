@@ -55,6 +55,8 @@
   * bug fix: compiler error when attempting to derive return value of
     ARRAY-ELEMENT-TYPE when the array type was a union of intersection
     types.
+  * bug fix: address-spaces overlapped on OpenBSD. (thanks to Josh
+    Elsasser)
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
