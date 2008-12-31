@@ -210,7 +210,9 @@
                         (and :x86 :openbsd)
                         (and :x86 :sunos)
                         (and :x86 :darwin)
+                        (and :x86 :linux)
                         (and :x86-64 :darwin)
+                        (and :x86-64 :linux)
                         (and :sparc :linux)
                         :alpha
                         :mips))
