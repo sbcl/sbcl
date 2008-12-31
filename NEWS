@@ -1,8 +1,12 @@
-;;;; -*- coding: utf-8; -*-
-  * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying
-    data vector of an multidimensional SIMPLE-ARRAY.
+;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
+    vector of a multidimensional SIMPLE-ARRAY.
   * new feature: the system now signals a continuable error if standard
     readtable modification is attempted. (thanks to Tobias Rittweiler)
+  * new feature: DIRECTORY has been extended with a non-standard keyword
+    argument :RESOLVE-SYMLINKS. (thanks to TC-Rucho)
+  * enhancement: SB-BSD-SOCKETS:MAKE-SOCKET-STREAM keyword argument handling
+    has been robustified and documented better. (thanks to Robert Goldman)
   * optimization: faster generic arithmetic dispatch on x86 and x86-64.
   * optimization: FORMAT ~D and ~F are now approximately 5% faster.
   * tradeoff: constant FORMAT control strings are now compiled unless
@@ -57,6 +61,8 @@
     types.
   * bug fix: address-spaces overlapped on OpenBSD. (thanks to Josh
     Elsasser)
+  * bug fix: Mac OS X binaries should now be portable between Leopard
+    and Tiger.
 
 changes in sbcl-1.0.23 relative to 1.0.22:
   * enhancement: when disassembling method functions, disassembly
