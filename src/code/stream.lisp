@@ -939,7 +939,6 @@
 
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
-                (force-output (two-way-stream-output-stream stream))
                 (,fun (two-way-stream-input-stream stream) ,@args))))
   (in-fun two-way-in read-char eof-error-p eof-value)
   (in-fun two-way-bin read-byte eof-error-p eof-value)

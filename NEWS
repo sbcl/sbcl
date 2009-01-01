@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes in sbcl-1.0.25 relative to 1.0.24:
+  * improvement: reading from a TWO-WAY-STREAM does not touch the output
+    stream anymore making it thread safe to have a concurrent reader and
+    a writer, for instance, in a pipe.
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
     vector of a multidimensional SIMPLE-ARRAY.
@@ -1190,7 +1194,7 @@ changes in sbcl-0.9.14 relative to sbcl-0.9.13:
     default, and DISABLE-DEBUGGER and ENABLE-DEBUGGER also affect
     the low-level debugger.
   * enchancement: RUN-PROGRAM is now able to extract the file-descriptor
-    from SYNONYM-STREAM and TWO-WAY-STEAMS provided they can be decomposed
+    from SYNONYM-STREAM and TWO-WAY-STREAM provided they can be decomposed
     down to an SB-SYS:FD-STREAM, allowing direct communication in
     more cases. Temporary files and pipes are still used as a fallback
     strategy.
