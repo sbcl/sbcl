@@ -122,6 +122,21 @@
 ;;;; Test finding a type that isn't one
 (assert (not (find-definition-sources-by-name 'fboundp :type)))
 
+;;;; Check correctness of DEFTYPE-LAMBDA-LIST.
+(deftype foobar-type
+    (&whole w &environment e r1 r2 &optional o &rest rest &key k1 k2 k3)
+  (declare (ignore w e r1 r2 o rest k1 k2 k3))
+  nil)
+
+(assert (multiple-value-bind (arglist found?) (deftype-lambda-list 'foobar-type)
+          (and found?
+               (equal arglist '(&whole w &environment e
+                                r1 r2 &optional o &rest rest &key k1 k2 k3)))))
+
+(assert (equal (multiple-value-list (deftype-lambda-list (gensym)))
+               '(nil nil)))
+
+
 ;;;; Test the xref facility
 
 (load (merge-pathnames "xref-test.lisp" *load-pathname*))

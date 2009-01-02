@@ -25,6 +25,7 @@
 (defpackage :sb-introspect
   (:use "CL")
   (:export "FUNCTION-ARGLIST"
+           "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
            "FIND-DEFINITION-SOURCES-BY-NAME"
@@ -429,6 +430,12 @@ not found"
         ((typep function 'sb-eval:interpreted-function)
          (sb-eval:interpreted-function-lambda-list function))
         (t (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
+
+(defun deftype-lambda-list (typespec-operator)
+  "Returns the lambda list of TYPESPEC-OPERATOR as first return
+value, and a flag whether the arglist could be found as second
+value."
+  (sb-int:info :type :lambda-list typespec-operator))
 
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))
