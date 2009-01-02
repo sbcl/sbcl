@@ -179,9 +179,6 @@ stack-allocation of structures is impossible.
 #22
 IR2 does not perform unused code flushing.
 --------------------------------------------------------------------------------
-#23
-Python does not know that &REST lists are LISTs (and cannot derive it).
---------------------------------------------------------------------------------
 #24
 a. Iterations on &REST lists, returning them as VALUES could be
    rewritten with &MORE vectors.

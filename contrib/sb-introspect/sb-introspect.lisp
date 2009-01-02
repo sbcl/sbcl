@@ -25,7 +25,7 @@
 (defpackage :sb-introspect
   (:use "CL")
   (:export "FUNCTION-ARGLIST"
-	   "FUNCTION-LAMBDA-LIST"
+           "FUNCTION-LAMBDA-LIST"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"

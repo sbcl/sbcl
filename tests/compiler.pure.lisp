@@ -2675,3 +2675,11 @@
   (compile nil '(lambda (x)
                  (declare (type (and simple-string (satisfies array-has-fill-pointer-p)) x))
                  (array-element-type x))))
+
+(with-test (:name :rest-list-type-derivation)
+  (multiple-value-bind (type derivedp)
+      (funcall (compile nil `(lambda (&rest args)
+                               (sb-c::compiler-derived-type args)))
+               nil)
+    (assert (eq 'list type))
+    (assert derivedp)))
