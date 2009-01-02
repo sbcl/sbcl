@@ -173,8 +173,7 @@ NULL-TN directly.
       (declare (dynamic-extent l))
       (mapc #'print l))))
 
-Result of MAKE is not stack allocated, which means that
-stack-allocation of structures is impossible.
+Result of MAKE is not stack allocated.
 --------------------------------------------------------------------------------
 #22
 IR2 does not perform unused code flushing.

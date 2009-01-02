@@ -2683,3 +2683,10 @@
                nil)
     (assert (eq 'list type))
     (assert derivedp)))
+
+(with-test (:name :base-char-typep-elimination)
+  (assert (eq (funcall (lambda (ch)
+                         (declare (type base-char ch) (optimize (speed 3) (safety 0)))
+                         (typep ch 'base-char))
+                       t)
+              t)))

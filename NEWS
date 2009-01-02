@@ -10,6 +10,9 @@ changes in sbcl-1.0.25 relative to 1.0.24:
   * improvement: GET-SETF-EXPANDER avoids adding bindings for constant
     arguments, making compiler-macros for SETF-functions able to inspect
     their constant arguments.
+  * optimization: CHAR-CODE type derivation has been improved, making
+    TYPEP elimination on subtypes of CHARACTER work better. (reported
+    by Tobias Rittweiler, patch by Paul Khuong)
 
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data

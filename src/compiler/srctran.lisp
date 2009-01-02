@@ -2616,6 +2616,27 @@
              (hi-res (if hi (isqrt hi) '*)))
         (specifier-type `(integer ,lo-res ,hi-res))))))
 
+(defoptimizer (char-code derive-type) ((char))
+  (let ((type (type-intersection (lvar-type char) (specifier-type 'character))))
+    (cond ((member-type-p type)
+           (specifier-type
+            `(member
+              ,@(loop for member in (member-type-members type)
+                      when (characterp member)
+                      collect (char-code member)))))
+          ((sb!kernel::character-set-type-p type)
+           (specifier-type
+            `(or
+              ,@(loop for (low . high)
+                      in (character-set-type-pairs type)
+                      collect `(integer ,low ,high)))))
+          ((csubtypep type (specifier-type 'base-char))
+           (specifier-type
+            `(mod ,base-char-code-limit)))
+          (t
+           (specifier-type
+            `(mod ,char-code-limit))))))
+
 (defoptimizer (code-char derive-type) ((code))
   (let ((type (lvar-type code)))
     ;; FIXME: unions of integral ranges?  It ought to be easier to do
