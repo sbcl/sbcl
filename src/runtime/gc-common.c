@@ -1885,7 +1885,7 @@ scav_lose(lispobj *where, lispobj object)
 {
     lose("no scavenge function for object 0x%08x (widetag 0x%x)\n",
          (unsigned long)object,
-         widetag_of(*(lispobj*)native_pointer(object)));
+         widetag_of(object));
 
     return 0; /* bogus return value to satisfy static type checking */
 }
