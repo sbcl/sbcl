@@ -302,6 +302,11 @@ main(int argc, char *argv[], char *envp[])
                 dynamic_space_size = strtol(argv[argi++], 0, 0) << 20;
                 if (errno)
                     lose("argument to --dynamic-space-size is not a number");
+#               ifdef MAX_DYNAMIC_SPACE_END
+                if (!((DYNAMIC_SPACE_START < DYNAMIC_SPACE_START+dynamic_space_size) &&
+                      (DYNAMIC_SPACE_START+dynamic_space_size <= MAX_DYNAMIC_SPACE_END)))
+                    lose("specified --dynamic-space-size too large");
+#               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
                 ++argi;
                 if (argi >= argc)
@@ -309,7 +314,7 @@ main(int argc, char *argv[], char *envp[])
                 errno = 0;
                 thread_control_stack_size = strtol(argv[argi++], 0, 0) << 20;
                 if (errno)
-                    lose("argument to --dynamic-space-size is not a number");
+                    lose("argument to --control-stack-size is not a number");
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 int n = 0;
                 printf("; Commandline arguments:\n");

@@ -54,3 +54,14 @@
   (min #x1fffffffffffff most-positive-fixnum))
 (def!constant most-negative-exactly-double-float-fixnum
   (max #x-1fffffffffffff most-negative-fixnum))
+
+;;;; Point where continuous area starting at dynamic-space-start bumps into
+;;;; next space.
+#!+gencgc
+(def!constant max-dynamic-space-end
+    (let ((stop (1- (ash 1 n-word-bits)))
+          (start dynamic-space-start))
+      (dolist (other-start (list read-only-space-start static-space-start linkage-table-space-start))
+        (when (< start other-start)
+          (setf stop (min stop other-start))))
+      stop))

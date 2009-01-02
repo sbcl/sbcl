@@ -2594,6 +2594,30 @@ core and return a descriptor to it."
     (do-cold-fixup code-object offset value kind)
     code-object))
 
+;;;; sanity checking space layouts
+
+(defun check-spaces ()
+  ;;; Co-opt type machinery to check for intersections...
+  (let (types)
+    (flet ((check (start end space)
+             (unless (< start end)
+               (error "Bogus space: ~A" space))
+             (let ((type (specifier-type `(integer ,start ,end))))
+               (dolist (other types)
+                 (unless (eq *empty-type* (type-intersection (cdr other) type))
+                   (error "Space overlap: ~A with ~A" space (car other))))
+               (push (cons space type) types))))
+      (check sb!vm:read-only-space-start sb!vm:read-only-space-end :read-only)
+      (check sb!vm:static-space-start sb!vm:static-space-end :static)
+      #!+gencgc
+      (check sb!vm:dynamic-space-start sb!vm:dynamic-space-end :dynamic)
+      #!-gencgc
+      (progn
+        (check sb!vm:dynamic-0-space-start sb!vm:dynamic-0-space-end :dynamic-0)
+        (check sb!vm:dynamic-1-space-start sb!vm:dynamic-1-space-end :dynamic-1))
+      #!+linkage-table
+      (check sb!vm:linkage-table-space-start sb!vm:linkage-table-space-end :linkage-table))))
+
 ;;;; emitting C header file
 
 (defun tailwise-equal (string tail)
@@ -3144,6 +3168,8 @@ initially undefined function references:~2%")
     ;; rerunning genesis interactively.)
     (do-all-symbols (sym)
       (remprop sym 'cold-intern-info))
+
+    (check-spaces)
 
     (let* ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
            (*load-time-value-counter* 0)
