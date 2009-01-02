@@ -41,7 +41,7 @@
                (sb!xc:macroexpand-1 form environment)
              (if expanded
                  (sb!xc:get-setf-expansion expansion environment)
-                 (let ((new-var (gensym)))
+                 (let ((new-var (gensym "NEW")))
                    (values nil nil (list new-var)
                            `(setq ,form ,new-var) form)))))
           ;; Local functions inhibit global SETF methods.
@@ -53,7 +53,7 @@
                       (return t)))))
            (expand-or-get-setf-inverse form environment))
           ((setq temp (info :setf :inverse (car form)))
-           (get-setf-method-inverse form `(,temp) nil))
+           (get-setf-method-inverse form `(,temp) nil environment))
           ((setq temp (info :setf :expander (car form)))
            ;; KLUDGE: It may seem as though this should go through
            ;; *MACROEXPAND-HOOK*, but the ANSI spec seems fairly explicit
@@ -100,21 +100,29 @@ GET-SETF-EXPANSION directly."
         (sb!xc:get-setf-expansion expansion environment)
         (get-setf-method-inverse form
                                  `(funcall #'(setf ,(car form)))
-                                 t))))
+                                 t
+                                 environment))))
 
-(defun get-setf-method-inverse (form inverse setf-fun)
-  (let ((new-var (gensym))
+(defun get-setf-method-inverse (form inverse setf-fun environment)
+  (let ((new-var (gensym "NEW"))
         (vars nil)
-        (vals nil))
-    (dolist (x (cdr form))
-      (push (gensym) vars)
-      (push x vals))
-    (setq vals (nreverse vals))
-    (values vars vals (list new-var)
+        (vals nil)
+        (args nil))
+    (dolist (x (reverse (cdr form)))
+      (cond ((sb!xc:constantp x environment)
+             (push x args))
+            (t
+             (let ((temp (gensym "TMP")))
+               (push temp args)
+               (push temp vars)
+               (push x vals)))))
+    (values vars
+            vals
+            (list new-var)
             (if setf-fun
-                `(,@inverse ,new-var ,@vars)
-                `(,@inverse ,@vars ,new-var))
-            `(,(car form) ,@vars))))
+                `(,@inverse ,new-var ,@args)
+                `(,@inverse ,@args ,new-var))
+            `(,(car form) ,@args))))
 
 ;;;; SETF itself
 

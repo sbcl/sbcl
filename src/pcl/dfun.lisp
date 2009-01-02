@@ -1235,13 +1235,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                            (class-precedence-list
                                             accessor-class))
                                        :test #'eq)
-                               (if early-p
-                                   (not (eq *the-class-standard-method*
-                                            (early-method-class meth)))
-                                   (accessor-method-p meth))
-                               (if early-p
-                                   (early-accessor-method-slot-name meth)
-                                   (accessor-method-slot-name meth))))))
+                               (accessor-method-p meth)
+                               (accessor-method-slot-name meth)))))
          (slotd (and accessor-class
                      (if early-p
                          (dolist (slot (early-class-slotds accessor-class) nil)

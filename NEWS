@@ -3,6 +3,10 @@ changes in sbcl-1.0.25 relative to 1.0.24:
   * improvement: reading from a TWO-WAY-STREAM does not touch the output
     stream anymore making it thread safe to have a concurrent reader and
     a writer, for instance, in a pipe.
+  * improvement: GET-SETF-EXPANDER avoids adding bindings for constant
+    arguments, making compiler-macros for SETF-functions able to inspect
+    their constant arguments.
+
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
     vector of a multidimensional SIMPLE-ARRAY.
