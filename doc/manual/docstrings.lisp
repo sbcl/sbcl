@@ -388,7 +388,7 @@ there is no corresponding docstring."
                       (cond ((or key optional) (car x))
                             (t (clean (car x))))
                       (clean (cdr x) :key key :optional optional))))))
-         (clean (sb-introspect:function-arglist (get-name doc))))))))
+         (clean (sb-introspect:function-lambda-list (get-name doc))))))))
 
 (defun documentation< (x y)
   (let ((p1 (position (get-kind x) *ordered-documentation-kinds*))

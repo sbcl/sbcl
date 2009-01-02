@@ -25,6 +25,7 @@
 (defpackage :sb-introspect
   (:use "CL")
   (:export "FUNCTION-ARGLIST"
+	   "FUNCTION-LAMBDA-LIST"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
@@ -414,22 +415,30 @@ If an unsupported TYPE is requested, the function will return NIL.
     ;; FIXME there may be other structure predicate functions
     (member self (list *struct-predicate*))))
 
-;;; FIXME: maybe this should be renamed as FUNCTION-LAMBDA-LIST?
 (defun function-arglist (function)
+  "Deprecated alias for FUNCTION-LAMBDA-LIST."
+  (function-lambda-list function))
+
+(define-compiler-macro function-arglist (function)
+  (sb-int:deprecation-warning 'function-arglist 'function-lambda-list)
+  `(function-lambda-list ,function))
+
+(defun function-lambda-list (function)
   "Describe the lambda list for the extended function designator FUNCTION.
-Works for special-operators, macros, simple functions,
-interpreted functions, and generic functions.  Signals error if
-not found"
+Works for special-operators, macros, simple functions, interpreted functions,
+and generic functions. Signals an error if FUNCTION is not a valid extended
+function designator."
   (cond ((valid-function-name-p function)
-         (function-arglist (or (and (symbolp function)
-                                    (macro-function function))
-                               (fdefinition function))))
+         (function-lambda-list (or (and (symbolp function)
+                                        (macro-function function))
+                                   (fdefinition function))))
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
         #+sb-eval
         ((typep function 'sb-eval:interpreted-function)
          (sb-eval:interpreted-function-lambda-list function))
-        (t (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
+        (t
+         (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return

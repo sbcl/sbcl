@@ -7,12 +7,12 @@
 (with-compilation-unit (:source-plist (list :test-outer "OUT"))
   (load (compile-file (merge-pathnames "test.lisp" *load-pathname*))))
 
-(assert (equal (function-arglist 'cl-user::one)
+(assert (equal (function-lambda-list 'cl-user::one)
                '(cl-user::a cl-user::b cl-user::c)))
-(assert (equal (function-arglist 'the)
+(assert (equal (function-lambda-list 'the)
                '(sb-c::value-type sb-c::form)))
 
-(assert (equal (function-arglist #'(sb-pcl::slow-method cl-user::j (t)))
+(assert (equal (function-lambda-list #'(sb-pcl::slow-method cl-user::j (t)))
                '(sb-pcl::method-args sb-pcl::next-methods)))
 
 (let ((source (find-definition-source #'cl-user::one)))
@@ -76,11 +76,11 @@
 (sb-profile:unprofile cl-user::one)
 
 
-;;;; Check correctness of FUNCTION-ARGLIST.
+;;;; Check correctness of FUNCTION-LAMBDA-LIST.
 
-(assert (equal (function-arglist 'cl-user::one)
+(assert (equal (function-lambda-list 'cl-user::one)
                '(cl-user::a cl-user::b cl-user::c)))
-(assert (equal (function-arglist 'the)
+(assert (equal (function-lambda-list 'the)
                '(sb-c::value-type sb-c::form)))
 
 ;;; Check wrt. interplay of generic functions and their methods.
@@ -99,7 +99,7 @@
 ;;
 (multiple-value-bind (required optional restp rest keyp keys allowp
                       auxp aux morep more-context more-count)
-    (sb-int:parse-lambda-list (function-arglist #'xuuq))
+    (sb-int:parse-lambda-list (function-lambda-list #'xuuq))
   (assert (equal required '(gf.a gf.b)))
   (assert (null optional))
   (assert (and restp (eql rest 'gf.rest)))
@@ -117,7 +117,7 @@
 (defmethod kroolz (r1 r2 &optional opt &aux aux)
   (declare (ignore r1 r2 opt aux))
   'kroolz)
-(assert (equal (function-arglist #'kroolz) '(r1 r2 &optional opt)))
+(assert (equal (function-lambda-list #'kroolz) '(r1 r2 &optional opt)))
 
 ;;;; Test finding a type that isn't one
 (assert (not (find-definition-sources-by-name 'fboundp :type)))

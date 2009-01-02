@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.25 relative to 1.0.24:
+  * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be
+    removed later. Please use SB-INTROSPECT:FUNCTION-LAMBDA-LIST instead.
   * new feature: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST allows retrieval of
     DEFTYPE lambda lists. (thanks to Tobias Rittweiler)
   * improvement: reading from a TWO-WAY-STREAM does not touch the output
