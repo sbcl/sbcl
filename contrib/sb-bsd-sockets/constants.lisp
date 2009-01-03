@@ -12,8 +12,8 @@
 ((:integer af-inet "AF_INET" "IP Protocol family")
  (:integer af-unspec "AF_UNSPEC" "Unspecified")
  (:integer af-local
-           #+(or sunos solaris) "AF_UNIX"
-           #-(or sunos solaris) "AF_LOCAL"
+           #+(or sunos solaris hpux) "AF_UNIX"
+           #-(or sunos solaris hpux) "AF_LOCAL"
            "Local to host (pipes and file-domain).")
  #+linux (:integer af-inet6 "AF_INET6"   "IP version 6")
  #+linux (:integer af-route "AF_NETLINK" "Alias to emulate 4.4BSD ")
@@ -78,14 +78,14 @@
  (:integer ENETUNREACH "ENETUNREACH")
  (:integer ENOTCONN "ENOTCONN")
 
- (:integer NETDB-INTERNAL "NETDB_INTERNAL" "See errno.")
- (:integer NETDB-SUCCESS "NETDB_SUCCESS" "No problem.")
+ (:integer NETDB-INTERNAL #+hpux "h_NETDB_INTERNAL" #-hpux "NETDB_INTERNAL" "See errno.")
+ (:integer NETDB-SUCCESS #+hpux "h_NETDB_SUCCESS" #-hpux "NETDB_SUCCESS" "No problem.")
  (:integer HOST-NOT-FOUND "HOST_NOT_FOUND" "Authoritative Answer Host not found.")
  (:integer TRY-AGAIN "TRY_AGAIN" "Non-Authoritative Host not found, or SERVERFAIL.")
  (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
  (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
  (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
- (:function h-strerror ("hstrerror" c-string (errno int)))
+ #-hpux (:function h-strerror ("hstrerror" c-string (errno int)))
 
  (:integer O-NONBLOCK "O_NONBLOCK")
  (:integer f-getfl "F_GETFL")
