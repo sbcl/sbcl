@@ -395,15 +395,15 @@ corresponds to NAME, or NIL if there is none."
   ;; comma not inside a backquote. This error has absolutely nothing
   ;; to do with the actual meaning of the error (and little to do with
   ;; its location, either).
-  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin win32) (,stub,)
-  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin win32)
+  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32) (,stub,)
+  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                        (function (* char)
                                                                  (* char)
                                                                  size-t))
                                          nil
                                          #!+(or linux openbsd freebsd netbsd darwin win32) 0
-                                         #!+(or sunos osf1) 1025))
+                                         #!+(or sunos osf1 hpux) 1025))
       (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated

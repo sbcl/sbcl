@@ -120,7 +120,7 @@
 #!-win32(def-math-rtn "pow" 2)
 #!-(or x86 x86-64) (def-math-rtn "sqrt" 1)
 #!-win32 (def-math-rtn "hypot" 2)
-#!-(or hpux x86) (def-math-rtn "log1p" 1)
+#!-x86 (def-math-rtn "log1p" 1)
 
 #!+win32
 (progn
@@ -636,18 +636,6 @@
     ((complex)
      (complex-atanh number))))
 
-;;; HP-UX does not supply a C version of log1p, so use the definition.
-;;;
-;;; FIXME: This is really not a good definition. As per Raymond Toy
-;;; working on CMU CL, "The definition really loses big-time in
-;;; roundoff as x gets small."
-#!+hpux
-#!-sb-fluid (declaim (inline %log1p))
-#!+hpux
-(defun %log1p (number)
-  (declare (double-float number)
-           (optimize (speed 3) (safety 0)))
-  (the double-float (log (the (double-float 0d0) (+ number 1d0)))))
 
 ;;;; not-OLD-SPECFUN stuff
 ;;;;

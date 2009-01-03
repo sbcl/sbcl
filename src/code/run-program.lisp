@@ -249,7 +249,7 @@ PROCESS."
       (sb-sys:serve-all-events 1))
   process)
 
-#-(or hpux win32)
+#-win32
 ;;; Find the current foreground process group id.
 (defun find-current-foreground-process (proc)
   (with-alien ((result sb-alien:int))
@@ -274,18 +274,11 @@ PROCESS."
                ((:pid :process-group)
                 (process-pid process))
                (:pty-process-group
-                #-hpux
                 (find-current-foreground-process process)))))
     (multiple-value-bind
           (okay errno)
         (case whom
-          #+hpux
-          (:pty-process-group
-           (sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty process))
-                               sb-unix:TIOCSIGSEND
-                               (sb-sys:int-sap
-                                signal)))
-          ((:process-group #-hpux :pty-process-group)
+          ((:process-group)
            (sb-unix:unix-killpg pid signal))
           (t
            (sb-unix:unix-kill pid signal)))

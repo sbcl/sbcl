@@ -185,6 +185,7 @@
   (enable-interrupt sigsys #'sigsys-handler)
   (ignore-interrupt sigpipe)
   (enable-interrupt sigalrm #'sigalrm-handler)
+  #!+hpux (ignore-interrupt sigxcpu)
   (sb!unix::reset-signal-mask)
   (values))
 

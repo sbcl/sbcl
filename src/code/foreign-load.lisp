@@ -103,7 +103,7 @@ Experimental."
                        :key #'shared-object-pathname
                        :test #'equal)))
         (when old
-          (dlclose-or-lose old)
+          #!-hpux (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
           #!+(and linkage-table (not win32))
           (update-linkage-table))))))
@@ -152,11 +152,11 @@ Experimental."
 (defun close-shared-objects ()
   (let (saved)
     (dolist (obj (reverse *shared-objects*))
-      (dlclose-or-lose obj)
+      #!-hpux (dlclose-or-lose obj)
       (unless (shared-object-dont-save obj)
         (push obj saved)))
     (setf *shared-objects* saved))
-  #!-win32
+  #!-(or win32 hpux)
   (dlclose-or-lose))
 
 (let ((symbols (make-hash-table :test #'equal))
