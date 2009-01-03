@@ -14,4 +14,8 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 unsigned long os_context_fp_control(os_context_t *context);
 void os_restore_fp_control(os_context_t *context);
 
+#define SC_REG(sc, n) (((unsigned long *)((sc)->sc_ap))[n])
+#define SC_PC(sc) ((sc)->sc_pcoqh)
+#define SC_NPC(sc) ((sc)->sc_pcoqt)
+
 #endif /* _HPPA_LINUX_OS_H */

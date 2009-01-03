@@ -29,11 +29,17 @@ void arch_init(void)
     return;
 }
 
+static inline unsigned int
+os_context_pc(os_context_t *context)
+{
+    return (unsigned int)(*os_context_pc_addr(context));
+}
+
 os_vm_address_t arch_get_bad_addr(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    return siginfo->si_addr;
+    return (os_vm_address_t)siginfo->si_addr;
 #if 0
-#ifdef hpux
+#ifdef LISP_FEATURE_HPUX
     struct save_state *state;
     os_vm_address_t addr;
 
@@ -86,25 +92,41 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * The foreign_function_call_active used to live at each call-site
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
-    return (!foreign_function_call_active)
-        && ((*os_context_register_addr(context,reg_ALLOC)) & 4);
+
+      // FIX-lav: use accessor macro instead
+      return (!foreign_function_call_active) &&
+             *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) & 4;
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) |=  1;
+
+    *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) |= 1;
+/* on hpux do we need to watch out for the barbarian ? */
+#ifdef LISP_FEATURE_HPUX
+    *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
+     |= SS_MODIFIEDWIDE;
+#endif
 }
 
 /* FIXME: untested */
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+    *(&((ucontext_t *) context)->uc_mcontext.ss_wide.ss_64.ss_gr7) &= ~1;
+#ifdef LISP_FEATURE_HPUX
+    *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
+     |= SS_MODIFIEDWIDE;
+#endif
 }
 
 void arch_skip_instruction(os_context_t *context)
 {
-    ((char *) *os_context_pc_addr(context)) = ((char *) *os_context_npc_addr(context));
-    ((char *) *os_context_npc_addr(context)) += 4;
+    *((unsigned int *) os_context_pc_addr(context)) = *((unsigned int *) os_context_npc_addr(context));
+    *((unsigned int *) os_context_npc_addr(context)) += 4;
+#ifdef LISP_FEATURE_HPUX
+    *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
+     |= SS_MODIFIEDWIDE;
+#endif
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -127,9 +149,10 @@ void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
+  fprintf(stderr, "arch_do_displaced_inst() WARNING: stub.\n");
     /* FIXME: Fill this in */
 #if 0
-#ifdef hpux
+#ifdef LISP_FEATURE_HPUX
     /* We change the next-pc to point to a breakpoint instruction, restore */
     /* the original instruction, and exit.  We would like to be able to */
     /* sigreturn, but we can't, because this is hpux. */
@@ -156,7 +179,8 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 #endif
 }
 
-#ifdef hpux
+#ifdef LISP_FEATURE_HPUX
+#if 0
 static void restore_breakpoint(struct sigcontext *scp)
 {
     /* We just single-stepped over an instruction that we want to replace */
@@ -191,6 +215,9 @@ static void restore_breakpoint(struct sigcontext *scp)
     }
 }
 #endif
+#endif
+
+
 
 void
 arch_handle_breakpoint(os_context_t *context)
@@ -208,6 +235,19 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
         handle_fun_end_breakpoint(context);
     *os_context_pc_addr(context) = pc;
     *os_context_npc_addr(context) = pc + 4;
+    *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
+     |= SS_MODIFIEDWIDE;
+}
+
+
+//FIX-lav: this whole is copied from mips
+void
+arch_handle_single_step_trap(os_context_t *context, int trap)
+{
+    unsigned int code = *((u32 *)(os_context_pc(context)));
+    int register_offset = code >> 11 & 0x1f;
+    handle_single_step_trap(context, trap, register_offset);
+    arch_skip_instruction(context);
 }
 
 static void
@@ -216,18 +256,29 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     unsigned int bad_inst;
 
-#if 0
-    printf("sigtrap_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
-           SC_REG(scp,reg_ALLOC));
-#endif
-
     bad_inst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
     if (bad_inst & 0xfc001fe0)
         interrupt_handle_now(signal, siginfo, context);
     else {
         int im5 = bad_inst & 0x1f;
-        handle_trap(context, trap);
+        handle_trap(context, im5);
     }
+}
+
+static void
+sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
+{
+  os_context_t *context = arch_os_get_context(&void_context);
+  unsigned int bad_inst;
+
+  bad_inst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
+  if (bad_inst == 9) { /* pending-interrupt */
+    arch_clear_pseudo_atomic_interrupted(context);
+    arch_skip_instruction(context);
+    interrupt_handle_pending(context);
+  } else {
+    handle_trap(context,bad_inst);
+  }
 }
 
 static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
@@ -236,11 +287,6 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
     unsigned int badinst;
     int opcode, r1, r2, t;
     long op1, op2, res;
-
-#if 0
-    printf("sigfpe_handler, pc=0x%08x, alloc=0x%08x\n", scp->sc_pcoqh,
-           SC_REG(scp,reg_ALLOC));
-#endif
 
     switch (siginfo->si_code) {
     case FPE_INTOVF: /*I_OVFLO: */
@@ -274,7 +320,7 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
             /* Add or subtract immediate. */
             op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
             r2 = (badinst >> 16) & 0x1f;
-            op2 = fixnum_value(*os_context_register_addr(context, r1));
+            op2 = fixnum_value(*os_context_register_addr(context, r2));
             t = (badinst >> 21) & 0x1f;
             if (opcode == 0x2d)
                 res = op1 + op2;
@@ -283,7 +329,6 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
         }
         else
             goto not_interesting;
-
         /* ?? What happens here if we hit the end of dynamic space? */
         dynamic_space_free_pointer = (lispobj *) *os_context_register_addr(context, reg_ALLOC);
         *os_context_register_addr(context, t) = alloc_number(res);
@@ -292,15 +337,20 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
         arch_skip_instruction(context);
 
         break;
-
-    case 0: /* I_COND: ?? Maybe tagged add?? FIXME */
+//#ifdef LINUX
+//    case 0:
+//#endif
+    case FPE_COND:
         badinst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
         if ((badinst&0xfffff800) == (0xb000e000|reg_ALLOC<<21|reg_ALLOC<<16)) {
-            /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped. */
-            /* That means that it is the end of a pseudo-atomic.  So do the */
-            /* add stripping off the pseudo-atomic-interrupted bit, and then */
-            /* tell the machine-independent code to process the pseudo- */
-            /* atomic. */
+            /* It is an ADDIT,OD i,ALLOC,ALLOC instruction that trapped.
+             * That means that it is the end of a pseudo-atomic.  So do the
+             * add stripping off the pseudo-atomic-interrupted bit, and then
+             * tell the machine-independent code to process the pseudo-
+             * atomic. We cant skip the instruction because it holds
+             * extra-bytes that we must add to reg_alloc in context.
+             * It is so because we optimized away 'addi ,extra-bytes reg_alloc'
+             */
             int immed = (badinst>>1)&0x3ff;
             if (badinst & 1)
                 immed |= -1<<10;
@@ -375,7 +425,7 @@ static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
             /* Add or subtract immediate. */
             op1 = ((badinst >> 3) & 0xff) | ((-badinst&1)<<8);
             r2 = (badinst >> 16) & 0x1f;
-            op2 = fixnum_value(*os_context_register_addr(context, r1));
+            op2 = fixnum_value(*os_context_register_addr(context, r2));
             t = (badinst >> 21) & 0x1f;
             if (opcode == 0x2d)
                 res = op1 + op2;
@@ -399,11 +449,23 @@ static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
     }
 }
 
+static void
+ignore_handler(int signal, siginfo_t *siginfo, void *void_context)
+{
+}
 
+/* this routine installs interrupt handlers that will
+ * bypass the lisp interrupt handlers */
 void arch_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGILL,sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGFPE,sigfpe_handler);
     /* FIXME: beyond 2.4.19-pa4 this shouldn't be necessary. */
     undoably_install_low_level_interrupt_handler(SIGBUS,sigbus_handler);
+#ifdef LISP_FEATURE_HPUX
+    undoably_install_low_level_interrupt_handler(SIGXCPU,ignore_handler);
+    undoably_install_low_level_interrupt_handler(SIGXFSZ,ignore_handler);
+#endif
 }
+

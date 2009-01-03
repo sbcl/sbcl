@@ -47,17 +47,8 @@
     "NL2", "NL1", "NL0", "DP", "NL4", "NL5", "NSP", "LIP"
 
 #define BOXED_REGISTERS { \
-    reg_CODE, reg_FDEFN, reg_LEXENV, reg_NARGS, reg_OCFP, reg_LRA, \
+    reg_CODE, reg_FDEFN, reg_LEXENV, reg_OCFP, reg_LRA, \
     reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, \
-    reg_L0, reg_L1, reg_L2 \
+    reg_L0, reg_L1, reg_L2, reg_NFP \
 }
 
-#ifdef hpux
-#define SC_REG(sc, n) (((unsigned long *)(&(sc)->sc_sl.sl_ss.ss_flags))[n])
-#define SC_PC(sc) ((sc)->sc_sl.sl_ss.ss_pcoq_head)
-#define SC_NPC(sc) ((sc)->sc_sl.sl_ss.ss_pcoq_tail)
-#else
-#define SC_REG(sc, n) (((unsigned long *)((sc)->sc_ap))[n])
-#define SC_PC(sc) ((sc)->sc_pcoqh)
-#define SC_NPC(sc) ((sc)->sc_pcoqt)
-#endif

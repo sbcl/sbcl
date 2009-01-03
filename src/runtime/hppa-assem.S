@@ -2,47 +2,54 @@
 
 #include "sbcl.h"
 #include "lispregs.h"
+#include "genesis/closure.h"
+#include "genesis/fdefn.h"
+#include "genesis/simple-fun.h"
+#include "genesis/return-pc.h"
+#include "genesis/static-symbols.h"
+#include "genesis/funcallable-instance.h"
+
+        .level  2.0
+        .text
 
 	.import $global$,data
+        .import $$dyncall,MILLICODE
 	.import foreign_function_call_active,data
 	.import current_control_stack_pointer,data
 	.import current_control_frame_pointer,data
 	.import current_binding_stack_pointer,data
 	.import dynamic_space_free_pointer,data
+/*	.import return_from_lisp_function,data */
 
-/*	.space	$TEXT$
-	.subspace	$CODE$
-	.import $$dyncall,MILLICODE
-*/
 
 /*
  * Call-into-lisp
  */
 
 	.export call_into_lisp
-call_into_lisp:	
+call_into_lisp:
 	.proc
 	.callinfo entry_gr=18,save_rp
 	.entry
 	/* %arg0=function, %arg1=cfp, %arg2=nargs */
 
-	stw	%rp,-0x14(%sr0,%sp)
-	stwm	%r3,0x40(%sr0,%sp)
-	stw	%r4,-0x3c(%sr0,%sp)
-	stw	%r5,-0x38(%sr0,%sp)
-	stw	%r6,-0x34(%sr0,%sp)
-	stw	%r7,-0x30(%sr0,%sp)
-	stw	%r8,-0x2c(%sr0,%sp)
-	stw	%r9,-0x28(%sr0,%sp)
-	stw	%r10,-0x24(%sr0,%sp)
-	stw	%r11,-0x20(%sr0,%sp)
-	stw	%r12,-0x1c(%sr0,%sp)
-	stw	%r13,-0x18(%sr0,%sp)
-	stw	%r14,-0x14(%sr0,%sp)
-	stw	%r15,-0x10(%sr0,%sp)
-	stw	%r16,-0xc(%sr0,%sp)
-	stw	%r17,-0x8(%sr0,%sp)
-	stw	%r18,-0x4(%sr0,%sp)
+        stw     %rp,-0x14(%sr0,%sp)
+        stwm    %r3,0x40(%sr0,%sp)
+        stw     %r4,-0x3c(%sr0,%sp)
+        stw     %r5,-0x38(%sr0,%sp)
+        stw     %r6,-0x34(%sr0,%sp)
+        stw     %r7,-0x30(%sr0,%sp)
+        stw     %r8,-0x2c(%sr0,%sp)
+        stw     %r9,-0x28(%sr0,%sp)
+        stw     %r10,-0x24(%sr0,%sp)
+        stw     %r11,-0x20(%sr0,%sp)
+        stw     %r12,-0x1c(%sr0,%sp)
+        stw     %r13,-0x18(%sr0,%sp)
+        stw     %r14,-0x14(%sr0,%sp)
+        stw     %r15,-0x10(%sr0,%sp)
+        stw     %r16,-0xc(%sr0,%sp)
+        stw     %r17,-0x8(%sr0,%sp)
+        stw     %r18,-0x4(%sr0,%sp)
 
 	/* Clear the descriptor regs, moving in args as approporate. */
 	copy	%r0,reg_CODE
@@ -96,8 +103,8 @@ call_into_lisp:
 	ldw	20(reg_CFP),reg_A5
 
 	/* Calculate the LRA. */
-	ldil	L%lra+OTHER_POINTER_LOWTAG,reg_LRA
-	ldo	R%lra+OTHER_POINTER_LOWTAG(reg_LRA),reg_LRA
+  ldil  L%lra-RETURN_PC_RETURN_POINT_OFFSET,reg_LRA
+  ldo R%lra-RETURN_PC_RETURN_POINT_OFFSET(reg_LRA),reg_LRA
 
 	/* Indirect the closure */
 	ldw	CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_CODE
@@ -111,13 +118,15 @@ break_here:
 	break	0,0
 
 	.align	8
-lra:	
-	.word	RETURN_PC_HEADER_WIDETAG
-	copy	reg_OCFP,reg_CSP
+lra:
+  nop /* a few nops because we dont know where we land */
+  nop /* the return convention would govern this */
+  nop
+  nop
 
 	/* Copy CFP (%r4) into someplace else and restore r4. */
 	copy	reg_CFP,reg_NL1
-	ldw	-64(0,%sp),%r4
+  ldw -0x3c(0,%sp),%r4
 
 	/* Copy the return value. */
 	copy	reg_A0,%ret0
@@ -144,26 +153,24 @@ lra:
 	/* Turn off pseudo-atomic and check for traps. */
 	addit,od	-4,reg_ALLOC,reg_ALLOC
 
-
-	ldw	-0x54(%sr0,%sp),%rp
-	ldw	-0x4(%sr0,%sp),%r18
-	ldw	-0x8(%sr0,%sp),%r17
-	ldw	-0xc(%sr0,%sp),%r16
-	ldw	-0x10(%sr0,%sp),%r15
-	ldw	-0x14(%sr0,%sp),%r14
-	ldw	-0x18(%sr0,%sp),%r13
-	ldw	-0x1c(%sr0,%sp),%r12
-	ldw	-0x20(%sr0,%sp),%r11
-	ldw	-0x24(%sr0,%sp),%r10
-	ldw	-0x28(%sr0,%sp),%r9
-	ldw	-0x2c(%sr0,%sp),%r8
-	ldw	-0x30(%sr0,%sp),%r7
-	ldw	-0x34(%sr0,%sp),%r6
-	ldw	-0x38(%sr0,%sp),%r5
-	ldw	-0x3c(%sr0,%sp),%r4
-	bv	%r0(%rp)
-	ldwm	-0x40(%sr0,%sp),%r3
-
+        ldw     -0x54(%sr0,%sp),%rp
+        ldw     -0x4(%sr0,%sp),%r18
+        ldw     -0x8(%sr0,%sp),%r17
+        ldw     -0xc(%sr0,%sp),%r16
+        ldw     -0x10(%sr0,%sp),%r15
+        ldw     -0x14(%sr0,%sp),%r14
+        ldw     -0x18(%sr0,%sp),%r13
+        ldw     -0x1c(%sr0,%sp),%r12
+        ldw     -0x20(%sr0,%sp),%r11
+        ldw     -0x24(%sr0,%sp),%r10
+        ldw     -0x28(%sr0,%sp),%r9
+        ldw     -0x2c(%sr0,%sp),%r8
+        ldw     -0x30(%sr0,%sp),%r7
+        ldw     -0x34(%sr0,%sp),%r6
+        ldw     -0x38(%sr0,%sp),%r5
+        ldw     -0x3c(%sr0,%sp),%r4
+        bv      %r0(%rp)
+        ldwm    -0x40(%sr0,%sp),%r3
 
 	/* And thats all. */
 	.exit
@@ -174,22 +181,22 @@ lra:
  * Call-into-C
  */
 
-	
 	.export call_into_c
-call_into_c:	
-	/* Set up a lisp stack frame.  Note: we convert the raw return pc into
-	 * a fixnum pc-offset because we don't have ahold of an lra object.
-	 */
+call_into_c:
+	/* Set up a lisp stack frame. */
 	copy	reg_CFP, reg_OCFP
 	copy	reg_CSP, reg_CFP
 	addi	32, reg_CSP, reg_CSP
-	stw	reg_OCFP, 0(0,reg_CFP)
+	stw	reg_OCFP, 0(0,reg_CFP) ; save old cfp
+	stw	reg_CFP, 4(0,reg_CFP)  ; save old csp
+        /* convert raw return PC into a fixnum PC-offset, because we dont
+           have ahold of an lra object */
 	sub	reg_LIP, reg_CODE, reg_NL5
 	addi	3-OTHER_POINTER_LOWTAG, reg_NL5, reg_NL5
-	stw	reg_NL5, 4(0,reg_CFP)
-	stw	reg_CODE, 8(0,reg_CFP)
+	stw	reg_NL5, 8(0,reg_CFP)
+	stw	reg_CODE, 0xc(0,reg_CFP)
 
-	/* Turn on pseudo-atomic. */
+	/* set pseudo-atomic flag */
 	addi	4, reg_ALLOC, reg_ALLOC
 
 	/* Store the lisp state. */
@@ -213,10 +220,10 @@ call_into_c:
 
 	/* in order to be able to call incrementally linked (ld -A) functions,
 	   we have to do some mild trickery here */
-	copy	reg_CFUNC,%r22
-	bl	$$dyncall,%r31
-	copy	%r31, %r2
-
+        copy reg_CFUNC, %r22
+        bl      $$dyncall,%r31
+        copy    %r31, %r2
+call_into_c_return:
 	/* Clear the callee saves descriptor regs. */
 	copy	%r0, reg_A5
 	copy	%r0, reg_L0
@@ -245,26 +252,37 @@ call_into_c:
 	/* Restore CODE.  Even though it is in a callee saves register
 	 * it might have been GC'ed.
 	 */
-	ldw	8(0,reg_CFP), reg_CODE
+	ldw	0xc(0,reg_CFP), reg_CODE
 
 	/* Restore the return pc. */
-	ldw	4(0,reg_CFP), reg_NL0
+	ldw	8(0,reg_CFP), reg_NL0
 	addi	OTHER_POINTER_LOWTAG-3, reg_NL0, reg_NL0
+/*
+	addi	-3, reg_NL0, reg_NL0
+        ldi OTHER_POINTER_LOWTAG, reg_NL1
+	sub	reg_NL0, reg_NL1, reg_NL0
+*/
 	add	reg_CODE, reg_NL0, reg_LIP
 
 	/* Pop the lisp stack frame, and back we go. */
-	copy	reg_CFP, reg_CSP
-	be	0(4,reg_LIP)
+	ldw	4(0,reg_CFP), reg_CSP
+	ldw	0(0,reg_CFP), reg_OCFP
 	copy	reg_OCFP, reg_CFP
-
+	be	0(5,reg_LIP)
+        nop
 
 
 /*
  * Stuff to sanctify a block of memory for execution.
+ * FIX why does this code work: parisc2.0 guide tells
+ * us that we should add an sync after fdc and fic and
+ * then let seven nops be executed before executing the
+ * sanctified code.
  */
 
+
 	.EXPORT sanctify_for_execution
-sanctify_for_execution:	
+sanctify_for_execution:
 	.proc
 	.callinfo
 	.entry
@@ -276,7 +294,7 @@ sanctify_for_execution:
 	ldsid	(%arg0),%r1
 	mtsp	%r1,%sr1
 	ldi	32,%r1			; bytes per cache line
-sanctify_loop:	
+sanctify_loop:
 	fdc	0(%sr1,%arg0)
 	comb,<	%arg0,%arg1,sanctify_loop
 	fic,m	%r1(%sr1,%arg0)
@@ -289,34 +307,11 @@ sanctify_loop:
 
 
 /*
- * Trampolines.
- */
-
-	.EXPORT closure_tramp
-closure_tramp:	
-	/* reg_FDEFN holds the fdefn object. */
-	ldw	FDEFN_FUN_OFFSET(0,reg_FDEFN),reg_LEXENV
-	ldw	CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_L0
-	addi	SIMPLE_FUN_CODE_OFFSET, reg_L0, reg_LIP
-	bv,n	0(reg_LIP)
-
-	.EXPORT undefined_tramp
-undefined_tramp:	
-	break	trap_Error,0
-        .byte	4
-        .byte	UNDEFINED_FUN_ERROR
-        .byte	254
-        .byte	(0x20 + sc_DescriptorReg)
-        .byte	1
-	.align	4
-
-
-/*
  * Core saving/restoring support
  */
 
 	.export call_on_stack
-call_on_stack:	
+call_on_stack:
 	/* %arg0 = fn to invoke, %arg1 = new stack base */
 
 	/* Compute the new stack pointer. */
@@ -333,7 +328,7 @@ call_on_stack:
 	break	0,0
 
 	.export	save_state
-save_state:	
+save_state:
 	.proc
 	.callinfo entry_gr=18,entry_fr=21,save_rp,calls
 	.entry
@@ -380,7 +375,7 @@ save_state:
 	copy	%r31, %r2
 
 	.export _restore_state
-_restore_state:	
+_restore_state:
 
 	ldw	-0xd4(%sr0,%sp),%rp
 	ldw	-0x34(%sr0,%sp),%r18
@@ -416,7 +411,7 @@ _restore_state:
 	.procend
 
 	.export	restore_state
-restore_state:	
+restore_state:
 	.proc
 	.callinfo
 	copy	%arg0,%sp
@@ -426,17 +421,20 @@ restore_state:
 
 
 
+/* FIX, add support for singlestep
+	break	trap_SingleStepBreakpoint,0
+	break	trap_SingleStepBreakpoint,0
+*/
 	.export SingleStepTraps
-SingleStepTraps:	
-	break	trap_SingleStepBreakpoint,0
-	break	trap_SingleStepBreakpoint,0
+SingleStepTraps:
+
 /* Missing !! NOT
 	there's a break 0,0 in the new version here!!!
 */
 
 	.align	8
 	.export fun_end_breakpoint_guts
-fun_end_breakpoint_guts:	
+fun_end_breakpoint_guts:
 	.word	RETURN_PC_HEADER_WIDETAG
 	/* multiple value return point -- just jump to trap. */
 	b,n	fun_end_breakpoint_trap
@@ -451,9 +449,36 @@ fun_end_breakpoint_guts:
 	copy	reg_NULL, reg_A5
 
 	.export	fun_end_breakpoint_trap
-fun_end_breakpoint_trap:	
+fun_end_breakpoint_trap:
 	break	trap_FunEndBreakpoint,0
 	b,n	fun_end_breakpoint_trap
 
 	.export	fun_end_breakpoint_end
-fun_end_breakpoint_end:	
+fun_end_breakpoint_end:
+
+/* FIX-lav: these are found in assem-rtns.lisp too, but
+   genesis.lisp has problem referencing them, so we keep
+   these old versions too.  Lisp code cant jump to them
+   because it is an inter space jump but lisp do intra
+   space jumps */
+
+	.align	8
+        .EXPORT closure_tramp
+closure_tramp:
+        /* reg_FDEFN holds the fdefn object. */
+        ldw     FDEFN_FUN_OFFSET(0,reg_FDEFN),reg_LEXENV
+        ldw     CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_L0
+        addi    SIMPLE_FUN_CODE_OFFSET, reg_L0, reg_LIP
+        bv,n    0(reg_LIP)
+
+	.align	8
+        .EXPORT undefined_tramp
+undefined_tramp:
+        break   trap_Error,0
+        .byte   4
+        .byte   UNDEFINED_FUN_ERROR
+        .byte   254
+        .byte   (0x20 + sc_DescriptorReg)
+        .byte   1
+        .align  4
+
