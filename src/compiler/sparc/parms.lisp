@@ -95,7 +95,7 @@
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-start     #x11000000)
   (def!constant read-only-space-end       #x15000000)
 
   (def!constant static-space-start        #x28000000)
@@ -112,7 +112,7 @@
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-start     #x11000000)
   (def!constant read-only-space-end       #x15000000)
 
   (def!constant static-space-start        #x28000000)
@@ -129,17 +129,17 @@
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
 
-  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-start     #x11000000)
   (def!constant read-only-space-end       #x15000000)
 
   (def!constant static-space-start        #x18000000)
   (def!constant static-space-end          #x1c000000)
 
-  (def!constant dynamic-0-space-start     #x20000000)
-  (def!constant dynamic-0-space-end       #x38000000)
+  (def!constant dynamic-0-space-start     #x48000000)
+  (def!constant dynamic-0-space-end       #x5ffff000)
 
-  (def!constant dynamic-1-space-start     #x48000000)
-  (def!constant dynamic-1-space-end       #x60000000))
+  (def!constant dynamic-1-space-start     #x60000000)
+  (def!constant dynamic-1-space-end       #x77fff000))
 
 ;; Size of one linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c
