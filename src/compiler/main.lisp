@@ -758,7 +758,7 @@
                               (print-unreadable-object (s stream :type t))))
              (:copier nil))
   ;; the UT that compilation started at
-  (start-time (get-universal-time) :type unsigned-byte)
+  (start-time (get-internal-real-time) :type unsigned-byte)
   ;; the FILE-INFO structure for this compilation
   (file-info nil :type (or file-info null))
   ;; the stream that we are using to read the FILE-INFO, or NIL if
@@ -1606,10 +1606,13 @@
             ((try-with-type pathname "lisp"  nil))
             ((try-with-type pathname "lisp"  t))))))
 
-(defun elapsed-time-to-string (tsec)
-  (multiple-value-bind (tmin sec) (truncate tsec 60)
-    (multiple-value-bind (thr min) (truncate tmin 60)
-      (format nil "~D:~2,'0D:~2,'0D" thr min sec))))
+(defun elapsed-time-to-string (internal-time-delta)
+  (multiple-value-bind (tsec remainder)
+      (truncate internal-time-delta internal-time-units-per-second)
+    (let ((ms (truncate remainder (/ internal-time-units-per-second 1000))))
+      (multiple-value-bind (tmin sec) (truncate tsec 60)
+        (multiple-value-bind (thr min) (truncate tmin 60)
+          (format nil "~D:~2,'0D:~2,'0D.~3,'0D" thr min sec ms))))))
 
 ;;; Print some junk at the beginning and end of compilation.
 (defun print-compile-start-note (source-info)
@@ -1630,7 +1633,7 @@
   (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
                    won
                    (elapsed-time-to-string
-                    (- (get-universal-time)
+                    (- (get-internal-real-time)
                        (source-info-start-time source-info))))
   (values))
 

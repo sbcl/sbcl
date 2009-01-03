@@ -10,6 +10,8 @@ changes in sbcl-1.0.25 relative to 1.0.24:
   * improvement: GET-SETF-EXPANDER avoids adding bindings for constant
     arguments, making compiler-macros for SETF-functions able to inspect
     their constant arguments.
+  * improvement: COMPILE-FILE reports times with millisecond accuracy
+    (thanks to Luis Oliveira)
   * optimization: CHAR-CODE type derivation has been improved, making
     TYPEP elimination on subtypes of CHARACTER work better. (reported
     by Tobias Rittweiler, patch by Paul Khuong)
