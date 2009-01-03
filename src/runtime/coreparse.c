@@ -145,6 +145,41 @@ lose:
     return -1;
 }
 
+/* If more platforms doesn't support overlapping mmap rename this
+ * def to something like ifdef nommapoverlap */
+/* currently hpux only */
+#ifdef LISP_FEATURE_HPUX
+os_vm_address_t copy_core_bytes(int fd, os_vm_offset_t offset,
+                                os_vm_address_t addr, int len)
+{
+  unsigned char buf[4096];
+  int c,x;
+  int old_fd = lseek(fd, 0, SEEK_CUR);
+
+  if(len & (4096-1)){
+    fprintf(stderr, "cant copy a slice of core because slice-length is not of page size(4096)\n");
+    exit(-1);
+  }
+  if(old_fd < 0){
+    fprintf(stderr, "cant perform lseek() on corefile\n");
+  }
+  lseek(fd, offset, SEEK_SET);
+  if(fd < 0){
+    fprintf(stderr, "cant perform lseek(%u,%lu,SEEK_SET) on corefile\n", fd, offset);
+  }
+  for(x = 0; x < len; x += 4096){
+    c = read(fd, buf, 4096);
+    if(c != 4096){
+      fprintf(stderr, "cant read memory area from corefile at position %lu, got %d\n", offset + x, c);
+      exit(-1);
+    }
+    memcpy(addr+x, buf, 4096);
+  }
+  os_flush_icache(addr, len);
+  return addr;
+}
+#endif
+
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
@@ -160,12 +195,15 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
             (os_vm_address_t) (os_vm_page_size * entry->address);
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         unsigned long len = os_vm_page_size * entry->page_count;
-
         if (len != 0) {
             os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
                    (long)len, (long)len, (unsigned long)addr));
+#ifdef LISP_FEATURE_HPUX
+            real_addr = copy_core_bytes(fd, offset + file_offset, addr, len);
+#else
             real_addr = os_map(fd, offset + file_offset, addr, len);
+#endif
             if (real_addr != addr) {
                 lose("file mapped in wrong place! "
                      "(0x%08x != 0x%08lx)\n",

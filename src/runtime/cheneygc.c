@@ -239,6 +239,10 @@ collect_garbage(generation_index_t ignore)
     /* Maybe FIXME: it's possible that we could significantly reduce
      * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or
      * similar os-dependent tricks here */
+#ifdef LISP_FEATURE_HPUX
+    /* hpux cant handle unmapping areas that are not 100% mapped */
+    clear_auto_gc_trigger();
+#endif
     os_zero((os_vm_address_t) from_space,
             (os_vm_size_t) dynamic_space_size);
 
