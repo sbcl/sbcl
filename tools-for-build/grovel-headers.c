@@ -47,6 +47,10 @@
 
 #include "genesis/config.h"
 
+#ifdef LISP_FEATURE_HPUX
+#include <sys/bsdtty.h> /* for TIOCGPGRP */
+#endif
+
 #include "wrap.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
@@ -323,11 +327,10 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; various ioctl(2) flags\n");
-    defconstant("tiocnotty",  TIOCNOTTY);
-    defconstant("tiocgwinsz", TIOCGWINSZ);
-    defconstant("tiocswinsz", TIOCSWINSZ);
     defconstant("tiocgpgrp",  TIOCGPGRP);
     defconstant("tiocspgrp",  TIOCSPGRP);
+    defconstant("tiocgwinsz", TIOCGWINSZ);
+    defconstant("tiocswinsz", TIOCSWINSZ);
     /* KLUDGE: These are referenced by old CMUCL-derived code, but
      * Linux doesn't define them.
      *
@@ -399,7 +402,7 @@ main(int argc, char *argv[])
     defsignal("sigwaiting", SIGWAITING);
 #endif
     defsignal("sigwinch", SIGWINCH);
-#ifndef SIGXCPU
+#ifdef SIGXCPU
     defsignal("sigxcpu", SIGXCPU);
 #endif
 #ifdef SIGXFSZ
@@ -428,7 +431,6 @@ main(int argc, char *argv[])
 #else
     defconstant("fpe-fltsub", -1);
 #endif
-
 #endif // !WIN32
     return 0;
 }

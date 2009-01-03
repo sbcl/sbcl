@@ -53,6 +53,9 @@ case `uname` in
     CYGWIN* | WindowsNT | MINGW*)
         sbcl_os="win32"
         ;;
+    HP-UX)
+        sbcl_os="hpux"
+        ;;
     *)
         echo unsupported OS type: `uname`
         exit 1
@@ -110,6 +113,7 @@ case `uname -m` in
     ppc64) guessed_sbcl_arch=ppc ;;
     Power*Macintosh) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
+    9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
     *)
         # If we're not building on a supported target architecture, we
@@ -187,6 +191,14 @@ case "$sbcl_os" in
         link_or_copy Config.$sbcl_arch-osf1 Config
         link_or_copy $sbcl_arch-osf1-os.h target-arch-os.h
         link_or_copy osf1-os.h target-os.h
+        ;;
+    hpux)
+        printf ' :unix' >> $ltf
+        printf ' :elf' >> $ltf
+        printf ' :hpux' >> $ltf
+        link_or_copy Config.$sbcl_arch-hpux Config
+        link_or_copy $sbcl_arch-hpux-os.h target-arch-os.h
+        link_or_copy hpux-os.h target-os.h
         ;;
     *bsd)
         printf ' :unix' >> $ltf

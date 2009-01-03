@@ -348,6 +348,7 @@
  ;;   :darwin  = We're intended to run under Darwin (including MacOS X).
  ;;   :sunos   = We're intended to run under Solaris user environment
  ;;              with the SunOS kernel.
+ ;;   :hpux    = We're intended to run under HP-UX 11.11 or later
  ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
  ;;              aka OSF/1).
  ;;   :win32   = We're intended to under some version of Microsoft Windows.

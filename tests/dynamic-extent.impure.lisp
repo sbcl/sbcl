@@ -129,7 +129,7 @@
 
 (defun-with-dx dx-value-cell (x)
   ;; Not implemented everywhere, yet.
-  #+(or x86 x86-64 mips)
+  #+(or x86 x86-64 mips hppa)
   (let ((cell x))
     (declare (sb-int:truly-dynamic-extent cell))
     (flet ((f ()
@@ -463,7 +463,7 @@
 
 (defvar *a-cons* (cons nil nil))
 
-#+(or x86 x86-64 alpha ppc sparc mips)
+#+(or x86 x86-64 alpha ppc sparc mips hppa)
 (progn
   (assert-no-consing (dxclosure 42))
   (assert-no-consing (dxlength 1 2 3))

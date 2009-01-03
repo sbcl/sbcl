@@ -22,16 +22,16 @@
 ;;;; files for more information.
 
 #!-sparc
-(defun ldso-stubify (fct str)
-  (format str "LDSO_STUBIFY(~A)~%" fct))
+(defun ldso-stubify (fct stream)
+  (format stream "LDSO_STUBIFY(~A)~%" fct))
 
 ;;; This is an attempt to follow DB's hint of sbcl-devel
 ;;; 2001-09-18. -- CSR
 ;;;
 ;;; And an attempt to work around the Sun toolchain... --ns
 #!+sparc
-(defun ldso-stubify (fct str)
-  (apply #'format str "
+(defun ldso-stubify (fct stream)
+  (apply #'format stream "
 .globl ldso_stub__~A ;                          \\
         FUNCDEF(ldso_stub__~A) ;                \\
 ldso_stub__~A: ;                                \\
@@ -41,6 +41,18 @@ ldso_stub__~A: ;                                \\
 .L~Ae1: ;                                       \\
         .size    ldso_stub__~A,.L~Ae1-ldso_stub__~A ;~%"
           (make-list 9 :initial-element fct)))
+
+#!+hppa
+(defun ldso-stubify (fct stream)
+  (let ((stub (format nil "ldso_stub__~a" fct)))
+    (apply #'format stream (list
+"    .export ~A
+~A:
+    .proc
+    .callinfo
+    b,n ~a
+    .procend
+    .import ~a,code~%" stub stub fct fct))))
 
 (defvar *preludes* '("
 /* This is an automatically generated file, please do not hand-edit it.
@@ -84,6 +96,10 @@ ldso_stub__ ## fct: ;                           \\
         jmp fct ;                               \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
+
+#!+hppa "
+        .level  2.0
+        .text"
 
 #!+(and (not darwin) ppc) "
 #define LDSO_STUBIFY(fct)                       \\
@@ -271,7 +287,7 @@ ldso_stub__ ## fct: ;                  \\
                    "tcsetattr"
                    "truncate"
                    "ttyname"
-                   "tzname"
+                   #!-hpux "tzname"
                    "unlink"
                    "utimes"
                    "wait3"
