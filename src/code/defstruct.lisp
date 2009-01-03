@@ -272,9 +272,6 @@
     (alignment 1 :type (integer 1 2) :read-only t))
 
   (defvar *raw-slot-data-list*
-    #!+hppa
-    nil
-    #!-hppa
     (let ((double-float-alignment
            ;; white list of architectures that can load unaligned doubles:
            #!+(or x86 x86-64 ppc) 1

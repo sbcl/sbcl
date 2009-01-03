@@ -126,8 +126,6 @@
   (unsafe always-translatable))
 (defknown %layout-invalid-error (t layout) nil)
 
-#!-hppa
-(progn
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
   (flushable always-translatable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
@@ -153,7 +151,7 @@
 (defknown %raw-instance-set/complex-double
     (instance index (complex double-float))
   (complex double-float)
-  (unsafe always-translatable)))
+  (unsafe always-translatable))
 
 #!+(or x86 x86-64)
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:signed-word) sb!vm:word
@@ -163,47 +161,6 @@
 ;;; as their first argument (clarity and to match these DEFKNOWNs).
 ;;; We declare RAW-VECTOR as a primitive type so the VOP machinery
 ;;; will accept our VOPs as legitimate.  --njf, 2004-08-10
-;;;
-;;; These are only used on HPPA, since on HPPA implements raw slots in
-;;; structures with an indirection vector; all other ports implement
-;;; raw slots directly in the structure.  --njf, 2006-06-02
-#!+hppa
-(progn
-(sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
-
-(sb!vm::!def-primitive-type-alias raw-vector
-                                  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-                                  sb!vm::simple-array-unsigned-byte-32
-                                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                                  sb!vm::simple-array-unsigned-byte-64)
-
-(defknown %raw-ref-single (raw-vector index) single-float
-  (foldable flushable always-translatable))
-(defknown %raw-ref-double (raw-vector index) double-float
-  (foldable flushable always-translatable))
-#!+long-float
-(defknown %raw-ref-long (raw-vector index) long-float
-  (foldable flushable always-translatable))
-(defknown %raw-set-single (raw-vector index single-float) single-float
-  (unsafe always-translatable))
-(defknown %raw-set-double (raw-vector index double-float) double-float
-  (unsafe always-translatable))
-#!+long-float
-(defknown %raw-set-long (raw-vector index long-float) long-float
-  (unsafe always-translatable))
-
-(defknown %raw-ref-complex-single (raw-vector index) (complex single-float)
-  (foldable flushable always-translatable))
-(defknown %raw-ref-complex-double (raw-vector index) (complex double-float)
-  (foldable flushable always-translatable))
-
-(defknown %raw-set-complex-single (raw-vector index (complex single-float))
-  (complex single-float)
-  (unsafe always-translatable))
-(defknown %raw-set-complex-double (raw-vector index (complex double-float))
-  (complex double-float)
-  (unsafe always-translatable))
-)
 
 (defknown %raw-bits (t fixnum) sb!vm:word
   (foldable flushable))

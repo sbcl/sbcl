@@ -54,103 +54,45 @@
           slot-specs slot-values)
     instance))
 
-#!-hppa
-(progn
-  (defun %raw-instance-ref/word (instance index)
-    (declare (type index index))
-    (%raw-instance-ref/word instance index))
-  (defun %raw-instance-set/word (instance index new-value)
-    (declare (type index index)
-             (type sb!vm:word new-value))
-    (%raw-instance-set/word instance index new-value))
-
-  (defun %raw-instance-ref/single (instance index)
-    (declare (type index index))
-    (%raw-instance-ref/single instance index))
-  (defun %raw-instance-set/single (instance index new-value)
-    (declare (type index index)
-             (type single-float new-value))
-    (%raw-instance-set/single instance index new-value))
-
-  (defun %raw-instance-ref/double (instance index)
-    (declare (type index index))
-    (%raw-instance-ref/double instance index))
-  (defun %raw-instance-set/double (instance index new-value)
-    (declare (type index index)
-             (type double-float new-value))
-    (%raw-instance-set/double instance index new-value))
-
-  (defun %raw-instance-ref/complex-single (instance index)
-    (declare (type index index))
-    (%raw-instance-ref/complex-single instance index))
-  (defun %raw-instance-set/complex-single (instance index new-value)
-    (declare (type index index)
-             (type (complex single-float) new-value))
-    (%raw-instance-set/complex-single instance index new-value))
-
-  (defun %raw-instance-ref/complex-double (instance index)
-    (declare (type index index))
-    (%raw-instance-ref/complex-double instance index))
-  (defun %raw-instance-set/complex-double (instance index new-value)
-    (declare (type index index)
-             (type (complex double-float) new-value))
-    (%raw-instance-set/complex-double instance index new-value))
-) ; #!-HPPA
-
-#!+hppa
-(progn
-(defun %raw-ref-single (vec index)
+(defun %raw-instance-ref/word (instance index)
   (declare (type index index))
-  (%raw-ref-single vec index))
+  (%raw-instance-ref/word instance index))
+(defun %raw-instance-set/word (instance index new-value)
+  (declare (type index index)
+           (type sb!vm:word new-value))
+  (%raw-instance-set/word instance index new-value))
 
-(defun %raw-ref-double (vec index)
+(defun %raw-instance-ref/single (instance index)
   (declare (type index index))
-  (%raw-ref-double vec index))
+  (%raw-instance-ref/single instance index))
+(defun %raw-instance-set/single (instance index new-value)
+  (declare (type index index)
+           (type single-float new-value))
+  (%raw-instance-set/single instance index new-value))
 
-#!+long-float
-(defun %raw-ref-long (vec index)
+(defun %raw-instance-ref/double (instance index)
   (declare (type index index))
-  (%raw-ref-long vec index))
+  (%raw-instance-ref/double instance index))
+(defun %raw-instance-set/double (instance index new-value)
+  (declare (type index index)
+           (type double-float new-value))
+  (%raw-instance-set/double instance index new-value))
 
-(defun %raw-set-single (vec index val)
+(defun %raw-instance-ref/complex-single (instance index)
   (declare (type index index))
-  (%raw-set-single vec index val))
+  (%raw-instance-ref/complex-single instance index))
+(defun %raw-instance-set/complex-single (instance index new-value)
+  (declare (type index index)
+           (type (complex single-float) new-value))
+  (%raw-instance-set/complex-single instance index new-value))
 
-(defun %raw-set-double (vec index val)
+(defun %raw-instance-ref/complex-double (instance index)
   (declare (type index index))
-  (%raw-set-double vec index val))
-
-#!+long-float
-(defun %raw-set-long (vec index val)
-  (declare (type index index))
-  (%raw-set-long vec index val))
-
-(defun %raw-ref-complex-single (vec index)
-  (declare (type index index))
-  (%raw-ref-complex-single vec index))
-
-(defun %raw-ref-complex-double (vec index)
-  (declare (type index index))
-  (%raw-ref-complex-double vec index))
-
-#!+long-float
-(defun %raw-ref-complex-long (vec index)
-  (declare (type index index))
-  (%raw-ref-complex-long vec index))
-
-(defun %raw-set-complex-single (vec index val)
-  (declare (type index index))
-  (%raw-set-complex-single vec index val))
-
-(defun %raw-set-complex-double (vec index val)
-  (declare (type index index))
-  (%raw-set-complex-double vec index val))
-
-#!+long-float
-(defun %raw-set-complex-long (vec index val)
-  (declare (type index index))
-  (%raw-set-complex-long vec index val))
-) ; #!+HPPA
+  (%raw-instance-ref/complex-double instance index))
+(defun %raw-instance-set/complex-double (instance index new-value)
+  (declare (type index index)
+           (type (complex double-float) new-value))
+  (%raw-instance-set/complex-double instance index new-value))
 
 (defun %instance-layout (instance)
   (%instance-layout instance))
