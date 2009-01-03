@@ -55,7 +55,7 @@ int set_noecho(int fd)
 }
 
 extern char **environ;
-int spawn(char *program, char *argv[], int stdin, int stdout, int stderr,
+int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name, int wait)
 {
     int pid = fork();
@@ -66,7 +66,7 @@ int spawn(char *program, char *argv[], int stdin, int stdout, int stderr,
         return pid;
 
     /* Put us in our own process group. */
-#if defined(hpux)
+#if defined(LISP_FEATURE_HPUX)
     setsid();
 #elif defined(LISP_FEATURE_DARWIN)
     setpgid(0, getpid());
@@ -82,7 +82,7 @@ int spawn(char *program, char *argv[], int stdin, int stdout, int stderr,
 
     /* If we are supposed to be part of some other pty, go for it. */
     if (pty_name) {
-#if !defined(hpux) && !defined(SVR4)
+#if !defined(LISP_FEATURE_HPUX) && !defined(SVR4)
         fd = open("/dev/tty", O_RDWR, 0);
         if (fd >= 0) {
             ioctl(fd, TIOCNOTTY, 0);
@@ -97,12 +97,12 @@ int spawn(char *program, char *argv[], int stdin, int stdout, int stderr,
         close(fd);
     } else{
     /* Set up stdin, stdout, and stderr */
-    if (stdin >= 0)
-        dup2(stdin, 0);
-    if (stdout >= 0)
-        dup2(stdout, 1);
-    if (stderr >= 0)
-        dup2(stderr, 2);
+    if (sin >= 0)
+        dup2(sin, 0);
+    if (sout >= 0)
+        dup2(sout, 1);
+    if (serr >= 0)
+        dup2(serr, 2);
     }
     /* Close all other fds. */
 #ifdef SVR4
