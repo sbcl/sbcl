@@ -13,7 +13,7 @@
   nil)
 
 ;;;; FIXUP-CODE-OBJECT
-
+;FIX-lav: unify code with genesis.lisp fixup
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
@@ -23,12 +23,21 @@
      (setf (sap-ref-32 sap offset)
            (ecase kind
              (:load
-              (logior (ash (ldb (byte 11 0) value) 1)
-                      (logand inst #xffffc000)))
+              (logior (mask-field (byte 18 14) value)
+                      (if (< value 0)
+                        (1+ (ash (ldb (byte 13 0) value) 1))
+                        (ash (ldb (byte 13 0) value) 1))))
+             (:load11u
+              (logior (if (< value 0)
+                          (1+ (ash (ldb (byte 10 0) value) 1))
+                          (ash (ldb (byte 11 0) value) 1))
+                      (mask-field (byte 18 14) inst)))
              (:load-short
               (let ((low-bits (ldb (byte 11 0) value)))
                 (aver (<= 0 low-bits (1- (ash 1 4))))
-                (logior (ash low-bits 17)
+                (logior (ash (dpb (ldb (byte 4 0) value)
+                                  (byte 4 1)
+                                  (ldb (byte 1 4) value)) 17)
                         (logand inst #xffe0ffff))))
              (:hi
               (logior (ash (ldb (byte 5 13) value) 16)
@@ -41,7 +50,9 @@
               (let ((bits (ldb (byte 9 2) value)))
                 (aver (zerop (ldb (byte 2 0) value)))
                 (logior (ash bits 3)
-                        (logand inst #xffe0e002)))))))))
+                        (mask-field (byte 1 1) inst)
+                        (mask-field (byte 3 13) inst)
+                        (mask-field (byte 11 21) inst)))))))))
 
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
   (context (* os-context-t)))
