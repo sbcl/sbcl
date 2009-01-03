@@ -175,7 +175,7 @@
 ;;; Stack allocation optimizers per platform support
 ;;;
 ;;; Platforms with stack-allocatable vectors
-#!+(or mips x86 x86-64)
+#!+(or hppa mips x86 x86-64)
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
@@ -208,7 +208,7 @@
         (annotate-1-value-lvar arg)))))
 
 ;;; ...lists
-#!+(or alpha mips ppc sparc x86 x86-64)
+#!+(or alpha hppa mips ppc sparc x86 x86-64)
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
     (declare (ignore node dx))
@@ -221,7 +221,7 @@
     t))
 
 ;;; ...conses
-#!+(or mips x86 x86-64)
+#!+(or hppa mips x86 x86-64)
 (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
   (declare (ignore node dx))
   t)

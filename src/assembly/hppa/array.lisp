@@ -1,32 +1,5 @@
 (in-package "SB!VM")
 
-(define-assembly-routine
-    (allocate-vector
-     (:policy :fast-safe)
-     (:translate allocate-vector)
-     (:arg-types positive-fixnum
-                 positive-fixnum
-                 positive-fixnum))
-    ((:arg type any-reg a0-offset)
-     (:arg length any-reg a1-offset)
-     (:arg words any-reg a2-offset)
-     (:res result descriptor-reg a0-offset)
-
-     (:temp ndescr non-descriptor-reg nl0-offset)
-     (:temp vector descriptor-reg a3-offset))
-  (pseudo-atomic ()
-    (move alloc-tn vector)
-    (inst dep other-pointer-lowtag 31 3 vector)
-    (inst addi (* (1+ vector-data-offset) n-word-bytes) words ndescr)
-    (inst dep 0 31 3 ndescr)
-    (inst add ndescr alloc-tn alloc-tn)
-    (inst srl type word-shift ndescr)
-    (storew ndescr vector 0 other-pointer-lowtag)
-    (storew length vector vector-length-slot other-pointer-lowtag))
-  (move vector result))
-
-
-
 ;;;; Hash primitives
 
 ;;; FIXME: This looks kludgy bad and wrong.

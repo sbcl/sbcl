@@ -71,6 +71,53 @@
 
 
 ;;;; Special purpose inline allocators.
+;;; ALLOCATE-VECTOR
+(define-vop (allocate-vector-on-heap)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:temporary (:sc non-descriptor-reg) bytes)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:policy :fast-safe)
+  (:generator 100
+    (inst addi (+ lowtag-mask
+                  (* vector-data-offset n-word-bytes)) words bytes)
+    (inst dep 0 31 n-lowtag-bits bytes)
+    (pseudo-atomic ()
+      (set-lowtag other-pointer-lowtag alloc-tn result)
+      (inst add bytes alloc-tn alloc-tn)
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag))))
+
+(define-vop (allocate-vector-on-stack)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:temporary (:sc non-descriptor-reg) bytes temp)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:policy :fast-safe)
+  (:generator 100
+    (inst addi (+ lowtag-mask
+                  (* vector-data-offset n-word-bytes)) words bytes)
+    (inst dep 0 31 n-lowtag-bits bytes)
+    ;; FIXME: It would be good to check for stack overflow here.
+    (pseudo-atomic ()
+      (align-csp temp)
+      (set-lowtag other-pointer-lowtag csp-tn result)
+      (inst addi (* vector-data-offset n-word-bytes) csp-tn temp)
+      (inst add bytes csp-tn csp-tn)
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag)
+      (let ((loop (gen-label)))
+        (emit-label loop)
+        (inst comb :<> temp csp-tn loop :nullify t)
+        (inst stwm zero-tn n-word-bytes temp)))))
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
@@ -159,16 +206,13 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name stack-allocate-p)
+  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (pseudo-atomic (:extra (pad-data-block words))
-      (inst move alloc-tn result)
-      (inst dep lowtag 31 3 result)
-      (when type
-        (inst li (logior (ash (1- words) n-widetag-bits) type) temp)
-        (storew temp result 0 lowtag)))))
+    (with-fixed-allocation
+      (result nil temp type words stack-allocate-p
+       :lowtag lowtag :maybe-write t))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

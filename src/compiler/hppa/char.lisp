@@ -15,6 +15,7 @@
 
 ;;; Move a tagged char to an untagged representation.
 (define-vop (move-to-character)
+  (:note "character untagging")
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (character-reg)))
   (:generator 1
@@ -24,6 +25,7 @@
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-character)
+  (:note "character tagging")
   (:args (x :scs (character-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
   (:generator 1
@@ -34,6 +36,7 @@
 
 ;;; Move untagged character values.
 (define-vop (character-move)
+  (:note "character move")
   (:args (x :target y
             :scs (character-reg)
             :load-if (not (location= x y))))
@@ -48,6 +51,7 @@
 
 ;;; Move untagged character args/return-values.
 (define-vop (move-character-arg)
+  (:note "character arg move")
   (:args (x :target y
             :scs (character-reg))
          (fp :scs (any-reg)

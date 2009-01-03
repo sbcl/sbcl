@@ -54,6 +54,11 @@
     (:big-endian
      `(inst ldb (+ ,offset (1- n-word-bytes)) ,source ,target))))
 
+(defmacro set-lowtag (tag src dst)
+  `(progn
+     (inst move ,src ,dst)
+     (inst dep ,tag 31 n-lowtag-bits ,dst)))
+
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 
@@ -118,23 +123,49 @@
 
 ;;;; Storage allocation:
 
-(defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
+(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code
+                                  size dynamic-extent-p
+                                  &key (lowtag other-pointer-lowtag)
+                                       maybe-write)
                                  &body body)
+  #!+sb-doc
   "Do stuff to allocate an other-pointer object of fixed Size with a single
-  word header having the specified Type-Code.  The result is placed in
-  Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
-  by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
-  initializes the object."
-  (unless body
-    (bug "empty &body in WITH-FIXED-ALLOCATION"))
+word header having the specified Type-Code.  The result is placed in
+Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
+by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
+initializes the object."
+  (declare (ignore flag-tn))
   (once-only ((result-tn result-tn) (temp-tn temp-tn)
-              (type-code type-code) (size size))
-    `(pseudo-atomic (:extra (pad-data-block ,size))
-       (inst move alloc-tn ,result-tn)
-       (inst dep other-pointer-lowtag 31 3 ,result-tn)
-       (inst li (logior (ash (1- ,size) n-widetag-bits) ,type-code) ,temp-tn)
-       (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
-       ,@body)))
+              (type-code type-code) (size size)
+              (lowtag lowtag))
+    (let ((write-body `((inst li (logior (ash (1- ,size) n-widetag-bits) ,type-code) ,temp-tn)
+                        (storew ,temp-tn ,result-tn 0 ,lowtag))))
+      `(if ,dynamic-extent-p
+         (pseudo-atomic ()
+           (align-csp ,temp-tn)
+           (set-lowtag ,lowtag csp-tn ,result-tn)
+           (inst addi (pad-data-block ,size) csp-tn csp-tn)
+           ,@(if maybe-write
+               `((when ,type-code ,@write-body))
+               write-body)
+           ,@body)
+         (pseudo-atomic (:extra (pad-data-block ,size))
+           (set-lowtag ,lowtag alloc-tn ,result-tn)
+           ,@(if maybe-write
+               `((when ,type-code ,@write-body))
+               write-body)
+           ,@body)))))
+
+;; is used for stack allocation of dynamic-extent objects
+; FIX-lav, if using defun, atleast surround in assembly-form ? macro better ?
+(defun align-csp (temp)
+  (declare (ignore temp))
+  (let ((aligned (gen-label)))
+    (inst extru csp-tn 31 n-lowtag-bits zero-tn :<>)
+    (inst b aligned :nullify t)
+    (inst addi n-word-bytes csp-tn csp-tn)
+    (storew zero-tn csp-tn -1)
+    (emit-label aligned)))
 
 
 ;;;; Error Code
