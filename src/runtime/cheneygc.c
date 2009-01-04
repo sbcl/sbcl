@@ -597,7 +597,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
         lose("set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
              (unsigned long)dynamic_usage);
 
-#if defined(SUNOS) || defined(SOLARIS)
+#if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
     os_invalidate(addr, length);
 #else
     os_protect(addr, length, 0);
@@ -617,7 +617,7 @@ void clear_auto_gc_trigger(void)
     addr = (os_vm_address_t)current_auto_gc_trigger;
     length = dynamic_space_size + (os_vm_address_t)current_dynamic_space - addr;
 
-#if defined(SUNOS) || defined(SOLARIS)
+#if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
     /* don't want to force whole space into swapping mode... */
     os_validate(addr, length);
 #else

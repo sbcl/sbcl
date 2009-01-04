@@ -104,7 +104,7 @@ static long compute_offset(os_context_t *context, lispobj code)
     else {
         unsigned long code_start;
         struct code *codeptr = (struct code *)native_pointer(code);
-#ifdef parisc
+#ifdef LISP_FEATURE_HPPA
         unsigned long pc = *os_context_pc_addr(context) & ~3;
 #else
         unsigned long pc = *os_context_pc_addr(context);

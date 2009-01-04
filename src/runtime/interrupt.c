@@ -86,8 +86,10 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGTSTP);
     sigaddset(s, SIGCHLD);
     sigaddset(s, SIGIO);
+#ifndef LISP_FEATURE_HPUX
     sigaddset(s, SIGXCPU);
     sigaddset(s, SIGXFSZ);
+#endif
     sigaddset(s, SIGVTALRM);
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
@@ -279,6 +281,12 @@ fake_foreign_function_call(os_context_t *context)
 #if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_MIPS)
     if ((long)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x\n", context);
+    }
+#endif
+/* why doesnt PPC and SPARC do something like this: */
+#if defined(LISP_FEATURE_HPPA)
+    if ((long)dynamic_space_free_pointer & 4) {
+        lose("dead in fake_foreign_function_call, context = %x, d_s_f_p = %x\n", context, dynamic_space_free_pointer);
     }
 #endif
 #endif
