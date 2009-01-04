@@ -20,6 +20,7 @@
 (progn
   (defvar sb!vm::*current-catch-block*)
   (defvar sb!vm::*current-unwind-protect-block*)
+  #!+hpux (defvar sb!vm::*c-lra*)
   (defvar *free-interrupt-context-index*))
 
 ;;; specials initialized by !COLD-INIT

@@ -70,6 +70,10 @@
 #define SBCL_HOME "/usr/local/lib/sbcl/"
 #endif
 
+#ifdef LISP_FEATURE_HPUX
+extern void *return_from_lisp_stub;
+#endif
+
 
 /* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
 static void
@@ -426,6 +430,10 @@ main(int argc, char *argv[], char *envp[])
     if (initial_function == NIL) {
         lose("couldn't find initial function\n");
     }
+#ifdef LISP_FEATURE_HPUX
+    return_from_lisp_stub = (void *) ((char *)*((unsigned long *)
+                 ((char *)initial_function - 1)) + 23);
+#endif
 
     gc_initialize_pointers();
 

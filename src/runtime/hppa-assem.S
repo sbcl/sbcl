@@ -108,12 +108,16 @@ call_into_lisp:
 
 	/* Indirect the closure */
 	ldw	CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_CODE
-	addi	6*4-FUN_POINTER_LOWTAG,reg_CODE,reg_LIP
+  addi  SIMPLE_FUN_CODE_OFFSET,reg_CODE,reg_LIP
 
-	/* And into lisp we go. */
-	.export break_here
-break_here:	
-	be,n	0(%sr5,reg_LIP)
+#ifdef LISP_FEATURE_HPUX
+  /*  Get the stub address, ie assembly-routine return-from-lisp */
+  addil   L%return_from_lisp_stub-$global$,%dp
+  ldw     R%return_from_lisp_stub-$global$(0,%r1),reg_NL0
+  be,n  0(%sr5,reg_NL0)
+#else                 
+  be,n  0(%sr5,reg_NL0)
+#endif
 
 	break	0,0
 

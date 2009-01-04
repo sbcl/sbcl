@@ -199,6 +199,29 @@
   (:generator 1
     (inst break halt-trap)))
 
+#+hpux
+(define-vop (setup-return-from-lisp-stub)
+  (:results)
+  (:save-p t)
+  (:temporary (:sc any-reg :offset nl0-offset) nl0)
+  (:temporary (:sc any-reg :offset cfunc-offset) cfunc)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:vop-var vop)
+  (:generator 100
+    (let ((stub (make-fixup 'return-from-lisp-stub :assembly-routine)))
+      (inst li stub nl0))
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (inst li (make-fixup "setup_return_from_lisp_stub" :foreign) cfunc)
+      (let ((fixup (make-fixup "call_into_c" :foreign)))
+        (inst ldil fixup temp)
+        (inst ble fixup c-text-space temp))
+      (inst addi  64 nsp-tn nsp-tn)
+      (inst addi -64 nsp-tn nsp-tn)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))))
 
 ;;;; Dynamic vop count collection support
 
@@ -212,3 +235,4 @@
       (inst ldw offset count-vector count)
       (inst addi 1 count count)
       (inst stw count offset count-vector))))
+

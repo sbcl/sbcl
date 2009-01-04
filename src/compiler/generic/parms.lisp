@@ -44,6 +44,8 @@
     *current-catch-block*
     *current-unwind-protect-block*
 
+    #!+hpux *c-lra*
+
     ;; stack pointers
     *binding-stack-start*
     *control-stack-start*

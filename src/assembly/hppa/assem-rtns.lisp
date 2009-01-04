@@ -201,3 +201,26 @@
 
   (inst b *unwind-entry-point*)
   (inst move catch target))
+
+#!+hpux
+(define-assembly-routine
+  (return-from-lisp-stub (:return-style :none))
+  ((:temp lip interior-reg lip-offset)
+   (:temp nl0 descriptor-reg nl0-offset)
+   (:temp nl1 descriptor-reg nl1-offset)
+   (:temp lra descriptor-reg lra-offset))
+  ; before calling into lisp we must save our return address (reg_LRA)
+  (store-symbol-value lra *c-lra*)
+  ; note the lra we calculate next must "simulate" an fixnum,
+  ; because compute-calling-frame will use fixnump on this value.
+  ; either use 16 or 20, finetune it...
+  (inst addi 19 nl0 lra) ; then setup the new LRA (rest of this routine after branch)
+  (inst bv lip :nullify t)
+  (inst word return-pc-header-widetag)
+  ; ok, we are back from the lisp-call, lets return to c
+  ; FIX-lav: steal more stuff from call_into_lisp here, ideally the whole thing
+  (inst move ocfp-tn csp-tn) ; dont think we should ever get here
+  (inst nop)
+  (load-symbol-value nl0 *c-lra*)
+  (inst addi 1 nl0 nl0)
+  (inst ble 0 c-text-space nl0 :nullify t))

@@ -259,6 +259,8 @@
   (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
   (setf *cold-init-complete-p* t)
 
+  ; hppa heap is segmented, lisp and c uses a stub to call eachother
+  #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (gc-on)

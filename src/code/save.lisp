@@ -125,6 +125,7 @@ sufficiently motivated to do lengthy fixes."
   (labels ((restart-lisp ()
              (handling-end-of-the-world
                (reinit)
+               #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
                (funcall toplevel)))
            (foreign-bool (value)
              (if value 1 0))

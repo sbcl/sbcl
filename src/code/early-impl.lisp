@@ -33,6 +33,7 @@
                   ;; pseudo-atomicity too, but they handle it without
                   ;; messing with special variables.)
                   #!+(or x86 x86-64) *pseudo-atomic-bits*
+                  #!+(or hpux) sb!vm::*c-lra*
                   *allow-with-interrupts*
                   *interrupts-enabled*
                   *interrupt-pending*
