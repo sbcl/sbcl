@@ -12,12 +12,11 @@
 (in-package "SB!VM")
 
 
-;;;; Define the registers
+;;;; Registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *register-names* (make-array 32 :initial-element nil)))
 
-;;; FIXME: These want to turn into macrolets.
 (macrolet ((defreg (name offset)
                (let ((offset-sym (symbolicate name "-OFFSET")))
                  `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -27,11 +26,10 @@
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                  (defparameter ,name
                    (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
-
   ;; Wired-zero
   (defreg zero 0)
   ;; This gets trashed by the C call convention.
-  (defreg nfp 1)
+  (defreg nfp 1) ;; and saved by lisp before calling C
   (defreg cfunc 2)
   ;; These are the callee saves, so these registers are stay live over
   ;; call-out.
@@ -73,14 +71,19 @@
   (defreg lip 31)
 
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 nl5 nfp cfunc)
+    nl0 nl1 nl2 nl3 nl4 nl5 cfunc nargs nfp)
 
   (defregset descriptor-regs
-      fdefn lexenv nargs ocfp lra a0 a1 a2 a3 a4 a5 l0 l1 l2)
+    a0 a1 a2 a3 a4 a5 fdefn lexenv ocfp lra l0 l1 l2)
 
   (defregset *register-arg-offsets*
-      a0 a1 a2 a3 a4 a5))
+    a0 a1 a2 a3 a4 a5)
 
+  (defregset reserve-descriptor-regs
+             fdefn lexenv)
+
+  (defregset reserve-non-descriptor-regs
+             cfunc))
 
 (define-storage-base registers :finite :size 32)
 (define-storage-base float-registers :finite :size 64)
@@ -92,7 +95,7 @@
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class.
-;;;
+;;; FIX-lav: move this into arch-generic-helpers.lisp and rip out from arches
 (defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
               (let* ((class (car classes))
@@ -113,7 +116,7 @@
 
 (!define-storage-classes
 
-  ;; Non-immediate contstants in the constant pool
+  ;; Non-immediate constants in the constant pool
   (constant constant)
 
   ;; ZERO and NULL are in registers.
@@ -141,13 +144,16 @@
   (any-reg
    registers
    :locations #.(append non-descriptor-regs descriptor-regs)
-   :constant-scs (zero immediate)
+   :reserve-locations #.(append reserve-non-descriptor-regs
+                                reserve-descriptor-regs)
+   :constant-scs (constant zero immediate)
    :save-p t
    :alternate-scs (control-stack))
 
   ;; Pointer descriptor objects.  Must be seen by GC.
   (descriptor-reg registers
    :locations #.descriptor-regs
+   :reserve-locations #.reserve-descriptor-regs
    :constant-scs (constant null immediate)
    :save-p t
    :alternate-scs (control-stack))
@@ -163,12 +169,12 @@
   (complex-single-stack non-descriptor-stack :element-size 2)
   (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
 
-
   ;; **** Things that can go in the integer registers.
 
   ;; Non-Descriptor characters
   (character-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations #.reserve-non-descriptor-regs
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (character-stack))
@@ -176,6 +182,7 @@
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations #.reserve-non-descriptor-regs
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (sap-stack))
@@ -183,11 +190,13 @@
   ;; Non-Descriptor (signed or unsigned) numbers.
   (signed-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations #.reserve-non-descriptor-regs
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (signed-stack))
   (unsigned-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations #.reserve-non-descriptor-regs
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (unsigned-stack))
@@ -232,11 +241,28 @@
    :alternate-scs (complex-double-stack))
 
   ;; A catch or unwind block.
-  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size))
+  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size)
+
+
+  ;; floating point numbers temporarily stuck in integer registers for c-call
+  (single-int-carg-reg registers
+                       :locations (26 25 24 23)
+                       :alternate-scs ()
+                       :constant-scs ())
+  (double-int-carg-reg registers
+                       :locations (25 23)
+                       :constant-scs ()
+                       :alternate-scs ()
+;                       :alignment 2          ;is this needed?
+;                       :element-size 2
+                       ))
 
 
 ;;;; Make some random tns for important registers.
-
+; how can we address reg L0 through L0-offset when it is not
+; defined here ? do all registers have an -offset and this is
+; redundant work ?
+;FIX-lav: move this into arch-generic-helpers
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
@@ -248,18 +274,23 @@
   ;; These, we access by foo-TN only
 
   (defregtn zero any-reg)
+  (defregtn nargs any-reg)
+  ;FIX-lav: 20080820: not a fix, but fdefn and lexenv is used in assembly-rtns
+  (defregtn fdefn descriptor-reg) ; FIX-lav, not used
+  (defregtn lexenv descriptor-reg) ; FIX-lav, not used
+
+  (defregtn nfp descriptor-reg) ; why not descriptor-reg ?
+  (defregtn ocfp any-reg) ; why not descriptor-reg ?
+
   (defregtn null descriptor-reg)
-  (defregtn code descriptor-reg)
-  (defregtn alloc any-reg)
+
   (defregtn bsp any-reg)
-  (defregtn csp any-reg)
   (defregtn cfp any-reg)
+  (defregtn csp any-reg)
+  (defregtn alloc any-reg)
   (defregtn nsp any-reg)
 
-  ;; These alias regular locations, so we have to make sure we don't bypass
-  ;; the register allocator when using them.
-  (defregtn nargs any-reg)
-  (defregtn ocfp any-reg)
+  (defregtn code descriptor-reg)
   (defregtn lip interior-reg))
 
 ;; And some floating point values.
@@ -282,7 +313,7 @@
     (null
      (sc-number-or-lose 'null))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-         character)
+         system-area-pointer character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)
@@ -326,11 +357,11 @@
 
 ;;; A list of TN's describing the register arguments.
 ;;;
-(defparameter register-arg-tns
-  (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+(defparameter *register-arg-tns*
+  (mapcar (lambda (n)
+            (make-random-tn :kind :normal
+                            :sc (sc-or-lose 'descriptor-reg)
+                            :offset n))
           *register-arg-offsets*))
 
 ;;; This is used by the debugger.

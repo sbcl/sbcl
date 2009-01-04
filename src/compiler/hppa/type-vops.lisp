@@ -31,8 +31,7 @@
     (inst extru value 31 8 temp)
     (inst bci := not-p immediate temp target)))
 
-(defun %test-lowtag (value target not-p lowtag
-                     &key temp temp-loaded)
+(defun %test-lowtag (value target not-p lowtag &key temp temp-loaded)
   (assemble ()
     (unless temp-loaded
       (inst extru value 31 3 temp))
@@ -116,7 +115,6 @@
 
 ;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
-
 (defun signed-byte-32-test (value temp not-p target not-target)
   (multiple-value-bind
       (yep nope)
@@ -149,14 +147,13 @@
 ;;; An (unsigned-byte 32) can be represented with either a positive fixnum, a
 ;;; bignum with exactly one positive digit, or a bignum with exactly two digits
 ;;; and the second digit all zeros.
-
 (defun unsigned-byte-32-test (value temp not-p target not-target)
   (let ((nope (if not-p target not-target)))
     (assemble ()
       ;; Is it a fixnum?
       (inst extru value 31 2 zero-tn :<>)
       (inst b fixnum)
-      (inst move value temp)
+      (move value temp t)
 
       ;; If not, is it an other pointer?
       (inst extru value 31 3 temp)
@@ -170,8 +167,10 @@
       ;; Get the second digit.
       (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
-      (inst comb (if not-p := :<>) temp zero-tn not-target :nullify t)
-      (inst b target :nullify t)
+      ; Dont nullify comb here, because we cant guarantee target is forward
+      (inst comb (if not-p := :<>) temp zero-tn not-target)
+      (inst nop)
+      (inst b target)
 
       SINGLE-WORD
       ;; Get the single digit.

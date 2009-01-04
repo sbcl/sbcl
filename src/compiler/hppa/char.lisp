@@ -77,20 +77,20 @@
   (:policy :fast-safe)
   (:args (ch :scs (character-reg) :target res))
   (:arg-types character)
-  (:results (res :scs (unsigned-reg)))
+  (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (move ch res)))
+    (inst sll ch 2 res)))
 
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg) :target res))
+  (:args (code :scs (any-reg) :target res))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (move code res)))
+    (inst srl code 2 res)))
 
 ;;; Comparison of characters.
 (define-vop (character-compare)
@@ -116,3 +116,4 @@
 (define-vop (fast-char>/character character-compare)
   (:translate char>)
   (:variant :>>))
+

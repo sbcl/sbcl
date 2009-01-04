@@ -24,14 +24,12 @@
        (load-symbol y val))
       (character
        (inst li (logior (ash (char-code val) n-widetag-bits)
-                        character-widetag)
-             y)))))
+                        character-widetag) y)))))
 
 (define-move-fun (load-number 1) (vop x y)
-  ((immediate zero)
+  ((zero immediate)
    (signed-reg unsigned-reg))
-  (let ((x (tn-value x)))
-    (inst li (if (>= x (ash 1 31)) (logior (ash -1 32) x) x) y)))
+  (inst li (tn-value x) y))
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))
@@ -42,7 +40,7 @@
   (inst li (sap-int (tn-value x)) y))
 
 (define-move-fun (load-constant 5) (vop x y)
-  ((constant) (descriptor-reg))
+  ((constant) (descriptor-reg any-reg))
   (loadw y code-tn (tn-offset x) other-pointer-lowtag))
 
 (define-move-fun (load-stack 5) (vop x y)
@@ -58,7 +56,7 @@
     (loadw y nfp (tn-offset x))))
 
 (define-move-fun (store-stack 5) (vop x y)
-  ((any-reg descriptor-reg) (control-stack))
+  ((any-reg descriptor-reg null zero) (control-stack))
   (store-stack-tn y x))
 
 (define-move-fun (store-number-stack 5) (vop x y)
@@ -73,17 +71,22 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
+            :scs (any-reg descriptor-reg zero null)
             :load-if (not (location= x y))))
-  (:results (y :scs (any-reg descriptor-reg)
+  (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:effects)
   (:affected)
   (:generator 0
-    (move x y)))
+    (unless (location= x y)
+      (sc-case y
+        ((any-reg descriptor-reg)
+          (inst move x y))
+        (control-stack
+          (store-stack-tn y x))))))
 
 (define-move-vop move :move
-  (any-reg descriptor-reg)
+  (any-reg descriptor-reg zero null)
   (any-reg descriptor-reg))
 
 ;;; Make MOVE the check VOP for T so that type check generation
@@ -95,7 +98,7 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg))
+            :scs (any-reg descriptor-reg null zero))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
@@ -106,9 +109,8 @@
       (control-stack
        (storew x fp (tn-offset y))))))
 (define-move-vop move-arg :move-arg
-  (any-reg descriptor-reg)
+  (any-reg descriptor-reg null zero)
   (any-reg descriptor-reg))
-
 
 
 ;;;; ILLEGAL-MOVE
@@ -142,6 +144,7 @@
   (:note "fixnum untagging")
   (:generator 1
     (inst sra x 2 y)))
+
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
@@ -152,6 +155,7 @@
   (:note "constant load")
   (:generator 1
     (inst li (tn-value x) y)))
+
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
@@ -161,9 +165,10 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 3
-    (inst extru x 31 2 zero-tn :<>)
-    (inst sra x 2 y :tr)
+    (inst sra x 2 y)
+    (inst extru x 31 2 zero-tn :=)
     (loadw y x bignum-digits-offset other-pointer-lowtag)))
+
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
 
@@ -176,29 +181,34 @@
   (:note "fixnum tagging")
   (:generator 1
     (inst sll x 2 y)))
+
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
 ;;; RESULT may be a bignum, so we have to check.  Use a worst-case
 ;;; cost to make sure people know they may be number consing.
 (define-vop (move-from-signed)
-  (:args (x :scs (signed-reg unsigned-reg) :to (:eval 1)))
-  (:results (y :scs (any-reg descriptor-reg) :from (:eval 0)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
   (:note "signed word to integer coercion")
   (:generator 18
-    ;; Extract the top three bits.
-    (inst extrs x 2 3 temp :=)
-    ;; Invert them (unless they are already zero).
-    (inst uaddcm zero-tn temp temp)
-    ;; If we are left with zero, it will fit in a fixnum.  So branch around
-    ;; the bignum-construction, doing the shift in the delay slot.
-    (inst comb := temp zero-tn done)
-    (inst sll x 2 y)
-    ;; Make a single-digit bignum.
-    (with-fixed-allocation (y temp bignum-widetag (1+ bignum-digits-offset))
-      (storew x y bignum-digits-offset other-pointer-lowtag))
-    DONE))
+    (move arg x)
+    (let ((done (gen-label)))
+      ;; Extract the top three bits.
+      (inst extrs x 2 3 temp :=)
+      ;; Invert them (unless they are already zero).
+      (inst uaddcm zero-tn temp temp)
+      ;; If we are left with zero, it will fit in a fixnum.  So branch around
+      ;; the bignum-construction, doing the shift in the delay slot.
+      (inst comb := temp zero-tn done)
+      (inst sll x 2 y)
+      ;; Make a single-digit bignum.
+      (with-fixed-allocation
+          (y nil temp bignum-widetag (1+ bignum-digits-offset) nil)
+        (storew x y bignum-digits-offset other-pointer-lowtag))
+      (emit-label done))))
+
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
@@ -206,36 +216,27 @@
 ;;; result.  Use a worst-case cost to make sure people know they may
 ;;; be number consing.
 (define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :to (:eval 1)))
-  (:results (y :scs (any-reg descriptor-reg) :from (:eval 0)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:note "unsigned word to integer coercion")
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
   (:generator 20
-    ;; Grab the top three bits.
-    (inst extrs x 2 3 temp)
-    ;; If zero, it will fit as a fixnum.
-    (inst comib := 0 temp done)
+    (move arg x)
+    (inst srl x 29 temp)
+    (inst comb := temp zero-tn done)
     (inst sll x 2 y)
-    ;; Make a bignum.
-    (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
-      ;; Create the result pointer.
-      (inst move alloc-tn y)
-      (inst dep other-pointer-lowtag 31 3 y)
-      ;; Check the high bit, and skip the next instruction if it's 0.
+    (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 2)))
+      (set-lowtag other-pointer-lowtag alloc-tn y)
+      (inst xor temp temp temp)
       (inst comclr x zero-tn zero-tn :>=)
-      ;; The high bit is set, so allocate enough space for a two-word bignum.
-      ;; We always skip the following instruction, so it is only executed
-      ;; when we want one word.
-      (inst addi (pad-data-block 1) alloc-tn alloc-tn :tr)
-      ;; Set up the header for one word.  Use ADDI instead of LI so we can
-      ;; skip the next instruction.
-      (inst addi (logior (ash 1 n-widetag-bits) bignum-widetag) zero-tn temp :tr)
-      ;; Set up the header for two words.
-      (inst li (logior (ash 2 n-widetag-bits) bignum-widetag) temp)
-      ;; Store the header and the data.
-      (storew temp y 0 other-pointer-lowtag)
-      (storew x y bignum-digits-offset other-pointer-lowtag))
+      (inst li 1 temp)
+      (inst sll temp n-widetag-bits temp)
+      (inst addi (logior (ash 1 n-widetag-bits) bignum-widetag) temp temp)
+      (storew temp y 0 other-pointer-lowtag))
+
+    (storew x y bignum-digits-offset other-pointer-lowtag)
     DONE))
+
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
@@ -251,6 +252,7 @@
   (:note "word integer move")
   (:generator 0
     (move x y)))
+
 (define-move-vop word-move :move
   (signed-reg unsigned-reg) (signed-reg unsigned-reg))
 
@@ -268,6 +270,7 @@
        (move x y))
       ((signed-stack unsigned-stack)
        (storew x fp (tn-offset y))))))
+
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

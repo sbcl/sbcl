@@ -1,6 +1,5 @@
 (in-package "SB!VM")
 
-
 (define-vop (static-fun-template)
   (:save-p t)
   (:policy :safe)
@@ -9,18 +8,17 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg)) move-temp)
   (:temporary (:sc descriptor-reg :offset lra-offset) lra)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc interior-reg :offset lip-offset) lip)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
-  (:temporary (:sc any-reg :offset ocfp-offset) old-fp)
+  (:temporary (:sc any-reg :offset ocfp-offset) ocfp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save))
 
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
+;why do we have this ?
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defun static-fun-template-name (num-args num-results)
   (intern (format nil "~:@(~R-arg-~R-result-static-fun~)"
                   num-args num-results)))
-
 
 (defun moves (src dst)
   (collect ((moves))
@@ -56,7 +54,7 @@
         (let ((arg-name (intern (format nil "ARG-~D" i))))
           (arg-names arg-name)
           (args `(,arg-name
-                  :scs (any-reg descriptor-reg)
+                  :scs (any-reg descriptor-reg null zero)
                   :target ,(nth i (temp-names))))))
       `(define-vop (,(static-fun-template-name num-args num-results)
                     static-fun-template)
@@ -71,11 +69,11 @@
              (inst ldw (static-fun-offset symbol) null-tn lip)
              (when cur-nfp
                (store-stack-tn nfp-save cur-nfp))
-             (inst move cfp-tn old-fp)
+             (move cfp-tn ocfp)
              (inst compute-lra-from-code code-tn lra-label temp lra)
              (note-this-location vop :call-site)
              (inst bv lip)
-             (inst move csp-tn cfp-tn)
+             (move csp-tn cfp-tn t)
              (emit-return-pc lra-label)
              ,(collect ((bindings) (links))
                 (do ((temp (temp-names) (cdr temp))
@@ -98,19 +96,19 @@
 
 ) ; EVAL-WHEN
 
-(macrolet
-    ((foo ()
-       (collect ((templates (list 'progn)))
-         (dotimes (i register-arg-count)
-           (templates (static-fun-template-vop i 1)))
-         (templates))))
-  (foo))
+
+(expand
+  (collect ((templates (list 'progn)))
+    (dotimes (i register-arg-count)
+      (templates (static-fun-template-vop i 1)))
+    (templates)))
+
 
 (defmacro define-static-fun (name args &key (results '(x)) translate
-                                       policy cost arg-types result-types)
+                             policy cost arg-types result-types)
   `(define-vop (,name
                 ,(static-fun-template-name (length args)
-                                                (length results)))
+                                           (length results)))
      (:variant ',name)
      (:note ,(format nil "static-fun ~@(~S~)" name))
      ,@(when translate

@@ -22,7 +22,7 @@
     (inst li 0 count)
 
     (inst extru ptr 31 3 temp)
-    (inst comib :<> list-pointer-lowtag temp loose :nullify t)
+    (inst comib :<> list-pointer-lowtag temp lose :nullify t)
     (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
 
     LOOP
@@ -32,7 +32,7 @@
     (inst comib := list-pointer-lowtag temp loop :nullify t)
     (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
 
-    LOOSE
+    LOSE
     (cerror-call vop done object-not-list-error ptr)
 
     DONE

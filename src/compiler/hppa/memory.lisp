@@ -16,7 +16,7 @@
 ;;;
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg null zero)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 1
@@ -36,9 +36,9 @@
 ;;;
 (define-vop (slot-set)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg null zero)))
   (:variant-vars base lowtag)
   (:info offset)
-  (:generator 1
+  (:generator 4
     (storew value object (+ base offset) lowtag)))
 

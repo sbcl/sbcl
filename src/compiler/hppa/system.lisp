@@ -10,31 +10,54 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst extru object 31 3 result)))
+    (inst extru object 31 n-lowtag-bits result)))
 
+;FIX this vop got instruction-exploded after mips convert, look at old hppa
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:eval 1)))
-  (:results (result :scs (unsigned-reg) :from (:eval 0)))
+  (:args (object :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp1 temp2)
+  (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst extru object 31 3 result)
-    (inst comib := other-pointer-lowtag result other-ptr :nullify t)
-    (inst comib := fun-pointer-lowtag result function-ptr :nullify t)
-    (inst bb t object 31 done :nullify t)
-    (inst extru object 31 2 result :=)
-    (inst extru object 31 8 result)
-    (inst nop :tr)
+    (inst li lowtag-mask temp1)
+    (inst li other-pointer-lowtag temp2)
+    (inst and temp1 object temp1)
+    (inst xor temp1 temp2 temp1)
+    (inst comb := temp1 zero-tn OTHER-PTR)
+    (inst li (logxor other-pointer-lowtag fun-pointer-lowtag) temp2)
+    (inst xor temp1 temp2 temp1)
+    (inst comb := temp1 zero-tn FUNCTION-PTR)
+    (inst li 3 temp1)  ; pick off fixnums
+    (inst li 1 temp2)
+    (inst and temp1 object result)
+    (inst comb := result zero-tn DONE)
+
+    (inst and object temp2 result)
+    (inst comb :<> result zero-tn LOWTAG-ONLY :nullify t)
+
+    ; must be an other immediate
+    (inst li widetag-mask temp2)
+    (inst b DONE)
+    (inst and temp2 object result)
 
     FUNCTION-PTR
     (load-type result object (- fun-pointer-lowtag))
-    (inst nop :tr)
+    (inst b done)
+    (inst nop)
+
+    LOWTAG-ONLY
+    (inst li lowtag-mask temp1)
+    (inst b done)
+    (inst and object temp1 result)
 
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
+    (inst nop)
 
     DONE))
+
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)
@@ -43,7 +66,8 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result function (- fun-pointer-lowtag))))
+    (load-type result function (- fun-pointer-lowtag))
+    (inst nop))) ;FIX-lav, not sure this nop is needed
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
@@ -54,7 +78,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst stb type (- 3 fun-pointer-lowtag) function)
+    (inst stb type (- fun-pointer-lowtag) function)
     (move type result)))
 
 (define-vop (get-header-data)
@@ -65,7 +89,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst srl res 8 res)))
+    (inst srl res n-widetag-bits res)))
 
 (define-vop (get-closure-length)
   (:translate get-closure-length)
@@ -75,34 +99,31 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res 8 res)))
-
+    (inst srl res n-widetag-bits res)))
+;FIX-lav, not sure we need data of type immediate and zero, test without, if so revert to old hppa code
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-         (data :scs (unsigned-reg)))
+         (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst dep data 23 24 temp)
-    (storew temp x 0 other-pointer-lowtag)
-    (move x res)))
+    (loadw t1 x 0 other-pointer-lowtag)
+    ; replace below 2 inst with: (mask widetag-mask t1 t1)
+    (inst li widetag-mask t2)
+    (inst and t1 t2 t1)
+    (sc-case data
+      (any-reg
+        (inst sll data (- n-widetag-bits 2) t2)
+        (inst or t1 t2 t1))
+      (immediate
+        (inst li (ash (tn-value data) n-widetag-bits) t2)
+        (inst or t1 t2 t1))
+      (zero))
 
-(define-vop (set-header-data-c)
-  (:translate set-header-data)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg) :target res))
-  (:arg-types * (:constant (signed-byte 5)))
-  (:info data)
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 5
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst dep data 23 24 temp)
-    (storew temp x 0 other-pointer-lowtag)
+    (storew t1 x 0 other-pointer-lowtag)
     (move x res)))
 
 (define-vop (pointer-hash)
@@ -111,20 +132,24 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    ;; FIXME: It would be better if this would mask the lowtag,
-    ;; and shift the result into a positive fixnum like on x86.
     (inst zdep ptr 29 29 res)))
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))
-         (type :scs (any-reg descriptor-reg) :target temp))
-  (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
+         (type :scs (any-reg descriptor-reg immediate) :target temp))
+  (:results (res :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) t2)
   (:generator 2
-    (inst sll val (- n-widetag-bits 2) res)
-    (inst sra type 2 temp)
-    (inst or res temp res)))
-
+    (sc-case type
+      ((immediate)
+        (inst sll val n-widetag-bits temp)
+        (inst li (tn-value type) t2)
+        (inst or temp t2 res))
+      (t
+        (inst sra type 2 temp)
+        (inst sll val (- n-widetag-bits 2) res)
+        (inst or res temp res)))))
 
 ;;;; Allocation
 
@@ -164,8 +189,8 @@
   (:result-types system-area-pointer)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr 8 ndescr)
-    (inst sll ndescr 2 ndescr)
+    (inst srl ndescr n-widetag-bits ndescr)
+    (inst sll ndescr word-shift ndescr)
     (inst addi (- other-pointer-lowtag) ndescr ndescr)
     (inst add code ndescr sap)))
 
@@ -177,8 +202,9 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr 8 ndescr)
-    (inst sll ndescr 2 ndescr)
+    ;FIX-lav: replace below two with DEPW
+    (inst srl ndescr n-widetag-bits ndescr)
+    (inst sll ndescr word-shift ndescr)
     (inst add ndescr offset ndescr)
     (inst addi (- fun-pointer-lowtag other-pointer-lowtag) ndescr ndescr)
     (inst add ndescr code func)))

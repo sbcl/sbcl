@@ -1,7 +1,7 @@
 (in-package "SB!VM")
-
 
 ;;;; Machine Architecture parameters:
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; number of bits per word where a word holds one lisp descriptor
 (def!constant n-word-bits 32)
@@ -17,16 +17,16 @@
 (def!constant float-sign-shift 31)
 
 (def!constant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equal)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equal)
+(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
+(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
 (def!constant single-float-normal-exponent-min 1)
 (def!constant single-float-normal-exponent-max 254)
 (def!constant single-float-hidden-bit (ash 1 23))
 (def!constant single-float-trapping-nan-bit (ash 1 22))
 
 (def!constant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equal)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equal)
+(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
+(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
 (def!constant double-float-normal-exponent-min 1)
 (def!constant double-float-normal-exponent-max #x7FE)
 (def!constant double-float-hidden-bit (ash 1 20))
@@ -49,11 +49,11 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-negative 3)
 
-(defconstant-eqx float-rounding-mode (byte 2 7) #'equal)
-(defconstant-eqx float-sticky-bits (byte 5 27) #'equal)
-(defconstant-eqx float-traps-byte (byte 5 0) #'equal)
-(defconstant-eqx float-exceptions-byte (byte 5 27) #'equal)
-(def!constant float-condition-bit (ash 1 26))
+(defconstant-eqx float-rounding-mode (byte 2 7) #'equalp)
+(defconstant-eqx float-sticky-bits (byte 5 27) #'equalp)
+(defconstant-eqx float-traps-byte (byte 5 0) #'equalp)
+(defconstant-eqx float-exceptions-byte (byte 5 27) #'equalp)
+(defconstant-eqx float-condition-bit (ash 1 26) #'equalp)
 (def!constant float-fast-bit 0)                   ; No fast mode on HPPA.
 
 
@@ -62,27 +62,34 @@
 
 ;;; Where to put the different spaces.
 ;;;
-(def!constant read-only-space-start #x20000000)
-(def!constant read-only-space-end   #x24000000)
+(def!constant read-only-space-start #x4b000000)
+(def!constant read-only-space-end   #x4dff0000)
 
-(def!constant static-space-start    #x28000000)
-(def!constant static-space-end      #x2a000000)
+(def!constant static-space-start    #x4e000000)
+(def!constant static-space-end      #x4fff0000)
 
-(def!constant dynamic-0-space-start   #x30000000)
-(def!constant dynamic-0-space-end     #x37fff000)
-(def!constant dynamic-1-space-start   #x38000000)
-(def!constant dynamic-1-space-end     #x3ffff000)
+(def!constant dynamic-0-space-start   #x50000000)
+(def!constant dynamic-0-space-end     #x54000000)
+(def!constant dynamic-1-space-start   #x60000000)
+(def!constant dynamic-1-space-end     #x64000000)
 
-;;; FIXME: WTF are these for?
+); eval-when
+
+;;; When doing external branching on hppa (e.g. inst ble)
+;;; we must know which space we want to jump into (text, code)
 
 ;; The space-register holding the lisp heap.
 (def!constant lisp-heap-space 5)
 
-;; The space-register holding the C text segment.
+;; The space-register holding the C text heap.
 (def!constant c-text-space 4)
 
 
 ;;;; Other random constants.
+
+(defenum (:suffix -flag)
+  atomic
+  interrupted)
 
 (defenum (:suffix -trap :start 8)
   halt
@@ -91,7 +98,10 @@
   cerror
   breakpoint
   fun-end-breakpoint
-  single-step-breakpoint)
+  single-step-breakpoint
+  single-step-around
+  single-step-before
+  single-step-after)
 
 (defenum (:prefix trace-table-)
   normal
@@ -125,11 +135,14 @@
     sb!kernel:two-arg-<
     sb!kernel:two-arg->
     sb!kernel:two-arg-=
+    sb!kernel:two-arg-<=
+    sb!kernel:two-arg->=
+    sb!kernel:two-arg-/=
     eql
     sb!kernel:%negate
     sb!kernel:two-arg-and
     sb!kernel:two-arg-ior
     sb!kernel:two-arg-xor
     sb!kernel:two-arg-gcd
-    sb!kernel:two-arg-lcm
-    ))
+    sb!kernel:two-arg-lcm))
+

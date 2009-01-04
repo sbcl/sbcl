@@ -11,13 +11,25 @@
 (in-package "SB!VM")
 
 
-;;; Instruction-like macros.
 
-(defmacro move (src dst)
-  "Move SRC into DST unless they are location=."
-  (once-only ((src src) (dst dst))
-    `(unless (location= ,src ,dst)
-       (inst move ,src ,dst))))
+(defmacro expand (expr)
+  (let ((gensym (gensym)))
+    `(macrolet
+       ((,gensym ()
+           ,expr))
+       (,gensym))))
+
+;;; Instruction-like macros.
+;;; FIX-lav: add if always-emit-code-p is :e= then error if location=
+(defmacro move (src dst &optional always-emit-code-p)
+  #!+sb-doc
+  "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P is nil)."
+  (once-only ((n-src src)
+              (n-dst dst))
+    `(if (location= ,n-dst ,n-src)
+       (when ,always-emit-code-p
+         (inst nop))
+       (inst move ,n-src ,n-dst))))
 
 (defmacro loadw (result base &optional (offset 0) (lowtag 0))
   (once-only ((result result) (base base))
@@ -36,8 +48,7 @@
          (+ (static-symbol-offset ',symbol)
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))
-         null-tn
-         ,reg))
+         null-tn ,reg))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst stw ,reg (+ (static-symbol-offset ',symbol)
@@ -46,13 +57,17 @@
          null-tn))
 
 (defmacro load-type (target source &optional (offset 0))
+  #!+sb-doc
   "Loads the type bits of a pointer into target independent of
-   byte-ordering issues."
-  (ecase *backend-byte-order*
-    (:little-endian
-     `(inst ldb ,offset ,source ,target))
-    (:big-endian
-     `(inst ldb (+ ,offset (1- n-word-bytes)) ,source ,target))))
+byte-ordering issues."
+  (once-only ((n-target target)
+              (n-source source)
+              (n-offset offset))
+    (ecase *backend-byte-order*
+      (:little-endian
+       `(inst ldb ,n-offset ,n-source ,n-target))
+      (:big-endian
+       `(inst ldb (+ ,n-offset (1- n-word-bytes)) ,n-source ,n-target)))))
 
 (defmacro set-lowtag (tag src dst)
   `(progn
@@ -63,28 +78,31 @@
 ;;; return instructions.
 
 (defmacro lisp-jump (function)
-  "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
+  #!+sb-doc
+  "Jump to the lisp function FUNCTION."
   `(progn
-     (inst addi
-           (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
-           ,function
-           lip-tn)
+     (inst addi (- (ash simple-fun-code-offset word-shift)
+                   fun-pointer-lowtag) ,function lip-tn)
      (inst bv lip-tn)
-     (move ,function code-tn)))
+     (move ,function code-tn t)))
 
 (defmacro lisp-return (return-pc &key (offset 0) (frob-code t))
+  #!+sb-doc
   "Return to RETURN-PC."
   `(progn
      (inst addi (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag)
            ,return-pc lip-tn)
      (inst bv lip-tn ,@(unless frob-code '(:nullify t)))
-     ,@(when frob-code
-         `((move ,return-pc code-tn)))))
+     ,@(if frob-code
+         `((move ,return-pc code-tn t)))))
 
 (defmacro emit-return-pc (label)
+  #!+sb-doc
   "Emit a return-pc header word.  LABEL is the label to use for this
    return-pc."
   `(progn
+     ; alignment causes the return point to land on two address,
+     ; where the first must be nop pad.
      (emit-alignment n-lowtag-bits)
      (emit-label ,label)
      (inst lra-header-word)))
@@ -100,6 +118,7 @@
        (sc-case stack
          ((control-stack)
           (loadw reg cfp-tn offset))))))
+
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
          (reg ,reg))
@@ -109,6 +128,7 @@
           (storew reg cfp-tn offset))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
+  #!+sb-doc
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
@@ -169,7 +189,7 @@ initializes the object."
 
 
 ;;;; Error Code
-(eval-when (compile load eval)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
       `((let ((vop ,vop))
@@ -191,19 +211,23 @@ initializes the object."
         (emit-alignment word-shift)))))
 
 (defmacro error-call (vop error-code &rest values)
+  #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
   (cons 'progn
         (emit-error-break vop error-trap error-code values)))
 
 
 (defmacro cerror-call (vop label error-code &rest values)
+  #!+sb-doc
   "Cause a continuable error.  If the error is continued, execution resumes at
   LABEL."
   `(progn
-     (inst b ,label)
-     ,@(emit-error-break vop cerror-trap error-code values)))
+     (without-scheduling ()
+       (inst b ,label)
+       ,@(emit-error-break vop cerror-trap error-code values))))
 
 (defmacro generate-error-code (vop error-code &rest values)
+  #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   `(assemble (*elsewhere*)
@@ -213,6 +237,7 @@ initializes the object."
        start-lab)))
 
 (defmacro generate-cerror-code (vop error-code &rest values)
+  #!+sb-doc
   "Generate-CError-Code Error-code Value*
   Emit code for a continuable error with the specified Error-Code and
   context Values.  If the error is continued, execution resumes after
@@ -255,15 +280,15 @@ initializes the object."
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg) :to (:eval 0))
-              (index :scs (any-reg) :target temp))
+       (:args (object :scs (descriptor-reg))
+              (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
-       (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) temp)
+       (:temporary (:scs (interior-reg)) lip)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 5
-         (inst addi (- (* ,offset n-word-bytes) ,lowtag) index temp)
-         (inst ldwx temp object value)))
+         (inst add object index lip)
+         (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -276,8 +301,7 @@ initializes the object."
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 4
-         (inst ldw (- (* (+ ,offset index) n-word-bytes) ,lowtag)
-               object value)))))
+         (loadw value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                                    &optional translate)
@@ -295,7 +319,7 @@ initializes the object."
        (:result-types ,el-type)
        (:generator 2
          (inst add object index lip)
-         (inst stw value (- (* ,offset n-word-bytes) ,lowtag) lip)
+         (storew value lip ,offset ,lowtag)
          (move value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
@@ -311,7 +335,7 @@ initializes the object."
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 1
-         (inst stw value (- (* (+ ,offset index) n-word-bytes) ,lowtag) object)
+         (storew value object (+ ,offset index) ,lowtag)
          (move value result)))))
 
 
@@ -406,3 +430,4 @@ garbage collection.  This is currently implemented by disabling GC"
   (declare (ignore objects))            ;should we eval these for side-effect?
   `(without-gcing
     ,@body))
+

@@ -13,13 +13,12 @@
 
 (!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
-    (:raw
+    ((:raw :none)
      (with-unique-names (fixup)
        (values
         `((let ((fixup (make-fixup ',name :assembly-routine)))
             (inst ldil fixup ,fixup)
-            (inst ble fixup lisp-heap-space ,fixup :nullify t))
-          (inst nop))
+            (inst ble fixup lisp-heap-space ,fixup :nullify t)))
         `((:temporary (:scs (any-reg) :from (:eval 0) :to (:eval 1))
                       ,fixup)))))
     (:full-call
@@ -32,32 +31,26 @@
             (when cur-nfp
               (store-stack-tn ,nfp-save cur-nfp))
             (inst compute-lra-from-code code-tn lra-label ,temp ,lra)
-            (note-this-location ,vop :call-site)
+            (note-next-instruction ,vop :call-site)
             (let ((fixup (make-fixup ',name :assembly-routine)))
               (inst ldil fixup ,temp)
               (inst be fixup lisp-heap-space ,temp :nullify t))
-            (emit-return-pc lra-label)
-            (note-this-location ,vop :single-value-return)
-            (move ocfp-tn csp-tn)
+            (without-scheduling ()
+              (emit-return-pc lra-label)
+              (note-this-location ,vop :single-value-return)
+              (inst move ocfp-tn csp-tn)
+              (inst nop)) ; this nop is here because of emit-return-pc align
             (inst compute-code-from-lra code-tn lra-label ,temp code-tn)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))
         `((:temporary (:scs (non-descriptor-reg) :from (:eval 0) :to (:eval 1))
                       ,temp)
           (:temporary (:sc descriptor-reg :offset lra-offset
-                           :from (:eval 0) :to (:eval 1))
+                       :from (:eval 0) :to (:eval 1))
                       ,lra)
           (:temporary (:scs (control-stack) :offset nfp-save-offset)
                       ,nfp-save)
-          (:save-p :compute-only)))))
-    (:none
-     (with-unique-names (fixup)
-       (values
-        `((let ((fixup (make-fixup ',name :assembly-routine)))
-            (inst ldil fixup ,fixup)
-            (inst be fixup lisp-heap-space ,fixup :nullify t)))
-        `((:temporary (:scs (any-reg) :from (:eval 0) :to (:eval 1))
-                      ,fixup)))))))
+          (:save-p t)))))))
 
 (!def-vm-support-routine generate-return-sequence (style)
   (ecase style

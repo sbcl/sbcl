@@ -14,6 +14,7 @@
 
 (in-package "SB!VM")
 
+; FIX-lav, can we do this in assembly instead ?
 (defun sanctify-for-execution (component)
   (without-gcing
    (alien-funcall (extern-alien "sanctify_for_execution"

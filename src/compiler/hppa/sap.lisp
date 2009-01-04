@@ -15,23 +15,25 @@
 
 ;;; Move a tagged SAP to an untagged representation.
 (define-vop (move-to-sap)
-  (:args (x :scs (descriptor-reg)))
+  (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (sap-reg)))
   (:note "system area pointer indirection")
   (:generator 1
     (loadw y x sap-pointer-slot other-pointer-lowtag)))
+
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
 
 ;;; Move an untagged SAP to a tagged representation.
 (define-vop (move-from-sap)
-  (:args (x :scs (sap-reg) :to (:eval 1)))
+  (:args (sap :scs (sap-reg) :to :save))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:results (y :scs (descriptor-reg) :from (:eval 0)))
+  (:results (res :scs (descriptor-reg)))
   (:note "system area pointer allocation")
   (:generator 20
-    (with-fixed-allocation (y ndescr sap-widetag sap-size)
-      (storew x y sap-pointer-slot other-pointer-lowtag))))
+    (with-fixed-allocation (res nil ndescr sap-widetag sap-size nil)
+      (storew sap res sap-pointer-slot other-pointer-lowtag))))
+
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
@@ -42,10 +44,12 @@
             :load-if (not (location= x y))))
   (:results (y :scs (sap-reg)
                :load-if (not (location= x y))))
+  (:note "SAP move")
   (:effects)
   (:affected)
   (:generator 0
     (move x y)))
+
 (define-move-vop sap-move :move
   (sap-reg) (sap-reg))
 
@@ -56,12 +60,14 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y sap-reg))))
   (:results (y))
+  (:note "SAP argument move")
   (:generator 0
     (sc-case y
       (sap-reg
        (move x y))
       (sap-stack
        (storew x fp (tn-offset y))))))
+
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))
 
@@ -94,25 +100,24 @@
 ;;;; POINTER+ and POINTER-
 (define-vop (pointer+)
   (:translate sap+)
-  (:args (ptr :scs (sap-reg) :target res)
-         (offset :scs (signed-reg)))
+  (:args (ptr :scs (sap-reg))
+         (offset :scs (signed-reg immediate)))
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:policy :fast-safe)
   (:generator 1
-    (inst add ptr offset res)))
-
-(define-vop (pointer+-c)
-  (:translate sap+)
-  (:args (ptr :scs (sap-reg)))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 11)))
-  (:results (res :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:policy :fast-safe)
-  (:generator 1
-    (inst addi offset ptr res)))
+    (sc-case offset
+      (signed-reg
+        (inst add ptr offset res))
+      (immediate
+        (cond
+          ((and (< (tn-value offset) (ash 1 10))
+                (> (tn-value offset) (- (ash 1 10))))
+            (inst addi (tn-value offset) ptr res))
+          (t
+            (inst li (tn-value offset) res)
+            (inst add ptr res res)))))))
 
 (define-vop (pointer-)
   (:translate sap-)
@@ -243,10 +248,8 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (inst addi
-          (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-          vector
-          sap)))
+    (inst addi (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+               vector sap)))
 
 ;;; Transforms for 64-bit SAP accessors.
 

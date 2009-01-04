@@ -10,11 +10,10 @@
 ;;; non-local entry.
 (!def-vm-support-routine make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
-
 
 ;;; Save and restore dynamic environment.
 ;;;
-;;;    These VOPs are used in the reentered function to restore the appropriate
+;;; These VOPs are used in the reentered function to restore the appropriate
 ;;; dynamic environment.  Currently we only save the Current-Catch and binding
 ;;; stack pointer.  We don't need to save/restore the current unwind-protect,
 ;;; since unwind-protects are implicitly processed during unwinding.  If there
@@ -83,23 +82,24 @@
   (:args (tn)
          (tag :scs (any-reg descriptor-reg)))
   (:info entry-label)
-  (:results (block :scs (any-reg) :from (:argument 0)))
+  (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
-    (inst addi (* (tn-offset tn) n-word-bytes) cfp-tn block)
+    (inst addi (* (tn-offset tn) n-word-bytes) cfp-tn result)
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block catch-block-current-uwp-slot)
-    (storew cfp-tn block catch-block-current-cont-slot)
-    (storew code-tn block catch-block-current-code-slot)
+    (storew temp result catch-block-current-uwp-slot)
+    (storew cfp-tn result catch-block-current-cont-slot)
+    (storew code-tn result catch-block-current-code-slot)
     (inst compute-lra-from-code code-tn entry-label ndescr temp)
-    (storew temp block catch-block-entry-pc-slot)
+    (storew temp result catch-block-entry-pc-slot)
 
-    (storew tag block catch-block-tag-slot)
+    (storew tag result catch-block-tag-slot)
     (load-symbol-value temp *current-catch-block*)
-    (storew temp block catch-block-previous-catch-slot)
-    (store-symbol-value block *current-catch-block*)))
-
+    (storew temp result catch-block-previous-catch-slot)
+    (store-symbol-value result *current-catch-block*)
+    (move result block)))
 
 ;;; Just set the current unwind-protect to TN's address.  This instantiates an
 ;;; unwind block as an unwind-protect.
@@ -149,9 +149,9 @@
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
+           (loadw (tn-ref-tn values) start)
            (inst comclr count zero-tn zero-tn :<>)
-           (inst move null-tn (tn-ref-tn values) :tr)
-           (loadw (tn-ref-tn values) start))
+           (move null-tn (tn-ref-tn values) t))
           (t
            (collect ((defaults))
              (do ((i 0 (1+ i))
@@ -160,31 +160,27 @@
                (let ((default-lab (gen-label))
                      (tn (tn-ref-tn tn-ref)))
                  (defaults (cons default-lab tn))
-
-                 (inst bci := nil (fixnumize i) count default-lab)
+                 (inst comb := zero-tn count default-lab)
+                 (inst addi (fixnumize -1) count count)
                  (sc-case tn
                    ((descriptor-reg any-reg)
-                    (loadw tn start i))
+                     (loadw tn start i))
                    (control-stack
-                    (loadw move-temp start i)
-                    (store-stack-tn tn move-temp)))))
-
+                     (loadw move-temp start i)
+                     (store-stack-tn tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
-
                (assemble (*elsewhere*)
-                 (do ((defs (defaults) (cdr defs)))
-                     ((null defs))
-                   (let ((def (car defs)))
-                     (emit-label (car def))
-                     (unless (cdr defs)
-                       (inst b defaulting-done))
-                     (let ((tn (cdr def)))
-                       (sc-case tn
-                         ((descriptor-reg any-reg)
-                          (move null-tn tn))
-                         (control-stack
-                          (store-stack-tn tn null-tn)))))))))))
+                 (dolist (def (defaults))
+                   (emit-label (car def))
+                   (let ((tn (cdr def)))
+                     (sc-case tn
+                       ((descriptor-reg any-reg)
+                         (move null-tn tn))
+                       (control-stack
+                         (store-stack-tn tn null-tn)))))
+                 (inst b defaulting-done)
+                 (inst nop)))))) ; FIX remove me or tell why I'm needed
     (load-stack-tn csp-tn sp)))
 
 
@@ -203,32 +199,32 @@
   (:generator 30
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)
+    (let ((loop (gen-label))
+          (done (gen-label)))
 
-    ;; Copy args.
-    (load-stack-tn dst top)
-    (move start src)
-    (move count num)
+      ;; Copy args.
+      (load-stack-tn dst top)
+      (move start src)
+      (move count num)
 
-    ;; Establish results.
-    (sc-case new-start
-      (any-reg (move dst new-start))
-      (control-stack (store-stack-tn new-start dst)))
-    (inst comb := num zero-tn done)
-    (sc-case new-count
-      (any-reg (inst move num new-count))
-      (control-stack (store-stack-tn new-count num)))
-    ;; Load the first word.
-    (inst ldwm n-word-bytes src temp)
+      ;; Establish results.
+      (sc-case new-start
+        (any-reg (move dst new-start))
+        (control-stack (store-stack-tn new-start dst)))
+      (inst comb := num zero-tn done)
+      (inst nop) ; fix-lav remove nop
+      (sc-case new-count
+        (any-reg (move num new-count))
+        (control-stack (store-stack-tn new-count num)))
 
-    ;; Copy stuff on stack.
-    LOOP
-    (inst stwm temp n-word-bytes dst)
-    (inst addib :<> (fixnumize -1) num loop :nullify t)
-    (inst ldwm n-word-bytes src temp)
+      ;; Copy stuff on stack.
+      (emit-label loop)
+      (inst ldwm n-word-bytes src temp)
+      (inst addib :<> (fixnumize -1) num loop)
+      (inst stwm temp n-word-bytes dst)
 
-    DONE
-    (inst move dst csp-tn)))
-
+      (emit-label done)
+      (move dst csp-tn))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;

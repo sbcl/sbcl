@@ -24,7 +24,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg null zero)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -44,7 +44,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:temporary (:type random  :scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.  So
@@ -65,7 +65,7 @@
   (:info target not-p)
   (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value)
-  (:temporary (:type random  :scs (non-descriptor-reg)) temp))
+  (:temporary (:scs (non-descriptor-reg)) temp))
 
 (define-vop (boundp boundp-frob)
   (:translate boundp)
@@ -83,15 +83,15 @@
   (:policy :fast-safe)
   (:translate symbol-hash)
   (:args (symbol :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    ;; The symbol-hash slot of NIL holds NIL because it is also the
-    ;; cdr slot, so we have to strip off the two low bits to make sure
-    ;; it is a fixnum.  The lowtag selection magic that is required to
-    ;; ensure this is explained in the comment in objdef.lisp
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst andcm res #b11 res)))
+    (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
+    (inst dep 0 31 n-fixnum-tag-bits temp)
+    ; we must go through an temporary to avoid gc
+    (move temp res)))
+
 
 ;;;; Fdefinition (fdefn) objects.
 
@@ -119,16 +119,17 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (load-type type function (- fun-pointer-lowtag))
-    (inst addi (- simple-fun-header-widetag) type type)
-    (inst comb := type zero-tn normal-fn)
-    (inst addi (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
-          function lip)
-    (inst li (make-fixup "closure_tramp" :foreign) lip)
-    NORMAL-FN
-    (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-    (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (move function result)))
+    (let ((normal-fn (gen-label)))
+      (load-type type function (- fun-pointer-lowtag))
+      (inst addi (- simple-fun-header-widetag) type type)
+      (inst comb := type zero-tn normal-fn)
+      (inst addi (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
+            function lip)
+      (inst li (make-fixup 'closure-tramp :assembly-routine) lip)
+      (emit-label normal-fn)
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
+      (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+      (move function result))))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
@@ -141,7 +142,6 @@
     (inst li (make-fixup "undefined_tramp" :foreign) temp)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move fdefn result)))
-
 
 
 ;;;; Binding and Unbinding.
@@ -156,7 +156,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst addi (* binding-size n-word-bytes) bsp-tn bsp-tn)
+    (inst addi (* 2 n-word-bytes) bsp-tn bsp-tn)
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
@@ -169,29 +169,32 @@
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-    (inst addi (- (* binding-size n-word-bytes)) bsp-tn bsp-tn)))
+    (inst addi (- (* 2 n-word-bytes)) bsp-tn bsp-tn)))
 
 (define-vop (unbind-to-here)
-  (:args (where :scs (descriptor-reg any-reg)))
+  (:args (arg :scs (descriptor-reg any-reg) :target where))
+  (:temporary (:scs (any-reg) :from (:argument 0)) where)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-    (inst comb := where bsp-tn done :nullify t)
-    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (let ((loop (gen-label))
+          (skip (gen-label))
+          (done (gen-label)))
+      (move arg where)
+      (inst comb := where bsp-tn done :nullify t)
 
-    LOOP
-    (inst comb := symbol zero-tn skip)
-    (loadw value bsp-tn (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+      (emit-label loop)
+      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+      (inst comb := symbol zero-tn skip)
+      (loadw value bsp-tn (- binding-value-slot binding-size))
+      (storew value symbol symbol-value-slot other-pointer-lowtag)
+      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
-    SKIP
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-    (inst addi (* -2 n-word-bytes) bsp-tn bsp-tn)
-    (inst comb :<> where bsp-tn loop :nullify t)
-    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-
-    DONE))
-
+      (emit-label skip)
+      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+      (inst addi (* -2 n-word-bytes) bsp-tn bsp-tn)
+      (inst comb :<> where bsp-tn loop)
+      (inst nop)
+      (emit-label done))))
 
 
 ;;;; Closure indexing.
@@ -202,7 +205,7 @@
 
 (define-full-setter set-funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
-  (descriptor-reg any-reg) * %set-funcallable-instance-info)
+  (descriptor-reg any-reg null zero) * %set-funcallable-instance-info)
 
 (define-full-reffer funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
@@ -240,7 +243,7 @@
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
+  instance-pointer-lowtag (descriptor-reg any-reg null zero) * %instance-set)
 
 
 
@@ -250,7 +253,8 @@
   (descriptor-reg any-reg) * code-header-ref)
 
 (define-full-setter code-header-set * 0 other-pointer-lowtag
-  (descriptor-reg any-reg) * code-header-set)
+  (descriptor-reg any-reg null zero) * code-header-set)
+
 
 ;;;; raw instance slot accessors
 

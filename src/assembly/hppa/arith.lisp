@@ -49,8 +49,6 @@
   (inst xor res sign res)
   (inst add res sign res))
 
-
-#+sb-assembling
 (define-assembly-routine
     (truncate)
     ((:arg dividend signed-reg nl0-offset)
@@ -58,7 +56,6 @@
 
      (:res quo signed-reg nl2-offset)
      (:res rem signed-reg nl3-offset))
-
   ;; Move abs(divident) into quo.
   (inst move dividend quo :>=)
   (inst sub zero-tn quo quo)
@@ -87,7 +84,6 @@
   (inst move dividend zero-tn :>=)
   (inst sub zero-tn rem rem))
 
-
 
 ;;;; Generic arithmetic.
 
@@ -99,26 +95,43 @@
                           (:save-p t))
                          ((:arg x (descriptor-reg any-reg) a0-offset)
                           (:arg y (descriptor-reg any-reg) a1-offset)
-
                           (:res res (descriptor-reg any-reg) a0-offset)
-
-                          (:temp lip interior-reg lip-offset)
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp1 non-descriptor-reg nl1-offset)
+                          (:temp temp2 non-descriptor-reg nl2-offset)
                           (:temp lra descriptor-reg lra-offset)
+                          (:temp lip interior-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
-  (inst extru x 31 2 zero-tn :=)
-  (inst b do-static-fun :nullify t)
-  (inst extru y 31 2 zero-tn :=)
-  (inst b do-static-fun :nullify t)
-  (inst addo x y res)
+  ;; If either arg is not fixnum, use two-arg-+ to summarize
+  (inst or x y temp)
+  (inst extru temp 31 3 zero-tn :=)
+  (inst b DO-STATIC-FUN :nullify t)
+  ;; check for overflow
+  (inst add x y temp)
+  (inst xor temp x temp1)
+  (inst xor temp y temp2)
+  (inst and temp1 temp2 temp1)
+  (inst bc :< nil temp1 zero-tn DO-OVERFLOW)
+  (inst move temp res)
+  (lisp-return lra :offset 1)
+
+  DO-OVERFLOW
+  ;; We did overflow, so do the bignum version
+  (inst sra x n-fixnum-tag-bits temp1)
+  (inst sra y n-fixnum-tag-bits temp2)
+  (inst add temp1 temp2 temp)
+  (with-fixed-allocation (res nil temp2 bignum-widetag
+                          (1+ bignum-digits-offset) nil)
+    (storew temp res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra :offset 1)
 
   DO-STATIC-FUN
   (inst ldw (static-fun-offset 'two-arg-+) null-tn lip)
   (inst li (fixnumize 2) nargs)
-  (inst move cfp-tn ocfp)
+  (move cfp-tn ocfp)
   (inst bv lip)
-  (inst move csp-tn cfp-tn))
+  (move csp-tn cfp-tn t))
 
 (define-assembly-routine (generic--
                           (:cost 10)
@@ -131,24 +144,42 @@
 
                           (:res res (descriptor-reg any-reg) a0-offset)
 
-                          (:temp lip interior-reg lip-offset)
+                          (:temp temp non-descriptor-reg nl0-offset)
+                          (:temp temp1 non-descriptor-reg nl1-offset)
+                          (:temp temp2 non-descriptor-reg nl2-offset)
                           (:temp lra descriptor-reg lra-offset)
+                          (:temp lip interior-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
-  (inst extru x 31 2 zero-tn :=)
-  (inst b do-static-fun :nullify t)
-  (inst extru y 31 2 zero-tn :=)
-  (inst b do-static-fun :nullify t)
-  (inst subo x y res)
+  ;; If either arg is not fixnum, use two-arg-+ to summarize
+  (inst or x y temp)
+  (inst extru temp 31 3 zero-tn :=)
+  (inst b DO-STATIC-FUN :nullify t)
+  (inst sub x y temp)
+  ;; check for overflow
+  (inst xor x y temp1)
+  (inst xor x temp temp2)
+  (inst and temp2 temp1 temp1)
+  (inst bc :< nil temp1 zero-tn DO-OVERFLOW)
+  (inst move temp res)
+  (lisp-return lra :offset 1)
+
+  DO-OVERFLOW
+  ;; We did overflow, so do the bignum version
+  (inst sra x n-fixnum-tag-bits temp1)
+  (inst sra y n-fixnum-tag-bits temp2)
+  (inst sub temp1 temp2 temp)
+  (with-fixed-allocation (res nil temp2 bignum-widetag
+                          (1+ bignum-digits-offset) nil)
+    (storew temp res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra :offset 1)
 
   DO-STATIC-FUN
   (inst ldw (static-fun-offset 'two-arg--) null-tn lip)
   (inst li (fixnumize 2) nargs)
-  (inst move cfp-tn ocfp)
+  (move cfp-tn ocfp)
   (inst bv lip)
-  (inst move csp-tn cfp-tn))
-
+  (move csp-tn cfp-tn t))
 
 
 ;;;; Comparison routines.

@@ -1,8 +1,7 @@
 (in-package "SB!VM")
 
-
 (define-vop (debug-cur-sp)
-  (:translate current-sp)
+  (:translate sb!di::current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -10,7 +9,7 @@
     (move csp-tn res)))
 
 (define-vop (debug-cur-fp)
-  (:translate current-fp)
+  (:translate sb!di::current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -18,7 +17,7 @@
     (move cfp-tn res)))
 
 (define-vop (read-control-stack)
-  (:translate stack-ref)
+  (:translate sb!kernel:stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg))
          (offset :scs (any-reg)))
@@ -27,12 +26,12 @@
   (:result-types *)
   (:generator 5
     (inst ldwx offset object result)))
-
 (define-vop (read-control-stack-c)
-  (:translate stack-ref)
+  (:translate sb!kernel:stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg)))
   (:info offset)
+  ; make room for multiply by limiting to 12 bits
   (:arg-types system-area-pointer (:constant (signed-byte 12)))
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
@@ -40,7 +39,7 @@
     (inst ldw (* offset n-word-bytes) object result)))
 
 (define-vop (write-control-stack)
-  (:translate %set-stack-ref)
+  (:translate sb!kernel:%set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg))
@@ -53,7 +52,6 @@
     (inst add object offset sap)
     (inst stw value 0 sap)
     (move value result)))
-
 (define-vop (write-control-stack-c)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
@@ -69,27 +67,32 @@
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)
-  (:args (thing :scs (descriptor-reg) :to :save))
+  (:args (thing :scs (descriptor-reg)))
   (:results (code :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:variant-vars lowtag)
   (:generator 5
-    (loadw temp thing 0 lowtag)
-    (inst srl temp n-widetag-bits temp)
-    (inst comb := zero-tn temp done)
-    (move null-tn code)
-    (inst sll temp (1- (integer-length n-word-bytes)) temp)
-    (unless (= lowtag other-pointer-lowtag)
-      (inst addi (- lowtag other-pointer-lowtag) temp temp))
-    (inst sub thing temp code)
-    DONE))
+    (let ((bogus (gen-label))
+          (done (gen-label)))
+      (loadw temp thing 0 lowtag)
+      (inst srl temp n-widetag-bits temp)
+      (inst comb := zero-tn temp bogus)
+      (inst sll temp (1- (integer-length n-word-bytes)) temp)
+      (unless (= lowtag other-pointer-lowtag)
+        (inst addi (- lowtag other-pointer-lowtag) temp temp))
+      (inst sub thing temp code)
+      (emit-label done)
+      (assemble (*elsewhere*)
+        (emit-label bogus)
+        (inst b done)
+        (move null-tn code t)))))
 
 (define-vop (code-from-lra code-from-mumble)
-  (:translate lra-code-header)
+  (:translate sb!di::lra-code-header)
   (:variant other-pointer-lowtag))
 
 (define-vop (code-from-fun code-from-mumble)
-  (:translate fun-code-header)
+  (:translate sb!di::fun-code-header)
   (:variant fun-pointer-lowtag))
 
 (define-vop (%make-lisp-obj)
@@ -103,7 +106,7 @@
 
 (define-vop (get-lisp-obj-address)
   (:policy :fast-safe)
-  (:translate get-lisp-obj-address)
+  (:translate sb!di::get-lisp-obj-address)
   (:args (thing :scs (descriptor-reg) :target result))
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
@@ -112,7 +115,7 @@
 
 (define-vop (fun-word-offset)
   (:policy :fast-safe)
-  (:translate fun-word-offset)
+  (:translate sb!di::fun-word-offset)
   (:args (fun :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
