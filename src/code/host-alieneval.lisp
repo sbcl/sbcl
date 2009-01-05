@@ -869,13 +869,15 @@
 
 (define-alien-type-method (mem-block :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap+ ,sap (/ ,offset sb!vm:n-byte-bits)))
+  `(sap+ ,sap (truncate ,offset sb!vm:n-byte-bits)))
 
 (define-alien-type-method (mem-block :deposit-gen) (type sap offset value)
-  (let ((bytes (truncate (alien-mem-block-type-bits type) sb!vm:n-byte-bits)))
-    (unless bytes
+  (let ((bits (alien-mem-block-type-bits type)))
+    (unless bits
       (error "can't deposit aliens of type ~S (unknown size)" type))
-    `(sb!kernel:system-area-ub8-copy ,value 0 ,sap ,offset ',bytes)))
+    `(sb!kernel:system-area-ub8-copy ,value 0 ,sap
+      (truncate ,offset sb!vm:n-byte-bits)
+      ',(truncate bits sb!vm:n-byte-bits))))
 
 ;;;; the ARRAY type
 

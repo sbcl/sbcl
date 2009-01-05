@@ -355,6 +355,21 @@ run_sbcl <<EOF
 EOF
 check_status_maybe_lose "ADDR of a heap-allocated object" $?
 
+run_sbcl <<EOF
+  (define-alien-type inner (struct inner (var (unsigned 32))))
+  (define-alien-type outer (struct outer (one inner) (two inner)))
+
+  (defvar *outer* (make-alien outer))
+  (defvar *inner* (make-alien inner))
+  (setf (slot *inner* 'var) 20)
+  (setf (slot *outer* 'one) *inner*)
+  (assert (= (slot (slot *outer* 'one) 'var) 20))
+  (setf (slot *inner* 'var) 40)
+  (setf (slot *outer* 'two) *inner*)
+  (assert (= (slot (slot *outer* 'two) 'var) 40))
+  (quit :unix-status $EXIT_LISP_WIN)
+EOF
+check_status_maybe_lose "struct offsets" $?
 
 # success convention for script
 exit $EXIT_TEST_WIN
