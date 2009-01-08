@@ -17,7 +17,9 @@ use_test_subdirectory
 flag="condition-wait-sigcont.tmp"
 touch $flag
 
-run_sbcl --load "$SBCL_PWD/condition-wait-sigcont.lisp" &
+# $! is not set correctly when calling run_sbcl, do it directly
+"$SBCL_RUNTIME" --core "$SBCL_CORE" \
+    --load "$SBCL_PWD/condition-wait-sigcont.lisp" &
 sb_pid=$!
 
 while [ -f $flag ]; do sleep 1; done
