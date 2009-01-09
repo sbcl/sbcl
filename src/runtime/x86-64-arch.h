@@ -49,12 +49,6 @@ get_spinlock(volatile lispobj *word,long value)
 #endif
 }
 
-static inline void
-release_spinlock(volatile lispobj *word)
-{
-    *word=0;
-}
-
 static inline lispobj
 swap_lispobjs(volatile lispobj *dest, lispobj value)
 {
@@ -65,6 +59,14 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
          : "r" (dest), "0" (value)
          : "memory");
     return old_value;
+}
+
+static inline void
+release_spinlock(volatile lispobj *word)
+{
+    /* A memory barrier is needed, use swap_lispobjs. See comment in
+     * RELEASE-SPINLOCK in target-thread.lisp. */
+    swap_lispobjs(word,0);
 }
 
 #endif /* _X86_64_ARCH_H */

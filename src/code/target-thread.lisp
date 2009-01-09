@@ -218,8 +218,15 @@ in future versions."
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
-  (setf (spinlock-value spinlock) nil)
-  nil)
+  ;; Simply setting SPINLOCK-VALUE to NIL is not enough as it does not
+  ;; propagate to other processors, plus without a memory barrier the
+  ;; CPU might reorder instructions allowing code from the critical
+  ;; section to leak out. Use COMPARE-AND-SWAP for the memory barrier
+  ;; effect and do some sanity checking while we are at it.
+  (unless (eq *current-thread*
+              (sb!ext:compare-and-swap (spinlock-value spinlock)
+                                       *current-thread* nil))
+    (error "Only the owner can release the spinlock ~S." spinlock)))
 
 ;;;; mutexes
 
