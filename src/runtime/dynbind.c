@@ -81,6 +81,7 @@ unbind(void *th)
     SetTlSymbolValue(symbol, binding->value,thread);
 
     binding->symbol = 0;
+    binding->value = 0;
 
     SetBSP(binding);
 }
@@ -102,6 +103,7 @@ unbind_to_here(lispobj *bsp,void *th)
                 SetTlSymbolValue(symbol, binding->value,thread);
             }
             binding->symbol = 0;
+            binding->value = 0;
         }
     }
     SetBSP(binding);
