@@ -43,14 +43,16 @@ in future versions."
     (let* ((cookie (list thread))
            (info (if (thread-alive-p thread)
                      :running
-                     (multiple-value-list (join-thread thread :default cookie))))
+                     (multiple-value-list
+                      (join-thread thread :default cookie))))
            (state (if (eq :running info)
                       info
                       (if (eq cookie (car info))
                           :aborted
                           :finished)))
            (values (when (eq :finished state) info)))
-      (format stream "~@[~S ~]~:[~A~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
+      (format stream
+              "~@[~S ~]~:[~A~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
               (thread-name thread)
               (eq :finished state)
               state
@@ -98,8 +100,9 @@ in future versions."
     ;; in case we are in reinit since saving core with multiple
     ;; threads doesn't work.
     (setq *all-threads* (list initial-thread))))
+
 
-;;;;
+;;;; Aliens, low level stuff
 
 #!+sb-thread
 (progn
@@ -191,10 +194,13 @@ in future versions."
 (defun sb!vm::current-thread-offset-sap (n)
   (declare (type (unsigned-byte 27) n))
   (sb!vm::current-thread-offset-sap n))
+
+
+;;;; Spinlocks
 
 (declaim (inline get-spinlock release-spinlock))
 
-;; Should always be called with interrupts disabled.
+;;; Should always be called with interrupts disabled.
 (defun get-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
   (let* ((new *current-thread*)
@@ -227,8 +233,9 @@ in future versions."
               (sb!ext:compare-and-swap (spinlock-value spinlock)
                                        *current-thread* nil))
     (error "Only the owner can release the spinlock ~S." spinlock)))
+
 
-;;;; mutexes
+;;;; Mutexes
 
 #!+sb-doc
 (setf (fdocumentation 'make-mutex 'function)
@@ -364,8 +371,9 @@ mutex."
         (with-pinned-objects (mutex)
           (futex-wake (mutex-state-address mutex) 1))))
     nil))
+
 
-;;;; waitqueues/condition variables
+;;;; Waitqueues/condition variables
 
 (defstruct (waitqueue (:constructor %make-waitqueue))
   #!+sb-doc
@@ -403,8 +411,9 @@ time we reacquire MUTEX and return to the caller."
     (assert (eq me (mutex-%owner mutex)))
     (/show0 "CONDITION-WAITing")
     #!+sb-lutex
-    ;; Need to disable interrupts so that we don't miss setting the owner on
-    ;; our way out. (pthread_cond_wait handles the actual re-acquisition.)
+    ;; Need to disable interrupts so that we don't miss setting the
+    ;; owner on our way out. (pthread_cond_wait handles the actual
+    ;; re-acquisition.)
     (without-interrupts
       (unwind-protect
            (progn
@@ -415,38 +424,43 @@ time we reacquire MUTEX and return to the caller."
                    (%lutex-wait queue-lutex-address mutex-lutex-address)))))
         (setf (mutex-%owner mutex) me)))
     #!-sb-lutex
-    ;; Need to disable interrupts so that we don't miss grabbing the mutex
-    ;; on our way out.
+    ;; Need to disable interrupts so that we don't miss grabbing the
+    ;; mutex on our way out.
     (without-interrupts
       (unwind-protect
            (let ((me *current-thread*))
-             ;; FIXME: should we do something to ensure that the result
-             ;; of this setf is visible to all CPUs?
+             ;; This setf becomes visible to other CPUS due to the
+             ;; usual memory barrier semantics of lock
+             ;; acquire/release.
              (setf (waitqueue-data queue) me)
              (release-mutex mutex)
-             ;; Now we go to sleep using futex-wait.  If anyone else
+             ;; Now we go to sleep using futex-wait. If anyone else
              ;; manages to grab MUTEX and call CONDITION-NOTIFY during
              ;; this comment, it will change queue->data, and so
              ;; futex-wait returns immediately instead of sleeping.
-             ;; Ergo, no lost wakeup. We may get spurious wakeups,
-             ;; but that's ok.
+             ;; Ergo, no lost wakeup. We may get spurious wakeups, but
+             ;; that's ok.
              (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
                (when (= 1 (with-pinned-objects (queue me)
                             (allow-with-interrupts
                               (futex-wait (waitqueue-data-address queue)
                                           (get-lisp-obj-address me)
-                                          (or to-sec -1) ;; our way if saying "no timeout"
+                                          ;; our way if saying "no
+                                          ;; timeout":
+                                          (or to-sec -1)
                                           (or to-usec 0)))))
                  (signal-deadline))))
-        ;; If we are interrupted while waiting, we should do these things
-        ;; before returning.  Ideally, in the case of an unhandled signal,
-        ;; we should do them before entering the debugger, but this is
-        ;; better than nothing.
+        ;; If we are interrupted while waiting, we should do these
+        ;; things before returning. Ideally, in the case of an
+        ;; unhandled signal, we should do them before entering the
+        ;; debugger, but this is better than nothing.
         (get-mutex mutex)))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
-  "Notify N threads waiting on QUEUE."
+  "Notify N threads waiting on QUEUE. The same mutex that is used in
+the correspoinding condition-wait must be held by this thread during
+this call."
   #!-sb-thread (declare (ignore queue n))
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
@@ -473,12 +487,13 @@ time we reacquire MUTEX and return to the caller."
   #!+sb-doc
   "Notify all threads waiting on QUEUE."
   (condition-notify queue
-                    ;; On a 64-bit platform truncating M-P-F to an int results
-                    ;; in -1, which wakes up only one thread.
+                    ;; On a 64-bit platform truncating M-P-F to an int
+                    ;; results in -1, which wakes up only one thread.
                     (ldb (byte 29 0)
                          most-positive-fixnum)))
+
 
-;;;; semaphores
+;;;; Semaphores
 
 (defstruct (semaphore (:constructor %make-semaphore (name %count)))
   #!+sb-doc
@@ -511,9 +526,9 @@ negative. Else blocks until the semaphore can be decremented."
   ;; A more direct implementation based directly on futexes should be
   ;; possible.
   ;;
-  ;; We need to disable interrupts so that we don't forget to decrement the
-  ;; waitcount (which would happen if an asynch interrupt should catch us on
-  ;; our way out from the loop.)
+  ;; We need to disable interrupts so that we don't forget to
+  ;; decrement the waitcount (which would happen if an asynch
+  ;; interrupt should catch us on our way out from the loop.)
   (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
     ;; Quick check: is it positive? If not, enter the wait loop.
     (let ((count (semaphore-%count semaphore)))
@@ -523,7 +538,8 @@ negative. Else blocks until the semaphore can be decremented."
                (progn
                  (incf (semaphore-waitcount semaphore))
                  (loop until (plusp (setf count (semaphore-%count semaphore)))
-                       do (condition-wait (semaphore-queue semaphore) (semaphore-mutex semaphore)))
+                       do (condition-wait (semaphore-queue semaphore)
+                                          (semaphore-mutex semaphore)))
                  (setf (semaphore-%count semaphore) (1- count)))
             (decf (semaphore-waitcount semaphore)))))))
 
@@ -532,15 +548,16 @@ negative. Else blocks until the semaphore can be decremented."
   "Increment the count of SEMAPHORE by N. If there are threads waiting
 on this semaphore, then N of them is woken up."
   (declare (type (integer 1) n))
-  ;; Need to disable interrupts so that we don't lose a wakeup after we have
-  ;; incremented the count.
+  ;; Need to disable interrupts so that we don't lose a wakeup after
+  ;; we have incremented the count.
   (with-system-mutex ((semaphore-mutex semaphore))
     (let ((waitcount (semaphore-waitcount semaphore))
           (count (incf (semaphore-%count semaphore) n)))
       (when (plusp waitcount)
         (condition-notify (semaphore-queue semaphore) (min waitcount count))))))
+
 
-;;;; job control, independent listeners
+;;;; Job control, independent listeners
 
 (defstruct session
   (lock (make-mutex :name "session lock"))
@@ -553,15 +570,15 @@ on this semaphore, then N of them is woken up."
 ;;; The debugger itself tries to acquire the session lock, don't let
 ;;; funny situations (like getting a sigint while holding the session
 ;;; lock) occur. At the same time we need to allow interrupts while
-;;; *waiting* for the session lock for things like GET-FOREGROUND
-;;; to be interruptible.
+;;; *waiting* for the session lock for things like GET-FOREGROUND to
+;;; be interruptible.
 ;;;
-;;; Take care: we sometimes need to obtain the session lock while holding
-;;; on to *ALL-THREADS-LOCK*, so we must _never_ obtain it _after_ getting
-;;; a session lock! (Deadlock risk.)
+;;; Take care: we sometimes need to obtain the session lock while
+;;; holding on to *ALL-THREADS-LOCK*, so we must _never_ obtain it
+;;; _after_ getting a session lock! (Deadlock risk.)
 ;;;
-;;; FIXME: It would be good to have ordered locks to ensure invariants like
-;;; the above.
+;;; FIXME: It would be good to have ordered locks to ensure invariants
+;;; like the above.
 (defmacro with-session-lock ((session) &body body)
   `(with-system-mutex ((session-lock ,session) :allow-with-interrupts t)
      ,@body))
@@ -597,8 +614,8 @@ on this semaphore, then N of them is woken up."
 #!+sb-thread
 (defun handle-thread-exit (thread)
   (/show0 "HANDLING THREAD EXIT")
-  ;; We're going down, can't handle interrupts sanely anymore.
-  ;; GC remains enabled.
+  ;; We're going down, can't handle interrupts sanely anymore. GC
+  ;; remains enabled.
   (block-deferrable-signals)
   ;; Lisp-side cleanup
   (with-all-threads-lock
@@ -711,8 +728,9 @@ have the foreground next."
                         (sb!impl::toplevel-repl nil)
                      (sb!int:flush-standard-output-streams))))))
       (make-thread #'thread-repl))))
+
 
-;;;; the beef
+;;;; The beef
 
 (defun make-thread (function &key name)
   #!+sb-doc
@@ -843,7 +861,7 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
   `(with-system-mutex ((thread-interruptions-lock ,thread))
      ,@body))
 
-;; Called from the signal handler in C.
+;;; Called from the signal handler in C.
 (defun run-interruption ()
   (in-interruption ()
     (loop
@@ -854,13 +872,13 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
                (funcall interruption))
              (return))))))
 
-;; The order of interrupt execution is peculiar. If thread A
-;; interrupts thread B with I1, I2 and B for some reason receives I1
-;; when FUN2 is already on the list, then it is FUN2 that gets to run
-;; first. But when FUN2 is run SIG_INTERRUPT_THREAD is enabled again
-;; and I2 hits pretty soon in FUN2 and run FUN1. This is of course
-;; just one scenario, and the order of thread interrupt execution is
-;; undefined.
+;;; The order of interrupt execution is peculiar. If thread A
+;;; interrupts thread B with I1, I2 and B for some reason receives I1
+;;; when FUN2 is already on the list, then it is FUN2 that gets to run
+;;; first. But when FUN2 is run SIG_INTERRUPT_THREAD is enabled again
+;;; and I2 hits pretty soon in FUN2 and run FUN1. This is of course
+;;; just one scenario, and the order of thread interrupt execution is
+;;; undefined.
 (defun interrupt-thread (thread function)
   #!+sb-doc
   "Interrupt the live THREAD and make it run FUNCTION. A moderate
@@ -918,39 +936,48 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 
   (defun %symbol-value-in-thread (symbol thread)
     (tagbody
-       ;; Prevent the dead from dying completely while we look for the TLS area...
+       ;; Prevent the dead from dying completely while we look for the
+       ;; TLS area...
        (with-all-threads-lock
          (if (thread-alive-p thread)
-             (let* ((offset (* sb!vm:n-word-bytes (sb!vm::symbol-tls-index symbol)))
+             (let* ((offset (* sb!vm:n-word-bytes
+                               (sb!vm::symbol-tls-index symbol)))
                     (tl-val (sap-ref-word (%thread-sap thread) offset)))
                (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
                    (go :unbound)
-                   (return-from %symbol-value-in-thread (values (make-lisp-obj tl-val) t))))
+                   (return-from %symbol-value-in-thread
+                     (values (make-lisp-obj tl-val) t))))
              (return-from %symbol-value-in-thread (values nil nil))))
      :unbound
-       (error "Cannot read thread-local symbol value: ~S unbound in ~S" symbol thread)))
+       (error "Cannot read thread-local symbol value: ~S unbound in ~S"
+              symbol thread)))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
     (tagbody
        (with-pinned-objects (value)
-         ;; Prevent the dead from dying completely while we look for the TLS area...
+         ;; Prevent the dead from dying completely while we look for
+         ;; the TLS area...
          (with-all-threads-lock
            (if (thread-alive-p thread)
-               (let* ((offset (* sb!vm:n-word-bytes (sb!vm::symbol-tls-index symbol)))
+               (let* ((offset (* sb!vm:n-word-bytes
+                                 (sb!vm::symbol-tls-index symbol)))
                       (sap (%thread-sap thread))
                       (tl-val (sap-ref-word sap offset)))
                  (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
                      (go :unbound)
-                     (setf (sap-ref-word sap offset) (get-lisp-obj-address value)))
+                     (setf (sap-ref-word sap offset)
+                           (get-lisp-obj-address value)))
                  (return-from %set-symbol-value-in-thread (values value t)))
                (return-from %set-symbol-value-in-thread (values nil nil)))))
      :unbound
-       (error "Cannot set thread-local symbol value: ~S unbound in ~S" symbol thread))))
+       (error "Cannot set thread-local symbol value: ~S unbound in ~S"
+              symbol thread))))
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
   (sb!vm::locked-symbol-global-value-add symbol-name delta))
+
 
-;;; Stepping
+;;;; Stepping
 
 (defun thread-stepping ()
   (make-lisp-obj
