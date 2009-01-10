@@ -124,7 +124,7 @@ call to the constructor is bound to a variable declared
 stack-allocated only on x86 and x86-64.
 
 @item
-all of the above when they appear as initial parts if another
+all of the above when they appear as initial parts of another
 stack-allocated object.
 
 @end itemize
