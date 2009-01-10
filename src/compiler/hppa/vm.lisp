@@ -95,7 +95,7 @@
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
 ;;; we insert a new storage class.
-;;; FIX-lav: move this into arch-generic-helpers.lisp and rip out from arches
+;;; FIXME-lav: move this into arch-generic-helpers.lisp and rip out from arches
 (defmacro !define-storage-classes (&rest classes)
   (do ((forms (list 'progn)
               (let* ((class (car classes))
@@ -259,10 +259,12 @@
 
 
 ;;;; Make some random tns for important registers.
-; how can we address reg L0 through L0-offset when it is not
-; defined here ? do all registers have an -offset and this is
-; redundant work ?
-;FIX-lav: move this into arch-generic-helpers
+
+;;; how can we address reg L0 through L0-offset when it is not
+;;; defined here ? do all registers have an -offset and this is
+;;; redundant work ?
+;;;
+;;; FIXME-lav: move this into arch-generic-helpers
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
@@ -275,9 +277,9 @@
 
   (defregtn zero any-reg)
   (defregtn nargs any-reg)
-  ;FIX-lav: 20080820: not a fix, but fdefn and lexenv is used in assembly-rtns
-  (defregtn fdefn descriptor-reg) ; FIX-lav, not used
-  (defregtn lexenv descriptor-reg) ; FIX-lav, not used
+  ;; FIXME-lav: 20080820: not a fix, but fdefn and lexenv is used in assembly-rtns
+  (defregtn fdefn descriptor-reg) ; FIXME-lav, not used
+  (defregtn lexenv descriptor-reg) ; FIXME-lav, not used
 
   (defregtn nfp descriptor-reg) ; why not descriptor-reg ?
   (defregtn ocfp any-reg) ; why not descriptor-reg ?

@@ -357,8 +357,8 @@
   (:temporary (:sc interior-reg :offset lip-offset) lip)
   (:ignore lip sign) ; fix-lav: why dont we ignore tmp ?
   (:generator 30
-    ; looking at the register setup above, not sure if both can clash
-    ; maybe it is ok that x and x-pass share register ? like it was
+    ;; looking at the register setup above, not sure if both can clash
+    ;; maybe it is ok that x and x-pass share register ? like it was
     (unless (location= y y-pass)
       (inst sra x 2 x-pass))
     (let ((fixup (make-fixup 'multiply :assembly-routine)))
@@ -469,11 +469,11 @@
       (inst bc := nil y zero-tn zero))
     (move x x-pass)
     (move y y-pass)
-    ; really dirty trick to avoid the bug truncate/unsigned vop
-    ; followed by move-from/word->fixnum where the result from
-    ; the truncate is 0xe39516a7 and move-from-word will treat
-    ; the unsigned high number as an negative number.
-    ; instead we clear the high bit in the input to truncate.
+    ;; really dirty trick to avoid the bug truncate/unsigned vop
+    ;; followed by move-from/word->fixnum where the result from
+    ;; the truncate is 0xe39516a7 and move-from-word will treat
+    ;; the unsigned high number as an negative number.
+    ;; instead we clear the high bit in the input to truncate.
     (inst li #x1fffffff q)
     (inst comb :<> q y skip :nullify t)
     (inst addi -1 zero-tn q)
@@ -481,7 +481,7 @@
     (inst and x-pass q x-pass)
     (inst and y-pass q y-pass)
     SKIP
-    ; fix bug#2  (truncate #xe39516a7 #x3) => #0xf687078d,#x0
+    ;; fix bug#2  (truncate #xe39516a7 #x3) => #0xf687078d,#x0
     (inst li #x7fffffff q)
     (inst and x-pass q x-pass)
     (let ((fixup (make-fixup 'truncate :assembly-routine)))

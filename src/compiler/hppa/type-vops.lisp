@@ -167,7 +167,7 @@
       ;; Get the second digit.
       (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
-      ; Dont nullify comb here, because we cant guarantee target is forward
+      ;; Dont nullify comb here, because we cant guarantee target is forward
       (inst comb (if not-p := :<>) temp zero-tn not-target)
       (inst nop)
       (inst b target)

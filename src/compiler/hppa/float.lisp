@@ -39,7 +39,7 @@
          (inst fsts x offset base))
         ((and (< offset (ash 1 13))
               (> offset 0))
-         ; FIX-lav, ok with GC to use lip-tn for arbitrary offsets ?
+         ;; FIXME-lav, ok with GC to use lip-tn for arbitrary offsets ?
          (inst ldo offset zero-tn lip-tn)
          ;(note-next-instruction vop :internal-error)
          (inst fstx x lip-tn base))
@@ -362,12 +362,12 @@
                            (double-stack y)
                            (double-int-carg-reg temp)))
                (offset (* (tn-offset stack-tn) n-word-bytes)))
-          ; save 8 bytes of stack to two register,
-          ; write down float in stack and load it back
-          ; into result register. Notice the result hack,
-          ; we are writing to one extra register.
-          ; Double float argument convention uses two registers,
-          ; but we only know about one (thanks to c-call).
+          ;; save 8 bytes of stack to two register,
+          ;; write down float in stack and load it back
+          ;; into result register. Notice the result hack,
+          ;; we are writing to one extra register.
+          ;; Double float argument convention uses two registers,
+          ;; but we only know about one (thanks to c-call).
           (inst ldw offset nfp old1)
           (inst ldw (+ offset n-word-bytes) nfp old2)
           (str-float x offset nfp) ; writes 8 bytes
@@ -496,7 +496,7 @@
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
                   (:variant ,condition ,complement)))))
-  ;FIX-lav: let 'inst cmp' translate keywords into raw binary instead of giving it here
+  ;; FIXME-lav: let 'inst cmp' translate keywords into raw binary instead of giving it here
   (frob < #b01001 #b10101 </single-float </double-float)
   (frob > #b10001 #b01101 >/single-float >/double-float)
   (frob = #b00101 #b11001 eql/single-float eql/double-float))

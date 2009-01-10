@@ -37,15 +37,14 @@
     (inst and object temp2 result)
     (inst comb :<> result zero-tn LOWTAG-ONLY :nullify t)
 
-    ; must be an other immediate
+    ;; must be an other immediate
     (inst li widetag-mask temp2)
     (inst b DONE)
     (inst and temp2 object result)
 
     FUNCTION-PTR
     (load-type result object (- fun-pointer-lowtag))
-    (inst b done)
-    (inst nop)
+    (inst b done :nullify t)
 
     LOWTAG-ONLY
     (inst li lowtag-mask temp1)
@@ -54,10 +53,8 @@
 
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
-    (inst nop)
 
     DONE))
-
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)
@@ -66,8 +63,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result function (- fun-pointer-lowtag))
-    (inst nop))) ;FIX-lav, not sure this nop is needed
+    (load-type result function (- fun-pointer-lowtag))))
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
@@ -100,7 +96,8 @@
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
     (inst srl res n-widetag-bits res)))
-;FIX-lav, not sure we need data of type immediate and zero, test without, if so revert to old hppa code
+;;; FIXME-lav, not sure we need data of type immediate and zero, test without,
+;;; if so revert to old hppa code
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
@@ -111,7 +108,7 @@
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
     (loadw t1 x 0 other-pointer-lowtag)
-    ; replace below 2 inst with: (mask widetag-mask t1 t1)
+    ;; replace below 2 inst with: (mask widetag-mask t1 t1)
     (inst li widetag-mask t2)
     (inst and t1 t2 t1)
     (sc-case data
@@ -202,7 +199,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    ;FIX-lav: replace below two with DEPW
+    ;; FIXME-lav: replace below two with DEPW
     (inst srl ndescr n-widetag-bits ndescr)
     (inst sll ndescr word-shift ndescr)
     (inst add ndescr offset ndescr)
@@ -225,7 +222,7 @@
   (:generator 1
     (inst break halt-trap)))
 
-#+hpux
+#!+hpux
 (define-vop (setup-return-from-lisp-stub)
   (:results)
   (:save-p t)

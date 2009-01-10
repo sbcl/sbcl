@@ -784,6 +784,10 @@ Raymond Toy:
   floating point stuff. Various patches and fixes of his have been
   ported to SBCL, including his Sparc port of linkage-table.
 
+Larry Valkama:
+  He resurrected the HPUX port, and worked on the HPPA backend in
+  general.
+
 Peter Van Eynde:
   He wrestled the CLISP test suite into a mostly portable test suite
   (clocc ansi-test) which can be used on SBCL, provided a slew of
@@ -821,6 +825,7 @@ DFL  David Lichteblau
 DTC  Douglas Crosher
 JES  Juho Snellman
 JRXR Joshua Ross
+LAV  Larry Valkama
 MG   Gabor Melis
 MNA  Martin Atzmueller
 NJF  Nathan Froyd
@@ -830,6 +835,7 @@ PRM  Pierre Mai
 PVE  Peter Van Eynde
 PW   Paul Werkowski
 RAM  Robert MacLachlan
+TCR  Tobias Rittweiler
 THS  Thiemo Seufer
 VJA  Vincent Arkesteijn
 WHN  William ("Bill") Newman

@@ -1025,10 +1025,13 @@ default-value-8
       (lisp-return lra-arg :offset 2)
       ;; Nope, not the single case.
       (emit-label not-single)
+      ;; most of these moves will not be emitted and therefor
+      ;; isn't suitable to put in the delay slot below. But if
+      ;; you do, dont forget to force-emit as in (move src dst t)
       (move ocfp-arg ocfp)
       (move lra-arg lra)
       (move vals-arg vals)
-      (move nvals-arg nvals) ; FIX-lav: cant utilize branch-delay-slot, why?
+      (move nvals-arg nvals)
       (let ((fixup (make-fixup 'return-multiple :assembly-routine)))
         (inst ldil fixup tmp)
         (inst be fixup lisp-heap-space tmp :nullify t)))
@@ -1061,7 +1064,7 @@ default-value-8
 
 ;;; Copy a more arg from the argument area to the end of the current frame.
 ;;; Fixed is the number of non-more arguments.
-;;; FIX-lav: old hppa code look smarter.
+;;; FIXME-lav: old hppa code look smarter.
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
@@ -1097,11 +1100,11 @@ default-value-8
       (inst add nargs-tn cfp-tn src)
 
       (emit-label loop)
-      ; decrease src, then load src into temp
+      ;; decrease src, then load src into temp
       (inst ldwm (- n-word-bytes) src temp)
-      ; increase, compare if count >= to zero, if true, jump
+      ;; increase, compare if count >= to zero, if true, jump
       (inst addib :>= (fixnumize -1) count loop)
-      ; decrease dst, then store temp at dst
+      ;; decrease dst, then store temp at dst
       (inst stwm temp (- n-word-bytes) dst)
 
       (emit-label do-regs)

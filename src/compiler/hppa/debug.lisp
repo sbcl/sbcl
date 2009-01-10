@@ -31,7 +31,7 @@
   (:policy :fast-safe)
   (:args (object :scs (sap-reg)))
   (:info offset)
-  ; make room for multiply by limiting to 12 bits
+  ;; make room for multiply by limiting to 12 bits
   (:arg-types system-area-pointer (:constant (signed-byte 12)))
   (:results (result :scs (descriptor-reg)))
   (:result-types *)

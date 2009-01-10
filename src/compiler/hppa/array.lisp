@@ -22,7 +22,7 @@
   (:temporary (:scs (non-descriptor-reg)) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
-    ; Note: Cant use addi, the immediate is too large
+    ;; Note: Cant use addi, the immediate is too large
     (inst li (+ (* (1+ array-dimensions-offset) n-word-bytes)
                 lowtag-mask) header)
     (inst add header rank bytes)

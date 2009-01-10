@@ -123,8 +123,9 @@
 
 
 ;;;; Initial disassembler setup.
-;FIX-lav: is this still used, if so , why use package prefix
-;(setf sb!disassem:*disassem-inst-alignment-bytes* 4)
+
+;;; FIXME-lav: is this still used, if so , why use package prefix
+;;; (setf sb!disassem:*disassem-inst-alignment-bytes* 4)
 
 (defvar *disassem-use-lisp-reg-names* t)
 
@@ -983,8 +984,7 @@
                  (:printer r3-inst ((op ,opcode) (c nil :type ',(symbolicate
                                                                  cond-kind
                                                                  "-CONDITION"))))
-                 ;FIX-lav, change opcode test to name test
-                 ,@(when (= opcode #x12)
+                 ,@(when (eq name 'or)
                          `((:printer r3-inst ((op ,opcode) (r2 0)
                                               (c nil :type ',(symbolicate cond-kind
                                                                           "-CONDITION")))
@@ -1531,7 +1531,7 @@
          (assemble (segment vop)
            (cond ((<= (- (ash 1 11)) disp (1- (ash 1 11)))
                   (inst comb (maybe-negate-cond cond not-p) r1 r2 target)
-                  (inst nop)) ;FIX-lav, cant nullify when backward branch
+                  (inst nop)) ; FIXME-lav, cant nullify when backward branch
                  (t
                   (inst comclr r1 r2 zero-tn
                         (maybe-negate-cond cond (not not-p)))
@@ -1599,10 +1599,10 @@
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 3 byte alignments.
    segment 12 3
-   ; This is the best-case that emits one instruction ( 4 bytes )
+   ;; This is the best-case that emits one instruction ( 4 bytes )
    (lambda (segment posn delta-if-after)
      (let ((delta (funcall calc label posn delta-if-after)))
-       ; WHEN, Why not AVER ?
+       ;; WHEN, Why not AVER ?
        (when (<= (- (ash 1 10)) delta (1- (ash 1 10)))
          (emit-back-patch segment 4
                           (lambda (segment posn)
@@ -1610,19 +1610,19 @@
                               (inst addi (funcall calc label posn 0) src
                                     dst))))
          t)))
-   ; This is the worst-case that emits three instruction ( 12 bytes )
+   ;; This is the worst-case that emits three instruction ( 12 bytes )
    (lambda (segment posn)
      (let ((delta (funcall calc label posn 0)))
-       ; FIX-lav: why do we hit below check ?
-       ;(when (<= (- (ash 1 10)) delta (1- (ash 1 10)))
-       ;  (error "emit-compute-inst selected worst-case, but is shrinkable, delta is ~s" delta))
+       ;; FIXME-lav: why do we hit below check ?
+       ;;  (when (<= (- (ash 1 10)) delta (1- (ash 1 10)))
+       ;;   (error "emit-compute-inst selected worst-case, but is shrinkable, delta is ~s" delta))
        ;; Note: if we used addil/ldo to do this in 2 instructions then the
        ;; intermediate value would be tagged but pointing into space.
        ;; Does above note mean that the intermediate value would be
        ;; a bogus pointer that would be GCed wrongly ?
        ;; Also what I can see addil would also overwrite NFP (r1) ???
        (assemble (segment vop)
-         ; Three instructions (4 * 3) this is the reason for 12 bytes
+         ;; Three instructions (4 * 3) this is the reason for 12 bytes
          (inst ldil delta temp)
          (inst ldo (ldb (byte 11 0) delta) temp temp :unsigned t)
          (inst add src temp dst))))))

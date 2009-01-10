@@ -20,7 +20,7 @@
        (,gensym))))
 
 ;;; Instruction-like macros.
-;;; FIX-lav: add if always-emit-code-p is :e= then error if location=
+;;; FIXME-lav: add if always-emit-code-p is :e= then error if location=
 (defmacro move (src dst &optional always-emit-code-p)
   #!+sb-doc
   "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P is nil)."
@@ -101,8 +101,8 @@ byte-ordering issues."
   "Emit a return-pc header word.  LABEL is the label to use for this
    return-pc."
   `(progn
-     ; alignment causes the return point to land on two address,
-     ; where the first must be nop pad.
+     ;; alignment causes the return point to land on two address,
+     ;; where the first must be nop pad.
      (emit-alignment n-lowtag-bits)
      (emit-label ,label)
      (inst lra-header-word)))
@@ -176,8 +176,8 @@ initializes the object."
                write-body)
            ,@body)))))
 
-;; is used for stack allocation of dynamic-extent objects
-; FIX-lav, if using defun, atleast surround in assembly-form ? macro better ?
+;;; is used for stack allocation of dynamic-extent objects
+;;; FIXME-lav, if using defun, atleast surround in assembly-form ? macro better ?
 (defun align-csp (temp)
   (declare (ignore temp))
   (let ((aligned (gen-label)))

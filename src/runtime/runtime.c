@@ -72,6 +72,8 @@
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
+#include "genesis/closure.h"
+#include "genesis/simple-fun.h"
 #endif
 
 
@@ -431,8 +433,10 @@ main(int argc, char *argv[], char *envp[])
         lose("couldn't find initial function\n");
     }
 #ifdef LISP_FEATURE_HPUX
+    /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are not in LANGUAGE_ASSEMBLY
+       so we cant reach them. */
     return_from_lisp_stub = (void *) ((char *)*((unsigned long *)
-                 ((char *)initial_function - 1)) + 23);
+                 ((char *)initial_function + -1)) + 23);
 #endif
 
     gc_initialize_pointers();

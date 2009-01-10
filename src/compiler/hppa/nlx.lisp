@@ -135,8 +135,8 @@
 
 
 (define-vop (nlx-entry)
-  (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
-              ; would be inserted before the LRA.
+  (:args (sp) ;; Note: we can't list an sc-restriction, 'cause any load vops
+              ;; would be inserted before the LRA.
          (start)
          (count))
   (:results (values :more t))
@@ -179,8 +179,7 @@
                          (move null-tn tn))
                        (control-stack
                          (store-stack-tn tn null-tn)))))
-                 (inst b defaulting-done)
-                 (inst nop)))))) ; FIX remove me or tell why I'm needed
+                 (inst b defaulting-done :nullify t))))))
     (load-stack-tn csp-tn sp)))
 
 
@@ -211,8 +210,7 @@
       (sc-case new-start
         (any-reg (move dst new-start))
         (control-stack (store-stack-tn new-start dst)))
-      (inst comb := num zero-tn done)
-      (inst nop) ; fix-lav remove nop
+      (inst comb := num zero-tn done :nullify t)
       (sc-case new-count
         (any-reg (move num new-count))
         (control-stack (store-stack-tn new-count num)))

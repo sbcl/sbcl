@@ -89,7 +89,7 @@
   (:generator 2
     (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
     (inst dep 0 31 n-fixnum-tag-bits temp)
-    ; we must go through an temporary to avoid gc
+    ;; we must go through an temporary to avoid gc
     (move temp res)))
 
 

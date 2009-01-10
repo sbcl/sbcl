@@ -11,13 +11,13 @@
 
 (in-package "SB!VM")
 
-; beware that we deal alot here with register-offsets directly
-; instead of their symbol-name in vm.lisp
-; offset works differently depending on sc-type
+;;; beware that we deal alot here with register-offsets directly
+;;; instead of their symbol-name in vm.lisp
+;;; offset works differently depending on sc-type
 (defun my-make-wired-tn (prim-type-name sc-name offset state)
   (make-wired-tn (primitive-type-or-lose prim-type-name)
                  (sc-number-or-lose sc-name)
-                 ; try to utilize vm.lisp definitions of registers:
+                 ;; try to utilize vm.lisp definitions of registers:
                  (ecase sc-name
                    ((any-reg sap-reg signed-reg unsigned-reg)
                      (ecase offset ; FIX: port to other arch ???
@@ -36,9 +36,9 @@
                        (3 nl3-offset)))
                    ((single-reg double-reg) ; only for return
                      (+ 4 offset))
-                   ; A tn of stack type tells us that we have data on
-                   ; stack. This offset is current argument number so
-                   ; -1 points to the correct place to write that data
+                   ;; A tn of stack type tells us that we have data on
+                   ;; stack. This offset is current argument number so
+                   ;; -1 points to the correct place to write that data
                    ((sap-stack signed-stack unsigned-stack)
                      (- (arg-state-nargs state) offset 8 1)))))
 
@@ -260,8 +260,8 @@
   (:temporary (:sc any-reg :offset cfunc-offset
                    :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  ; Not sure if using nargs is safe ( have we saved it ).
-  ; but we cant use any non-descriptor-reg because c-args nl-4 is of that type
+  ;; Not sure if using nargs is safe ( have we saved it ).
+  ;; but we cant use any non-descriptor-reg because c-args nl-4 is of that type
   (:temporary (:sc non-descriptor-reg :offset nargs-offset) temp)
   (:vop-var vop)
   (:generator 0
@@ -281,12 +281,12 @@
   (:results (result :scs (sap-reg any-reg)))
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
-    ; Because stack grows to higher addresses, we have the result
-    ; pointing to an lowerer address than nsp
+    ;; Because stack grows to higher addresses, we have the result
+    ;; pointing to an lowerer address than nsp
     (move nsp-tn result)
     (unless (zerop amount)
-      ; hp-ux stack grows towards larger addresses and stack must be
-      ; allocated in blocks of 64 bytes
+      ;; hp-ux stack grows towards larger addresses and stack must be
+      ;; allocated in blocks of 64 bytes
       (let ((delta (+ 0 (logandc2 (+ amount 63) 63)))) ; was + 16
         (cond ((< delta (ash 1 10))
                (inst addi delta nsp-tn nsp-tn))
