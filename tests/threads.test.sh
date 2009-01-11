@@ -19,6 +19,7 @@ touch $flag
 
 # $! is not set correctly when calling run_sbcl, do it directly
 "$SBCL_RUNTIME" --core "$SBCL_CORE" \
+    --no-userinit --no-sysinit --disable-debugger \
     --load "$SBCL_PWD/condition-wait-sigcont.lisp" &
 sb_pid=$!
 
