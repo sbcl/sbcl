@@ -25,17 +25,187 @@
 
 ;;; The generic conditional branch, emitted immediately after test
 ;;; VOPs that only set flags.
+;;;
+;;; FLAGS is a list of condition descriptors. If the first descriptor
+;;; is CL:NOT, the test was true if all the remaining conditions are
+;;; false. Otherwise, the test was true if any of the conditions is.
+;;;
+;;; NOT-P flips the meaning of the test, as with regular :CONDITIONAL
+;;; VOP. If NOT-P is true, the code must branch to dest if the test was
+;;; false. Otherwise, the code must branch to dest if the test was true.
 
 (define-vop (branch-if)
   (:info dest flags not-p)
-  (:ignore dest flags not-p)
   (:generator 0
-     (error "BRANCH-IF not yet implemented")))
+     (when (eq (car flags) 'not)
+       (pop flags)
+       (setf not-p (not not-p)))
+     (flet ((negate-condition (name)
+              (let ((code (logxor 1 (conditional-opcode name))))
+                (aref *condition-name-vec* code))))
+       (cond ((null (rest flags))
+              (inst jmp
+                    (if not-p
+                        (negate-condition (first flags))
+                        (first flags))
+                    dest))
+             (not-p
+              (let ((not-lab (gen-label))
+                    (last    (car (last flags))))
+                (dolist (flag (butlast flags))
+                  (inst jmp flag not-lab))
+                (inst jmp (negate-condition last) dest)
+                (emit-label not-lab)))
+             (t
+              (dolist (flag flags)
+                (inst jmp flag dest)))))))
+
+(defvar *cmov-ptype-representation-vop*
+  (mapcan (lambda (entry)
+            (destructuring-bind (ptypes &optional sc vop)
+                entry
+              (unless (listp ptypes)
+                (setf ptypes (list ptypes)))
+              (mapcar (if (and vop sc)
+                          (lambda (ptype)
+                            (list ptype sc vop))
+                          #'list)
+                      ptypes)))
+          '((t descriptor-reg move-if/t)
+
+            ((fixnum positive-fixnum)
+             any-reg move-if/fx)
+            ((unsigned-byte-64 unsigned-byte-63)
+             unsigned-reg move-if/unsigned)
+            (signed-byte-64 signed-reg move-if/signed)
+            (character character-reg move-if/char)
+
+            ((single-float complex-single-float
+              double-float complex-double-float))
+
+            (system-area-pointer sap-reg move-if/sap)))
+  "Alist of primitive type -> (storage-class-name VOP-name)
+   if values of such a type should be cmoved, and NIL otherwise.
+
+   storage-class-name is the name of the storage class to use for
+   the values, and VOP-name the name of the VOP that will be used
+   to execute the conditional move.")
 
 (!def-vm-support-routine
     convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
-  nil)
+  (declare (ignore node))
+  (let* ((ptype (sb!c::tn-primitive-type dst-tn))
+         (name  (sb!c::primitive-type-name ptype))
+         (param (cdr (or (assoc name *cmov-ptype-representation-vop*)
+                         '(t descriptor-reg move-if/t)))))
+    (when param
+      (destructuring-bind (representation vop) param
+        (let ((scn (sc-number-or-lose representation)))
+          (labels ((make-tn ()
+                     (make-representation-tn ptype scn))
+                   (immediate-tn-p (tn)
+                     (and (eq (sb!c::tn-kind tn) :constant)
+                          (eq (sb!c::immediate-constant-sc (tn-value tn))
+                              (sc-number-or-lose 'immediate))))
+                   (frob-tn (tn)
+                     (if (immediate-tn-p tn)
+                         tn
+                         (make-tn))))
+            (values vop
+                    (frob-tn x-tn) (frob-tn y-tn)
+                    (make-tn)
+                    nil)))))))
+
+(define-vop (move-if)
+  (:args (then) (else))
+  (:results (res))
+  (:info flags)
+  (:generator 0
+     (let ((not-p (eq (first flags) 'not)))
+       (when not-p (pop flags))
+       (flet ((negate-condition (name)
+                (let ((code (logxor 1 (conditional-opcode name))))
+                  (aref *condition-name-vec* code)))
+              (load-immediate (dst constant-tn
+                                   &optional (sc (sc-name (tn-sc dst))))
+                (let ((val (tn-value constant-tn)))
+                  (etypecase val
+                    (integer
+                       (if (memq sc '(any-reg descriptor-reg))
+                           (inst mov dst (fixnumize val))
+                           (inst mov dst val)))
+                    (symbol
+                       (aver (eq sc 'descriptor-reg))
+                       (load-symbol dst val))
+                    (character
+                       (if (eq sc 'descriptor-reg)
+                           (inst mov dst (logior (ash (char-code val) n-widetag-bits)
+                                                 character-widetag))
+                           (inst mov dst (char-code val))))))))
+         (cond ((null (rest flags))
+                (if (sc-is else immediate)
+                    (load-immediate res else)
+                    (move res else))
+                (when (sc-is then immediate)
+                  (load-immediate temp-reg-tn then (sc-name (tn-sc res)))
+                  (setf then temp-reg-tn))
+                (inst cmov (if not-p
+                               (negate-condition (first flags))
+                               (first flags))
+                      res
+                      then))
+               (not-p
+                (cond ((sc-is then immediate)
+                       (when (location= else res)
+                         (inst mov temp-reg-tn else)
+                         (setf else temp-reg-tn))
+                       (load-immediate res then))
+                      ((location= else res)
+                       (inst xchg else then)
+                       (rotatef else then))
+                      (t
+                       (move res then)))
+                (when (sc-is else immediate)
+                  (load-immediate temp-reg-tn else (sc-name (tn-sc res)))
+                  (setf else temp-reg-tn))
+                (dolist (flag flags)
+                  (inst cmov flag res else)))
+               (t
+                (if (sc-is else immediate)
+                    (load-immediate res else)
+                    (move res else))
+                (when (sc-is then immediate)
+                  (load-immediate temp-reg-tn then (sc-name (tn-sc res)))
+                  (setf then temp-reg-tn))
+                (dolist (flag flags)
+                  (inst cmov flag res then))))))))
+
+(macrolet ((def-move-if (name type reg &optional stack)
+               (when stack (setf stack (list stack)))
+
+               `(define-vop (,name move-if)
+                  (:args (then :scs (immediate ,reg ,@stack) :to :eval
+                               :load-if (not (or (sc-is then immediate)
+                                                 (and (sc-is then ,@stack)
+                                                      (not (location= else res))))))
+                         (else :scs (immediate ,reg ,@stack) :target res
+                               :load-if (not (sc-is else immediate ,@stack))))
+                  (:arg-types ,type ,type)
+                  (:results (res :scs (,reg)
+                                 :from (:argument 1)))
+                  (:result-types ,type))))
+  (def-move-if move-if/t
+      t descriptor-reg control-stack)
+  (def-move-if move-if/fx
+      tagged-num any-reg control-stack)
+  (def-move-if move-if/unsigned
+      unsigned-num unsigned-reg unsigned-stack)
+  (def-move-if move-if/signed
+      signed-num signed-reg signed-stack)
+  (def-move-if move-if/char
+      character character-reg character-stack)
+  (def-move-if move-if/sap
+      system-area-pointer sap-reg sap-stack))
 
 
 ;;;; conditional VOPs
@@ -51,8 +221,7 @@
             :load-if (not (and (sc-is x any-reg descriptor-reg immediate)
                                (sc-is y control-stack constant)))))
   (:temporary (:sc descriptor-reg) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
   (:generator 3
@@ -95,6 +264,4 @@
            (inst cmp y (logior (ash (char-code val) n-widetag-bits)
                                character-widetag))))))
       (t
-       (inst cmp x y)))
-
-    (inst jmp (if not-p :ne :e) target)))
+       (inst cmp x y)))))

@@ -1009,8 +1009,7 @@
 ;;;; binary conditional VOPs
 
 (define-vop (fast-conditional)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:effects)
   (:affected)
   (:policy :fast-safe))
@@ -1026,7 +1025,7 @@
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg control-stack)))
   (:arg-types tagged-num (:constant (signed-byte 30)))
-  (:info target not-p y))
+  (:info y))
 
 (define-vop (fast-conditional/signed fast-conditional)
   (:args (x :scs (signed-reg)
@@ -1039,7 +1038,7 @@
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack)))
   (:arg-types signed-num (:constant (signed-byte 32)))
-  (:info target not-p y))
+  (:info y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
   (:args (x :scs (unsigned-reg)
@@ -1052,7 +1051,7 @@
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg unsigned-stack)))
   (:arg-types unsigned-num (:constant (unsigned-byte 32)))
-  (:info target not-p y))
+  (:info y))
 
 (macrolet ((define-logtest-vops ()
              `(progn
@@ -1064,12 +1063,12 @@
                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
                          (:translate logtest)
+                         (:conditional :ne)
                          (:generator ,cost
                           (emit-optimized-test-inst x
                                                     ,(if (eq suffix '-c/fixnum)
                                                          '(fixnumize y)
-                                                         'y))
-                          (inst jmp (if not-p :e :ne) target)))))))
+                                                         'y))))))))
   (define-logtest-vops))
 
 (defknown %logbitp (integer unsigned-byte) boolean
@@ -1082,42 +1081,42 @@
 ;;; too much work to do the non-constant case (maybe?)
 (define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
   (:translate %logbitp)
+  (:conditional :c)
   (:arg-types tagged-num (:constant (integer 0 29)))
   (:generator 4
-    (inst bt x (+ y n-fixnum-tag-bits))
-    (inst jmp (if not-p :nc :c) target)))
+    (inst bt x (+ y n-fixnum-tag-bits))))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack))
          (y :scs (signed-reg)))
   (:translate %logbitp)
+  (:conditional :c)
   (:generator 6
-    (inst bt x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (inst bt x y)))
 
 (define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
   (:translate %logbitp)
+  (:conditional :c)
   (:arg-types signed-num (:constant (integer 0 31)))
   (:generator 5
-    (inst bt x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (inst bt x y)))
 
 (define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg unsigned-stack))
          (y :scs (unsigned-reg)))
   (:translate %logbitp)
+  (:conditional :c)
   (:generator 6
-    (inst bt x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (inst bt x y)))
 
 (define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
   (:translate %logbitp)
+  (:conditional :c)
   (:arg-types unsigned-num (:constant (integer 0 31)))
   (:generator 5
-    (inst bt x y)
-    (inst jmp (if not-p :nc :c) target)))
+    (inst bt x y)))
 
-(macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
+(macrolet ((define-conditional-vop (tran cond unsigned)
              `(progn
                 ,@(mapcar
                    (lambda (suffix cost signed)
@@ -1129,31 +1128,25 @@
                                      (format nil "~:@(FAST-CONDITIONAL~A~)"
                                              suffix)))
                         (:translate ,tran)
+                        (:conditional ,(if signed
+                                           cond
+                                           unsigned))
                         (:generator ,cost
                                     (inst cmp x
                                           ,(if (eq suffix '-c/fixnum)
                                                '(fixnumize y)
-                                               'y))
-                                    (inst jmp (if not-p
-                                                  ,(if signed
-                                                       not-cond
-                                                       not-unsigned)
-                                                  ,(if signed
-                                                       cond
-                                                       unsigned))
-                                          target))))
+                                               'y)))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
                    '(4 3 6 5 6 5)
                    '(t t t t nil nil)))))
 
-  (define-conditional-vop < :l :b :ge :ae)
-  (define-conditional-vop > :g :a :le :be))
+  (define-conditional-vop < :l :b)
+  (define-conditional-vop > :g :a))
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
   (:translate eql)
   (:generator 6
-    (inst cmp x y)
-    (inst jmp (if not-p :ne :e) target)))
+    (inst cmp x y)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
   (:translate eql)
@@ -1161,14 +1154,12 @@
     (cond ((and (sc-is x signed-reg) (zerop y))
            (inst test x x))  ; smaller instruction
           (t
-           (inst cmp x y)))
-    (inst jmp (if not-p :ne :e) target)))
+           (inst cmp x y)))))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
   (:translate eql)
   (:generator 6
-    (inst cmp x y)
-    (inst jmp (if not-p :ne :e) target)))
+    (inst cmp x y)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
   (:translate eql)
@@ -1176,8 +1167,7 @@
     (cond ((and (sc-is x unsigned-reg) (zerop y))
            (inst test x x))  ; smaller instruction
           (t
-           (inst cmp x y)))
-    (inst jmp (if not-p :ne :e) target)))
+           (inst cmp x y)))))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
 ;;; known fixnum.
@@ -1197,8 +1187,7 @@
   (:note "inline fixnum comparison")
   (:translate eql)
   (:generator 4
-    (inst cmp x y)
-    (inst jmp (if not-p :ne :e) target)))
+    (inst cmp x y)))
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg)
             :load-if (not (and (sc-is x control-stack)
@@ -1210,14 +1199,13 @@
 (define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg control-stack)))
   (:arg-types tagged-num (:constant (signed-byte 30)))
-  (:info target not-p y)
+  (:info y)
   (:translate eql)
   (:generator 2
     (cond ((and (sc-is x any-reg) (zerop y))
            (inst test x x))  ; smaller instruction
           (t
-           (inst cmp x (fixnumize y))))
-    (inst jmp (if not-p :ne :e) target)))
+           (inst cmp x (fixnumize y))))))
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
   (:args (x :scs (any-reg descriptor-reg control-stack)))
   (:arg-types * (:constant (signed-byte 30)))
@@ -1478,11 +1466,9 @@
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :ns)
   (:generator 3
-    (inst or digit digit)
-    (inst jmp (if not-p :s :ns) target)))
+    (inst or digit digit)))
 
 
 ;;; For add and sub with carry the sc of carry argument is any-reg so

@@ -154,18 +154,12 @@
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
+             #+sb-assembling
              `(define-assembly-routine (,name
-                                        (:cost 10)
-                                        (:return-style :full-call)
-                                        (:policy :safe)
-                                        (:translate ,translate)
-                                        (:save-p t))
+                                        (:return-style :none))
                 ((:arg x (descriptor-reg any-reg) edx-offset)
                  (:arg y (descriptor-reg any-reg) edi-offset)
 
-                 (:res res descriptor-reg edx-offset)
-
-                 (:temp eax unsigned-reg eax-offset)
                  (:temp ecx unsigned-reg ecx-offset))
 
                 (inst mov ecx x)
@@ -174,120 +168,174 @@
                 (inst jmp :nz DO-STATIC-FUN)  ; are both fixnums?
 
                 (inst cmp x y)
-                (cond ((member :cmov *backend-subfeatures*)
-                       (load-symbol res t)
-                       (inst mov eax nil-value)
-                       (inst cmov ,test res eax))
-                      (t
-                       (inst mov res nil-value)
-                       (inst jmp ,test RETURN)
-                       (load-symbol res t)))
-                RETURN
-                (inst clc)     ; single-value return
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst pop eax)
-                (inst push ebp-tn)
-                (inst lea ebp-tn (make-ea :dword
-                                          :base esp-tn
-                                          :disp n-word-bytes))
-                (inst sub esp-tn (fixnumize 2)) ; FIXME: Push 2 words on stack,
-                                                ; weirdly?
-                (inst push eax)
-                (inst mov ecx (fixnumize 2)) ; FIXME: FIXNUMIZE and
-                                        ; SINGLE-FLOAT-BITS are parallel,
-                                        ; should be named parallelly.
-                (inst jmp (make-ea :dword
-                                   :disp (+ nil-value
-                                            (static-fun-offset ',static-fn)))))))
+                (move ecx esp-tn)
+                (inst sub esp-tn (fixnumize 3))
+                (inst mov (make-ea :dword
+                                   :base ecx :disp (fixnumize -1))
+                      ebp-tn)
+                (move ebp-tn ecx)
+                (inst mov ecx (fixnumize 2))
+                (inst call (make-ea :dword
+                                    :disp (+ nil-value
+                                             (static-fun-offset ',static-fn))))
+                ;; HACK: We depend on NIL having the lowest address of all
+                ;; static symbols (including T)
+                ,@(ecase test
+                    (:l `((inst mov y (1+ nil-value))
+                          (inst cmp y x)))
+                    (:g `((inst cmp x (1+ nil-value)))))
+                (inst ret))
+             #-sb-assembling
+                          `(define-vop (,name)
+                (:translate ,translate)
+                (:policy :safe)
+                (:save-p t)
+                (:args (x :scs (descriptor-reg any-reg) :target edx)
+                       (y :scs (descriptor-reg any-reg) :target edi))
 
-  (define-cond-assem-rtn generic-< < two-arg-< :ge)
-  (define-cond-assem-rtn generic-> > two-arg-> :le))
+                (:temporary (:sc unsigned-reg :offset edx-offset
+                                 :from (:argument 0))
+                            edx)
+                (:temporary (:sc unsigned-reg :offset edi-offset
+                                 :from (:argument 1))
+                            edi)
 
+                (:temporary (:sc unsigned-reg :offset ecx-offset
+                                 :from :eval)
+                            ecx)
+                (:conditional ,test)
+                (:generator 10
+                   (move edx x)
+                   (move edi y)
+                   (inst lea ecx (make-ea :dword
+                                          :disp (make-fixup ',name :assembly-routine)))
+                   (inst call ecx)))))
+
+  (define-cond-assem-rtn generic-< < two-arg-< :l)
+  (define-cond-assem-rtn generic-> > two-arg-> :g))
+
+#+sb-assembling
 (define-assembly-routine (generic-eql
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate eql)
-                          (:save-p t))
+                          (:return-style :none))
                          ((:arg x (descriptor-reg any-reg) edx-offset)
                           (:arg y (descriptor-reg any-reg) edi-offset)
 
-                          (:res res descriptor-reg edx-offset)
-
-                          (:temp eax unsigned-reg eax-offset)
                           (:temp ecx unsigned-reg ecx-offset))
   (inst mov ecx x)
   (inst and ecx y)
-  (inst test ecx fixnum-tag-mask)
-  (inst jmp :nz DO-STATIC-FUN)
+  (inst and ecx lowtag-mask)
+  (inst cmp ecx other-pointer-lowtag)
+  (inst jmp :e DO-STATIC-FUN)
 
-  ;; At least one fixnum
+  ;; Not both other pointers
   (inst cmp x y)
-  (load-symbol res t)
-  (cond ((member :cmov *backend-subfeatures*)
-         (inst mov eax nil-value)
-         (inst cmov :ne res eax))
-        (t
-         (inst jmp :e RETURN)
-         (inst mov res nil-value)))
-  RETURN
-  (inst clc)
+  RET
   (inst ret)
 
-  ;; FIXME: We could handle all non-numbers here easily enough: go to
-  ;; TWO-ARG-EQL only if lowtags and widetags match, lowtag is
-  ;; other-pointer-lowtag and widetag is < code-header-widetag.
   DO-STATIC-FUN
-  (inst pop eax)
-  (inst push ebp-tn)
-  (inst lea ebp-tn (make-ea :dword :base esp-tn :disp n-word-bytes))
-  (inst sub esp-tn (fixnumize 2))
-  (inst push eax)
-  (inst mov ecx (fixnumize 2))
-  (inst jmp (make-ea :dword
-                     :disp (+ nil-value (static-fun-offset 'eql)))))
+  ;; Might as well fast path that...
+  (inst cmp x y)
+  (inst jmp :e RET)
 
+  (move ecx esp-tn)
+  (inst sub esp-tn (fixnumize 3))
+  (inst mov (make-ea :dword
+                     :base ecx
+                     :disp (fixnumize -1))
+        ebp-tn)
+  (move ebp-tn ecx)
+  (inst mov ecx (fixnumize 2))
+  (inst call (make-ea :dword
+                      :disp (+ nil-value (static-fun-offset 'eql))))
+  (load-symbol y t)
+  (inst cmp x y)
+  (inst ret))
+
+#-sb-assembling
+(define-vop (generic-eql)
+  (:translate eql)
+  (:policy :safe)
+  (:save-p t)
+  (:args (x :scs (descriptor-reg any-reg) :target edx)
+         (y :scs (descriptor-reg any-reg) :target edi))
+
+  (:temporary (:sc unsigned-reg :offset edx-offset
+               :from (:argument 0))
+              edx)
+  (:temporary (:sc unsigned-reg :offset edi-offset
+               :from (:argument 1))
+              edi)
+
+  (:temporary (:sc unsigned-reg :offset ecx-offset
+               :from :eval)
+              ecx)
+  (:conditional :e)
+  (:generator 10
+    (move edx x)
+    (move edi y)
+    (inst lea ecx (make-ea :dword
+                           :disp (make-fixup 'generic-eql :assembly-routine)))
+    (inst call ecx)))
+
+#+sb-assembling
 (define-assembly-routine (generic-=
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate =)
-                          (:save-p t))
+                          (:return-style :none))
                          ((:arg x (descriptor-reg any-reg) edx-offset)
                           (:arg y (descriptor-reg any-reg) edi-offset)
 
-                          (:res res descriptor-reg edx-offset)
-
-                          (:temp eax unsigned-reg eax-offset)
                           (:temp ecx unsigned-reg ecx-offset))
   (inst mov ecx x)
   (inst or ecx y)
-  (inst test ecx fixnum-tag-mask)        ; both fixnums?
+  (inst test ecx fixnum-tag-mask)
   (inst jmp :nz DO-STATIC-FUN)
 
+  ;; Both fixnums
   (inst cmp x y)
-  (load-symbol res t)
-  (cond ((member :cmov *backend-subfeatures*)
-         (inst mov eax nil-value)
-         (inst cmov :ne res eax))
-        (t
-         (inst jmp :e RETURN)
-         (inst mov res nil-value)))
-  RETURN
-  (inst clc)
   (inst ret)
 
   DO-STATIC-FUN
-  (inst pop eax)
-  (inst push ebp-tn)
-  (inst lea ebp-tn (make-ea :dword :base esp-tn :disp n-word-bytes))
-  (inst sub esp-tn (fixnumize 2))
-  (inst push eax)
+  (move ecx esp-tn)
+  (inst sub esp-tn (fixnumize 3))
+  (inst mov (make-ea :dword
+                     :base ecx
+                     :disp (fixnumize -1))
+        ebp-tn)
+  (move ebp-tn ecx)
   (inst mov ecx (fixnumize 2))
-  (inst jmp (make-ea :dword
-                     :disp (+ nil-value (static-fun-offset 'two-arg-=)))))
+  (inst call (make-ea :dword
+                      :disp (+ nil-value (static-fun-offset 'two-arg-=))))
+  (load-symbol y t)
+  (inst cmp x y)
+  (inst ret))
+
+#-sb-assembling
+(define-vop (generic-=)
+  (:translate =)
+  (:policy :safe)
+  (:save-p t)
+  (:args (x :scs (descriptor-reg any-reg) :target edx)
+         (y :scs (descriptor-reg any-reg) :target edi))
+
+  (:temporary (:sc unsigned-reg :offset edx-offset
+               :from (:argument 0))
+              edx)
+  (:temporary (:sc unsigned-reg :offset edi-offset
+               :from (:argument 1))
+              edi)
+
+  (:temporary (:sc unsigned-reg :offset ecx-offset
+               :from :eval)
+              ecx)
+  (:conditional :e)
+  (:generator 10
+    (move edx x)
+    (move edi y)
+    (inst lea ecx (make-ea :dword
+                           :disp (make-fixup 'generic-= :assembly-routine)))
+    (inst call ecx)))
 
 
 ;;; Support for the Mersenne Twister, MT19937, random number generator

@@ -151,64 +151,79 @@
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
+               (declare (ignorable translate static-fn))
+             #+sb-assembling
              `(define-assembly-routine (,name
-                                        (:cost 10)
-                                        (:return-style :full-call)
-                                        (:policy :safe)
-                                        (:translate ,translate)
-                                        (:save-p t))
-                ((:arg x (descriptor-reg any-reg) rdx-offset)
-                 (:arg y (descriptor-reg any-reg) rdi-offset)
+                                        (:return-style :none))
+                  ((:arg x (descriptor-reg any-reg) rdx-offset)
+                   (:arg y (descriptor-reg any-reg) rdi-offset)
 
-                 (:res res descriptor-reg rdx-offset)
+                   (:temp rcx unsigned-reg rcx-offset))
 
-                 (:temp eax unsigned-reg rax-offset)
-                 (:temp ecx unsigned-reg rcx-offset))
-
-                (inst mov ecx x)
-                (inst or ecx y)
-                (inst test ecx fixnum-tag-mask)
+                (inst mov rcx x)
+                (inst or rcx y)
+                (inst test rcx fixnum-tag-mask)
                 (inst jmp :nz DO-STATIC-FUN)
 
                 (inst cmp x y)
-                (load-symbol res t)
-                (inst mov eax nil-value)
-                (inst cmov ,test res eax)
-                (inst clc)   ; single-value return
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst pop eax)
-                (inst push rbp-tn)
-                (inst lea rbp-tn (make-ea :qword
-                                          :base rsp-tn
-                                          :disp n-word-bytes))
-                (inst sub rsp-tn (fixnumize 2)) ; FIXME: Push 2 words on stack,
-                                                ; weirdly?
-                (inst push eax)
-                (inst mov ecx (fixnumize 2)) ; FIXME: FIXNUMIZE and
-                                        ; SINGLE-FLOAT-BITS are parallel,
-                                        ; should be named parallelly.
-                (inst jmp (make-ea :qword
-                                   :disp (+ nil-value
-                                            (static-fun-offset ',static-fn)))))))
+                (move rcx rsp-tn)
+                (inst sub rsp-tn (fixnumize 3))
+                (inst mov (make-ea :qword
+                                   :base rcx
+                                   :disp (fixnumize -1))
+                      rbp-tn)
+                (move rbp-tn rcx)
+                (inst mov rcx (fixnumize 2))
+                (inst call (make-ea :qword
+                                    :disp (+ nil-value
+                                             (static-fun-offset ',static-fn))))
+                ;; HACK: We depend on NIL having the lowest address of all
+                ;; static symbols (including T)
+                ,@(ecase test
+                    (:l `((inst mov y (1+ nil-value))
+                          (inst cmp y x)))
+                    (:g `((inst cmp x (1+ nil-value)))))
+                (inst ret))
+             #-sb-assembling
+             `(define-vop (,name)
+                (:translate ,translate)
+                (:policy :safe)
+                (:save-p t)
+                (:args (x :scs (descriptor-reg any-reg) :target rdx)
+                       (y :scs (descriptor-reg any-reg) :target rdi))
 
-  (define-cond-assem-rtn generic-< < two-arg-< :ge)
-  (define-cond-assem-rtn generic-> > two-arg-> :le))
+                (:temporary (:sc unsigned-reg :offset rdx-offset
+                                 :from (:argument 0))
+                            rdx)
+                (:temporary (:sc unsigned-reg :offset rdi-offset
+                                 :from (:argument 1))
+                            rdi)
 
+                (:temporary (:sc unsigned-reg :offset rcx-offset
+                                 :from :eval)
+                            rcx)
+                (:conditional ,test)
+                (:generator 10
+                   (move rdx x)
+                   (move rdi y)
+                   (inst lea rcx (make-ea :qword
+                                          :disp (make-fixup ',name :assembly-routine)))
+                   (inst call rcx)))))
+
+  (define-cond-assem-rtn generic-< < two-arg-< :l)
+  (define-cond-assem-rtn generic-> > two-arg-> :g))
+
+#+sb-assembling
 (define-assembly-routine (generic-eql
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate eql)
-                          (:save-p t))
+                          (:return-style :none))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
-                          (:res res descriptor-reg rdx-offset)
-
-                          (:temp rax unsigned-reg rax-offset)
                           (:temp rcx unsigned-reg rcx-offset))
+
   (inst mov rcx x)
   (inst and rcx y)
   (inst test rcx fixnum-tag-mask)
@@ -216,34 +231,55 @@
 
   ;; At least one fixnum
   (inst cmp x y)
-  (load-symbol res t)
-  (inst mov rax nil-value)
-  (inst cmov :ne res rax)
-  (inst clc)
   (inst ret)
 
   DO-STATIC-FUN
-  (inst pop rax)
-  (inst push rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp n-word-bytes))
-  (inst sub rsp-tn (fixnumize 2))
-  (inst push rax)
+  (move rcx rsp-tn)
+  (inst sub rsp-tn (fixnumize 3))
+  (inst mov (make-ea :qword
+                     :base rcx
+                     :disp (fixnumize -1))
+        rbp-tn)
+  (move rbp-tn rcx)
   (inst mov rcx (fixnumize 2))
-  (inst jmp (make-ea :qword
-                     :disp (+ nil-value (static-fun-offset 'eql)))))
+  (inst call (make-ea :qword
+                      :disp (+ nil-value (static-fun-offset 'eql))))
+  (load-symbol y t)
+  (inst cmp x y)
+  (inst ret))
 
+#-sb-assembling
+(define-vop (generic-eql)
+  (:translate eql)
+  (:policy :safe)
+  (:save-p t)
+  (:args (x :scs (descriptor-reg any-reg) :target rdx)
+         (y :scs (descriptor-reg any-reg) :target rdi))
+
+  (:temporary (:sc unsigned-reg :offset rdx-offset
+               :from (:argument 0))
+              rdx)
+  (:temporary (:sc unsigned-reg :offset rdi-offset
+               :from (:argument 1))
+              rdi)
+
+  (:temporary (:sc unsigned-reg :offset rcx-offset
+               :from :eval)
+              rcx)
+  (:conditional :e)
+  (:generator 10
+    (move rdx x)
+    (move rdi y)
+    (inst lea rcx (make-ea :qword
+                           :disp (make-fixup 'generic-eql :assembly-routine)))
+    (inst call rcx)))
+
+#+sb-assembling
 (define-assembly-routine (generic-=
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate =)
-                          (:save-p t))
+                          (:return-style :none))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
-                          (:res res descriptor-reg rdx-offset)
-
-                          (:temp rax unsigned-reg rax-offset)
                           (:temp rcx unsigned-reg rcx-offset))
   (inst mov rcx x)
   (inst or rcx y)
@@ -252,20 +288,45 @@
 
   ;; Both fixnums
   (inst cmp x y)
-  (load-symbol res t)
-  (inst mov rax nil-value)
-  (inst cmov :ne res rax)
-  (inst clc)
   (inst ret)
 
   DO-STATIC-FUN
-  (inst pop rax)
-  (inst push rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp n-word-bytes))
-  (inst sub rsp-tn (fixnumize 2))
-  (inst push rax)
+  (move rcx rsp-tn)
+  (inst sub rsp-tn (fixnumize 3))
+  (inst mov (make-ea :qword
+                     :base rcx
+                     :disp (fixnumize -1))
+        rbp-tn)
+  (move rbp-tn rcx)
   (inst mov rcx (fixnumize 2))
-  (inst jmp (make-ea :qword
-                     :disp (+ nil-value (static-fun-offset 'two-arg-=)))))
+  (inst call (make-ea :qword
+                      :disp (+ nil-value (static-fun-offset 'two-arg-=))))
+  (load-symbol y t)
+  (inst cmp x y)
+  (inst ret))
 
+#-sb-assembling
+(define-vop (generic-=)
+  (:translate =)
+  (:policy :safe)
+  (:save-p t)
+  (:args (x :scs (descriptor-reg any-reg) :target rdx)
+         (y :scs (descriptor-reg any-reg) :target rdi))
 
+  (:temporary (:sc unsigned-reg :offset rdx-offset
+               :from (:argument 0))
+              rdx)
+  (:temporary (:sc unsigned-reg :offset rdi-offset
+               :from (:argument 1))
+              rdi)
+
+  (:temporary (:sc unsigned-reg :offset rcx-offset
+               :from :eval)
+              rcx)
+  (:conditional :e)
+  (:generator 10
+    (move rdx x)
+    (move rdi y)
+    (inst lea rcx (make-ea :qword
+                           :disp (make-fixup 'generic-= :assembly-routine)))
+    (inst call rcx)))

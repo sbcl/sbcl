@@ -1182,8 +1182,7 @@
 (define-vop (=/float)
   (:args (x) (y))
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
@@ -1210,8 +1209,7 @@
        (inst fxch x)))
      (inst fnstsw)                      ; status word to ax
      (inst and ah-tn #x45)              ; C3 C2 C0
-     (inst cmp ah-tn #x40)
-     (inst jmp (if not-p :ne :e) target)))
+     (inst cmp ah-tn #x40)))
 
 (define-vop (=/single-float =/float)
   (:translate =)
@@ -1239,8 +1237,7 @@
   (:arg-types single-float single-float)
   (:temporary (:sc single-reg :offset fr0-offset :from :eval) fr0)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1280,8 +1277,7 @@
            (inst fcom (ea-for-sf-desc y)))))
       (inst fnstsw)                     ; status word to ax
       (inst and ah-tn #x45)             ; C3 C2 C0
-      (inst cmp ah-tn #x01)))
-    (inst jmp (if not-p :ne :e) target)))
+      (inst cmp ah-tn #x01)))))
 
 (define-vop (<double-float)
   (:translate <)
@@ -1290,8 +1286,7 @@
   (:arg-types double-float double-float)
   (:temporary (:sc double-reg :offset fr0-offset :from :eval) fr0)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1331,8 +1326,7 @@
            (inst fcomd (ea-for-df-desc y)))))
       (inst fnstsw)                     ; status word to ax
       (inst and ah-tn #x45)             ; C3 C2 C0
-      (inst cmp ah-tn #x01)))
-    (inst jmp (if not-p :ne :e) target)))
+      (inst cmp ah-tn #x01)))))
 
 #!+long-float
 (define-vop (<long-float)
@@ -1341,8 +1335,7 @@
          (y :scs (long-reg)))
   (:arg-types long-float long-float)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1366,8 +1359,8 @@
        (inst fcomd x)
        (inst fxch y)
        (inst fnstsw)                    ; status word to ax
-       (inst and ah-tn #x45)))          ; C3 C2 C0
-    (inst jmp (if not-p :ne :e) target)))
+       (inst and ah-tn #x45)))))        ; C3 C2 C0
+
 
 (define-vop (>single-float)
   (:translate >)
@@ -1376,8 +1369,7 @@
   (:arg-types single-float single-float)
   (:temporary (:sc single-reg :offset fr0-offset :from :eval) fr0)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1417,8 +1409,7 @@
              (inst fcom (ea-for-sf-stack y))
            (inst fcom (ea-for-sf-desc y)))))
       (inst fnstsw)                     ; status word to ax
-      (inst and ah-tn #x45)))
-    (inst jmp (if not-p :ne :e) target)))
+      (inst and ah-tn #x45)))))
 
 (define-vop (>double-float)
   (:translate >)
@@ -1427,8 +1418,7 @@
   (:arg-types double-float double-float)
   (:temporary (:sc double-reg :offset fr0-offset :from :eval) fr0)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1468,8 +1458,7 @@
              (inst fcomd (ea-for-df-stack y))
            (inst fcomd (ea-for-df-desc y)))))
       (inst fnstsw)                     ; status word to ax
-      (inst and ah-tn #x45)))
-    (inst jmp (if not-p :ne :e) target)))
+      (inst and ah-tn #x45)))))
 
 #!+long-float
 (define-vop (>long-float)
@@ -1478,8 +1467,7 @@
          (y :scs (long-reg)))
   (:arg-types long-float long-float)
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :e)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:ignore temp)
@@ -1503,16 +1491,15 @@
        (inst fcomd y)
        (inst fxch x)
        (inst fnstsw)                    ; status word to ax
-       (inst and ah-tn #x45)))
-    (inst jmp (if not-p :ne :e) target)))
+       (inst and ah-tn #x45)))))
 
 ;;; Comparisons with 0 can use the FTST instruction.
 
 (define-vop (float-test)
   (:args (x))
   (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p y)
+  (:conditional :e)
+  (:info y)
   (:variant-vars code)
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1533,8 +1520,7 @@
      (inst fnstsw)                      ; status word to ax
      (inst and ah-tn #x45)              ; C3 C2 C0
      (unless (zerop code)
-        (inst cmp ah-tn code))
-     (inst jmp (if not-p :ne :e) target)))
+        (inst cmp ah-tn code))))
 
 (define-vop (=0/single-float float-test)
   (:translate =)

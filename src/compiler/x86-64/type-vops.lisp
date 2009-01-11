@@ -184,10 +184,11 @@
   (:arg-types unsigned-num)
   (:translate fixnump)
   (:temporary (:sc unsigned-reg) tmp)
+  (:info)
+  (:conditional :z)
   (:generator 5
     (inst mov tmp value)
-    (inst shr tmp n-positive-fixnum-bits)
-    (inst jmp (if not-p :nz :z) target)))
+    (inst shr tmp n-positive-fixnum-bits)))
 
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.

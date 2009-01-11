@@ -207,11 +207,12 @@
 
 (define-vop (fixnump/unsigned-byte-32 simple-type-predicate)
   (:args (value :scs (unsigned-reg)))
+  (:info)
+  (:conditional :be)
   (:arg-types unsigned-num)
   (:translate fixnump)
   (:generator 5
-    (inst cmp value #.sb!xc:most-positive-fixnum)
-    (inst jmp (if not-p :a :be) target)))
+    (inst cmp value #.sb!xc:most-positive-fixnum)))
 
 ;;; A (SIGNED-BYTE 32) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.

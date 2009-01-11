@@ -196,8 +196,7 @@
   (:translate boundp)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:conditional)
-  (:info target not-p)
+  (:conditional :ne)
   (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
   (:generator 9
     (let ((check-unbound-label (gen-label)))
@@ -207,21 +206,18 @@
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (emit-label check-unbound-label)
-      (inst cmp value unbound-marker-widetag)
-      (inst jmp (if not-p :e :ne) target))))
+      (inst cmp value unbound-marker-widetag))))
 
 #!-sb-thread
 (define-vop (boundp)
   (:translate boundp)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:conditional)
-  (:info target not-p)
+  (:conditional :ne)
   (:generator 9
     (inst cmp (make-ea-for-object-slot object symbol-value-slot
                                        other-pointer-lowtag)
-          unbound-marker-widetag)
-    (inst jmp (if not-p :e :ne) target)))
+          unbound-marker-widetag)))
 
 
 (define-vop (symbol-hash)

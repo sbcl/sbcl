@@ -498,8 +498,6 @@
 ;;;; comparison
 
 (define-vop (float-compare)
-  (:conditional)
-  (:info target not-p)
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
@@ -511,102 +509,59 @@
 
 (define-vop (single-float-compare float-compare)
   (:args (x :scs (single-reg)) (y :scs (single-reg)))
-  (:conditional)
   (:arg-types single-float single-float))
 (define-vop (double-float-compare float-compare)
   (:args (x :scs (double-reg)) (y :scs (double-reg)))
-  (:conditional)
   (:arg-types double-float double-float))
 
 (define-vop (=/single-float single-float-compare)
     (:translate =)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :ne)
   (:vop-var vop)
   (:generator 3
     (note-this-location vop :internal-error)
     (inst comiss x y)
     ;; if PF&CF, there was a NaN involved => not equal
     ;; otherwise, ZF => equal
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :ne target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :e target)
-             (emit-label not-lab))))))
+    ))
 
 (define-vop (=/double-float double-float-compare)
     (:translate =)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :ne)
   (:vop-var vop)
   (:generator 3
     (note-this-location vop :internal-error)
-    (inst comisd x y)
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :ne target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :e target)
-             (emit-label not-lab))))))
+    (inst comisd x y)))
 
 (define-vop (<double-float double-float-compare)
   (:translate <)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :nc)
   (:generator 3
-    (inst comisd x y)
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :nc target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :c target)
-             (emit-label not-lab))))))
+    (inst comisd x y)))
 
 (define-vop (<single-float single-float-compare)
   (:translate <)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :nc)
   (:generator 3
-    (inst comiss x y)
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :nc target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :c target)
-             (emit-label not-lab))))))
+    (inst comiss x y)))
 
 (define-vop (>double-float double-float-compare)
   (:translate >)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :na)
   (:generator 3
-    (inst comisd x y)
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :na target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :a target)
-             (emit-label not-lab))))))
+    (inst comisd x y)))
 
 (define-vop (>single-float single-float-compare)
   (:translate >)
-  (:info target not-p)
+  (:info)
+  (:conditional not :p :na)
   (:generator 3
-    (inst comiss x y)
-    (cond (not-p
-           (inst jmp :p target)
-           (inst jmp :na target))
-          (t
-           (let ((not-lab (gen-label)))
-             (inst jmp :p not-lab)
-             (inst jmp :a target)
-             (emit-label not-lab))))))
+    (inst comiss x y)))
 
 
 
