@@ -224,15 +224,18 @@ in future versions."
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
-  ;; Simply setting SPINLOCK-VALUE to NIL is not enough as it does not
-  ;; propagate to other processors, plus without a memory barrier the
-  ;; CPU might reorder instructions allowing code from the critical
-  ;; section to leak out. Use COMPARE-AND-SWAP for the memory barrier
-  ;; effect and do some sanity checking while we are at it.
-  (unless (eq *current-thread*
-              (sb!ext:compare-and-swap (spinlock-value spinlock)
-                                       *current-thread* nil))
-    (error "Only the owner can release the spinlock ~S." spinlock)))
+  ;; On x86 and x86-64 we can get away with no memory barriers, (see
+  ;; Linux kernel mailing list "spin_unlock optimization(i386)"
+  ;; thread, summary at
+  ;; http://kt.iserv.nl/kernel-traffic/kt19991220_47.html#1.
+  ;;
+  ;; If the compiler may reorder this with other instructions, insert
+  ;; compiler barrier here.
+  ;;
+  ;; FIXME: this does not work on SMP Pentium Pro and OOSTORE systems,
+  ;; neither on most non-x86 architectures (but we don't have threads
+  ;; on those).
+  (setf (spinlock-value spinlock) nil))
 
 
 ;;;; Mutexes

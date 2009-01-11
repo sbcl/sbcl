@@ -112,6 +112,7 @@
                      (fixnumize 1))
                (storew target other symbol-tls-index-slot other-pointer-lowtag)
                (emit-label release-tls-index-lock)
+               ;; No need for barriers on x86/x86-64 on unlock.
                (store-symbol-value 0 *tls-index-lock*)
                ;; Restore OTHER.
                (inst pop other))

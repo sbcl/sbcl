@@ -18,7 +18,8 @@
  * here? (The answer wasn't obvious to me when merging the
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
-#include "interr.h"
+#define COMPILER_BARRIER \
+    do { __asm__ __volatile__ ( "" : : : "memory"); } while (0)
 
 static inline void
 get_spinlock(volatile lispobj *word, unsigned long value)
@@ -48,7 +49,14 @@ get_spinlock(volatile lispobj *word, unsigned long value)
 #endif
 }
 
-#include <stdio.h>
+static inline void
+release_spinlock(volatile lispobj *word)
+{
+    /* See comment in RELEASE-SPINLOCK in target-thread.lisp. */
+    COMPILER_BARRIER;
+    *word=0;
+    COMPILER_BARRIER;
+}
 
 static inline lispobj
 swap_lispobjs(volatile lispobj *dest, lispobj value)
@@ -66,14 +74,6 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
          : "memory");
 #endif
     return old_value;
-}
-
-static inline void
-release_spinlock(volatile lispobj *word)
-{
-    /* A memory barrier is needed, use swap_lispobjs. See comment in
-     * RELEASE-SPINLOCK in target-thread.lisp. */
-    swap_lispobjs(word,0);
 }
 
 extern void fast_bzero_detect(void *, size_t);
