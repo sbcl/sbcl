@@ -245,4 +245,11 @@
           (with-alien ((myin int (slot myst 'myint)))
             (assert (integerp myin))))))
 
+;;; void conflicted with derived type
+(declaim (inline bug-316075))
+(sb-alien:define-alien-routine bug-316075 void (result char :out))
+(with-test (:name bug-316075)
+  (handler-bind ((warning #'error))
+    (compile nil '(lambda () (multiple-value-list (bug-316075))))))
+
 ;;; success

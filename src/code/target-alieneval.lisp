@@ -723,25 +723,11 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
             ((,lisp-name (function ,result-type ,@(arg-types))
                          :extern ,alien-name)
              ,@(alien-vars))
-             #-nil
-             (values (alien-funcall ,lisp-name ,@(alien-args))
-                     ,@(results))
-             #+nil
-             (if (alien-values-type-p result-type)
-                 ;; FIXME: RESULT-TYPE is a type specifier, so it
-                 ;; cannot be of type ALIEN-VALUES-TYPE. Also note,
-                 ;; that if RESULT-TYPE is VOID, then this code
-                 ;; disagrees with the computation of the return type
-                 ;; and with all usages of this macro. -- APD,
-                 ;; 2002-03-02
-                 (let ((temps (make-gensym-list
-                               (length
-                                (alien-values-type-values result-type)))))
-                   `(multiple-value-bind ,temps
-                        (alien-funcall ,lisp-name ,@(alien-args))
-                      (values ,@temps ,@(results))))
-                 (values (alien-funcall ,lisp-name ,@(alien-args))
-                         ,@(results)))))))))
+             ,@(if (eq 'void result-type)
+                   `((alien-funcall ,lisp-name ,@(alien-args))
+                     (values nil ,@(results)))
+                   `((values (alien-funcall ,lisp-name ,@(alien-args))
+                             ,@(results))))))))))
 
 (defun alien-typep (object type)
   #!+sb-doc

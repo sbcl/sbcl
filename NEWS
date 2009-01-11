@@ -17,6 +17,8 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     by Tobias Rittweiler, patch by Paul Khuong)
   * bug fix: setting alien structure fields of type struct by value now
     computes the right offset for the memory copy.
+  * bug fix: compilation problem involving inlined calls to aliens with
+    result type VOID. (reported by Ken Olum)
 
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
