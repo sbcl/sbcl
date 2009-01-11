@@ -642,7 +642,7 @@
                                    atypes)
                      (template-more-args-type info) "args")
       (check-tn-refs (vop-results vop) vop t
-                     (if (eq rtypes :conditional) 0 (length rtypes))
+                     (if (template-conditional-p info) 0 (length rtypes))
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
       (unless (= (length (vop-codegen-info vop))

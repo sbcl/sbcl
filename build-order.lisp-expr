@@ -631,6 +631,7 @@
 
  ("src/compiler/copyprop")
  ("src/compiler/represent")
+ ("src/compiler/ir2opt")
  ("src/compiler/pack")
  ("src/compiler/codegen")
  ("src/compiler/debug")

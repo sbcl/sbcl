@@ -194,6 +194,9 @@
     make-dynamic-state-tns
     make-nlx-entry-arg-start-location
 
+    ;; from pred.lisp
+    convert-conditional-move-p
+
     ;; from support.lisp
     generate-call-sequence
     generate-return-sequence

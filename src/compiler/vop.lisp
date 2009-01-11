@@ -559,8 +559,12 @@
   ;; conditional that yields its result as a control transfer. The
   ;; emit function takes two info arguments: the target label and a
   ;; boolean flag indicating whether to negate the sense of the test.
+  ;;
+  ;; If RESULT-TYPES is a cons whose car is :CONDITIONAL, then this is
+  ;; a flag-setting VOP. The rest is a list of condition descriptors to
+  ;; be interpreted by the BRANCH-IF VOP (see $ARCH/pred.lisp).
   (arg-types nil :type list)
-  (result-types nil :type (or list (member :conditional)))
+  (result-types nil :type (or list (member :conditional) (cons (eql :conditional))))
   ;; the primitive type restriction applied to each extra argument or
   ;; result following the fixed operands. If NIL, no extra
   ;; args/results are allowed. Otherwise, either * or a (:OR ...) list

@@ -367,7 +367,7 @@
     (unless (and (combination-p use)
                  (let ((info (basic-combination-info use)))
                    (and (template-p info)
-                        (eq (template-result-types info) :conditional))))
+                        (template-conditional-p info))))
       (annotate-ordinary-lvar test)))
   (values))
 
@@ -523,7 +523,7 @@
                    (if (and safe-p (template-args-ok template call nil))
                        :arg-check
                        :arg-types)))
-          ((eq (template-result-types template) :conditional)
+          ((template-conditional-p template)
            (let ((dest (lvar-dest lvar)))
              (if (and (if-p dest)
                       (immediately-used-p (if-test dest) call))

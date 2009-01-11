@@ -571,16 +571,28 @@
   (declare (type node node) (type ir2-block block)
            (type template template) (type (or tn-ref null) args)
            (list info-args) (type cif if) (type boolean not-p))
-  (aver (= (template-info-arg-count template) (+ (length info-args) 2)))
   (let ((consequent (if-consequent if))
-        (alternative (if-alternative if)))
-    (cond ((drop-thru-p if consequent)
+        (alternative (if-alternative if))
+        (flags       (and (consp (template-result-types template))
+                          (rest (template-result-types template)))))
+    (aver (= (template-info-arg-count template)
+             (+ (length info-args)
+                (if flags 0 2))))
+    (when not-p
+      (rotatef consequent alternative)
+      (setf not-p nil))
+    (when (drop-thru-p if consequent)
+      (rotatef consequent alternative)
+      (setf not-p t))
+    (cond ((not flags)
            (emit-template node block template args nil
-                          (list* (block-label alternative) (not not-p)
-                                 info-args)))
+                          (list* (block-label consequent) not-p
+                                 info-args))
+           (unless (drop-thru-p if alternative)
+             (vop branch node block (block-label alternative))))
           (t
-           (emit-template node block template args nil
-                          (list* (block-label consequent) not-p info-args))
+           (emit-template node block template args nil info-args)
+           (vop branch-if node block (block-label consequent) flags not-p)
            (unless (drop-thru-p if alternative)
              (vop branch node block (block-label alternative)))))))
 
@@ -648,7 +660,7 @@
     (multiple-value-bind (args info-args)
         (reference-args call block (combination-args call) template)
       (aver (not (template-more-results-type template)))
-      (if (eq rtypes :conditional)
+      (if (template-conditional-p template)
           (ir2-convert-conditional call block template args info-args
                                    (lvar-dest lvar) nil)
           (let* ((results (make-template-result-tns call lvar rtypes))
@@ -680,7 +692,7 @@
     (multiple-value-bind (args info-args)
         (reference-args call block (cddr (combination-args call)) template)
       (aver (not (template-more-results-type template)))
-      (aver (not (eq rtypes :conditional)))
+      (aver (not (template-conditional-p template)))
       (aver (null info-args))
 
       (if info

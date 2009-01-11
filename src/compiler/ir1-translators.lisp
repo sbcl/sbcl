@@ -449,7 +449,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
                nargs
                min)))
 
-    (when (eq (template-result-types template) :conditional)
+    (when (template-conditional-p template)
       (bug "%PRIMITIVE was used with a conditional template."))
 
     (when (template-more-results-type template)

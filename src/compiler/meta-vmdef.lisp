@@ -389,7 +389,9 @@
   (operands nil :type list)
   ;; names of variables that should be declared IGNORE
   (ignores () :type list)
-  ;; true if this is a :CONDITIONAL VOP
+  ;; true if this is a :CONDITIONAL VOP. T if a branchful VOP,
+  ;; a list of condition descriptor otherwise. See $ARCH/pred.lisp
+  ;; for more information.
   (conditional-p nil)
   ;; argument and result primitive types. These are pulled out of the
   ;; operands, since we often want to change them without respecifying
@@ -1083,7 +1085,7 @@
          (setf (vop-parse-result-types parse) ())
          (setf (vop-parse-results parse) ())
          (setf (vop-parse-more-results parse) nil)
-         (setf (vop-parse-conditional-p parse) t))
+         (setf (vop-parse-conditional-p parse) (or (rest spec) t)))
         (:temporary
          (parse-temporary spec parse))
         (:generator
@@ -1460,9 +1462,12 @@
     `(:type (specifier-type '(function () nil))
       :arg-types (list ,@(mapcar #'make-operand-type args))
       :more-args-type ,(when more-args (make-operand-type more-arg))
-      :result-types ,(if conditional
-                         :conditional
-                         `(list ,@(mapcar #'make-operand-type results)))
+      :result-types ,(cond ((eq conditional t)
+                            :conditional)
+                           (conditional
+                            `'(:conditional . ,conditional))
+                           (t
+                            `(list ,@(mapcar #'make-operand-type results))))
       :more-results-type ,(when more-results
                             (make-operand-type more-result)))))
 
@@ -1572,13 +1577,17 @@
 ;;;         (:ARGUMENT N)/(:RESULT N). These options are necessary
 ;;;         primarily when operands are read or written out of order.
 ;;;
-;;; :CONDITIONAL
+;;; :CONDITIONAL [Condition-descriptor+]
 ;;;     This is used in place of :RESULTS with conditional branch VOPs.
 ;;;     There are no result values: the result is a transfer of control.
 ;;;     The target label is passed as the first :INFO arg. The second
 ;;;     :INFO arg is true if the sense of the test should be negated.
 ;;;     A side effect is to set the PREDICATE attribute for functions
 ;;;     in the :TRANSLATE option.
+;;;
+;;;     If some condition descriptors are provided, this is a flag-setting
+;;;     VOP. Descriptors are interpreted in an architecture-dependent
+;;;     manner. See the BRANCH-IF VOP in $ARCH/pred.lisp.
 ;;;
 ;;; :TEMPORARY ({Key Value}*) Name*
 ;;;     Allocate a temporary TN for each Name, binding that variable to

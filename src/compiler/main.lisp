@@ -459,6 +459,8 @@
             (maybe-mumble "copy ")
             (copy-propagate component))
 
+          (ir2-optimize component)
+
           (select-representations component)
 
           (when *check-consistency*

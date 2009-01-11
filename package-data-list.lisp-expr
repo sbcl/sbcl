@@ -380,7 +380,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "VM-SUPPORT-ROUTINES-LOCATION-NUMBER"
 
                "WITH-SOURCE-LOCATION"
-               "*SOURCE-LOCATION-THUNKS*"))
+               "*SOURCE-LOCATION-THUNKS*"
+
+               "BRANCH-IF"))
 
    #s(sb-cold:package-data
       :name "SB!DEBUG"

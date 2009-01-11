@@ -219,7 +219,7 @@
     (let* ((args (convert (template-arg-types template)
                           (template-more-args-type template)))
            (result-restr (template-result-types template))
-           (results (if (eq result-restr :conditional)
+           (results (if (template-conditional-p template)
                         '(boolean)
                         (convert result-restr
                                  (cond ((template-more-results-type template))
@@ -229,3 +229,10 @@
                  ,(if (= (length results) 1)
                       (first results)
                       `(values ,@results))))))
+
+#!-sb-fluid (declaim (inline template-conditional-p))
+(defun template-conditional-p (template)
+  (declare (type template template))
+  (let ((rtypes (template-result-types template)))
+    (or (eq rtypes :conditional)
+        (eq (car rtypes) :conditional))))
