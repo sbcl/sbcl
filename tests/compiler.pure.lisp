@@ -2691,6 +2691,11 @@
                        t)
               t)))
 
+(with-test (:name :regression-1.0.24.37)
+  (compile nil '(lambda (&key (test (constantly t)))
+                 (when (funcall test)
+                   :quux))))
+
 ;;; Attempt to test a decent cross section of conditions
 ;;; and values types to move conditionally.
 (macrolet

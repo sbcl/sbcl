@@ -445,6 +445,16 @@
   (aver (eq (tn-kind tn) :constant))
   (constant-value (tn-leaf tn)))
 
+(defun immediate-tn-p (tn)
+  (declare (type tn tn))
+  (let ((leaf (tn-leaf tn)))
+    ;; Leaves with KIND :CONSTANT can have NIL as the leaf if they
+    ;; represent load time values.
+    (and leaf
+         (eq (tn-kind tn) :constant)
+         (eq (immediate-constant-sc (constant-value leaf))
+             (sc-number-or-lose 'sb!vm::immediate)))))
+
 ;;; Force TN to be allocated in a SC that doesn't need to be saved: an
 ;;; unbounded non-save-p SC. We don't actually make it a real "restricted" TN,
 ;;; but since we change the SC to an unbounded one, we should always succeed in

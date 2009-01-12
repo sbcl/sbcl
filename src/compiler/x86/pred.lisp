@@ -91,10 +91,6 @@
         (let ((scn (sc-number-or-lose representation)))
           (labels ((make-tn ()
                      (make-representation-tn ptype scn))
-                   (immediate-tn-p (tn)
-                     (and (eq (sb!c::tn-kind tn) :constant)
-                          (eq (sb!c::immediate-constant-sc (tn-value tn))
-                              (sc-number-or-lose 'immediate))))
                    (frob-tn (tn)
                      (if (immediate-tn-p tn)
                          tn
