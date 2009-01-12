@@ -34,7 +34,9 @@
     (fp-single-zero (values 0 nil))
     (single-reg (values (tn-offset tn) nil))
     (fp-double-zero (values 0 t))
-    (double-reg (values (tn-offset tn) t))))
+    (double-reg (values (tn-offset tn) t))
+    (complex-single-reg (values (tn-offset tn) nil))
+    (complex-double-reg (values (tn-offset tn) t))))
 
 (defconstant-eqx compare-conditions
   '(:never := :< :<= :<< :<<= :sv :od :tr :<> :>= :> :>>= :>> :nsv :ev)

@@ -132,10 +132,10 @@
                   :offset (1+ (tn-offset x))))
 
 (defun complex-double-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
+  (make-random-tn :kind :normal :sc (sc-or-lose 'complex-double-reg)
                   :offset (tn-offset x)))
 (defun complex-double-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
+  (make-random-tn :kind :normal :sc (sc-or-lose 'complex-double-reg)
                   :offset (1+ (tn-offset x))))
 
 (macrolet
