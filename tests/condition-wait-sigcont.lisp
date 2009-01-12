@@ -21,7 +21,10 @@
   (write-line "/waiting")
   (force-output)
   (delete-file "condition-wait-sigcont.tmp")
+  #+sb-thread
   (condition-wait *queue* *lock*)
+  #-sb-thread
+  (loop (sleep 10))
   (write-line "/woken")
   (force-output)
   (with-open-file (f "condition-wait-sigcont.tmp" :direction :output)

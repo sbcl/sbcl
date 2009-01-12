@@ -10,7 +10,8 @@ use_test_subdirectory
 
 echo //entering finalize.test.sh
 
-run_sbcl <<EOF > /dev/null &
+# $! is not set correctly when calling run_sbcl, do it directly
+"$SBCL_RUNTIME" --core "$SBCL_CORE" $SBCL_ARGS <<EOF > /dev/null &
 (defvar *tmp* 0.0)
 (defvar *count* 0)
 
