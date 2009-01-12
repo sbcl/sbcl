@@ -4,6 +4,11 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     removed later. Please use SB-INTROSPECT:FUNCTION-LAMBDA-LIST instead.
   * new feature: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST allows retrieval of
     DEFTYPE lambda lists. (thanks to Tobias Rittweiler)
+  * enhancement: MUTEX-VALUE is to be superseded by MUTEX-OWNER that has a
+    better name and does not return values so stale on multiprocessor systems.
+    Also, HOLDING-MUTEX-P was added for about the only sane usage of
+    MUTEX-OWNER.
+  * improvement: unithread builds keep track of MUTEX-VALUE.
   * improvement: reading from a TWO-WAY-STREAM does not touch the output
     stream anymore making it thread safe to have a concurrent reader and
     a writer, for instance, in a pipe.
@@ -252,7 +257,7 @@ changes in sbcl-1.0.19 relative to 1.0.18:
     type is not know sufficiently well a compile-time are now compiled
     correctly. (reported by John Morrison)
   * bug fix: compiler no longer makes erronous assumptions in the
-    presense of non-foldable SATISFIES types.
+    presence of non-foldable SATISFIES types.
   * bug fix: stack analysis missed cleanups of dynamic-extent
     arguments in non-let-converted calls to local functions.
   * improvements to the Windows port:

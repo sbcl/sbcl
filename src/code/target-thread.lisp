@@ -257,6 +257,15 @@ in future versions."
   (defconstant +lock-taken+ 1)
   (defconstant +lock-contested+ 2))
 
+(defun mutex-owner (mutex)
+  "Current owner of the mutex, NIL if the mutex is free. Naturally,
+this is racy by design (another thread may acquire the mutex after
+this function returns), it is intended for informative purposes. For
+testing whether the current thread is holding a mutex see
+HOLDING-MUTEX-P."
+  ;; Make sure to get the current value.
+  (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
+
 (defun get-mutex (mutex &optional (new-owner *current-thread*) (waitp t))
   #!+sb-doc
   "Acquire MUTEX for NEW-OWNER, which must be a thread or NIL. If
@@ -287,9 +296,10 @@ directly."
     (when (eq new-owner old)
       (error "Recursive lock attempt ~S." mutex))
     #!-sb-thread
-    (if old
-        (error "Strange deadlock on ~S in an unithreaded build?" mutex)
-        (setf (mutex-%owner mutex) new-owner)))
+    (when old
+      (error "Strange deadlock on ~S in an unithreaded build?" mutex)))
+  #!-sb-thread
+  (setf (mutex-%owner mutex) new-owner)
   #!+sb-thread
   (progn
     ;; FIXME: Lutexes do not currently support deadlines, as at least
@@ -309,6 +319,8 @@ directly."
       (setf (mutex-%owner mutex) new-owner)
       t)
     #!-sb-lutex
+    ;; This is a direct tranlation of the Mutex 2 algorithm from
+    ;; "Futexes are Tricky" by Ulrich Drepper.
     (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
                                         +lock-free+
                                         +lock-taken+)))
@@ -351,7 +363,7 @@ this mutex.
 RELEASE-MUTEX is not interrupt safe: interrupts should be disabled
 around calls to it.
 
-Signals a WARNING is current thread is not the current owner of the
+Signals a WARNING if current thread is not the current owner of the
 mutex."
   (declare (type mutex mutex))
   ;; Order matters: set owner to NIL before releasing state.
@@ -366,6 +378,14 @@ mutex."
     (with-lutex-address (lutex (mutex-lutex mutex))
       (%lutex-unlock lutex))
     #!-sb-lutex
+    ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
+    ;; unsigned-byte type this can be used:
+    ;;
+    ;;     (let ((old (sb!ext:atomic-incf (mutex-state mutex) -1)))
+    ;;       (unless (eql old +lock-free+)
+    ;;         (setf (mutex-state mutex) +lock-free+)
+    ;;         (with-pinned-objects (mutex)
+    ;;           (futex-wake (mutex-state-address mutex) 1))))
     (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
                                         +lock-taken+ +lock-free+)))
       (when (eql old +lock-contested+)

@@ -21,10 +21,16 @@
   #!+(and sb-lutex sb-thread)
   (lutex (make-lutex)))
 
-;;; FIXME: We probably want to rename the accessor MUTEX-OWNER.
 (defun mutex-value (mutex)
-  "Current owner of the mutex, NIL if the mutex is free."
+  "Current owner of the mutex, NIL if the mutex is free. May return a
+stale value, use MUTEX-OWNER instead."
   (mutex-%owner mutex))
+
+(defun holding-mutex-p (mutex)
+  "Test whether the current thread is holding MUTEX."
+  ;; This is about the only use for which a stale value of owner is
+  ;; sufficient.
+  (eq sb!thread:*current-thread* (mutex-%owner mutex)))
 
 (defsetf mutex-value set-mutex-value)
 
@@ -58,7 +64,9 @@ and the mutex is in use, sleep until it is available"
       ,value
       ,wait-p)))
 
-(sb!xc:defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts) &body body)
+(sb!xc:defmacro with-system-mutex ((mutex
+                                    &key without-gcing allow-with-interrupts)
+                                   &body body)
   `(dx-flet ((with-system-mutex-thunk () ,@body))
      (,(cond (without-gcing
                'call-with-system-mutex/without-gcing)
@@ -109,25 +117,44 @@ provided the default value is used for the mutex."
       #'with-spinlock-thunk
       ,spinlock)))
 
-;;; KLUDGE: this separate implementation for (NOT SB-THREAD) is not
-;;; strictly necessary; GET-MUTEX and RELEASE-MUTEX are implemented.
-;;; However, there would be a (possibly slight) performance hit in
-;;; using them.
+(macrolet ((def (name &optional variant)
+             `(defun ,(if variant (symbolicate name "/" variant) name)
+                  (function mutex)
+                (declare (function function))
+                (flet ((%call-with-system-mutex ()
+                         (dx-let (got-it)
+                           (unwind-protect
+                                (when (setf got-it (get-mutex mutex))
+                                  (funcall function))
+                             (when got-it
+                               (release-mutex mutex))))))
+                  (declare (inline %call-with-system-mutex))
+                  ,(ecase variant
+                     (:without-gcing
+                       `(without-gcing (%call-with-system-mutex)))
+                     (:allow-with-interrupts
+                       `(without-interrupts
+                          (allow-with-interrupts (%call-with-system-mutex))))
+                     ((nil)
+                      `(without-interrupts (%call-with-system-mutex))))))))
+  (def call-with-system-mutex)
+  (def call-with-system-mutex :without-gcing)
+  (def call-with-system-mutex :allow-with-interrupts))
+
 #!-sb-thread
 (progn
   (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name) (function lock)
+               `(defun ,(if variant (symbolicate name "/" variant) name)
+                    (function lock)
                   (declare (ignore lock) (function function))
                   ,(ecase variant
                     (:without-gcing
                       `(without-gcing (funcall function)))
                     (:allow-with-interrupts
-                      `(without-interrupts (allow-with-interrupts (funcall function))))
+                      `(without-interrupts
+                         (allow-with-interrupts (funcall function))))
                     ((nil)
                       `(without-interrupts (funcall function)))))))
-    (def call-with-system-mutex)
-    (def call-with-system-mutex :without-gcing)
-    (def call-with-system-mutex :allow-with-interrupts)
     (def call-with-system-spinlock)
     (def call-with-recursive-system-spinlock)
     (def call-with-recursive-system-spinlock :without-gcing))
@@ -154,28 +181,6 @@ provided the default value is used for the mutex."
 ;;; closes over GOT-IT causes a value-cell to be allocated for it --
 ;;; and we prefer that to go on the stack since it can.
 (progn
-  (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name) (function mutex)
-                  (declare (function function))
-                  (flet ((%call-with-system-mutex ()
-                           (dx-let (got-it)
-                             (unwind-protect
-                                  (when (setf got-it (get-mutex mutex))
-                                    (funcall function))
-                               (when got-it
-                                 (release-mutex mutex))))))
-                    (declare (inline %call-with-system-mutex))
-                    ,(ecase variant
-                      (:without-gcing
-                        `(without-gcing (%call-with-system-mutex)))
-                      (:allow-with-interrupts
-                        `(without-interrupts (allow-with-interrupts (%call-with-system-mutex))))
-                      ((nil)
-                        `(without-interrupts (%call-with-system-mutex))))))))
-    (def call-with-system-mutex)
-    (def call-with-system-mutex :without-gcing)
-    (def call-with-system-mutex :allow-with-interrupts))
-
   (defun call-with-system-spinlock (function spinlock)
     (declare (function function))
     (without-interrupts
@@ -187,13 +192,18 @@ provided the default value is used for the mutex."
             (release-spinlock spinlock))))))
 
   (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name) (function spinlock)
+               `(defun ,(if variant (symbolicate name "/" variant) name)
+                    (function spinlock)
                   (declare (function function))
                   (flet ((%call-with-system-spinlock ()
-                           (dx-let ((inner-lock-p (eq *current-thread* (spinlock-value spinlock)))
+                           (dx-let ((inner-lock-p
+                                     (eq *current-thread*
+                                         (spinlock-value spinlock)))
                                     (got-it nil))
                              (unwind-protect
-                                  (when (or inner-lock-p (setf got-it (get-spinlock spinlock)))
+                                  (when (or inner-lock-p
+                                            (setf got-it
+                                                  (get-spinlock spinlock)))
                                     (funcall function))
                                (when got-it
                                  (release-spinlock spinlock))))))
@@ -239,8 +249,6 @@ provided the default value is used for the mutex."
                (with-local-interrupts (funcall function)))
           (when got-it
             (release-mutex mutex))))))
-
-
 
   (defun call-with-recursive-spinlock (function spinlock)
     (declare (function function))
