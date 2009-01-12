@@ -1515,9 +1515,10 @@ copy_large_unboxed_object(lispobj object, long nwords)
     gc_assert(from_space_p(object));
     gc_assert((nwords & 0x01) == 0);
 
-    if ((nwords > 1024*1024) && gencgc_verbose)
+    if ((nwords > 1024*1024) && gencgc_verbose) {
         FSHOW((stderr, "/copy_large_unboxed_object: %d bytes\n",
                nwords*N_WORD_BYTES));
+    }
 
     /* Check whether it's a large object. */
     first_page = find_page_index((void *)object);
@@ -1586,10 +1587,11 @@ copy_large_unboxed_object(lispobj object, long nwords)
             next_page++;
         }
 
-        if ((bytes_freed > 0) && gencgc_verbose)
+        if ((bytes_freed > 0) && gencgc_verbose) {
             FSHOW((stderr,
                    "/copy_large_unboxed bytes_freed=%d\n",
                    bytes_freed));
+        }
 
         generations[from_space].bytes_allocated -=
             nwords*N_WORD_BYTES + bytes_freed;
@@ -2231,28 +2233,31 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
             if ((unsigned long)pointer !=
                 ((unsigned long)start_addr+FUN_POINTER_LOWTAG)) {
-                if (gencgc_verbose)
+                if (gencgc_verbose) {
                     FSHOW((stderr,
                            "/Wf2: %x %x %x\n",
                            pointer, start_addr, *start_addr));
+                }
                 return 0;
             }
             break;
         default:
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wf3: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         break;
     case LIST_POINTER_LOWTAG:
         if ((unsigned long)pointer !=
             ((unsigned long)start_addr+LIST_POINTER_LOWTAG)) {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wl1: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         /* Is it plausible cons? */
@@ -2262,44 +2267,49 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
              is_lisp_immediate(start_addr[1])))
             break;
         else {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wl2: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
     case INSTANCE_POINTER_LOWTAG:
         if ((unsigned long)pointer !=
             ((unsigned long)start_addr+INSTANCE_POINTER_LOWTAG)) {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wi1: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wi2: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         break;
     case OTHER_POINTER_LOWTAG:
         if ((unsigned long)pointer !=
             ((unsigned long)start_addr+OTHER_POINTER_LOWTAG)) {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wo1: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         /* Is it plausible?  Not a cons. XXX should check the headers. */
         if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wo2: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         switch (widetag_of(start_addr[0])) {
@@ -2309,26 +2319,29 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
 #if N_WORD_BITS == 64
         case SINGLE_FLOAT_WIDETAG:
 #endif
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "*Wo3: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
 
             /* only pointed to by function pointers? */
         case CLOSURE_HEADER_WIDETAG:
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "*Wo4: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
 
         case INSTANCE_HEADER_WIDETAG:
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "*Wo5: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
 
             /* the valid other immediate pointer objects */
@@ -2431,18 +2444,20 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
             break;
 
         default:
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 FSHOW((stderr,
                        "/Wo6: %x %x %x\n",
                        pointer, start_addr, *start_addr));
+            }
             return 0;
         }
         break;
     default:
-        if (gencgc_verbose)
+        if (gencgc_verbose) {
             FSHOW((stderr,
                    "*W?: %x %x %x\n",
                    pointer, start_addr, *start_addr));
+        }
         return 0;
     }
 
@@ -3146,8 +3161,9 @@ scavenge_newspace_generation(generation_index_t generation)
             /* New areas of objects allocated have been lost so need to do a
              * full scan to be sure! If this becomes a problem try
              * increasing NUM_NEW_AREAS. */
-            if (gencgc_verbose)
+            if (gencgc_verbose) {
                 SHOW("new_areas overflow, doing full scavenge");
+            }
 
             /* Don't need to record new areas that get scavenged
              * anyway during scavenge_newspace_generation_one_scan. */
@@ -4206,8 +4222,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[generation].alloc_large_unboxed_start_page = 0;
 
     if (generation >= verify_gens) {
-        if (gencgc_verbose)
+        if (gencgc_verbose) {
             SHOW("verifying");
+        }
         verify_gc();
         verify_dynamic_space();
     }
@@ -4435,8 +4452,9 @@ gc_free_heap(void)
 {
     page_index_t page;
 
-    if (gencgc_verbose > 1)
+    if (gencgc_verbose > 1) {
         SHOW("entering gc_free_heap");
+    }
 
     for (page = 0; page < page_table_pages; page++) {
         /* Skip free pages which should already be zero filled. */
