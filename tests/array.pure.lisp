@@ -249,3 +249,14 @@
     (assert (not (array-has-fill-pointer-p
                   (sb-ext::array-storage-vector
                    (make-array 5 :fill-pointer 4)))))))
+
+(with-test (:name invalid-array-index-error)
+  (let ((array (make-array '(3 3 3))))
+    (assert
+     (eq :right
+         (handler-case
+             (eval `(aref ,array 0 1 3))
+           (sb-int:invalid-array-index-error (e)
+             (when (and (eq array (sb-kernel::invalid-array-index-error-array e))
+                        (= 3 (type-error-datum e)))
+               :right)))))))

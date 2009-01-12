@@ -1101,6 +1101,21 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                     "No traps are enabled? How can this be?"
                     stream))))))
 
+(define-condition invalid-array-index-error (type-error)
+  ((array :initarg :array :reader invalid-array-index-error-array)
+   (axis :initarg :axis :reader invalid-array-index-error-axis))
+  (:report
+   (lambda (condition stream)
+     (let ((array (invalid-array-index-error-array condition)))
+       (format stream "Index ~W out of bounds for ~@[axis ~W of ~]~S, ~
+                       should be nonnegative and <~W."
+               (type-error-datum condition)
+               (when (> (array-rank array) 1)
+                 (invalid-array-index-error-axis condition))
+               (type-of array)
+               ;; Extract the bound from (INTEGER 0 (BOUND))
+               (caaddr (type-error-expected-type condition)))))))
+
 (define-condition index-too-large-error (type-error)
   ()
   (:report

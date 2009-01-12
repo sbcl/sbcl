@@ -476,6 +476,14 @@ of specialized arrays is supported."
 (defun data-vector-ref-with-offset (array index offset)
   (hairy-data-vector-ref array (+ index offset)))
 
+(declaim (ftype (function (array integer integer &optional t) nil) signal-invalid-array-index-error))
+(defun invalid-array-index-error (array index bound &optional axis)
+  (error 'invalid-array-index-error
+         :array array
+         :axis axis
+         :datum index
+         :type `(integer 0 (,bound))))
+
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
 (defun %array-row-major-index (array subscripts
                                      &optional (invalid-index-error-p t))
@@ -497,11 +505,7 @@ of specialized arrays is supported."
             (declare (fixnum dim))
             (unless (and (fixnump index) (< -1 index dim))
               (if invalid-index-error-p
-                  (error 'simple-type-error
-                         :format-control "invalid index ~W~[~;~:; on axis ~:*~W~] in ~S"
-                         :format-arguments (list index axis array)
-                         :datum index
-                         :expected-type `(integer 0 (,dim)))
+                  (invalid-array-index-error array index dim axis)
                   (return-from %array-row-major-index nil)))
             (incf result (* chunk-size (the fixnum index)))
             (setf chunk-size (* chunk-size dim))))
@@ -509,14 +513,7 @@ of specialized arrays is supported."
               (length (length (the (simple-array * (*)) array))))
           (unless (and (fixnump index) (< -1 index length))
             (if invalid-index-error-p
-                ;; FIXME: perhaps this should share a format-string
-                ;; with INVALID-ARRAY-INDEX-ERROR or
-                ;; INDEX-TOO-LARGE-ERROR?
-                (error 'simple-type-error
-                       :format-control "invalid index ~W in ~S"
-                       :format-arguments (list index array)
-                       :datum index
-                       :expected-type `(integer 0 (,length)))
+                (invalid-array-index-error array index length)
                 (return-from %array-row-major-index nil)))
           index))))
 
