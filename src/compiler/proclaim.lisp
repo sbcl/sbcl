@@ -67,7 +67,7 @@
       (unless (assq (car old-entry) result)
         (push old-entry result)))
     ;; Voila.
-    result))
+    (sort-policy result)))
 
 (declaim (ftype (function (list list) list)
                 process-handle-conditions-decl))
@@ -254,7 +254,8 @@
                (process-package-lock-decl form *disabled-package-locks*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
-         (proclaim-as-fun-name name) ; since implicitly it is a function
+         ; since implicitly it is a function, also scrubs *FREE-FUNS*
+         (proclaim-as-fun-name name)
          (setf (info :function :inlinep name)
                (ecase kind
                  (inline :inline)

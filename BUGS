@@ -597,25 +597,6 @@ WORKAROUND:
 
   This is probably the same bug as 162
 
-235: "type system and inline expansion"
-  a.
-  (declaim (ftype (function (cons) number) acc))
-  (declaim (inline acc))
-  (defun acc (c)
-    (the number (car c)))
-
-  (defun foo (x y)
-    (values (locally (declare (optimize (safety 0)))
-              (acc x))
-            (locally (declare (optimize (safety 3)))
-              (acc y))))
-
-  (foo '(nil) '(t)) => NIL, T.
-
-  As of 0.9.15.41 this seems to be due to ACC being inlined only once
-  inside FOO, which results in the second call reusing the FUNCTIONAL
-  resulting from the first -- which doesn't check the type.
-
 237: "Environment arguments to type functions"
   a. Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
      UPGRADED-COMPLEX-PART-TYPE now have an optional environment

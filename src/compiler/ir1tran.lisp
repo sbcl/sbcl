@@ -132,48 +132,51 @@
                        *universal-type*)
      :where-from where)))
 
-;;; Has the *FREE-FUNS* entry FREE-FUN become invalid?
+;;; Have some DEFINED-FUN-FUNCTIONALS of a *FREE-FUNS* entry become invalid?
+;;; Drop 'em.
 ;;;
-;;; In CMU CL, the answer was implicitly always true, so this
-;;; predicate didn't exist.
-;;;
-;;; This predicate was added to fix bug 138 in SBCL. In some obscure
-;;; circumstances, it was possible for a *FREE-FUNS* entry to contain a
-;;; DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object contained IR1
-;;; stuff (NODEs, BLOCKs...) referring to an already compiled (aka
-;;; "dead") component. When this IR1 stuff was reused in a new
-;;; component, under further obscure circumstances it could be used by
+;;; This was added to fix bug 138 in SBCL. It is possible for a *FREE-FUNS*
+;;; entry to contain a DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object
+;;; contained IR1 stuff (NODEs, BLOCKs...) referring to an already compiled
+;;; (aka "dead") component. When this IR1 stuff was reused in a new component,
+;;; under further obscure circumstances it could be used by
 ;;; WITH-IR1-ENVIRONMENT-FROM-NODE to generate a binding for
-;;; *CURRENT-COMPONENT*. At that point things got all confused, since
-;;; IR1 conversion was sending code to a component which had already
-;;; been compiled and would never be compiled again.
-(defun invalid-free-fun-p (free-fun)
+;;; *CURRENT-COMPONENT*. At that point things got all confused, since IR1
+;;; conversion was sending code to a component which had already been compiled
+;;; and would never be compiled again.
+;;;
+;;; Note: as of 1.0.24.41 this seems to happen only in XC, and the original
+;;; BUGS entry also makes it seem like this might not be an issue at all on
+;;; target.
+(defun clear-invalid-functionals (free-fun)
   ;; There might be other reasons that *FREE-FUN* entries could
   ;; become invalid, but the only one we've been bitten by so far
   ;; (sbcl-0.pre7.118) is this one:
-  (and (defined-fun-p free-fun)
-       (let ((functional (defined-fun-functional free-fun)))
-         (or (and functional
-                  (eql (functional-kind functional) :deleted))
-             (and (lambda-p functional)
-                  (or
-                   ;; (The main reason for this first test is to bail
-                   ;; out early in cases where the LAMBDA-COMPONENT
-                   ;; call in the second test would fail because links
-                   ;; it needs are uninitialized or invalid.)
-                   ;;
-                   ;; If the BIND node for this LAMBDA is null, then
-                   ;; according to the slot comments, the LAMBDA has
-                   ;; been deleted or its call has been deleted. In
-                   ;; that case, it seems rather questionable to reuse
-                   ;; it, and certainly it shouldn't be necessary to
-                   ;; reuse it, so we cheerfully declare it invalid.
-                   (null (lambda-bind functional))
-                   ;; If this IR1 stuff belongs to a dead component,
-                   ;; then we can't reuse it without getting into
-                   ;; bizarre confusion.
-                   (eql (component-info (lambda-component functional))
-                        :dead)))))))
+  (when (defined-fun-p free-fun)
+    (setf (defined-fun-functionals free-fun)
+          (delete-if (lambda (functional)
+                       (or (eq (functional-kind functional) :deleted)
+                           (when (lambda-p functional)
+                             (or
+                              ;; (The main reason for this first test is to bail
+                              ;; out early in cases where the LAMBDA-COMPONENT
+                              ;; call in the second test would fail because links
+                              ;; it needs are uninitialized or invalid.)
+                              ;;
+                              ;; If the BIND node for this LAMBDA is null, then
+                              ;; according to the slot comments, the LAMBDA has
+                              ;; been deleted or its call has been deleted. In
+                              ;; that case, it seems rather questionable to reuse
+                              ;; it, and certainly it shouldn't be necessary to
+                              ;; reuse it, so we cheerfully declare it invalid.
+                              (not (lambda-bind functional))
+                              ;; If this IR1 stuff belongs to a dead component,
+                              ;; then we can't reuse it without getting into
+                              ;; bizarre confusion.
+                              (eq (component-info (lambda-component functional))
+                                  :dead)))))
+                     (defined-fun-functionals free-fun)))
+    nil))
 
 ;;; If NAME already has a valid entry in *FREE-FUNS*, then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
@@ -184,8 +187,9 @@
 (declaim (ftype (sfunction (t string) global-var) find-free-fun))
 (defun find-free-fun (name context)
   (or (let ((old-free-fun (gethash name *free-funs*)))
-        (and (not (invalid-free-fun-p old-free-fun))
-             old-free-fun))
+        (when old-free-fun
+          (clear-invalid-functionals old-free-fun)
+          old-free-fun))
       (ecase (info :function :kind name)
         ;; FIXME: The :MACRO and :SPECIAL-FORM cases could be merged.
         (:macro
@@ -1257,8 +1261,8 @@
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)
             (defined-fun-inline-expansion var))
-      (setf (defined-fun-functional res)
-            (defined-fun-functional var)))
+      (setf (defined-fun-functionals res)
+            (defined-fun-functionals var)))
     ;; FIXME: Is this really right? Needs we not set the FUNCTIONAL
     ;; to the original global-var?
     res))

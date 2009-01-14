@@ -711,16 +711,16 @@
   ;; global environment.
   (inlinep nil :type inlinep)
   (inline-expansion nil :type (or cons null))
-  ;; the block-local definition of this function (either because it
-  ;; was semi-inline, or because it was defined in this block). If
-  ;; this function is not an entry point, then this may be deleted or
-  ;; LET-converted. Null if we haven't converted the expansion yet.
-  (functional nil :type (or functional null)))
+  ;; List of functionals corresponding to this DEFINED-FUN: either from the
+  ;; conversion of a NAMED-LAMBDA, or from inline-expansion (see
+  ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
+  ;; which the function is used.
+  (functionals nil :type list))
 (defprinter (defined-fun :identity t)
   %source-name
   #!+sb-show id
   inlinep
-  (functional :test functional))
+  (functionals :test functionals))
 
 ;;;; function stuff
 
@@ -1163,7 +1163,7 @@
   (%source-name (missing-arg) :type symbol :read-only t))
 (defprinter (ref :identity t)
   #!+sb-show id
-  %source-name
+  (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.

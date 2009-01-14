@@ -1016,7 +1016,7 @@
                                           :maybe-add-debug-catch t
                                           :source-name name)))
              (assert-global-function-definition-type name res)
-             (setf (defined-fun-functional defined-fun-res) res)
+             (push res (defined-fun-functionals defined-fun-res))
              (unless (eq (defined-fun-inlinep defined-fun-res) :notinline)
                (substitute-leaf-if
                 (lambda (ref)
@@ -1088,7 +1088,7 @@
              (setf (gethash name *free-funs*) res)))
           ;; If *FREE-FUNS* has a previously converted definition
           ;; for this name, then blow it away and try again.
-          ((defined-fun-functional found)
+          ((defined-fun-functionals found)
            (remhash name *free-funs*)
            (get-defined-fun name))
           (t found))))

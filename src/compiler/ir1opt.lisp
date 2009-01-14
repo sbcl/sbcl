@@ -879,9 +879,9 @@
                             leaf
                             inlinep
                             (info :function :info name))))
-                 ;; allow backward references to this function from
-                 ;; following top level forms
-                 (setf (defined-fun-functional leaf) res)
+                 ;; Allow backward references to this function from following
+                 ;; forms. (Reused only if policy matches.)
+                 (push res (defined-fun-functionals leaf))
                  (change-ref-leaf ref res))))
         (let ((fun (defined-fun-functional leaf)))
           (if (or (not fun)
@@ -892,7 +892,8 @@
                   (with-ir1-environment-from-node call
                     (frob)
                     (locall-analyze-component *current-component*)))
-              ;; If we've already converted, change ref to the converted functional.
+              ;; If we've already converted, change ref to the converted
+              ;; functional.
               (change-ref-leaf ref fun))))
       (values (ref-leaf ref) nil))
      (t

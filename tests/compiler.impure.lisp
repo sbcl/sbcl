@@ -1035,6 +1035,26 @@
        (flet ((i (x) (frob x (bug-405-foo-bar foo))))
          (i :five))))))
 
+;;; bug 235a
+(declaim (ftype (function (cons) number) bug-235a-aux))
+(declaim (inline bug-235a-aux))
+(defun bug-235a-aux (c)
+  (the number (car c)))
+(with-test (:name :bug-235a)
+  (let ((fun (compile nil
+                      `(lambda (x y)
+                         (values (locally (declare (optimize (safety 0)))
+                                   (bug-235a-aux x))
+                                 (locally (declare (optimize (safety 3)))
+                                   (bug-235a-aux y)))))))
+    (assert
+     (eq :error
+         (handler-case
+             (funcall fun '(:one) '(:two))
+           (type-error (e)
+             (assert (eq :two (type-error-datum e)))
+             (assert (eq 'number (type-error-expected-type e)))
+             :error))))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

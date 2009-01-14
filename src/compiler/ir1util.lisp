@@ -1141,6 +1141,14 @@
                    (eq (defined-fun-functional defined-fun) fun))
           (remhash name *free-funs*))))))
 
+;;; Return functional for DEFINED-FUN which has been converted in policy
+;;; corresponding to the current one, or NIL if no such functional exists.
+(defun defined-fun-functional (defined-fun)
+  (let ((policy (lexenv-%policy *lexenv*)))
+    (dolist (functional (defined-fun-functionals defined-fun))
+      (when (equal policy (lexenv-%policy (functional-lexenv functional)))
+        (return functional)))))
+
 ;;; Do stuff to delete the semantic attachments of a REF node. When
 ;;; this leaves zero or one reference, we do a type dispatch off of
 ;;; the leaf to determine if a special action is appropriate.

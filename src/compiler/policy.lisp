@@ -89,6 +89,11 @@ EXPERIMENTAL INTERFACE: Subject to change."
 (declaim (type policy *policy*))
 (defvar *policy*)          ; initialized in cold init
 
+(defun sort-policy (policy)
+  ;; We occasionally want to compare policies using EQL, hence we
+  ;; canonize the order.
+  (sort policy #'string< :key #'car))
+
 ;;; This is to be called early in cold init to set things up, and may
 ;;; also be called again later in cold init in order to reset default
 ;;; optimization policy back to default values after toplevel PROCLAIM
@@ -111,12 +116,12 @@ EXPERIMENTAL INTERFACE: Subject to change."
           ;; Perhaps INHIBIT-NOTES?
           inhibit-warnings))
   (setf *policy*
-        (mapcar (lambda (name)
-                  ;; CMU CL didn't use 1 as the default for
-                  ;; everything, but since ANSI says 1 is the ordinary
-                  ;; value, we do.
-                  (cons name 1))
-                *policy-qualities*))
+        (sort-policy (mapcar (lambda (name)
+                               ;; CMU CL didn't use 1 as the default for
+                               ;; everything, but since ANSI says 1 is the ordinary
+                               ;; value, we do.
+                               (cons name 1))
+                             *policy-qualities*)))
   (setf *policy-restrictions* nil)
   ;; not actually POLICY, but very similar
   (setf *handled-conditions* nil

@@ -24,6 +24,8 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     computes the right offset for the memory copy.
   * bug fix: compilation problem involving inlined calls to aliens with
     result type VOID. (reported by Ken Olum)
+  * bug fix: #235a; sequential inline expasion in different policies no
+    longer reuses the functional from the previous expansion site.
 
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
