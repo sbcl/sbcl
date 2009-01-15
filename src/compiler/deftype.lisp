@@ -31,7 +31,7 @@
         ;; is not availble early enough.
         (if (and (not lambda-list) (not decls) (not (cdr forms))
                  (or (member (car forms) '(t nil))
-                     (eq 'quote (caar forms))))
+                     (and (consp (car forms)) (eq 'quote (caar forms)))))
             (values `(constant-type-expander ,(car forms)) doc '(sb!c:source-location))
             (with-unique-names (whole)
               (multiple-value-bind (macro-body local-decs doc)

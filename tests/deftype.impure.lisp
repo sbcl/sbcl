@@ -44,3 +44,8 @@
 (assert (equal '(x) (sb-int:info :type :lambda-list 'bar)))
 (defclass bar () ())
 (assert (not (sb-int:info :type :lambda-list 'bar)))
+
+;; Need to work with plain symbols as the body.
+(defconstant whatever 't)
+(deftype anything () whatever)
+(assert (typep 42 'anything))
