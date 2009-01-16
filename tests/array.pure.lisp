@@ -258,5 +258,6 @@
              (eval `(aref ,array 0 1 3))
            (sb-int:invalid-array-index-error (e)
              (when (and (eq array (sb-kernel::invalid-array-index-error-array e))
-                        (= 3 (type-error-datum e)))
+                        (= 3 (type-error-datum e))
+                        (equal '(integer 0 (3)) (type-error-expected-type e)))
                :right)))))))

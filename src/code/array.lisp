@@ -482,7 +482,7 @@ of specialized arrays is supported."
          :array array
          :axis axis
          :datum index
-         :type `(integer 0 (,bound))))
+         :expected-type `(integer 0 (,bound))))
 
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
 (defun %array-row-major-index (array subscripts
