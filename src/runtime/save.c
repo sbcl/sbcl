@@ -56,13 +56,18 @@ write_runtime_options(FILE *file, struct runtime_options *options)
         optarray[3] = options->thread_control_stack_size;
     }
 
-    fwrite(optarray, sizeof(size_t), RUNTIME_OPTIONS_WORDS, file);
+    if (RUNTIME_OPTIONS_WORDS !=
+        fwrite(optarray, sizeof(size_t), RUNTIME_OPTIONS_WORDS, file)) {
+        perror("Error writing runtime options to file");
+    }
 }
 
 static void
 write_lispobj(lispobj obj, FILE *file)
 {
-    fwrite(&obj, sizeof(lispobj), 1, file);
+    if (1 != fwrite(&obj, sizeof(lispobj), 1, file)) {
+        perror("Error writing to file");
+    }
 }
 
 static long
@@ -354,9 +359,13 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_runtime_options(file,
                           (save_runtime_options ? runtime_options : NULL));
 
-    fwrite(&core_start_pos, sizeof(os_vm_offset_t), 1, file);
-    write_lispobj(CORE_MAGIC, file);
-    fclose(file);
+    if (1 != fwrite(&core_start_pos, sizeof(os_vm_offset_t), 1, file)) {
+        perror("Error writing core starting position to file");
+        fclose(file);
+    } else {
+        write_lispobj(CORE_MAGIC, file);
+        fclose(file);
+    }
 
 #ifndef LISP_FEATURE_WIN32
     if (make_executable)
@@ -416,13 +425,20 @@ save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size)
     size_t padding;
     void *padbytes;
 
-    fwrite(runtime, 1, runtime_size, output);
+    if (runtime_size != fwrite(runtime, 1, runtime_size, output)) {
+        perror("Error saving runtime");
+        return 0;
+    }
 
     padding = (os_vm_page_size - (runtime_size % os_vm_page_size)) & ~os_vm_page_size;
     if (padding > 0) {
         padbytes = successful_malloc(padding);
         memset(padbytes, 0, padding);
-        fwrite(padbytes, 1, padding, output);
+        if (padding != fwrite(padbytes, 1, padding, output)) {
+            perror("Error saving runtime");
+            free(padbytes);
+            return 0;
+        }
         free(padbytes);
     }
 
