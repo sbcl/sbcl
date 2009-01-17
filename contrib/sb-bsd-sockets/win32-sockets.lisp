@@ -68,8 +68,16 @@
 (defun make-wsa-version (major minor)
   (dpb minor (byte 8 8) major))
 
-(defvar *wsa-startup-call*
-  (wsa-startup (make-wsa-version 2 2)))
+(defvar *wsa-startup-call* nil)
+
+(defun call-wsa-startup ()
+  (setf *wsa-startup-call* (wsa-startup (make-wsa-version 2 2))))
+
+;;; Startup!
+(call-wsa-startup)
+
+;;; Ensure startup for saved cores as well.
+(push 'call-wsa-startup sb-ext:*init-hooks*)
 
 ;; not implemented on win32
 (defconstant af-local 0)

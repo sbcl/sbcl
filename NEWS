@@ -28,6 +28,9 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     longer reuses the functional from the previous expansion site.
   * bug fix: DEFTYPE no longer breaks on bodies consisting of a single
     unquoted symbol. Regression from 1.0.22.8. (reported by Ariel Badichi)
+  * improvements to the Windows port:
+    ** SB-BSD-SOCKETS now works from saved cores as well. (reported by Stephen
+       Westfold, thanks to Rudi Schlatte)
 
 changes in sbcl-1.0.24 relative to 1.0.23:
   * new feature: ARRAY-STORAGE-VECTOR provides access to the underlying data
