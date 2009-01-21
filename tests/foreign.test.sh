@@ -14,7 +14,9 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+. ./expect.sh
 . ./subr.sh
+
 use_test_subdirectory
 
 echo //entering foreign.test.sh
@@ -370,6 +372,29 @@ run_sbcl <<EOF
   (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "struct offsets" $?
+
+cat > $TEST_FILESTEM.alien.enum.lisp <<EOF
+(define-alien-type foo-flag
+  (enum foo-flag-
+    (:a 1)
+    (:b 2)))
+
+(define-alien-type bar
+  (struct bar
+    (foo-flag foo-flag)))
+
+(define-alien-type barp
+  (* bar))
+
+(defun foo (x)
+  (declare (type (alien barp) x))
+  x)
+
+(defun bar (x)
+  (declare (type (alien barp) x))
+  x)
+EOF
+expect_clean_compile $TEST_FILESTEM.alien.enum.lisp
 
 # success convention for script
 exit $EXIT_TEST_WIN

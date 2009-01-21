@@ -658,8 +658,16 @@
                  (auxiliary-alien-type :enum name env)
                (when old-p
                  (unless (alien-type-= result old)
-                   (warn "redefining alien enum ~S" name))))
-             (setf (auxiliary-alien-type :enum name env) result))
+                   (cerror "Continue, clobbering the old definition"
+                           "Incompatible alien enum type definition: ~S" name)
+                   (setf (alien-type-from old) (alien-type-from result)
+                         (alien-type-to old) (alien-type-to result)
+                         (alien-type-kind old) (alien-type-kind result)
+                         (alien-type-offset old) (alien-type-offset result)
+                         (alien-type-signed old) (alien-type-signed result)))
+                 (setf result old))
+               (unless old-p
+                 (setf (auxiliary-alien-type :enum name env) result))))
            result))
         (name
          (multiple-value-bind (result found)

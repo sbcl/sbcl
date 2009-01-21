@@ -28,6 +28,8 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     longer reuses the functional from the previous expansion site.
   * bug fix: DEFTYPE no longer breaks on bodies consisting of a single
     unquoted symbol. Regression from 1.0.22.8. (reported by Ariel Badichi)
+  * bug fix: named ENUMs in multiply-referenced alien record types no longer
+    cause an implied type redefinition.  Regression from 1.0.21.29.
   * improvements to the Windows port:
     ** SB-BSD-SOCKETS now works from saved cores as well. (reported by Stephen
        Westfold, thanks to Rudi Schlatte)
