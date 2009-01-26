@@ -78,6 +78,12 @@
             (values 'unsigned-byte-32 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
+(define-alien-type-method (integer :naturalize-gen) (type alien)
+  (if (and (alien-integer-type-signed type)
+           (<= (alien-type-bits type) 16))
+      `(sign-extend ,alien ,(alien-type-bits type))
+      alien))
+
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
@@ -180,6 +186,45 @@
                                        :result-type result-type)
                                     ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
+
+;;; The ABI is vague about how signed sub-word integer return values
+;;; are handled, but since gcc versions >=4.3 no longer do sign
+;;; extension in the callee, we need to do it in the caller.
+(defknown sign-extend ((signed-byte 16) t) fixnum
+    (foldable flushable movable))
+
+(define-vop (sign-extend)
+  (:translate sign-extend)
+  (:policy :fast-safe)
+  ;; Need to wire this to EAX since in x86 some dword registers don't
+  ;; have a matching word or byte register.
+  (:args (val :scs (signed-reg) :target eax))
+  (:temporary (:sc signed-reg :offset eax-offset :from :eval :to :result) eax)
+  (:arg-types fixnum (:constant fixnum))
+  (:info size)
+  (:results (res :scs (signed-reg)))
+  (:result-types fixnum)
+  (:ignore eax)
+  (:generator 1
+   (inst movsx res
+         (make-random-tn :kind :normal
+                         :sc (sc-or-lose (ecase size
+                                           (8 'byte-reg)
+                                           (16 'word-reg)))
+                         :offset (tn-offset val)))))
+
+#-sb-xc-host
+(defun sign-extend (x size)
+  (declare (type fixnum x))
+  (ecase size
+    (8 (sign-extend x size))
+    (16 (sign-extend x size))))
+
+#+sb-xc-host
+(defun sign-extend (x size)
+  (if (logbitp (1- size) x)
+      (dpb x (byte size 0) -1)
+      x))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)

@@ -74,8 +74,6 @@
     (0 eax-offset)
     (1 edx-offset)))
 
-;; XXX The return handling probably doesn't conform to the ABI
-
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
@@ -88,7 +86,7 @@
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (if (and (alien-integer-type-signed type)
            (<= (alien-type-bits type) 32))
-      `(sign-extend ,alien)
+      `(sign-extend ,alien ,(alien-type-bits type))
       alien))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
@@ -191,34 +189,41 @@
                                     ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
 
-;;; The ABI specifies that signed short/int's are returned as 32-bit
-;;; values. Negative values need to be sign-extended to 64-bits (done
-;;; in a :NATURALIZE-GEN alien-type-method).
-(defknown sign-extend ((signed-byte 32)) fixnum
-          (foldable flushable movable))
+;;; The ABI is vague about how signed sub-word integer return values
+;;; are handled, but since gcc versions >=4.3 no longer do sign
+;;; extension in the callee, we need to do it in the caller.
+(defknown sign-extend ((signed-byte 32) t) fixnum
+    (foldable flushable movable))
 
 (define-vop (sign-extend)
   (:translate sign-extend)
   (:policy :fast-safe)
   (:args (val :scs (signed-reg)))
-  (:arg-types fixnum)
+  (:arg-types fixnum (:constant fixnum))
+  (:info size)
   (:results (res :scs (signed-reg)))
   (:result-types fixnum)
   (:generator 1
    (inst movsxd res
          (make-random-tn :kind :normal
-                         :sc (sc-or-lose 'dword-reg)
+                         :sc (sc-or-lose (ecase size
+                                           (8 'byte-reg)
+                                           (16 'word-reg)
+                                           (32 'dword-reg)))
                          :offset (tn-offset val)))))
 
 #-sb-xc-host
-(defun sign-extend (x)
-  (declare (type (signed-byte 32) x))
-  (sign-extend x))
+(defun sign-extend (x size)
+  (declare (type fixnum x))
+  (ecase size
+    (8 (sign-extend x size))
+    (16 (sign-extend x size))
+    (32 (sign-extend x size))))
 
 #+sb-xc-host
-(defun sign-extend (x)
-  (if (logbitp 31 x)
-      (dpb x (byte 32 0) -1)
+(defun sign-extend (x size)
+  (if (logbitp (1- size) x)
+      (dpb x (byte size 0) -1)
       x))
 
 (define-vop (foreign-symbol-sap)

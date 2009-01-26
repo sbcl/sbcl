@@ -30,6 +30,8 @@ changes in sbcl-1.0.25 relative to 1.0.24:
     unquoted symbol. Regression from 1.0.22.8. (reported by Ariel Badichi)
   * bug fix: named ENUMs in multiply-referenced alien record types no longer
     cause an implied type redefinition.  Regression from 1.0.21.29.
+  * bug fix: sign-extension of small signed return values now works with C
+    code compiled with gcc 4.3 or newer. (reported by Liam Healy)
   * improvements to the Windows port:
     ** SB-BSD-SOCKETS now works from saved cores as well. (reported by Stephen
        Westfold, thanks to Rudi Schlatte)
