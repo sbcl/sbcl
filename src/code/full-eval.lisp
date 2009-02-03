@@ -279,7 +279,8 @@
 (defun parse-arguments (arguments lambda-list)
   (multiple-value-bind (required optional rest-p rest keyword-p
                         keyword allow-other-keys-p aux-p aux)
-      (sb!int:parse-lambda-list lambda-list)
+      (handler-bind ((style-warning #'muffle-warning))
+        (sb!int:parse-lambda-list lambda-list))
     (let* ((original-arguments arguments)
            (arguments-present (length arguments))
            (required-length (length required))
