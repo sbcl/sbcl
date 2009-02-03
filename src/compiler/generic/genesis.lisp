@@ -280,7 +280,7 @@
                           (high low &optional gspace word-offset))
             (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
-  (gspace nil :type (or gspace null))
+  (gspace nil :type (or gspace (eql :load-time-value) null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
   (word-offset nil :type (or sb!vm:word null))
   ;; the high and low halves of the descriptor
@@ -529,7 +529,7 @@
   (read-wordindexed address 0))
 
 ;;; (Note: In CMU CL, this function expected a SAP-typed ADDRESS
-;;; value, instead of the SAP-INT we use here.)
+;;; value, instead of the object-and-offset we use here.)
 (declaim (ftype (function (descriptor sb!vm:word descriptor) (values))
                 note-load-time-value-reference))
 (defun note-load-time-value-reference (address offset marker)
@@ -547,15 +547,7 @@
 (defun write-wordindexed (address index value)
   #!+sb-doc
   "Write VALUE displaced INDEX words from ADDRESS."
-  ;; KLUDGE: There is an algorithm (used in DESCRIPTOR-INTUIT-GSPACE)
-  ;; for calculating the value of the GSPACE slot from scratch. It
-  ;; doesn't work for all values, only some of them, but mightn't it
-  ;; be reasonable to see whether it works on VALUE before we give up
-  ;; because (DESCRIPTOR-GSPACE VALUE) isn't set? (Or failing that,
-  ;; perhaps write a comment somewhere explaining why it's not a good
-  ;; idea?) -- WHN 19990817
-  (if (and (null (descriptor-gspace value))
-           (not (null (descriptor-word-offset value))))
+  (if (eql (descriptor-gspace value) :load-time-value)
     (note-load-time-value-reference address
                                     (- (ash index sb!vm:word-shift)
                                        (logand (descriptor-bits address)
@@ -2329,7 +2321,7 @@ core and return a descriptor to it."
                   *nil-descriptor*)))
                *current-reversed-cold-toplevels*)
     (setf *load-time-value-counter* (1+ counter))
-    (make-descriptor 0 0 nil counter)))
+    (make-descriptor 0 0 :load-time-value counter)))
 
 (defun finalize-load-time-value-noise ()
   (cold-set (cold-intern '*!load-time-values*)
