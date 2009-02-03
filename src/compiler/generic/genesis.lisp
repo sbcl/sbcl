@@ -1638,33 +1638,34 @@ core and return a descriptor to it."
 (defvar *load-time-code-fixups*)
 
 #!+x86
-(defun note-load-time-code-fixup (code-object offset value kind)
+(defun note-load-time-code-fixup (code-object offset)
   ;; If CODE-OBJECT might be moved
   (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
            dynamic-core-space-id)
-    ;; FIXME: pushed thing should be a structure, not just a list
-    (push (list code-object offset value kind) *load-time-code-fixups*))
+    (push offset (gethash (descriptor-bits code-object)
+                          *load-time-code-fixups*
+                          nil)))
   (values))
 
 #!+x86
 (defun output-load-time-code-fixups ()
-  (dolist (fixups *load-time-code-fixups*)
-    (let ((code-object (first fixups))
-          (offset (second fixups))
-          (value (third fixups))
-          (kind (fourth fixups)))
-      (cold-push (cold-cons
-                  (cold-intern :load-time-code-fixup)
-                  (cold-cons
-                   code-object
-                   (cold-cons
-                    (number-to-core offset)
-                    (cold-cons
-                     (number-to-core value)
-                     (cold-cons
-                      (cold-intern kind)
-                      *nil-descriptor*)))))
-                 *current-reversed-cold-toplevels*))))
+  (maphash
+   (lambda (code-object-address fixup-offsets)
+     (let ((fixup-vector
+            (allocate-vector-object
+             *dynamic* sb-vm:n-word-bits (length fixup-offsets)
+             sb!vm:simple-array-unsigned-byte-32-widetag)))
+       (do ((index sb!vm:vector-data-offset (1+ index))
+            (fixups fixup-offsets (cdr fixups)))
+           ((null fixups))
+         (write-wordindexed fixup-vector index
+                            (make-random-descriptor (car fixups))))
+       ;; KLUDGE: The fixup vector is stored as the first constant,
+       ;; not as a separately-named slot.
+       (write-wordindexed (make-random-descriptor code-object-address)
+                          sb!vm:code-constants-offset
+                          fixup-vector)))
+   *load-time-code-fixups*))
 
 ;;; Given a pointer to a code object and an offset relative to the
 ;;; tail of the code object's header, return an offset relative to the
@@ -1859,9 +1860,7 @@ core and return a descriptor to it."
               #!+x86
               (unless (< fixed-up code-object-start-addr)
                 (note-load-time-code-fixup code-object
-                                           after-header
-                                           value
-                                           kind))))
+                                           after-header))))
            (:relative ; (used for arguments to X86 relative CALL instruction)
             (let ((fixed-up (- (+ value un-fixed-up)
                                gspace-byte-address
@@ -1875,9 +1874,7 @@ core and return a descriptor to it."
               ;; a fixup.
               #!+x86
               (note-load-time-code-fixup code-object
-                                         after-header
-                                         value
-                                         kind))))))))
+                                         after-header))))))))
   (values))
 
 (defun resolve-assembler-fixups ()
@@ -3221,7 +3218,7 @@ initially undefined function references:~2%")
                               sb!vm:unbound-marker-widetag))
            *cold-assembler-fixups*
            *cold-assembler-routines*
-           #!+x86 *load-time-code-fixups*)
+           #!+x86 (*load-time-code-fixups* (make-hash-table)))
 
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
