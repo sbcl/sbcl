@@ -400,21 +400,31 @@
 ;;; (DESCRIPTOR-WORD-OFFSET DES), and return the GSPACE.
 (declaim (ftype (function (descriptor) gspace) descriptor-intuit-gspace))
 (defun descriptor-intuit-gspace (des)
-  (if (descriptor-gspace des)
-    (descriptor-gspace des)
-    ;; KLUDGE: It's not completely clear to me what's going on here;
-    ;; this is a literal translation from of some rather mysterious
-    ;; code from CMU CL's DESCRIPTOR-SAP function. Some explanation
-    ;; would be nice. -- WHN 19990817
-    (let ((lowtag (descriptor-lowtag des))
-          (high (descriptor-high des))
-          (low (descriptor-low des)))
-      (if (or (eql lowtag sb!vm:fun-pointer-lowtag)
-              (eql lowtag sb!vm:instance-pointer-lowtag)
-              (eql lowtag sb!vm:list-pointer-lowtag)
-              (eql lowtag sb!vm:other-pointer-lowtag))
+  (or (descriptor-gspace des)
+
+      ;; gspace wasn't set, now we have to search for it.
+      (let ((lowtag (descriptor-lowtag des))
+            (high (descriptor-high des))
+            (low (descriptor-low des)))
+
+        ;; Non-pointer objects don't have a gspace.
+        (unless (or (eql lowtag sb!vm:fun-pointer-lowtag)
+                    (eql lowtag sb!vm:instance-pointer-lowtag)
+                    (eql lowtag sb!vm:list-pointer-lowtag)
+                    (eql lowtag sb!vm:other-pointer-lowtag))
+          (error "don't even know how to look for a GSPACE for ~S" des))
+
         (dolist (gspace (list *dynamic* *static* *read-only*)
-                        (error "couldn't find a GSPACE for ~S" des))
+                 (error "couldn't find a GSPACE for ~S" des))
+          ;; Bounds-check the descriptor against the allocated area
+          ;; within each gspace.
+          ;;
+          ;; Most of the faffing around in here involving ash and
+          ;; various computed shift counts is due to the high/low
+          ;; split representation of the descriptor bits and an
+          ;; apparent disinclination to create intermediate values
+          ;; larger than a target fixnum.
+          ;;
           ;; This code relies on the fact that GSPACEs are aligned
           ;; such that the descriptor-low-bits low bits are zero.
           (when (and (>= high (ash (gspace-word-address gspace)
@@ -422,6 +432,8 @@
                      (<= high (ash (+ (gspace-word-address gspace)
                                       (gspace-free-word-index gspace))
                                    (- sb!vm:word-shift descriptor-low-bits))))
+            ;; Update the descriptor with the correct gspace and the
+            ;; offset within the gspace and return the gspace.
             (setf (descriptor-gspace des) gspace)
             (setf (descriptor-word-offset des)
                   (+ (ash (- high (ash (gspace-word-address gspace)
@@ -430,8 +442,7 @@
                           (- descriptor-low-bits sb!vm:word-shift))
                      (ash (logandc2 low sb!vm:lowtag-mask)
                           (- sb!vm:word-shift))))
-            (return gspace)))
-        (error "don't even know how to look for a GSPACE for ~S" des)))))
+            (return gspace))))))
 
 (defun make-random-descriptor (value)
   (make-descriptor (logand (ash value (- descriptor-low-bits))
