@@ -1632,10 +1632,10 @@ core and return a descriptor to it."
 ;;; The x86 port needs to store code fixups along with code objects if
 ;;; they are to be moved, so fixups for code objects in the dynamic
 ;;; heap need to be noted.
-#!+(or x86 x86-64)
+#!+x86
 (defvar *load-time-code-fixups*)
 
-#!+(or x86 x86-64)
+#!+x86
 (defun note-load-time-code-fixup (code-object offset value kind)
   ;; If CODE-OBJECT might be moved
   (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
@@ -1644,7 +1644,7 @@ core and return a descriptor to it."
     (push (list code-object offset value kind) *load-time-code-fixups*))
   (values))
 
-#!+(or x86 x86-64)
+#!+x86
 (defun output-load-time-code-fixups ()
   (dolist (fixups *load-time-code-fixups*)
     (let ((code-object (first fixups))
@@ -1821,6 +1821,11 @@ core and return a descriptor to it."
                      (byte 10 0)
                      (bvref-32 gspace-bytes gspace-byte-offset))))))
       ((:x86 :x86-64)
+       ;; XXX: Note that un-fixed-up is read via bvref-word, which is
+       ;; 64 bits wide on x86-64, but the fixed-up value is written
+       ;; via bvref-32.  This would make more sense if we supported
+       ;; :absolute64 fixups, but apparently the cross-compiler
+       ;; doesn't dump them.
        (let* ((un-fixed-up (bvref-word gspace-bytes
                                                gspace-byte-offset))
               (code-object-start-addr (logandc2 (descriptor-bits code-object)
@@ -1842,6 +1847,14 @@ core and return a descriptor to it."
               ;; (not beyond it). It would be good to add an
               ;; explanation of why that's true, or an assertion that
               ;; it's really true, or both.
+              ;;
+              ;; One possible explanation is that all absolute fixups
+              ;; point either within the code object, within the
+              ;; runtime, within read-only or static-space, or within
+              ;; the linkage-table space.  In all x86 configurations,
+              ;; these areas are prior to the start of dynamic space,
+              ;; where all the code-objects are loaded.
+              #!+x86
               (unless (< fixed-up code-object-start-addr)
                 (note-load-time-code-fixup code-object
                                            after-header
@@ -1858,6 +1871,7 @@ core and return a descriptor to it."
               ;; object, which is to say all relative fixups, since
               ;; relative addressing within a code object never needs
               ;; a fixup.
+              #!+x86
               (note-load-time-code-fixup code-object
                                          after-header
                                          value
@@ -3205,7 +3219,7 @@ initially undefined function references:~2%")
                               sb!vm:unbound-marker-widetag))
            *cold-assembler-fixups*
            *cold-assembler-routines*
-           #!+(or x86 x86-64) *load-time-code-fixups*)
+           #!+x86 *load-time-code-fixups*)
 
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
@@ -3273,7 +3287,7 @@ initially undefined function references:~2%")
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-assembler-fixups)
-      #!+(or x86 x86-64) (output-load-time-code-fixups)
+      #!+x86 (output-load-time-code-fixups)
       (foreign-symbols-to-core)
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")

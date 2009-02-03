@@ -200,7 +200,7 @@
             (setf (sap-ref-word (second toplevel-thing) 0)
                   (get-lisp-obj-address
                    (svref *!load-time-values* (third toplevel-thing)))))
-           #!+(and (or x86 x86-64) gencgc)
+           #!+(and x86 gencgc)
            (:load-time-code-fixup
             (sb!vm::!envector-load-time-code-fixup (second toplevel-thing)
                                                    (third  toplevel-thing)
