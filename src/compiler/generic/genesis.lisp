@@ -530,15 +530,16 @@
 
 ;;; (Note: In CMU CL, this function expected a SAP-typed ADDRESS
 ;;; value, instead of the SAP-INT we use here.)
-(declaim (ftype (function (sb!vm:word descriptor) (values))
+(declaim (ftype (function (descriptor sb!vm:word descriptor) (values))
                 note-load-time-value-reference))
-(defun note-load-time-value-reference (address marker)
+(defun note-load-time-value-reference (address offset marker)
   (cold-push (cold-cons
               (cold-intern :load-time-value-fixup)
-              (cold-cons (sap-int-to-core address)
-                         (cold-cons
-                          (number-to-core (descriptor-word-offset marker))
-                          *nil-descriptor*)))
+              (cold-cons address
+                         (cold-cons (number-to-core offset)
+                                    (cold-cons
+                                     (number-to-core (descriptor-word-offset marker))
+                                     *nil-descriptor*))))
              *current-reversed-cold-toplevels*)
   (values))
 
@@ -555,9 +556,10 @@
   ;; idea?) -- WHN 19990817
   (if (and (null (descriptor-gspace value))
            (not (null (descriptor-word-offset value))))
-    (note-load-time-value-reference (+ (logandc2 (descriptor-bits address)
-                                                 sb!vm:lowtag-mask)
-                                       (ash index sb!vm:word-shift))
+    (note-load-time-value-reference address
+                                    (- (ash index sb!vm:word-shift)
+                                       (logand (descriptor-bits address)
+                                               sb!vm:lowtag-mask))
                                     value)
     (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
            (byte-index (ash (+ index (descriptor-word-offset address))
