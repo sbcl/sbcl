@@ -994,6 +994,7 @@ possibly temporariliy, because it might be used internally."
                "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
 
                ;; ..and DEFTYPEs..
+               "MAX-HASH" "HASH"
                "INDEX" "LOAD/STORE-INDEX"
                "SIGNED-BYTE-WITH-A-BITE-OUT"
                "UNSIGNED-BYTE-WITH-A-BITE-OUT"

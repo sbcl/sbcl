@@ -76,16 +76,16 @@
   (or index null)
   (foldable flushable))
 
-(defknown %sxhash-simple-string (simple-string) index
+(defknown %sxhash-simple-string (simple-string) hash
   (foldable flushable))
 
-(defknown %sxhash-simple-substring (simple-string index) index
+(defknown %sxhash-simple-substring (simple-string index) hash
   (foldable flushable))
 
-(defknown symbol-hash (symbol) (integer 0 #.sb!xc:most-positive-fixnum)
+(defknown symbol-hash (symbol) hash
   (flushable movable))
 
-(defknown %set-symbol-hash (symbol (integer 0 #.sb!xc:most-positive-fixnum))
+(defknown %set-symbol-hash (symbol hash)
   t (unsafe))
 
 (defknown vector-length (vector) index (flushable))

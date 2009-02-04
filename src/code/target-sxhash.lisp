@@ -11,12 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash sb!xc:most-positive-fixnum))
-
-(deftype hash ()
-  `(integer 0 ,max-hash))
-
 (defun pointer-hash (key)
   (pointer-hash key))
 
@@ -148,10 +142,8 @@
 ;;;; the SXHASH function
 
 ;; simple cases
-(declaim (ftype (sfunction (integer) (integer 0 #.sb!xc:most-positive-fixnum))
-                sxhash-bignum))
-(declaim (ftype (sfunction (t) (integer 0 #.sb!xc:most-positive-fixnum))
-                sxhash-instance))
+(declaim (ftype (sfunction (integer) hash) sxhash-bignum))
+(declaim (ftype (sfunction (t) hash) sxhash-instance))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go

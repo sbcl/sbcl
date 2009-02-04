@@ -16,6 +16,12 @@
 ;;; something not EQ to anything we might legitimately READ
 (defparameter *eof-object* (make-symbol "EOF-OBJECT"))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant max-hash sb!xc:most-positive-fixnum))
+
+(def!type hash ()
+  `(integer 0 ,max-hash))
+
 ;;; a type used for indexing into arrays, and for related quantities
 ;;; like lengths of lists
 ;;;
