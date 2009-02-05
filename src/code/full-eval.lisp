@@ -185,13 +185,13 @@
 
 ;;; Augment ENV with a local function binding
 (declaim (inline push-fun))
-(defun push-fun (name value env)
+(defun push-fun (name value calling-env body-env)
   (when (fboundp name)
-    (let ((sb!c:*lexenv* (env-native-lexenv env)))
+    (let ((sb!c:*lexenv* (env-native-lexenv calling-env)))
       (program-assert-symbol-home-package-unlocked
        :eval name "binding ~A as a local function")))
-  (push (cons name value) (env-funs env))
-  (push (cons name :bogus) (sb!c::lexenv-funs (env-native-lexenv env))))
+  (push (cons name value) (env-funs body-env))
+  (push (cons name :bogus) (sb!c::lexenv-funs (env-native-lexenv body-env))))
 
 (sb!int:def!method print-object ((env env) stream)
   (print-unreadable-object (env stream :type t :identity t)))
@@ -682,6 +682,8 @@
           (push-fun (car function-def)
                     ;; Evaluate the function definitions in ENV.
                     (eval-local-function-def function-def env)
+                    ;; Do package-lock checks in ENV.
+                    env
                     ;; But add the bindings to the child environment.
                     new-env))
         (eval-progn body new-env)))))
@@ -698,6 +700,7 @@
         (dolist (function-def local-functions)
           (push-fun (car function-def)
                     (eval-local-function-def function-def env)
+                    old-env
                     env))
         ;; And then add an environment for the body of the LABELS.  A
         ;; separate environment from the one where we added the

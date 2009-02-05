@@ -55,3 +55,22 @@
           (assert (eql #c(1.0 2.0) (evaluated-struct-csingle *evaluated-struct*)))
           (assert (eql #c(2.0d0 3.0d0) (evaluated-struct-cdouble *evaluated-struct*))))))
 
+;;; Prior to 1.0.25, the interpreter checked for package lock
+;;; violation for a local function in the fbinding form's body's
+;;; lexical environment.
+(let ((sb-ext:*evaluator-mode* :interpret))
+  (assert
+   (ignore-errors
+     (eval
+      '(eql
+        (locally (declare (disable-package-locks
+                           ;; rather than create a whole new package
+                           ;; just to test this corner case, we'll
+                           ;; lexically shadow something innocuous in
+                           ;; the CL package.
+                           cl:ed))
+          (flet ((cl:ed ()
+                   42))
+            (declare (enable-package-locks cl:ed))
+            (cl:ed)))
+        42)))))
