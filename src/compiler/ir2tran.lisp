@@ -1253,15 +1253,21 @@
   (values))
 
 ;;;; debugger hooks
+;;;;
+;;;; These are used by the debugger to find the top function on the
+;;;; stack. They return the OLD-FP and RETURN-PC for the current
+;;;; function as multiple values.
 
-;;; This is used by the debugger to find the top function on the
-;;; stack. It returns the OLD-FP and RETURN-PC for the current
-;;; function as multiple values.
-(defoptimizer (sb!kernel:%caller-frame-and-pc ir2-convert) (() node block)
+(defoptimizer (%caller-frame ir2-convert) (() node block)
   (let ((ir2-physenv (physenv-info (node-physenv node))))
     (move-lvar-result node block
-                      (list (ir2-physenv-old-fp ir2-physenv)
-                            (ir2-physenv-return-pc ir2-physenv))
+                      (list (ir2-physenv-old-fp ir2-physenv))
+                      (node-lvar node))))
+
+(defoptimizer (%caller-pc ir2-convert) (() node block)
+  (let ((ir2-physenv (physenv-info (node-physenv node))))
+    (move-lvar-result node block
+                      (list (ir2-physenv-return-pc ir2-physenv))
                       (node-lvar node))))
 
 ;;;; multiple values

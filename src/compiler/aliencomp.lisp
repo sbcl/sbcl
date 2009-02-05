@@ -621,14 +621,16 @@
 (declaim (inline invoke-with-saved-fp-and-pc))
 #!+:c-stack-is-control-stack
 (defun invoke-with-saved-fp-and-pc (fn)
-  (let* ((fp-and-pc (multiple-value-bind (fp pc)
-                        (%caller-frame-and-pc)
-                      (cons fp pc)))
-         (*saved-fp-and-pcs* (if (boundp '*saved-fp-and-pcs*)
-                                 (cons fp-and-pc *saved-fp-and-pcs*)
-                                 (list fp-and-pc))))
-    (declare (truly-dynamic-extent fp-and-pc *saved-fp-and-pcs*))
-    (funcall fn)))
+  (declare #-sb-xc-host (muffle-conditions compiler-note)
+           (optimize (speed 3)))
+  (let* ((fp-and-pc (cons (%caller-frame)
+                          (sap-int (%caller-pc)))))
+    (declare (truly-dynamic-extent fp-and-pc))
+    (let ((*saved-fp-and-pcs* (if (boundp '*saved-fp-and-pcs*)
+                                  (cons fp-and-pc *saved-fp-and-pcs*)
+                                  (list fp-and-pc))))
+      (declare (truly-dynamic-extent *saved-fp-and-pcs*))
+      (funcall fn))))
 
 (defun find-saved-fp-and-pc (fp)
   (when (boundp '*saved-fp-and-pcs*)
@@ -640,7 +642,7 @@
              (int-sap (get-lisp-obj-address (car x))) fp)
         (return (values (car x) (cdr x)))))))
 
-(deftransform alien-funcall ((function &rest args) * * :important t)
+(deftransform alien-funcall ((function &rest args) * * :node node :important t)
   (let ((type (lvar-type function)))
     (unless (alien-type-type-p type)
       (give-up-ir1-transform "can't tell function type at compile time"))
@@ -698,7 +700,8 @@
             ;; to it later regardless of how the foreign stack looks
             ;; like.
             #!+:c-stack-is-control-stack
-            (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body)))
+            (when (policy node (<= speed debug))
+              (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body))))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
             `(lambda (function ,@(params))
                ,body)))))))

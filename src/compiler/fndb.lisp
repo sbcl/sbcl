@@ -1453,7 +1453,8 @@
 (defknown hairy-data-vector-set/check-bounds (array index t)
   t
   (unsafe explicit-check))
-(defknown %caller-frame-and-pc () (values t t) (flushable))
+(defknown %caller-frame () t (flushable))
+(defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
   (values (simple-array * (*)) index index index)
   (foldable flushable))

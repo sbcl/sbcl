@@ -15,7 +15,8 @@
 
 (macrolet ((def (name &optional (args '(x)))
              `(defun ,name ,args (,name ,@args))))
-  (def %caller-frame-and-pc ())
+  (def %caller-frame ())
+  (def %caller-pc ())
   (def %code-code-size)
   (def %code-debug-info)
   (def %code-entry-points)

@@ -662,8 +662,9 @@
 ;;; this function.
 (defun top-frame ()
   (/noshow0 "entering TOP-FRAME")
-  (multiple-value-bind (fp pc) (%caller-frame-and-pc)
-    (compute-calling-frame (descriptor-sap fp) pc nil)))
+  (compute-calling-frame (descriptor-sap (%caller-frame))
+                         (descriptor-sap (%caller-pc))
+                         nil))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
 ;;; below FRAME.
@@ -677,7 +678,9 @@
 (defun find-saved-frame-down (fp up-frame)
   (multiple-value-bind (saved-fp saved-pc) (sb!c:find-saved-fp-and-pc fp)
     (when saved-fp
-      (compute-calling-frame (descriptor-sap saved-fp) saved-pc up-frame))))
+      (compute-calling-frame (descriptor-sap saved-fp)
+                             (descriptor-sap saved-pc)
+                             up-frame))))
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
