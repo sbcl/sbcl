@@ -663,7 +663,7 @@
 (defun top-frame ()
   (/noshow0 "entering TOP-FRAME")
   (compute-calling-frame (descriptor-sap (%caller-frame))
-                         (descriptor-sap (%caller-pc))
+                         (%caller-pc)
                          nil))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
