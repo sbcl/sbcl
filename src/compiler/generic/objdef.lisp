@@ -295,8 +295,7 @@
   #!+win32 next-seh-frame
   #!+win32 seh-frame-handler
   tag
-  (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
-  size)
+  (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32"))
 
 ;;; (For an explanation of this, see the comments at the definition of
 ;;; KLUDGE-NONDETERMINISTIC-CATCH-BLOCK-SIZE.)

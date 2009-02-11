@@ -129,7 +129,7 @@
 ;;; and seems to be working so far    -dan
 ;;;
 ;;; arbitrarily taken for alpha, too. - Christophe
-(def!constant kludge-nondeterministic-catch-block-size 7)
+(def!constant kludge-nondeterministic-catch-block-size 6)
 
 (!define-storage-classes
 
