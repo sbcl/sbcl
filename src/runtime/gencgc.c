@@ -4824,6 +4824,9 @@ gencgc_handle_wp_violation(void* fault_addr)
         return 0;
 
     } else {
+        int ret;
+        ret = thread_mutex_lock(&free_pages_lock);
+        gc_assert(ret == 0);
         if (page_table[page_index].write_protected) {
             /* Unprotect the page. */
             os_protect(page_address(page_index), PAGE_BYTES, OS_VM_PROT_ALL);
@@ -4841,6 +4844,8 @@ gencgc_handle_wp_violation(void* fault_addr)
                      page_index, boxed_region.first_page,
                      boxed_region.last_page);
         }
+        ret = thread_mutex_unlock(&free_pages_lock);
+        gc_assert(ret == 0);
         /* Don't worry, we can handle it. */
         return 1;
     }
