@@ -508,7 +508,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
                 gen_av_mem_age(i));
     }
     fprintf(stderr,"   Total bytes allocated    = %lu\n", bytes_allocated);
-    fprintf(stderr,"   Dynamic-space-size bytes = %lu\n", dynamic_space_size);
+    fprintf(stderr,"   Dynamic-space-size bytes = %u\n", dynamic_space_size);
 
     fpu_restore(fpu_state);
 }
@@ -1046,7 +1046,7 @@ gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_regio
     int orig_first_page_bytes_used;
     long byte_cnt;
     int more;
-    long bytes_used;
+    unsigned long bytes_used;
     page_index_t next_page;
     int ret;
 
@@ -1188,7 +1188,8 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
 }
 
 page_index_t
-gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int page_type_flag)
+gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
+                      int page_type_flag)
 {
     page_index_t first_page, last_page;
     page_index_t restart_page = *restart_page_ptr;
@@ -1201,7 +1202,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes, int page_type
         restart_page = gencgc_alloc_start_page;
     }
 
-    if (nbytes>=PAGE_BYTES) {
+    gc_assert(nbytes>=0);
+    if (((unsigned long)nbytes)>=PAGE_BYTES) {
         /* Search for a contiguous free space of at least nbytes,
          * aligned on a page boundary. The page-alignment is strictly
          * speaking needed only for objects at least large_object_size
@@ -2726,7 +2728,7 @@ preserve_pointer(void *addr)
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
     if (!(code_page_p(addr_page_index)
-          || (is_lisp_pointer(addr) &&
+          || (is_lisp_pointer((lispobj)addr) &&
               possibly_valid_dynamic_space_pointer(addr))))
         return;
 
