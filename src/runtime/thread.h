@@ -56,6 +56,8 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 
 #endif
 
+extern int kill_safely(os_thread_t os_thread, int signal);
+
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 

@@ -563,20 +563,6 @@ os_thread_t create_thread(lispobj initial_function) {
     return kid_tid;
 }
 
-int signal_interrupt_thread(os_thread_t os_thread)
-{
-    int status = pthread_kill(os_thread, SIG_INTERRUPT_THREAD);
-    FSHOW_SIGNAL((stderr,"/signal_interrupt_thread: %lu\n", os_thread));
-    if (status == 0) {
-        return 0;
-    } else if (status == ESRCH) {
-        return -1;
-    } else {
-        lose("cannot send SIG_INTERRUPT_THREAD to thread=%lu: %d, %s\n",
-             os_thread, status, strerror(status));
-    }
-}
-
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while
@@ -612,6 +598,8 @@ void gc_stop_the_world()
         if((p!=th) && ((thread_state(p)==STATE_RUNNING))) {
             FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending thread %lu\n",
                           p->os_thread));
+            /* We already hold all_thread_lock, P can become DEAD but
+             * cannot exit, ergo it's safe to use pthread_kill. */
             status=pthread_kill(p->os_thread,SIG_STOP_FOR_GC);
             if (status==ESRCH) {
                 /* This thread has exited. */
@@ -680,5 +668,61 @@ thread_yield()
     return sched_yield();
 #else
     return 0;
+#endif
+}
+
+/* If the thread id given does not belong to a running thread (it has
+ * exited or never even existed) pthread_kill _may_ fail with ESRCH,
+ * but it is also allowed to just segfault, see
+ * <http://udrepper.livejournal.com/16844.html>.
+ *
+ * Relying on thread ids can easily backfire since ids are recycled
+ * (NPTL recycles them extremely fast) so a signal can be sent to
+ * another process if the one it was sent to exited.
+ *
+ * We send signals in two places: signal_interrupt_thread sends a
+ * signal that's harmless if delivered to another thread, but
+ * SIG_STOP_FOR_GC is fatal.
+ *
+ * For these reasons, we must make sure that the thread is still alive
+ * when the pthread_kill is called and return if the thread is
+ * exiting. */
+int
+kill_safely(os_thread_t os_thread, int signal)
+{
+#ifdef LISP_FEATURE_SB_THREAD
+    sigset_t oldset;
+    struct thread *thread;
+    /* pthread_kill is not async signal safe and we don't want to be
+     * interrupted while holding the lock. */
+    thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
+    pthread_mutex_lock(&all_threads_lock);
+    for (thread = all_threads; thread; thread = thread->next) {
+        if (thread->os_thread == os_thread) {
+            int status = pthread_kill(os_thread, signal);
+            if (status)
+                lose("kill_safely: pthread_kill failed with %d\n", status);
+            break;
+        }
+    }
+    pthread_mutex_unlock(&all_threads_lock);
+    thread_sigmask(SIG_SETMASK,&oldset,0);
+    if (thread)
+        return 0;
+    else
+        return -1;
+#else
+    int status;
+    if (os_thread != getpid())
+        lose("kill_safely: who do you want to kill? %d?\n", os_thread);
+    status = kill(os_thread, signal);
+    if (status == 0) {
+        return 0;
+    } else if (status == ESRCH) {
+        return -1;
+    } else {
+        lose("cannot send signal %d to process %lu: %d, %s\n",
+             signal, os_thread, status, strerror(status));
+    }
 #endif
 }

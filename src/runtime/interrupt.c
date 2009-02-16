@@ -1332,6 +1332,14 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+int
+signal_interrupt_thread(os_thread_t os_thread)
+{
+    /* FSHOW first, in case we are signalling ourselves. */
+    FSHOW((stderr,"/signal_interrupt_thread: %lu\n", os_thread));
+    return kill_safely(os_thread, SIG_INTERRUPT_THREAD);
+}
+
 /* FIXME: this function can go away when all lisp handlers are invoked
  * via arrange_return_to_lisp_function. */
 void
