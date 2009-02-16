@@ -769,15 +769,16 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
-    if (arch_pseudo_atomic_atomic(context)) {
-        SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
-        arch_set_pseudo_atomic_interrupted(context);
-        FSHOW_SIGNAL((stderr, "sig_stop_for_gc deferred (PA)\n"));
-        return;
-    }
-    else if (SymbolValue(GC_INHIBIT,thread) != NIL) {
+    /* Test for GC_INHIBIT _first_, else we'd trap on every single
+     * pseudo atomic until gc is finally allowed. */
+    if (SymbolValue(GC_INHIBIT,thread) != NIL) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         FSHOW_SIGNAL((stderr, "sig_stop_for_gc deferred (*GC-INHIBIT*)\n"));
+        return;
+    } else if (arch_pseudo_atomic_atomic(context)) {
+        SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
+        arch_set_pseudo_atomic_interrupted(context);
+        FSHOW_SIGNAL((stderr,"sig_stop_for_gc deferred (PA)\n"));
         return;
     }
 
