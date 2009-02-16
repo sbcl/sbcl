@@ -996,9 +996,21 @@ corresponds to NAME, or NIL if there is none."
       (setf (values e-sec e-msec) (system-real-time-values)
             c-sec 0
             c-msec 0))
-    ;; If two threads call this at the same time, we're still safe, I believe,
-    ;; as long as NOW is updated before either of C-MSEC or C-SEC. Same applies
-    ;; to interrupts. --NS
+    ;; If two threads call this at the same time, we're still safe, I
+    ;; believe, as long as NOW is updated before either of C-MSEC or
+    ;; C-SEC. Same applies to interrupts. --NS
+    ;;
+    ;; I believe this is almost correct with x86/x86-64 cache
+    ;; coherency, but if the new value of C-SEC, C-MSEC can become
+    ;; visible to another CPU without NOW doing the same then it's
+    ;; unsafe. It's `almost' correct on x86 because writes by other
+    ;; processors may become visible in any order provided transitity
+    ;; holds. With at least three cpus, C-MSEC and C-SEC may be from
+    ;; different threads and an incorrect value may be returned.
+    ;; Considering that this failure is not detectable by the caller -
+    ;; it looks like time passes a bit slowly - and that it should be
+    ;; an extremely rare occurance I'm inclinded to leave it as it is.
+    ;; --MG
     (defun get-internal-real-time ()
       (multiple-value-bind (sec msec) (system-real-time-values)
         (unless (and (= msec c-msec) (= sec c-sec))

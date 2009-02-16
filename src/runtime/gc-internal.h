@@ -19,7 +19,11 @@
 #include <genesis/simple-fun.h>
 
 /* disabling gc assertions made no discernable difference to GC speed,
- * last I tried it - dan 2003.12.21 */
+ * last I tried it - dan 2003.12.21
+ *
+ * And it's unsafe to do so while things like gc_assert(0 ==
+ * thread_mutex_lock(&allocation_lock)) exist. - MG 2009-01-13
+ */
 #if 1
 # define gc_assert(ex)                                                 \
 do {                                                                   \

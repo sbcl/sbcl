@@ -214,8 +214,9 @@ in future versions."
                    (thread-yield)
                    (return-from get-spinlock t))))
         (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
-            ;; If interrupts are enabled, but we are allowed to enabled them,
-            ;; check for pending interrupts every once in a while.
+            ;; If interrupts are disabled, but we are allowed to
+            ;; enabled them, check for pending interrupts every once
+            ;; in a while.
             (loop
               (loop repeat 128 do (cas)) ; 128 is arbitrary here
               (sb!unix::%check-interrupts))
@@ -780,6 +781,9 @@ around and can be retrieved by JOIN-THREAD."
             ;; of Allegro's *cl-default-special-bindings*, as that is at
             ;; least accessible to users to secure their own libraries.
             ;;   --njf, 2006-07-15
+            ;;
+            ;; As it is, this lambda must not cons until we are ready
+            ;; to run GC. Be very careful.
             (let* ((*current-thread* thread)
                    (*restart-clusters* nil)
                    (*handler-clusters* (sb!kernel::initial-handler-clusters))

@@ -177,8 +177,7 @@ run in any thread.")
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(defvar *already-in-gc*
-  (sb!thread:make-mutex :name "GC lock") "ID of thread running SUB-GC")
+(defvar *already-in-gc* (sb!thread:make-mutex :name "GC lock"))
 
 ;;; A unique GC id. This is supplied for code that needs to detect
 ;;; whether a GC has happened since some earlier point in time. For

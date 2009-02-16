@@ -391,15 +391,16 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 void
 interrupt_handle_pending(os_context_t *context)
 {
-    /* There are three ways we can get here.  First, if an interrupt
+    /* There are three ways we can get here. First, if an interrupt
      * occurs within pseudo-atomic, it will be deferred, and we'll
-     * trap to here at the end of the pseudo-atomic block.  Second, if
+     * trap to here at the end of the pseudo-atomic block. Second, if
      * the GC (in alloc()) decides that a GC is required, it will set
-     * *GC-PENDING* and pseudo-atomic-interrupted, and alloc() is
-     * always called from within pseudo-atomic, and thus we end up
-     * here again.  Third, when calling GC-ON or at the end of a
-     * WITHOUT-GCING, MAYBE-HANDLE-PENDING-GC will trap to here if
-     * there is a pending GC. */
+     * *GC-PENDING* and pseudo-atomic-interrupted if not *GC-INHIBIT*,
+     * and alloc() is always called from within pseudo-atomic, and
+     * thus we end up here again. Third, when calling GC-ON or at the
+     * end of a WITHOUT-GCING, MAYBE-HANDLE-PENDING-GC will trap to
+     * here if there is a pending GC. Fourth, ahem, at the end of
+     * WITHOUT-INTERRUPTS (bar complications with nesting). */
 
     /* Win32 only needs to handle the GC cases (for now?) */
 

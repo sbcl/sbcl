@@ -33,6 +33,8 @@
                                  lowtag-mask))
                (new-pointer (+ *static-space-free-pointer* nwords))
                (new-free (* new-pointer n-word-bytes)))
+          ;; FIXME: don't signal while in WITHOUT-GCING, the handler
+          ;; risks deadlock with SIG_STOP_FOR_GC.
           (unless (> static-space-end new-free)
             (error 'simple-storage-condition
                    :format-control "Not enough memory left in static space to ~

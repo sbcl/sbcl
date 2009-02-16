@@ -222,6 +222,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             lisp_memory_fault_error(context, fault_addr);
 #else
+            /* FIXME: never returns 0 */
             if (!maybe_gc(context)) {
                 interrupt_handle_now(signal, siginfo, context);
             }

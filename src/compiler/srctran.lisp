@@ -4104,11 +4104,6 @@
                          *universal-type*))))
         (recurse array-type)))))
 
-;;; Like CMU CL, we use HEAPSORT. However, other than that, this code
-;;; isn't really related to the CMU CL code, since instead of trying
-;;; to generalize the CMU CL code to allow START and END values, this
-;;; code has been written from scratch following Chapter 7 of
-;;; _Introduction to Algorithms_ by Corman, Rivest, and Shamir.
 (define-source-transform sb!impl::sort-vector (vector start end predicate key)
   ;; Like CMU CL, we use HEAPSORT. However, other than that, this code
   ;; isn't really related to the CMU CL code, since instead of trying
