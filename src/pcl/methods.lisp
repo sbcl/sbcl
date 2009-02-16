@@ -1642,6 +1642,10 @@
                             (list (list (find-class
                                          'sb-kernel::control-stack-exhausted))
                                   (list (find-class
+                                         'sb-kernel::binding-stack-exhausted))
+                                  (list (find-class
+                                         'sb-kernel::alien-stack-exhausted))
+                                  (list (find-class
                                          'sb-kernel::heap-exhausted-error))
                                   (list (find-class 'restart))))
                          (setq po-cache cache)

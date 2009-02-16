@@ -18,6 +18,8 @@
 #endif
 
 #define BINDING_STACK_SIZE (1024*1024)   /* chosen at random */
+#define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
+
 /* eventually choosable per-thread: */
 #define DEFAULT_CONTROL_STACK_SIZE (2*1024*1024)
 
@@ -41,20 +43,42 @@
     ((os_vm_address_t)(th->control_stack_start))
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
+#define ALIEN_STACK_GUARD_PAGE(th) \
+    ((os_vm_address_t)(th->alien_stack_start))
+#define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
+    (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
 #else
 #define CONTROL_STACK_GUARD_PAGE(th) \
     (((os_vm_address_t)(th->control_stack_end)) - os_vm_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
+#define ALIEN_STACK_GUARD_PAGE(th)                                 \
+    (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
+     os_vm_page_size)
+#define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
+    (ALIEN_STACK_GUARD_PAGE(th) - os_vm_page_size)
 #endif
 
+#define BINDING_STACK_GUARD_PAGE(th)                                   \
+    (((os_vm_address_t)th->binding_stack_start) + BINDING_STACK_SIZE - \
+     os_vm_page_size)
+#define BINDING_STACK_RETURN_GUARD_PAGE(th) \
+    (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
+
 extern void validate(void);
-extern void protect_control_stack_guard_page(int protect_p);
-extern void protect_control_stack_return_guard_page(int protect_p);
-extern void protect_control_stack_guard_page_thread(int protect_p,
-                                                    struct thread *th);
-extern void protect_control_stack_return_guard_page_thread(int protect_p,
-                                                           struct thread* th);
+
+extern void
+protect_control_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_control_stack_return_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_binding_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_binding_stack_return_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_return_guard_page(int protect_p, struct thread *thread);
 extern os_vm_address_t undefined_alien_address;
 #endif
 

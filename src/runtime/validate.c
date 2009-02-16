@@ -83,37 +83,35 @@ validate(void)
 #endif
 }
 
-void
-protect_control_stack_guard_page(int protect_p) {
-    struct thread *th = arch_os_get_current_thread();
-    os_protect(CONTROL_STACK_GUARD_PAGE(th),
-               os_vm_page_size,protect_p ?
-               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
+static inline void
+protect_page(void *page, int protect_p, os_vm_prot_t flags) {
+    os_protect(page, os_vm_page_size, protect_p ?
+               flags : OS_VM_PROT_ALL);
 }
 
-void
-protect_control_stack_return_guard_page(int protect_p) {
-    struct thread *th = arch_os_get_current_thread();
-    os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
-               os_vm_page_size,protect_p ?
-               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
-}
+#define DEF_PROTECT_PAGE(name,page_name,flags)                               \
+    void                                                                     \
+    protect_##name(int protect_p, struct thread *thread) {                   \
+        if (!thread)                                                         \
+           thread = arch_os_get_current_thread();                            \
+        protect_page(page_name(thread), protect_p, flags);                   \
+    }
 
-/* these OOAO violations are here because with mach exception handlers
- * we need to protect the stack guard pages from the mach exception
- * handlers which run on a different thread, so we take a thread
- * argument here. Too bad we don't have keywords args in C. */
-void
-protect_control_stack_guard_page_thread(int protect_p, struct thread *th) {
-    os_protect(CONTROL_STACK_GUARD_PAGE(th),
-               os_vm_page_size,protect_p ?
-               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
-}
-
-void
-protect_control_stack_return_guard_page_thread(int protect_p,
-                                               struct thread* th) {
-    os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
-               os_vm_page_size,protect_p ?
-               (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
-}
+DEF_PROTECT_PAGE(control_stack_guard_page,
+                 CONTROL_STACK_GUARD_PAGE,
+                 OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
+DEF_PROTECT_PAGE(control_stack_return_guard_page,
+                 CONTROL_STACK_RETURN_GUARD_PAGE,
+                 OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
+DEF_PROTECT_PAGE(binding_stack_guard_page,
+                 BINDING_STACK_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
+DEF_PROTECT_PAGE(binding_stack_return_guard_page,
+                 BINDING_STACK_RETURN_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
+DEF_PROTECT_PAGE(alien_stack_guard_page,
+                 ALIEN_STACK_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
+DEF_PROTECT_PAGE(alien_stack_return_guard_page,
+                 ALIEN_STACK_RETURN_GUARD_PAGE,
+                 OS_VM_PROT_NONE)

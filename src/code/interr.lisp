@@ -460,6 +460,20 @@
              "Control stack guard page temporarily disabled: proceed with caution~%")
      (error 'control-stack-exhausted))))
 
+(defun binding-stack-exhausted-error ()
+  (let ((sb!debug:*stack-top-hint* nil))
+    (infinite-error-protect
+     (format *error-output*
+             "Binding stack guard page temporarily disabled: proceed with caution~%")
+     (error 'binding-stack-exhausted))))
+
+(defun alien-stack-exhausted-error ()
+  (let ((sb!debug:*stack-top-hint* nil))
+    (infinite-error-protect
+     (format *error-output*
+             "Alien stack guard page temporarily disabled: proceed with caution~%")
+     (error 'alien-stack-exhausted))))
+
 ;;; KLUDGE: we keep a single HEAP-EXHAUSTED-ERROR object around, so
 ;;; that we don't need to allocate it when running out of
 ;;; memory. Similarly we pass the amounts in special variables as

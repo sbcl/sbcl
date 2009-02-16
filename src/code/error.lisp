@@ -164,6 +164,28 @@ calls, or a tail call that SBCL cannot or has not optimized away.
 
 PROCEED WITH CAUTION."))))
 
+(define-condition binding-stack-exhausted (storage-condition)
+  ()
+  (:report
+    (lambda (condition stream)
+      (declare (ignore condition))
+      (format stream
+              ;; no pretty-printing, because that would use a lot of stack.
+              "Binding stack exhausted.
+
+PROCEED WITH CAUTION."))))
+
+(define-condition alien-stack-exhausted (storage-condition)
+  ()
+  (:report
+    (lambda (condition stream)
+      (declare (ignore condition))
+      (format stream
+              ;; no pretty-printing, because that would use a lot of stack.
+              "Alien stack exhausted.
+
+PROCEED WITH CAUTION."))))
+
 (define-condition heap-exhausted-error (storage-condition)
   ()
   (:report

@@ -432,15 +432,15 @@ catch_exception_raise(mach_port_t exception_port,
         }
         /* At stack guard */
         if (os_trunc_to_page(addr) == CONTROL_STACK_GUARD_PAGE(th)) {
-            protect_control_stack_guard_page_thread(0, th);
-            protect_control_stack_return_guard_page_thread(1, th);
+            protect_control_stack_guard_page(0, th);
+            protect_control_stack_return_guard_page(1, th);
             handler = control_stack_exhausted_handler;
             break;
         }
         /* Return from stack guard */
         if (os_trunc_to_page(addr) == CONTROL_STACK_RETURN_GUARD_PAGE(th)) {
-            protect_control_stack_guard_page_thread(1, th);
-            protect_control_stack_return_guard_page_thread(0, th);
+            protect_control_stack_guard_page(1, th);
+            protect_control_stack_return_guard_page(0, th);
             break;
         }
         /* Regular memory fault */

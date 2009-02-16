@@ -63,8 +63,6 @@
 #define LOCK_CREATE_THREAD
 #endif
 
-#define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
-
 #ifdef LISP_FEATURE_SB_THREAD
 struct thread_post_mortem {
 #ifdef DELAY_THREAD_POST_MORTEM
@@ -135,7 +133,9 @@ initial_thread_trampoline(struct thread *th)
     link_thread(th);
     th->os_thread=thread_self();
 #ifndef LISP_FEATURE_WIN32
-    protect_control_stack_guard_page(1);
+    protect_control_stack_guard_page(1, NULL);
+    protect_binding_stack_guard_page(1, NULL);
+    protect_alien_stack_guard_page(1, NULL);
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -268,7 +268,9 @@ new_thread_trampoline(struct thread *th)
     }
 
     th->os_thread=thread_self();
-    protect_control_stack_guard_page(1);
+    protect_control_stack_guard_page(1, NULL);
+    protect_binding_stack_guard_page(1, NULL);
+    protect_alien_stack_guard_page(1, NULL);
     /* Since GC can only know about this thread from the all_threads
      * list and we're just adding this thread to it, there is no
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which

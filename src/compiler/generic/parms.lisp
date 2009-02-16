@@ -17,6 +17,8 @@
     sb!kernel::post-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
+    sb!kernel::binding-stack-exhausted-error
+    sb!kernel::alien-stack-exhausted-error
     sb!kernel::heap-exhausted-error
     sb!kernel::undefined-alien-variable-error
     sb!kernel::undefined-alien-function-error

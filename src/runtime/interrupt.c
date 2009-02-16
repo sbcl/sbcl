@@ -1382,8 +1382,8 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * previous page so that we can catch returns from the guard page
          * and restore it. */
         corruption_warning_and_maybe_lose("Control stack exhausted");
-        protect_control_stack_guard_page(0);
-        protect_control_stack_return_guard_page(1);
+        protect_control_stack_guard_page(0, NULL);
+        protect_control_stack_return_guard_page(1, NULL);
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* For the unfortunate case, when the control stack is
@@ -1401,8 +1401,48 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
         fprintf(stderr, "INFO: Control stack guard page reprotected\n");
-        protect_control_stack_guard_page(1);
-        protect_control_stack_return_guard_page(0);
+        protect_control_stack_guard_page(1, NULL);
+        protect_control_stack_return_guard_page(0, NULL);
+        return 1;
+    }
+    else if(addr >= BINDING_STACK_GUARD_PAGE(th) &&
+            addr < BINDING_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+        corruption_warning_and_maybe_lose("Binding stack exhausted");
+        protect_binding_stack_guard_page(0, NULL);
+        protect_binding_stack_return_guard_page(1, NULL);
+
+        /* For the unfortunate case, when the binding stack is
+         * exhausted in a signal handler. */
+        unblock_signals_in_context_and_maybe_warn(context);
+        arrange_return_to_lisp_function
+            (context, StaticSymbolFunction(BINDING_STACK_EXHAUSTED_ERROR));
+        return 1;
+    }
+    else if(addr >= BINDING_STACK_RETURN_GUARD_PAGE(th) &&
+            addr < BINDING_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+        fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
+        protect_binding_stack_guard_page(1, NULL);
+        protect_binding_stack_return_guard_page(0, NULL);
+        return 1;
+    }
+    else if(addr >= ALIEN_STACK_GUARD_PAGE(th) &&
+            addr < ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+        corruption_warning_and_maybe_lose("Alien stack exhausted");
+        protect_alien_stack_guard_page(0, NULL);
+        protect_alien_stack_return_guard_page(1, NULL);
+
+        /* For the unfortunate case, when the alien stack is
+         * exhausted in a signal handler. */
+        unblock_signals_in_context_and_maybe_warn(context);
+        arrange_return_to_lisp_function
+            (context, StaticSymbolFunction(ALIEN_STACK_EXHAUSTED_ERROR));
+        return 1;
+    }
+    else if(addr >= ALIEN_STACK_RETURN_GUARD_PAGE(th) &&
+            addr < ALIEN_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+        fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
+        protect_alien_stack_guard_page(1, NULL);
+        protect_alien_stack_return_guard_page(0, NULL);
         return 1;
     }
     else if (addr >= undefined_alien_address &&

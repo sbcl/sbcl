@@ -70,4 +70,31 @@
          (recurse)))))
   (assert (= exhaust-count recurse-count *count*)))
 
+(with-test (:name (:exhaust :binding-stack))
+  (let ((ok nil)
+        (symbols (loop repeat 1024 collect (gensym)))
+        (values (loop repeat 1024 collect nil)))
+    (gc :full t)
+    (labels ((exhaust-binding-stack (i)
+               (progv symbols values
+                 (exhaust-binding-stack (1+ i)))))
+      (handler-case
+          (exhaust-binding-stack 0)
+        (sb-kernel::binding-stack-exhausted ()
+          (setq ok t)))
+      (assert ok))))
+
+#+c-stack-is-control-stack
+(with-test (:name (:exhaust :alien-stack))
+  (let ((ok nil))
+    (labels ((exhaust-alien-stack (i)
+               (with-alien ((integer-array (array int 500)))
+                 (+ (deref integer-array 0)
+                    (exhaust-alien-stack (1+ i))))))
+      (handler-case
+          (exhaust-alien-stack 0)
+        (sb-kernel::alien-stack-exhausted ()
+          (setq ok t)))
+      (assert ok))))
+
 ;;; OK!
