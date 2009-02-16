@@ -300,7 +300,7 @@ new_thread_trampoline(struct thread *th)
 #endif
 
     schedule_thread_post_mortem(th);
-    FSHOW((stderr,"/exiting thread %p\n", thread_self()));
+    FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
     return result;
 }
 

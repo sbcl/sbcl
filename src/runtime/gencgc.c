@@ -4717,11 +4717,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((signed long) alloc_signal <= 0) {
             SetSymbolValue(ALLOC_SIGNAL, T, thread);
-#ifdef LISP_FEATURE_SB_THREAD
-            kill_thread_safely(thread->os_thread, SIGPROF);
-#else
-            raise(SIGPROF);
-#endif
+            thread_kill(thread->os_thread, SIGPROF);
         } else {
             SetSymbolValue(ALLOC_SIGNAL,
                            alloc_signal - (1 << N_FIXNUM_TAG_BITS),

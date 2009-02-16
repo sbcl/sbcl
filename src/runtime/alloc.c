@@ -94,7 +94,7 @@ pa_alloc(int bytes, int page_type_flag)
 }
 #endif
 
-lispobj *
+static lispobj *
 alloc_unboxed(int type, int words)
 {
     lispobj *result;

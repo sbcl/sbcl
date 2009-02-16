@@ -43,10 +43,6 @@ lispobj *dynamic_space_free_pointer;
 lispobj *current_auto_gc_trigger;
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-boolean stop_the_world=0;
-#endif
-
 /* For copying GCs, this points to the start of the dynamic space
  * currently in use (that will become the from_space when the next GC
  * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
