@@ -51,10 +51,15 @@
 (defvar *package-lock*)
 
 (!cold-init-forms
- (setf *package-lock* (sb!thread::make-spinlock :name "Package Lock")))
+ (setf *package-lock* (sb!thread:make-mutex :name "Package Lock")))
 
 (defmacro with-packages ((&key) &body forms)
-  `(sb!thread::with-recursive-spinlock (*package-lock*)
+  ;; FIXME: Since name conflicts can be signalled while holding the
+  ;; mutex, user code can be run leading to lock ordering problems.
+  ;;
+  ;; This used to be a spinlock, but there it can be held for a long
+  ;; time while the debugger waits for user input.
+  `(sb!thread:with-recursive-lock (*package-lock*)
      ,@forms))
 
 ;;; Make a package hashtable having a prime number of entries at least

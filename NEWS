@@ -16,6 +16,8 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     memory, stack, alien stack, binding stack, encountering a memory
     fault, etc. In the absence of --lose-on-corruption a warning is
     printed to stderr.
+  * enhancement: detect binding stack exhaustion
+  * enhancement: detect alien stack exhaustion on x86/x86-64
   * improvement: generally more stable and reliable interrupt handling
   * improvement: there is a per thread interruption queue,
     interruptions are executed in order of arrival
@@ -37,6 +39,8 @@ changes in sbcl-1.0.26 relative to 1.0.25:
   * bug fix: fix deadlocks related to starting threads
   * bug fix: fix deadlines on locks on futex platforms
   * bug fix: restore errno in signal handlers
+  * bug fix: fix deadlocks related to hash tables
+  * bug fix: fix deadlocks in pcl
 
 changes in sbcl-1.0.25 relative to 1.0.24:
   * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be

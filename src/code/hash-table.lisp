@@ -147,5 +147,6 @@ unspecified."
   ;; Needless to say, this also excludes some internal bits, but
   ;; getting there is too much detail when "unspecified" says what
   ;; is important -- unpredictable, but harmless.
-  `(sb!thread::with-recursive-spinlock ((hash-table-spinlock ,hash-table))
+  `(sb!thread::with-recursive-system-spinlock
+       ((hash-table-spinlock ,hash-table))
      ,@body))

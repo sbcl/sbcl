@@ -181,13 +181,13 @@
 (defmethod add-direct-method :around ((specializer specializer) method)
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
-  (sb-thread::with-recursive-spinlock (*specializer-lock*)
+  (sb-thread::with-recursive-system-spinlock (*specializer-lock*)
     (call-next-method)))
 
 (defmethod remove-direct-method :around ((specializer specializer) method)
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
-  (sb-thread::with-recursive-spinlock (*specializer-lock*)
+  (sb-thread::with-recursive-system-spinlock (*specializer-lock*)
     (call-next-method)))
 
 (defmethod add-direct-method ((specializer class) (method method))
