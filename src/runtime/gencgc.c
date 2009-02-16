@@ -4087,7 +4087,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         fprintf(stderr,
                 "/non-movable pages due to conservative pointers = %d (%d bytes)\n",
                 num_dont_move_pages,
-                npage_bytes(num_dont_move_pages);
+                npage_bytes(num_dont_move_pages));
     }
 #endif
 

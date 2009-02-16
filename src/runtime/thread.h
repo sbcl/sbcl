@@ -186,20 +186,6 @@ static inline struct thread *arch_os_get_current_thread(void)
 #define EXCEPTION_PORT_TO_THREAD_STRUCT(th) ((struct thread *) th)
 #endif
 
-#if defined(LISP_FEATURE_SB_THREAD)
-#define thread_self pthread_self
-#define thread_kill pthread_kill
-#define thread_sigmask pthread_sigmask
-#define thread_mutex_lock(l) pthread_mutex_lock(l)
-#define thread_mutex_unlock(l) pthread_mutex_unlock(l)
-#else
-#define thread_self getpid
-#define thread_kill kill
-#define thread_sigmask sigprocmask
-#define thread_mutex_lock(l) 0
-#define thread_mutex_unlock(l) 0
-#endif
-
 extern void create_initial_thread(lispobj);
 extern int kill_thread_safely(os_thread_t os_thread, int signo);
 

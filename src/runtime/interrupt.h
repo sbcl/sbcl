@@ -26,6 +26,9 @@
 /* FIXME: do not rely on NSIG being a multiple of 8 */
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
+extern sigset_t deferrable_sigset;
+extern sigset_t blockable_sigset;
+
 extern void check_blockables_blocked_or_lose(void);
 extern void check_gc_signals_unblocked_or_lose(void);
 extern void unblock_gc_signals(void);

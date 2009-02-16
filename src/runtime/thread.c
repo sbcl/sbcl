@@ -507,8 +507,6 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         (kid_tid,th->os_attr,(void *(*)(void *))new_thread_trampoline,th))) {
         FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
         FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
-        FSHOW_SIGNAL((stderr, "wanted stack size %d, min stack size %d\n",
-                      cstack_size, PTHREAD_STACK_MIN));
         if(retcode < 0) {
             perror("create_os_thread");
         }
@@ -568,6 +566,7 @@ kill_thread_safely(os_thread_t os_thread, int signo)
 int signal_interrupt_thread(os_thread_t os_thread)
 {
     int status = kill_thread_safely(os_thread, SIG_INTERRUPT_THREAD);
+    FSHOW_SIGNAL((stderr,"/signal_interrupt_thread: %lu\n", os_thread));
     if (status == 0) {
         return 0;
     } else if (status == ESRCH) {
@@ -594,28 +593,25 @@ void gc_stop_the_world()
 #ifdef LOCK_CREATE_THREAD
     /* KLUDGE: Stopping the thread during pthread_create() causes deadlock
      * on FreeBSD. */
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock, thread=%lu\n",
-                  th->os_thread));
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on create_thread_lock\n"));
     lock_ret = pthread_mutex_lock(&create_thread_lock);
     gc_assert(lock_ret == 0);
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock, thread=%lu\n",
-                  th->os_thread));
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got create_thread_lock\n"));
 #endif
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock, thread=%lu\n",
-                  th->os_thread));
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:waiting on lock\n"));
     /* keep threads from starting while the world is stopped. */
     lock_ret = pthread_mutex_lock(&all_threads_lock);      \
     gc_assert(lock_ret == 0);
 
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock, thread=%lu\n",
-                  th->os_thread));
+    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:got lock\n"));
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for(p=all_threads; p; p=p->next) {
         gc_assert(p->os_thread != 0);
-        FSHOW_SIGNAL((stderr,"/gc_stop_the_world: p->state: %x\n", p->state));
+        FSHOW_SIGNAL((stderr,"/gc_stop_the_world: thread=%lu, state=%x\n",
+                      p->os_thread, p->state));
         if((p!=th) && ((p->state==STATE_RUNNING))) {
-            FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending %x, os_thread %x\n",
-                          p, p->os_thread));
+            FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending thread %lu\n",
+                          p->os_thread));
             status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
             if (status==ESRCH) {
                 /* This thread has exited. */
@@ -628,12 +624,25 @@ void gc_stop_the_world()
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:signals sent\n"));
     /* wait for the running threads to stop or finish */
-    for(p=all_threads;p;) {
-        FSHOW_SIGNAL((stderr,"/gc_stop_the_world: th: %p, p: %p\n", th, p));
-        if((p!=th) && (p->state==STATE_RUNNING)) {
-            sched_yield();
-        } else {
-            p=p->next;
+    {
+#if QSHOW_SIGNALS
+        struct thread *prev = 0;
+#endif
+        for(p=all_threads;p;) {
+#if QSHOW_SIGNALS
+            if ((p!=th)&&(p!=prev)&&(p->state==STATE_RUNNING)) {
+                FSHOW_SIGNAL
+                    ((stderr,
+                      "/gc_stop_the_world: waiting for thread=%lu: state=%x\n",
+                      p->os_thread, p->state));
+                prev=p;
+            }
+#endif
+            if((p!=th) && (p->state==STATE_RUNNING)) {
+                sched_yield();
+            } else {
+                p=p->next;
+            }
         }
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:end\n"));

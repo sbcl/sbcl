@@ -117,8 +117,8 @@ sigaddset_blockable(sigset_t *s)
 }
 
 /* initialized in interrupt_init */
-static sigset_t deferrable_sigset;
-static sigset_t blockable_sigset;
+sigset_t deferrable_sigset;
+sigset_t blockable_sigset;
 #endif
 
 void
@@ -639,9 +639,8 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred\n",
-                      (unsigned int)handler,signal,
-                      (unsigned long)thread->os_thread));
+                      "/maybe_defer_handler(%x,%d): deferred\n",
+                      (unsigned int)handler,signal));
         return 1;
     }
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
@@ -651,15 +650,13 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d),thread=%lu: deferred(PA)\n",
-                      (unsigned int)handler,signal,
-                      (unsigned long)thread->os_thread));
+                      "/maybe_defer_handler(%x,%d): deferred(PA)\n",
+                      (unsigned int)handler,signal));
         return 1;
     }
     FSHOW_SIGNAL((stderr,
-                  "/maybe_defer_handler(%x,%d),thread=%lu: not deferred\n",
-                  (unsigned int)handler,signal,
-                  (unsigned long)thread->os_thread));
+                  "/maybe_defer_handler(%x,%d): not deferred\n",
+                  (unsigned int)handler,signal));
     return 0;
 }
 
@@ -748,15 +745,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     if (arch_pseudo_atomic_atomic(context)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         arch_set_pseudo_atomic_interrupted(context);
-        FSHOW_SIGNAL((stderr,"thread=%lu sig_stop_for_gc deferred (PA)\n",
-                      thread->os_thread));
+        FSHOW_SIGNAL((stderr, "sig_stop_for_gc deferred (PA)\n"));
         return;
     }
     else if (SymbolValue(GC_INHIBIT,thread) != NIL) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
-        FSHOW_SIGNAL((stderr,
-                      "thread=%lu sig_stop_for_gc deferred (*GC-INHIBIT*)\n",
-                      thread->os_thread));
+        FSHOW_SIGNAL((stderr, "sig_stop_for_gc deferred (*GC-INHIBIT*)\n"));
         return;
     }
 
@@ -779,7 +773,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     }
 
     thread->state=STATE_SUSPENDED;
-    FSHOW_SIGNAL((stderr,"thread=%lu suspended\n",thread->os_thread));
+    FSHOW_SIGNAL((stderr,"suspended\n"));
 
     sigemptyset(&ss);
 #if defined(SIG_RESUME_FROM_GC)
@@ -800,7 +794,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
 #endif
 
-    FSHOW_SIGNAL((stderr,"thread=%lu resumed\n",thread->os_thread));
+    FSHOW_SIGNAL((stderr,"resumed\n"));
     if(thread->state!=STATE_RUNNING) {
         lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
              fixnum_value(thread->state));
@@ -1002,6 +996,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)(fun + FUN_POINTER_LOWTAG);
 #endif
+    FSHOW((stderr, "/arranged return to Lisp function (0x%lx)\n",
+           (long)function));
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1012,6 +1008,9 @@ void
 interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+
+    FSHOW_SIGNAL((stderr,"/interrupt_thread_handler\n"));
+    check_blockables_blocked_or_lose();
 
     /* let the handler enable interrupts again when it sees fit */
     sigaddset_deferrable(os_context_sigmask_addr(context));

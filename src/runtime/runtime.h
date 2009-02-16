@@ -15,14 +15,59 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
-/*#define QSHOW */ /* Enable low-level debugging output? */
+#if defined(LISP_FEATURE_SB_THREAD)
+#define thread_self pthread_self
+#define thread_kill pthread_kill
+#define thread_sigmask pthread_sigmask
+#define thread_mutex_lock(l) pthread_mutex_lock(l)
+#define thread_mutex_unlock(l) pthread_mutex_unlock(l)
+#else
+#define thread_self getpid
+#define thread_kill kill
+#define thread_sigmask sigprocmask
+#define thread_mutex_lock(l) 0
+#define thread_mutex_unlock(l) 0
+#endif
+
+/* #define QSHOW */ /* Enable low-level debugging output? */
+/* #define QSHOW_SAFE */ /* Enable blocking interrupts for each SHOW. */
 
 #ifdef QSHOW
-#define FSHOW(args) fprintf args
-#define SHOW(string) FSHOW((stderr, "/%s\n", string))
+
+#ifdef QSHOW_SAFE
+
+#include <signal.h>
+extern sigset_t blockable_sigset;
+
+#define QSHOW_BLOCK                                             \
+        sigset_t oldset;                                        \
+        thread_sigmask(SIG_BLOCK, &blockable_sigset, &oldset);
+#define QSHOW_UNBLOCK thread_sigmask(SIG_SETMASK,&oldset,0);
 #else
+#define QSHOW_BLOCK
+#define QSHOW_UNBLOCK
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+#define QSHOW_PREFIX fprintf(stderr, "%lu ", pthread_self());
+#else
+#define QSHOW_PREFIX
+#endif
+
+#define FSHOW(args)                                             \
+    do {                                                        \
+        QSHOW_BLOCK                                             \
+        QSHOW_PREFIX                                            \
+        fprintf args;                                           \
+        QSHOW_UNBLOCK                                           \
+    } while (0)
+#define SHOW(string) FSHOW((stderr, "/%s\n", string))
+
+#else
+
 #define FSHOW(args)
 #define SHOW(string)
+
 #endif
 
 /* Enable extra-verbose low-level debugging output for signals? (You
