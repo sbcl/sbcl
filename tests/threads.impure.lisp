@@ -914,7 +914,7 @@
                   ;; but the same can happen because of a regular
                   ;; MAKE-THREAD or LIST-ALL-THREADS, and various
                   ;; session functions.
-                  (sb-thread:with-mutex (sb-thread::*all-threads-lock*)
+                  (sb-thread::with-all-threads-lock
                     (sb-thread::with-session-lock (sb-thread::*session*)
                       (sb-ext:gc))))
                 :name (list :gc i)))
