@@ -4749,7 +4749,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((signed long) alloc_signal <= 0) {
             SetSymbolValue(ALLOC_SIGNAL, T, thread);
-            thread_kill(thread->os_thread, SIGPROF);
+            raise(SIGPROF);
         } else {
             SetSymbolValue(ALLOC_SIGNAL,
                            alloc_signal - (1 << N_FIXNUM_TAG_BITS),

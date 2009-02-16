@@ -87,8 +87,10 @@ in future versions."
 
 (declaim (inline current-thread-os-thread))
 (defun current-thread-os-thread ()
-  (sap-int
-   (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot)))
+  #!+sb-thread
+  (sap-int (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot))
+  #!-sb-thread
+  0)
 
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")

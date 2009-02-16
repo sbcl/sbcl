@@ -16,14 +16,14 @@
 #define _SBCL_RUNTIME_H_
 
 #if defined(LISP_FEATURE_SB_THREAD)
-#define thread_self pthread_self
+#define thread_self() pthread_self()
 #define thread_kill pthread_kill
 #define thread_sigmask pthread_sigmask
 #define thread_mutex_lock(l) pthread_mutex_lock(l)
 #define thread_mutex_unlock(l) pthread_mutex_unlock(l)
 #else
-#define thread_self getpid
-#define thread_kill kill
+#define thread_self() 0
+#define thread_kill kill_safely
 #define thread_sigmask sigprocmask
 #define thread_mutex_lock(l) 0
 #define thread_mutex_unlock(l) 0

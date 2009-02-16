@@ -713,16 +713,14 @@ kill_safely(os_thread_t os_thread, int signal)
         return -1;
 #else
     int status;
-    if (os_thread != getpid())
+    if (os_thread != 0)
         lose("kill_safely: who do you want to kill? %d?\n", os_thread);
-    status = kill(os_thread, signal);
+    status = raise(signal);
     if (status == 0) {
         return 0;
-    } else if (status == ESRCH) {
-        return -1;
     } else {
-        lose("cannot send signal %d to process %lu: %d, %s\n",
-             signal, os_thread, status, strerror(status));
+        lose("cannot raise signal %d, %d %s\n",
+             signal, status, strerror(errno));
     }
 #endif
 }
