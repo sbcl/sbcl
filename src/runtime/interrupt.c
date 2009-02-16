@@ -198,6 +198,22 @@ check_interrupts_enabled_or_lose(os_context_t *context)
         lose ("in pseudo atomic section\n");
 }
 
+/* Are we leaving WITH-GCING and already running with interrupts
+ * enabled, without the protection of *GC-INHIBIT* T and there is gc
+ * (or stop for gc) pending, but we haven't trapped yet? */
+int
+in_leaving_without_gcing_race_p(struct thread *thread)
+{
+    return ((SymbolValue(IN_WITHOUT_GCING,thread) != NIL) &&
+            (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) &&
+            (SymbolValue(GC_INHIBIT,thread) == NIL) &&
+            ((SymbolValue(GC_PENDING,thread) != NIL)
+#if defined(LISP_FEATURE_SB_THREAD)
+             || (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL)
+#endif
+             ));
+}
+
 /* Check our baroque invariants. */
 void
 check_interrupt_context_or_lose(os_context_t *context)
@@ -211,10 +227,11 @@ check_interrupt_context_or_lose(os_context_t *context)
 #if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_PPC)
 #if 0
     int interrupts_enabled = (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL);
+#endif
     int gc_inhibit = (SymbolValue(GC_INHIBIT,thread) != NIL);
     int gc_pending = (SymbolValue(GC_PENDING,thread) == T);
     int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
-#endif
+    int in_race_p = in_leaving_without_gcing_race_p(thread);
     /* In the time window between leaving the *INTERRUPTS-ENABLED* NIL
      * section and trapping, a SIG_STOP_FOR_GC would see the next
      * check fail, for this reason sig_stop_for_gc handler does not
@@ -223,20 +240,19 @@ check_interrupt_context_or_lose(os_context_t *context)
      * triggered, too. */
 #if 0
     if (interrupt_deferred_p)
-        if (interrupts_enabled && !pseudo_atomic_interrupted)
+        if (!(!interrupts_enabled || pseudo_atomic_interrupted || in_race_p))
             lose("Stray deferred interrupt.");
 #endif
-    /* Broken momentarily at the end of WITHOUT-GCING. */
 #if 0
     if (gc_pending)
-        if (!(pseudo_atomic_interrupted || gc_inhibit))
+        if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
             lose("GC_PENDING, but why?.");
 #if defined(LISP_FEATURE_SB_THREAD)
     {
         int stop_for_gc_pending =
             (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL);
         if (stop_for_gc_pending)
-            if (!(pseudo_atomic_interrupted || gc_inhibit))
+            if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
                 lose("STOP_FOR_GC_PENDING, but why?.");
     }
 #endif
@@ -723,8 +739,13 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
      * atomic section inside a WITHOUT-INTERRUPTS.
+     *
+     * Also, if in_leaving_without_gcing_race_p then
+     * interrupt_handle_pending is going to be called soon, so
+     * stashing the signal away is safe.
      */
-    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
+    if ((SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) ||
+        in_leaving_without_gcing_race_p(thread)) {
         store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
         FSHOW_SIGNAL((stderr,

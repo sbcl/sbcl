@@ -19,16 +19,19 @@
     (declare (optimize (safety 0) (speed 3)))
     (sb!vm::locked-symbol-global-value-add ',symbol-name ,delta)))
 
-(defvar *gc-inhibit*) ; initialized in cold init
+;;;; these are initialized in cold init
+
+(defvar *in-without-gcing*)
+(defvar *gc-inhibit*)
 
 ;;; When the dynamic usage increases beyond this amount, the system
 ;;; notes that a garbage collection needs to occur by setting
 ;;; *GC-PENDING* to T. It starts out as NIL meaning nobody has figured
 ;;; out what it should be yet.
-(defvar *gc-pending* nil)
+(defvar *gc-pending*)
 
 #!+sb-thread
-(defvar *stop-for-gc-pending* nil)
+(defvar *stop-for-gc-pending*)
 
 (defmacro without-gcing (&body body)
   #!+sb-doc
@@ -53,24 +56,21 @@ maintained."
               ,@body))
        (if *gc-inhibit*
            (,without-gcing-body)
-           (without-interrupts
-             ;; We need to disable interrupts before disabling GC, so that
-             ;; signal handlers using locks don't accidentally try to grab
-             ;; them with GC inhibited.
-             ;;
-             ;; It would be nice to implement this with just a single UWP, but
-             ;; unfortunately it seems that it cannot be done: the naive
-             ;; solution of binding both *INTERRUPTS-ENABLED* and
-             ;; *GC-INHIBIT*, and checking for both pending GC and interrupts
-             ;; in the cleanup breaks if we have a GC pending, but no
-             ;; interrupts, and we receive an asynch unwind while checking for
-             ;; the pending GC: we unwind before handling the pending GC, and
-             ;; will be left running with further GCs blocked due to the GC
-             ;; pending flag.
+           ;; We need to disable interrupts before disabling GC, so
+           ;; that signal handlers using locks don't accidentally try
+           ;; to grab them with GC inhibited.
+           (let ((*in-without-gcing* t))
              (unwind-protect
-                  (let ((*gc-inhibit* t))
+                  (let* ((*allow-with-interrupts* nil)
+                         (*interrupts-enabled* nil)
+                         (*gc-inhibit* t))
                     (,without-gcing-body))
-               (when (or *gc-pending* #!+sb-thread *stop-for-gc-pending*)
+               ;; This is not racy becuase maybe_defer_handler
+               ;; defers signals if *GC-INHIBIT* is NIL but there
+               ;; is a pending gc or stop-for-gc.
+               (when (or *interrupt-pending*
+                         *gc-pending*
+                         #!+sb-thread *stop-for-gc-pending*)
                  (sb!unix::receive-pending-interrupt))))))))
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

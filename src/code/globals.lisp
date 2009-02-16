@@ -22,7 +22,7 @@
                   sb!debug:*stack-top-hint*
                   *handler-clusters*
                   *restart-clusters*
-                  *gc-inhibit* *gc-pending*
+                  *in-without-gcing* *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
                   *software-interrupt-vector* *load-verbose*
                   *load-print-stuff* *in-compilation-unit*

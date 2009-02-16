@@ -9,6 +9,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     fault, etc. In the absence of --lose-on-corruption a warning is
     printed to stderr.
   * optimization: slightly faster gc on multithreaded builds
+  * optimization: faster WITHOUT-GCING
   * bug fix: real-time signals are not used anymore, so no more
     hanging when the system wide real-time signal queue gets full.
 

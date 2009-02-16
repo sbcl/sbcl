@@ -93,6 +93,7 @@
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.
   (setf *after-gc-hooks* nil
+        *in-without-gcing* nil
         *gc-inhibit* t
         *gc-pending* nil
         #!+sb-thread *stop-for-gc-pending* #!+sb-thread nil

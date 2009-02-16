@@ -57,6 +57,7 @@
     sb!unix::*allow-with-interrupts*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
+    *in-without-gcing*
     *gc-inhibit*
     *gc-pending*
     #!-sb-thread
