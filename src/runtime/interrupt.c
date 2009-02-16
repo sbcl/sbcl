@@ -79,6 +79,7 @@ sigaddset_deferrable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
     sigaddset(s, SIGINT);
+    sigaddset(s, SIGTERM);
     sigaddset(s, SIGQUIT);
     sigaddset(s, SIGPIPE);
     sigaddset(s, SIGALRM);
@@ -1265,6 +1266,14 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 #endif
 }
 
+/* This must not go through lisp as it's allowed anytime, even when on
+ * the altstack. */
+void
+sigabrt_handler(int signal, siginfo_t *info, void *void_context)
+{
+    lose("SIGABRT received.\n");
+}
+
 void
 interrupt_init(void)
 {
@@ -1287,7 +1296,7 @@ interrupt_init(void)
              * 3-argument form is expected.) */
             (void (*)(int, siginfo_t*, void*))SIG_DFL;
     }
-
+    undoably_install_low_level_interrupt_handler(SIGABRT, sigabrt_handler);
     SHOW("returning from interrupt_init()");
 #endif
 }

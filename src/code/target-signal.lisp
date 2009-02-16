@@ -164,18 +164,12 @@
   (sb!thread::terminate-session)
   (sb!ext:quit))
 
-;; Also known as SIGABRT.
-(defun sigiot-handler (signal code context)
-  (declare (ignore signal code context))
-  (sb!impl::%halt))
-
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)
   (enable-interrupt sigill #'sigill-handler)
-  (enable-interrupt sigiot #'sigiot-handler)
   #!-linux
   (enable-interrupt sigemt #'sigemt-handler)
   (enable-interrupt sigfpe #'sb!vm:sigfpe-handler)
