@@ -75,8 +75,8 @@ is deferred by pseudo atomic and @code{WITHOUT-GCING}.
 
 @subsection Miscellaneous issues
 
-Signal handlers should automatically restore errno and fp
-state. Currently, this is not the case.
+Signal handlers automatically restore errno and fp state, but
+arrange_return_to_lisp_function does not restore errno.
 
 @subsection POSIX -- Letter and Spirit
 

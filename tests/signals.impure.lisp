@@ -35,3 +35,24 @@
           (princ '*)
           (force-output))
     (terpri)))
+
+(require :sb-posix)
+
+(with-test (:name (:signal :errno))
+  (let* (saved-errno
+         (returning nil)
+         (timer (make-timer (lambda ()
+                              (sb-unix:unix-open "~!@#$%^&*[]()/\\" 0 0)
+                              (assert (= sb-unix:enoent
+                                         (sb-unix::get-errno)))
+                              (setq returning t)))))
+    (schedule-timer timer 0.2)
+    ;; Fail and set errno.
+    (sb-unix:nanosleep -1 -1)
+    (setq saved-errno (sb-unix::get-errno))
+    (assert (= saved-errno sb-posix:einval))
+    ;; Wait, but not with sleep because that will be interrupted and
+    ;; we get EINTR.
+    (loop until returning)
+    (loop repeat 1000000000)
+    (assert (= saved-errno (sb-unix::get-errno)))))

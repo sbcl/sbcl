@@ -68,6 +68,26 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
+/* These are to be used in signal handlers. Currently all handlers are
+ * called from one of:
+ *
+ * interrupt_handle_now_handler
+ * maybe_now_maybe_later
+ * unblock_me_trampoline
+ * low_level_handle_now_handler
+ * low_level_maybe_now_maybe_later
+ * low_level_unblock_me_trampoline
+ */
+#define SAVE_ERRNO()                                            \
+    {                                                           \
+        int _saved_errno = errno;                               \
+        {
+
+#define RESTORE_ERRNO                                           \
+        }                                                       \
+        errno = _saved_errno;                                   \
+    }
+
 static void run_deferred_handler(struct interrupt_data *data, void *v_context);
 #ifndef LISP_FEATURE_WIN32
 static void store_signal_data_for_later (struct interrupt_data *data,
@@ -1024,6 +1044,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
+    SAVE_ERRNO();
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
@@ -1034,6 +1055,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
     if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         interrupt_handle_now(signal, info, context);
+    RESTORE_ERRNO;
 }
 
 static void
@@ -1050,6 +1072,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
 static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
+    SAVE_ERRNO();
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
@@ -1061,6 +1084,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     if(!maybe_defer_handler(low_level_interrupt_handle_now,data,
                             signal,info,context))
         low_level_interrupt_handle_now(signal, info, context);
+    RESTORE_ERRNO;
 }
 #endif
 
@@ -1129,6 +1153,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
+    SAVE_ERRNO();
     os_context_t *context = arch_os_get_context(&void_context);
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
@@ -1142,6 +1167,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 #endif
 #endif
     interrupt_handle_now(signal, info, context);
+    RESTORE_ERRNO;
 }
 
 /* manipulate the signal context and stack such that when the handler
@@ -1170,7 +1196,13 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
      * user's backtrace makes (as much) sense (as usual) */
 
     /* FIXME: what about restoring fp state? */
-    /* FIXME: what about restoring errno? */
+    /* FIXME: errno is not restored, but since current uses of this
+     * function only call Lisp code that signals an error, it's not
+     * much of a problem. In other words, running out of the control
+     * stack between a syscall and (GET-ERRNO) may clobber errno if
+     * something fails during signalling or in the handler. But I
+     * can't see what can go wrong as long as there is no CONTINUE
+     * like restart on them. */
 #ifdef LISP_FEATURE_X86
     /* Suppose the existence of some function that saved all
      * registers, called call_into_lisp, then restored GP registers and
@@ -1463,23 +1495,36 @@ see_if_sigaction_nodefer_works(void)
 static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
+    SAVE_ERRNO();
+    os_context_t *context = arch_os_get_context(&void_context);
     sigset_t unblock;
 
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
-    interrupt_handle_now_handler(signal, info, void_context);
+    interrupt_handle_now(signal, info, context);
+    RESTORE_ERRNO;
 }
 
 static void
 low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
+    SAVE_ERRNO();
     sigset_t unblock;
 
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
     (*interrupt_low_level_handlers[signal])(signal, info, void_context);
+    RESTORE_ERRNO;
+}
+
+static void
+low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
+{
+    SAVE_ERRNO();
+    (*interrupt_low_level_handlers[signal])(signal, info, void_context);
+    RESTORE_ERRNO;
 }
 
 void
@@ -1506,7 +1551,7 @@ undoably_install_low_level_interrupt_handler (int signal,
         sa.sa_sigaction = low_level_unblock_me_trampoline;
 #endif
     else
-        sa.sa_sigaction = handler;
+        sa.sa_sigaction = low_level_handle_now_handler;
 
     sigcopyset(&sa.sa_mask, &blockable_sigset);
     sa.sa_flags = SA_SIGINFO | SA_RESTART
