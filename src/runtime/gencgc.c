@@ -1172,7 +1172,9 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
         fprintf(stderr, "GC control variables:\n");
         fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",
                 SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
-                SymbolValue(GC_PENDING,thread)==NIL ? "false" : "true");
+                (SymbolValue(GC_PENDING, thread) == T) ?
+                "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+                  "false" : "in progress"));
 #ifdef LISP_FEATURE_SB_THREAD
         fprintf(stderr, " *STOP-FOR-GC-PENDING* = %s\n",
                 SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");

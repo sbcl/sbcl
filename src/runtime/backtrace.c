@@ -548,7 +548,10 @@ describe_thread_state(void)
 #endif
     printf("Specials:\n");
     printf(" *GC-INHIBIT* = %s\n", (SymbolValue(GC_INHIBIT, thread) == T) ? "T" : "NIL");
-    printf(" *GC-PENDING* = %s\n", (SymbolValue(GC_PENDING, thread) == T) ? "T" : "NIL");
+    printf(" *GC-PENDING* = %s\n",
+           (SymbolValue(GC_PENDING, thread) == T) ?
+           "T" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+                  "NIL" : ":IN-PROGRESS"));
     printf(" *INTERRUPTS-ENABLED* = %s\n", (SymbolValue(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
 #ifdef STOP_FOR_GC_PENDING
     printf(" *STOP-FOR-GC-PENDING* = %s\n", (SymbolValue(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");

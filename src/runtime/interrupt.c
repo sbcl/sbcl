@@ -539,7 +539,10 @@ interrupt_handle_pending(os_context_t *context)
             sig_stop_for_gc_handler(SIG_STOP_FOR_GC,NULL,context);
         } else
 #endif
-        if (SymbolValue(GC_PENDING,thread) != NIL) {
+         /* Test for T and not for != NIL since the value :IN-PROGRESS
+          * is used in SUB-GC as part of the mechanism to supress
+          * recursive gcs.*/
+        if (SymbolValue(GC_PENDING,thread) == T) {
             /* GC_PENDING is cleared in SUB-GC, or if another thread
              * is doing a gc already we will get a SIG_STOP_FOR_GC and
              * that will clear it. */

@@ -196,57 +196,72 @@ run in any thread.")
 (defvar *gc-epoch* (cons nil nil))
 
 (defun sub-gc (&key (gen 0))
-  (unless (sb!thread:holding-mutex-p *already-in-gc*)
-    ;; With gencgc, unless *GC-PENDING* every allocation in this
-    ;; function triggers another gc, potentially exceeding maximum
-    ;; interrupt nesting. If *GC-INHIBIT* is not true, however,
-    ;; there is no guarantee that we would ever check for pending
-    ;; GC -- so in that case we must first disable interrupts, which
-    ;; needs to be done for GC anyways...
-    (cond (*gc-inhibit*
-           (setf *gc-pending* t))
-          (t
-           (without-interrupts
-             (setf *gc-pending* t)
+  (cond (*gc-inhibit*
+         (setf *gc-pending* t))
+        (t
+         (without-interrupts
+           (setf *gc-pending* :in-progress)
+           ;; Tricks to to prevent triggerring a recursive gc. This is
+           ;; like a WITHOUT-GCING inside the lock except that we
+           ;; cannot call MAYBE-HANDLE-PENDING-GC at the end, because
+           ;; that would lead to a recursive attempt on the lock. In
+           ;; case you are wondering, wrapping the lock in a
+           ;; WITHOUT-GCING would also deadlock. The
+           ;; *IN-WITHOUT-GCING* part is used to tell the runtime that
+           ;; it's ok to have a pending gc even though *GC-INHIBIT* is
+           ;; NIL.
+           ;;
+           ;; Now, if GET-MUTEX did not cons, that would be enough.
+           ;; Because it does, we need the :IN-PROGRESS bit above to
+           ;; tell the runtime not to trigger gcs.
+           (let ((sb!impl::*in-without-gcing* t))
              (sb!thread:with-mutex (*already-in-gc*)
-               (let ((old-usage (dynamic-usage))
-                     (new-usage 0))
-                 (unsafe-clear-roots)
-
-                 (gc-stop-the-world)
-                 (let ((start-time (get-internal-run-time)))
-                   (collect-garbage gen)
-                   (setf *gc-epoch* (cons nil nil))
-                   (incf *gc-run-time*
-                         (- (get-internal-run-time) start-time)))
-                 (setf *gc-pending* nil
-                       new-usage (dynamic-usage))
-                 (gc-start-the-world)
-
-                 ;; In a multithreaded environment the other threads will
-                 ;; see *n-b-f-o-p* change a little late, but that's OK.
-                 (let ((freed (- old-usage new-usage)))
-                   ;; GENCGC occasionally reports negative here, but the
-                   ;; current belief is that it is part of the normal order
-                   ;; of things and not a bug.
-                   (when (plusp freed)
-                     (incf *n-bytes-freed-or-purified* freed))))))
-
-           ;; Outside the mutex, interrupts enabled: these may cause
-           ;; another GC. FIXME: it can potentially exceed maximum
-           ;; interrupt nesting by triggering GCs.
-           ;;
-           ;; Can that be avoided by having the finalizers and hooks
-           ;; run only from the outermost SUB-GC?
-           ;;
-           ;; KLUDGE: Don't run the hooks in GC's triggered by dying
-           ;; threads, so that user-code never runs with
-           ;;   (thread-alive-p *current-thread*) => nil
-           ;; The long-term solution will be to keep a separate thread
-           ;; for finalizers and after-gc hooks.
-           (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
-             (run-pending-finalizers)
-             (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
+               (let ((*gc-inhibit* t))
+                 (let ((old-usage (dynamic-usage))
+                       (new-usage 0))
+                   (unsafe-clear-roots)
+                   (gc-stop-the-world)
+                   (let ((start-time (get-internal-run-time)))
+                     (collect-garbage gen)
+                     (setf *gc-epoch* (cons nil nil))
+                     (incf *gc-run-time*
+                           (- (get-internal-run-time) start-time)))
+                   (setf *gc-pending* nil
+                         new-usage (dynamic-usage))
+                   #!+sb-thread
+                   (assert (not *stop-for-gc-pending*))
+                   (gc-start-the-world)
+                   ;; In a multithreaded environment the other threads
+                   ;; will see *n-b-f-o-p* change a little late, but
+                   ;; that's OK.
+                   (let ((freed (- old-usage new-usage)))
+                     ;; GENCGC occasionally reports negative here, but
+                     ;; the current belief is that it is part of the
+                     ;; normal order of things and not a bug.
+                     (when (plusp freed)
+                       (incf *n-bytes-freed-or-purified* freed)))))))
+           ;; While holding the mutex we were protected from
+           ;; SIG_STOP_FOR_GC and recursive GCs. Now, in order to
+           ;; preserve the invariant (*GC-PENDING* ->
+           ;; pseudo-atomic-interrupted or *GC-INHIBIT*), let's check
+           ;; explicitly for a pending gc before interrupts are
+           ;; enabled again.
+           (maybe-handle-pending-gc))
+         ;; Outside the mutex, interrupts enabled: these may cause
+         ;; another GC. FIXME: it can potentially exceed maximum
+         ;; interrupt nesting by triggering GCs.
+         ;;
+         ;; Can that be avoided by having the finalizers and hooks
+         ;; run only from the outermost SUB-GC?
+         ;;
+         ;; KLUDGE: Don't run the hooks in GC's triggered by dying
+         ;; threads, so that user-code never runs with
+         ;;   (thread-alive-p *current-thread*) => nil
+         ;; The long-term solution will be to keep a separate thread
+         ;; for finalizers and after-gc hooks.
+         (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
+           (run-pending-finalizers)
+           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
