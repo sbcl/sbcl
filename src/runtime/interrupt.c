@@ -164,6 +164,19 @@ sigset_t blockable_sigset;
 sigset_t gc_sigset;
 #endif
 
+boolean
+deferrables_blocked_in_sigset_p(sigset_t *sigset)
+{
+#if !defined(LISP_FEATURE_WIN32)
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(&deferrable_sigset, i) && sigismember(sigset, i))
+            return 1;
+    }
+#endif
+    return 0;
+}
+
 void
 check_deferrables_unblocked_in_sigset_or_lose(sigset_t *sigset)
 {
@@ -669,24 +682,24 @@ interrupt_handle_pending(os_context_t *context)
 
     check_blockables_blocked_or_lose();
 
-    /* If GC/SIG_STOP_FOR_GC stroke during PA and there was no pending
+    /* If GC/SIG_STOP_FOR_GC struck during PA and there was no pending
      * handler, then the pending mask was saved and
      * gc_blocked_deferrables set. Hence, there can be no pending
      * handler and it's safe to restore the pending mask.
      *
      * Note, that if gc_blocked_deferrables is false we may still have
-     * to GC. In this case, we are coming out of a WITHOUT-GCING. */
+     * to GC. In this case, we are coming out of a WITHOUT-GCING or a
+     * pseudo atomic was interrupt be a deferrable first. */
     if (data->gc_blocked_deferrables) {
         if (data->pending_handler)
             lose("GC blocked deferrables but still got a pending handler.");
         if (SymbolValue(GC_INHIBIT,thread)!=NIL)
             lose("GC blocked deferrables while GC is inhibited.");
-        /* restore the saved signal mask from the original signal
-         * (the one that interrupted us during the critical
-         * section) into the os_context for the signal we're
-         * currently in the handler for. This should ensure that
-         * when we return from the handler the blocked signals are
-         * unblocked */
+        /* Restore the saved signal mask from the original signal (the
+         * one that interrupted us during the critical section) into
+         * the os_context for the signal we're currently in the
+         * handler for. This should ensure that when we return from
+         * the handler the blocked signals are unblocked. */
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
         data->gc_blocked_deferrables = 0;
     }
@@ -706,6 +719,7 @@ interrupt_handle_pending(os_context_t *context)
           * is used in SUB-GC as part of the mechanism to supress
           * recursive gcs.*/
         if (SymbolValue(GC_PENDING,thread) == T) {
+
             /* Two reasons for doing this. First, if there is a
              * pending handler we don't want to run. Second, we are
              * going to clear pseudo atomic interrupted to avoid
@@ -722,7 +736,11 @@ interrupt_handle_pending(os_context_t *context)
 
             /* GC_PENDING is cleared in SUB-GC, or if another thread
              * is doing a gc already we will get a SIG_STOP_FOR_GC and
-             * that will clear it. */
+             * that will clear it.
+             *
+             * If there is a pending handler or gc was triggerred in a
+             * signal handler then maybe_gc won't run POST_GC and will
+             * return normally. */
             if (!maybe_gc(context))
                 lose("GC not inhibited but maybe_gc did not GC.");
 

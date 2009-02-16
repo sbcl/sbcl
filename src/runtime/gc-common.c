@@ -2440,10 +2440,8 @@ maybe_gc(os_context_t *context)
     FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
     /* FIXME: Nothing must go wrong during GC else we end up running
      * the debugger, error handlers, and user code in general in a
-     * potentially unsafe place. With deferrables blocked due to
-     * fake_foreign_function_call + unblock_gc_signals(), we'll not
-     * have a pleasant time either. Running out of the control stack
-     * or the heap in SUB-GC are ways to lose. Of course, deferrables
+     * potentially unsafe place. Running out of the control stack or
+     * the heap in SUB-GC are ways to lose. Of course, deferrables
      * cannot be unblocked because there may be a pending handler, or
      * we may even be in a WITHOUT-INTERRUPTS. */
     gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
@@ -2452,16 +2450,19 @@ maybe_gc(os_context_t *context)
     if ((gc_happened != NIL) &&
         /* See if interrupts are enabled or it's possible to enable
          * them. POST-GC has a similar check, but we don't want to
-         * unlock deferrables in that case, because if there is a
-         * pending interrupt we'd lose, but more to point the POST-GC
-         * runs user code in a pretty much arbitrary place so it
-         * better not be in WITHOUT-INTERRUPTS. */
+         * unlock deferrables in that case and get a pending interrupt
+         * here. */
         ((SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) ||
          (SymbolValue(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
-        FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
-        if (!interrupt_handler_pending_p())
-            unblock_deferrable_signals();
-        funcall0(StaticSymbolFunction(POST_GC));
+        sigset_t *context_sigmask = os_context_sigmask_addr(context);
+        if (!deferrables_blocked_in_sigset_p(context_sigmask)) {
+            FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
+            thread_sigmask(SIG_SETMASK, context_sigmask, 0);
+            check_gc_signals_unblocked_or_lose();
+            funcall0(StaticSymbolFunction(POST_GC));
+        } else {
+            FSHOW((stderr, "/maybe_gc: punting on POST_GC due to blockage\n"));
+        }
     }
     undo_fake_foreign_function_call(context);
     FSHOW((stderr, "/maybe_gc: returning\n"));
