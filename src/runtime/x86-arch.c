@@ -24,6 +24,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"

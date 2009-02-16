@@ -51,6 +51,21 @@ extern int dynamic_values_bytes;
 #define for_each_thread(th) for(th=all_threads;th;th=0)
 #endif
 
+static inline lispobj *
+SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
+{
+    struct symbol *sym= (struct symbol *)
+        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+#ifdef LISP_FEATURE_SB_THREAD
+    if(thread && sym->tls_index) {
+        lispobj *r = &(((union per_thread_data *)thread)
+                       ->dynamic_values[fixnum_value(sym->tls_index)]);
+        if((*r)!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
+    }
+#endif
+    return &sym->value;
+}
+
 static inline lispobj
 SymbolValue(u64 tagged_symbol_pointer, void *thread)
 {

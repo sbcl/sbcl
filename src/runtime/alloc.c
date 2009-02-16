@@ -24,6 +24,7 @@
 #include "globals.h"
 #include "gc.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 #include "genesis/vector.h"
 #include "genesis/cons.h"
 #include "genesis/bignum.h"

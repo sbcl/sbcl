@@ -63,6 +63,7 @@
 #include "alloc.h"
 #include "dynbind.h"
 #include "interr.h"
+#include "pseudo-atomic.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"

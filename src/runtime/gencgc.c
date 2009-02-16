@@ -41,6 +41,7 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 #include "alloc.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"

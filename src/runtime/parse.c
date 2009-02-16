@@ -32,6 +32,7 @@
 #include "arch.h"
 #include "search.h"
 #include "thread.h"
+#include "pseudo-atomic.h"
 
 #include "genesis/simple-fun.h"
 #include "genesis/fdefn.h"

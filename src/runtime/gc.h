@@ -40,8 +40,6 @@ extern void clear_auto_gc_trigger(void);
 
 #include "fixnump.h"
 
-#include "pseudo-atomic.h"
-
 extern boolean maybe_gc(os_context_t *context);
 
 extern unsigned long bytes_consed_between_gcs;

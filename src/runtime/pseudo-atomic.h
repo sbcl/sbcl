@@ -24,33 +24,76 @@
     SymbolValue(ALLOCATION_POINTER, 0)
 #define get_binding_stack_pointer(thread)       \
     SymbolValue(BINDING_STACK_POINTER, thread)
-#define get_pseudo_atomic_atomic(thread)        \
-    (fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) & make_fixnum(1)))
-#define set_pseudo_atomic_atomic(thread)                                \
-    { \
-        lispobj bits = SymbolValue(PSEUDO_ATOMIC_BITS, thread); \
-        SetSymbolValue(PSEUDO_ATOMIC_BITS, bits | make_fixnum(1), thread); \
-    }
-#define clear_pseudo_atomic_atomic(thread)                      \
-    { \
-        lispobj bits = SymbolValue(PSEUDO_ATOMIC_BITS, thread);       \
-        SetSymbolValue(PSEUDO_ATOMIC_BITS, bits & ~make_fixnum(1), thread); \
-    }
-#define get_pseudo_atomic_interrupted(thread)                   \
-    (fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) & make_fixnum(2)))
-#define clear_pseudo_atomic_interrupted(thread)                         \
-    { \
-        lispobj bits = SymbolValue(PSEUDO_ATOMIC_BITS, thread);       \
-        SetSymbolValue(PSEUDO_ATOMIC_BITS, bits & ~make_fixnum(2), thread); \
-    }
 
-#define set_pseudo_atomic_interrupted(thread)                           \
-    { \
-        lispobj bits = SymbolValue(PSEUDO_ATOMIC_BITS, thread); \
-        SetSymbolValue(PSEUDO_ATOMIC_BITS, bits | make_fixnum(2), thread); \
-    }
+#if defined(LISP_FEATURE_X86)
+#define LISPOBJ_ASM_SUFFIX "l"
+#elif defined(LISP_FEATURE_X86_64)
+#define LISPOBJ_ASM_SUFFIX "q"
+#endif
+
+static inline int
+get_pseudo_atomic_atomic(struct thread *thread)
+{
+    return fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) &
+                        make_fixnum(1));
+}
+
+static inline void
+set_pseudo_atomic_atomic(struct thread *thread)
+{
+    lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
+    __asm__ __volatile__
+        ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
+         :
+         : "g" (make_fixnum(1)), "m" (*p)
+         : "memory");
+}
+
+static inline void
+clear_pseudo_atomic_atomic(struct thread *thread)
+{
+    lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
+    __asm__ __volatile__
+        ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
+         :
+         : "g" (~make_fixnum(1)), "m" (*p)
+         : "memory");
+}
+
+static inline int
+get_pseudo_atomic_interrupted(struct thread *thread)
+{
+    return fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) &
+                        make_fixnum(2));
+}
+
+static inline void
+set_pseudo_atomic_interrupted(struct thread *thread)
+{
+    lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
+    __asm__ __volatile__
+        ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
+         :
+         : "g" (make_fixnum(2)), "m" (*p)
+         : "memory");
+}
+
+static inline void
+clear_pseudo_atomic_interrupted(struct thread *thread)
+{
+    lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
+    __asm__ __volatile__
+        ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
+         :
+         : "g" (~make_fixnum(2)), "m" (*p)
+         : "memory");
+}
+
+#undef LISPOBJ_SUFFIX
 
 #elif defined(LISP_FEATURE_PPC) && defined(LISP_FEATURE_GENCGC)
+
+/* FIXME: Are these async signal safe? Compiler reordering? */
 
 #define set_alloc_pointer(value) \
     (dynamic_space_free_pointer = \
