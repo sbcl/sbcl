@@ -467,6 +467,7 @@ create_thread_struct(lispobj initial_function) {
         return 0;
     }
     th->interrupt_data->pending_handler = 0;
+    th->interrupt_data->gc_blocked_deferrables = 0;
     th->no_tls_value_marker=initial_function;
 
     th->stepping = NIL;

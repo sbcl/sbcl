@@ -654,6 +654,8 @@ cheneygc_handle_wp_violation(os_context_t *context, void *addr)
                      * the PA section */
                     SetSymbolValue(GC_PENDING,T,thread);
                     arch_set_pseudo_atomic_interrupted(context);
+                    maybe_save_gc_mask_and_block_deferrables
+                        (os_context_sigmask_addr(context));
                 } else {
                     maybe_gc(context);
                 }

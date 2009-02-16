@@ -4723,8 +4723,23 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
             /* set things up so that GC happens when we finish the PA
              * section */
             SetSymbolValue(GC_PENDING,T,thread);
-            if (SymbolValue(GC_INHIBIT,thread) == NIL)
-              set_pseudo_atomic_interrupted(thread);
+            if (SymbolValue(GC_INHIBIT,thread) == NIL) {
+                set_pseudo_atomic_interrupted(thread);
+#ifdef LISP_FEATURE_PPC
+                /* PPC calls alloc() from a trap, look up the most
+                 * recent one and frob that. */
+                {
+                    int context_index =
+                        fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,
+                                                 thread));
+                    os_context_t *context =
+                        thread->interrupt_contexts[context_index - 1];
+                    maybe_save_gc_mask_and_block_deferrables(context);
+                }
+#else
+                maybe_save_gc_mask_and_block_deferrables(NULL);
+#endif
+            }
         }
     }
     new_obj = gc_alloc_with_region(nbytes, page_type_flag, region, 0);

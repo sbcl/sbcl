@@ -244,6 +244,48 @@ check_interrupts_enabled_or_lose(os_context_t *context)
         lose ("in pseudo atomic section\n");
 }
 
+/* Save sigset (or the current sigmask if 0) if there is no pending
+ * handler, because that means that deferabbles are already blocked.
+ * The purpose is to avoid losing the pending gc signal if a
+ * deferrable interrupt async unwinds between clearing the pseudo
+ * atomic and trapping to GC.*/
+void
+maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
+{
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
+    sigset_t oldset;
+    /* Obviously, this function is called when signals may not be
+     * blocked. Let's make sure we are not interrupted. */
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, &oldset);
+#ifndef LISP_FEATURE_SB_THREAD
+    /* With threads a SIG_STOP_FOR_GC and a normal GC may also want to
+     * block. */
+    if (data->gc_blocked_deferrables)
+        lose("gc_blocked_deferrables already true\n");
+#endif
+    if ((!data->pending_handler) &&
+        (!data->gc_blocked_deferrables)) {
+        FSHOW_SIGNAL((stderr,"/setting gc_blocked_deferrables\n"));
+        data->gc_blocked_deferrables = 1;
+        if (sigset) {
+            /* This is the sigmask of some context. */
+            sigcopyset(&data->pending_mask, sigset);
+            sigaddset_deferrable(sigset);
+            thread_sigmask(SIG_SETMASK,&oldset,0);
+            return;
+        } else {
+            /* Operating on the current sigmask. Save oldset and
+             * unblock gc signals. In the end, this is equivalent to
+             * blocking the deferrables. */
+            sigcopyset(&data->pending_mask, &oldset);
+            unblock_gc_signals();
+            return;
+        }
+    }
+    thread_sigmask(SIG_SETMASK,&oldset,0);
+}
+
 /* Are we leaving WITH-GCING and already running with interrupts
  * enabled, without the protection of *GC-INHIBIT* T and there is gc
  * (or stop for gc) pending, but we haven't trapped yet? */
@@ -268,50 +310,50 @@ check_interrupt_context_or_lose(os_context_t *context)
     struct interrupt_data *data = thread->interrupt_data;
     int interrupt_deferred_p = (data->pending_handler != 0);
     int interrupt_pending = (SymbolValue(INTERRUPT_PENDING,thread) != NIL);
+    sigset_t *sigset = os_context_sigmask_addr(context);
     /* On PPC pseudo_atomic_interrupted is cleared when coming out of
      * handle_allocation_trap. */
 #if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_PPC)
-#if 0
     int interrupts_enabled = (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL);
     int gc_inhibit = (SymbolValue(GC_INHIBIT,thread) != NIL);
     int gc_pending = (SymbolValue(GC_PENDING,thread) == T);
     int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
     int in_race_p = in_leaving_without_gcing_race_p(thread);
-#endif
     /* In the time window between leaving the *INTERRUPTS-ENABLED* NIL
      * section and trapping, a SIG_STOP_FOR_GC would see the next
      * check fail, for this reason sig_stop_for_gc handler does not
-     * call this function. Plus, there may be interrupt lossage when a
-     * pseudo atomic is interrupted by a deferrable signal and gc is
-     * triggered, too. */
-#if 0
-    if (interrupt_deferred_p)
+     * call this function. */
+    if (interrupt_deferred_p) {
         if (!(!interrupts_enabled || pseudo_atomic_interrupted || in_race_p))
-            lose("Stray deferred interrupt.");
-#endif
-#if 0
+            lose("Stray deferred interrupt.\n");
+    }
     if (gc_pending)
         if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
-            lose("GC_PENDING, but why?.");
+            lose("GC_PENDING, but why?\n");
 #if defined(LISP_FEATURE_SB_THREAD)
     {
         int stop_for_gc_pending =
             (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL);
         if (stop_for_gc_pending)
             if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
-                lose("STOP_FOR_GC_PENDING, but why?.");
+                lose("STOP_FOR_GC_PENDING, but why?\n");
     }
 #endif
 #endif
-#endif
     if (interrupt_pending && !interrupt_deferred_p)
-        lose("INTERRUPT_PENDING but not pending handler.");
-    if (interrupt_deferred_p)
-        check_deferrables_blocked_in_sigset_or_lose
-            (os_context_sigmask_addr(context));
-    else
-        check_deferrables_unblocked_in_sigset_or_lose
-            (os_context_sigmask_addr(context));
+        lose("INTERRUPT_PENDING but not pending handler.\n");
+    if ((data->gc_blocked_deferrables) && interrupt_pending)
+        lose("gc_blocked_deferrables and interrupt pending\n.");
+    if (data->gc_blocked_deferrables)
+        check_deferrables_blocked_in_sigset_or_lose(sigset);
+    if (interrupt_pending || interrupt_deferred_p)
+        check_deferrables_blocked_in_sigset_or_lose(sigset);
+    else {
+        check_deferrables_unblocked_in_sigset_or_lose(sigset);
+        /* If deferrables are unblocked then we are open to signals
+         * that run lisp code. */
+        check_gc_signals_unblocked_in_sigset_or_lose(sigset);
+    }
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -616,27 +658,47 @@ interrupt_handle_pending(os_context_t *context)
 
     /* Win32 only needs to handle the GC cases (for now?) */
 
-    struct thread *thread;
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
 
     if (arch_pseudo_atomic_atomic(context)) {
         lose("Handling pending interrupt in pseduo atomic.");
     }
 
-    thread = arch_os_get_current_thread();
-
     FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
 
     check_blockables_blocked_or_lose();
 
-    /* If pseudo_atomic_interrupted is set then the interrupt is going
-     * to be handled now, ergo it's safe to clear it. */
-    arch_clear_pseudo_atomic_interrupted(context);
+    /* If GC/SIG_STOP_FOR_GC stroke during PA and there was no pending
+     * handler, then the pending mask was saved and
+     * gc_blocked_deferrables set. Hence, there can be no pending
+     * handler and it's safe to restore the pending mask.
+     *
+     * Note, that if gc_blocked_deferrables is false we may still have
+     * to GC. In this case, we are coming out of a WITHOUT-GCING. */
+    if (data->gc_blocked_deferrables) {
+        if (data->pending_handler)
+            lose("GC blocked deferrables but still got a pending handler.");
+        if (SymbolValue(GC_INHIBIT,thread)!=NIL)
+            lose("GC blocked deferrables while GC is inhibited.");
+        /* restore the saved signal mask from the original signal
+         * (the one that interrupted us during the critical
+         * section) into the os_context for the signal we're
+         * currently in the handler for. This should ensure that
+         * when we return from the handler the blocked signals are
+         * unblocked */
+        sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
+        data->gc_blocked_deferrables = 0;
+    }
 
     if (SymbolValue(GC_INHIBIT,thread)==NIL) {
+        void *original_pending_handler = data->pending_handler;
+
 #ifdef LISP_FEATURE_SB_THREAD
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
              * the signal handler if it actually stops us. */
+            arch_clear_pseudo_atomic_interrupted(context);
             sig_stop_for_gc_handler(SIG_STOP_FOR_GC,NULL,context);
         } else
 #endif
@@ -644,46 +706,81 @@ interrupt_handle_pending(os_context_t *context)
           * is used in SUB-GC as part of the mechanism to supress
           * recursive gcs.*/
         if (SymbolValue(GC_PENDING,thread) == T) {
+            /* Two reasons for doing this. First, if there is a
+             * pending handler we don't want to run. Second, we are
+             * going to clear pseudo atomic interrupted to avoid
+             * spurious trapping on every allocation in SUB_GC and
+             * having a pending handler with interrupts enabled and
+             * without pseudo atomic interrupted breaks an
+             * invariant. */
+            if (data->pending_handler) {
+                bind_variable(ALLOW_WITH_INTERRUPTS, NIL, thread);
+                bind_variable(INTERRUPTS_ENABLED, NIL, thread);
+            }
+
+            arch_clear_pseudo_atomic_interrupted(context);
+
             /* GC_PENDING is cleared in SUB-GC, or if another thread
              * is doing a gc already we will get a SIG_STOP_FOR_GC and
              * that will clear it. */
-            maybe_gc(context);
+            if (!maybe_gc(context))
+                lose("GC not inhibited but maybe_gc did not GC.");
+
+            if (data->pending_handler) {
+                unbind(thread);
+                unbind(thread);
+            }
+        } else if (SymbolValue(GC_PENDING,thread) != NIL) {
+            /* It's not NIL or T so GC_PENDING is :IN-PROGRESS. If
+             * GC-PENDING is not NIL then we cannot trap on pseudo
+             * atomic due to GC (see if(GC_PENDING) logic in
+             * cheneygc.c an gengcgc.c), plus there is a outer
+             * WITHOUT-INTERRUPTS SUB_GC, so how did we end up
+             * here? */
+            lose("Trapping to run pending handler while GC in progress.");
         }
+
         check_blockables_blocked_or_lose();
+
+        /* No GC shall be lost. If SUB_GC triggers another GC then
+         * that should be handled on the spot. */
+        if (SymbolValue(GC_PENDING,thread) != NIL)
+            lose("GC_PENDING after doing gc.");
+#ifdef LISP_FEATURE_SB_THREAD
+        if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL)
+            lose("STOP_FOR_GC_PENDING after doing gc.");
+#endif
+        /* Check two things. First, that gc does not clobber a handler
+         * that's already pending. Second, that there is no interrupt
+         * lossage: if original_pending_handler was NULL then even if
+         * an interrupt arrived during GC (POST-GC, really) it was
+         * handled. */
+        if (original_pending_handler != data->pending_handler)
+            lose("pending handler changed in gc: %x -> %d.",
+                 original_pending_handler, data->pending_handler);
     }
 
 #ifndef LISP_FEATURE_WIN32
-    /* we may be here only to do the gc stuff, if interrupts are
-     * enabled run the pending handler */
-    if (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) {
-        struct interrupt_data *data = thread->interrupt_data;
-
-        /* There may be no pending handler, because it was only a gc
-         * that had to be executed or because pseudo atomic triggered
-         * twice for a single interrupt. For the interested reader,
-         * that may happen if an interrupt hits after the interrupted
-         * flag is cleared but before pseudo-atomic is set and a
-         * pseudo atomic is interrupted in that interrupt. */
-        if (data->pending_handler) {
-
-            /* If we're here as the result of a pseudo-atomic as opposed
-             * to WITHOUT-INTERRUPTS, then INTERRUPT_PENDING is already
-             * NIL, because maybe_defer_handler sets
-             * PSEUDO_ATOMIC_INTERRUPTED only if interrupts are enabled.*/
-            SetSymbolValue(INTERRUPT_PENDING, NIL, thread);
-
-            /* restore the saved signal mask from the original signal (the
-             * one that interrupted us during the critical section) into the
-             * os_context for the signal we're currently in the handler for.
-             * This should ensure that when we return from the handler the
-             * blocked signals are unblocked */
-            sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
-
-            /* This will break on sparc linux: the deferred handler really wants
-             * to be called with a void_context */
-            run_deferred_handler(data,(void *)context);
-        }
+    /* There may be no pending handler, because it was only a gc that
+     * had to be executed or because Lisp is a bit too eager to call
+     * DO-PENDING-INTERRUPT. */
+    if ((SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) &&
+        (data->pending_handler))  {
+        /* No matter how we ended up here, clear both
+         * INTERRUPT_PENDING and pseudo atomic interrupted. It's safe
+         * because we checked above that there is no GC pending. */
+        SetSymbolValue(INTERRUPT_PENDING, NIL, thread);
+        arch_clear_pseudo_atomic_interrupted(context);
+        /* Restore the sigmask in the context. */
+        sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
+        /* This will break on sparc linux: the deferred handler really
+         * wants to be called with a void_context */
+        run_deferred_handler(data,(void *)context);
     }
+    /* It is possible that the end of this function was reached
+     * without never actually doing anything, the tests in Lisp for
+     * when to call receive-pending-interrupt are not exact. */
+    FSHOW_SIGNAL((stderr, "/exiting interrupt_handle_pending\n"));
 #endif
 }
 
@@ -779,6 +876,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
                  info_sap,
                  context_sap);
     } else {
+        /* This cannot happen in sane circumstances. */
 
         FSHOW_SIGNAL((stderr,"/calling C-level handler\n"));
 
@@ -816,6 +914,7 @@ run_deferred_handler(struct interrupt_data *data, void *v_context)
     void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
 
     data->pending_handler=0;
+    FSHOW_SIGNAL((stderr, "/running deferred handler %p\n", pending_handler));
     (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
 }
 
@@ -830,6 +929,10 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
 
     if (SymbolValue(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending\n");
+    if (thread->interrupt_data->pending_handler)
+        lose("there is a pending handler already (PA)\n");
+    if (data->gc_blocked_deferrables)
+        lose("maybe_defer_handler: gc_blocked_deferrables true\n");
     check_interrupt_context_or_lose(context);
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
@@ -844,8 +947,9 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         store_signal_data_for_later(data,handler,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d): deferred\n",
-                      (unsigned int)handler,signal));
+                      "/maybe_defer_handler(%x,%d): deferred (RACE=%d)\n",
+                      (unsigned int)handler,signal,
+                      in_leaving_without_gcing_race_p(thread)));
         check_interrupt_context_or_lose(context);
         return 1;
     }
@@ -885,15 +989,16 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n",
                   signal));
 
-    if(context) {
-        /* the signal mask in the context (from before we were
-         * interrupted) is copied to be restored when
-         * run_deferred_handler happens.  Then the usually-blocked
-         * signals are added to the mask in the context so that we are
-         * running with blocked signals when the handler returns */
-        sigcopyset(&(data->pending_mask),os_context_sigmask_addr(context));
-        sigaddset_deferrable(os_context_sigmask_addr(context));
-    }
+    if(!context)
+        lose("Null context");
+
+    /* the signal mask in the context (from before we were
+     * interrupted) is copied to be restored when run_deferred_handler
+     * happens. Then the usually-blocked signals are added to the mask
+     * in the context so that we are running with blocked signals when
+     * the handler returns */
+    sigcopyset(&(data->pending_mask),os_context_sigmask_addr(context));
+    sigaddset_deferrable(os_context_sigmask_addr(context));
 }
 
 static void
@@ -941,6 +1046,7 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+/* This function must not cons, because that may trigger a GC. */
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -958,9 +1064,13 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     } else if (arch_pseudo_atomic_atomic(context)) {
         SetSymbolValue(STOP_FOR_GC_PENDING,T,thread);
         arch_set_pseudo_atomic_interrupted(context);
+        maybe_save_gc_mask_and_block_deferrables
+            (os_context_sigmask_addr(context));
         FSHOW_SIGNAL((stderr,"sig_stop_for_gc deferred (PA)\n"));
         return;
     }
+
+    FSHOW_SIGNAL((stderr, "/sig_stop_for_gc_handler\n"));
 
     /* Not PA and GC not inhibited -- we can stop now. */
 

@@ -37,6 +37,7 @@ extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
 extern sigset_t gc_sigset;
 
+extern void block_deferrable_signals(void);
 extern void block_blockable_signals(void);
 extern void unblock_deferrable_signals(void);
 extern void unblock_gc_signals(void);
@@ -46,6 +47,8 @@ extern void check_deferrables_blocked_or_lose(void);
 extern void check_blockables_blocked_or_lose(void);
 extern void check_gc_signals_unblocked_or_lose(void);
 extern void check_gc_signals_unblocked_in_sigset_or_lose(sigset_t *sigset);
+
+extern void maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset);
 
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
@@ -94,6 +97,11 @@ struct interrupt_data {
     int pending_signal;
     siginfo_t pending_info;
     sigset_t pending_mask;
+    /* Was pending mask saved for gc request? True if GC_PENDING or
+     * SIG_STOP_FOR_GC happened in a pseudo atomic with no GC_INHIBIT
+     * NIL. Both deferrable interrupt handlers and gc are careful not
+     * to clobber each other's pending_mask. */
+    boolean gc_blocked_deferrables;
 };
 
 extern boolean interrupt_handler_pending_p(void);
