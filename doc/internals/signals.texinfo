@@ -73,20 +73,6 @@ is deferred by pseudo atomic and @code{WITHOUT-GCING}.
 @node Implementation warts
 @section Implementation warts
 
-@subsection RT signals
-
-Sending and receiving the same number of signals is crucial for
-@code{INTERRUPT-THREAD} and @code{sig_stop_for_gc}, hence they are
-real-time signals for which the kernel maintains a queue as opposed to
-just setting a flag for ``sigint pending''.
-
-Note, however, that the rt signal queue is finite and on current linux
-kernels a system wide resource. If the queue is full, SBCL tries to
-signal until it succeeds. This behaviour can lead to deadlocks, if a
-thread in a @code{WITHOUT-INTERRUPTS} is interrupted many times,
-filling up the queue and then a gc hits and tries to send
-@code{SIG_STOP_FOR_GC}.
-
 @subsection Miscellaneous issues
 
 Signal handlers should automatically restore errno and fp

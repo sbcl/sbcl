@@ -892,12 +892,18 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
 (defun run-interruption ()
   (in-interruption ()
     (loop
-       (let ((interruption (with-interruptions-lock (*current-thread*)
-                             (pop (thread-interruptions *current-thread*)))))
-         (if interruption
-             (with-interrupts
-               (funcall interruption))
-             (return))))))
+     (let ((interruption (with-interruptions-lock (*current-thread*)
+                           (pop (thread-interruptions *current-thread*)))))
+       ;; Resignalling after popping one works fine, because from the
+       ;; OS's point of view we have returned from the signal handler
+       ;; (thanks to arrange_return_to_lisp_function) so at least one
+       ;; more signal will be delivered.
+       (when (thread-interruptions *current-thread*)
+         (signal-interrupt-thread (thread-os-thread *current-thread*)))
+       (if interruption
+           (with-interrupts
+             (funcall interruption))
+           (return))))))
 
 ;;; The order of interrupt execution is peculiar. If thread A
 ;;; interrupts thread B with I1, I2 and B for some reason receives I1

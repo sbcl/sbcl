@@ -560,31 +560,9 @@ os_thread_t create_thread(lispobj initial_function) {
     }
 }
 
-/* Send the signo to os_thread, retry if the rt signal queue is
- * full. */
-int
-kill_thread_safely(os_thread_t os_thread, int signo)
-{
-    int r;
-    /* The man page does not mention EAGAIN as a valid return value
-     * for either pthread_kill or kill. But that's theory, this is
-     * practice. By waiting here we assume that the delivery of this
-     * signal is not necessary for the delivery of the signals in the
-     * queue. In other words, we _assume_ there are no deadlocks. */
-    while ((r=pthread_kill(os_thread,signo))==EAGAIN) {
-        /* wait a bit then try again in the hope of the rt signal
-         * queue not being full */
-        FSHOW_SIGNAL((stderr,"/rt signal queue full\n"));
-        /* FIXME: some kind of backoff (random, exponential) would be
-         * nice. */
-        sleep(1);
-    }
-    return r;
-}
-
 int signal_interrupt_thread(os_thread_t os_thread)
 {
-    int status = kill_thread_safely(os_thread, SIG_INTERRUPT_THREAD);
+    int status = pthread_kill(os_thread, SIG_INTERRUPT_THREAD);
     FSHOW_SIGNAL((stderr,"/signal_interrupt_thread: %lu\n", os_thread));
     if (status == 0) {
         return 0;

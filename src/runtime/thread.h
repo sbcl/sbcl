@@ -235,6 +235,5 @@ static inline struct thread *arch_os_get_current_thread(void)
 #endif
 
 extern void create_initial_thread(lispobj);
-extern int kill_thread_safely(os_thread_t os_thread, int signo);
 
 #endif /* _INCLUDE_THREAD_H_ */
