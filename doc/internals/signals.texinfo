@@ -14,17 +14,16 @@
 
 There are two distinct groups of signals.
 
-@subsection Semi-synchronous signals
+@subsection Synchronous signals
 
-The first group, tentatively named ``semi-synchronous'', consists of
-signals that are raised on illegal instruction, hitting a protected
-page, or on a trap. Examples from this group are:
+This group consists of signals that are raised on illegal instruction,
+hitting a protected page, or on a trap. Examples from this group are:
 @code{SIGBUS}/@code{SIGSEGV}, @code{SIGTRAP}, @code{SIGILL} and
 @code{SIGEMT}. The exact meaning and function of these signals varies
 by platform and OS. Understandably, because these signals are raised
 in a controllable manner they are never blocked or deferred.
 
-@subsection Blockable signals
+@subsection Asynchronous or blockable signals
 
 The other group is of blockable signals. Typically, signal handlers
 block them to protect against being interrupted at all. For example
@@ -70,6 +69,22 @@ Something of a special case, a signal that is blockable but not
 deferrable by @code{WITHOUT-INTERRUPTS} is @code{SIG_STOP_FOR_GC}. It
 is deferred by pseudo atomic and @code{WITHOUT-GCING}.
 
+@subsection When are signals handled?
+
+At once or as soon as the mechanism that deferred them allows.
+
+First, if something is deferred by pseudo atomic then it is run at the
+end of pseudo atomic without exceptions. Even when both a GC request
+or a @code{SIG_STOP_FOR_GC} and a deferrable signal such as
+SIG_INTERRUPT_THREAD interrupts the pseudo atomic section.
+
+Second, an interrupt deferred by WITHOUT-INTERRUPTS is run when the
+interrupts are enabled again. GC cannot interfere.
+
+Third, if GC or @code{SIG_STOP_FOR_GC} is deferred by
+@code{WITHOUT-GCING} then the GC or stopping for GC will happen when
+GC is not inhibited anymore. Interrupts cannot delay a gc.
+
 @node Implementation warts
 @section Implementation warts
 
@@ -93,9 +108,9 @@ though we would no longer be in a signal handler, we might still be in
 the middle of an interrupted POSIX call.
 
 For some signals this appears to be a non-issue: @code{SIGSEGV} and
-other semi-synchronous signals are raised by our code for our code,
-and so we can be sure that we are not interrupting a POSIX call with
-any of them.
+other synchronous signals are raised by our code for our code, and so
+we can be sure that we are not interrupting a POSIX call with any of
+them.
 
 For asynchronous signals like @code{SIGALARM} and @code{SIGINT} this
 is a real issue.
