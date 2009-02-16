@@ -2406,9 +2406,8 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
 boolean
 maybe_gc(os_context_t *context)
 {
-#ifndef LISP_FEATURE_WIN32
+    lispobj gc_happened;
     struct thread *thread = arch_os_get_current_thread();
-#endif
 
     fake_foreign_function_call(context);
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
@@ -2434,32 +2433,37 @@ maybe_gc(os_context_t *context)
      * outer context.
      */
 #ifndef LISP_FEATURE_WIN32
-    if(SymbolValue(INTERRUPTS_ENABLED,thread)!=NIL) {
-        sigset_t *context_sigmask = os_context_sigmask_addr(context);
-#ifdef LISP_FEATURE_SB_THREAD
-        /* What if the context we'd like to restore has GC signals
-         * blocked? Just skip the GC: we can't set GC_PENDING, because
-         * that would block the next attempt, and we don't know when
-         * we'd next check for it -- and it's hard to be sure that
-         * unblocking would be safe.
-         *
-         * FIXME: This is not actually much better: we may already have
-         * GC_PENDING set, and presumably our caller assumes that we will
-         * clear it. Perhaps we should, even though we don't actually GC? */
-        if (sigismember(context_sigmask,SIG_STOP_FOR_GC)) {
-            undo_fake_foreign_function_call(context);
-            return 1;
-        }
+    check_gc_signals_unblocked_in_sigset_or_lose
+        (os_context_sigmask_addr(context));
+    unblock_gc_signals();
 #endif
-        thread_sigmask(SIG_SETMASK, context_sigmask, 0);
+    FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
+    /* FIXME: Nothing must go wrong during GC else we end up running
+     * the debugger, error handlers, and user code in general in a
+     * potentially unsafe place. With deferrables blocked due to
+     * fake_foreign_function_call + unblock_gc_signals(), we'll not
+     * have a pleasant time either. Running out of the control stack
+     * or the heap in SUB-GC are ways to lose. Of course, deferrables
+     * cannot be unblocked because there may be a pending handler, or
+     * we may even be in a WITHOUT-INTERRUPTS. */
+    gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
+    FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
+           (gc_happened == NIL) ? "NIL" : "T"));
+    if ((gc_happened != NIL) &&
+        /* See if interrupts are enabled or it's possible to enable
+         * them. POST-GC has a similar check, but we don't want to
+         * unlock deferrables in that case, because if there is a
+         * pending interrupt we'd lose, but more to point the POST-GC
+         * runs user code in a pretty much arbitrary place so it
+         * better not be in WITHOUT-INTERRUPTS. */
+        ((SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) ||
+         (SymbolValue(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
+        FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
+        if (!interrupt_handler_pending_p())
+            unblock_deferrable_signals();
+        funcall0(StaticSymbolFunction(POST_GC));
     }
-    else
-        unblock_gc_signals();
-#endif
-    /* SIG_STOP_FOR_GC needs to be enabled before we can call lisp:
-     * otherwise two threads racing here may deadlock: the other will
-     * wait on the GC lock, and the other cannot stop the first one... */
-    funcall0(StaticSymbolFunction(SUB_GC));
     undo_fake_foreign_function_call(context);
-    return 1;
+    FSHOW((stderr, "/maybe_gc: returning\n"));
+    return (gc_happened != NIL);
 }

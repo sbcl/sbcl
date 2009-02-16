@@ -14,6 +14,7 @@
 
 (defparameter *c-callable-static-symbols*
   '(sub-gc
+    sb!kernel::post-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
     sb!kernel::heap-exhausted-error

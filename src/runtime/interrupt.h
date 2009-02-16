@@ -26,13 +26,25 @@
 /* FIXME: do not rely on NSIG being a multiple of 8 */
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
+/* Set all deferrable signals into *s. */
+extern void sigaddset_deferrable(sigset_t *s);
+/* Set all blockable signals into *s. */
+extern void sigaddset_blockable(sigset_t *s);
+/* Set all gc signals into *s. */
+extern void sigaddset_gc(sigset_t *s);
+
 extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
+extern sigset_t gc_sigset;
+
+extern void block_blockable_signals(void);
+extern void unblock_deferrable_signals(void);
+extern void unblock_gc_signals(void);
 
 extern void check_deferrables_blocked_or_lose(void);
 extern void check_blockables_blocked_or_lose(void);
 extern void check_gc_signals_unblocked_or_lose(void);
-extern void unblock_gc_signals(void);
+extern void check_gc_signals_unblocked_in_sigset_or_lose(sigset_t *sigset);
 
 static inline void
 sigcopyset(sigset_t *new, sigset_t *old)
@@ -83,7 +95,7 @@ struct interrupt_data {
     sigset_t pending_mask;
 };
 
-
+extern boolean interrupt_handler_pending_p(void);
 extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
@@ -112,14 +124,6 @@ extern unsigned long install_handler(int signal,
                                      interrupt_handler_t handler);
 
 extern union interrupt_handler interrupt_handlers[NSIG];
-
-/* Set all deferrable signals into *s. */
-extern void sigaddset_deferrable(sigset_t *s);
-/* Set all blockable signals into *s. */
-extern void sigaddset_blockable(sigset_t *s);
-
-extern void block_blockable_signals(void);
-extern void unblock_deferrable_signals(void);
 
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:

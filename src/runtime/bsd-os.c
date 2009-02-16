@@ -222,10 +222,19 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             lisp_memory_fault_error(context, fault_addr);
 #else
+
+            /* this disabled section is what used to be here: */
+#if 0
             /* FIXME: never returns 0 */
             if (!maybe_gc(context)) {
                 interrupt_handle_now(signal, siginfo, context);
             }
+#endif
+            /* FIXME: Nowadays, maybe_gc does return 1 to indicate
+             * that GC did happen, but I'm keeping the code as it
+             * was. */
+            maybe_gc(context);
+            interrupt_handle_now(signal, siginfo, context);
 #endif
         }
 }

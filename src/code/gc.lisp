@@ -197,7 +197,8 @@ run in any thread.")
 
 (defun sub-gc (&key (gen 0))
   (cond (*gc-inhibit*
-         (setf *gc-pending* t))
+         (setf *gc-pending* t)
+         nil)
         (t
          (without-interrupts
            (setf *gc-pending* :in-progress)
@@ -247,21 +248,32 @@ run in any thread.")
            ;; explicitly for a pending gc before interrupts are
            ;; enabled again.
            (maybe-handle-pending-gc))
-         ;; Outside the mutex, interrupts enabled: these may cause
-         ;; another GC. FIXME: it can potentially exceed maximum
-         ;; interrupt nesting by triggering GCs.
-         ;;
-         ;; Can that be avoided by having the finalizers and hooks
-         ;; run only from the outermost SUB-GC?
-         ;;
-         ;; KLUDGE: Don't run the hooks in GC's triggered by dying
-         ;; threads, so that user-code never runs with
-         ;;   (thread-alive-p *current-thread*) => nil
-         ;; The long-term solution will be to keep a separate thread
-         ;; for finalizers and after-gc hooks.
-         (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
-           (run-pending-finalizers)
-           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
+         t)))
+
+(defun post-gc ()
+  ;; Outside the mutex, interrupts may be enabled: these may cause
+  ;; another GC. FIXME: it can potentially exceed maximum interrupt
+  ;; nesting by triggering GCs.
+  ;;
+  ;; Can that be avoided by having the finalizers and hooks run only
+  ;; from the outermost SUB-GC? If the nested GCs happen in interrupt
+  ;; handlers that's not enough.
+  ;;
+  ;; KLUDGE: Don't run the hooks in GC's if:
+  ;;
+  ;; A) this thread is dying, so that user-code never runs with
+  ;;    (thread-alive-p *current-thread*) => nil
+  ;;
+  ;; B) interrupts are disabled somewhere up the call chain since we
+  ;;    don't want to run user code in such a case.
+  ;;
+  ;; The long-term solution will be to keep a separate thread for
+  ;; finalizers and after-gc hooks.
+  (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
+    (when *allow-with-interrupts*
+      (with-interrupts
+        (run-pending-finalizers)
+        (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
@@ -271,7 +283,8 @@ run in any thread.")
   #!+(and sb-doc (not gencgc))
   "Initiate a garbage collection. GEN may be provided for compatibility with
   generational garbage collectors, but is ignored in this implementation."
-  (sub-gc :gen (if full 6 gen)))
+  (when (sub-gc :gen (if full 6 gen))
+    (post-gc)))
 
 (defun unsafe-clear-roots ()
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
