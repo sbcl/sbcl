@@ -203,12 +203,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     void* fault_addr = (void*)info->si_addr;
 
     if (!gencgc_handle_wp_violation(fault_addr))
-         if(!handle_guard_page_triggered(context, fault_addr))
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-             lisp_memory_fault_error(context, fault_addr);
-#else
-            interrupt_handle_now(signal, info, context);
-#endif
+        if(!handle_guard_page_triggered(context, fault_addr))
+            lisp_memory_fault_error(context, fault_addr);
 }
 
 #else
@@ -221,7 +217,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 
     if (!cheneygc_handle_wp_violation(context, addr)) {
         if (!handle_guard_page_triggered(context,addr))
-            interrupt_handle_now(signal, info, context);
+            lisp_memory_fault_error(context, fault_addr);
     }
 }
 

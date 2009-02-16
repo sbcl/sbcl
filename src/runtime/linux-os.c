@@ -403,11 +403,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     if (!cheneygc_handle_wp_violation(context, addr))
 #endif
         if (!handle_guard_page_triggered(context, addr))
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             lisp_memory_fault_error(context, addr);
-#else
-            interrupt_handle_now(signal, info, context);
-#endif
 }
 
 void

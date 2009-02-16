@@ -218,25 +218,8 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
     FSHOW((stderr, "Memory fault at: %p, PC: %p\n", fault_addr, *os_context_pc_addr(context)));
 
     if (!gencgc_handle_wp_violation(fault_addr))
-        if(!handle_guard_page_triggered(context,fault_addr)) {
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        if(!handle_guard_page_triggered(context,fault_addr))
             lisp_memory_fault_error(context, fault_addr);
-#else
-
-            /* this disabled section is what used to be here: */
-#if 0
-            /* FIXME: never returns 0 */
-            if (!maybe_gc(context)) {
-                interrupt_handle_now(signal, siginfo, context);
-            }
-#endif
-            /* FIXME: Nowadays, maybe_gc does return 1 to indicate
-             * that GC did happen, but I'm keeping the code as it
-             * was. */
-            maybe_gc(context);
-            interrupt_handle_now(signal, siginfo, context);
-#endif
-        }
 }
 
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)

@@ -161,7 +161,6 @@
 #!-linux
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
-(define-signal-handler sigsegv-handler "segmentation violation")
 #!-linux
 (define-signal-handler sigsys-handler "bad argument to a system call")
 
@@ -207,7 +206,6 @@
   (enable-interrupt sigemt #'sigemt-handler)
   (enable-interrupt sigfpe #'sb!vm:sigfpe-handler)
   (enable-interrupt sigbus #'sigbus-handler)
-  (enable-interrupt sigsegv #'sigsegv-handler)
   #!-linux
   (enable-interrupt sigsys #'sigsys-handler)
   (enable-interrupt sigalrm #'sigalrm-handler)

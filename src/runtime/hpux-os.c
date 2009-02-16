@@ -123,7 +123,7 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 
     if (!cheneygc_handle_wp_violation(context, addr))
         if (!handle_guard_page_triggered(context, addr))
-            interrupt_handle_now(signal, info, context);
+            lisp_memory_fault_error(context, addr);
     *((os_context_register_t *) &((ucontext_t *) context)->uc_mcontext.ss_flags)
      |= SS_MODIFIEDWIDE;
 }
