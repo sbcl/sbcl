@@ -881,7 +881,9 @@
   (declare (type (unsigned-byte 32) n)
            (optimize (speed 3) (safety 0)))
   (sb!alien:sap-alien (sb!vm::current-thread-offset-sap
-                       (+ sb!vm::thread-interrupt-contexts-offset n))
+                       (+ sb!vm::thread-interrupt-contexts-offset
+                          #!-alpha n
+                          #!+alpha (* 2 n)))
                       (* os-context-t)))
 
 #!+(or x86 x86-64)

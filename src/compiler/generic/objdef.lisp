@@ -403,4 +403,10 @@
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
   (stepping)
+  ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
+  ;; bit slots came in pairs. However the C compiler will align
+  ;; interrupt_contexts on a double word boundary. This logic should
+  ;; be handled by DEFINE-PRIMITIVE-OBJECT.
+  #!+alpha
+  (padding)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

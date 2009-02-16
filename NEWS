@@ -18,6 +18,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
   * bug fix: INTERRUPT-THREAD on a dying thread could produce memory
     fault.
   * bug fix: finalizers, gc hooks never run in a WITHOUT-INTERRUPTS
+  * bug fix: fix random memory faults related to interrupts on alpha
   * bug fix: fix deadlocks related to starting threads
 
 changes in sbcl-1.0.25 relative to 1.0.24:
