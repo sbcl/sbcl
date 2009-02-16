@@ -35,6 +35,7 @@
           (etypecase name
             (list
              (destructuring-bind (name &key c-name options) name
+               (declare (ignorable options))
                (if c-name
                    c-name
                    (cond #+largefile

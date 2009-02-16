@@ -293,12 +293,11 @@
         (funcall-stm-handler j-listen (sm melded-stream stream))
         (or (< (sm buffpos stream) (sm buffer-ptr stream))
             ;; Attempt buffer refill
-            (let ((lcrs (sm last-char-read-size stream)))
-              (when (and (not (any-stream-instance-flags stream :dual :string))
-                         (>= (sm mode stream) 0))
-                ;; single-channel stream dirty -> write data before reading
-                (flush-buffer stream nil))
-              (>= (refill-buffer stream nil) width))))))
+            (when (and (not (any-stream-instance-flags stream :dual :string))
+                       (>= (sm mode stream) 0))
+              ;; single-channel stream dirty -> write data before reading
+              (flush-buffer stream nil))
+            (>= (refill-buffer stream nil) width)))))
 
 (defun %clear-input (stream buffer-only)
   (declare (type simple-stream stream))
@@ -750,7 +749,6 @@
 (defun read-char-no-hang (&optional (stream *standard-input*) (eof-error-p t)
                                     eof-value recursive-p)
   "Returns the next character from the Stream if one is availible, or nil."
-  (declare (ignore recursive-p))
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream

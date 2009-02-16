@@ -553,7 +553,7 @@
           (sb-debug::error-debug-command)))))
 
 (defun frame-cmd ()
-  (sb-debug::print-frame-call sb-debug::*current-frame*))
+  (sb-debug::print-frame-call sb-debug::*current-frame* t))
 
 (defun zoom-cmd ()
   )

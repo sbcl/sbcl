@@ -193,6 +193,7 @@
                                                 translations-name
                                                 attribute-names
                                                 get-setf-expansion-fun-name)
+    (declare (ignore attribute-names))
     `(define-setf-expander ,test-name (place &rest attributes
                                              &environment env)
        "Automagically generated boolean attribute setter. See

@@ -155,7 +155,8 @@
 
   (defmacro do-conset-elements ((constraint conset &optional result) &body body)
     (with-unique-names (vector index start end
-                               ignore constraint-universe-end)
+                               #-sb-xc-host ignore
+                               #-sb-xc-host constraint-universe-end)
       (let* ((constraint-universe #+sb-xc-host '*constraint-universe*
                                   #-sb-xc-host (gensym))
              (with-array-data

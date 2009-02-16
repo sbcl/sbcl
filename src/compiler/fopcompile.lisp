@@ -36,7 +36,7 @@
   ;; supporting in the future are LOCALLY (with declarations),
   ;; MACROLET, SYMBOL-MACROLET and THE.
   #+sb-xc-host
-  nil
+  (declare (ignore form))
   #-sb-xc-host
   (or (and (self-evaluating-p form)
            (constant-fopcompilable-p form))

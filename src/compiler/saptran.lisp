@@ -109,7 +109,8 @@
             (sap+ sap (+ offset1 offset2))))))
 
 (macrolet ((def (fun element-size &optional setp value-type)
-             (declare (ignorable value-type))
+             (declare (ignorable value-type)
+                      #!-x86 (ignore element-size))
              `(progn
                 (deftransform ,fun ((sap offset ,@(when setp `(new-value))) * *)
                   (splice-fun-args sap 'sap+ 2)

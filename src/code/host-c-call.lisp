@@ -44,6 +44,8 @@
 
 (defun c-string-needs-conversion-p (type)
   #+sb-xc-host
+  (declare (ignore type))
+  #+sb-xc-host
   t
   #-sb-xc-host
   (let ((external-format (sb!impl::get-external-format
