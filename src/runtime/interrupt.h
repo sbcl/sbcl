@@ -119,6 +119,7 @@ extern void sigaddset_deferrable(sigset_t *s);
 extern void sigaddset_blockable(sigset_t *s);
 
 extern void block_blockable_signals(void);
+extern void unblock_deferrable_signals(void);
 
 /* The void* casting here avoids having to mess with the various types
  * of function argument lists possible for signal handlers:

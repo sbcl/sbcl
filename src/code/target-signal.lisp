@@ -36,11 +36,9 @@
       ;; deferrable interrupts before arranging return to lisp. This is
       ;; safe because we can't get a pending interrupt before we unblock
       ;; signals.
-      ;;
-      ;; FIXME: Should we not reset the _entire_ mask, but just
-      ;; restore it to the state before we got the interrupt?
-      (reset-signal-mask)
-      (let ((sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+      (unblock-deferrable-signals)
+      (let ((sb!debug:*stack-top-hint*
+             (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
         (allow-with-interrupts (funcall function))))))
 
 (defmacro in-interruption ((&key) &body body)
@@ -75,9 +73,8 @@
 ;;; doing things the SBCL way and moving this kind of C-level work
 ;;; down to C wrapper functions.)
 
-;;; When inappropriate build options are used, this also prints messages
-;;; listing the signals that were masked
-(sb!alien:define-alien-routine "reset_signal_mask" sb!alien:void)
+(sb!alien:define-alien-routine "unblock_deferrable_signals" sb!alien:void)
+(sb!alien:define-alien-routine "unblock_gc_signals" sb!alien:void)
 
 
 ;;;; C routines that actually do all the work of establishing signal handlers
@@ -180,7 +177,8 @@
   (ignore-interrupt sigpipe)
   (enable-interrupt sigalrm #'sigalrm-handler)
   #!+hpux (ignore-interrupt sigxcpu)
-  (sb!unix::reset-signal-mask)
+  (unblock-deferrable-signals)
+  (unblock-gc-signals)
   (values))
 
 ;;;; etc.

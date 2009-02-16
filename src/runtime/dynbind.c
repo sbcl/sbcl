@@ -44,7 +44,6 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
         if(!sym->tls_index) {
             lispobj *tls_index_lock=
                 &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
-            clear_pseudo_atomic_interrupted(th);
             set_pseudo_atomic_atomic(th);
             get_spinlock(tls_index_lock,(long)th);
             if(!sym->tls_index) {

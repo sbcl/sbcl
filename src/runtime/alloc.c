@@ -41,7 +41,6 @@ pa_alloc(int bytes, int page_type_flag)
     struct thread *th = arch_os_get_current_thread();
 
     /* FIXME: OOAO violation: see arch_pseudo_* */
-    clear_pseudo_atomic_interrupted(th);
     set_pseudo_atomic_atomic(th);
     result = general_alloc(bytes, page_type_flag);
 #if 0

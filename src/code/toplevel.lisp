@@ -620,7 +620,6 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
                (with-simple-restart
                    (abort "~@<Exit debugger, returning to top level.~@:>")
                  (catch 'toplevel-catcher
-                   #!-win32 (sb!unix::reset-signal-mask)
                    ;; In the event of a control-stack-exhausted-error, we
                    ;; should have unwound enough stack by the time we get
                    ;; here that this is now possible.

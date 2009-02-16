@@ -426,14 +426,6 @@
          (multiple-value-bind (name sb!debug:*stack-top-hint*)
              (find-interrupted-name-and-frame)
            (/show0 "back from FIND-INTERRUPTED-NAME")
-           ;; Unblock trap signal here, we unwound the stack and can't return.
-           ;; FIXME: Should we not reset the _entire_ mask, but just
-           ;; restore it to the state before we got the condition?
-           ;; FIXME 2: Signals are currently unblocked in
-           ;; interrupt.c:internal_error before we do stack unwinding, can this
-           ;; introduce a race condition?
-           #!+(and linux mips)
-           (sb!unix::reset-signal-mask)
            (let ((fp (int-sap (sb!vm:context-register alien-context
                                                       sb!vm::cfp-offset)))
                  (handler (and (< -1 error-number (length *internal-errors*))

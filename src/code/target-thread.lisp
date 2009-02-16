@@ -823,7 +823,7 @@ around and can be retrieved by JOIN-THREAD."
                              ;; now that most things have a chance to
                              ;; work properly without messing up other
                              ;; threads, it's time to enable signals
-                             (sb!unix::reset-signal-mask)
+                             (sb!unix::unblock-deferrable-signals)
                              (setf (thread-result thread)
                                    (cons t
                                          (multiple-value-list

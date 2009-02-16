@@ -206,20 +206,6 @@ static void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*);
 #endif
 union interrupt_handler interrupt_handlers[NSIG];
 
-/* At the toplevel repl we routinely call this function.  The signal
- * mask ought to be clear anyway most of the time, but may be non-zero
- * if we were interrupted e.g. while waiting for a queue.  */
-
-void
-reset_signal_mask(void)
-{
-#ifndef LISP_FEATURE_WIN32
-    sigset_t new;
-    sigemptyset(&new);
-    thread_sigmask(SIG_SETMASK,&new,0);
-#endif
-}
-
 void
 block_blockable_signals(void)
 {
@@ -233,6 +219,14 @@ block_deferrable_signals(void)
 {
 #ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_BLOCK, &deferrable_sigset, 0);
+#endif
+}
+
+void
+unblock_deferrable_signals(void)
+{
+#ifndef LISP_FEATURE_WIN32
+    thread_sigmask(SIG_UNBLOCK, &deferrable_sigset, 0);
 #endif
 }
 
@@ -406,6 +400,16 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
 
+#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_MIPS)
+    /* Workaround for blocked SIGTRAP. */
+    {
+        sigset_t newset;
+        sigemptyset(&newset);
+        sigaddset(&newset, SIGTRAP);
+        thread_sigmask(SIG_UNBLOCK, &newset, 0);
+    }
+#endif
+
     SHOW("in interrupt_internal_error");
 #ifdef QSHOW
     /* Display some rudimentary debugging information about the
@@ -497,7 +501,6 @@ interrupt_handle_pending(os_context_t *context)
              * blocked signals are unblocked */
             sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
 
-            sigemptyset(&data->pending_mask);
             /* This will break on sparc linux: the deferred handler really wants
              * to be called with a void_context */
             run_deferred_handler(data,(void *)context);
