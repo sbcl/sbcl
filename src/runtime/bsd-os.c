@@ -414,7 +414,6 @@ futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
     struct timespec timeout;
     int ret;
 
-again:
     if (sec < 0)
         ret = umtx_wait((void *)lock_word, oldval, NULL);
     else {
@@ -429,8 +428,7 @@ again:
     case ETIMEDOUT:
         return 1;
     case EINTR:
-        /* spurious wakeup from interrupt */
-        goto again;
+        return 2;
     default:
         /* EWOULDBLOCK and others, need to check the lock */
         return -1;

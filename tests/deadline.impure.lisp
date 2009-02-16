@@ -60,4 +60,30 @@
   (assert-timeout
    (sb-impl::with-deadline (:seconds 1)
      (sb-thread:join-thread
-      (sb-thread:make-thread (lambda () (loop (sleep 1))))))))
+      (sb-thread:make-thread (lambda () (loop (sleep 1)))))))
+
+  (with-test (:name (:deadline :futex-wait-eintr))
+    (let ((lock (sb-thread:make-mutex))
+          (waitp t))
+      (sb-thread:make-thread (lambda ()
+                               (sb-thread:get-mutex lock)
+                               (setf waitp nil)
+                               (sleep 5)))
+      (loop while waitp do (sleep 0.01))
+      (let ((thread (sb-thread:make-thread
+                     (lambda ()
+                       (let ((start (get-internal-real-time)))
+                         (handler-case
+                             (sb-impl::with-deadline (:seconds 1)
+                               (sb-thread:get-mutex lock))
+                           (sb-sys:deadline-timeout (x)
+                             (declare (ignore x))
+                             (let ((end (get-internal-real-time)))
+                               (float (/ (- end start)
+                                         internal-time-units-per-second)
+                                      0.0)))))))))
+        (sleep 0.3)
+        (sb-thread:interrupt-thread thread (lambda () 42))
+        (let ((seconds-passed (sb-thread:join-thread thread)))
+          (format t "Deadline in ~S~%" seconds-passed)
+          (assert (< seconds-passed 1.2)))))))

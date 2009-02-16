@@ -35,6 +35,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
   * bug fix: finalizers, gc hooks never run in a WITHOUT-INTERRUPTS
   * bug fix: fix random memory faults related to interrupts on alpha
   * bug fix: fix deadlocks related to starting threads
+  * bug fix: fix deadlines on locks on futex platforms
 
 changes in sbcl-1.0.25 relative to 1.0.24:
   * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be

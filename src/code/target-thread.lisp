@@ -342,13 +342,16 @@ directly."
                                                         +lock-taken+
                                                         +lock-contested+))))
              ;; Wait on the contested lock.
-             (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
-               (when (= 1 (with-pinned-objects (mutex)
-                            (futex-wait (mutex-state-address mutex)
-                                        (get-lisp-obj-address +lock-contested+)
-                                        (or to-sec -1)
-                                        (or to-usec 0))))
-                 (signal-deadline))))
+             (loop
+              (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+                (case (with-pinned-objects (mutex)
+                        (futex-wait (mutex-state-address mutex)
+                                    (get-lisp-obj-address +lock-contested+)
+                                    (or to-sec -1)
+                                    (or to-usec 0)))
+                  ((1) (signal-deadline))
+                  ((2))
+                  (otherwise (return))))))
            (setf old (sb!ext:compare-and-swap (mutex-state mutex)
                                               +lock-free+
                                               +lock-contested+))
@@ -472,16 +475,19 @@ time we reacquire MUTEX and return to the caller."
              ;; futex-wait returns immediately instead of sleeping.
              ;; Ergo, no lost wakeup. We may get spurious wakeups, but
              ;; that's ok.
-             (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
-               (when (= 1 (with-pinned-objects (queue me)
-                            (allow-with-interrupts
-                              (futex-wait (waitqueue-data-address queue)
-                                          (get-lisp-obj-address me)
-                                          ;; our way if saying "no
-                                          ;; timeout":
-                                          (or to-sec -1)
-                                          (or to-usec 0)))))
-                 (signal-deadline))))
+             (loop
+              (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+                (case (with-pinned-objects (queue me)
+                        (allow-with-interrupts
+                          (futex-wait (waitqueue-data-address queue)
+                                      (get-lisp-obj-address me)
+                                      ;; our way if saying "no
+                                      ;; timeout":
+                                      (or to-sec -1)
+                                      (or to-usec 0))))
+                  ((1) (signal-deadline))
+                  ((2))
+                  (otherwise (return))))))
         ;; If we are interrupted while waiting, we should do these
         ;; things before returning. Ideally, in the case of an
         ;; unhandled signal, we should do them before entering the

@@ -89,7 +89,6 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
   struct timespec timeout;
   int t;
 
- again:
   if (sec<0) {
     t = sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
   }
@@ -103,8 +102,7 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
   else if (errno==ETIMEDOUT)
       return 1;
   else if (errno==EINTR)
-      /* spurious wakeup from interrupt */
-      goto again;
+      return 2;
   else
       /* EWOULDBLOCK and others, need to check the lock */
       return -1;
