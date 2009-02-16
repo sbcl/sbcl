@@ -638,9 +638,6 @@ on this semaphore, then N of them is woken up."
 #!+sb-thread
 (defun handle-thread-exit (thread)
   (/show0 "HANDLING THREAD EXIT")
-  ;; We're going down, can't handle interrupts sanely anymore. GC
-  ;; remains enabled.
-  (block-deferrable-signals)
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
@@ -818,28 +815,50 @@ around and can be retrieved by JOIN-THREAD."
                          (format nil
                                  "~~@<Terminate this thread (~A)~~@:>"
                                  *current-thread*))
-                      (unwind-protect
-                           (progn
-                             ;; now that most things have a chance to
-                             ;; work properly without messing up other
-                             ;; threads, it's time to enable signals
-                             (sb!unix::unblock-deferrable-signals)
-                             (setf (thread-result thread)
-                                   (cons t
-                                         (multiple-value-list
-                                          (funcall real-function)))))
-                        (handle-thread-exit thread)))))))
+                      (without-interrupts
+                        (unwind-protect
+                             (with-local-interrupts
+                               ;; Now that most things have a chance
+                               ;; to work properly without messing up
+                               ;; other threads, it's time to enable
+                               ;; signals.
+                               (sb!unix::unblock-deferrable-signals)
+                               (setf (thread-result thread)
+                                     (cons t
+                                           (multiple-value-list
+                                            (funcall real-function))))
+                               ;; Try to block deferrables. An
+                               ;; interrupt may unwind it, but for a
+                               ;; normal exit it prevents interrupt
+                               ;; loss.
+                               (block-deferrable-signals))
+                          ;; We're going down, can't handle interrupts
+                          ;; sanely anymore. GC remains enabled.
+                          (block-deferrable-signals)
+                          ;; We don't want to run interrupts in a dead
+                          ;; thread when we leave WITHOUT-INTERRUPTS.
+                          ;; This potentially causes important
+                          ;; interupts to be lost: SIGINT comes to
+                          ;; mind.
+                          (setq *interrupt-pending* nil)
+                          (handle-thread-exit thread))))))))
             (values))))
+    ;; If the starting thread is stopped for gc before it signals the
+    ;; semaphore then we'd be stuck.
+    (assert (not *gc-inhibit*))
     ;; Keep INITIAL-FUNCTION pinned until the child thread is
-    ;; initialized properly.
-    (with-pinned-objects (initial-function)
-      (let ((os-thread
-             (%create-thread
-              (get-lisp-obj-address initial-function))))
-        (when (zerop os-thread)
-          (error "Can't create a new thread"))
-        (wait-on-semaphore setup-sem)
-        thread))))
+    ;; initialized properly. Wrap the whole thing in
+    ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to another
+    ;; thread.
+    (without-interrupts
+      (with-pinned-objects (initial-function)
+        (let ((os-thread
+               (%create-thread
+                (get-lisp-obj-address initial-function))))
+          (when (zerop os-thread)
+            (error "Can't create a new thread"))
+          (wait-on-semaphore setup-sem)
+          thread)))))
 
 (define-condition join-thread-error (error)
   ((thread :reader join-thread-error-thread :initarg :thread))

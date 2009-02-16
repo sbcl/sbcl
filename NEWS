@@ -13,6 +13,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
   * bug fix: real-time signals are not used anymore, so no more
     hanging when the system wide real-time signal queue gets full.
   * bug fix: finalizers, gc hooks never run in a WITHOUT-INTERRUPTS
+  * bug fix: fix deadlocks related to starting threads
 
 changes in sbcl-1.0.25 relative to 1.0.24:
   * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be

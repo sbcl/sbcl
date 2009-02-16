@@ -258,6 +258,8 @@ new_thread_trampoline(struct thread *th)
     int result, lock_ret;
 
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
+    check_deferrables_blocked_or_lose();
+    check_gc_signals_unblocked_or_lose();
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
@@ -268,9 +270,9 @@ new_thread_trampoline(struct thread *th)
     th->os_thread=thread_self();
     protect_control_stack_guard_page(1);
     /* Since GC can only know about this thread from the all_threads
-     * list and we're just adding this thread to it there is no danger
-     * of deadlocking even with SIG_STOP_FOR_GC blocked (which it is
-     * not). */
+     * list and we're just adding this thread to it, there is no
+     * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
+     * it is not). */
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     link_thread(th);
@@ -501,23 +503,22 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 {
     /* The new thread inherits the restrictive signal mask set here,
      * and enables signals again when it is set up properly. */
-    sigset_t newset,oldset;
+    sigset_t oldset;
     boolean r=1;
     int retcode = 0, initcode;
 
     FSHOW_SIGNAL((stderr,"/create_os_thread: creating new thread\n"));
+
+    /* Blocking deferrable signals is enough, no need to block
+     * SIG_STOP_FOR_GC because the child process is not linked onto
+     * all_threads until it's ready. */
+    thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
 
 #ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_lock(&create_thread_lock);
     gc_assert(retcode == 0);
     FSHOW_SIGNAL((stderr,"/create_os_thread: got lock\n"));
 #endif
-    sigemptyset(&newset);
-    /* Blocking deferrable signals is enough, no need to block
-     * SIG_STOP_FOR_GC because the child process is not linked onto
-     * all_threads until it's ready. */
-    sigaddset_deferrable(&newset);
-    thread_sigmask(SIG_BLOCK, &newset, &oldset);
 
     if((initcode = pthread_attr_init(th->os_attr)) ||
        /* call_into_lisp_first_time switches the stack for the initial thread. For the
@@ -533,32 +534,33 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
         r=0;
     }
 
-    thread_sigmask(SIG_SETMASK,&oldset,0);
 #ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_unlock(&create_thread_lock);
     gc_assert(retcode == 0);
     FSHOW_SIGNAL((stderr,"/create_os_thread: released lock\n"));
 #endif
+    thread_sigmask(SIG_SETMASK,&oldset,0);
     return r;
 }
 
 os_thread_t create_thread(lispobj initial_function) {
-    struct thread *th;
-    os_thread_t kid_tid;
+    struct thread *th, *thread = arch_os_get_current_thread();
+    os_thread_t kid_tid = 0;
 
+    /* Must defend against async unwinds. */
+    if (SymbolValue(INTERRUPTS_ENABLED, thread) != NIL)
+        lose("create_thread is not safe when interrupts are enabled.\n");
+    
     /* Assuming that a fresh thread struct has no lisp objects in it,
      * linking it to all_threads can be left to the thread itself
      * without fear of gc lossage. initial_function violates this
      * assumption and must stay pinned until the child starts up. */
     th = create_thread_struct(initial_function);
-    if(th==0) return 0;
-
-    if (create_os_thread(th,&kid_tid)) {
-        return kid_tid;
-    } else {
+    if (th && !create_os_thread(th,&kid_tid)) {
         free_thread_struct(th);
-        return 0;
+        kid_tid = 0;
     }
+    return kid_tid;
 }
 
 int signal_interrupt_thread(os_thread_t os_thread)
