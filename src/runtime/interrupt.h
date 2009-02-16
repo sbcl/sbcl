@@ -40,6 +40,7 @@ extern sigset_t gc_sigset;
 extern void block_blockable_signals(void);
 extern void unblock_deferrable_signals(void);
 extern void unblock_gc_signals(void);
+extern void unblock_signals_in_context_and_maybe_warn(os_context_t *context);
 
 extern void check_deferrables_blocked_or_lose(void);
 extern void check_blockables_blocked_or_lose(void);

@@ -177,8 +177,8 @@
   (ignore-interrupt sigpipe)
   (enable-interrupt sigalrm #'sigalrm-handler)
   #!+hpux (ignore-interrupt sigxcpu)
-  (unblock-deferrable-signals)
   (unblock-gc-signals)
+  (unblock-deferrable-signals)
   (values))
 
 ;;;; etc.

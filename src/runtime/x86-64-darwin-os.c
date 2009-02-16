@@ -280,6 +280,7 @@ void
 control_stack_exhausted_handler(int signal, siginfo_t *siginfo, void *void_context) {
     os_context_t *context = arch_os_get_context(&void_context);
 
+    unblock_signals_in_context_and_maybe_warn(context);
     arrange_return_to_lisp_function
         (context, StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 }

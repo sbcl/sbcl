@@ -111,6 +111,31 @@ sigaddset_deferrable(sigset_t *s)
 }
 
 void
+sigdelset_deferrable(sigset_t *s)
+{
+    sigdelset(s, SIGHUP);
+    sigdelset(s, SIGINT);
+    sigdelset(s, SIGQUIT);
+    sigdelset(s, SIGPIPE);
+    sigdelset(s, SIGALRM);
+    sigdelset(s, SIGURG);
+    sigdelset(s, SIGTSTP);
+    sigdelset(s, SIGCHLD);
+    sigdelset(s, SIGIO);
+#ifndef LISP_FEATURE_HPUX
+    sigdelset(s, SIGXCPU);
+    sigdelset(s, SIGXFSZ);
+#endif
+    sigdelset(s, SIGVTALRM);
+    sigdelset(s, SIGPROF);
+    sigdelset(s, SIGWINCH);
+
+#ifdef LISP_FEATURE_SB_THREAD
+    sigdelset(s, SIG_INTERRUPT_THREAD);
+#endif
+}
+
+void
 sigaddset_blockable(sigset_t *sigset)
 {
     sigaddset_deferrable(sigset);
@@ -122,6 +147,14 @@ sigaddset_gc(sigset_t *sigset)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(sigset,SIG_STOP_FOR_GC);
+#endif
+}
+
+void
+sigdelset_gc(sigset_t *sigset)
+{
+#ifdef LISP_FEATURE_SB_THREAD
+    sigdelset(sigset,SIG_STOP_FOR_GC);
 #endif
 }
 
@@ -310,9 +343,23 @@ block_deferrable_signals(void)
 }
 
 void
+unblock_deferrable_signals_in_sigset(sigset_t *sigset)
+{
+#ifndef LISP_FEATURE_WIN32
+    if (interrupt_handler_pending_p())
+        lose("unblock_deferrable_signals_in_sigset: losing proposition\n");
+    check_gc_signals_unblocked_in_sigset_or_lose(sigset);
+    sigdelset_deferrable(sigset);
+#endif
+}
+
+void
 unblock_deferrable_signals(void)
 {
 #ifndef LISP_FEATURE_WIN32
+    if (interrupt_handler_pending_p())
+        lose("unblock_deferrable_signals: losing proposition\n");
+    check_gc_signals_unblocked_or_lose();
     thread_sigmask(SIG_UNBLOCK, &deferrable_sigset, 0);
 #endif
 }
@@ -322,6 +369,30 @@ unblock_gc_signals(void)
 {
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
     thread_sigmask(SIG_UNBLOCK,&gc_sigset,0);
+#endif
+}
+
+void
+unblock_signals_in_context_and_maybe_warn(os_context_t *context)
+{
+#ifndef LISP_FEATURE_WIN32
+    int i, oops=0;
+    sigset_t *sigset=os_context_sigmask_addr(context);
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(&gc_sigset, i) && sigismember(sigset, i)) {
+            if (!oops) {
+                fprintf(stderr,
+"Enabling blocked gc signals to allow returning to Lisp without risking\n\
+gc deadlocks. Since GC signals are only blocked in signal handlers when \n\
+they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
+            }
+            oops=1;
+        }
+    }
+    sigdelset_gc(sigset);
+    if (!interrupt_handler_pending_p()) {
+        unblock_deferrable_signals_in_sigset(sigset);
+    }
 #endif
 }
 
@@ -1180,6 +1251,11 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         protect_control_stack_guard_page(0);
         protect_control_stack_return_guard_page(1);
 
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        /* For the unfortunate case, when the control stack is
+         * exhausted in a signal handler. */
+        unblock_signals_in_context_and_maybe_warn(context);
+#endif
         arrange_return_to_lisp_function
             (context, StaticSymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
         return 1;
@@ -1190,6 +1266,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
+        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
         protect_control_stack_guard_page(1);
         protect_control_stack_return_guard_page(0);
         return 1;
@@ -1444,6 +1521,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     current_memory_fault_address = addr;
     /* To allow debugging memory faults in signal handlers and such. */
     corruption_warning_and_maybe_lose("Memory fault");
+    unblock_signals_in_context_and_maybe_warn(context);
     arrange_return_to_lisp_function(context,
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 }
