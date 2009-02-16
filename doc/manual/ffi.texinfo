@@ -969,8 +969,7 @@ other ports it is implemented by turning off GC for the duration (so
 could be said to have a whole-world granularity).
 
 @item
-Disable GC, using the @code{without-gcing} macro or @code{gc-off}
-call.
+Disable GC, using the @code{without-gcing} macro.
 @end enumerate
 
 @c <!-- FIXME: This is a "changebar" section from the CMU CL manual.

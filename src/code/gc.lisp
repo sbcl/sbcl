@@ -118,7 +118,7 @@
 (declaim (type unsigned-byte *n-bytes-freed-or-purified*))
 (defvar *n-bytes-freed-or-purified* 0)
 (defun gc-reinit ()
-  (gc-on)
+  (setq *gc-inhibit* nil)
   (gc)
   (setf *n-bytes-freed-or-purified* 0
         *gc-run-time* 0
@@ -292,18 +292,3 @@ run in any thread.")
              (or #!+sb-thread *stop-for-gc-pending*
                  *gc-pending*))
     (sb!unix::receive-pending-interrupt)))
-
-;;; These work both regardless of whether we're inside WITHOUT-GCING
-;;; or not.
-(defun gc-on ()
-  #!+sb-doc
-  "Enable the garbage collector."
-  (setq *gc-inhibit* nil)
-  (maybe-handle-pending-gc)
-  nil)
-
-(defun gc-off ()
-  #!+sb-doc
-  "Disable the garbage collector."
-  (setq *gc-inhibit* t)
-  nil)

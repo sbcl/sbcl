@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.26 relative to 1.0.25:
+  * incompatible change: GC-OFF and GC-ON are removed, they were
+    always unsafe. Use WITHOUT-GCING instead.
   * new feature: runtime option --disable-ldb
   * new feature: runtime option --lose-on-corruption to die at the
     slightest hint of possibly non-recoverable errors: running out of

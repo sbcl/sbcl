@@ -31,15 +31,7 @@
 (let ((gc-happend nil))
   (push (lambda () (setq gc-happend t)) sb-ext:*after-gc-hooks*)
 
-  ;; check GC-{ON,OFF} works and gc is deferred
-  (gc-off)
-  (gc)
-  (assert (not gc-happend))
-  (gc-on)
-  (assert gc-happend)
-
   ;; check that WITHOUT-GCING defers explicit gc
-  (setq gc-happend nil)
   (sb-sys:without-gcing
     (gc)
     (assert (not gc-happend)))
@@ -58,15 +50,5 @@
       (assert (not gc-happend)))
     ;; give the hook time to run
     (sleep 1)
-    (assert gc-happend))
-
-  ;; check GC-ON works even in a WITHOUT-GCING
-  (setq gc-happend nil)
-  (sb-sys:without-gcing
-    (gc)
-    (assert (not gc-happend))
-    (gc-on)
-    (assert gc-happend)
-    (setq gc-happend nil))
-  (assert (not gc-happend)))
+    (assert gc-happend)))
 

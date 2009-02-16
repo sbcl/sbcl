@@ -258,7 +258,7 @@
   #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
-  (gc-on)
+  (setq *gc-inhibit* nil)
   (/show0 "doing first GC")
   (gc :full t)
   (/show0 "back from first GC")
