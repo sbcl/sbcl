@@ -229,6 +229,7 @@ main(int argc, char *argv[], char *envp[])
     /* other command line options */
     boolean noinform = 0;
     boolean end_runtime_options = 0;
+    boolean disable_lossage_handler_p = 0;
 
     lispobj initial_function;
     const char *sbcl_home = getenv("SBCL_HOME");
@@ -275,6 +276,8 @@ main(int argc, char *argv[], char *envp[])
                  * TOPLEVEL-INIT sees the option. */
                 noinform = 1;
                 end_runtime_options = 1;
+                disable_lossage_handler_p = 1;
+                lose_on_corruption_p = 1;
                 break;
             } else if (0 == strcmp(arg, "--noinform")) {
                 noinform = 1;
@@ -336,6 +339,12 @@ main(int argc, char *argv[], char *envp[])
                     printf(";  %2d: \"%s\"\n", n, ENVIRON[n]);
                     ++n;
                 }
+                ++argi;
+            } else if (0 == strcmp(arg, "--disable-ldb")) {
+                disable_lossage_handler_p = 1;
+                ++argi;
+            } else if (0 == strcmp(arg, "--lose-on-corruption")) {
+                lose_on_corruption_p = 1;
                 ++argi;
             } else if (0 == strcmp(arg, "--end-runtime-options")) {
                 end_runtime_options = 1;
@@ -426,7 +435,8 @@ main(int argc, char *argv[], char *envp[])
     define_var("nil", NIL, 1);
     define_var("t", T, 1);
 
-    enable_lossage_handler();
+    if (!disable_lossage_handler_p)
+        enable_lossage_handler();
 
     globals_init();
 

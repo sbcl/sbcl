@@ -1154,6 +1154,7 @@ static page_index_t gencgc_alloc_start_page = -1;
 void
 gc_heap_exhausted_error_or_lose (long available, long requested)
 {
+    struct thread *thread = arch_os_get_current_thread();
     /* Write basic information before doing anything else: if we don't
      * call to lisp this is a must, and even if we do there is always
      * the danger that we bounce back here before the error has been
@@ -1166,7 +1167,6 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
         /* If we are in GC, or totally out of memory there is no way
          * to sanely transfer control to the lisp-side of things.
          */
-        struct thread *thread = arch_os_get_current_thread();
         print_generation_stats(1);
         fprintf(stderr, "GC control variables:\n");
         fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",
@@ -1181,6 +1181,18 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
     else {
         /* FIXME: assert free_pages_lock held */
         (void)thread_mutex_unlock(&free_pages_lock);
+        gc_assert(get_pseudo_atomic_atomic(thread));
+        clear_pseudo_atomic_atomic(thread);
+        if (get_pseudo_atomic_interrupted(thread))
+            do_pending_interrupt();
+        /* Another issue is that signalling HEAP-EXHAUSTED error leads
+         * to running user code at arbitrary places, even in a
+         * WITHOUT-INTERRUPTS which may lead to a deadlock without
+         * running out of the heap. So at this point all bets are
+         * off. */
+        if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
+            corruption_warning_and_maybe_lose
+                ("Signalling HEAP-EXHAUSTED in a WITHOUT-INTERRUPTS.");
         funcall2(StaticSymbolFunction(HEAP_EXHAUSTED_ERROR),
                  alloc_number(available), alloc_number(requested));
         lose("HEAP-EXHAUSTED-ERROR fell through");

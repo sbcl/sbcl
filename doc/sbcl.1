@@ -105,10 +105,22 @@ startup. (This makes it easier to write Lisp programs which work
 cleanly in Unix pipelines. See also the "\-\-noprint" and
 "\-\-disable\-debugger" options.)
 .TP 3
+.B \-\-disable\-ldb
+Disable the low-level debugger. Only effective if SBCL is compiled with LDB.
+.TP 3
+.B \-\-lose\-on\-corruption
+There are some dangerous low level errors (for instance, control stack
+exhausted, memory fault) that (or whose handlers) can corrupt the
+image. By default SBCL prints a warning, then tries to continue and
+handle the error in Lisp, but this will not always work and SBCL may
+malfunction or even hang. With this option, upon encountering such an
+error SBCL will invoke ldb (if present and enabled) or else exit.
+.TP 3
 .B \-\-script <filename>
-As a runtime option equivalent to \-\-noinform
-\-\-end\-toplevel\-options \-\-script <filename>. See the description
-of \-\-script as a toplevel option below.
+As a runtime option equivalent to \-\-noinform \-\-disable\-ldb
+\-\-lose\-on\-corruption \-\-end\-toplevel\-options \-\-script
+<filename>. See the description of \-\-script as a toplevel option
+below.
 .TP 3
 .B \-\-help
 Print some basic information about SBCL, then exit.
@@ -166,6 +178,7 @@ debugger, allowing interactive diagnosis and possible intercession.
 This option disables the debugger, causing errors to print a backtrace
 and exit with status 1 instead -- which is a mode of operation better suited
 for batch processing. See the User Manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
+.TP 3
 .B \-\-script <filename>
 Implies \-\-no-sysinit \-\-no-userinit \-\-disable-debugger
 \-\-end\-toplevel\-options.

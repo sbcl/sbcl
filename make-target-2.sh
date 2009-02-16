@@ -32,8 +32,10 @@ export LANG LC_ALL
 echo //doing warm init - compilation phase
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
+--lose-on-corruption \
 --no-sysinit --no-userinit < make-target-2.lisp
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
+--lose-on-corruption \
 --no-sysinit --no-userinit < make-target-2-load.lisp

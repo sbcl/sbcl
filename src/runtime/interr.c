@@ -48,25 +48,69 @@ void disable_lossage_handler(void)
     lossage_handler = default_lossage_handler;
 }
 
-void
-lose(char *fmt, ...)
+static
+void print_message(char *fmt, va_list ap)
 {
-    va_list ap;
-    fprintf(stderr, "fatal error encountered in SBCL pid %d",getpid());
+    fprintf(stderr, " in SBCL pid %d",getpid());
 #if defined(LISP_FEATURE_SB_THREAD)
     fprintf(stderr, "(tid %lu)", (unsigned long) thread_self());
 #endif
     if (fmt) {
         fprintf(stderr, ":\n");
-        va_start(ap, fmt);
         vfprintf(stderr, fmt, ap);
-        va_end(ap);
     }
     fprintf(stderr, "\n");
-    fflush(stderr);
+}
+
+static inline void
+call_lossage_handler() never_returns;
+
+static inline void
+call_lossage_handler()
+{
     lossage_handler();
     fprintf(stderr, "Argh! lossage_handler() returned, total confusion..\n");
     exit(1);
+}
+
+void
+lose(char *fmt, ...)
+{
+    va_list ap;
+    /* Block signals to prevent other threads, timers and such from
+     * interfering. If only all threads could be stopped somehow. */
+    block_blockable_signals();
+    fprintf(stderr, "fatal error encountered");
+    va_start(ap, fmt);
+    print_message(fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "\n");
+    fflush(stderr);
+    call_lossage_handler();
+}
+
+boolean lose_on_corruption_p = 0;
+
+void
+corruption_warning_and_maybe_lose(char *fmt, ...)
+{
+    va_list ap;
+    sigset_t oldset;
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, &oldset);
+    fprintf(stderr, "CORRUPTION WARNING");
+    va_start(ap, fmt);
+    print_message(fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "The integrity of this image is possibly compromised.\n");
+    if (lose_on_corruption_p)
+        fprintf(stderr, "Exiting.\n");
+    else
+        fprintf(stderr, "Continuing with fingers crossed.\n");
+    fflush(stderr);
+    if (lose_on_corruption_p)
+        call_lossage_handler();
+    else
+        thread_sigmask(SIG_SETMASK,&oldset,0);
 }
 
 /* internal error handler for when the Lisp error system doesn't exist

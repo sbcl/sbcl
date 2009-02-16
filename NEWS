@@ -1,4 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes in sbcl-1.0.26 relative to 1.0.25:
+  * new feature: runtime option --disable-ldb
+  * new feature: runtime option --lose-on-corruption to die at the
+    slightest hint of possibly non-recoverable errors: running out of
+    memory, stack, alien stack, binding stack, encountering a memory
+    fault, etc. In the absence of --lose-on-corruption a warning is
+    printed to stderr.
+
 changes in sbcl-1.0.25 relative to 1.0.24:
   * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be
     removed later. Please use SB-INTROSPECT:FUNCTION-LAMBDA-LIST instead.

@@ -810,6 +810,14 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
 #if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
     os_restore_fp_control(context);
+#ifndef LISP_FEATURE_WIN32
+    if ((signal == SIGILL) || (signal == SIGBUS)
+#ifndef LISP_FEATURE_LINUX
+        || (signal == SIGEMT)
+#endif
+        )
+        corruption_warning_and_maybe_lose("Signal %d recieved", signal);
+#endif
 #endif
     interrupt_handle_now(signal, info, context);
 }
@@ -1045,6 +1053,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
+        corruption_warning_and_maybe_lose("Control stack exhausted");
         protect_control_stack_guard_page(0);
         protect_control_stack_return_guard_page(1);
 
@@ -1300,6 +1309,8 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     * now -- some address is better then no address in this case.
     */
     current_memory_fault_address = addr;
+    /* To allow debugging memory faults in signal handlers and such. */
+    corruption_warning_and_maybe_lose("Memory fault");
     arrange_return_to_lisp_function(context,
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 }

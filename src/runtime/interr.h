@@ -13,6 +13,8 @@
 #define _INTERR_H_
 
 extern void lose(char *fmt, ...) never_returns;
+extern boolean lose_on_corruption_p;
+extern void corruption_warning_and_maybe_lose(char *fmt, ...);
 extern void enable_lossage_handler(void);
 extern void disable_lossage_handler(void);
 extern void describe_internal_error(os_context_t *context);
