@@ -173,8 +173,7 @@ Lfp_rtn_value:
 	.globl GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
 		
-/* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
- * the stack changes.  We don't worry too much about saving registers 
+/* We don't worry too much about saving registers 
  * here, because we never expect to return from the initial call to lisp 
  * anyway */
 	
@@ -183,7 +182,6 @@ GNAME(call_into_lisp_first_time):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
 #ifndef LISP_FEATURE_WIN32
-	movl    %esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
 	movl    GNAME(all_threads),%eax
 	/* pthread machinery takes care of this for other threads */
 	movl    THREAD_CONTROL_STACK_END_OFFSET(%eax) ,%esp

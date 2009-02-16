@@ -128,8 +128,7 @@ GNAME(call_into_c):
 	.globl  GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
 		
-/* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
- * the stack changes.  We don't worry too much about saving registers 
+/* We don't worry too much about saving registers 
  * here, because we never expect to return from the initial call to lisp 
  * anyway */
 	
@@ -137,7 +136,6 @@ GNAME(call_into_c):
 GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
-	mov     %rsp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
 #if defined(LISP_FEATURE_DARWIN)
 	movq    GSYM(GNAME(all_threads)),%rax
 #else
