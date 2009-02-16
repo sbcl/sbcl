@@ -61,7 +61,6 @@ extern int sig_memory_fault;
 
 #define SIG_INTERRUPT_THREAD (SIGINFO)
 #define SIG_STOP_FOR_GC (SIGUSR1)
-#define SIG_RESUME_FROM_GC (SIGUSR2)
 
 #elif defined __OpenBSD__
 

@@ -115,7 +115,6 @@ sigaddset_blockable(sigset_t *sigset)
 {
     sigaddset_deferrable(sigset);
 #ifdef LISP_FEATURE_SB_THREAD
-    sigaddset(sigset,SIG_RESUME_FROM_GC);
     sigaddset(sigset,SIG_STOP_FOR_GC);
 #endif
 }
@@ -860,38 +859,23 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     SetSymbolValue(GC_PENDING,NIL,thread);
     SetSymbolValue(STOP_FOR_GC_PENDING,NIL,thread);
 
-    if(thread->state!=STATE_RUNNING) {
+    if(thread_state(thread)!=STATE_RUNNING) {
         lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
              fixnum_value(thread->state));
     }
 
-    thread->state=STATE_SUSPENDED;
+    set_thread_state(thread,STATE_SUSPENDED);
     FSHOW_SIGNAL((stderr,"suspended\n"));
 
-    sigemptyset(&ss);
-    sigaddset(&ss,SIG_RESUME_FROM_GC);
-
-    /* It is possible to get SIGCONT (and probably other non-blockable
-     * signals) here. */
-    {
-        int sigret;
-        do { sigwait(&ss, &sigret); }
-        while (sigret != SIG_RESUME_FROM_GC);
-    }
-
+    wait_for_thread_state_change(thread, STATE_SUSPENDED);
     FSHOW_SIGNAL((stderr,"resumed\n"));
-    if(thread->state!=STATE_RUNNING) {
+
+    if(thread_state(thread)!=STATE_RUNNING) {
         lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
-             fixnum_value(thread->state));
+             fixnum_value(thread_state(thread)));
     }
 
     undo_fake_foreign_function_call(context);
-}
-
-void
-sig_resume_from_gc_handler(int signal, siginfo_t *info, void *void_context)
-{
-    lose("SIG_RESUME_FROM_GC handler called.");
 }
 
 #endif

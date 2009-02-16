@@ -6,6 +6,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     memory, stack, alien stack, binding stack, encountering a memory
     fault, etc. In the absence of --lose-on-corruption a warning is
     printed to stderr.
+  * optimization: slightly faster gc on multithreaded builds
 
 changes in sbcl-1.0.25 relative to 1.0.24:
   * incompatible change: SB-INTROSPECT:FUNCTION-ARGLIST is deprecated, to be

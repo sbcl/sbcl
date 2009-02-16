@@ -23,6 +23,39 @@ struct alloc_region { };
 #define STATE_SUSPENDED (make_fixnum(2))
 #define STATE_DEAD (make_fixnum(3))
 
+#ifdef LISP_FEATURE_SB_THREAD
+
+/* Only access thread state with blockables blocked. */
+static inline lispobj
+thread_state(struct thread *thread)
+{
+    lispobj state;
+    pthread_mutex_lock(thread->state_lock);
+    state = thread->state;
+    pthread_mutex_unlock(thread->state_lock);
+    return state;
+}
+
+static inline void
+set_thread_state(struct thread *thread, lispobj state)
+{
+    pthread_mutex_lock(thread->state_lock);
+    thread->state = state;
+    pthread_cond_broadcast(thread->state_cond);
+    pthread_mutex_unlock(thread->state_lock);
+}
+
+static inline void
+wait_for_thread_state_change(struct thread *thread, lispobj state)
+{
+    pthread_mutex_lock(thread->state_lock);
+    while (thread->state == state)
+        pthread_cond_wait(thread->state_cond, thread->state_lock);
+    pthread_mutex_unlock(thread->state_lock);
+}
+
+#endif
+
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 
@@ -31,7 +64,7 @@ union per_thread_data {
     lispobj dynamic_values[1];  /* actually more like 4000 or so */
 };
 
-extern struct thread * volatile all_threads;
+extern struct thread *all_threads;
 extern int dynamic_values_bytes;
 
 #if defined(LISP_FEATURE_DARWIN)

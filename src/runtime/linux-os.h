@@ -41,4 +41,3 @@ typedef int os_vm_prot_t;
 
 #define SIG_INTERRUPT_THREAD (SIGRTMIN)
 #define SIG_STOP_FOR_GC (SIGUSR1)
-#define SIG_RESUME_FROM_GC (SIGUSR2)

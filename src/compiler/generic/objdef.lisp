@@ -374,14 +374,18 @@
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
-  (os-thread :c-type "volatile os_thread_t")
+  (os-thread :c-type "os_thread_t")
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.
-  ;; Kept here so that when the thread dies we can releast the whole
+  ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
+  #!+sb-thread
+  (state-lock :c-type "pthread_mutex_t *" :length #!+alpha 2 #!-alpha 1)
+  #!+sb-thread
+  (state-cond :c-type "pthread_cond_t *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
@@ -393,7 +397,7 @@
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   ;; starting, running, suspended, dead
-  (state :c-type "volatile lispobj")
+  (state :c-type "lispobj")
   (tls-cookie)                          ;  on x86, the LDT index
   #!+(or x86 x86-64) (pseudo-atomic-bits)
   (interrupt-data :c-type "struct interrupt_data *"

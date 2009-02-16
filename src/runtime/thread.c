@@ -83,7 +83,7 @@ static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
 #endif
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
-struct thread * volatile all_threads;
+struct thread *all_threads;
 extern struct interrupt_data * global_interrupt_data;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -145,8 +145,17 @@ initial_thread_trampoline(struct thread *th)
 #endif
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
+#define THREAD_STATE_LOCK_SIZE \
+    (sizeof(pthread_mutex_t))+(sizeof(pthread_cond_t))
+#else
+#define THREAD_STATE_LOCK_SIZE 0
+#endif
+
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
-                            ALIEN_STACK_SIZE + dynamic_values_bytes +        \
+                            ALIEN_STACK_SIZE +                               \
+                            THREAD_STATE_LOCK_SIZE +                         \
+                            dynamic_values_bytes +                           \
                             32 * SIGSTKSZ +                                  \
                             THREAD_ALIGNMENT_BYTES)
 
@@ -272,7 +281,7 @@ new_thread_trampoline(struct thread *th)
 
     /* Block GC */
     block_blockable_signals();
-    th->state=STATE_DEAD;
+    set_thread_state(th, STATE_DEAD);
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
      * thread, but since we are already dead it won't wait long. */
@@ -285,6 +294,9 @@ new_thread_trampoline(struct thread *th)
     gc_assert(lock_ret == 0);
 
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
+    pthread_mutex_destroy(th->state_lock);
+    pthread_cond_destroy(th->state_cond);
+
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
 
@@ -351,7 +363,8 @@ create_thread_struct(lispobj initial_function) {
         (aligned_spaces+
          thread_control_stack_size+
          BINDING_STACK_SIZE+
-         ALIEN_STACK_SIZE);
+         ALIEN_STACK_SIZE +
+         THREAD_STATE_LOCK_SIZE);
 
 #ifdef LISP_FEATURE_SB_THREAD
     for(i = 0; i < (dynamic_values_bytes / sizeof(lispobj)); i++)
@@ -395,6 +408,12 @@ create_thread_struct(lispobj initial_function) {
     th->os_thread=0;
 #ifdef LISP_FEATURE_SB_THREAD
     th->os_attr=malloc(sizeof(pthread_attr_t));
+    th->state_lock=(pthread_mutex_t *)((void *)th->alien_stack_start +
+                                       ALIEN_STACK_SIZE);
+    pthread_mutex_init(th->state_lock, NULL);
+    th->state_cond=(pthread_cond_t *)((void *)th->state_lock +
+                                      (sizeof(pthread_mutex_t)));
+    pthread_cond_init(th->state_cond, NULL);
 #endif
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
@@ -608,14 +627,14 @@ void gc_stop_the_world()
     for(p=all_threads; p; p=p->next) {
         gc_assert(p->os_thread != 0);
         FSHOW_SIGNAL((stderr,"/gc_stop_the_world: thread=%lu, state=%x\n",
-                      p->os_thread, p->state));
-        if((p!=th) && ((p->state==STATE_RUNNING))) {
+                      p->os_thread, thread_state(p)));
+        if((p!=th) && ((thread_state(p)==STATE_RUNNING))) {
             FSHOW_SIGNAL((stderr,"/gc_stop_the_world: suspending thread %lu\n",
                           p->os_thread));
-            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
+            status=pthread_kill(p->os_thread,SIG_STOP_FOR_GC);
             if (status==ESRCH) {
                 /* This thread has exited. */
-                gc_assert(p->state==STATE_DEAD);
+                gc_assert(thread_state(p)==STATE_DEAD);
             } else if (status) {
                 lose("cannot send suspend thread=%lu: %d, %s\n",
                      p->os_thread,status,strerror(status));
@@ -623,26 +642,15 @@ void gc_stop_the_world()
         }
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:signals sent\n"));
-    /* wait for the running threads to stop or finish */
-    {
-#if QSHOW_SIGNALS
-        struct thread *prev = 0;
-#endif
-        for(p=all_threads;p;) {
-#if QSHOW_SIGNALS
-            if ((p!=th)&&(p!=prev)&&(p->state==STATE_RUNNING)) {
-                FSHOW_SIGNAL
-                    ((stderr,
-                      "/gc_stop_the_world: waiting for thread=%lu: state=%x\n",
-                      p->os_thread, p->state));
-                prev=p;
-            }
-#endif
-            if((p!=th) && (p->state==STATE_RUNNING)) {
-                sched_yield();
-            } else {
-                p=p->next;
-            }
+    for(p=all_threads;p;p=p->next) {
+        if (p!=th) {
+            FSHOW_SIGNAL
+                ((stderr,
+                  "/gc_stop_the_world: waiting for thread=%lu: state=%x\n",
+                  p->os_thread, thread_state(p)));
+            wait_for_thread_state_change(p, STATE_RUNNING);
+            if (p->state == STATE_RUNNING)
+                lose("/gc_stop_the_world: unexpected state");
         }
     }
     FSHOW_SIGNAL((stderr,"/gc_stop_the_world:end\n"));
@@ -651,7 +659,7 @@ void gc_stop_the_world()
 void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    int status, lock_ret;
+    int lock_ret;
     /* if a resumed thread creates a new thread before we're done with
      * this loop, the new thread will get consed on the front of
      * all_threads, but it won't have been stopped so won't need
@@ -659,19 +667,16 @@ void gc_start_the_world()
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:begin\n"));
     for(p=all_threads;p;p=p->next) {
         gc_assert(p->os_thread!=0);
-        if((p!=th) && (p->state!=STATE_DEAD)) {
-            if(p->state!=STATE_SUSPENDED) {
-                lose("gc_start_the_world: wrong thread state is %d\n",
-                     fixnum_value(p->state));
-            }
-            FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
-                          p->os_thread));
-            p->state=STATE_RUNNING;
-
-            status=kill_thread_safely(p->os_thread,SIG_RESUME_FROM_GC);
-            if (status) {
-                lose("cannot resume thread=%lu: %d, %s\n",
-                     p->os_thread,status,strerror(status));
+        if (p!=th) {
+            lispobj state = thread_state(p);
+            if (state != STATE_DEAD) {
+                if(state != STATE_SUSPENDED) {
+                    lose("gc_start_the_world: wrong thread state is %d\n",
+                         fixnum_value(state));
+                }
+                FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
+                              p->os_thread));
+                set_thread_state(p, STATE_RUNNING);
             }
         }
     }
