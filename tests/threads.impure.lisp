@@ -42,7 +42,45 @@
   (with-mutex (mutex)
     mutex))
 
+(sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
+    void)
+(sb-alien:define-alien-routine "check_deferrables_unblocked_or_lose"
+    void)
+
+(with-test (:name (:interrupt-thread :deferrables-blocked))
+  (sb-thread:interrupt-thread sb-thread:*current-thread*
+                              (lambda ()
+                                (check-deferrables-blocked-or-lose))))
+
+(with-test (:name (:interrupt-thread :deferrables-unblocked))
+  (sb-thread:interrupt-thread sb-thread:*current-thread*
+                              (lambda ()
+                                (with-interrupts
+                                  (check-deferrables-unblocked-or-lose)))))
+
+(with-test (:name (:interrupt-thread :nlx))
+  (catch 'xxx
+    (sb-thread:interrupt-thread sb-thread:*current-thread*
+                                (lambda ()
+                                  (check-deferrables-blocked-or-lose)
+                                  (throw 'xxx nil))))
+  (check-deferrables-unblocked-or-lose))
+
 #-sb-thread (sb-ext:quit :unix-status 104)
+
+(with-test (:name (:interrupt-thread :deferrables-unblocked-by-spinlock))
+  (let ((spinlock (sb-thread::make-spinlock))
+        (thread (sb-thread:make-thread (lambda ()
+                                         (loop (sleep 1))))))
+    (sb-thread::get-spinlock spinlock)
+    (sb-thread:interrupt-thread thread
+                                (lambda ()
+                                  (check-deferrables-blocked-or-lose)
+                                  (sb-thread::get-spinlock spinlock)
+                                  (check-deferrables-unblocked-or-lose)
+                                  (sb-ext:quit)))
+    (sleep 1)
+    (sb-thread::release-spinlock spinlock)))
 
 ;;; compare-and-swap
 
@@ -446,6 +484,43 @@
 
 (format t "~&interrupt count test done~%")
 
+(defvar *runningp* nil)
+
+(with-test (:name (:interrupt-thread :no-nesting))
+  (let ((thread (sb-thread:make-thread
+                 (lambda ()
+                   (catch 'xxx
+                     (loop))))))
+    (declare (special runningp))
+    (sleep 0.2)
+    (sb-thread:interrupt-thread thread
+                                (lambda ()
+                                    (let ((*runningp* t))
+                                      (sleep 1))))
+    (sleep 0.2)
+    (sb-thread:interrupt-thread thread
+                                (lambda ()
+                                  (throw 'xxx *runningp*)))
+    (assert (not (sb-thread:join-thread thread)))))
+
+(with-test (:name (:interrupt-thread :nesting))
+  (let ((thread (sb-thread:make-thread
+                 (lambda ()
+                   (catch 'xxx
+                     (loop))))))
+    (declare (special runningp))
+    (sleep 0.2)
+    (sb-thread:interrupt-thread thread
+                                (lambda ()
+                                  (let ((*runningp* t))
+                                    (sb-sys:with-interrupts
+                                      (sleep 1)))))
+    (sleep 0.2)
+    (sb-thread:interrupt-thread thread
+                                (lambda ()
+                                  (throw 'xxx *runningp*)))
+    (assert (sb-thread:join-thread thread))))
+
 (let (a-done b-done)
   (make-thread (lambda ()
                  (dotimes (i 100)
@@ -551,7 +626,10 @@
        (interruptor-thread
         (make-thread (lambda ()
                        (sleep 2)
-                       (interrupt-thread main-thread #'break)
+                       (interrupt-thread main-thread
+                                         (lambda ()
+                                           (with-interrupts
+                                             (break))))
                        (sleep 2)
                        (interrupt-thread main-thread #'continue))
                      :name "interruptor")))

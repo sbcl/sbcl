@@ -123,7 +123,6 @@ extern void do_pending_interrupt(void);
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-extern void interrupt_thread_handler(int, siginfo_t*, void*);
 extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);
 #endif
 typedef void (*interrupt_handler_t)(int, siginfo_t *, void *);

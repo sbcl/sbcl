@@ -104,10 +104,6 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGVTALRM);
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
-
-#ifdef LISP_FEATURE_SB_THREAD
-    sigaddset(s, SIG_INTERRUPT_THREAD);
-#endif
 }
 
 void
@@ -129,10 +125,6 @@ sigdelset_deferrable(sigset_t *s)
     sigdelset(s, SIGVTALRM);
     sigdelset(s, SIGPROF);
     sigdelset(s, SIGWINCH);
-
-#ifdef LISP_FEATURE_SB_THREAD
-    sigdelset(s, SIG_INTERRUPT_THREAD);
-#endif
 }
 
 void
@@ -198,6 +190,16 @@ check_deferrables_blocked_in_sigset_or_lose(sigset_t *sigset)
         if (sigismember(&deferrable_sigset, i) && !sigismember(sigset, i))
             lose("deferrable signal %d not blocked\n",i);
     }
+#endif
+}
+
+void
+check_deferrables_unblocked_or_lose(void)
+{
+#if !defined(LISP_FEATURE_WIN32)
+    sigset_t current;
+    fill_current_sigmask(&current);
+    check_deferrables_unblocked_in_sigset_or_lose(&current);
 #endif
 }
 
@@ -1330,34 +1332,6 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
            (long)function));
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
-
-int
-signal_interrupt_thread(os_thread_t os_thread)
-{
-    /* FSHOW first, in case we are signalling ourselves. */
-    FSHOW((stderr,"/signal_interrupt_thread: %lu\n", os_thread));
-    return kill_safely(os_thread, SIG_INTERRUPT_THREAD);
-}
-
-/* FIXME: this function can go away when all lisp handlers are invoked
- * via arrange_return_to_lisp_function. */
-void
-interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
-{
-    os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-
-    FSHOW_SIGNAL((stderr,"/interrupt_thread_handler\n"));
-    check_blockables_blocked_or_lose();
-
-    /* let the handler enable interrupts again when it sees fit */
-    sigaddset_deferrable(os_context_sigmask_addr(context));
-    arrange_return_to_lisp_function(context,
-                                    StaticSymbolFunction(RUN_INTERRUPTION));
-}
-
-#endif
-
 /* KLUDGE: Theoretically the approach we use for undefined alien
  * variables should work for functions as well, but on PPC/Darwin
  * we get bus error at bogus addresses instead, hence this workaround,
@@ -1538,11 +1512,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     sa.sa_flags = SA_SIGINFO | SA_RESTART
         | (sigaction_nodefer_works ? SA_NODEFER : 0);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    if((signal==SIG_MEMORY_FAULT)
-#ifdef SIG_INTERRUPT_THREAD
-       || (signal==SIG_INTERRUPT_THREAD)
-#endif
-       )
+    if((signal==SIG_MEMORY_FAULT))
         sa.sa_flags |= SA_ONSTACK;
 #endif
 

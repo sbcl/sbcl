@@ -539,9 +539,6 @@ describe_thread_state(void)
     printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
     printf(" SIGINT = %d\n", sigismember(&mask, SIGINT));
     printf(" SIGPROF = %d\n", sigismember(&mask, SIGPROF));
-#ifdef SIG_INTERRUPT_THREAD
-    printf(" SIG_INTERRUPT_THREAD = %d\n", sigismember(&mask, SIG_INTERRUPT_THREAD));
-#endif
 #ifdef SIG_STOP_FOR_GC
     printf(" SIG_STOP_FOR_GC = %d\n", sigismember(&mask, SIG_STOP_FOR_GC));
 #endif

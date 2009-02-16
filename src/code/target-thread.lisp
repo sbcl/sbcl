@@ -106,6 +106,11 @@ in future versions."
 
 ;;;; Aliens, low level stuff
 
+(define-alien-routine "kill_safely"
+    integer
+  (os-thread #!-alpha unsigned-long #!+alpha unsigned-int)
+  (signal int))
+
 #!+sb-thread
 (progn
   ;; FIXME it would be good to define what a thread id is or isn't
@@ -114,9 +119,6 @@ in future versions."
   ;; implementations.
   (define-alien-routine ("create_thread" %create-thread)
       unsigned-long (lisp-fun-address unsigned-long))
-
-  (define-alien-routine "signal_interrupt_thread"
-      integer (os-thread unsigned-long))
 
   (define-alien-routine "block_deferrable_signals"
       void)
@@ -218,10 +220,14 @@ in future versions."
         (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
             ;; If interrupts are disabled, but we are allowed to
             ;; enabled them, check for pending interrupts every once
-            ;; in a while.
-            (loop
-              (loop repeat 128 do (cas)) ; 128 is arbitrary here
-              (sb!unix::%check-interrupts))
+            ;; in a while. %CHECK-INTERRUPTS is taking shortcuts, make
+            ;; sure that deferrables are unblocked by doing an empty
+            ;; WITH-INTERRUPTS once.
+            (progn
+              (with-interrupts)
+              (loop
+               (loop repeat 128 do (cas)) ; 128 is arbitrary here
+               (sb!unix::%check-interrupts)))
             (loop (cas)))))
     t))
 
@@ -909,53 +915,47 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
   `(with-system-mutex ((thread-interruptions-lock ,thread))
      ,@body))
 
-;;; Called from the signal handler in C.
+;;; Called from the signal handler.
 (defun run-interruption ()
-  (in-interruption ()
-    (loop
-     (let ((interruption (with-interruptions-lock (*current-thread*)
-                           (pop (thread-interruptions *current-thread*)))))
-       ;; Resignalling after popping one works fine, because from the
-       ;; OS's point of view we have returned from the signal handler
-       ;; (thanks to arrange_return_to_lisp_function) so at least one
-       ;; more signal will be delivered.
-       (when (thread-interruptions *current-thread*)
-         (signal-interrupt-thread (thread-os-thread *current-thread*)))
-       (if interruption
-           (with-interrupts
-             (funcall interruption))
-           (return))))))
+  (let ((interruption (with-interruptions-lock (*current-thread*)
+                        (pop (thread-interruptions *current-thread*)))))
+    ;; If there is more to do, then resignal and let the normal
+    ;; interrupt deferral mechanism take care of the rest. From the
+    ;; OS's point of view the signal we are in the handler for is no
+    ;; longer pending, so the signal will not be lost.
+    (when (thread-interruptions *current-thread*)
+      (kill-safely (thread-os-thread *current-thread*) sb!unix:sigpipe))
+    (when interruption
+      (funcall interruption))))
 
-;;; The order of interrupt execution is peculiar. If thread A
-;;; interrupts thread B with I1, I2 and B for some reason receives I1
-;;; when FUN2 is already on the list, then it is FUN2 that gets to run
-;;; first. But when FUN2 is run SIG_INTERRUPT_THREAD is enabled again
-;;; and I2 hits pretty soon in FUN2 and run FUN1. This is of course
-;;; just one scenario, and the order of thread interrupt execution is
-;;; undefined.
 (defun interrupt-thread (thread function)
   #!+sb-doc
   "Interrupt the live THREAD and make it run FUNCTION. A moderate
 degree of care is expected for use of INTERRUPT-THREAD, due to its
 nature: if you interrupt a thread that was holding important locks
 then do something that turns out to need those locks, you probably
-won't like the effect."
-  #!-sb-thread (declare (ignore thread))
-  #!-sb-thread
-  (with-interrupt-bindings
-    (with-interrupts (funcall function)))
-  #!+sb-thread
-  (if (eq thread *current-thread*)
-      (with-interrupt-bindings
-        (with-interrupts (funcall function)))
-      (let ((os-thread (thread-os-thread thread)))
-        (cond ((not os-thread)
-               (error 'interrupt-thread-error :thread thread))
-              (t
-               (with-interruptions-lock (thread)
-                 (push function (thread-interruptions thread)))
-               (when (minusp (signal-interrupt-thread os-thread))
-                 (error 'interrupt-thread-error :thread thread)))))))
+won't like the effect. FUNCTION runs with interrupts disabled, but
+WITH-INTERRUPTS is allowed in it. Keep in mind that many things may
+enable interrupts (GET-MUTEX when contended, for instance) so the
+first thing to do is usually a WITH-INTERRUPTS or a
+WITHOUT-INTERRUPTS. Within a thread interrupts are queued, they are
+run in same the order they were sent."
+  (let ((os-thread (thread-os-thread thread)))
+    (cond ((not os-thread)
+           (error 'interrupt-thread-error :thread thread))
+          (t
+           (with-interruptions-lock (thread)
+             ;; Append to the end of the interruptions queue. It's
+             ;; O(N), but it does not hurt to slow interruptors down a
+             ;; bit when the queue gets long.
+             (setf (thread-interruptions thread)
+                   (append (thread-interruptions thread)
+                           (list (lambda ()
+                                   (without-interrupts
+                                     (allow-with-interrupts
+                                       (funcall function))))))))
+           (when (minusp (kill-safely os-thread sb!unix:sigpipe))
+             (error 'interrupt-thread-error :thread thread))))))
 
 (defun terminate-thread (thread)
   #!+sb-doc

@@ -262,8 +262,6 @@ os_install_interrupt_handlers(void)
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-    undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
-                                                 interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
 #endif

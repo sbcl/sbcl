@@ -29,17 +29,43 @@
           (sb!impl::*merge-sort-temp-vector* ,empty))
        ,@body)))
 
+;;; Evaluate CLEANUP-FORMS iff PROTECTED-FORM does a non-local exit.
+(defmacro nlx-protect (protected-form &rest cleanup-froms)
+  (with-unique-names (completep)
+    `(let ((,completep nil))
+       (without-interrupts
+         (unwind-protect
+              (progn
+                (allow-with-interrupts
+                  ,protected-form)
+                (setq ,completep t))
+           (unless ,completep
+             ,@cleanup-froms))))))
+
 (defun invoke-interruption (function)
   (without-interrupts
-    (with-interrupt-bindings
-      ;; Reset signal mask: the C-side handler has blocked all
-      ;; deferrable interrupts before arranging return to lisp. This is
-      ;; safe because we can't get a pending interrupt before we unblock
-      ;; signals.
-      (unblock-deferrable-signals)
-      (let ((sb!debug:*stack-top-hint*
-             (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
-        (allow-with-interrupts (funcall function))))))
+    ;; Reset signal mask: the C-side handler has blocked all
+    ;; deferrable signals before funcalling into lisp. They are to be
+    ;; unblocked the first time interrupts are enabled. With this
+    ;; mechanism there are no extra frames on the stack from a
+    ;; previous signal handler when the next signal is delivered
+    ;; provided there is no WITH-INTERRUPTS.
+    (let ((*unblock-deferrables-on-enabling-interrupts-p* t))
+      (with-interrupt-bindings
+        (let ((sb!debug:*stack-top-hint*
+               (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
+          (allow-with-interrupts
+            (nlx-protect (funcall function)
+                         ;; We've been running with deferrables
+                         ;; blocked in Lisp called by a C signal
+                         ;; handler. If we return normally the sigmask
+                         ;; in the interrupted context is restored.
+                         ;; However, if we do an nlx the operating
+                         ;; system will not restore it for us.
+                         (when *unblock-deferrables-on-enabling-interrupts-p*
+                           ;; This means that storms of interrupts
+                           ;; doing an nlx can still run out of stack.
+                           (unblock-deferrable-signals)))))))))
 
 (defmacro in-interruption ((&key) &body body)
   #!+sb-doc
@@ -145,9 +171,10 @@
   (/show "in Lisp-level SIGINT handler" (sap-int context))
   (flet ((interrupt-it ()
            (with-alien ((context (* os-context-t) context))
-             (%break 'sigint 'interactive-interrupt
-                     :context context
-                     :address (sap-int (sb!vm:context-pc context))))))
+             (with-interrupts
+               (%break 'sigint 'interactive-interrupt
+                       :context context
+                       :address (sap-int (sb!vm:context-pc context)))))))
     (sb!thread:interrupt-thread (sb!thread::foreground-thread)
                                 #'interrupt-it)))
 
@@ -160,6 +187,15 @@
   (declare (ignore signal code context))
   (sb!thread::terminate-session)
   (sb!ext:quit))
+
+;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
+;;; for signalling a thread that it should look at its interruption
+;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
+;;; nothing to do so it's safe to receive spurious SIGPIPEs coming
+;;; from the kernel.
+(defun sigpipe-handler (signal code context)
+  (declare (ignore signal code context))
+  (sb!thread::run-interruption))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
@@ -174,8 +210,8 @@
   (enable-interrupt sigsegv #'sigsegv-handler)
   #!-linux
   (enable-interrupt sigsys #'sigsys-handler)
-  (ignore-interrupt sigpipe)
   (enable-interrupt sigalrm #'sigalrm-handler)
+  (enable-interrupt sigpipe #'sigpipe-handler)
   #!+hpux (ignore-interrupt sigxcpu)
   (unblock-gc-signals)
   (unblock-deferrable-signals)

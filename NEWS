@@ -1,5 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.26 relative to 1.0.25:
+  * incompatible change: the interruption (be it a function passed to
+    INTERRUPT-THREAD or a timer function) runs in an environment where
+    interrupts can be enabled. The interruption can use
+    WITH-INTERRUPTS or WITHOUT-INTERRUPTS as it sees fit. Use
+    WITHOUT-INTERRUPTS to avoid nesting of interruptions and
+    potentially running out of stack. Keep in mind that in the absance
+    of WITHOUT-INTERRUPTS some potentially blocking operation such as
+    acquiring a lock can enable interrupts.
   * incompatible change: GC-OFF and GC-ON are removed, they were
     always unsafe. Use WITHOUT-GCING instead.
   * new feature: runtime option --disable-ldb
@@ -8,6 +16,13 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     memory, stack, alien stack, binding stack, encountering a memory
     fault, etc. In the absence of --lose-on-corruption a warning is
     printed to stderr.
+  * improvement: generally more stable and reliable interrupt handling
+  * improvement: there is a per thread interruption queue,
+    interruptions are executed in order of arrival
+  * improvement: a repeating timer reschedules itself when the it has
+    finished, but expiration times are spaced equally. If an
+    expiration time is in the past it will trigger after a short grace
+    period that may give a chance to other things to run.
   * optimization: slightly faster gc on multithreaded builds
   * optimization: faster WITHOUT-GCING
   * bug fix: when JOIN-THREAD signals an error, do it when not holding

@@ -98,6 +98,7 @@
         *gc-pending* nil
         #!+sb-thread *stop-for-gc-pending* #!+sb-thread nil
         *allow-with-interrupts* t
+        sb!unix::*unblock-deferrables-on-enabling-interrupts-p* nil
         *interrupts-enabled* t
         *interrupt-pending* nil
         *break-on-signals* nil

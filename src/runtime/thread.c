@@ -550,7 +550,7 @@ os_thread_t create_thread(lispobj initial_function) {
     /* Must defend against async unwinds. */
     if (SymbolValue(INTERRUPTS_ENABLED, thread) != NIL)
         lose("create_thread is not safe when interrupts are enabled.\n");
-    
+
     /* Assuming that a fresh thread struct has no lisp objects in it,
      * linking it to all_threads can be left to the thread itself
      * without fear of gc lossage. initial_function violates this
@@ -690,37 +690,40 @@ thread_yield()
 int
 kill_safely(os_thread_t os_thread, int signal)
 {
+    FSHOW_SIGNAL((stderr,"/kill_safely: %lu, %d\n", os_thread, signal));
+    {
 #ifdef LISP_FEATURE_SB_THREAD
-    sigset_t oldset;
-    struct thread *thread;
-    /* pthread_kill is not async signal safe and we don't want to be
-     * interrupted while holding the lock. */
-    thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
-    pthread_mutex_lock(&all_threads_lock);
-    for (thread = all_threads; thread; thread = thread->next) {
-        if (thread->os_thread == os_thread) {
-            int status = pthread_kill(os_thread, signal);
-            if (status)
-                lose("kill_safely: pthread_kill failed with %d\n", status);
-            break;
+        sigset_t oldset;
+        struct thread *thread;
+        /* pthread_kill is not async signal safe and we don't want to be
+         * interrupted while holding the lock. */
+        thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
+        pthread_mutex_lock(&all_threads_lock);
+        for (thread = all_threads; thread; thread = thread->next) {
+            if (thread->os_thread == os_thread) {
+                int status = pthread_kill(os_thread, signal);
+                if (status)
+                    lose("kill_safely: pthread_kill failed with %d\n", status);
+                break;
+            }
         }
-    }
-    pthread_mutex_unlock(&all_threads_lock);
-    thread_sigmask(SIG_SETMASK,&oldset,0);
-    if (thread)
-        return 0;
-    else
-        return -1;
+        pthread_mutex_unlock(&all_threads_lock);
+        thread_sigmask(SIG_SETMASK,&oldset,0);
+        if (thread)
+            return 0;
+        else
+            return -1;
 #else
-    int status;
-    if (os_thread != 0)
-        lose("kill_safely: who do you want to kill? %d?\n", os_thread);
-    status = raise(signal);
-    if (status == 0) {
-        return 0;
-    } else {
-        lose("cannot raise signal %d, %d %s\n",
-             signal, status, strerror(errno));
-    }
+        int status;
+        if (os_thread != 0)
+            lose("kill_safely: who do you want to kill? %d?\n", os_thread);
+        status = raise(signal);
+        if (status == 0) {
+            return 0;
+        } else {
+            lose("cannot raise signal %d, %d %s\n",
+                 signal, status, strerror(errno));
+        }
 #endif
+    }
 }

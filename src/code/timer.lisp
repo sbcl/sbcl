@@ -128,22 +128,6 @@
         (heap-extract contents i :key keyfun :test #'<=)
         i))))
 
-;;; thread utility
-
-(defun make-cancellable-interruptor (function)
-  ;; return a list of two functions: one that does the same as
-  ;; FUNCTION until the other is called, from when it does nothing.
-  (let ((mutex (sb!thread:make-mutex))
-        (cancelled-p nil))
-    (list
-     #'(lambda ()
-         (sb!thread:with-recursive-lock (mutex)
-           (unless cancelled-p
-             (funcall function))))
-     #'(lambda ()
-         (sb!thread:with-recursive-lock (mutex)
-           (setq cancelled-p t))))))
-
 ;;; timers
 
 (defstruct (timer
@@ -176,7 +160,10 @@ future versions."
 THREAD is a thread then that thread is to be interrupted with
 FUNCTION. If THREAD is T then a new thread is created each timer
 FUNCTION is run. If THREAD is NIL then FUNCTION can be run in any
-thread."
+thread. When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION
+and the ordering guarantees of INTERRUPT-THREAD also apply here.
+FUNCTION always runs with interrupts disabled but WITH-INTERRUPTS is
+allowed."
   (%make-timer :name name :function function :thread thread))
 
 (defun timer-name (timer)
@@ -222,6 +209,30 @@ from now. For timers with a repeat interval it returns true."
 
 ;;; Public interface
 
+(defun make-cancellable-interruptor (timer)
+  ;; return a list of two functions: one that does the same as
+  ;; FUNCTION until the other is called, from when it does nothing.
+  (let ((mutex (sb!thread:make-mutex))
+        (cancelledp nil)
+        (function (if (%timer-repeat-interval timer)
+                      (lambda ()
+                        (unwind-protect
+                             (funcall (%timer-function timer))
+                          (reschedule-timer timer)))
+                      (%timer-function timer))))
+    (list
+     (lambda ()
+       ;; Use WITHOUT-INTERRUPTS for the acquiring lock to avoid
+       ;; unblocking deferrables unless it's inevitable.
+       (without-interrupts
+         (sb!thread:with-recursive-lock (mutex)
+           (unless cancelledp
+             (allow-with-interrupts
+               (funcall function))))))
+     (lambda ()
+       (sb!thread:with-recursive-lock (mutex)
+         (setq cancelledp t))))))
+
 (defun %schedule-timer (timer)
   (let ((changed-p nil)
         (old-position (priority-queue-remove *schedule* timer)))
@@ -235,8 +246,7 @@ from now. For timers with a repeat interval it returns true."
       (setq changed-p t))
     (setf (values (%timer-interrupt-function timer)
                   (%timer-cancel-function timer))
-          (values-list (make-cancellable-interruptor
-                        (%timer-function timer))))
+          (values-list (make-cancellable-interruptor timer)))
     (when changed-p
       (set-system-timer)))
   (values))
@@ -290,28 +300,36 @@ triggers."
 ;;; Not public, but related
 
 (defun reschedule-timer (timer)
-  (let ((thread (%timer-thread timer)))
-    (if (and (sb!thread::thread-p thread) (not (sb!thread:thread-alive-p thread)))
-        (unschedule-timer timer)
-        (with-scheduler-lock ()
-          (setf (%timer-expire-time timer) (+ (get-internal-real-time)
-                                              (%timer-repeat-interval timer)))
-          (%schedule-timer timer)))))
+  ;; unless unscheduled
+  (when (%timer-expire-time timer)
+    (let ((thread (%timer-thread timer)))
+      (if (and (sb!thread::thread-p thread)
+               (not (sb!thread:thread-alive-p thread)))
+          (unschedule-timer timer)
+          (with-scheduler-lock ()
+            ;; Schedule at regular intervals. If TIMER has not finished
+            ;; in time then it may catch up later.
+            (incf (%timer-expire-time timer) (%timer-repeat-interval timer))
+            (%schedule-timer timer))))))
 
 ;;; Expiring timers
 
-(defun real-time->sec-and-usec(time)
-  (if (minusp time)
-      (list 0 1)
-      (multiple-value-bind (s u) (floor time internal-time-units-per-second)
-        (setf u (floor (* (/ u internal-time-units-per-second) 1000000)))
-        (if (= 0 s u)
-            ;; 0 0 means "shut down the timer" for setitimer
-            (list 0 1)
-            (list s u)))))
+(defun real-time->sec-and-usec (time)
+  ;; KLUDGE: Always leave 0.0001 second for other stuff in order to
+  ;; avoid starvation.
+  (let ((min-usec 100))
+    (if (minusp time)
+        (list 0 min-usec)
+        (multiple-value-bind (s u) (floor time internal-time-units-per-second)
+          (setf u (floor (* (/ u internal-time-units-per-second) 1000000)))
+          (if (and (= 0 s) (< u min-usec))
+              ;; 0 0 means "shut down the timer" for setitimer
+              (list 0 min-usec)
+              (list s u))))))
 
 (defun set-system-timer ()
   (assert (under-scheduler-lock-p))
+  (assert (not *interrupts-enabled*))
   (let ((next-timer (peek-schedule)))
     (if next-timer
         (let ((delta (- (%timer-expire-time next-timer)
@@ -321,40 +339,34 @@ triggers."
         (sb!unix:unix-setitimer :real 0 0 0 0))))
 
 (defun run-timer (timer)
-  (symbol-macrolet ((function (%timer-function timer))
-                    (repeat-interval (%timer-repeat-interval timer))
-                    (thread (%timer-thread timer)))
-    (when repeat-interval
-      (reschedule-timer timer))
-    (cond ((null thread)
-           (funcall function))
-          ((eq t thread)
-           (sb!thread:make-thread function))
-          (t
-           (handler-case
-               (sb!thread:interrupt-thread thread function)
-             (sb!thread:interrupt-thread-error (c)
-               (declare (ignore c))
-               (warn "Timer ~S failed to interrupt thread ~S."
-                     timer thread)))))))
+  (let ((function (%timer-interrupt-function timer))
+        (thread (%timer-thread timer)))
+    (if (eq t thread)
+        (sb!thread:make-thread (without-interrupts
+                                 (allow-with-interrupts
+                                   function))
+                               :name (format nil "Timer ~A"
+                                             (%timer-name timer)))
+        (let ((thread (or thread sb!thread:*current-thread*)))
+          (handler-case
+              (sb!thread:interrupt-thread thread function)
+            (sb!thread:interrupt-thread-error (c)
+              (declare (ignore c))
+              (warn "Timer ~S failed to interrupt thread ~S."
+                    timer thread)))))))
 
-;; Called from the signal handler.
+;;; Called from the signal handler.
 (defun run-expired-timers ()
-  (unwind-protect
-       (with-interrupts
-         (let (timer)
-           (loop
-            (with-scheduler-lock ()
-              (setq timer (peek-schedule))
-              (unless (and timer
-                           (> (get-internal-real-time)
-                              (%timer-expire-time timer)))
-                (return-from run-expired-timers nil))
-              (assert (eq timer (priority-queue-extract-maximum *schedule*))))
-            ;; run the timer without the lock
-            (run-timer timer))))
+  (let (timer)
     (with-scheduler-lock ()
-      (set-system-timer))))
+      (setq timer (peek-schedule))
+      (when (or (null timer)
+                (< (get-internal-real-time)
+                   (%timer-expire-time timer)))
+        (return-from run-expired-timers nil))
+      (assert (eq timer (priority-queue-extract-maximum *schedule*)))
+      (set-system-timer))
+    (run-timer timer)))
 
 (defmacro sb!ext:with-timeout (expires &body body)
   #!+sb-doc

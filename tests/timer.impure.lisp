@@ -13,6 +13,62 @@
 
 (use-package :test-util)
 
+(sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
+    void)
+(sb-alien:define-alien-routine "check_deferrables_unblocked_or_lose"
+    void)
+
+(defun make-limited-timer (fn n &rest args)
+  (let (timer)
+    (setq timer
+          (apply #'sb-ext:make-timer
+                 (lambda ()
+                   (sb-sys:without-interrupts
+                     (decf n)
+                     (cond ((minusp n)
+                            (warn "Unscheduling timer ~A ~
+                                   upon reaching run limit. System too slow?"
+                                  timer)
+                            (sb-ext:unschedule-timer timer))
+                           (t
+                            (sb-sys:allow-with-interrupts
+                              (funcall fn))))))
+                 args))))
+
+(defun make-and-schedule-and-wait (fn time)
+  (let ((finishedp nil))
+    (sb-ext:schedule-timer (sb-ext:make-timer
+                            (lambda ()
+                              (sb-sys:without-interrupts
+                                (unwind-protect
+                                     (sb-sys:allow-with-interrupts
+                                       (funcall fn))
+                                  (setq finishedp t)))))
+                           time)
+    (loop until finishedp)))
+
+(with-test (:name (:timer :deferrables-blocked))
+  (make-and-schedule-and-wait (lambda ()
+                                (check-deferrables-blocked-or-lose))
+                              (random 0.1))
+  (check-deferrables-unblocked-or-lose))
+
+(with-test (:name (:timer :deferrables-unblocked))
+  (make-and-schedule-and-wait (lambda ()
+                                (sb-sys:with-interrupts
+                                  (check-deferrables-unblocked-or-lose)))
+                              (random 0.1))
+  (check-deferrables-unblocked-or-lose))
+
+(with-test (:name (:timer :deferrables-unblocked :unwind))
+  (catch 'xxx
+    (make-and-schedule-and-wait (lambda ()
+                                  (check-deferrables-blocked-or-lose)
+                                  (throw 'xxx nil))
+                                (random 0.1))
+    (sleep 1))
+  (check-deferrables-unblocked-or-lose))
+
 (defmacro raises-timeout-p (&body body)
   `(handler-case (progn (progn ,@body) nil)
     (sb-ext:timeout () t)))
@@ -165,9 +221,10 @@
         (loop
            (assert (eq wanted (subtypep type1 type2))))))))
 
-;;; Disabled. Hangs occasionally at least on x86. See comment before
-;;; the next test case.
-#+(and nil sb-thread)
+;;; Used to hang occasionally at least on x86. Two bugs caused it:
+;;; running out of stack (due to repeating timers being rescheduled
+;;; before they ran) and dying threads were open interrupts.
+#+sb-thread
 (with-test (:name (:timer :parallel-unschedule))
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
@@ -180,42 +237,42 @@
                        (loop for i from 1 upto 10
                              collect (let* ((thread (sb-thread:make-thread #'flop
                                                                            :name (format nil "scheduler ~A" i)))
-                                            (ticker (sb-ext:make-timer (lambda () 13) :thread (or other thread)
-                                                                       :name (format nil "ticker ~A" i))))
+                                            (ticker (make-limited-timer (lambda () 13)
+                                                                               1000
+                                                                               :thread (or other thread)
+                                                                               :name (format nil "ticker ~A" i))))
                                        (setf other thread)
                                        (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
                                        thread)))))))
 
 ;;;; FIXME: OS X 10.4 doesn't like these being at all, and gives us a SIGSEGV
 ;;;; instead of using the Mach expection system! 10.5 on the other tends to
-;;;; lose() where with interrupt already pending. :/
+;;;; lose() here with interrupt already pending. :/
 ;;;;
-;;;; FIXME: This test also occasionally hangs on Linux/x86-64 at least. The
-;;;; common feature is one thread in gc_stop_the_world, and another trying to
-;;;; signal_interrupt_thread, but both (apparently) getting EAGAIN repeatedly.
-;;;; Exactly how or why this is happening remains under investigation -- but
-;;;; it seems plausible that the fast timers simply fill up the interrupt
-;;;; queue completely. (On some occasions the process unwedges itself after
-;;;; a few minutes, but not always.)
-;;;;
-;;;; FIXME: Another failure mode on Linux: recursive entries to
-;;;; RUN-EXPIRED-TIMERS blowing the stack.
-#+nil
+;;;; Used to have problems in genereal, see comment on (:TIMER
+;;;; :PARALLEL-UNSCHEDULE).
 (with-test (:name (:timer :schedule-stress))
   (flet ((test ()
-           (let* ((slow-timers (loop for i from 1 upto 100
-                                     collect (sb-ext:make-timer (lambda () 13) :name (format nil "slow ~A" i))))
-                  (fast-timer (sb-ext:make-timer (lambda () 42) :name "fast")))
-             (sb-ext:schedule-timer fast-timer 0.0001 :repeat-interval 0.0001)
-             (dolist (timer slow-timers)
-               (sb-ext:schedule-timer timer (random 0.1) :repeat-interval (random 0.1)))
-             (dolist (timer slow-timers)
-               (sb-ext:unschedule-timer timer))
-             (sb-ext:unschedule-timer fast-timer))))
-    #+sb-thread
-    (mapcar #'sb-thread:join-thread (loop repeat 10 collect (sb-thread:make-thread #'test)))
-    #-sb-thread
-    (loop repeat 10 do (test))))
+         (let* ((slow-timers
+                 (loop for i from 1 upto 1
+                       collect (make-limited-timer
+                                (lambda () 13)
+                                1000
+                                :name (format nil "slow ~A" i))))
+                (fast-timer (make-limited-timer (lambda () 42) 1000
+                                                :name "fast")))
+           (sb-ext:schedule-timer fast-timer 0.0001 :repeat-interval 0.0001)
+           (dolist (timer slow-timers)
+             (sb-ext:schedule-timer timer (random 0.1)
+                                    :repeat-interval (random 0.1)))
+           (dolist (timer slow-timers)
+             (sb-ext:unschedule-timer timer))
+           (sb-ext:unschedule-timer fast-timer))))
+  #+sb-thread
+  (mapcar #'sb-thread:join-thread
+          (loop repeat 10 collect (sb-thread:make-thread #'test)))
+  #-sb-thread
+  (loop repeat 10 do (test))))
 
 #+sb-thread
 (with-test (:name (:timer :threaded-stress))

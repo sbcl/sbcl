@@ -35,6 +35,7 @@
                   #!+(or x86 x86-64) *pseudo-atomic-bits*
                   #!+(or hpux) sb!vm::*c-lra*
                   *allow-with-interrupts*
+                  sb!unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*
                   *interrupt-pending*
                   *free-interrupt-context-index*

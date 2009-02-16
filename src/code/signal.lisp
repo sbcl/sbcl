@@ -51,6 +51,18 @@
 (defvar *interrupts-enabled* t)
 (defvar *interrupt-pending* nil)
 (defvar *allow-with-interrupts* t)
+;;; This is to support signal handlers that want to return to the
+;;; interrupted context without leaving anything extra on the stack. A
+;;; simple
+;;;
+;;;  (without-interrupts
+;;;   (unblock-deferrable-signals)
+;;;   (allow-with-interrupts ...))
+;;;
+;;; would not cut it, as upon leaving WITHOUT-INTERRUPTS the pending
+;;; handlers is run with stuff from the function in which this is
+;;; still on the stack.
+(defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc
@@ -105,9 +117,13 @@ WITHOUT-INTERRUPTS in:
                              ,',outer-allow-with-interrupts)
                             (*interrupts-enabled*
                              ,',outer-allow-with-interrupts))
-                        (when (and ,',outer-allow-with-interrupts
-                                   *interrupt-pending*)
-                          (receive-pending-interrupt))
+                        (when ,',outer-allow-with-interrupts
+                          (when *unblock-deferrables-on-enabling-interrupts-p*
+                            (setq *unblock-deferrables-on-enabling-interrupts-p*
+                                  nil)
+                            (sb!unix::unblock-deferrable-signals))
+                          (when *interrupt-pending*
+                            (receive-pending-interrupt)))
                         (locally ,@with-forms))))
                 (let ((*interrupts-enabled* nil)
                       (,outer-allow-with-interrupts *allow-with-interrupts*)
@@ -149,8 +165,12 @@ by ALLOW-WITH-INTERRUPTS."
     `(let* ((,allowp *allow-with-interrupts*)
             (,enablep *interrupts-enabled*)
             (*interrupts-enabled* (or ,enablep ,allowp)))
-       (when (and (and ,allowp (not ,enablep)) *interrupt-pending*)
-         (receive-pending-interrupt))
+       (when (and ,allowp (not ,enablep))
+         (when *unblock-deferrables-on-enabling-interrupts-p*
+           (setq *unblock-deferrables-on-enabling-interrupts-p* nil)
+           (sb!unix::unblock-deferrable-signals))
+         (when *interrupt-pending*
+           (receive-pending-interrupt)))
        (locally ,@body))))
 
 (defmacro allow-with-interrupts (&body body)
@@ -163,11 +183,12 @@ by ALLOW-WITH-INTERRUPTS."
   (error "~S is valid only inside ~S."
          'with-local-interrupts 'without-interrupts))
 
-;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is false,
-;;; and *ALLOW-WITH-INTERRUPTS* is true.
+;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is
+;;; false, *ALLOW-WITH-INTERRUPTS* is true and deferrable signals are
+;;; unblocked.
 (defun %check-interrupts ()
-  ;; Here we check for pending interrupts first, because reading a special
-  ;; is faster then binding it!
+  ;; Here we check for pending interrupts first, because reading a
+  ;; special is faster then binding it!
   (when *interrupt-pending*
     (let ((*interrupts-enabled* t))
       (receive-pending-interrupt))))
