@@ -254,10 +254,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-#ifdef LISP_FEATURE_LINUX
-    /* FIXME: Check that this is necessary -- CSR, 2002-07-15 */
-    os_restore_fp_control(context);
-#endif
 
     if ((siginfo->si_code) == ILL_ILLOPC
 #ifdef LISP_FEATURE_LINUX
@@ -301,9 +297,6 @@ static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
     boolean subtract, immed;
     int rd, rs1, op1, rs2, op2, result;
     os_context_t *context = arch_os_get_context(&void_context);
-#ifdef LISP_FEATURE_LINUX
-    os_restore_fp_control(context);
-#endif
 
     badinst = *(unsigned int *)os_context_pc_addr(context);
     if ((badinst >> 30) != 2 || ((badinst >> 20) & 0x1f) != 0x11) {

@@ -274,16 +274,6 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
     current_control_stack_pointer =
         (lispobj *)*os_context_sp_addr(context);
 
-    /* FIXME: CMUCL puts the float control restoration code here.
-       Thus, it seems to me that single-stepping won't restore the
-       float control.  Since SBCL currently doesn't support
-       single-stepping (as far as I can tell) this is somewhat moot,
-       but it might be worth either moving this code up or deleting
-       the single-stepping code entirely.  -- CSR, 2002-07-15 */
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    os_restore_fp_control(context);
-#endif
-
 #ifdef LISP_FEATURE_SUNOS
     /* For some reason the breakpoints that :ENCAPSULATE NIL tracing sets up
      * cause a trace trap (i.e. processor single-stepping trap) on the following

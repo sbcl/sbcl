@@ -319,9 +319,6 @@ static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code;
-#ifdef LISP_FEATURE_LINUX
-    os_restore_fp_control(context);
-#endif
 
     /* this is different from how CMUCL does it.  CMUCL used "call_pal
      * PAL_gentrap", which doesn't do anything on Linux (unless NL0

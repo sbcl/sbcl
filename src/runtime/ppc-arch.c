@@ -428,9 +428,6 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
     unsigned int code;
     os_context_t *context = void_context;
 
-#ifdef LISP_FEATURE_LINUX
-    os_restore_fp_control(context);
-#endif
     code=*((u32 *)(*os_context_pc_addr(context)));
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))) {
         arch_clear_pseudo_atomic_interrupted(context);

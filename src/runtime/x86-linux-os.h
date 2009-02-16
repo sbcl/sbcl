@@ -10,6 +10,7 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 }
 
 unsigned long os_context_fp_control(os_context_t *context);
+#define RESTORE_FP_CONTROL_FROM_CONTEXT
 void os_restore_fp_control(os_context_t *context);
 
 #endif /* _X86_LINUX_OS_H */

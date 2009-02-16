@@ -68,6 +68,18 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
+/* Under Linux on some architectures, we appear to have to restore the
+ * FPU control word from the context, as after the signal is delivered
+ * we appear to have a null FPU control word. */
+#if defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
+#define RESTORE_FP_CONTROL_WORD(context,void_context)           \
+    os_context_t *context = arch_os_get_context(&void_context); \
+    os_restore_fp_control(context);
+#else
+#define RESTORE_FP_CONTROL_WORD(context,void_context)           \
+    os_context_t *context = arch_os_get_context(&void_context);
+#endif
+
 /* These are to be used in signal handlers. Currently all handlers are
  * called from one of:
  *
@@ -78,9 +90,10 @@
  * low_level_maybe_now_maybe_later
  * low_level_unblock_me_trampoline
  */
-#define SAVE_ERRNO()                                            \
+#define SAVE_ERRNO(context,void_context)                        \
     {                                                           \
         int _saved_errno = errno;                               \
+        RESTORE_FP_CONTROL_WORD(context,void_context);          \
         {
 
 #define RESTORE_ERRNO                                           \
@@ -854,13 +867,6 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         check_interrupts_enabled_or_lose(context);
 #endif
 
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    /* Under Linux on some architectures, we appear to have to restore
-       the FPU control word from the context, as after the signal is
-       delivered we appear to have a null FPU control word. */
-    os_restore_fp_control(context);
-#endif
-
     handler = interrupt_handlers[signal];
 
     if (ARE_SAME_HANDLER(handler.c, SIG_IGN)) {
@@ -1044,14 +1050,9 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
-    os_context_t *context = arch_os_get_context(&void_context);
+    SAVE_ERRNO(context,void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
-
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    os_restore_fp_control(context);
-#endif
 
     if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         interrupt_handle_now(signal, info, context);
@@ -1072,14 +1073,9 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
 static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
-    os_context_t *context = arch_os_get_context(&void_context);
+    SAVE_ERRNO(context,void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
-
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    os_restore_fp_control(context);
-#endif
 
     if(!maybe_defer_handler(low_level_interrupt_handle_now,data,
                             signal,info,context))
@@ -1153,10 +1149,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
-    os_context_t *context = arch_os_get_context(&void_context);
-#if defined(LISP_FEATURE_LINUX) || defined(RESTORE_FP_CONTROL_FROM_CONTEXT)
-    os_restore_fp_control(context);
+    SAVE_ERRNO(context,void_context);
 #ifndef LISP_FEATURE_WIN32
     if ((signal == SIGILL) || (signal == SIGBUS)
 #ifndef LISP_FEATURE_LINUX
@@ -1164,7 +1157,6 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 #endif
         )
         corruption_warning_and_maybe_lose("Signal %d recieved", signal);
-#endif
 #endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
@@ -1195,7 +1187,7 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     /* Build a stack frame showing `interrupted' so that the
      * user's backtrace makes (as much) sense (as usual) */
 
-    /* FIXME: what about restoring fp state? */
+    /* fp state is saved and restored by call_into_lisp */
     /* FIXME: errno is not restored, but since current uses of this
      * function only call Lisp code that signals an error, it's not
      * much of a problem. In other words, running out of the control
@@ -1495,8 +1487,7 @@ see_if_sigaction_nodefer_works(void)
 static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
-    os_context_t *context = arch_os_get_context(&void_context);
+    SAVE_ERRNO(context,void_context);
     sigset_t unblock;
 
     sigemptyset(&unblock);
@@ -1509,7 +1500,7 @@ unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 static void
 low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
+    SAVE_ERRNO(context,void_context);
     sigset_t unblock;
 
     sigemptyset(&unblock);
@@ -1522,7 +1513,7 @@ low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO();
+    SAVE_ERRNO(context,void_context);
     (*interrupt_low_level_handlers[signal])(signal, info, void_context);
     RESTORE_ERRNO;
 }

@@ -208,7 +208,8 @@ os_context_sigmask_addr(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cw));
+    if (context->uc_mcontext.fpregs)
+        asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cw));
 }
 
 void

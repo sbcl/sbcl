@@ -151,11 +151,13 @@ os_context_sigmask_addr(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    /* reset exception flags and restore control flags on SSE2 FPU */
-    unsigned int temp = (context->uc_mcontext.fpregs->mxcsr) & ~0x3F;
-    asm ("ldmxcsr %0" : : "m" (temp));
-    /* same for x87 FPU. */
-    asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cwd));
+    if (context->uc_mcontext.fpregs) {
+        /* reset exception flags and restore control flags on SSE2 FPU */
+        unsigned int temp = (context->uc_mcontext.fpregs->mxcsr) & ~0x3F;
+        asm ("ldmxcsr %0" : : "m" (temp));
+        /* same for x87 FPU. */
+        asm ("fldcw %0" : : "m" (context->uc_mcontext.fpregs->cwd));
+    }
 }
 
 void
