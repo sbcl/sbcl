@@ -133,6 +133,18 @@ sigset_t blockable_sigset;
 #endif
 
 void
+check_deferrables_unblocked_in_sigset_or_lose(sigset_t *sigset)
+{
+#if !defined(LISP_FEATURE_WIN32)
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(&deferrable_sigset, i) && sigismember(sigset, i))
+            lose("deferrable signal %d blocked\n",i);
+    }
+#endif
+}
+
+void
 check_deferrables_blocked_in_sigset_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32)
@@ -192,6 +204,60 @@ check_interrupts_enabled_or_lose(os_context_t *context)
         lose("interrupts not enabled\n");
     if (arch_pseudo_atomic_atomic(context))
         lose ("in pseudo atomic section\n");
+}
+
+/* Check our baroque invariants. */
+void
+check_interrupt_context_or_lose(os_context_t *context)
+{
+    struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
+    int interrupt_deferred_p = (data->pending_handler != 0);
+    int interrupt_pending = (SymbolValue(INTERRUPT_PENDING,thread) != NIL);
+    /* On PPC pseudo_atomic_interrupted is cleared when coming out of
+     * handle_allocation_trap. */
+#if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_PPC)
+#if 0
+    int interrupts_enabled = (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL);
+    int gc_inhibit = (SymbolValue(GC_INHIBIT,thread) != NIL);
+    int gc_pending = (SymbolValue(GC_PENDING,thread) == T);
+    int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
+#endif
+    /* In the time window between leaving the *INTERRUPTS-ENABLED* NIL
+     * section and trapping, a SIG_STOP_FOR_GC would see the next
+     * check fail, for this reason sig_stop_for_gc handler does not
+     * call this function. Plus, there may be interrupt lossage when a
+     * pseudo atomic is interrupted by a deferrable signal and gc is
+     * triggered, too. */
+#if 0
+    if (interrupt_deferred_p)
+        if (interrupts_enabled && !pseudo_atomic_interrupted)
+            lose("Stray deferred interrupt.");
+#endif
+    /* Broken momentarily at the end of WITHOUT-GCING. */
+#if 0
+    if (gc_pending)
+        if (!(pseudo_atomic_interrupted || gc_inhibit))
+            lose("GC_PENDING, but why?.");
+#if defined(LISP_FEATURE_SB_THREAD)
+    {
+        int stop_for_gc_pending =
+            (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL);
+        if (stop_for_gc_pending)
+            if (!(pseudo_atomic_interrupted || gc_inhibit))
+                lose("STOP_FOR_GC_PENDING, but why?.");
+    }
+#endif
+#endif
+#endif
+    if (interrupt_pending && !interrupt_deferred_p)
+        lose("INTERRUPT_PENDING but not pending handler.");
+    if (interrupt_deferred_p)
+        check_deferrables_blocked_in_sigset_or_lose
+            (os_context_sigmask_addr(context));
+    else
+        check_deferrables_unblocked_in_sigset_or_lose
+            (os_context_sigmask_addr(context));
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -661,6 +727,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
 
     if (SymbolValue(INTERRUPT_PENDING,thread) != NIL)
         lose("interrupt already pending\n");
+    check_interrupt_context_or_lose(context);
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
      * atomic section inside a WITHOUT-INTERRUPTS.
@@ -671,6 +738,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         FSHOW_SIGNAL((stderr,
                       "/maybe_defer_handler(%x,%d): deferred\n",
                       (unsigned int)handler,signal));
+        check_interrupt_context_or_lose(context);
         return 1;
     }
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
@@ -682,6 +750,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         FSHOW_SIGNAL((stderr,
                       "/maybe_defer_handler(%x,%d): deferred(PA)\n",
                       (unsigned int)handler,signal));
+        check_interrupt_context_or_lose(context);
         return 1;
     }
     FSHOW_SIGNAL((stderr,
