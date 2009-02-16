@@ -33,8 +33,8 @@ typedef int os_vm_prot_t;
 #define SIG_MEMORY_FAULT SIGSEGV
 
 #define SIG_INTERRUPT_THREAD (SIGRTMIN)
-#define SIG_STOP_FOR_GC (SIGRTMIN+1)
-#define SIG_RESUME_FROM_GC (SIGRTMIN+2)
+#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_RESUME_FROM_GC (SIGUSR2)
 
 /* Yaargh?! */
 typedef int os_context_register_t ;

@@ -105,25 +105,18 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGPROF);
     sigaddset(s, SIGWINCH);
 
-#if !((defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_FREEBSD)) && defined(LISP_FEATURE_SB_THREAD))
-    sigaddset(s, SIGUSR1);
-    sigaddset(s, SIGUSR2);
-#endif
-
 #ifdef LISP_FEATURE_SB_THREAD
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
 }
 
 void
-sigaddset_blockable(sigset_t *s)
+sigaddset_blockable(sigset_t *sigset)
 {
-    sigaddset_deferrable(s);
+    sigaddset_deferrable(sigset);
 #ifdef LISP_FEATURE_SB_THREAD
-#ifdef SIG_RESUME_FROM_GC
-    sigaddset(s, SIG_RESUME_FROM_GC);
-#endif
-    sigaddset(s, SIG_STOP_FOR_GC);
+    sigaddset(sigset,SIG_RESUME_FROM_GC);
+    sigaddset(sigset,SIG_STOP_FOR_GC);
 #endif
 }
 
@@ -876,23 +869,15 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     FSHOW_SIGNAL((stderr,"suspended\n"));
 
     sigemptyset(&ss);
-#if defined(SIG_RESUME_FROM_GC)
     sigaddset(&ss,SIG_RESUME_FROM_GC);
-#else
-    sigaddset(&ss,SIG_STOP_FOR_GC);
-#endif
 
     /* It is possible to get SIGCONT (and probably other non-blockable
      * signals) here. */
-#ifdef SIG_RESUME_FROM_GC
     {
         int sigret;
         do { sigwait(&ss, &sigret); }
         while (sigret != SIG_RESUME_FROM_GC);
     }
-#else
-    while (sigwaitinfo(&ss,0) != SIG_STOP_FOR_GC);
-#endif
 
     FSHOW_SIGNAL((stderr,"resumed\n"));
     if(thread->state!=STATE_RUNNING) {
@@ -902,6 +887,13 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     undo_fake_foreign_function_call(context);
 }
+
+void
+sig_resume_from_gc_handler(int signal, siginfo_t *info, void *void_context)
+{
+    lose("SIG_RESUME_FROM_GC handler called.");
+}
+
 #endif
 
 void

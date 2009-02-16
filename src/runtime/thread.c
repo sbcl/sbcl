@@ -668,21 +668,13 @@ void gc_start_the_world()
                           p->os_thread));
             p->state=STATE_RUNNING;
 
-#if defined(SIG_RESUME_FROM_GC)
             status=kill_thread_safely(p->os_thread,SIG_RESUME_FROM_GC);
-#else
-            status=kill_thread_safely(p->os_thread,SIG_STOP_FOR_GC);
-#endif
             if (status) {
                 lose("cannot resume thread=%lu: %d, %s\n",
                      p->os_thread,status,strerror(status));
             }
         }
     }
-    /* If we waited here until all threads leave STATE_SUSPENDED, then
-     * SIG_STOP_FOR_GC wouldn't need to be a rt signal. That has some
-     * performance implications, but does away with the 'rt signal
-     * queue full' problem. */
 
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);

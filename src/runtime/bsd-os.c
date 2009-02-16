@@ -257,10 +257,8 @@ os_install_interrupt_handlers(void)
                                                  interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
-#ifdef SIG_RESUME_FROM_GC
     undoably_install_low_level_interrupt_handler(SIG_RESUME_FROM_GC,
-                                                 sig_stop_for_gc_handler);
-#endif
+                                                 sig_resume_from_gc_handler);
 #endif
     SHOW("leaving os_install_interrupt_handlers()");
 }
