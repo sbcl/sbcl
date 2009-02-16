@@ -79,10 +79,10 @@ extern void *return_from_lisp_stub;
 
 /* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
 static void
-sigint_handler(int signal, siginfo_t *info, void *void_context)
+sigint_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     lose("\nSIGINT hit at 0x%08lX\n",
-         (unsigned long) *os_context_pc_addr(void_context));
+         (unsigned long) *os_context_pc_addr(context));
 }
 
 /* (This is not static, because we want to be able to call it from

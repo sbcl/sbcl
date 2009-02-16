@@ -423,10 +423,9 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 }
 
 static void
-sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
+sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
     unsigned int code;
-    os_context_t *context = void_context;
 
     code=*((u32 *)(*os_context_pc_addr(context)));
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))) {

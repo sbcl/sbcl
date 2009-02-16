@@ -116,9 +116,10 @@ int arch_os_thread_cleanup(struct thread *thread) {
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 
-void sigill_handler(int signal, siginfo_t *siginfo, void *void_context);
-void sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context);
-void memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context);
+void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
+void sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context);
+void memory_fault_handler(int signal, siginfo_t *siginfo,
+                          os_context_t *context);
 
 /* exc_server handles mach exception messages from the kernel and
  * calls catch exception raise. We use the system-provided
@@ -371,8 +372,8 @@ void dump_context(x86_thread_state32_t *thread_state)
 #endif
 
 void
-control_stack_exhausted_handler(int signal, siginfo_t *siginfo, void *void_context) {
-    os_context_t *context = arch_os_get_context(&void_context);
+control_stack_exhausted_handler(int signal, siginfo_t *siginfo,
+                                os_context_t *context) {
 
     unblock_signals_in_context_and_maybe_warn(context);
     arrange_return_to_lisp_function
@@ -380,9 +381,7 @@ control_stack_exhausted_handler(int signal, siginfo_t *siginfo, void *void_conte
 }
 
 void
-undefined_alien_handler(int signal, siginfo_t *siginfo, void *void_context) {
-    os_context_t *context = arch_os_get_context(&void_context);
-
+undefined_alien_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     arrange_return_to_lisp_function
         (context, StaticSymbolFunction(UNDEFINED_ALIEN_VARIABLE_ERROR));
 }

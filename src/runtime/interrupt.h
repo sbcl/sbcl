@@ -86,7 +86,7 @@ sigcopyset(sigset_t *new, sigset_t *old)
 
 union interrupt_handler {
     lispobj lisp;
-    void (*c)(int, siginfo_t*, void*);
+    void (*c)(int, siginfo_t*, os_context_t*);
 };
 
 extern union interrupt_handler interrupt_handlers[NSIG];
@@ -94,7 +94,7 @@ extern union interrupt_handler interrupt_handlers[NSIG];
 struct interrupt_data {
     /* signal information for pending signal.  pending_signal=0 when there
      * is no pending signal. */
-    void (*pending_handler) (int, siginfo_t*, void*) ;
+    void (*pending_handler) (int, siginfo_t*, os_context_t*) ;
     int pending_signal;
     siginfo_t pending_info;
     sigset_t pending_mask;
@@ -123,9 +123,9 @@ extern void do_pending_interrupt(void);
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-extern void sig_stop_for_gc_handler(int, siginfo_t*, void*);
+extern void sig_stop_for_gc_handler(int, siginfo_t*, os_context_t*);
 #endif
-typedef void (*interrupt_handler_t)(int, siginfo_t *, void *);
+typedef void (*interrupt_handler_t)(int, siginfo_t *, os_context_t *);
 extern void undoably_install_low_level_interrupt_handler (
                         int signal,
                         interrupt_handler_t handler);

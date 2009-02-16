@@ -396,9 +396,8 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 }
 
 static void
-sigtrap_handler(int signal, siginfo_t *info, void *void_context)
+sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int code = (os_context_insn(context) >> 6) & 0xfffff;
     /* FIXME: This magic number is pseudo-atomic-trap from parms.lisp.
      * Genesis should provide the proper #define, but it specialcases
@@ -415,9 +414,8 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 #define FIXNUM_VALUE(lispobj) (((int)lispobj) >> N_FIXNUM_TAG_BITS)
 
 static void
-sigfpe_handler(int signal, siginfo_t *info, void *void_context)
+sigfpe_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int bad_inst = os_context_insn(context);
     unsigned int op, rs, rt, rd, funct, dest = 32;
     int immed;

@@ -251,9 +251,8 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 }
 
 static void
-sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
+sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int bad_inst;
 
     bad_inst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
@@ -266,9 +265,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, void *void_context)
 }
 
 static void
-sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
+sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-  os_context_t *context = arch_os_get_context(&void_context);
   unsigned int bad_inst;
 
   bad_inst = *(unsigned int *)(*os_context_pc_addr(context) & ~3);
@@ -281,9 +279,9 @@ sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
   }
 }
 
-static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
+static void sigfpe_handler(int signal, siginfo_t *siginfo,
+                           os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int badinst;
     int opcode, r1, r2, t;
     long op1, op2, res;
@@ -373,9 +371,9 @@ static void sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
    the light of day. Since the instructions that we need to fix up
    tend not to be doing unaligned memory access, this should be a safe
    workaround.  -- CSR, 2002-08-17 */
-static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
+static void sigbus_handler(int signal, siginfo_t *siginfo,
+                           os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int badinst;
     int opcode, r1, r2, t;
     long op1, op2, res;
@@ -450,7 +448,7 @@ static void sigbus_handler(int signal, siginfo_t *siginfo, void *void_context)
 }
 
 static void
-ignore_handler(int signal, siginfo_t *siginfo, void *void_context)
+ignore_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
 }
 
@@ -468,4 +466,3 @@ void arch_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIGXFSZ,ignore_handler);
 #endif
 }
-

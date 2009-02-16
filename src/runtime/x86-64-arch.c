@@ -230,9 +230,8 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 
 void
-sigtrap_handler(int signal, siginfo_t *info, void *void_context)
+sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = (os_context_t*)void_context;
     unsigned int trap;
 
     if (single_stepping && (signal==SIGTRAP))
@@ -273,16 +272,14 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 }
 
 void
-sigill_handler(int signal, siginfo_t *siginfo, void *void_context) {
-    os_context_t *context = (os_context_t*)void_context;
-
+sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     /* Triggering SIGTRAP using int3 is unreliable on OS X/x86, so
      * we need to use illegal instructions for traps.
      */
 #if defined(LISP_FEATURE_DARWIN) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
     if (*((unsigned short *)*os_context_pc_addr(context)) == 0x0b0f) {
         *os_context_pc_addr(context) += 2;
-        return sigtrap_handler(signal, siginfo, void_context);
+        return sigtrap_handler(signal, siginfo, context);
     }
 #endif
 
@@ -324,9 +321,8 @@ mxcsr_to_code(unsigned int mxcsr)
 }
 
 static void
-sigfpe_handler(int signal, siginfo_t *siginfo, void *void_context)
+sigfpe_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     unsigned int *mxcsr = arch_os_context_mxcsr_addr(context);
 
     if (siginfo->si_code == 0) { /* XMM exception */

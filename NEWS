@@ -36,6 +36,7 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     fault.
   * bug fix: finalizers, gc hooks never run in a WITHOUT-INTERRUPTS
   * bug fix: fix random memory faults related to interrupts on alpha
+  * bug fix: fix random memory faults related to interrupts on sparc
   * bug fix: fix deadlocks related to starting threads
   * bug fix: fix deadlines on locks on futex platforms
   * bug fix: restore errno in signal handlers

@@ -197,9 +197,8 @@ boolean is_valid_lisp_addr(os_vm_address_t addr)
 #if defined LISP_FEATURE_GENCGC
 
 void
-sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     void* fault_addr = (void*)info->si_addr;
 
     if (!gencgc_handle_wp_violation(fault_addr))
@@ -210,9 +209,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 #else
 
 static void
-sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
     if (!cheneygc_handle_wp_violation(context, addr)) {

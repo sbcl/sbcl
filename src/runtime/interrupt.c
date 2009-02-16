@@ -89,6 +89,14 @@
  * low_level_handle_now_handler
  * low_level_maybe_now_maybe_later
  * low_level_unblock_me_trampoline
+ *
+ * This gives us a single point of control (or six) over errno, fp
+ * control word, and fixing up signal context on sparc.
+ *
+ * The SPARC/Linux platform doesn't quite do signals the way we want
+ * them done. The third argument in the handler isn't filled in by the
+ * kernel properly, so we fix it up ourselves in the
+ * arch_os_get_context(..) function. -- CSR, 2002-07-23
  */
 #define SAVE_ERRNO(context,void_context)                        \
     {                                                           \
@@ -101,7 +109,8 @@
         errno = _saved_errno;                                   \
     }
 
-static void run_deferred_handler(struct interrupt_data *data, void *v_context);
+static void run_deferred_handler(struct interrupt_data *data,
+                                 os_context_t *context);
 #ifndef LISP_FEATURE_WIN32
 static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
@@ -412,7 +421,8 @@ check_interrupt_context_or_lose(os_context_t *context)
 boolean internal_errors_enabled = 0;
 
 #ifndef LISP_FEATURE_WIN32
-static void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, void*);
+static
+void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
 #endif
 union interrupt_handler interrupt_handlers[NSIG];
 
@@ -826,9 +836,7 @@ interrupt_handle_pending(os_context_t *context)
         arch_clear_pseudo_atomic_interrupted(context);
         /* Restore the sigmask in the context. */
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
-        /* This will break on sparc linux: the deferred handler really
-         * wants to be called with a void_context */
-        run_deferred_handler(data,(void *)context);
+        run_deferred_handler(data, context);
     }
     /* It is possible that the end of this function was reached
      * without never actually doing anything, the tests in Lisp for
@@ -837,20 +845,6 @@ interrupt_handle_pending(os_context_t *context)
 #endif
 }
 
-/*
- * the two main signal handlers:
- *   interrupt_handle_now(..)
- *   maybe_now_maybe_later(..)
- *
- * to which we have added interrupt_handle_now_handler(..).  Why?
- * Well, mostly because the SPARC/Linux platform doesn't quite do
- * signals the way we want them done.  The third argument in the
- * handler isn't filled in by the kernel properly, so we fix it up
- * ourselves in the arch_os_get_context(..) function; however, we only
- * want to do this when we first hit the handler, and not when
- * interrupt_handle_now(..) is being called from some other handler
- * (when the fixup will already have been done). -- CSR, 2002-07-23
- */
 
 void
 interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
@@ -951,17 +945,18 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
  * already; we're just doing the Lisp-level processing now that we
  * put off then */
 static void
-run_deferred_handler(struct interrupt_data *data, void *v_context)
+run_deferred_handler(struct interrupt_data *data, os_context_t *context)
 {
     /* The pending_handler may enable interrupts and then another
      * interrupt may hit, overwrite interrupt_data, so reset the
      * pending handler before calling it. Trust the handler to finish
      * with the siginfo before enabling interrupts. */
-    void (*pending_handler) (int, siginfo_t*, void*)=data->pending_handler;
+    void (*pending_handler) (int, siginfo_t*, os_context_t*) =
+        data->pending_handler;
 
     data->pending_handler=0;
     FSHOW_SIGNAL((stderr, "/running deferred handler %p\n", pending_handler));
-    (*pending_handler)(data->pending_signal,&(data->pending_info), v_context);
+    (*pending_handler)(data->pending_signal,&(data->pending_info), context);
 }
 
 #ifndef LISP_FEATURE_WIN32
@@ -1088,10 +1083,8 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
 /* This function must not cons, because that may trigger a GC. */
 void
-sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
+sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
-
     struct thread *thread=arch_os_get_current_thread();
     sigset_t ss;
 
@@ -1546,7 +1539,7 @@ low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
     sigemptyset(&unblock);
     sigaddset(&unblock, signal);
     thread_sigmask(SIG_UNBLOCK, &unblock, 0);
-    (*interrupt_low_level_handlers[signal])(signal, info, void_context);
+    (*interrupt_low_level_handlers[signal])(signal, info, context);
     RESTORE_ERRNO;
 }
 
@@ -1554,7 +1547,7 @@ static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     SAVE_ERRNO(context,void_context);
-    (*interrupt_low_level_handlers[signal])(signal, info, void_context);
+    (*interrupt_low_level_handlers[signal])(signal, info, context);
     RESTORE_ERRNO;
 }
 
@@ -1569,18 +1562,12 @@ undoably_install_low_level_interrupt_handler (int signal,
     }
 
     if (ARE_SAME_HANDLER(handler, SIG_DFL))
-        sa.sa_sigaction = handler;
+        sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
     else if (sigismember(&deferrable_sigset,signal))
         sa.sa_sigaction = low_level_maybe_now_maybe_later;
-    /* The use of a trampoline appears to break the
-       arch_os_get_context() workaround for SPARC/Linux.  For now,
-       don't use the trampoline (and so be vulnerable to the problems
-       that SA_NODEFER is meant to solve. */
-#if !(defined(LISP_FEATURE_SPARC) && defined(LISP_FEATURE_LINUX))
     else if (!sigaction_nodefer_works &&
              !sigismember(&blockable_sigset, signal))
         sa.sa_sigaction = low_level_unblock_me_trampoline;
-#endif
     else
         sa.sa_sigaction = low_level_handle_now_handler;
 
@@ -1600,7 +1587,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 
 /* This is called from Lisp. */
 unsigned long
-install_handler(int signal, void handler(int, siginfo_t*, void*))
+install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
@@ -1618,7 +1605,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
     if (interrupt_low_level_handlers[signal]==0) {
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
             ARE_SAME_HANDLER(handler, SIG_IGN))
-            sa.sa_sigaction = handler;
+            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
         else if (sigismember(&deferrable_sigset, signal))
             sa.sa_sigaction = maybe_now_maybe_later;
         else if (!sigaction_nodefer_works &&
@@ -1650,7 +1637,7 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 /* This must not go through lisp as it's allowed anytime, even when on
  * the altstack. */
 void
-sigabrt_handler(int signal, siginfo_t *info, void *void_context)
+sigabrt_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     lose("SIGABRT received.\n");
 }
@@ -1677,7 +1664,7 @@ interrupt_init(void)
              * signal(..)-style one-argument handlers, which is OK
              * because it works to call the 1-argument form where the
              * 3-argument form is expected.) */
-            (void (*)(int, siginfo_t*, void*))SIG_DFL;
+            (void (*)(int, siginfo_t*, os_context_t*))SIG_DFL;
     }
     undoably_install_low_level_interrupt_handler(SIGABRT, sigabrt_handler);
     SHOW("returning from interrupt_init()");

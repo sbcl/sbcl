@@ -194,14 +194,13 @@ is_valid_lisp_addr(os_vm_address_t addr)
  */
 
 void
-memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
+memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context
 #if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
 /* FreeBSD/amd64 stores fault address only in undocumented 4th arg. */
                      ,void *fault_addr
 #endif
     )
 {
-    os_context_t *context = arch_os_get_context(&void_context);
 #if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
     /* KLUDGE: Store fault address into si_addr for compatibilities. */
     siginfo->si_addr = fault_addr;
@@ -224,7 +223,8 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context
 
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
 void
-mach_error_memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context) {
+mach_error_memory_fault_handler(int signal, siginfo_t *siginfo,
+                                os_context_t *context) {
     lose("Unhandled memory fault. Exiting.");
 }
 #endif
@@ -254,9 +254,8 @@ os_install_interrupt_handlers(void)
 #else /* Currently PPC/Darwin/Cheney only */
 
 static void
-sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
 #if 0
     unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
 #endif

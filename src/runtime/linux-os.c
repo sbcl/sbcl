@@ -376,9 +376,8 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * page fault on this OS.
  */
 static void
-sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
 #ifdef LISP_FEATURE_ALPHA

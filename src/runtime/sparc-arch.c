@@ -251,10 +251,9 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
-static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
+static void sigill_handler(int signal, siginfo_t *siginfo,
+                           os_context_t *context)
 {
-    os_context_t *context = arch_os_get_context(&void_context);
-
     if ((siginfo->si_code) == ILL_ILLOPC
 #ifdef LISP_FEATURE_LINUX
         || (linux_sparc_siginfo_bug && (siginfo->si_code == 2))
@@ -291,12 +290,12 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
     }
 }
 
-static void sigemt_handler(int signal, siginfo_t *siginfo, void *void_context)
+static void sigemt_handler(int signal, siginfo_t *siginfo,
+                           os_context_t *context)
 {
     unsigned int badinst;
     boolean subtract, immed;
     int rd, rs1, op1, rs2, op2, result;
-    os_context_t *context = arch_os_get_context(&void_context);
 
     badinst = *(unsigned int *)os_context_pc_addr(context);
     if ((badinst >> 30) != 2 || ((badinst >> 20) & 0x1f) != 0x11) {
