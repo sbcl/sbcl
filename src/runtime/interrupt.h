@@ -29,6 +29,7 @@
 extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
 
+extern void check_deferrables_blocked_or_lose(void);
 extern void check_blockables_blocked_or_lose(void);
 extern void check_gc_signals_unblocked_or_lose(void);
 extern void unblock_gc_signals(void);

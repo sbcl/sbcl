@@ -74,6 +74,15 @@ static void store_signal_data_for_later (struct interrupt_data *data,
                                          siginfo_t *info,
                                          os_context_t *context);
 
+static void
+fill_current_sigmask(sigset_t *sigset)
+{
+    /* Get the current sigmask, by blocking the empty set. */
+    sigset_t empty;
+    sigemptyset(&empty);
+    thread_sigmask(SIG_BLOCK, &empty, sigset);
+}
+
 void
 sigaddset_deferrable(sigset_t *s)
 {
@@ -121,6 +130,28 @@ sigaddset_blockable(sigset_t *s)
 sigset_t deferrable_sigset;
 sigset_t blockable_sigset;
 #endif
+
+void
+check_deferrables_blocked_in_sigset_or_lose(sigset_t *sigset)
+{
+#if !defined(LISP_FEATURE_WIN32)
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(&deferrable_sigset, i) && !sigismember(sigset, i))
+            lose("deferrable signal %d not blocked\n",i);
+    }
+#endif
+}
+
+void
+check_deferrables_blocked_or_lose(void)
+{
+#if !defined(LISP_FEATURE_WIN32)
+    sigset_t current;
+    fill_current_sigmask(&current);
+    check_deferrables_blocked_in_sigset_or_lose(&current);
+#endif
+}
 
 void
 check_blockables_blocked_or_lose(void)
@@ -407,14 +438,8 @@ interrupt_handle_pending(os_context_t *context)
 
     struct thread *thread;
 
-    /* Punt if in PA section, marking it as interrupted. This can
-     * happenat least if we pick up a GC request while in a
-     * WITHOUT-GCING with an outer PA -- it is not immediately clear
-     * to me that this should/could ever happen, but better safe then
-     * sorry. --NS 2007-05-15 */
     if (arch_pseudo_atomic_atomic(context)) {
-        arch_set_pseudo_atomic_interrupted(context);
-        return;
+        lose("Handling pending interrupt in pseduo atomic.");
     }
 
     thread = arch_os_get_current_thread();

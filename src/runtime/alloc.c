@@ -43,6 +43,16 @@ pa_alloc(int bytes, int page_type_flag)
     clear_pseudo_atomic_interrupted(th);
     set_pseudo_atomic_atomic(th);
     result = general_alloc(bytes, page_type_flag);
+#if 0
+    /* See how the runtime deals with GC being triggerred. */
+    if ((SymbolValue(GC_PENDING,th) == NIL) &&
+        (SymbolValue(GC_INHIBIT,th) == NIL) &&
+        (random() < RAND_MAX/100)) {
+        SetSymbolValue(GC_PENDING,T,th);
+        set_pseudo_atomic_interrupted(th);
+        maybe_save_gc_mask_and_block_deferrables(NULL);
+    }
+#endif
     clear_pseudo_atomic_atomic(th);
 
     if (get_pseudo_atomic_interrupted(th)) {
@@ -75,8 +85,11 @@ pa_alloc(int bytes, int page_type_flag)
 {
     lispobj *result;
 
-    /* FIXME: this is not pseudo atomic at all, but is called only from
-     * interrupt safe places like interrupt handlers. MG - 2005-08-09 */
+    /* This is not pseudo atomic at all, but is called only from
+     * interrupt safe places like interrupt handlers. MG -
+     * 2005-08-09 */
+    check_deferrables_blocked_or_lose();
+
     result = dynamic_space_free_pointer;
 
     /* Align up to next dual word boundary. */
