@@ -70,7 +70,8 @@ validate(void)
 #endif
 
 #ifdef LISP_FEATURE_LINKAGE_TABLE
-    ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
+    ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START,
+                  LINKAGE_TABLE_SPACE_SIZE);
 #endif
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
@@ -110,7 +111,8 @@ protect_control_stack_guard_page_thread(int protect_p, struct thread *th) {
 }
 
 void
-protect_control_stack_return_guard_page_thread(int protect_p, struct thread* th) {
+protect_control_stack_return_guard_page_thread(int protect_p,
+                                               struct thread* th) {
     os_protect(CONTROL_STACK_RETURN_GUARD_PAGE(th),
                os_vm_page_size,protect_p ?
                (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);

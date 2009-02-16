@@ -99,7 +99,8 @@ alloc_unboxed(int type, int words)
 {
     lispobj *result;
 
-    result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)), UNBOXED_PAGE_FLAG);
+    result = pa_alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)),
+                      UNBOXED_PAGE_FLAG);
     *result = (lispobj) (words << N_WIDETAG_BITS) | type;
     return result;
 }
@@ -110,7 +111,8 @@ alloc_vector(int type, int length, int size, int page_type_flag)
     struct vector *result;
 
     result = (struct vector *)
-        pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)), page_type_flag);
+        pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)),
+                 page_type_flag);
 
     result->header = type;
     result->length = make_fixnum(length);
@@ -122,7 +124,8 @@ lispobj
 alloc_cons(lispobj car, lispobj cdr)
 {
     struct cons *ptr =
-        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)), BOXED_PAGE_FLAG);
+        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)),
+                                BOXED_PAGE_FLAG);
 
     ptr->car = car;
     ptr->cdr = cdr;
@@ -150,7 +153,8 @@ lispobj
 alloc_base_string(char *str)
 {
     int len = strlen(str);
-    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8, UNBOXED_PAGE_FLAG);
+    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8,
+                                  UNBOXED_PAGE_FLAG);
     struct vector *vec = (struct vector *)native_pointer(result);
 
     vec->length = make_fixnum(len);
@@ -172,13 +176,15 @@ alloc_sap(void *ptr)
 lispobj
 alloc_code_object (unsigned boxed, unsigned unboxed) {
     struct code * code;
-    boxed = make_fixnum(boxed + 1 + 4); /* 4 == trace_table_offset offset in words */
+    /* 4 == trace_table_offset offset in words */
+    boxed = make_fixnum(boxed + 1 + 4);
     boxed &= ~LOWTAG_MASK;
 
     unboxed += LOWTAG_MASK;
     unboxed &= ~LOWTAG_MASK;
 
-    code = (struct code *) pa_alloc(ALIGNED_SIZE((boxed + unboxed) * sizeof(lispobj)),
+    code = (struct code *)pa_alloc(ALIGNED_SIZE((boxed + unboxed) *
+                                                sizeof(lispobj)),
                                     CODE_PAGE_FLAG);
 
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);

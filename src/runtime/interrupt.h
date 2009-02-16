@@ -126,7 +126,8 @@ extern void block_blockable_signals(void);
 extern void handle_trap(os_context_t *context, int trap);
 
 #ifndef LISP_FEATURE_WIN32
-extern void lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr);
+extern void lisp_memory_fault_error(os_context_t *context,
+                                    os_vm_address_t addr);
 #endif
 
 #endif

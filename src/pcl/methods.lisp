@@ -1639,8 +1639,10 @@
                     (t (multiple-value-bind (dfun cache info)
                            (make-final-dfun-internal
                             gf
-                            (list (list (find-class 'sb-kernel::control-stack-exhausted))
-                                  (list (find-class 'sb-kernel::heap-exhausted-error))
+                            (list (list (find-class
+                                         'sb-kernel::control-stack-exhausted))
+                                  (list (find-class
+                                         'sb-kernel::heap-exhausted-error))
                                   (list (find-class 'restart))))
                          (setq po-cache cache)
                          (set-dfun gf dfun cache info))))))

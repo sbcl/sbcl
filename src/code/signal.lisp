@@ -91,21 +91,30 @@ WITHOUT-INTERRUPTS in:
 "
   (with-unique-names (outer-allow-with-interrupts without-interrupts-body)
     `(flet ((,without-interrupts-body ()
-              (declare (disable-package-locks allow-with-interrupts with-local-interrupts))
-              (macrolet ((allow-with-interrupts (&body allow-forms)
-                                                `(let ((*allow-with-interrupts* ,',outer-allow-with-interrupts))
-                                                   ,@allow-forms))
-                         (with-local-interrupts (&body with-forms)
-                                                `(let ((*allow-with-interrupts* ,',outer-allow-with-interrupts)
-                                                       (*interrupts-enabled* ,',outer-allow-with-interrupts))
-                                                   (when (and ,',outer-allow-with-interrupts *interrupt-pending*)
-                                                     (receive-pending-interrupt))
-                                                   (locally ,@with-forms))))
+              (declare (disable-package-locks allow-with-interrupts
+                                              with-local-interrupts))
+              (macrolet
+                  ((allow-with-interrupts
+                     (&body allow-forms)
+                     `(let ((*allow-with-interrupts*
+                             ,',outer-allow-with-interrupts))
+                        ,@allow-forms))
+                   (with-local-interrupts
+                     (&body with-forms)
+                     `(let ((*allow-with-interrupts*
+                             ,',outer-allow-with-interrupts)
+                            (*interrupts-enabled*
+                             ,',outer-allow-with-interrupts))
+                        (when (and ,',outer-allow-with-interrupts
+                                   *interrupt-pending*)
+                          (receive-pending-interrupt))
+                        (locally ,@with-forms))))
                 (let ((*interrupts-enabled* nil)
                       (,outer-allow-with-interrupts *allow-with-interrupts*)
                       (*allow-with-interrupts* nil))
                   (declare (ignorable ,outer-allow-with-interrupts))
-                  (declare (enable-package-locks allow-with-interrupts with-local-interrupts))
+                  (declare (enable-package-locks allow-with-interrupts
+                                                 with-local-interrupts))
                   ,@body))))
        (if *interrupts-enabled*
            (unwind-protect
@@ -146,11 +155,13 @@ by ALLOW-WITH-INTERRUPTS."
 
 (defmacro allow-with-interrupts (&body body)
   (declare (ignore body))
-  (error "~S is valid only inside ~S." 'allow-with-interrupts 'without-interrupts))
+  (error "~S is valid only inside ~S."
+         'allow-with-interrupts 'without-interrupts))
 
 (defmacro with-local-interrupts (&body body)
   (declare (ignore body))
-  (error "~S is valid only inside ~S." 'with-local-interrupts 'without-interrupts))
+  (error "~S is valid only inside ~S."
+         'with-local-interrupts 'without-interrupts))
 
 ;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is false,
 ;;; and *ALLOW-WITH-INTERRUPTS* is true.

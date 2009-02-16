@@ -277,7 +277,8 @@ fake_foreign_function_call(os_context_t *context)
     dynamic_space_free_pointer =
         (lispobj *)(unsigned long)
             (*os_context_register_addr(context, reg_ALLOC));
-    /* fprintf(stderr,"dynamic_space_free_pointer: %p\n", dynamic_space_free_pointer); */
+/*     fprintf(stderr,"dynamic_space_free_pointer: %p\n", */
+/*             dynamic_space_free_pointer); */
 #if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_MIPS)
     if ((long)dynamic_space_free_pointer & 1) {
         lose("dead in fake_foreign_function_call, context = %x\n", context);
@@ -341,7 +342,8 @@ undo_fake_foreign_function_call(os_context_t *context)
         | (*os_context_register_addr(context, reg_ALLOC)
            & LOWTAG_MASK);
     /*
-      ((unsigned long)(*os_context_register_addr(context, reg_ALLOC)) & ~LOWTAG_MASK)
+      ((unsigned long)(*os_context_register_addr(context, reg_ALLOC))
+      & ~LOWTAG_MASK)
       | ((unsigned long) dynamic_space_free_pointer & LOWTAG_MASK);
     */
 #endif
@@ -675,7 +677,8 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     if(info)
         memcpy(&(data->pending_info), info, sizeof(siginfo_t));
 
-    FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n", signal));
+    FSHOW_SIGNAL((stderr, "/store_signal_data_for_later: signal: %d\n",
+                  signal));
 
     if(context) {
         /* the signal mask in the context (from before we were
@@ -704,7 +707,8 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 }
 
 static void
-low_level_interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
+low_level_interrupt_handle_now(int signal, siginfo_t *info,
+                               os_context_t *context)
 {
     /* No FP control fixage needed, caller has done that. */
     check_blockables_blocked_or_lose();
@@ -1010,7 +1014,8 @@ interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 
     /* let the handler enable interrupts again when it sees fit */
     sigaddset_deferrable(os_context_sigmask_addr(context));
-    arrange_return_to_lisp_function(context, StaticSymbolFunction(RUN_INTERRUPTION));
+    arrange_return_to_lisp_function(context,
+                                    StaticSymbolFunction(RUN_INTERRUPTION));
 }
 
 #endif
@@ -1295,7 +1300,8 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     * now -- some address is better then no address in this case.
     */
     current_memory_fault_address = addr;
-    arrange_return_to_lisp_function(context, StaticSymbolFunction(MEMORY_FAULT_ERROR));
+    arrange_return_to_lisp_function(context,
+                                    StaticSymbolFunction(MEMORY_FAULT_ERROR));
 }
 #endif
 

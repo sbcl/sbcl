@@ -309,8 +309,10 @@ main(int argc, char *argv[], char *envp[])
                 if (errno)
                     lose("argument to --dynamic-space-size is not a number");
 #               ifdef MAX_DYNAMIC_SPACE_END
-                if (!((DYNAMIC_SPACE_START < DYNAMIC_SPACE_START+dynamic_space_size) &&
-                      (DYNAMIC_SPACE_START+dynamic_space_size <= MAX_DYNAMIC_SPACE_END)))
+                if (!((DYNAMIC_SPACE_START <
+                       DYNAMIC_SPACE_START+dynamic_space_size) &&
+                      (DYNAMIC_SPACE_START+dynamic_space_size <=
+                       MAX_DYNAMIC_SPACE_END)))
                     lose("specified --dynamic-space-size too large");
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
@@ -433,8 +435,8 @@ main(int argc, char *argv[], char *envp[])
         lose("couldn't find initial function\n");
     }
 #ifdef LISP_FEATURE_HPUX
-    /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are not in LANGUAGE_ASSEMBLY
-       so we cant reach them. */
+    /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
+     * not in LANGUAGE_ASSEMBLY so we cant reach them. */
     return_from_lisp_stub = (void *) ((char *)*((unsigned long *)
                  ((char *)initial_function + -1)) + 23);
 #endif
