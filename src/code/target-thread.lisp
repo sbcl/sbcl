@@ -878,13 +878,13 @@ around and can be retrieved by JOIN-THREAD."
   "Suspend current thread until THREAD exits. Returns the result
 values of the thread function. If the thread does not exit normally,
 return DEFAULT if given or else signal JOIN-THREAD-ERROR."
-  (with-mutex ((thread-result-lock thread))
+  (with-system-mutex ((thread-result-lock thread) :allow-with-interrupts t)
     (cond ((car (thread-result thread))
-           (values-list (cdr (thread-result thread))))
+           (return-from join-thread
+             (values-list (cdr (thread-result thread)))))
           (defaultp
-           default)
-          (t
-           (error 'join-thread-error :thread thread)))))
+           (return-from join-thread default))))
+  (error 'join-thread-error :thread thread))
 
 (defun destroy-thread (thread)
   #!+sb-doc

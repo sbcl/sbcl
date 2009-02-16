@@ -10,6 +10,9 @@ changes in sbcl-1.0.26 relative to 1.0.25:
     printed to stderr.
   * optimization: slightly faster gc on multithreaded builds
   * optimization: faster WITHOUT-GCING
+  * bug fix: when JOIN-THREAD signals an error, do it when not holding
+    important locks so that the debugger/handler doesn't produce
+    recursive errors or deadlock.
   * bug fix: real-time signals are not used anymore, so no more
     hanging when the system wide real-time signal queue gets full.
   * bug fix: finalizers, gc hooks never run in a WITHOUT-INTERRUPTS
