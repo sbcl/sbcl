@@ -12,6 +12,12 @@
 (defvar *break-on-failure* nil)
 (defvar *break-on-expected-failure* nil)
 
+(defun log-msg (&rest args)
+  (format *trace-output* "~&::: ")
+  (apply #'format *trace-output* args)
+  (terpri *trace-output*)
+  (force-output *trace-output*))
+
 (defmacro with-test ((&key fails-on name) &body body)
   (let ((block-name (gensym)))
     `(block ,block-name
@@ -21,10 +27,12 @@
                                    (fail-test :unexpected-failure ',name error))
                                (return-from ,block-name))))
          (progn
+           (log-msg "Running ~S" ',name)
            (start-test)
            ,@body
-           (when (expected-failure-p ,fails-on)
-             (fail-test :unexpected-success ',name nil)))))))
+           (if (expected-failure-p ,fails-on)
+               (fail-test :unexpected-success ',name nil)
+               (log-msg "Success ~S" ',name)))))))
 
 (defun report-test-status ()
   (with-standard-io-syntax
@@ -40,6 +48,7 @@
   (incf *test-count*))
 
 (defun fail-test (type test-name condition)
+  (log-msg "~A ~S" type test-name)
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (when (or (and *break-on-failure*
