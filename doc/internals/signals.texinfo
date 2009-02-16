@@ -145,6 +145,10 @@ derive the rule: in a @code{WITHOUT-GCING} form (or pseudo atomic for
 that matter) never wait for another thread that's not in
 @code{WITHOUT-GCING}.
 
+Somewhat of a special case, it is enforced by the runtime that
+@code{SIG_STOP_FOR_GC} and @code{SIG_RESUME_FROM_GC} always unblocked
+when we might trigger a gc (i.e. on alloc or calling into Lisp).
+
 @subsection Calling user code
 
 For the reasons above, calling user code, i.e. functions passed in, or

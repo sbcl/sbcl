@@ -18,9 +18,22 @@
 #include "sbcl.h"
 #include "runtime.h"
 #include "globals.h"
+#include "os.h"
+#include "interrupt.h"
 
 /* This is implemented in assembly language and called from C: */
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+
+static inline lispobj
+safe_call_into_lisp(lispobj fun, lispobj *args, int nargs)
+{
+    /* SIG_STOP_FOR_GC needs to be enabled before we can call lisp:
+     * otherwise two threads racing here may deadlock: the other will
+     * wait on the GC lock, and the other cannot stop the first
+     * one... */
+    check_gc_signals_unblocked_or_lose();
+    return call_into_lisp(fun, args, nargs);
+}
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 /* These functions are an interface to the Lisp call-in facility.
@@ -38,14 +51,14 @@ funcall0(lispobj function)
     lispobj *args = NULL;
 
     FSHOW((stderr, "/entering funcall0(0x%lx)\n", (long)function));
-    return call_into_lisp(function, args, 0);
+    return safe_call_into_lisp(function, args, 0);
 }
 lispobj
 funcall1(lispobj function, lispobj arg0)
 {
     lispobj args[1];
     args[0] = arg0;
-    return call_into_lisp(function, args, 1);
+    return safe_call_into_lisp(function, args, 1);
 }
 
 lispobj
@@ -54,7 +67,7 @@ funcall2(lispobj function, lispobj arg0, lispobj arg1)
     lispobj args[2];
     args[0] = arg0;
     args[1] = arg1;
-    return call_into_lisp(function, args, 2);
+    return safe_call_into_lisp(function, args, 2);
 }
 
 lispobj
@@ -64,7 +77,7 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     args[0] = arg0;
     args[1] = arg1;
     args[2] = arg2;
-    return call_into_lisp(function, args, 3);
+    return safe_call_into_lisp(function, args, 3);
 }
 
 #else
@@ -74,7 +87,7 @@ funcall0(lispobj function)
 {
     lispobj *args = current_control_stack_pointer;
 
-    return call_into_lisp(function, args, 0);
+    return safe_call_into_lisp(function, args, 0);
 }
 
 lispobj
@@ -85,7 +98,7 @@ funcall1(lispobj function, lispobj arg0)
     current_control_stack_pointer += 1;
     args[0] = arg0;
 
-    return call_into_lisp(function, args, 1);
+    return safe_call_into_lisp(function, args, 1);
 }
 
 lispobj
@@ -97,7 +110,7 @@ funcall2(lispobj function, lispobj arg0, lispobj arg1)
     args[0] = arg0;
     args[1] = arg1;
 
-    return call_into_lisp(function, args, 2);
+    return safe_call_into_lisp(function, args, 2);
 }
 
 lispobj
@@ -110,6 +123,6 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     args[1] = arg1;
     args[2] = arg2;
 
-    return call_into_lisp(function, args, 3);
+    return safe_call_into_lisp(function, args, 3);
 }
 #endif

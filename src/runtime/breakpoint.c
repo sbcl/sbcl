@@ -130,6 +130,7 @@ void handle_breakpoint(os_context_t *context)
 
     fake_foreign_function_call(context);
 
+    unblock_gc_signals();
     context_sap = alloc_sap(context);
     code = find_code(context);
 
@@ -154,6 +155,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
 
     fake_foreign_function_call(context);
 
+    unblock_gc_signals();
     context_sap = alloc_sap(context);
     code = find_code(context);
     codeptr = (struct code *)native_pointer(code);

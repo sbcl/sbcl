@@ -489,6 +489,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 
     /* Allocate the SAP object while the interrupts are still
      * disabled. */
+    unblock_gc_signals();
     context_sap = alloc_sap(context);
 
 #ifndef LISP_FEATURE_WIN32
@@ -693,21 +694,12 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * Yeah, but non-gencgc platforms don't really wrap allocation
          * in PA. MG - 2005-08-29  */
 
-        lispobj info_sap,context_sap = alloc_sap(context);
-        info_sap = alloc_sap(info);
+        lispobj info_sap, context_sap;
         /* Leave deferrable signals blocked, the handler itself will
          * allow signals again when it sees fit. */
-#ifdef LISP_FEATURE_SB_THREAD
-        {
-            sigset_t unblock;
-            sigemptyset(&unblock);
-            sigaddset(&unblock, SIG_STOP_FOR_GC);
-#ifdef SIG_RESUME_FROM_GC
-            sigaddset(&unblock, SIG_RESUME_FROM_GC);
-#endif
-            thread_sigmask(SIG_UNBLOCK, &unblock, 0);
-        }
-#endif
+        unblock_gc_signals();
+        context_sap = alloc_sap(context);
+        info_sap = alloc_sap(info);
 
         FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
 
@@ -966,6 +958,8 @@ extern void call_into_lisp_tramp(void);
 void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
+    check_gc_signals_unblocked_in_sigset_or_lose
+        (os_context_sigmask_addr(context));
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
     void *code = &(((struct simple_fun *) fun)->code);
@@ -1460,6 +1454,7 @@ unhandled_trap_error(os_context_t *context)
 {
     lispobj context_sap;
     fake_foreign_function_call(context);
+    unblock_gc_signals();
     context_sap = alloc_sap(context);
 #ifndef LISP_FEATURE_WIN32
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
