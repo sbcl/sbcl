@@ -21,7 +21,7 @@
            (type (member t nil) print-size-p)
            (type sb!disassem:disassem-state dstate))
   (when print-size-p
-    (princ (sb!disassem:dstate-get-prop dstate 'width) stream)
+    (princ (inst-operand-size dstate) stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
   (let ((firstp t))
