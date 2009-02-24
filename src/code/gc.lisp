@@ -215,7 +215,9 @@ run in any thread.")
            ;; Now, if GET-MUTEX did not cons, that would be enough.
            ;; Because it does, we need the :IN-PROGRESS bit above to
            ;; tell the runtime not to trigger gcs.
-           (let ((sb!impl::*in-without-gcing* t))
+           (let ((sb!impl::*in-without-gcing* t)
+                 (sb!impl::*deadline* nil)
+                 (sb!impl::*deadline-seconds* nil))
              (sb!thread:with-mutex (*already-in-gc*)
                (let ((*gc-inhibit* t))
                  (let ((old-usage (dynamic-usage))
