@@ -2454,15 +2454,19 @@ maybe_gc(os_context_t *context)
          * here. */
         ((SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) ||
          (SymbolValue(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
+#ifndef LISP_FEATURE_WIN32
         sigset_t *context_sigmask = os_context_sigmask_addr(context);
         if (!deferrables_blocked_in_sigset_p(context_sigmask)) {
-            FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
             thread_sigmask(SIG_SETMASK, context_sigmask, 0);
             check_gc_signals_unblocked_or_lose();
+#endif
+            FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
             funcall0(StaticSymbolFunction(POST_GC));
+#ifndef LISP_FEATURE_WIN32
         } else {
             FSHOW((stderr, "/maybe_gc: punting on POST_GC due to blockage\n"));
         }
+#endif
     }
     undo_fake_foreign_function_call(context);
     FSHOW((stderr, "/maybe_gc: returning\n"));

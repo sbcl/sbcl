@@ -60,6 +60,7 @@
                               (random 0.1))
   (check-deferrables-unblocked-or-lose))
 
+#-win32
 (with-test (:name (:timer :deferrables-unblocked :unwind))
   (catch 'xxx
     (make-and-schedule-and-wait (lambda ()

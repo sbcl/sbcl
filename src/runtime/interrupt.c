@@ -309,6 +309,7 @@ check_interrupts_enabled_or_lose(os_context_t *context)
 void
 maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
 {
+#ifndef LISP_FEATURE_WIN32
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
     sigset_t oldset;
@@ -341,6 +342,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
         }
     }
     thread_sigmask(SIG_SETMASK,&oldset,0);
+#endif
 }
 
 /* Are we leaving WITH-GCING and already running with interrupts
@@ -363,6 +365,7 @@ in_leaving_without_gcing_race_p(struct thread *thread)
 void
 check_interrupt_context_or_lose(os_context_t *context)
 {
+#ifndef LISP_FEATURE_WIN32
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
     int interrupt_deferred_p = (data->pending_handler != 0);
@@ -411,6 +414,7 @@ check_interrupt_context_or_lose(os_context_t *context)
          * that run lisp code. */
         check_gc_signals_unblocked_in_sigset_or_lose(sigset);
     }
+#endif
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -745,7 +749,9 @@ interrupt_handle_pending(os_context_t *context)
          * the os_context for the signal we're currently in the
          * handler for. This should ensure that when we return from
          * the handler the blocked signals are unblocked. */
+#ifndef LISP_FEATURE_WIN32
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
+#endif
         data->gc_blocked_deferrables = 0;
     }
 
@@ -1170,8 +1176,10 @@ extern void call_into_lisp_tramp(void);
 void
 arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
+#ifndef LISP_FEATURE_WIN32
     check_gc_signals_unblocked_in_sigset_or_lose
         (os_context_sigmask_addr(context));
+#endif
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
     void *code = &(((struct simple_fun *) fun)->code);

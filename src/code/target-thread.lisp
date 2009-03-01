@@ -922,6 +922,7 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
      ,@body))
 
 ;;; Called from the signal handler.
+#!-win32
 (defun run-interruption ()
   (let ((interruption (with-interruptions-lock (*current-thread*)
                         (pop (thread-interruptions *current-thread*)))))
@@ -946,6 +947,12 @@ enable interrupts (GET-MUTEX when contended, for instance) so the
 first thing to do is usually a WITH-INTERRUPTS or a
 WITHOUT-INTERRUPTS. Within a thread interrupts are queued, they are
 run in same the order they were sent."
+  #!+win32
+  (declare (ignore thread))
+  #!+win32
+  (with-interrupt-bindings
+    (with-interrupts (funcall function)))
+  #!-win32
   (let ((os-thread (thread-os-thread thread)))
     (cond ((not os-thread)
            (error 'interrupt-thread-error :thread thread))
