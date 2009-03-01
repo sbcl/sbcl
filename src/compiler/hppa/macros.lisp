@@ -41,7 +41,13 @@
 
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
-    `(inst addi (static-symbol-offset ,symbol) null-tn ,reg)))
+    `(let ((offset (static-symbol-offset ,symbol)))
+       (cond
+         ((typep offset '(signed-byte 11))
+           (inst addi offset null-tn ,reg))
+         (t
+           (inst ldil offset ,reg)
+           (inst ldo offset null-tn ,reg :unsigned t))))))
 
 (defmacro load-symbol-value (reg symbol)
   `(inst ldw

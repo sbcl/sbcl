@@ -783,7 +783,7 @@
   (emit-back-patch segment 4
     (lambda (segment posn)
       (let ((disp (label-relative-displacement target posn)))
-        (aver (<= (- (ash 1 16)) disp (1- (ash 1 16))))
+        (aver (typep disp '(signed-byte 17)))
         (multiple-value-bind
             (w1 w2 w)
             (decompose-branch-disp segment disp)
@@ -863,15 +863,12 @@
   (emit-back-patch segment 4
     (lambda (segment posn)
       (let ((disp (label-relative-displacement target posn)))
-        (when (not (<= (- (ash 1 11)) disp (1- (ash 1 11))))
-          (format t "AVER fail: disp = ~s~%" disp)
-          (format t "target = ~s~%" target)
-          (format t "posn   = ~s~%" posn)
-          )
-        (aver (<= (- (ash 1 11)) disp (1- (ash 1 11))))
+        ; emit-conditional-branch is used by instruction emitters: MOVB, COMB, ADDB and BB
+        ; which assembles an immediate of total 12 bits (including sign bit).
+        (aver (typep disp '(signed-byte 12)))
         (let ((w1 (logior (ash (ldb (byte 10 0) disp) 1)
                           (ldb (byte 1 10) disp)))
-              (w (ldb (byte 1 11) disp)))
+              (w (ldb (byte 1 11) disp))) ; take out the sign bit
           (emit-branch segment opcode r2 r1 cond w1 (if nullify 1 0) w))))))
 
 (defun im5-encoding (value)
@@ -1531,7 +1528,7 @@
      (lambda (segment posn)
        (let ((disp (label-relative-displacement target posn)))
          (assemble (segment vop)
-           (cond ((<= (- (ash 1 11)) disp (1- (ash 1 11)))
+           (cond ((typep disp '(signed-byte 12))
                   (inst comb (maybe-negate-cond cond not-p) r1 r2 target)
                   (inst nop)) ; FIXME-lav, cant nullify when backward branch
                  (t
@@ -1553,7 +1550,7 @@
      (lambda (segment posn delta-if-after)
        (let ((disp (label-relative-displacement target posn delta-if-after)))
          (when (and (<= 0 disp (1- (ash 1 11)))
-                    (<= (- (ash 1 4)) imm (1- (ash 1 4))))
+                    (typep imm '(signed-byte 5)))
            (assemble (segment vop)
              (inst comib (maybe-negate-cond cond not-p) imm reg target
                    :nullify t))
@@ -1561,8 +1558,8 @@
      (lambda (segment posn)
        (let ((disp (label-relative-displacement target posn)))
          (assemble (segment vop)
-           (cond ((and (<= (- (ash 1 11)) disp (1- (ash 1 11)))
-                       (<= (- (ash 1 4)) imm (1- (ash 1 4))))
+           (cond ((and (typep disp '(signed-byte 12))
+                       (typep imm '(signed-byte 5)))
                   (inst comib (maybe-negate-cond cond not-p) imm reg target)
                   (inst nop))
                  (t
@@ -1605,7 +1602,7 @@
    (lambda (segment posn delta-if-after)
      (let ((delta (funcall calc label posn delta-if-after)))
        ;; WHEN, Why not AVER ?
-       (when (<= (- (ash 1 10)) delta (1- (ash 1 10)))
+       (when (typep delta '(signed-byte 11))
          (emit-back-patch segment 4
                           (lambda (segment posn)
                             (assemble (segment vop)
