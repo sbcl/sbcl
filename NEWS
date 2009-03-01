@@ -1,14 +1,14 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.26 relative to 1.0.25:
-  * incompatible change: the interruption (be it a function passed to
+  * incompatible change: an interruption (be it a function passed to
     INTERRUPT-THREAD or a timer function) runs in an environment where
     interrupts can be enabled. The interruption can use
     WITH-INTERRUPTS or WITHOUT-INTERRUPTS as it sees fit. Use
     WITHOUT-INTERRUPTS to avoid nesting of interruptions and
-    potentially running out of stack. Keep in mind that in the absance
+    potentially running out of stack. Keep in mind that in the absence
     of WITHOUT-INTERRUPTS some potentially blocking operation such as
     acquiring a lock can enable interrupts.
-  * incompatible change: GC-OFF and GC-ON are removed, they were
+  * incompatible change: GC-OFF and GC-ON are removed, as they were
     always unsafe. Use WITHOUT-GCING instead.
   * new feature: runtime option --disable-ldb
   * new feature: runtime option --lose-on-corruption to die at the
