@@ -78,8 +78,11 @@ for sf anonymous ftp:
  #   scp $stem shell1.sourceforge.net:/home/groups/ftp/pub/sbcl/$stem-x.y.z
  # done
 for sf 'module release' system:
- * Upload the distribution files via anonymous ftp to
-  upload.sourceforge.net in the /incoming directory.
+ # no longer possible now that sf doesn't have upload.sourceforge.net
+ # * Upload the distribution files via anonymous ftp to
+ # upload.sourceforge.net in the /incoming directory.
+ * Upload the distribution files via sftp to the uploads/ directory at 
+   $sfuser@frs.sourceforge.net
  * possible shortcuts:
     <https://sourceforge.net/project/admin/?group_id=1373>
     <https://sourceforge.net/project/admin/editpackages.php?group_id=1373>
