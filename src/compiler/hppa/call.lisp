@@ -774,12 +774,7 @@ default-value-8
                 (insert-step-instrumenting (callable-tn)
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
-                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
-                    (loadw stepping null-tn
-                           (+ symbol-value-slot
-                              (truncate (static-symbol-offset 'sb!impl::*stepping*)
-                                        n-word-bytes))
-                           other-pointer-lowtag)
+                    (load-symbol-value stepping sb!impl::*stepping*)
                     ;; If it's not NIL, trap.
                     ;(inst comb := stepping null-tn step-done-label)
                     (inst comb := null-tn null-tn step-done-label :nullify t)
@@ -1255,12 +1250,7 @@ default-value-8
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    ;; Get the symbol-value of SB!IMPL::*STEPPING*
-    (loadw stepping null-tn
-           (+ symbol-value-slot
-              (truncate (static-symbol-offset 'sb!impl::*stepping*)
-                        n-word-bytes))
-           other-pointer-lowtag)
+    (load-symbol-value stepping sb!impl::*stepping*)
     ;; If it's not NIL, trap.
     (inst comb := stepping null-tn DONE :nullify t)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
