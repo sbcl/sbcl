@@ -195,17 +195,26 @@ alloc_sap(void *ptr)
 lispobj
 alloc_code_object (unsigned boxed, unsigned unboxed) {
     struct code * code;
-    /* 4 == trace_table_offset offset in words */
-    boxed = make_fixnum(boxed + 1 + 4);
+    /* Coming in, boxed is the number of boxed words requested.
+     * Converting it to a fixnum makes it measured in bytes. It's also
+     * rounded up to double word along the way. */
+    boxed = make_fixnum(boxed + 1 +
+                        (offsetof(struct code, trace_table_offset) >>
+                         WORD_SHIFT));
     boxed &= ~LOWTAG_MASK;
 
+    /* Unboxed is in bytes, round it up to double word boundary. Now
+     * it's also a fixnum containing the number of unboxed words. */
     unboxed += LOWTAG_MASK;
     unboxed &= ~LOWTAG_MASK;
 
-    code = (struct code *)pa_alloc(ALIGNED_SIZE((boxed + unboxed) *
-                                                sizeof(lispobj)),
-                                    CODE_PAGE_FLAG);
+    code = (struct code *)pa_alloc(boxed + unboxed, CODE_PAGE_FLAG);
 
+    /* It used to be that even on gencgc builds the
+     * ALLOCATE-CODE-OBJECT VOP did all this initialization within
+     * pseudo atomic. Here, we rely on gc being inhibited. */
+    if (SymbolValue(GC_INHIBIT, arch_os_get_current_thread()) == NIL)
+        lose("alloc_code_object called with GC enabled.");
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;
     code->code_size = unboxed;
