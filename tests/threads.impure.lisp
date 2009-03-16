@@ -871,6 +871,28 @@
 |     (mp:make-process #'roomy)))
 |#
 
+(with-test (:name (:condition-variable :wait-multiple))
+  (loop repeat 40 do
+        (let ((waitqueue (sb-thread:make-waitqueue :name "Q"))
+              (mutex (sb-thread:make-mutex :name "M"))
+              (failedp nil))
+          (format t ".")
+          (finish-output t)
+          (let ((threads (loop repeat 200
+                               collect
+                               (sb-thread:make-thread
+                                (lambda ()
+                                  (handler-case
+                                      (sb-sys:with-deadline (:seconds 0.01)
+                                        (sb-thread:with-mutex (mutex)
+                                          (sb-thread:condition-wait waitqueue
+                                                                    mutex)
+                                          (setq failedp t)))
+                                    (sb-sys:deadline-timeout (c)
+                                      (declare (ignore c)))))))))
+            (mapc #'sb-thread:join-thread threads)
+            (assert (not failedp))))))
+
 (with-test (:name (:condition-variable :notify-multiple))
   (flet ((tester (notify-fun)
            (let ((queue (make-waitqueue :name "queue"))

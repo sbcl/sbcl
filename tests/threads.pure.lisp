@@ -110,12 +110,12 @@
                (values
                 (loop for r from 0 below n
                       collect
-                      (let ((r r))
-                        (sb-thread:make-thread (lambda ()
-                                                 (let ((sem semaphore))
-                                                   (dotimes (s i)
-                                                     (sb-thread:wait-on-semaphore sem))))
-                                               :name "reader")))
+                      (sb-thread:make-thread
+                       (lambda ()
+                         (let ((sem semaphore))
+                           (dotimes (s i)
+                             (sb-thread:wait-on-semaphore sem))))
+                       :name "reader"))
                 (* n i)))
              (make-writers (n readers i)
                (let ((j (* readers i)))
@@ -124,12 +124,12 @@
                     (let ((writers
                            (loop for w from 0 below n
                                  collect
-                                 (let ((w w))
-                                   (sb-thread:make-thread (lambda ()
-                                                            (let ((sem semaphore))
-                                                              (dotimes (s k)
-                                                                (sb-thread:signal-semaphore sem))))
-                                                          :name "writer")))))
+                                 (sb-thread:make-thread
+                                  (lambda ()
+                                    (let ((sem semaphore))
+                                      (dotimes (s k)
+                                        (sb-thread:signal-semaphore sem))))
+                                  :name "writer"))))
                       (assert (zerop rem))
                       writers)
                     (+ rem (* n k))))))

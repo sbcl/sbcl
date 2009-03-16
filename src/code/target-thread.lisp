@@ -328,7 +328,7 @@ directly."
       (setf (mutex-%owner mutex) new-owner)
       t)
     #!-sb-lutex
-    ;; This is a direct tranlation of the Mutex 2 algorithm from
+    ;; This is a direct translation of the Mutex 2 algorithm from
     ;; "Futexes are Tricky" by Ulrich Drepper.
     (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
                                         +lock-free+
@@ -463,7 +463,7 @@ time we reacquire MUTEX and return to the caller."
     ;; mutex on our way out.
     (without-interrupts
       (unwind-protect
-           (let ((me *current-thread*))
+           (let ((me nil))
              ;; This setf becomes visible to other CPUS due to the
              ;; usual memory barrier semantics of lock
              ;; acquire/release.
@@ -487,6 +487,8 @@ time we reacquire MUTEX and return to the caller."
                                       (or to-usec 0))))
                   ((1) (signal-deadline))
                   ((2))
+                  ;; EWOULDBLOCK, -1 here, is the possible spurious
+                  ;; wakeup case. 0 is the normal wakeup.
                   (otherwise (return))))))
         ;; If we are interrupted while waiting, we should do these
         ;; things before returning. Ideally, in the case of an
@@ -497,7 +499,7 @@ time we reacquire MUTEX and return to the caller."
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
   "Notify N threads waiting on QUEUE. The same mutex that is used in
-the correspoinding condition-wait must be held by this thread during
+the corresponding CONDITION-WAIT must be held by this thread during
 this call."
   #!-sb-thread (declare (ignore queue n))
   #!-sb-thread (error "Not supported in unithread builds.")
