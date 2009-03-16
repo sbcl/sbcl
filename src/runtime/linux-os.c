@@ -72,15 +72,53 @@ size_t os_vm_page_size;
 /* values taken from the kernel's linux/futex.h.  This header file
    doesn't exist in userspace, which is our excuse for not grovelling
    them automatically */
-#define FUTEX_WAIT (0)
-#define FUTEX_WAKE (1)
+#define FUTEX_WAIT 0
+#define FUTEX_WAKE 1
+/* This is also copied from linux/futex.h so that a binary compiled on
+ * a not so recent Linux system can still take advantage of private
+ * futexes when available.*/
+#define FUTEX_WAIT_PRIVATE (0+128)
+#define FUTEX_WAKE_PRIVATE (1+128)
 #define FUTEX_FD (2)
 #define FUTEX_REQUEUE (3)
+
+/* Not static so that Lisp may query it. */
+boolean futex_private_supported_p;
+
+static inline int
+futex_wait_op()
+{
+    return (futex_private_supported_p ? FUTEX_WAIT_PRIVATE : FUTEX_WAIT);
+}
+
+static inline int
+futex_wake_op()
+{
+    return (futex_private_supported_p ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE);
+}
 
 #define sys_futex sbcl_sys_futex
 static inline int sys_futex (void *futex, int op, int val, struct timespec *rel)
 {
     return syscall (SYS_futex, futex, op, val, rel);
+}
+
+static void
+futex_init()
+{
+    int x = 0;
+    sys_futex(&x, FUTEX_WAIT, 1, 0);
+    if (errno == ENOSYS)
+        lose("This version of SBCL is compiled with threading support, but your kernel\n"
+             "is too old to support this. Please use a more recent kernel or\n"
+             "a version of SBCL without threading support.\n");
+    sys_futex(&x, FUTEX_WAIT_PRIVATE, 1, 0);
+    if (errno == EWOULDBLOCK) {
+        futex_private_supported_p = 1;
+    } else {
+        futex_private_supported_p = 0;
+        SHOW("No futex private suppport\n");
+    }
 }
 
 int
@@ -90,12 +128,12 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
   int t;
 
   if (sec<0) {
-    t = sys_futex(lock_word,FUTEX_WAIT,oldval, 0);
+      t = sys_futex(lock_word, futex_wait_op(), oldval, 0);
   }
   else {
-    timeout.tv_sec = sec;
-    timeout.tv_nsec = usec * 1000;
-    t = sys_futex(lock_word,FUTEX_WAIT,oldval, &timeout);
+      timeout.tv_sec = sec;
+      timeout.tv_nsec = usec * 1000;
+      t = sys_futex(lock_word, futex_wait_op(), oldval, &timeout);
   }
   if (t==0)
       return 0;
@@ -111,7 +149,7 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 int
 futex_wake(int *lock_word, int n)
 {
-    return sys_futex(lock_word,FUTEX_WAKE,n,0);
+    return sys_futex(lock_word, futex_wake_op(),n,0);
 }
 #endif
 
@@ -154,9 +192,6 @@ os_init(char *argv[], char *envp[])
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
-    int *futex=0;
-#endif
     struct utsname name;
     int major_version;
     int minor_version;
@@ -181,12 +216,7 @@ os_init(char *argv[], char *envp[])
     }
 #ifdef LISP_FEATURE_SB_THREAD
 #if !defined(LISP_FEATURE_SB_LUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
-    futex_wait(futex,-1,-1,0);
-    if(errno==ENOSYS) {
-       lose("This version of SBCL is compiled with threading support, but your kernel\n"
-            "is too old to support this. Please use a more recent kernel or\n"
-            "a version of SBCL without threading support.\n");
-    }
+    futex_init();
 #endif
     if(! isnptl()) {
        lose("This version of SBCL only works correctly with the NPTL threading\n"
