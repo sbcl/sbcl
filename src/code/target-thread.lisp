@@ -367,7 +367,7 @@ directly."
             (waitp
              (bug "Failed to acquire lock with WAITP."))))))
 
-(defun release-mutex (mutex)
+(defun release-mutex (mutex &key (if-not-owner :punt))
   #!+sb-doc
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
 this mutex.
@@ -375,37 +375,43 @@ this mutex.
 RELEASE-MUTEX is not interrupt safe: interrupts should be disabled
 around calls to it.
 
-Signals a WARNING if current thread is not the current owner of the
-mutex."
+If the current thread is not the owner of the mutex then it silently
+returns without doing anything (if IF-NOT-OWNER is :PUNT), signals a
+WARNING (if IF-NOT-OWNER is :WARN), or releases the mutex anyway (if
+IF-NOT-OWNER is :FORCE)."
   (declare (type mutex mutex))
   ;; Order matters: set owner to NIL before releasing state.
   (let* ((self *current-thread*)
          (old-owner (sb!ext:compare-and-swap (mutex-%owner mutex) self nil)))
-    (unless  (eql self old-owner)
-      (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner)
-      (setf (mutex-%owner mutex) nil)))
-  #!+sb-thread
-  (progn
-    #!+sb-lutex
-    (with-lutex-address (lutex (mutex-lutex mutex))
-      (%lutex-unlock lutex))
-    #!-sb-lutex
-    ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
-    ;; unsigned-byte type this can be used:
-    ;;
-    ;;     (let ((old (sb!ext:atomic-incf (mutex-state mutex) -1)))
-    ;;       (unless (eql old +lock-free+)
-    ;;         (setf (mutex-state mutex) +lock-free+)
-    ;;         (with-pinned-objects (mutex)
-    ;;           (futex-wake (mutex-state-address mutex) 1))))
-    (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
-                                        +lock-taken+ +lock-free+)))
-      (when (eql old +lock-contested+)
-        (sb!ext:compare-and-swap (mutex-state mutex)
-                                 +lock-contested+ +lock-free+)
-        (with-pinned-objects (mutex)
-          (futex-wake (mutex-state-address mutex) 1))))
-    nil))
+    (unless (eql self old-owner)
+      (ecase if-not-owner
+        ((:punt) (return-from release-mutex nil))
+        ((:warn)
+         (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner))
+        ((:force))))
+    #!+sb-thread
+    (when old-owner
+      (setf (mutex-%owner mutex) nil)
+      #!+sb-lutex
+      (with-lutex-address (lutex (mutex-lutex mutex))
+        (%lutex-unlock lutex))
+      #!-sb-lutex
+      ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
+      ;; unsigned-byte type this can be used:
+      ;;
+      ;;     (let ((old (sb!ext:atomic-incf (mutex-state mutex) -1)))
+      ;;       (unless (eql old +lock-free+)
+      ;;         (setf (mutex-state mutex) +lock-free+)
+      ;;         (with-pinned-objects (mutex)
+      ;;           (futex-wake (mutex-state-address mutex) 1))))
+      (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
+                                          +lock-taken+ +lock-free+)))
+        (when (eql old +lock-contested+)
+          (sb!ext:compare-and-swap (mutex-state mutex)
+                                   +lock-contested+ +lock-free+)
+          (with-pinned-objects (mutex)
+            (futex-wake (mutex-state-address mutex) 1))))
+      nil)))
 
 
 ;;;; Waitqueues/condition variables
@@ -462,22 +468,28 @@ time we reacquire MUTEX and return to the caller."
     ;; Need to disable interrupts so that we don't miss grabbing the
     ;; mutex on our way out.
     (without-interrupts
-      (unwind-protect
-           (let ((me nil))
-             ;; This setf becomes visible to other CPUS due to the
-             ;; usual memory barrier semantics of lock
-             ;; acquire/release.
-             (setf (waitqueue-data queue) me)
-             (release-mutex mutex)
-             ;; Now we go to sleep using futex-wait. If anyone else
-             ;; manages to grab MUTEX and call CONDITION-NOTIFY during
-             ;; this comment, it will change queue->data, and so
-             ;; futex-wait returns immediately instead of sleeping.
-             ;; Ergo, no lost wakeup. We may get spurious wakeups, but
-             ;; that's ok.
-             (loop
-              (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
-                (case (with-pinned-objects (queue me)
+      (let ((me nil))
+        ;; This setf becomes visible to other CPUS due to the usual
+        ;; memory barrier semantics of lock acquire/release. This must
+        ;; not be moved into the loop else wakeups may be lost upon
+        ;; continuing after a deadline or EINTR.
+        (setf (waitqueue-data queue) me)
+        (loop
+         (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+           (case (unwind-protect
+                      (with-pinned-objects (queue me)
+                        ;; RELEASE-MUTEX is purposefully as close to
+                        ;; FUTEX-WAIT as possible to reduce the size
+                        ;; of the window where WAITQUEUE-DATA may be
+                        ;; set by a notifier.
+                        (release-mutex mutex)
+                        ;; Now we go to sleep using futex-wait. If
+                        ;; anyone else manages to grab MUTEX and call
+                        ;; CONDITION-NOTIFY during this comment, it
+                        ;; will change queue->data, and so futex-wait
+                        ;; returns immediately instead of sleeping.
+                        ;; Ergo, no lost wakeup. We may get spurious
+                        ;; wakeups, but that's ok.
                         (allow-with-interrupts
                           (futex-wait (waitqueue-data-address queue)
                                       (get-lisp-obj-address me)
@@ -485,16 +497,19 @@ time we reacquire MUTEX and return to the caller."
                                       ;; timeout":
                                       (or to-sec -1)
                                       (or to-usec 0))))
-                  ((1) (signal-deadline))
-                  ((2))
-                  ;; EWOULDBLOCK, -1 here, is the possible spurious
-                  ;; wakeup case. 0 is the normal wakeup.
-                  (otherwise (return))))))
-        ;; If we are interrupted while waiting, we should do these
-        ;; things before returning. Ideally, in the case of an
-        ;; unhandled signal, we should do them before entering the
-        ;; debugger, but this is better than nothing.
-        (get-mutex mutex)))))
+                   ;; If we are interrupted while waiting, we should
+                   ;; do these things before returning. Ideally, in
+                   ;; the case of an unhandled signal, we should do
+                   ;; them before entering the debugger, but this is
+                   ;; better than nothing.
+                   (allow-with-interrupts (get-mutex mutex)))
+             ;; ETIMEDOUT
+             ((1) (signal-deadline))
+             ;; EINTR
+             ((2))
+             ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup
+             ;; case. 0 is the normal wakeup.
+             (otherwise (return)))))))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
