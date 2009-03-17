@@ -39,4 +39,4 @@ typedef int os_vm_prot_t;
 
 #define SIG_MEMORY_FAULT SIGSEGV
 
-#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_STOP_FOR_GC (SIGUSR2)

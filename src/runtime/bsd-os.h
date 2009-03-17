@@ -59,7 +59,7 @@ typedef ucontext_t os_context_t;
 extern int sig_memory_fault;
 #define SIG_MEMORY_FAULT (sig_memory_fault)
 
-#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_STOP_FOR_GC (SIGUSR2)
 
 #elif defined __OpenBSD__
 

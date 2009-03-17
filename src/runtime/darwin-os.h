@@ -33,6 +33,6 @@ typedef ucontext_t os_context_t;
 
 #define SIG_MEMORY_FAULT SIGBUS
 
-#define SIG_STOP_FOR_GC (SIGUSR1)
+#define SIG_STOP_FOR_GC (SIGUSR2)
 
 #endif /* _DARWIN_OS_H */
