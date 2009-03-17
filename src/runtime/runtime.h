@@ -29,12 +29,27 @@
 #define thread_mutex_unlock(l) 0
 #endif
 
-/* #define QSHOW */ /* Enable low-level debugging output? */
-/* #define QSHOW_SAFE */ /* Enable blocking interrupts for each SHOW. */
+/* Block blockable interrupts for each SHOW, if not 0. */
+#define QSHOW_SIGNAL_SAFE 1
+/* Enable extra-verbose low-level debugging output for signals? (You
+ * probably don't want this unless you're trying to debug very early
+ * cold boot on a new machine, or one where you've just messed up
+ * signal handling.)
+ *
+ * Note: It may be that doing this is fundamentally unsound, since it
+ * causes output from signal handlers, and the i/o libraries aren't
+ * necessarily reentrant. But it can still be very convenient for
+ * figuring out what's going on when you have a signal handling
+ * problem. */
+#define QSHOW_SIGNALS 0
+/* Enable low-level debugging output, if not zero. Defaults to enabled
+ * if QSHOW_SIGNALS, disabled otherwise. Change it to 1 if you want
+ * low-level debugging output but not the whole signal mess. */
+#define QSHOW QSHOW_SIGNALS
 
-#ifdef QSHOW
+#if QSHOW
 
-#ifdef QSHOW_SAFE
+#if QSHOW_SIGNAL_SAFE
 
 #include <signal.h>
 extern sigset_t blockable_sigset;
@@ -69,18 +84,6 @@ extern sigset_t blockable_sigset;
 #define SHOW(string)
 
 #endif
-
-/* Enable extra-verbose low-level debugging output for signals? (You
- * probably don't want this unless you're trying to debug very early
- * cold boot on a new machine, or one where you've just messed up
- * signal handling.)
- *
- * Note: It may be that doing this is fundamentally unsound, since it
- * causes output from signal handlers, and the i/o libraries aren't
- * necessarily reentrant. But it can still be very convenient for
- * figuring out what's going on when you have a signal handling
- * problem.. */
-#define QSHOW_SIGNALS 0
 
 #if QSHOW_SIGNALS
 #define FSHOW_SIGNAL FSHOW

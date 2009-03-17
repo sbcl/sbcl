@@ -89,7 +89,7 @@ long large_object_size = 4 * PAGE_BYTES;
 
 /* the verbosity level. All non-error messages are disabled at level 0;
  * and only a few rare messages are printed at level 1. */
-#ifdef QSHOW
+#if QSHOW
 boolean gencgc_verbose = 1;
 #else
 boolean gencgc_verbose = 0;
@@ -384,7 +384,7 @@ count_generation_pages(generation_index_t generation)
     return count;
 }
 
-#ifdef QSHOW
+#if QSHOW
 static long
 count_dont_move_pages(void)
 {
@@ -1684,7 +1684,7 @@ sniff_code_object(struct code *code, unsigned long displacement)
         unsigned d2 = *((unsigned char *)p - 2);
         unsigned d3 = *((unsigned char *)p - 3);
         unsigned d4 = *((unsigned char *)p - 4);
-#ifdef QSHOW
+#if QSHOW
         unsigned d5 = *((unsigned char *)p - 5);
         unsigned d6 = *((unsigned char *)p - 6);
 #endif
@@ -4096,7 +4096,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 #endif
 
-#ifdef QSHOW
+#if QSHOW
     if (gencgc_verbose > 1) {
         long num_dont_move_pages = count_dont_move_pages();
         fprintf(stderr,
@@ -4808,7 +4808,7 @@ gencgc_handle_wp_violation(void* fault_addr)
 {
     page_index_t page_index = find_page_index(fault_addr);
 
-#ifdef QSHOW_SIGNALS
+#if QSHOW_SIGNALS
     FSHOW((stderr, "heap WP violation? fault_addr=%x, page_index=%d\n",
            fault_addr, page_index));
 #endif

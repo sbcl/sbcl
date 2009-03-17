@@ -523,13 +523,15 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 #endif
 
     if((initcode = pthread_attr_init(th->os_attr)) ||
-       /* call_into_lisp_first_time switches the stack for the initial thread. For the
-        * others, we use this. */
-       (pthread_attr_setstack(th->os_attr,th->control_stack_start,thread_control_stack_size)) ||
+       /* call_into_lisp_first_time switches the stack for the initial
+        * thread. For the others, we use this. */
+       (pthread_attr_setstack(th->os_attr,th->control_stack_start,
+                              thread_control_stack_size)) ||
        (retcode = pthread_create
         (kid_tid,th->os_attr,(void *(*)(void *))new_thread_trampoline,th))) {
         FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
-        FSHOW_SIGNAL((stderr, printf("pthread_create returned %d, errno %d\n", retcode, errno)));
+        FSHOW_SIGNAL((stderr, "pthread_create returned %d, errno %d\n",
+                      retcode, errno));
         if(retcode < 0) {
             perror("create_os_thread");
         }

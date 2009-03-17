@@ -1,5 +1,3 @@
-
-
 #ifdef LISP_FEATURE_SB_THREAD
 #include <architecture/i386/table.h>
 #include <i386/user_ldt.h>
@@ -25,6 +23,7 @@
 #include <pthread.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #ifdef LISP_FEATURE_SB_THREAD
 

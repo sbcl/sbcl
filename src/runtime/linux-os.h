@@ -39,4 +39,8 @@ typedef int os_vm_prot_t;
 
 #define SIG_MEMORY_FAULT SIGSEGV
 
+/* Note that this must be higher than the highest numbered
+ * synchronously generated signal that we handle (that is SIGSEGV),
+ * due to Linux signal handling pecularities. See thread "Signal
+ * delivery order" from 2009-03-14 on kernel-devel@vger.kernel.org. */
 #define SIG_STOP_FOR_GC (SIGUSR2)

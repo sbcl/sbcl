@@ -21,6 +21,36 @@ but instead
        (MAKE-FOO)
      the program loops endlessly instead of printing the object.
 
+If you run into a signal related bug, you are getting fatal errors
+such as 'signal N is [un]blocked' or just hangs, and you want to send
+a useful bug report then:
+
+- compile sbcl with ldb support (feature :sb-ldb, see
+  base-target-features.lisp-expr) and change '#define QSHOW_SIGNAL 0'
+  to '#define QSHOW_SIGNAL 1' in src/runtime/runtime.h.
+
+- isolate a smallish test case, run it
+
+- if it just hangs kill it with sigabrt: kill -ABRT <pidof sbcl>
+
+- print the backtrace from ldb by typing 'ba'
+
+- attach gdb: gdb -p <pidof sbcl> and get backtraces for all threads:
+  thread apply all ba
+
+- if multiple threads are in play then still in gdb, try to get Lisp
+  backtrace for all threads: 'thread apply all
+  call_backtrace_from_fp($ebp, 100)'. Substitute $ebp with $rbp on
+  x86-64.
+
+- send a report with the backtraces and the output (both stdout,
+  stderr) produced by sbcl
+
+- don't forget to include OS and SBCL version
+
+- if available include info on outcome of the same test with other
+  versions of SBCL, OS, ...
+
 
 NOTES:
 
