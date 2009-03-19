@@ -237,6 +237,9 @@
            (if careful
                (make-lisp-obj tagged-address nil)
                (values (%make-lisp-obj tagged-address) t))))
+    ;; Inlining MAKE-OBJ reduces consing on platforms where dynamic
+    ;; space extends past fixnum range.
+    (declare (inline make-obj))
     (without-gcing
       (multiple-value-bind (start end) (space-bounds space)
         (declare (type system-area-pointer start end))
