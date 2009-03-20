@@ -721,7 +721,18 @@ kill_safely(os_thread_t os_thread, int signal)
         int status;
         if (os_thread != 0)
             lose("kill_safely: who do you want to kill? %d?\n", os_thread);
+        /* Dubious (as in don't know why it works) workaround for the
+         * signal sometimes not being generated on darwin. */
+#ifdef LISP_FEATURE_DARWIN
+        {
+            sigset_t oldset;
+            sigprocmask(SIG_BLOCK, &deferrable_sigset, &oldset);
+            status = raise(signal);
+            sigprocmask(SIG_SETMASK,&oldset,0);
+        }
+#else
         status = raise(signal);
+#endif
         if (status == 0) {
             return 0;
         } else {

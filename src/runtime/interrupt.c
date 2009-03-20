@@ -406,7 +406,8 @@ check_interrupt_context_or_lose(os_context_t *context)
         lose("gc_blocked_deferrables and interrupt pending\n.");
     if (data->gc_blocked_deferrables)
         check_deferrables_blocked_in_sigset_or_lose(sigset);
-    if (interrupt_pending || interrupt_deferred_p)
+    if (interrupt_pending || interrupt_deferred_p ||
+        data->gc_blocked_deferrables)
         check_deferrables_blocked_in_sigset_or_lose(sigset);
     else {
         check_deferrables_unblocked_in_sigset_or_lose(sigset);
@@ -1604,9 +1605,7 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
 
     FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
-    sigemptyset(&new);
-    sigaddset(&new, signal);
-    thread_sigmask(SIG_BLOCK, &new, &old);
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, &old);
 
     FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%x\n",
            (unsigned int)interrupt_low_level_handlers[signal]));

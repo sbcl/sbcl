@@ -579,7 +579,7 @@ mach_exception_handler(void *port)
   /* mach_msg_server should never return, but it should dispatch mach
    * exceptions to our catch_exception_raise function
    */
-  abort();
+  lose("mach_msg_server returned");
 }
 
 /* Sets up the thread that will listen for mach exceptions. note that
