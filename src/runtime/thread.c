@@ -472,6 +472,9 @@ create_thread_struct(lispobj initial_function) {
     }
     th->interrupt_data->pending_handler = 0;
     th->interrupt_data->gc_blocked_deferrables = 0;
+#ifdef LISP_FEATURE_PPC
+    th->interrupt_data->allocation_trap_context = 0;
+#endif
     th->no_tls_value_marker=initial_function;
 
     th->stepping = NIL;

@@ -16,6 +16,7 @@
 #include "globals.h"
 #include "validate.h"
 #include "os.h"
+#include "interrupt.h"
 #include "lispregs.h"
 #include "signal.h"
 #include "interrupt.h"
@@ -356,7 +357,13 @@ handle_allocation_trap(os_context_t * context)
             dynamic_space_free_pointer);
 #endif
 
-    memory = (char *) alloc(size);
+    {
+        struct interrupt_data *data =
+            arch_os_get_current_thread()->interrupt_data;
+        data->allocation_trap_context = context;
+        memory = (char *) alloc(size);
+        data->allocation_trap_context = 0;
+    }
 
 #if 0
     fprintf(stderr, "alloc returned %p\n", memory);

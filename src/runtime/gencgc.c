@@ -4726,10 +4726,14 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
             if (SymbolValue(GC_INHIBIT,thread) == NIL) {
                 set_pseudo_atomic_interrupted(thread);
 #ifdef LISP_FEATURE_PPC
-                /* PPC calls alloc() from a trap, look up the most
-                 * recent one and frob that. */
-                maybe_save_gc_mask_and_block_deferrables
-                    (get_interrupt_context_for_thread(thread));
+                /* PPC calls alloc() from a trap or from pa_alloc(),
+                 * look up the most context if it's from a trap. */
+                {
+                    os_context_t *context =
+                        thread->interrupt_data->allocation_trap_context;
+                    maybe_save_gc_mask_and_block_deferrables
+                        (context ? os_context_sigmask_addr(context) : NULL);
+                }
 #else
                 maybe_save_gc_mask_and_block_deferrables(NULL);
 #endif

@@ -113,6 +113,14 @@ struct interrupt_data {
      * NIL. Both deferrable interrupt handlers and gc are careful not
      * to clobber each other's pending_mask. */
     boolean gc_blocked_deferrables;
+#ifdef LISP_FEATURE_PPC
+    /* On PPC when consing wants to turn to alloc(), it does so via a
+     * trap. When alloc() wants to save the sigmask it consults
+     * allocation_trap_context. It does not look up the most recent
+     * context, because alloc() can be called from other places
+     * too. */
+    os_context_t *allocation_trap_context;
+#endif
 };
 
 extern boolean interrupt_handler_pending_p(void);

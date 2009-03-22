@@ -169,13 +169,6 @@ StaticSymbolFunction(lispobj sym)
     return ((struct fdefn *)native_pointer(SymbolValue(sym, 0)))->fun;
 }
 
-static inline
-os_context_t *get_interrupt_context_for_thread(struct thread *th)
-{
-    return th->interrupt_contexts
-        [fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th)-1)];
-}
-
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_GCC_TLS)
 extern __thread struct thread *current_thread;
 #endif
