@@ -48,4 +48,4 @@
   ;; disposable.
   ;; FIXME II: this could well be wrong
   #!+sparc 8192
-  #!+x86 4096)
+  #!+(or x86 x86-64) 4096)

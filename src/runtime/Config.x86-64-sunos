@@ -1,0 +1,23 @@
+CC=gcc
+CFLAGS = -m64 -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+ASFLAGS = -m64 -Wall
+LD = ld
+LINKFLAGS = -m64 -g
+NM = nm -xgp
+GREP = ggrep
+
+#CC=/opt/SunStudioExpress/bin/cc
+#CFLAGS = -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+#ASFLAGS = -xarch=generic64 -Wall
+
+ASSEM_SRC = x86-64-assem.S ldso-stubs.S
+ARCH_SRC = x86-64-arch.c
+
+OS_SRC = sunos-os.c x86-64-sunos-os.c os-common.c
+OS_LIBS= -ldl -lsocket -lnsl -lrt
+
+GC_SRC= gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

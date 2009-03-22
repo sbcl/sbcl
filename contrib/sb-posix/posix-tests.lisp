@@ -415,14 +415,14 @@
   #+win32
   #.sb-posix:eacces)
 
-#-(or (and x86-64 linux) win32)
+#-(or (and x86-64 (or linux sunos)) win32)
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (= (sb-posix:fcntl fd sb-posix::f-getfl) sb-posix::o-nonblock))
   t)
 ;; On AMD64/Linux O_LARGEFILE is always set, even though the whole
 ;; flag makes no sense.
-#+(and x86-64 linux)
+#+(and x86-64 (or linux sunos))
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (/= 0 (logand (sb-posix:fcntl fd sb-posix::f-getfl)
@@ -767,8 +767,10 @@
           (delete-file temp))))
   t "mkstemp-1")
 
-#-(or win32 sunos hpux)
-;;; mkdtemp is unimplemented on at least Solaris 10
+;#-(or win32 sunos hpux)
+;;;; mkdtemp is unimplemented on at least Solaris 10
+#-(or win32 hpux)
+;;; But it is implemented on OpenSolaris 2008.11
 (deftest mkdtemp.1
     (let ((pathname
            (sb-ext:parse-native-namestring

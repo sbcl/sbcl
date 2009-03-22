@@ -33,7 +33,3 @@ typedef int os_vm_prot_t;
 #define SIG_MEMORY_FAULT SIGSEGV
 
 #define SIG_STOP_FOR_GC (SIGUSR2)
-
-/* Yaargh?! */
-typedef int os_context_register_t ;
-

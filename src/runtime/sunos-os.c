@@ -28,7 +28,7 @@
 
 #if defined LISP_FEATURE_SPARC
 #define OS_VM_DEFAULT_PAGESIZE 8192
-#elif defined LISP_FEATURE_X86
+#elif defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
 #define OS_VM_DEFAULT_PAGESIZE 4096
 #else
 #error "Don't know OS_VM_DEFAULT_PAGESIZE"

@@ -123,6 +123,11 @@ case `uname -m` in
         ;;
 esac
 
+# Under Solaris, uname -m returns "i86pc" even if CPU is amd64.
+if [ "$sbcl_os" = "sunos" ] && [ `isainfo -k` = "amd64" ]; then
+    guessed_sbcl_arch=x86-64
+fi
+
 echo //setting up CPU-architecture-dependent information
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
 echo sbcl_arch=\"$sbcl_arch\"
@@ -250,7 +255,7 @@ case "$sbcl_os" in
         printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
-        if [ $sbcl_arch = "x86" ]; then
+        if [ $sbcl_arch = "x86" ] || [ $sbcl_arch = "amd64" ]; then
             printf ' :sb-lutex' >> $ltf
         fi
         link_or_copy Config.$sbcl_arch-sunos Config
