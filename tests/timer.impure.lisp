@@ -14,9 +14,11 @@
 (use-package :test-util)
 
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
-    void)
+    void
+  (where sb-alien:unsigned-long))
 (sb-alien:define-alien-routine "check_deferrables_unblocked_or_lose"
-    void)
+    void
+  (where sb-alien:unsigned-long))
 
 (defun make-limited-timer (fn n &rest args)
   (let (timer)
@@ -49,26 +51,26 @@
 
 (with-test (:name (:timer :deferrables-blocked))
   (make-and-schedule-and-wait (lambda ()
-                                (check-deferrables-blocked-or-lose))
+                                (check-deferrables-blocked-or-lose 0))
                               (random 0.1))
-  (check-deferrables-unblocked-or-lose))
+  (check-deferrables-unblocked-or-lose 0))
 
 (with-test (:name (:timer :deferrables-unblocked))
   (make-and-schedule-and-wait (lambda ()
                                 (sb-sys:with-interrupts
-                                  (check-deferrables-unblocked-or-lose)))
+                                  (check-deferrables-unblocked-or-lose 0)))
                               (random 0.1))
-  (check-deferrables-unblocked-or-lose))
+  (check-deferrables-unblocked-or-lose 0))
 
 #-win32
 (with-test (:name (:timer :deferrables-unblocked :unwind))
   (catch 'xxx
     (make-and-schedule-and-wait (lambda ()
-                                  (check-deferrables-blocked-or-lose)
+                                  (check-deferrables-blocked-or-lose 0)
                                   (throw 'xxx nil))
                                 (random 0.1))
     (sleep 1))
-  (check-deferrables-unblocked-or-lose))
+  (check-deferrables-unblocked-or-lose 0))
 
 (defmacro raises-timeout-p (&body body)
   `(handler-case (progn (progn ,@body) nil)

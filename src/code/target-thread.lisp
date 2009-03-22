@@ -120,8 +120,14 @@ in future versions."
   (define-alien-routine ("create_thread" %create-thread)
       unsigned-long (lisp-fun-address unsigned-long))
 
-  (define-alien-routine "block_deferrable_signals"
-      void)
+  (declaim (inline %block-deferrable-signals))
+  (define-alien-routine ("block_deferrable_signals" %block-deferrable-signals)
+      void
+    (where sb!alien:unsigned-long)
+    (old sb!alien:unsigned-long))
+
+  (defun block-deferrable-signals ()
+    (%block-deferrable-signals 0 0))
 
   #!+sb-lutex
   (progn

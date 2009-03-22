@@ -99,8 +99,22 @@
 ;;; doing things the SBCL way and moving this kind of C-level work
 ;;; down to C wrapper functions.)
 
-(sb!alien:define-alien-routine "unblock_deferrable_signals" sb!alien:void)
-(sb!alien:define-alien-routine "unblock_gc_signals" sb!alien:void)
+(declaim (inline %unblock-deferrable-signals %unblock-gc-signals))
+(sb!alien:define-alien-routine ("unblock_deferrable_signals"
+                                %unblock-deferrable-signals)
+    sb!alien:void
+  (where sb!alien:unsigned-long)
+  (old sb!alien:unsigned-long))
+(sb!alien:define-alien-routine ("unblock_gc_signals" %unblock-gc-signals)
+    sb!alien:void
+  (where sb!alien:unsigned-long)
+  (old sb!alien:unsigned-long))
+
+(defun unblock-deferrable-signals ()
+  (%unblock-deferrable-signals 0 0))
+
+(defun unblock-gc-signals ()
+  (%unblock-gc-signals 0 0))
 
 
 ;;;; C routines that actually do all the work of establishing signal handlers

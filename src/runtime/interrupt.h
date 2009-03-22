@@ -26,6 +26,14 @@
 /* FIXME: do not rely on NSIG being a multiple of 8 */
 #define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
 
+static inline void
+sigcopyset(sigset_t *new, sigset_t *old)
+{
+    memcpy(new, old, REAL_SIGSET_SIZE_BYTES);
+}
+
+extern void get_current_sigmask(sigset_t *sigset);
+
 /* Set all deferrable signals into *s. */
 extern void sigaddset_deferrable(sigset_t *s);
 /* Set all blockable signals into *s. */
@@ -37,25 +45,27 @@ extern sigset_t deferrable_sigset;
 extern sigset_t blockable_sigset;
 extern sigset_t gc_sigset;
 
-extern void block_deferrable_signals(void);
-extern void block_blockable_signals(void);
-extern void unblock_deferrable_signals(void);
-extern void unblock_gc_signals(void);
-extern void unblock_signals_in_context_and_maybe_warn(os_context_t *context);
+extern boolean deferrables_blocked_p(sigset_t *sigset);
+extern boolean blockables_blocked_p(sigset_t *sigset);
+extern boolean gc_signals_blocked_p(sigset_t *sigset);
 
-extern boolean deferrables_blocked_in_sigset_p(sigset_t *sigset);
-extern void check_deferrables_blocked_or_lose(void);
-extern void check_blockables_blocked_or_lose(void);
-extern void check_gc_signals_unblocked_or_lose(void);
-extern void check_gc_signals_unblocked_in_sigset_or_lose(sigset_t *sigset);
+extern void check_deferrables_blocked_or_lose(sigset_t *sigset);
+extern void check_blockables_blocked_or_lose(sigset_t *sigset);
+extern void check_gc_signals_blocked_or_lose(sigset_t *sigset);
+
+extern void check_deferrables_unblocked_or_lose(sigset_t *sigset);
+extern void check_blockables_unblocked_or_lose(sigset_t *sigset);
+extern void check_gc_signals_unblocked_or_lose(sigset_t *sigset);
+
+extern void block_deferrable_signals(sigset_t *where, sigset_t *old);
+extern void block_blockable_signals(sigset_t *where, sigset_t *old);
+extern void block_gc_signals(sigset_t *where, sigset_t *old);
+
+extern void unblock_deferrable_signals(sigset_t *where, sigset_t *old);
+extern void unblock_blockable_signals(sigset_t *where, sigset_t *old);
+extern void unblock_gc_signals(sigset_t *where, sigset_t *old);
 
 extern void maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset);
-
-static inline void
-sigcopyset(sigset_t *new, sigset_t *old)
-{
-    memcpy(new, old, REAL_SIGSET_SIZE_BYTES);
-}
 
 /* maximum signal nesting depth
  *

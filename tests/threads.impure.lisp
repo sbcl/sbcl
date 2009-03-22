@@ -43,28 +43,30 @@
     mutex))
 
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
-    void)
+    void
+  (where sb-alien:unsigned-long))
 (sb-alien:define-alien-routine "check_deferrables_unblocked_or_lose"
-    void)
+    void
+  (where sb-alien:unsigned-long))
 
 (with-test (:name (:interrupt-thread :deferrables-blocked))
   (sb-thread:interrupt-thread sb-thread:*current-thread*
                               (lambda ()
-                                (check-deferrables-blocked-or-lose))))
+                                (check-deferrables-blocked-or-lose 0))))
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked))
   (sb-thread:interrupt-thread sb-thread:*current-thread*
                               (lambda ()
                                 (with-interrupts
-                                  (check-deferrables-unblocked-or-lose)))))
+                                  (check-deferrables-unblocked-or-lose 0)))))
 
 (with-test (:name (:interrupt-thread :nlx))
   (catch 'xxx
     (sb-thread:interrupt-thread sb-thread:*current-thread*
                                 (lambda ()
-                                  (check-deferrables-blocked-or-lose)
+                                  (check-deferrables-blocked-or-lose 0)
                                   (throw 'xxx nil))))
-  (check-deferrables-unblocked-or-lose))
+  (check-deferrables-unblocked-or-lose 0))
 
 #-sb-thread (sb-ext:quit :unix-status 104)
 
@@ -75,9 +77,9 @@
     (sb-thread::get-spinlock spinlock)
     (sb-thread:interrupt-thread thread
                                 (lambda ()
-                                  (check-deferrables-blocked-or-lose)
+                                  (check-deferrables-blocked-or-lose 0)
                                   (sb-thread::get-spinlock spinlock)
-                                  (check-deferrables-unblocked-or-lose)
+                                  (check-deferrables-unblocked-or-lose 0)
                                   (sb-ext:quit)))
     (sleep 1)
     (sb-thread::release-spinlock spinlock)))

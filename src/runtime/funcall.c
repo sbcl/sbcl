@@ -31,7 +31,7 @@ safe_call_into_lisp(lispobj fun, lispobj *args, int nargs)
      * otherwise two threads racing here may deadlock: the other will
      * wait on the GC lock, and the other cannot stop the first
      * one... */
-    check_gc_signals_unblocked_or_lose();
+    check_gc_signals_unblocked_or_lose(0);
     return call_into_lisp(fun, args, nargs);
 }
 

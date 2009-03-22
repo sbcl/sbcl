@@ -2433,9 +2433,8 @@ maybe_gc(os_context_t *context)
      * outer context.
      */
 #ifndef LISP_FEATURE_WIN32
-    check_gc_signals_unblocked_in_sigset_or_lose
-        (os_context_sigmask_addr(context));
-    unblock_gc_signals();
+    check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
+    unblock_gc_signals(0, 0);
 #endif
     FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
     /* FIXME: Nothing must go wrong during GC else we end up running
@@ -2456,9 +2455,9 @@ maybe_gc(os_context_t *context)
          (SymbolValue(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
 #ifndef LISP_FEATURE_WIN32
         sigset_t *context_sigmask = os_context_sigmask_addr(context);
-        if (!deferrables_blocked_in_sigset_p(context_sigmask)) {
+        if (!deferrables_blocked_p(context_sigmask)) {
             thread_sigmask(SIG_SETMASK, context_sigmask, 0);
-            check_gc_signals_unblocked_or_lose();
+            check_gc_signals_unblocked_or_lose(0);
 #endif
             FSHOW((stderr, "/maybe_gc: calling POST_GC\n"));
             funcall0(StaticSymbolFunction(POST_GC));

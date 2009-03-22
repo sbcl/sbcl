@@ -235,7 +235,7 @@ main(int argc, char *argv[], char *envp[])
     const char *sbcl_home = getenv("SBCL_HOME");
 
     interrupt_init();
-    block_blockable_signals();
+    block_blockable_signals(0, 0);
 
     setlocale(LC_ALL, "");
 

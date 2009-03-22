@@ -227,11 +227,8 @@ futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
     int ret, result;
     struct futex *futex;
-    sigset_t oldset, newset;
+    sigset_t oldset;
     struct timeval tv, *timeout;
-
-    sigemptyset(&newset);
-    sigaddset_deferrable(&newset);
 
 again:
     if (sec < 0)
@@ -245,7 +242,7 @@ again:
         timeout = &tv;
     }
 
-    pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+    block_deferrable_signals(0, &oldset);
 
     futex = futex_get(lock_word);
 
@@ -311,12 +308,9 @@ futex_wake(int *lock_word, int n)
 {
     int ret;
     struct futex *futex;
-    sigset_t newset, oldset;
+    sigset_t oldset;
 
-    sigemptyset(&newset);
-    sigaddset_deferrable(&newset);
-
-    pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+    block_deferrable_signals(0, &oldset);
 
     futex = futex_get(lock_word);
 

@@ -79,7 +79,7 @@ lose(char *fmt, ...)
     va_list ap;
     /* Block signals to prevent other threads, timers and such from
      * interfering. If only all threads could be stopped somehow. */
-    block_blockable_signals();
+    block_blockable_signals(0, 0);
     fprintf(stderr, "fatal error encountered");
     va_start(ap, fmt);
     print_message(fmt, ap);
@@ -97,7 +97,7 @@ corruption_warning_and_maybe_lose(char *fmt, ...)
     va_list ap;
 #ifndef LISP_FEATURE_WIN32
     sigset_t oldset;
-    thread_sigmask(SIG_BLOCK, &blockable_sigset, &oldset);
+    block_blockable_signals(0, &oldset);
 #endif
     fprintf(stderr, "CORRUPTION WARNING");
     va_start(ap, fmt);

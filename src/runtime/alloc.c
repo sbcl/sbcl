@@ -44,7 +44,7 @@ pa_alloc(int bytes, int page_type_flag)
      * otherwise two threads racing here may deadlock: the other will
      * wait on the GC lock, and the other cannot stop the first
      * one... */
-    check_gc_signals_unblocked_or_lose();
+    check_gc_signals_unblocked_or_lose(0);
 
     /* FIXME: OOAO violation: see arch_pseudo_* */
     set_pseudo_atomic_atomic(th);
@@ -94,7 +94,7 @@ pa_alloc(int bytes, int page_type_flag)
     /* This is not pseudo atomic at all, but is called only from
      * interrupt safe places like interrupt handlers. MG -
      * 2005-08-09 */
-    check_deferrables_blocked_or_lose();
+    check_deferrables_blocked_or_lose(0);
 
     result = dynamic_space_free_pointer;
 

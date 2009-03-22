@@ -258,8 +258,8 @@ new_thread_trampoline(struct thread *th)
     int result, lock_ret;
 
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
-    check_deferrables_blocked_or_lose();
-    check_gc_signals_unblocked_or_lose();
+    check_deferrables_blocked_or_lose(0);
+    check_gc_signals_unblocked_or_lose(0);
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
@@ -284,7 +284,7 @@ new_thread_trampoline(struct thread *th)
     result = funcall0(function);
 
     /* Block GC */
-    block_blockable_signals();
+    block_blockable_signals(0, 0);
     set_thread_state(th, STATE_DEAD);
 
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
@@ -514,7 +514,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
-    thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
+    block_deferrable_signals(0, &oldset);
 
 #ifdef LOCK_CREATE_THREAD
     retcode = pthread_mutex_lock(&create_thread_lock);
@@ -701,7 +701,7 @@ kill_safely(os_thread_t os_thread, int signal)
         struct thread *thread;
         /* pthread_kill is not async signal safe and we don't want to be
          * interrupted while holding the lock. */
-        thread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldset);
+        block_deferrable_signals(0, &oldset);
         pthread_mutex_lock(&all_threads_lock);
         for (thread = all_threads; thread; thread = thread->next) {
             if (thread->os_thread == os_thread) {

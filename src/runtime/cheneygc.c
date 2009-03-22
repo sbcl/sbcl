@@ -132,9 +132,7 @@ collect_garbage(generation_index_t ignore)
 
     /* it's possible that signals are blocked already if this was called
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
-    sigemptyset(&tmp);
-    sigaddset_blockable(&tmp);
-    thread_sigmask(SIG_BLOCK, &tmp, &old);
+    block_blockable_signals(0, &old);
 
     current_static_space_free_pointer =
         (lispobj *) ((unsigned long)
