@@ -676,7 +676,7 @@
 ;;; you tweak it, make sure that you compare the disassembly, if not the
 ;;; performance of, the functions implementing string streams
 ;;; (e.g. SB!IMPL::STRING-OUCH).
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun make-replace-transform (saetp sequence-type1 sequence-type2)
     `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
                             (,sequence-type1 ,sequence-type2 &rest t)

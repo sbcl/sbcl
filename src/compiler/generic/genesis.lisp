@@ -1656,7 +1656,7 @@ core and return a descriptor to it."
    (lambda (code-object-address fixup-offsets)
      (let ((fixup-vector
             (allocate-vector-object
-             *dynamic* sb-vm:n-word-bits (length fixup-offsets)
+             *dynamic* sb!vm:n-word-bits (length fixup-offsets)
              sb!vm:simple-array-unsigned-byte-32-widetag)))
        (do ((index sb!vm:vector-data-offset (1+ index))
             (fixups fixup-offsets (cdr fixups)))
@@ -2790,7 +2790,9 @@ core and return a descriptor to it."
           (sort constants
                 (lambda (const1 const2)
                   (if (= (second const1) (second const2))
-                      (< (third const1) (third const2))
+                      (if (= (third const1) (third const2))
+                          (string< (first const1) (first const2))
+                          (< (third const1) (third const2)))
                       (< (second const1) (second const2))))))
     (let ((prev-priority (second (car constants))))
       (dolist (const constants)

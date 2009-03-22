@@ -447,8 +447,6 @@
         (output-float object stream))
        (ratio
         (output-ratio object stream))
-       (ratio
-        (output-ratio object stream))
        (complex
         (output-complex object stream))))
     (character

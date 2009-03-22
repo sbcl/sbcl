@@ -194,7 +194,7 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-sharp*)
 (defvar *debug-name-ellipsis*)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun dump-debug-name-marker (marker &optional env)
     (declare (ignore env))
     (cond ((eq marker *debug-name-sharp*)

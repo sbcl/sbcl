@@ -203,7 +203,7 @@
       ret))
 
   (defun %conset-grow (conset new-size)
-    (declare (index new-size))
+    (declare (type index new-size))
     (setf (conset-vector conset)
           (replace (the simple-bit-vector
                      (make-array
@@ -215,7 +215,7 @@
 
   (declaim (inline conset-grow))
   (defun conset-grow (conset new-size)
-    (declare (index new-size))
+    (declare (type index new-size))
     (when (< (length (conset-vector conset)) new-size)
       (%conset-grow conset new-size))
     (values))

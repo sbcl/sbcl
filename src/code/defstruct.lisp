@@ -1243,7 +1243,7 @@
   ;; included in that length to guarantee proper alignment of raw double float
   ;; slots, necessary for (at least) the SPARC backend.
   (let ((layout-length (dd-layout-length dd)))
-    (declare (index layout-length))
+    (declare (type index layout-length))
     (+ layout-length (mod (1+ layout-length) 2))))
 
 ;;; This is called when we are about to define a structure class. It

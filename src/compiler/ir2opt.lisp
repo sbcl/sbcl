@@ -181,7 +181,7 @@
     (maybe-convert-one-cmov 2block)))
 
 (defun delete-unused-ir2-blocks (component)
-  (declare (component component))
+  (declare (type component component))
   (let ((live-2blocks (make-hash-table)))
     (labels ((mark-2block (2block)
                (declare (type ir2-block 2block))
