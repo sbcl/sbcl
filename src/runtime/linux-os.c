@@ -363,7 +363,8 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
             lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
                  "of separate memory mappings was exceeded. To fix the problem, either increase\n"
                  "the maximum with e.g. 'echo 262144 > /proc/sys/vm/max_map_count' or recompile\n"
-                 "SBCL with a larger value for GENCGC-PAGE-SIZE in 'src/target/parms.lisp'.");
+                 "SBCL with a larger value for GENCGC-PAGE-BYTES in\n"
+                 "'src/compiler/target/backend-parms.lisp'.");
         } else {
             perror("mprotect");
         }
