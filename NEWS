@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes in sbcl-1.0.27 relative to 1.0.26:
+  * bug fix: a type error is signaled for attempts to use the LOOP
+    keyword ACROSS for a NIL value. (thanks to Daniel Lowe)
+
 changes in sbcl-1.0.26 relative to 1.0.25:
   * incompatible change: an interruption (be it a function passed to
     INTERRUPT-THREAD or a timer function) runs in an environment where

@@ -916,8 +916,11 @@ code to be loaded.
 ;;;; loop types
 
 (defun loop-typed-init (data-type &optional step-var-p)
-  (when (and data-type (sb!xc:subtypep data-type 'number))
-    (let ((init (if step-var-p 1 0)))
+  (cond
+    ((null data-type)
+     nil)
+    ((sb!xc:subtypep data-type 'number)
+     (let ((init (if step-var-p 1 0)))
       (flet ((like (&rest types)
                (coerce init (find-if (lambda (type)
                                        (sb!xc:subtypep data-type type))
@@ -932,7 +935,11 @@ code to be loaded.
                      '(complex long-float)
                      '(complex float)))
               (t
-               init))))))
+               init)))))
+    ((sb!xc:subtypep data-type 'vector)
+     (coerce nil data-type))
+    (t
+     nil)))
 
 (defun loop-optional-type (&optional variable)
   ;; No variable specified implies that no destructuring is permissible.
