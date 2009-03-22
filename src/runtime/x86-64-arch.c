@@ -66,7 +66,7 @@ context_eflags_addr(os_context_t *context)
 #elif defined LISP_FEATURE_DARWIN
     return CONTEXT_ADDR_FROM_STEM(rflags);
 #elif defined __OpenBSD__
-    return &context->sc_eflags;
+    return &context->sc_rflags;
 #else
 #error unsupported OS
 #endif

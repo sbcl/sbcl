@@ -111,7 +111,12 @@
   (def!constant static-space-end          #x201ff000)
 
   (def!constant dynamic-space-start   #x1000000000)
+  #!-openbsd
   (def!constant dynamic-space-end     #x11ffff0000)
+  #!+openbsd
+  ;; This is lower on OpenBSD to allow SBCL to run under the default
+  ;; 512M data size limit.
+  (def!constant dynamic-space-end     #x101bcf0000)
 
   (def!constant linkage-table-space-start #x20200000)
   (def!constant linkage-table-space-end   #x202ff000)

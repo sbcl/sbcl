@@ -484,12 +484,22 @@ os_get_runtime_executable_path()
 void
 openbsd_init()
 {
+    /*
+     * Show a warning if it looks like the memory available after
+     * allocating the spaces won't be at least this much.
+     */
+#ifdef LISP_FEATURE_X86_64
+    const int wantfree = 64 * 1024 * 1024;
+#else
+    const int wantfree = 32 * 1024 * 1024;
+#endif
     struct rlimit rl;
 
     /* OpenBSD, like NetBSD, counts mmap()ed space against the
      * process's data size limit. If the soft limit is lower than the
      * hard limit then try to yank it up, this lets users in the
-     * "staff" login class run sbcl with a default /etc/login.conf
+     * "staff" or "daemon" login classes run sbcl with larger dynamic
+     * space sizes.
      */
     getrlimit (RLIMIT_DATA, &rl);
     if (rl.rlim_cur < rl.rlim_max) {
@@ -503,18 +513,17 @@ The system may fail to start.\n",
         }
     }
 
-    /* Display a (hopefully) helpful warning if it looks like we won't
-     * be able to allocate enough memory. In testing I found that on
-     * my system at least, a minimum of 25M on top of the three space
-     * sizes was needed to start SBCL. Show a warning below 32M so as
-     * to leave a little breathing room.
+    /*
+     * Display a (hopefully) helpful warning if it looks like we won't
+     * be able to allocate enough memory.
      */
     getrlimit (RLIMIT_DATA, &rl);
     if (dynamic_space_size + READ_ONLY_SPACE_SIZE + STATIC_SPACE_SIZE +
-        LINKAGE_TABLE_SPACE_SIZE + (32*1024*1024) > rl.rlim_cur)
+        LINKAGE_TABLE_SPACE_SIZE + wantfree > rl.rlim_cur)
         fprintf (stderr,
                  "RUNTIME WARNING: data size resource limit may be too low,\n"
-                 "  try decreasing the dynamic space size with --dynamic-space-size\n");
+                 "  try decreasing the dynamic space size with --dynamic-space-size\n"
+                 "  or raising the datasize or datasize-max limits in /etc/login.conf\n");
 }
 
 /* OpenBSD's dlsym() relies on the gcc bulitin

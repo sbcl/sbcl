@@ -25,15 +25,15 @@
 #include "genesis/thread.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
-#if defined __linux__  || defined __FreeBSD__ /* (but *not* OpenBSD) */
+#if defined __linux__  || defined __FreeBSD__ || defined __OpenBSD__
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var
 #endif
 
-/* Get the right type of alignment. Linux and FreeBSD (but not OpenBSD)
+/* Get the right type of alignment. Linux, FreeBSD and OpenBSD
  * want alignment in bytes. */
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #define align_4byte	4
 #define align_8byte	8
 #define align_16byte	16

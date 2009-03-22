@@ -206,11 +206,20 @@ corresponds to NAME, or NIL if there is none."
 ;; microsecond but also has a range of years.
 ;; CLH: Note that tv-usec used to be a time-t, but that this seems
 ;; problematic on Darwin x86-64 (and wrong). Trying suseconds-t.
-#!-win32
+#!-(or win32 openbsd)
 (define-alien-type nil
   (struct timeval
           (tv-sec time-t)           ; seconds
           (tv-usec suseconds-t)))   ; and microseconds
+
+;; The above definition doesn't work on 64-bit OpenBSD platforms.
+;; Both tv_sec and tv_usec are declared as long instead of time_t, and
+;; time_t is a typedef for int.
+#!+openbsd
+(define-alien-type nil
+  (struct timeval
+          (tv-sec long)             ; seconds
+          (tv-usec long)))          ; and microseconds
 
 #!+win32
 (define-alien-type nil
@@ -772,9 +781,19 @@ corresponds to NAME, or NIL if there is none."
 
 ;; the POSIX.4 structure for a time value. This is like a "struct
 ;; timeval" but has nanoseconds instead of microseconds.
+#!-openbsd
 (define-alien-type nil
     (struct timespec
             (tv-sec long)   ; seconds
+            (tv-nsec long))) ; nanoseconds
+
+;; Just as with struct timeval, 64-bit OpenBSD has problems with the
+;; above definition.  tv_sec is declared as time_t instead of long,
+;; and time_t is a typedef for int.
+#!+openbsd
+(define-alien-type nil
+    (struct timespec
+            (tv-sec time-t)  ; seconds
             (tv-nsec long))) ; nanoseconds
 
 ;; used by other time functions

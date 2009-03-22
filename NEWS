@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.27 relative to 1.0.26:
+  * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)
   * bug fix: a type error is signaled for attempts to use the LOOP
     keyword ACROSS for a NIL value. (thanks to Daniel Lowe)
 

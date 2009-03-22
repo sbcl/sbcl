@@ -25,7 +25,7 @@ kern_return_t mach_thread_init(mach_port_t thread_exception_port);
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_OPENBSD)
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
