@@ -3,6 +3,10 @@ changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)
   * bug fix: a type error is signaled for attempts to use the LOOP
     keyword ACROSS for a NIL value. (thanks to Daniel Lowe)
+  * bug fix: fix gc related interrupt handling bug on ppc (regression from
+    1.0.25.37, reported by Harald Hanche-Olsen)
+  * bug fix: work around signal delivery bug in darwin (regression from
+    1.0.25.44, reported by Sidney Markowitz)
 
 changes in sbcl-1.0.26 relative to 1.0.25:
   * incompatible change: an interruption (be it a function passed to

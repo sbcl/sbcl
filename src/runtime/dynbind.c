@@ -13,6 +13,9 @@
  * files for more information.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "sbcl.h"
 #include "runtime.h"
 #include "globals.h"
@@ -44,6 +47,7 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
         if(!sym->tls_index) {
             lispobj *tls_index_lock=
                 &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
+            FSHOW_SIGNAL((stderr, "entering dynbind tls alloc\n"));
             set_pseudo_atomic_atomic(th);
             get_spinlock(tls_index_lock,(long)th);
             if(!sym->tls_index) {
@@ -55,6 +59,7 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
                 }
             }
             release_spinlock(tls_index_lock);
+            FSHOW_SIGNAL((stderr, "exiting dynbind tls alloc\n"));
             clear_pseudo_atomic_atomic(th);
             if (get_pseudo_atomic_interrupted(th))
                 do_pending_interrupt();

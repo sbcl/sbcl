@@ -109,9 +109,9 @@ struct interrupt_data {
     siginfo_t pending_info;
     sigset_t pending_mask;
     /* Was pending mask saved for gc request? True if GC_PENDING or
-     * SIG_STOP_FOR_GC happened in a pseudo atomic with no GC_INHIBIT
-     * NIL. Both deferrable interrupt handlers and gc are careful not
-     * to clobber each other's pending_mask. */
+     * SIG_STOP_FOR_GC happened in a pseudo atomic with GC_INHIBIT NIL
+     * and with no pending handler. Both deferrable interrupt handlers
+     * and gc are careful not to clobber each other's pending_mask. */
     boolean gc_blocked_deferrables;
 #ifdef LISP_FEATURE_PPC
     /* On PPC when consing wants to turn to alloc(), it does so via a

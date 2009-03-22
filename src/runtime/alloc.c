@@ -40,10 +40,9 @@ pa_alloc(int bytes, int page_type_flag)
     lispobj *result;
     struct thread *th = arch_os_get_current_thread();
 
-    /* SIG_STOP_FOR_GC needs to be enabled before we can call lisp:
-     * otherwise two threads racing here may deadlock: the other will
-     * wait on the GC lock, and the other cannot stop the first
-     * one... */
+    /* SIG_STOP_FOR_GC must be unblocked: else two threads racing here
+     * may deadlock: one will wait on the GC lock, and the other
+     * cannot stop the first one... */
     check_gc_signals_unblocked_or_lose(0);
 
     /* FIXME: OOAO violation: see arch_pseudo_* */

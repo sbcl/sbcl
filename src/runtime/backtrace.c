@@ -533,6 +533,7 @@ describe_thread_state(void)
 {
     sigset_t mask;
     struct thread *thread = arch_os_get_current_thread();
+    struct interrupt_data *data = thread->interrupt_data;
 #ifndef LISP_FEATURE_WIN32
     get_current_sigmask(&mask);
     printf("Signal mask:\n");
@@ -553,6 +554,7 @@ describe_thread_state(void)
 #ifdef STOP_FOR_GC_PENDING
     printf(" *STOP-FOR-GC-PENDING* = %s\n", (SymbolValue(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
 #endif
+    printf("Pending handler = %p\n", data->pending_handler);
 }
 
 /* This function has been split from backtrace() to enable Lisp
