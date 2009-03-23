@@ -39,42 +39,64 @@
 #if !defined(LANGUAGE_ASSEMBLY)
 #include <thread.h>
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
-#define CONTROL_STACK_GUARD_PAGE(th) \
+
+#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
     ((os_vm_address_t)(th->control_stack_start))
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
-#define ALIEN_STACK_GUARD_PAGE(th) \
+
+#define ALIEN_STACK_HARD_GUARD_PAGE(th) \
     ((os_vm_address_t)(th->alien_stack_start))
+#define ALIEN_STACK_GUARD_PAGE(th) \
+    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
+
 #else
-#define CONTROL_STACK_GUARD_PAGE(th) \
+
+#define CONTROL_STACK_HARD_GUARD_PAGE(th) \
     (((os_vm_address_t)(th->control_stack_end)) - os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) \
+    (CONTROL_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
-#define ALIEN_STACK_GUARD_PAGE(th)                                 \
+
+#define ALIEN_STACK_HARD_GUARD_PAGE(th)                            \
     (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
      os_vm_page_size)
+#define ALIEN_STACK_GUARD_PAGE(th) \
+    (ALIEN_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) - os_vm_page_size)
+
 #endif
 
-#define BINDING_STACK_GUARD_PAGE(th)                                   \
+#define BINDING_STACK_HARD_GUARD_PAGE(th)                              \
     (((os_vm_address_t)th->binding_stack_start) + BINDING_STACK_SIZE - \
      os_vm_page_size)
+#define BINDING_STACK_GUARD_PAGE(th) \
+    (BINDING_STACK_HARD_GUARD_PAGE(th) - os_vm_page_size)
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
 extern void validate(void);
 
 extern void
+protect_control_stack_hard_guard_page(int protect_p, struct thread *thread);
+extern void
 protect_control_stack_guard_page(int protect_p, struct thread *thread);
 extern void
 protect_control_stack_return_guard_page(int protect_p, struct thread *thread);
 extern void
+protect_binding_stack_hard_guard_page(int protect_p, struct thread *thread);
+extern void
 protect_binding_stack_guard_page(int protect_p, struct thread *thread);
 extern void
 protect_binding_stack_return_guard_page(int protect_p, struct thread *thread);
+extern void
+protect_alien_stack_hard_guard_page(int protect_p, struct thread *thread);
 extern void
 protect_alien_stack_guard_page(int protect_p, struct thread *thread);
 extern void

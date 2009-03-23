@@ -1429,17 +1429,19 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th=arch_os_get_current_thread();
 
-    /* note the os_context hackery here.  When the signal handler returns,
-     * it won't go back to what it was doing ... */
-    if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
-       addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+    if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
+       addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+        lose("Control stack exhausted");
+    }
+    else if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
+            addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
         /* We hit the end of the control stack: disable guard page
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        corruption_warning_and_maybe_lose("Control stack exhausted");
         protect_control_stack_guard_page(0, NULL);
         protect_control_stack_return_guard_page(1, NULL);
+        fprintf(stderr, "INFO: Control stack guard page unprotected\n");
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* For the unfortunate case, when the control stack is
@@ -1456,16 +1458,20 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
         protect_control_stack_guard_page(1, NULL);
         protect_control_stack_return_guard_page(0, NULL);
+        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
         return 1;
+    }
+    else if(addr >= BINDING_STACK_HARD_GUARD_PAGE(th) &&
+            addr < BINDING_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+        lose("Binding stack exhausted");
     }
     else if(addr >= BINDING_STACK_GUARD_PAGE(th) &&
             addr < BINDING_STACK_GUARD_PAGE(th) + os_vm_page_size) {
-        corruption_warning_and_maybe_lose("Binding stack exhausted");
         protect_binding_stack_guard_page(0, NULL);
         protect_binding_stack_return_guard_page(1, NULL);
+        fprintf(stderr, "INFO: Binding stack guard page unprotected\n");
 
         /* For the unfortunate case, when the binding stack is
          * exhausted in a signal handler. */
@@ -1476,16 +1482,20 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= BINDING_STACK_RETURN_GUARD_PAGE(th) &&
             addr < BINDING_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
-        fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
         protect_binding_stack_guard_page(1, NULL);
         protect_binding_stack_return_guard_page(0, NULL);
+        fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
         return 1;
+    }
+    else if(addr >= ALIEN_STACK_HARD_GUARD_PAGE(th) &&
+            addr < ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+        lose("Alien stack exhausted");
     }
     else if(addr >= ALIEN_STACK_GUARD_PAGE(th) &&
             addr < ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size) {
-        corruption_warning_and_maybe_lose("Alien stack exhausted");
         protect_alien_stack_guard_page(0, NULL);
         protect_alien_stack_return_guard_page(1, NULL);
+        fprintf(stderr, "INFO: Alien stack guard page unprotected\n");
 
         /* For the unfortunate case, when the alien stack is
          * exhausted in a signal handler. */
@@ -1496,9 +1506,9 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= ALIEN_STACK_RETURN_GUARD_PAGE(th) &&
             addr < ALIEN_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
-        fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
         protect_alien_stack_guard_page(1, NULL);
         protect_alien_stack_return_guard_page(0, NULL);
+        fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
         return 1;
     }
     else if (addr >= undefined_alien_address &&

@@ -208,7 +208,7 @@ command-line.")
          (initial-offset (logand csp (1- bytes-per-scrub-unit)))
          (end-of-stack
           (- (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
-             sb!c:*backend-page-bytes*)))
+             (* 2 sb!c:*backend-page-bytes*))))
     (labels
         ((scrub (ptr offset count)
            (declare (type system-area-pointer ptr)
@@ -240,8 +240,9 @@ command-line.")
 
   #!+stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-         (end-of-stack (+ (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*))
-                          sb!c:*backend-page-bytes*))
+         (end-of-stack (+ (sap-int
+                           (sb!di::descriptor-sap sb!vm:*control-stack-start*))
+                          (* 2 sb!c:*backend-page-bytes*)))
          (initial-offset (logand csp (1- bytes-per-scrub-unit))))
     (labels
         ((scrub (ptr offset count)

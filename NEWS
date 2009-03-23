@@ -2,6 +2,12 @@
 changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)
   * new port: support added for x86-64 Solaris. (thanks to Alex Viskovatoff)
+  * improvement: the system either recovers from stack exhaustion or dies
+    properly as opposed to leaving the user uncertain of whether the handler
+    trampled on some random memory next to the stack or having to rely on
+    --lose-on-corruption (which is still a good idea to use in production
+    because stack exhaustion can happen in signal handlers which will likely
+    lead to hangs.)
   * bug fix: a type error is signaled for attempts to use the LOOP
     keyword ACROSS for a NIL value. (thanks to Daniel Lowe)
   * bug fix: fix gc related interrupt handling bug on ppc (regression from

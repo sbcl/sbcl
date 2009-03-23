@@ -133,6 +133,9 @@ initial_thread_trampoline(struct thread *th)
     link_thread(th);
     th->os_thread=thread_self();
 #ifndef LISP_FEATURE_WIN32
+    protect_control_stack_hard_guard_page(1, NULL);
+    protect_binding_stack_hard_guard_page(1, NULL);
+    protect_alien_stack_hard_guard_page(1, NULL);
     protect_control_stack_guard_page(1, NULL);
     protect_binding_stack_guard_page(1, NULL);
     protect_alien_stack_guard_page(1, NULL);

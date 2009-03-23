@@ -97,17 +97,28 @@ protect_page(void *page, int protect_p, os_vm_prot_t flags) {
         protect_page(page_name(thread), protect_p, flags);                   \
     }
 
+DEF_PROTECT_PAGE(control_stack_hard_guard_page,
+                 CONTROL_STACK_HARD_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(control_stack_guard_page,
                  CONTROL_STACK_GUARD_PAGE,
                  OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
 DEF_PROTECT_PAGE(control_stack_return_guard_page,
                  CONTROL_STACK_RETURN_GUARD_PAGE,
                  OS_VM_PROT_READ|OS_VM_PROT_EXECUTE)
+
+DEF_PROTECT_PAGE(binding_stack_hard_guard_page,
+                 BINDING_STACK_HARD_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(binding_stack_guard_page,
                  BINDING_STACK_GUARD_PAGE,
                  OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(binding_stack_return_guard_page,
                  BINDING_STACK_RETURN_GUARD_PAGE,
+                 OS_VM_PROT_NONE)
+
+DEF_PROTECT_PAGE(alien_stack_hard_guard_page,
+                 ALIEN_STACK_HARD_GUARD_PAGE,
                  OS_VM_PROT_NONE)
 DEF_PROTECT_PAGE(alien_stack_guard_page,
                  ALIEN_STACK_GUARD_PAGE,
