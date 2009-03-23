@@ -357,7 +357,7 @@
       (let ((new (make-constraint (length *constraint-universe*)
                                   kind x y not-p)))
         (vector-push-extend new *constraint-universe*
-                            (* 2 (length *constraint-universe*)))
+                            (1+ (length *constraint-universe*)))
         (conset-adjoin new (lambda-var-constraints x))
         (when (lambda-var-p y)
           (conset-adjoin new (lambda-var-constraints y)))
