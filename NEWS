@@ -14,6 +14,7 @@ changes in sbcl-1.0.27 relative to 1.0.26:
     1.0.25.37, reported by Harald Hanche-Olsen)
   * bug fix: work around signal delivery bug in darwin (regression from
     1.0.25.44, reported by Sidney Markowitz)
+  * bug fix: fix ERROR leaking memory (reported by David Thompson)
 
 changes in sbcl-1.0.26 relative to 1.0.25:
   * incompatible change: an interruption (be it a function passed to

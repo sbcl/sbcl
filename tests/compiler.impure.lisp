@@ -1055,6 +1055,20 @@
              (assert (eq :two (type-error-datum e)))
              (assert (eq 'number (type-error-expected-type e)))
              :error))))))
+
+(with-test (:name :compiled-debug-funs-leak)
+  (sb-ext:gc :full t)
+  (let ((usage-before (sb-kernel::dynamic-usage)))
+    (dotimes (x 10000)
+      (let ((f (compile nil '(lambda ()
+                               (error "X")))))
+        (handler-case
+            (funcall f)
+          (error () nil))))
+    (sb-ext:gc :full t)
+    (let ((usage-after (sb-kernel::dynamic-usage)))
+      (when (< (+ usage-before 2000000) usage-after)
+        (error "Leak")))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
