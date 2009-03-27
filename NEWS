@@ -8,8 +8,6 @@ changes in sbcl-1.0.27 relative to 1.0.26:
     --lose-on-corruption (which is still a good idea to use in production
     because stack exhaustion can happen in signal handlers which will likely
     lead to hangs.)
-  * bug fix: a type error is signaled for attempts to use the LOOP
-    keyword ACROSS for a NIL value. (thanks to Daniel Lowe)
   * bug fix: fix gc related interrupt handling bug on ppc (regression from
     1.0.25.37, reported by Harald Hanche-Olsen)
   * bug fix: work around signal delivery bug in darwin (regression from

@@ -242,3 +242,8 @@
 ;;; Loop variable with a range excluding 0, reported by Andras Simon.
 ;;; (Used to signal an error during macroexpansion.)
 (assert (not (loop with foo of-type (single-float 1.0 2.0) = 1.5 do (return))))
+
+;;; 1.0.26.12 used to signal a bogus type error for this.
+(loop with x of-type (simple-vector 1) = (make-array '(1))
+      repeat 1
+      return x)
