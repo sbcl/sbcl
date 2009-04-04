@@ -187,7 +187,10 @@
   (external-format :default)
   ;; fixed width, or function to call with a character
   (char-size 1 :type (or fixnum function))
-  (output-bytes #'ill-out :type function))
+  (output-bytes #'ill-out :type function)
+  ;; a boolean indicating whether the stream is bivalent.  For
+  ;; internal use only.
+  (bivalent-p nil :type boolean))
 (def!method print-object ((fd-stream fd-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
@@ -2041,7 +2044,16 @@
                                  (do-listen)))))))
        (do-listen)))
     (:unread
-     (setf (fd-stream-unread fd-stream) arg1)
+     ;; If the stream is bivalent, the user might follow an
+     ;; unread-char with a read-byte.  In this case, the bookkeeping
+     ;; is simpler if we adjust the buffer head by the number of code
+     ;; units in the character.
+     ;; FIXME: there has to be a proper way to check for bivalence,
+     ;; right?
+     (if (fd-stream-bivalent-p fd-stream)
+         (decf (buffer-head (fd-stream-ibuf fd-stream))
+               (fd-stream-character-size fd-stream arg1))
+         (setf (fd-stream-unread fd-stream) arg1))
      (setf (fd-stream-listen fd-stream) t))
     (:close
      ;; Drop input buffers
@@ -2315,6 +2327,7 @@
                                  :buffering buffering
                                  :dual-channel-p dual-channel-p
                                  :external-format external-format
+                                 :bivalent-p (eq element-type :default)
                                  :char-size (external-format-char-size external-format)
                                  :timeout
                                  (if timeout

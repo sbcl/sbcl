@@ -526,5 +526,56 @@
       (assert (= 3 (read-sequence buffer s :start 2 :end 3)))
       (file-position s :end)
       (assert (= 3 (read-sequence buffer s :start 3))))))
+
+;;; In 1.0.27 (and also 0.9.16; presumably in between, too), binary
+;;; input operations on a bivalent stream did something bad after
+;;; unread-char: READ-BYTE would return the character, and
+;;; READ-SEQUENCE into a byte buffer would lose when attempting to
+;;; store the character in the vector.
+(let ((pathname "bivalent-stream-unread-char-test.tmp"))
+  (with-open-file (s pathname
+                     :element-type :default
+                     :direction :io :if-exists :rename)
+    (write-char #\a s)
+    (file-position s :start)
+    (unread-char (read-char s) s)
+    (assert (integerp (read-byte s))))
+  (delete-file pathname))
+
+(let ((pathname "bivalent-stream-unread-char-test.tmp"))
+  (with-open-file (s pathname
+                     :element-type :default
+                     :direction :io :if-exists :rename)
+    (write-char #\a s)
+    (file-position s :start)
+    (unread-char (read-char s) s)
+    (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
+              (read-sequence buffer s))))
+  (delete-file pathname))
+
+#+sb-unicode
+(let ((pathname "bivalent-stream-unread-char-test.tmp"))
+  (with-open-file (s pathname
+                     :element-type :default
+                     :direction :io :if-exists :rename
+                     :external-format :utf8)
+    (write-char (code-char 192) s)
+    (file-position s :start)
+    (unread-char (read-char s) s)
+    (assert (integerp (read-byte s))))
+  (delete-file pathname))
+
+#+sb-unicode
+(let ((pathname "bivalent-stream-unread-char-test.tmp"))
+  (with-open-file (s pathname
+                     :element-type :default
+                     :direction :io :if-exists :rename
+                     :external-format :utf8)
+    (write-char (code-char 192) s)
+    (file-position s :start)
+    (unread-char (read-char s) s)
+    (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
+              (read-sequence buffer s))))
+  (delete-file pathname))
 
 ;;; success
