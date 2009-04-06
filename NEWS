@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes in sbcl-1.0.28 relative to 1.0.27:
+  * bug fix: timers could go off in the wrong order, be delayed indefinitely
+    (thanks to Ole Arndt for the patch)
+
 changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)
   * new port: support added for x86-64 Solaris. (thanks to Alex Viskovatoff)

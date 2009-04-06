@@ -13,6 +13,18 @@
 
 (use-package :test-util)
 
+(with-test (:name :heap)
+  (let* ((size 1000)
+         (heap (make-array size :adjustable t :fill-pointer 0))
+         (unsorted (loop for i below size collect (random size)))
+         (sorted (sort (copy-list unsorted) #'>=))
+         heap-sorted)
+    (map nil #'(lambda (val) (sb-impl::heap-insert heap val)) unsorted)
+    (setf heap-sorted (loop for i below size
+                            collect (sb-impl::heap-extract-maximum heap)))
+    (unless (equal sorted heap-sorted)
+      (error "Heap sort failure ~S" heap-sorted))))
+
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
     void
   (where sb-alien:unsigned-long))
