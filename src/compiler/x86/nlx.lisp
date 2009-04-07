@@ -266,7 +266,7 @@
                            temp)
 
     ;; Allocate space for magic UWP block.
-    (inst sub esp-tn unwind-block-size)
+    (inst sub esp-tn (* unwind-block-size n-word-bytes))
     ;; Set up magic catch / UWP block.
     (move block esp-tn)
     (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
