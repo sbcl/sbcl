@@ -1894,7 +1894,7 @@
 
 (define-instruction rep (segment)
   (:emitter
-   (emit-byte segment #b11110010)))
+   (emit-byte segment #b11110011)))
 
 (define-instruction repe (segment)
   (:printer byte ((op #b11110011)))
