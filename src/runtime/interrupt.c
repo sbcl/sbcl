@@ -250,11 +250,13 @@ sigset_t gc_sigset;
 
 #endif
 
+#if !defined(LISP_FEATURE_WIN32)
 boolean
 deferrables_blocked_p(sigset_t *sigset)
 {
     return all_signals_blocked_p(sigset, &deferrable_sigset, "deferrable");
 }
+#endif
 
 void
 check_deferrables_unblocked_or_lose(sigset_t *sigset)
@@ -274,11 +276,13 @@ check_deferrables_blocked_or_lose(sigset_t *sigset)
 #endif
 }
 
+#if !defined(LISP_FEATURE_WIN32)
 boolean
 blockables_blocked_p(sigset_t *sigset)
 {
     return all_signals_blocked_p(sigset, &blockable_sigset, "blockable");
 }
+#endif
 
 void
 check_blockables_unblocked_or_lose(sigset_t *sigset)
@@ -298,11 +302,13 @@ check_blockables_blocked_or_lose(sigset_t *sigset)
 #endif
 }
 
+#if !defined(LISP_FEATURE_WIN32)
 boolean
 gc_signals_blocked_p(sigset_t *sigset)
 {
     return all_signals_blocked_p(sigset, &gc_sigset, "gc");
 }
+#endif
 
 void
 check_gc_signals_unblocked_or_lose(sigset_t *sigset)
