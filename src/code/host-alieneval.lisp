@@ -34,6 +34,7 @@
 
 (defstruct (alien-type-class (:copier nil))
   (name nil :type symbol)
+  (defstruct-name nil :type symbol)
   (include nil :type (or null alien-type-class))
   (unparse nil :type (or null function))
   (type= nil :type (or null function))
@@ -57,13 +58,15 @@
   (or (gethash name *alien-type-classes*)
       (error "no alien type class ~S" name)))
 
-(defun create-alien-type-class-if-necessary (name include)
+(defun create-alien-type-class-if-necessary (name defstruct-name include)
   (let ((old (gethash name *alien-type-classes*))
         (include (and include (alien-type-class-or-lose include))))
     (if old
         (setf (alien-type-class-include old) include)
         (setf (gethash name *alien-type-classes*)
-              (make-alien-type-class :name name :include include)))))
+              (make-alien-type-class :name name
+                                     :defstruct-name defstruct-name
+                                     :include include)))))
 
 (defparameter *method-slot-alist*
   '((:unparse . alien-type-class-unparse)
@@ -99,16 +102,19 @@
           (symbol
            (values
             include
-            (symbolicate "ALIEN-" include "-TYPE")
+            (alien-type-class-defstruct-name
+             (alien-type-class-or-lose include))
             nil))
           (list
            (values
             (car include)
-            (symbolicate "ALIEN-" (car include) "-TYPE")
+            (alien-type-class-defstruct-name
+             (alien-type-class-or-lose (car include)))
             (cdr include))))
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (create-alien-type-class-if-necessary ',name ',(or include 'root)))
+           (create-alien-type-class-if-necessary ',name ',defstruct-name
+                                                 ',(or include 'root)))
          (def!struct (,defstruct-name
                         (:include ,include-defstruct
                                   (class ',name)
@@ -329,7 +335,7 @@
 ;;;; the root alien type
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (create-alien-type-class-if-necessary 'root nil))
+  (create-alien-type-class-if-necessary 'root 'alien-type nil))
 
 (def!struct (alien-type
              (:make-load-form-fun sb!kernel:just-dump-it-normally)
