@@ -65,7 +65,14 @@ if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
 else
     DEVNULL=/dev/null
 fi
-SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit $DEVNULL --sysinit $DEVNULL}"
+# The classic form here was to use --userinit $DEVNULL --sysinit
+# $DEVNULL, but that doesn't work on Win32 because SBCL doesn't handle
+# device names properly.  We still need $DEVNULL to be NUL on Win32
+# because it's used elsewhere (such as canonicalize-whitespace), so we
+# need an alternate solution for the init file overrides.  It turns
+# out that version.lisp-expr has no side effects from evaluation, so
+# we may as well use that.
+SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit version.lisp-expr --sysinit version.lisp-expr}"
 export DEVNULL
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
