@@ -354,14 +354,14 @@
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-       (inst or (make-ea :byte :disp (* 4 thread-pseudo-atomic-bits-slot))
-             (fixnumize 1) :fs)
+       (inst mov (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
+             ebp-tn :fs)
        ,@forms
-       (inst xor (make-ea :byte :disp (* 4 thread-pseudo-atomic-bits-slot))
-             (fixnumize 1) :fs)
+       (inst xor (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
+             ebp-tn :fs)
        (inst jmp :z ,label)
-       ;; if PAI was set, interrupts were disabled at the same
-       ;; time using the process signal mask.
+       ;; if PAI was set, interrupts were disabled at the same time
+       ;; using the process signal mask.
        (inst break pending-interrupt-trap)
        (emit-label ,label))))
 
@@ -369,14 +369,14 @@
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-       (inst or (make-ea-for-symbol-value *pseudo-atomic-bits* :byte)
-             (fixnumize 1))
+       (inst mov (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)
+             ebp-tn)
        ,@forms
-       (inst xor (make-ea-for-symbol-value *pseudo-atomic-bits* :byte)
-             (fixnumize 1))
+       (inst xor (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)
+             ebp-tn)
        (inst jmp :z ,label)
-       ;; if PAI was set, interrupts were disabled at the same
-       ;; time using the process signal mask.
+       ;; if PAI was set, interrupts were disabled at the same time
+       ;; using the process signal mask.
        (inst break pending-interrupt-trap)
        (emit-label ,label))))
 

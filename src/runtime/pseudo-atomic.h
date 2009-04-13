@@ -34,18 +34,19 @@
 static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {
-    return fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) &
-                        make_fixnum(1));
+    return SymbolValue(PSEUDO_ATOMIC_BITS, thread) & (~1);
 }
 
 static inline void
 set_pseudo_atomic_atomic(struct thread *thread)
 {
     lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
+    if (*p)
+        lose("set_pseudo_atomic_atomic: pseudo atomic bits is %d.", *p);
     __asm__ __volatile__
         ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
-         : "g" (make_fixnum(1)), "m" (*p)
+         : "g" (~1), "m" (*p)
          : "memory");
 }
 
@@ -56,36 +57,39 @@ clear_pseudo_atomic_atomic(struct thread *thread)
     __asm__ __volatile__
         ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
-         : "g" (~make_fixnum(1)), "m" (*p)
+         : "g" (1), "m" (*p)
          : "memory");
 }
 
 static inline int
 get_pseudo_atomic_interrupted(struct thread *thread)
 {
-    return fixnum_value(SymbolValue(PSEUDO_ATOMIC_BITS, thread) &
-                        make_fixnum(2));
+    return SymbolValue(PSEUDO_ATOMIC_BITS, thread) & 1;
 }
 
 static inline void
 set_pseudo_atomic_interrupted(struct thread *thread)
 {
+    if (!get_pseudo_atomic_atomic(thread))
+        lose("set_pseudo_atomic_interrupted not in pseudo atomic");
     lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
     __asm__ __volatile__
         ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
-         : "g" (make_fixnum(2)), "m" (*p)
+         : "g" (1), "m" (*p)
          : "memory");
 }
 
 static inline void
 clear_pseudo_atomic_interrupted(struct thread *thread)
 {
+    if (get_pseudo_atomic_atomic(thread))
+        lose("clear_pseudo_atomic_interrupted in pseudo atomic");
     lispobj *p = SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread);
     __asm__ __volatile__
         ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
-         : "g" (~make_fixnum(2)), "m" (*p)
+         : "g" (~1), "m" (*p)
          : "memory");
 }
 

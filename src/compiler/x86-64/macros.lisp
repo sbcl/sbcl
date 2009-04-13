@@ -294,48 +294,46 @@
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-      (inst or (make-ea :byte
-                 :base thread-base-tn
-                 :disp (* 8 thread-pseudo-atomic-bits-slot))
-            (fixnumize 1))
-      ,@forms
-      (inst xor (make-ea :byte
-                 :base thread-base-tn
-                 :disp (* 8 thread-pseudo-atomic-bits-slot))
-            (fixnumize 1))
-      (inst jmp :z ,label)
-      ;; if PAI was set, interrupts were disabled at the same
-      ;; time using the process signal mask.
-      (inst break pending-interrupt-trap)
-      (emit-label ,label))))
+       (inst mov (make-ea :qword
+                          :base thread-base-tn
+                          :disp (* 8 thread-pseudo-atomic-bits-slot))
+             rbp-tn)
+       ,@forms
+       (inst xor (make-ea :qword
+                          :base thread-base-tn
+                          :disp (* 8 thread-pseudo-atomic-bits-slot))
+             rbp-tn)
+       (inst jmp :z ,label)
+       ;; if PAI was set, interrupts were disabled at the same time
+       ;; using the process signal mask.
+       (inst break pending-interrupt-trap)
+       (emit-label ,label))))
 
 
 #!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
     `(let ((,label (gen-label)))
-      ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
-      ;; something. (perhaps SVLB, for static variable low byte)
-      (inst or (make-ea :byte :disp (+ nil-value
-                                       (static-symbol-offset
-                                        '*pseudo-atomic-bits*)
-                                       (ash symbol-value-slot word-shift)
-                                       (- other-pointer-lowtag)))
-            (fixnumize 1))
-      ,@forms
-      (inst xor (make-ea :byte :disp (+ nil-value
-                                        (static-symbol-offset
-                                         '*pseudo-atomic-bits*)
-                                        (ash symbol-value-slot word-shift)
-                                        (- other-pointer-lowtag)))
-            (fixnumize 1))
-      (inst jmp :z ,label)
-      ;; if PAI was set, interrupts were disabled at the same time
-      ;; using the process signal mask.
-      (inst break pending-interrupt-trap)
-      (emit-label ,label))))
-
-
+       ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
+       ;; something. (perhaps SVLB, for static variable low byte)
+       (inst mov (make-ea :qword :disp (+ nil-value
+                                          (static-symbol-offset
+                                           '*pseudo-atomic-bits*)
+                                          (ash symbol-value-slot word-shift)
+                                          (- other-pointer-lowtag)))
+             rbp-tn)
+       ,@forms
+       (inst xor (make-ea :qword :disp (+ nil-value
+                                          (static-symbol-offset
+                                           '*pseudo-atomic-bits*)
+                                          (ash symbol-value-slot word-shift)
+                                          (- other-pointer-lowtag)))
+             rbp-tn)
+       (inst jmp :z ,label)
+       ;; if PAI was set, interrupts were disabled at the same time
+       ;; using the process signal mask.
+       (inst break pending-interrupt-trap)
+       (emit-label ,label))))
 
 ;;;; indexed references
 
