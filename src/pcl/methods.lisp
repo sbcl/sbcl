@@ -1585,7 +1585,7 @@
       (eq gf #'(setf slot-value-using-class))
       (eq gf #'slot-boundp-using-class)))
 
-(let (po-cache)
+(let (initial-print-object-cache)
   (defmethod compute-discriminating-function ((gf standard-generic-function))
     (let ((dfun-state (slot-value gf 'dfun-state)))
       (when (special-case-for-compute-discriminating-function-p gf)
@@ -1623,11 +1623,11 @@
               (cond ((/= nkeys 1)
                      ;; KLUDGE: someone has defined a method
                      ;; specialized on the second argument: punt.
-                     (setf po-cache nil)
+                     (setf initial-print-object-cache nil)
                      (make-initial-dfun gf))
-                    (po-cache
+                    (initial-print-object-cache
                      (multiple-value-bind (dfun cache info)
-                         (make-caching-dfun gf po-cache)
+                         (make-caching-dfun gf (copy-cache initial-print-object-cache))
                        (set-dfun gf dfun cache info)))
                     ;; the relevant PRINT-OBJECT methods get defined
                     ;; late, by delayed DEF!METHOD.  We mustn't cache
@@ -1639,17 +1639,14 @@
                     (t (multiple-value-bind (dfun cache info)
                            (make-final-dfun-internal
                             gf
-                            (list (list (find-class
-                                         'sb-kernel::control-stack-exhausted))
-                                  (list (find-class
-                                         'sb-kernel::binding-stack-exhausted))
-                                  (list (find-class
-                                         'sb-kernel::alien-stack-exhausted))
-                                  (list (find-class
-                                         'sb-kernel::heap-exhausted-error))
-                                  (list (find-class 'restart))))
-                         (setq po-cache cache)
-                         (set-dfun gf dfun cache info))))))
+                            (mapcar (lambda (x) (list (find-class x)))
+                                    '(sb-kernel::control-stack-exhausted
+                                      sb-kernel::binding-stack-exhausted
+                                      sb-kernel::alien-stack-exhausted
+                                      sb-kernel::heap-exhausted-error
+                                      restart)))
+                         (setq initial-print-object-cache cache)
+                         (set-dfun gf dfun (copy-cache cache) info))))))
            ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
             (make-final-dfun gf))
            (t

@@ -3,6 +3,8 @@ changes in sbcl-1.0.28 relative to 1.0.27:
   * bug fix: timers could go off in the wrong order, be delayed indefinitely
     (thanks to Ole Arndt for the patch)
   * bug fix: RESTART-FRAME and RETURN-FROM-FRAME stack corruption
+  * bug fix: the discriminating function for PRINT-OBJECT no longer preserves
+    potentially-invalid effective methods in its cache.
 
 changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)
