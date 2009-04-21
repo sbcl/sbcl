@@ -1224,7 +1224,6 @@
       (inst lea dst (make-ea :qword :base rcx :index rcx))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       (inst shr rcx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
        ;; Set up the result.
@@ -1242,7 +1241,7 @@
        (inst lods rax)
        (storew rax dst 0 list-pointer-lowtag)
        ;; Go back for more.
-       (inst sub rcx 1)
+       (inst sub rcx n-word-bytes)
        (inst jmp :nz loop)
        ;; NIL out the last cons.
        (storew nil-value dst 1 list-pointer-lowtag)

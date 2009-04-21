@@ -1253,7 +1253,6 @@
       (inst lea dst (make-ea :dword :base ecx :index ecx))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       (inst shr ecx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
        ;; Set up the result.
@@ -1271,7 +1270,7 @@
        (inst lods eax)
        (storew eax dst 0 list-pointer-lowtag)
        ;; Go back for more.
-       (inst sub ecx 1)
+       (inst sub ecx n-word-bytes)
        (inst jmp :nz loop)
        ;; NIL out the last cons.
        (storew nil-value dst 1 list-pointer-lowtag)
