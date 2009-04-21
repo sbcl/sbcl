@@ -369,6 +369,36 @@
 ;;;; We provide a few special operations that can be meaningfully used
 ;;;; on VALUES types (as well as on any other type).
 
+;;; Return the minimum number of values possibly matching VALUES type
+;;; TYPE.
+(defun values-type-min-value-count (type)
+  (etypecase type
+    (named-type
+     (ecase (named-type-name type)
+       ((t *) 0)
+       ((nil) 0)))
+    (values-type
+     (length (values-type-required type)))))
+
+;;; Return the maximum number of values possibly matching VALUES type
+;;; TYPE.
+(defun values-type-max-value-count (type)
+  (etypecase type
+    (named-type
+     (ecase (named-type-name type)
+       ((t *) call-arguments-limit)
+       ((nil) 0)))
+    (values-type
+     (if (values-type-rest type)
+         call-arguments-limit
+         (+ (length (values-type-optional type))
+            (length (values-type-required type)))))))
+
+(defun values-type-may-be-single-value-p (type)
+  (<= (values-type-min-value-count type)
+      1
+      (values-type-max-value-count type)))
+
 (defun type-single-value-p (type)
   (and (values-type-p type)
        (not (values-type-rest type))

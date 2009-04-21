@@ -191,181 +191,189 @@
 ;;;     there are stack values.
 ;;;  -- Reset SP. This must be done whenever other than 1 value is
 ;;;     returned, regardless of the number of values desired.
-(defun default-unknown-values (vop values nvals)
+(defun default-unknown-values (vop values nvals node)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals))
-  (cond
-   ((<= nvals 1)
-    (note-this-location vop :single-value-return)
-    (inst cmov :c rsp-tn rbx-tn))
-   ((<= nvals register-arg-count)
-    (let ((regs-defaulted (gen-label)))
-      (note-this-location vop :unknown-return)
-      (inst jmp :c regs-defaulted)
-      ;; Default the unsupplied registers.
-      (let* ((2nd-tn-ref (tn-ref-across values))
-             (2nd-tn (tn-ref-tn 2nd-tn-ref)))
-        (inst mov 2nd-tn nil-value)
-        (when (> nvals 2)
-          (loop
-            for tn-ref = (tn-ref-across 2nd-tn-ref)
-            then (tn-ref-across tn-ref)
-            for count from 2 below register-arg-count
-            do (inst mov (tn-ref-tn tn-ref) 2nd-tn))))
-      (inst mov rbx-tn rsp-tn)
-      (emit-label regs-defaulted)
-      (inst mov rsp-tn rbx-tn)))
-   ((<= nvals 7)
-    ;; The number of bytes depends on the relative jump instructions.
-    ;; Best case is 31+(n-3)*14, worst case is 35+(n-3)*18. For
-    ;; NVALS=6 that is 73/89 bytes, and for NVALS=7 that is 87/107
-    ;; bytes which is likely better than using the blt below.
-    (let ((regs-defaulted (gen-label))
-          (defaulting-done (gen-label))
-          (default-stack-slots (gen-label)))
-      (note-this-location vop :unknown-return)
-      ;; Branch off to the MV case.
-      (inst jmp :c regs-defaulted)
-      ;; Do the single value case.
-      ;; Default the register args
-      (inst mov rax-tn nil-value)
-      (do ((i 1 (1+ i))
-           (val (tn-ref-across values) (tn-ref-across val)))
-          ((= i (min nvals register-arg-count)))
-        (inst mov (tn-ref-tn val) rax-tn))
-
-      ;; Fake other registers so it looks like we returned with all the
-      ;; registers filled in.
-      (move rbx-tn rsp-tn)
-      (inst jmp default-stack-slots)
-
-      (emit-label regs-defaulted)
-
-      (inst mov rax-tn nil-value)
-      (collect ((defaults))
-        (do ((i register-arg-count (1+ i))
-             (val (do ((i 0 (1+ i))
-                       (val values (tn-ref-across val)))
-                      ((= i register-arg-count) val))
-                  (tn-ref-across val)))
-            ((null val))
-          (let ((default-lab (gen-label))
-                (tn (tn-ref-tn val))
-                (first-stack-arg-p (= i register-arg-count)))
-            (defaults (cons default-lab (cons tn first-stack-arg-p)))
-
-            (inst cmp rcx-tn (fixnumize i))
-            (inst jmp :be default-lab)
-            (when first-stack-arg-p
-              ;; There are stack args so the frame of the callee is
-              ;; still there, save RDX in its first slot temporalily.
-              (storew rdx-tn rbx-tn (frame-word-offset sp->fp-offset)))
-            (loadw rdx-tn rbx-tn (frame-word-offset (+ sp->fp-offset i)))
-            (inst mov tn rdx-tn)))
-
-        (emit-label defaulting-done)
-        (loadw rdx-tn rbx-tn (frame-word-offset sp->fp-offset))
-        (move rsp-tn rbx-tn)
-
-        (let ((defaults (defaults)))
-          (when defaults
-            (assemble (*elsewhere*)
-              (trace-table-entry trace-table-fun-prologue)
-              (emit-label default-stack-slots)
-              (dolist (default defaults)
-                (emit-label (car default))
-                (when (cddr default)
-                  ;; We are setting the first stack argument to NIL.
-                  ;; The callee's stack frame is dead, save RDX by
-                  ;; pushing it to the stack, it will end up at same
-                  ;; place as in the (STOREW RDX-TN RBX-TN -1) case
-                  ;; above.
-                  (inst push rdx-tn))
-                (inst mov (second default) rax-tn))
-              (inst jmp defaulting-done)
-              (trace-table-entry trace-table-normal)))))))
-   (t
-    (let ((regs-defaulted (gen-label))
-          (restore-edi (gen-label))
-          (no-stack-args (gen-label))
-          (default-stack-vals (gen-label))
-          (count-okay (gen-label)))
-      (note-this-location vop :unknown-return)
-      ;; Branch off to the MV case.
-      (inst jmp :c regs-defaulted)
-
-      ;; Default the register args, and set up the stack as if we
-      ;; entered the MV return point.
-      (inst mov rbx-tn rsp-tn)
-      (inst mov rdi-tn nil-value)
-      (inst mov rsi-tn rdi-tn)
-      ;; Compute a pointer to where to put the [defaulted] stack values.
-      (emit-label no-stack-args)
-      (inst push rdx-tn)
-      (inst push rdi-tn)
-      (inst lea rdi-tn
-            (make-ea :qword :base rbp-tn
-                     :disp (frame-byte-offset register-arg-count)))
-      ;; Load RAX with NIL so we can quickly store it, and set up
-      ;; stuff for the loop.
-      (inst mov rax-tn nil-value)
-      (inst std)
-      (inst mov rcx-tn (- nvals register-arg-count))
-      ;; Jump into the default loop.
-      (inst jmp default-stack-vals)
-
-      ;; The regs are defaulted. We need to copy any stack arguments,
-      ;; and then default the remaining stack arguments.
-      (emit-label regs-defaulted)
-      ;; Save EDI.
-      (storew rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
-      ;; Compute the number of stack arguments, and if it's zero or
-      ;; less, don't copy any stack arguments.
-      (inst sub rcx-tn (fixnumize register-arg-count))
-      (inst jmp :le no-stack-args)
-
-      ;; Throw away any unwanted args.
-      (inst cmp rcx-tn (fixnumize (- nvals register-arg-count)))
-      (inst jmp :be count-okay)
-      (inst mov rcx-tn (fixnumize (- nvals register-arg-count)))
-      (emit-label count-okay)
-      ;; Save the number of stack values.
-      (inst mov rax-tn rcx-tn)
-      ;; Compute a pointer to where the stack args go.
-      (inst lea rdi-tn
-            (make-ea :qword :base rbp-tn
-                     :disp (frame-byte-offset register-arg-count)))
-      ;; Save ESI, and compute a pointer to where the args come from.
-      (storew rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
-      (inst lea rsi-tn
-            (make-ea :qword :base rbx-tn
-                     :disp (frame-byte-offset
-                            (+ sp->fp-offset register-arg-count))))
-      ;; Do the copy.
-      (inst shr rcx-tn word-shift)              ; make word count
-      (inst std)
-      (inst rep)
-      (inst movs :qword)
-      ;; Restore RSI.
-      (loadw rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
-      ;; Now we have to default the remaining args. Find out how many.
-      (inst sub rax-tn (fixnumize (- nvals register-arg-count)))
-      (inst neg rax-tn)
-      ;; If none, then just blow out of here.
-      (inst jmp :le restore-edi)
-      (inst mov rcx-tn rax-tn)
-      (inst shr rcx-tn word-shift)      ; word count
-      ;; Load RAX with NIL for fast storing.
-      (inst mov rax-tn nil-value)
-      ;; Do the store.
-      (emit-label default-stack-vals)
-      (inst rep)
-      (inst stos rax-tn)
-      ;; Restore EDI, and reset the stack.
-      (emit-label restore-edi)
-      (loadw rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
-      (inst mov rsp-tn rbx-tn)
-      (inst cld))))
+  (let ((type (sb!c::basic-combination-derived-type node)))
+    (cond
+      ((<= nvals 1)
+       (note-this-location vop :single-value-return)
+       (cond
+         ((<= (sb!kernel:values-type-max-value-count type)
+              register-arg-count)
+          (when (and (named-type-p type)
+                     (eq nil (named-type-name type)))
+            ;; The function never returns, it may happen that the code
+            ;; ends right here leavig the :SINGLE-VALUE-RETURN note
+            ;; dangling. Let's emit a NOP.
+            (inst nop)))
+         ((not (sb!kernel:values-type-may-be-single-value-p type))
+          (inst mov rsp-tn rbx-tn))
+         (t
+          (inst cmov :c rsp-tn rbx-tn))))
+      ((<= nvals register-arg-count)
+       (note-this-location vop :unknown-return)
+       (when (sb!kernel:values-type-may-be-single-value-p type)
+         (let ((regs-defaulted (gen-label)))
+           (inst jmp :c regs-defaulted)
+           ;; Default the unsupplied registers.
+           (let* ((2nd-tn-ref (tn-ref-across values))
+                  (2nd-tn (tn-ref-tn 2nd-tn-ref)))
+             (inst mov 2nd-tn nil-value)
+             (when (> nvals 2)
+               (loop
+                for tn-ref = (tn-ref-across 2nd-tn-ref)
+                then (tn-ref-across tn-ref)
+                for count from 2 below register-arg-count
+                do (inst mov (tn-ref-tn tn-ref) 2nd-tn))))
+           (inst mov rbx-tn rsp-tn)
+           (emit-label regs-defaulted)))
+       (when (< register-arg-count
+                (sb!kernel:values-type-max-value-count type))
+         (inst mov rsp-tn rbx-tn)))
+      ((<= nvals 7)
+       ;; The number of bytes depends on the relative jump instructions.
+       ;; Best case is 31+(n-3)*14, worst case is 35+(n-3)*18. For
+       ;; NVALS=6 that is 73/89 bytes, and for NVALS=7 that is 87/107
+       ;; bytes which is likely better than using the blt below.
+       (let ((regs-defaulted (gen-label))
+             (defaulting-done (gen-label))
+             (default-stack-slots (gen-label)))
+         (note-this-location vop :unknown-return)
+         ;; Branch off to the MV case.
+         (inst jmp :c regs-defaulted)
+         ;; Do the single value case.
+         ;; Default the register args
+         (inst mov rax-tn nil-value)
+         (do ((i 1 (1+ i))
+              (val (tn-ref-across values) (tn-ref-across val)))
+             ((= i (min nvals register-arg-count)))
+           (inst mov (tn-ref-tn val) rax-tn))
+         ;; Fake other registers so it looks like we returned with all the
+         ;; registers filled in.
+         (move rbx-tn rsp-tn)
+         (inst jmp default-stack-slots)
+         (emit-label regs-defaulted)
+         (inst mov rax-tn nil-value)
+         (collect ((defaults))
+           (do ((i register-arg-count (1+ i))
+                (val (do ((i 0 (1+ i))
+                          (val values (tn-ref-across val)))
+                         ((= i register-arg-count) val))
+                     (tn-ref-across val)))
+               ((null val))
+             (let ((default-lab (gen-label))
+                   (tn (tn-ref-tn val))
+                   (first-stack-arg-p (= i register-arg-count)))
+               (defaults (cons default-lab
+                               (cons tn first-stack-arg-p)))
+               (inst cmp rcx-tn (fixnumize i))
+               (inst jmp :be default-lab)
+               (when first-stack-arg-p
+                 ;; There are stack args so the frame of the callee is
+                 ;; still there, save RDX in its first slot temporalily.
+                 (storew rdx-tn rbx-tn (frame-word-offset sp->fp-offset)))
+               (loadw rdx-tn rbx-tn (frame-word-offset (+ sp->fp-offset i)))
+               (inst mov tn rdx-tn)))
+           (emit-label defaulting-done)
+           (loadw rdx-tn rbx-tn (frame-word-offset sp->fp-offset))
+           (move rsp-tn rbx-tn)
+           (let ((defaults (defaults)))
+             (when defaults
+               (assemble (*elsewhere*)
+                 (trace-table-entry trace-table-fun-prologue)
+                 (emit-label default-stack-slots)
+                 (dolist (default defaults)
+                   (emit-label (car default))
+                   (when (cddr default)
+                     ;; We are setting the first stack argument to NIL.
+                     ;; The callee's stack frame is dead, save RDX by
+                     ;; pushing it to the stack, it will end up at same
+                     ;; place as in the (STOREW RDX-TN RBX-TN -1) case
+                     ;; above.
+                     (inst push rdx-tn))
+                   (inst mov (second default) rax-tn))
+                 (inst jmp defaulting-done)
+                 (trace-table-entry trace-table-normal)))))))
+      (t
+       (let ((regs-defaulted (gen-label))
+             (restore-edi (gen-label))
+             (no-stack-args (gen-label))
+             (default-stack-vals (gen-label))
+             (count-okay (gen-label)))
+         (note-this-location vop :unknown-return)
+         ;; Branch off to the MV case.
+         (inst jmp :c regs-defaulted)
+         ;; Default the register args, and set up the stack as if we
+         ;; entered the MV return point.
+         (inst mov rbx-tn rsp-tn)
+         (inst mov rdi-tn nil-value)
+         (inst mov rsi-tn rdi-tn)
+         ;; Compute a pointer to where to put the [defaulted] stack values.
+         (emit-label no-stack-args)
+         (inst push rdx-tn)
+         (inst push rdi-tn)
+         (inst lea rdi-tn
+               (make-ea :qword :base rbp-tn
+                        :disp (frame-byte-offset register-arg-count)))
+         ;; Load RAX with NIL so we can quickly store it, and set up
+         ;; stuff for the loop.
+         (inst mov rax-tn nil-value)
+         (inst std)
+         (inst mov rcx-tn (- nvals register-arg-count))
+         ;; Jump into the default loop.
+         (inst jmp default-stack-vals)
+         ;; The regs are defaulted. We need to copy any stack arguments,
+         ;; and then default the remaining stack arguments.
+         (emit-label regs-defaulted)
+         ;; Compute the number of stack arguments, and if it's zero or
+         ;; less, don't copy any stack arguments.
+         (inst sub rcx-tn (fixnumize register-arg-count))
+         (inst jmp :le no-stack-args)
+         ;; Save EDI.
+         (storew rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
+         ;; Throw away any unwanted args.
+         (inst cmp rcx-tn (fixnumize (- nvals register-arg-count)))
+         (inst jmp :be count-okay)
+         (inst mov rcx-tn (fixnumize (- nvals register-arg-count)))
+         (emit-label count-okay)
+         ;; Save the number of stack values.
+         (inst mov rax-tn rcx-tn)
+         ;; Compute a pointer to where the stack args go.
+         (inst lea rdi-tn
+               (make-ea :qword :base rbp-tn
+                        :disp (frame-byte-offset register-arg-count)))
+         ;; Save ESI, and compute a pointer to where the args come from.
+         (storew rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
+         (inst lea rsi-tn
+               (make-ea :qword :base rbx-tn
+                        :disp (frame-byte-offset
+                               (+ sp->fp-offset register-arg-count))))
+         ;; Do the copy.
+         (inst shr rcx-tn word-shift)   ; make word count
+         (inst std)
+         (inst rep)
+         (inst movs :qword)
+         ;; Restore RSI.
+         (loadw rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
+         ;; Now we have to default the remaining args. Find out how many.
+         (inst sub rax-tn (fixnumize (- nvals register-arg-count)))
+         (inst neg rax-tn)
+         ;; If none, then just blow out of here.
+         (inst jmp :le restore-edi)
+         (inst mov rcx-tn rax-tn)
+         (inst shr rcx-tn word-shift)   ; word count
+         ;; Load RAX with NIL for fast storing.
+         (inst mov rax-tn nil-value)
+         ;; Do the store.
+         (emit-label default-stack-vals)
+         (inst rep)
+         (inst stos rax-tn)
+         ;; Restore EDI, and reset the stack.
+         (emit-label restore-edi)
+         (loadw rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
+         (inst mov rsp-tn rbx-tn)
+         (inst cld)))))
   (values))
 
 ;;;; unknown values receiving
@@ -387,34 +395,37 @@
 ;;; explicitly allocate these TNs, since their lifetimes overlap with
 ;;; the results start and count. (Also, it's nice to be able to target
 ;;; them.)
-(defun receive-unknown-values (args nargs start count)
+(defun receive-unknown-values (args nargs start count node)
   (declare (type tn args nargs start count))
-  (let ((variable-values (gen-label))
+  (let ((type (sb!c::basic-combination-derived-type node))
+        (variable-values (gen-label))
         (stack-values (gen-label))
         (done (gen-label)))
-    (inst jmp :c variable-values)
-
-    (cond ((location= start (first *register-arg-tns*))
-           (inst push (first *register-arg-tns*))
-           (inst lea start (make-ea :qword :base rsp-tn :disp n-word-bytes)))
-          (t (inst mov start rsp-tn)
-             (inst push (first *register-arg-tns*))))
-    (inst mov count (fixnumize 1))
-    (inst jmp done)
-
-    (emit-label variable-values)
+    (when (sb!kernel:values-type-may-be-single-value-p type)
+      (inst jmp :c variable-values)
+      (cond ((location= start (first *register-arg-tns*))
+             (inst push (first *register-arg-tns*))
+             (inst lea start (make-ea :qword :base rsp-tn :disp n-word-bytes)))
+            (t (inst mov start rsp-tn)
+               (inst push (first *register-arg-tns*))))
+      (inst mov count (fixnumize 1))
+      (inst jmp done)
+      (emit-label variable-values))
     ;; The stack frame is burnt and RETurned from if there are no
     ;; stack values. In this case quickly reallocate sufficient space.
-    (inst cmp nargs (fixnumize register-arg-count))
-    (inst jmp :g stack-values)
-    (inst sub rsp-tn nargs)
-    (emit-label stack-values)
+    (when (<= (sb!kernel:values-type-min-value-count type)
+              register-arg-count)
+      (inst cmp nargs (fixnumize register-arg-count))
+      (inst jmp :g stack-values)
+      (inst sub rsp-tn nargs)
+      (emit-label stack-values))
     ;; dtc: this writes the registers onto the stack even if they are
     ;; not needed, only the number specified in rcx are used and have
     ;; stack allocated to them. No harm is done.
     (loop
       for arg in *register-arg-tns*
       for i downfrom -1
+      for j below (sb!kernel:values-type-max-value-count type)
       do (storew arg args i))
     (move start args)
     (move count nargs)
@@ -483,6 +494,7 @@
   (:info arg-locs callee target nvals)
   (:vop-var vop)
   (:ignore nfp arg-locs args #+nil callee)
+  (:node-var node)
   (:generator 5
     (trace-table-entry trace-table-call-site)
     (move rbp-tn fp)
@@ -508,7 +520,7 @@
     (note-this-location vop :call-site)
     (inst jmp target)
     RETURN
-    (default-unknown-values vop values nvals)
+    (default-unknown-values vop values nvals node)
     (trace-table-entry trace-table-normal)))
 
 ;;; Non-TR local call for a variable number of return values passed according
@@ -524,6 +536,7 @@
   (:info save callee target)
   (:ignore args save nfp #+nil callee)
   (:vop-var vop)
+  (:node-var node)
   (:generator 20
     (trace-table-entry trace-table-call-site)
     (move rbp-tn fp)
@@ -549,7 +562,7 @@
     (inst jmp target)
     RETURN
     (note-this-location vop :unknown-return)
-    (receive-unknown-values values-start nvals start count)
+    (receive-unknown-values values-start nvals start count node)
     (trace-table-entry trace-table-normal)))
 
 ;;;; local call with known values return
@@ -729,6 +742,8 @@
                                       :from (:argument 1)
                                       :to (:argument 2))
                                  old-fp-tmp)))
+               ,@(unless (eq return :tail)
+                   '((:node-var node)))
 
                (:generator ,(+ (if named 5 0)
                                (if variable 19 1)
@@ -846,10 +861,11 @@
                                            fun-pointer-lowtag))))
                ,@(ecase return
                    (:fixed
-                    '((default-unknown-values vop values nvals)))
+                    '((default-unknown-values vop values nvals node)))
                    (:unknown
                     '((note-this-location vop :unknown-return)
-                      (receive-unknown-values values-start nvals start count)))
+                      (receive-unknown-values values-start nvals start count
+                                              node)))
                    (:tail))
                (trace-table-entry trace-table-normal)))))
 

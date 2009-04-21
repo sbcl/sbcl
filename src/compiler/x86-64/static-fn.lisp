@@ -137,7 +137,8 @@
                      (default-unknown-values
                          vop
                          ,(if (zerop num-results) nil 'values)
-                       ,num-results)))
+                       ,num-results
+                       ,node)))
          ,@(moves (result-names) (temp-names)))))))
 
 ) ; EVAL-WHEN
