@@ -24,7 +24,7 @@
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
   (make-ea :qword :base rbp-tn
-           :disp (- (* (+ (tn-offset tn) catch-block-size) n-word-bytes))))
+           :disp (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size))))
 
 
 ;;;; Save and restore dynamic environment.
@@ -168,9 +168,10 @@
                    (storew rdx-tn rbx-tn -1))
                  (sc-case tn
                    ((descriptor-reg any-reg)
-                    (loadw tn start (frame-word-offset i)))
+                    (loadw tn start (frame-word-offset (+ sp->fp-offset i))))
                    ((control-stack)
-                    (loadw move-temp start (frame-word-offset i))
+                    (loadw move-temp start
+                           (frame-word-offset (+ sp->fp-offset i)))
                     (inst mov tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
@@ -277,7 +278,8 @@
 
     ;; Clear the stack
     (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn :disp (* -3 n-word-bytes)))
+          (make-ea :qword :base rbp-tn
+                   :disp (* (- sp->fp-offset 3) n-word-bytes)))
 
     ;; Push the return-pc so it looks like we just called.
     (pushw rbp-tn (frame-word-offset return-pc-save-offset))

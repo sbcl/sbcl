@@ -143,7 +143,8 @@
       (inst lea rsp-tn
             (make-ea :qword :base rbp-tn
                      :disp (- (* n-word-bytes
-                                 (max 3 (sb-allocated-size 'stack)))))))
+                                 (- (max 3 (sb-allocated-size 'stack))
+                                    sp->fp-offset))))))
 
     (trace-table-entry trace-table-normal)))
 
@@ -151,12 +152,13 @@
 ;;; or a multiple-call-local. All it does is allocate stack space for the
 ;;; callee (who has the same size stack as us).
 (define-vop (allocate-frame)
-  (:results (res :scs (any-reg control-stack))
+  (:results (res :scs (any-reg))
             (nfp))
   (:info callee)
   (:ignore nfp callee)
   (:generator 2
-    (move res rsp-tn)
+    (inst lea res (make-ea :qword :base rsp-tn
+                           :disp (- (* sp->fp-offset n-word-bytes))))
     (inst sub rsp-tn (* n-word-bytes (sb-allocated-size 'stack)))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full
@@ -165,9 +167,10 @@
 ;;; before it can extend the stack.
 (define-vop (allocate-full-call-frame)
   (:info nargs)
-  (:results (res :scs (any-reg control-stack)))
+  (:results (res :scs (any-reg)))
   (:generator 2
-    (move res rsp-tn)
+    (inst lea res (make-ea :qword :base rsp-tn
+                           :disp (- (* sp->fp-offset n-word-bytes))))
     (inst sub rsp-tn (* (max nargs 3) n-word-bytes))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
@@ -256,12 +259,12 @@
             (when first-stack-arg-p
               ;; There are stack args so the frame of the callee is
               ;; still there, save RDX in its first slot temporalily.
-              (storew rdx-tn rbx-tn -1))
-            (loadw rdx-tn rbx-tn (frame-word-offset i))
+              (storew rdx-tn rbx-tn (frame-word-offset sp->fp-offset)))
+            (loadw rdx-tn rbx-tn (frame-word-offset (+ sp->fp-offset i)))
             (inst mov tn rdx-tn)))
 
         (emit-label defaulting-done)
-        (loadw rdx-tn rbx-tn -1)
+        (loadw rdx-tn rbx-tn (frame-word-offset sp->fp-offset))
         (move rsp-tn rbx-tn)
 
         (let ((defaults (defaults)))
@@ -315,7 +318,7 @@
       ;; and then default the remaining stack arguments.
       (emit-label regs-defaulted)
       ;; Save EDI.
-      (storew rdi-tn rbx-tn (frame-word-offset 1))
+      (storew rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
       ;; Compute the number of stack arguments, and if it's zero or
       ;; less, don't copy any stack arguments.
       (inst sub rcx-tn (fixnumize register-arg-count))
@@ -333,17 +336,18 @@
             (make-ea :qword :base rbp-tn
                      :disp (frame-byte-offset register-arg-count)))
       ;; Save ESI, and compute a pointer to where the args come from.
-      (storew rsi-tn rbx-tn (frame-word-offset 2))
+      (storew rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
       (inst lea rsi-tn
             (make-ea :qword :base rbx-tn
-                     :disp (frame-byte-offset register-arg-count)))
+                     :disp (frame-byte-offset
+                            (+ sp->fp-offset register-arg-count))))
       ;; Do the copy.
       (inst shr rcx-tn word-shift)              ; make word count
       (inst std)
       (inst rep)
       (inst movs :qword)
       ;; Restore RSI.
-      (loadw rsi-tn rbx-tn (frame-word-offset 2))
+      (loadw rsi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 2)))
       ;; Now we have to default the remaining args. Find out how many.
       (inst sub rax-tn (fixnumize (- nvals register-arg-count)))
       (inst neg rax-tn)
@@ -359,7 +363,7 @@
       (inst stos rax-tn)
       ;; Restore EDI, and reset the stack.
       (emit-label restore-edi)
-      (loadw rdi-tn rbx-tn (frame-word-offset 1))
+      (loadw rdi-tn rbx-tn (frame-word-offset (+ sp->fp-offset 1)))
       (inst mov rsp-tn rbx-tn)
       (inst cld))))
   (values))
@@ -611,9 +615,7 @@
     (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
     ;; Zot all of the stack except for the old-fp and return-pc.
-    (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn
-                   :disp (frame-byte-offset ocfp-save-offset)))
+    (inst mov rsp-tn rbp-tn)
     (inst pop rbp-tn)
     (inst ret)
     (trace-table-entry trace-table-normal)))
@@ -815,6 +817,10 @@
                           ,(if variable
                                '(inst sub rsp-tn (fixnumize 3)))
 
+                          ;; Bias the new-fp for use as an fp
+                          ,(if variable
+                               '(inst sub new-fp (fixnumize sp->fp-offset)))
+
                           ;; Save the fp
                           (storew rbp-tn new-fp
                                   (frame-word-offset ocfp-save-offset))
@@ -899,8 +905,7 @@
     (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
     ;; Drop stack above old-fp
-    (inst lea rsp-tn (make-ea :qword :base rbp-tn
-                              :disp (frame-byte-offset (tn-offset old-fp))))
+    (inst mov rsp-tn rbp-tn)
     ;; Clear the multiple-value return flag
     (inst clc)
     ;; Restore the old frame pointer
@@ -942,18 +947,11 @@
       (error "nvalues is 1"))
     (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
-    (move rbx rbp-tn)
+    (inst lea rbx (make-ea :qword :base rbp-tn
+                           :disp (* sp->fp-offset n-word-bytes)))
     (if (zerop nvals)
         (zeroize rcx) ; smaller
         (inst mov rcx (fixnumize nvals)))
-    ;; Clear as much of the stack as possible, but not past the old
-    ;; frame address.
-    (inst lea rsp-tn
-          (make-ea :qword :base rbx
-                   :disp (frame-byte-offset
-                          (if (< register-arg-count nvals)
-                              (1- nvals)
-                              ocfp-save-offset))))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
@@ -967,15 +965,24 @@
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of RBX instead of RBP.
     (cond ((<= nvals register-arg-count)
+           (inst mov rsp-tn rbp-tn)
            (inst pop rbp-tn)
            (inst ret))
           (t
            ;; Some values are on the stack after RETURN-PC and OLD-FP,
            ;; can't return normally and some slots of the frame will
            ;; be used as temporaries by the receiver.
+           ;;
+           ;; Clear as much of the stack as possible, but not past the
+           ;; old frame address.
+           (inst lea rsp-tn
+                 (make-ea :qword :base rbp-tn
+                          :disp (frame-byte-offset (1- nvals))))
            (move rbp-tn old-fp)
            (inst push (make-ea :qword :base rbx
-                               :disp (frame-byte-offset (tn-offset return-pc))))
+                               :disp (frame-byte-offset
+                                      (+ sp->fp-offset
+                                         (tn-offset return-pc)))))
            (inst ret)))
 
     (trace-table-entry trace-table-normal)))
@@ -987,8 +994,6 @@
 ;;; assembly-routine.
 ;;;
 ;;; The assembly routine takes the following args:
-;;;  RAX -- the return-pc to finally jump to.
-;;;  RBX -- pointer to where to put the values.
 ;;;  RCX -- number of values to find there.
 ;;;  RSI -- pointer to where to find the values.
 (define-vop (return-multiple)
@@ -1012,8 +1017,8 @@
         (inst jmp :ne not-single)
         ;; Return with one value.
         (loadw a0 vals -1)
-        (inst lea rsp-tn (make-ea :qword :base rbp-tn
-                                  :disp (frame-byte-offset ocfp-save-offset)))
+        ;; Clear the stack until ocfp.
+        (inst mov rsp-tn rbp-tn)
         ;; clear the multiple-value return flag
         (inst clc)
         ;; Out of here.
@@ -1064,11 +1069,11 @@
            (inst jmp :be JUST-ALLOC-FRAME)))
 
     ;; Allocate the space on the stack.
-    ;; stack = rbp - (max 3 frame-size) - (nargs - fixed)
+    ;; stack = rbp + sp->fp-offset - (max 3 frame-size) - (nargs - fixed)
     (inst lea rbx-tn
           (make-ea :qword :base rbp-tn
-                   :disp (- (fixnumize fixed)
-                            (* n-word-bytes
+                   :disp (* n-word-bytes
+                            (- (+ sp->fp-offset fixed)
                                (max 3 (sb-allocated-size 'stack))))))
     (inst sub rbx-tn rcx-tn)  ; Got the new stack in rbx
     (inst mov rsp-tn rbx-tn)
@@ -1090,7 +1095,8 @@
            (inst sub rcx-tn (fixnumize fixed))))
 
     ;; Initialize R8 to be the end of args.
-    (inst mov source rbp-tn)
+    (inst lea source (make-ea :qword :base rbp-tn
+                              :disp (* sp->fp-offset n-word-bytes)))
     (inst sub source rbx-tn)
 
     ;; We need to copy from downwards up to avoid overwriting some of
@@ -1120,9 +1126,12 @@
           ( nil )
         ;; Store it relative to rbp
         (inst mov (make-ea :qword :base rbp-tn
-                           :disp (- (* n-word-bytes
-                                       (+ 1 (- i fixed)
-                                          (max 3 (sb-allocated-size 'stack))))))
+                           :disp (* n-word-bytes
+                                    (- sp->fp-offset
+                                       (+ 1
+                                          (- i fixed)
+                                          (max 3 (sb-allocated-size
+                                                  'stack))))))
               (nth i *register-arg-tns*))
 
         (incf i)
@@ -1140,7 +1149,8 @@
     JUST-ALLOC-FRAME
     (inst lea rsp-tn
           (make-ea :qword :base rbp-tn
-                   :disp (- (* n-word-bytes
+                   :disp (* n-word-bytes
+                            (- sp->fp-offset
                                (max 3 (sb-allocated-size 'stack))))))
 
     DONE))

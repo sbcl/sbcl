@@ -119,7 +119,39 @@ frame to include sufficient space for its local variables, after
 possibly converting any @code{&rest} arguments to a proper list.
 
 The above scheme was changed in 1.0.27 on x86 and x86-64 by swapping
-the old frame pointer and the return address.
+the old frame pointer with the return address and making EBP point two
+words later:
+
+On x86/x86-64 the stack now looks like this (stack grows downwards):
+
+@verbatim
+----------
+RETURN PC
+----------
+OLD FP
+---------- <- FP points here
+EMPTY SLOT
+----------
+FIRST ARG
+----------
+@end verbatim
+
+just as if the function had been CALLed and upon entry executed the
+standard prologue: PUSH EBP; MOV EBP, ESP. On other architectures the
+stack looks like this (stack grows upwards):
+
+@verbatim
+----------
+FIRST ARG
+----------
+EMPTY SLOT
+----------
+RETURN PC
+----------
+OLD FP
+---------- <- FP points here
+@end verbatim
+
 
 @node Unknown-Values Returns
 @comment  node-name,  next,  previous,  up

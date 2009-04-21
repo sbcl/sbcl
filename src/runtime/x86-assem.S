@@ -272,11 +272,10 @@ Ldone:
 #endif
 
 	/* Alloc new frame. */
-	mov	%esp,%ebx	# The current sp marks start of new frame.
-	push	%ebp		# dummy for return address
+	push	%ebp            # Dummy for return address
 	push	%ebp		# fp in save location S1
+	mov	%esp,%ebp	# The current sp marks start of new frame.
 	sub	$4,%esp		# Ensure 3 slots are allocated, two above.
-	mov	%ebx,%ebp	# Switch to new frame.
 
 	call	*CLOSURE_FUN_OFFSET(%eax)
 	

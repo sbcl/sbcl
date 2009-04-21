@@ -43,7 +43,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-          (make-ea :qword :base sap :disp (- n-word-bytes) :index temp))))
+          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp))))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -55,7 +55,7 @@
   (:result-types *)
   (:generator 5
     (inst mov result (make-ea :qword :base sap
-                              :disp (- (* (1+ index) n-word-bytes))))))
+                              :disp (frame-byte-offset index)))))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -71,7 +71,8 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-          (make-ea :qword :base sap :disp (- n-word-bytes) :index temp) value)
+          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp)
+          value)
     (move result value)))
 
 (define-vop (write-control-stack-c)
@@ -84,8 +85,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 5
-    (inst mov (make-ea :qword :base sap
-                       :disp (- (* (1+ index) n-word-bytes)))
+    (inst mov (make-ea :qword :base sap :disp (frame-byte-offset index))
           value)
     (move result value)))
 

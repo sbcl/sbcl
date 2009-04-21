@@ -20,7 +20,7 @@
                (make-byte-tn value))
               ((sc-is value control-stack)
                (make-ea :byte :base rbp-tn
-                        :disp (- (* (1+ (tn-offset value)) n-word-bytes))))
+                        :disp (frame-byte-offset (tn-offset value))))
               (t
                value))
         sb!vm::fixnum-tag-mask))

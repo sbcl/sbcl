@@ -40,12 +40,12 @@
                 (inst ret)
 
                 DO-STATIC-FUN
+                ;; Same as: (inst enter (fixnumize 1))
                 (inst push rbp-tn)
-                (inst lea rbp-tn (make-ea :qword
-                                          :base rsp-tn
-                                          :disp (* 2 n-word-bytes)))
+                (inst mov rbp-tn rsp-tn)
                 (inst sub rsp-tn (fixnumize 1))
-                (inst push (make-ea :qword :base rbp-tn :disp (- n-word-bytes)))
+                (inst push (make-ea :qword :base rbp-tn
+                            :disp (frame-byte-offset return-pc-save-offset)))
                 (inst mov rcx (fixnumize 2)) ; arg count
                 (inst jmp
                       (make-ea :qword
@@ -127,9 +127,10 @@
   (inst jmp :z FIXNUM)
 
   (inst push rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp (* 2 n-word-bytes)))
+  (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (fixnumize 1))
-  (inst push (make-ea :qword :base rbp-tn :disp (- n-word-bytes)))
+  (inst push (make-ea :qword :base rbp-tn
+                      :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov rcx (fixnumize 1))    ; arg count
   (inst jmp (make-ea :qword
                      :disp (+ nil-value (static-fun-offset '%negate))))
@@ -167,13 +168,18 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (move rcx rsp-tn)
                 (inst sub rsp-tn (fixnumize 3))
-                (inst mov (make-ea :qword
-                                   :base rcx
-                                   :disp (frame-byte-offset ocfp-save-offset))
+                (inst mov (make-ea :qword :base rsp-tn
+                                   :disp (frame-byte-offset
+                                          (+ sp->fp-offset
+                                             -3
+                                             ocfp-save-offset)))
                       rbp-tn)
-                (move rbp-tn rcx)
+                (inst lea rbp-tn (make-ea :qword :base rsp-tn
+                                          :disp (frame-byte-offset
+                                          (+ sp->fp-offset
+                                             -3
+                                             ocfp-save-offset))))
                 (inst mov rcx (fixnumize 2))
                 (inst call (make-ea :qword
                                     :disp (+ nil-value
@@ -232,13 +238,18 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (move rcx rsp-tn)
   (inst sub rsp-tn (fixnumize 3))
-  (inst mov (make-ea :qword
-                     :base rcx
-                     :disp (frame-byte-offset ocfp-save-offset))
+  (inst mov (make-ea :qword :base rsp-tn
+                     :disp (frame-byte-offset
+                            (+ sp->fp-offset
+                               -3
+                               ocfp-save-offset)))
         rbp-tn)
-  (move rbp-tn rcx)
+  (inst lea rbp-tn (make-ea :qword :base rsp-tn
+                            :disp (frame-byte-offset
+                                   (+ sp->fp-offset
+                                      -3
+                                      ocfp-save-offset))))
   (inst mov rcx (fixnumize 2))
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'eql))))
@@ -289,13 +300,19 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (move rcx rsp-tn)
   (inst sub rsp-tn (fixnumize 3))
-  (inst mov (make-ea :qword
-                     :base rcx
-                     :disp (frame-byte-offset ocfp-save-offset))
+  (inst mov (make-ea :qword :base rsp-tn
+                     :disp (frame-byte-offset
+                            (+ sp->fp-offset
+                               -3
+                               ocfp-save-offset)))
         rbp-tn)
-  (move rbp-tn rcx)
+  (inst lea rbp-tn (make-ea :qword :base rsp-tn
+                            :disp (frame-byte-offset
+                                   (+ sp->fp-offset
+                                      -3
+                                      ocfp-save-offset))))
+
   (inst mov rcx (fixnumize 2))
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))

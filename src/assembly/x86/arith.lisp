@@ -40,12 +40,12 @@
                 (inst ret)
 
                 DO-STATIC-FUN
+                ;; Same as: (inst enter (fixnumize 1))
                 (inst push ebp-tn)
-                (inst lea ebp-tn (make-ea :dword
-                                          :base esp-tn
-                                          :disp (* 2 n-word-bytes)))
+                (inst mov ebp-tn esp-tn)
                 (inst sub esp-tn (fixnumize 1))
-                (inst push (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
+                (inst push (make-ea :dword :base ebp-tn
+                            :disp (frame-byte-offset return-pc-save-offset)))
                 (inst mov ecx (fixnumize 2)) ; arg count
                 (inst jmp
                       (make-ea :dword
@@ -130,9 +130,10 @@
   (inst jmp :z FIXNUM)
 
   (inst push ebp-tn)
-  (inst lea ebp-tn (make-ea :dword :base esp-tn :disp (* 2 n-word-bytes)))
+  (inst mov ebp-tn esp-tn)
   (inst sub esp-tn (fixnumize 1))
-  (inst push (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
+  (inst push (make-ea :dword :base ebp-tn
+                      :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov ecx (fixnumize 1))    ; arg count
   (inst jmp (make-ea :dword
                      :disp (+ nil-value (static-fun-offset '%negate))))
@@ -169,13 +170,18 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (move ecx esp-tn)
                 (inst sub esp-tn (fixnumize 3))
-                (inst mov (make-ea :dword
-                                   :base ecx
-                                   :disp (frame-byte-offset ocfp-save-offset))
+                (inst mov (make-ea :dword :base esp-tn
+                                   :disp (frame-byte-offset
+                                          (+ sp->fp-offset
+                                             -3
+                                             ocfp-save-offset)))
                       ebp-tn)
-                (move ebp-tn ecx)
+                (inst lea ebp-tn (make-ea :dword :base esp-tn
+                                          :disp (frame-byte-offset
+                                          (+ sp->fp-offset
+                                             -3
+                                             ocfp-save-offset))))
                 (inst mov ecx (fixnumize 2))
                 (inst call (make-ea :dword
                                     :disp (+ nil-value
@@ -229,7 +235,7 @@
   (inst cmp ecx other-pointer-lowtag)
   (inst jmp :e DO-STATIC-FUN)
 
-  ;; Not both other pointers
+  ;; At least one fixnum
   (inst cmp x y)
   RET
   (inst ret)
@@ -239,13 +245,18 @@
   (inst cmp x y)
   (inst jmp :e RET)
 
-  (move ecx esp-tn)
   (inst sub esp-tn (fixnumize 3))
-  (inst mov (make-ea :dword
-                     :base ecx
-                     :disp (frame-byte-offset ocfp-save-offset))
+  (inst mov (make-ea :dword :base esp-tn
+                     :disp (frame-byte-offset
+                            (+ sp->fp-offset
+                               -3
+                               ocfp-save-offset)))
         ebp-tn)
-  (move ebp-tn ecx)
+  (inst lea ebp-tn (make-ea :dword :base esp-tn
+                            :disp (frame-byte-offset
+                                   (+ sp->fp-offset
+                                      -3
+                                      ocfp-save-offset))))
   (inst mov ecx (fixnumize 2))
   (inst call (make-ea :dword
                       :disp (+ nil-value (static-fun-offset 'eql))))
@@ -296,13 +307,18 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (move ecx esp-tn)
   (inst sub esp-tn (fixnumize 3))
-  (inst mov (make-ea :dword
-                     :base ecx
-                     :disp (frame-byte-offset ocfp-save-offset))
+  (inst mov (make-ea :dword :base esp-tn
+                     :disp (frame-byte-offset
+                            (+ sp->fp-offset
+                               -3
+                               ocfp-save-offset)))
         ebp-tn)
-  (move ebp-tn ecx)
+  (inst lea ebp-tn (make-ea :dword :base esp-tn
+                            :disp (frame-byte-offset
+                                   (+ sp->fp-offset
+                                      -3
+                                      ocfp-save-offset))))
   (inst mov ecx (fixnumize 2))
   (inst call (make-ea :dword
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))

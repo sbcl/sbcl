@@ -39,8 +39,13 @@
   (inst cmp ecx (fixnumize 3))
   (inst jmp :e THREE-VALUES)
 
-  (inst mov ebx rbp-tn)
-  ;; Save the count, because the loop is going to destroy it.
+  ;; As per the calling convention EBX is expected to point at the SP
+  ;; before the stack frame.
+  (inst lea ebx (make-ea :qword :base rbp-tn
+                         :disp (* sp->fp-offset n-word-bytes)))
+
+  ;; Save the count, the return address and restore the frame pointer,
+  ;; because the loop is going to destroy them.
   (inst mov edx ecx)
   (inst mov eax (make-ea :qword :base rbp-tn
                          :disp (frame-byte-offset return-pc-save-offset)))
@@ -78,13 +83,12 @@
 
   ;; Handle the register arg cases.
   ZERO-VALUES
-  (inst mov ebx rbp-tn)
+  (inst lea ebx (make-ea :qword :base rbp-tn
+                         :disp (* sp->fp-offset n-word-bytes)))
   (inst mov edx nil-value)
   (inst mov edi edx)
   (inst mov esi edx)
-  (inst lea rsp-tn
-        (make-ea :qword :base ebx
-                 :disp (frame-byte-offset ocfp-save-offset)))
+  (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
   (inst ret)
@@ -93,33 +97,29 @@
   ;; check for this case when size > speed.
   ONE-VALUE
   (loadw edx esi -1)
-  (inst lea rsp-tn
-        (make-ea :qword :base rbp-tn
-                 :disp (frame-byte-offset ocfp-save-offset)))
+  (inst mov rsp-tn rbp-tn)
   (inst clc)
   (inst pop rbp-tn)
   (inst ret)
 
   TWO-VALUES
-  (inst mov ebx rbp-tn)
+  (inst lea ebx (make-ea :qword :base rbp-tn
+                         :disp (* sp->fp-offset n-word-bytes)))
   (loadw edx esi -1)
   (loadw edi esi -2)
   (inst mov esi nil-value)
-  (inst lea rsp-tn
-        (make-ea :qword :base ebx
-                 :disp (frame-byte-offset ocfp-save-offset)))
+  (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
   (inst ret)
 
   THREE-VALUES
-  (inst mov ebx rbp-tn)
+  (inst lea ebx (make-ea :qword :base rbp-tn
+                         :disp (* sp->fp-offset n-word-bytes)))
   (loadw edx esi -1)
   (loadw edi esi -2)
   (loadw esi esi -3)
-  (inst lea rsp-tn
-        (make-ea :qword :base ebx
-                 :disp (frame-byte-offset ocfp-save-offset)))
+  (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
   (inst ret))
@@ -207,7 +207,7 @@
 
   ;; Clear most of the stack.
   (inst lea rsp-tn
-        (make-ea :qword :base rbp-tn :disp (* -3 n-word-bytes)))
+        (make-ea :qword :base rbp-tn :disp (* (- sp->fp-offset 3) n-word-bytes)))
 
   ;; Push the return-pc so it looks like we just called.
   (pushw rbp-tn (frame-word-offset return-pc-save-offset))

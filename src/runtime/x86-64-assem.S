@@ -209,11 +209,10 @@ Ldone:
 	xor	%rbx,%rbx	# available
 
 	/* Alloc new frame. */
-	mov	%rsp,%rbx	# The current sp marks start of new frame.
-	push	%rbp		# dummy for return address
-	push	%rbp		# fp in save location S0
+	push	%rbp            # Dummy for return address
+	push	%rbp		# fp in save location S1
+	mov	%rsp,%rbp	# The current sp marks start of new frame.
 	sub	$8,%rsp	        # Ensure 3 slots are allocated, two above.
-	mov	%rbx,%rbp	# Switch to new frame.
 
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)

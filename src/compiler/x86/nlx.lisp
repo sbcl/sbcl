@@ -189,9 +189,10 @@
                    (storew edx-tn ebx-tn -1))
                  (sc-case tn
                    ((descriptor-reg any-reg)
-                    (loadw tn start (frame-word-offset i)))
+                    (loadw tn start (frame-word-offset (+ sp->fp-offset i))))
                    ((control-stack)
-                    (loadw move-temp start (frame-word-offset i))
+                    (loadw move-temp start
+                           (frame-word-offset (+ sp->fp-offset i)))
                     (inst mov tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
@@ -296,7 +297,8 @@
 
     ;; Clear the stack
     (inst lea esp-tn
-          (make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
+          (make-ea :dword :base ebp-tn
+                   :disp (* (- sp->fp-offset 3) n-word-bytes)))
 
     ;; Push the return-pc so it looks like we just called.
     (pushw ebp-tn (frame-word-offset return-pc-save-offset))

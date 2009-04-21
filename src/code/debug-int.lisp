@@ -558,7 +558,7 @@
                             (- (get-lisp-obj-address code)
                                sb!vm:other-pointer-lowtag)
                             code-header-len)))
-;        (format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
+         ;;(format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
          (values pc-offset code)))))
 
 #!+(or x86 x86-64)
@@ -594,61 +594,14 @@
 (declaim (maybe-inline x86-call-context))
 (defun x86-call-context (fp)
   (declare (type system-area-pointer fp))
-  (labels ((fail ()
-             (values nil
-                     (int-sap 0)
-                     (int-sap 0)))
-           (handle (fp)
-             (cond
-               ((not (control-stack-pointer-valid-p fp))
-                (fail))
-               (t
-                ;; Check the two possible frame pointers.
-                (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset)
-                                                       sb!vm::n-word-bytes))))
-                      (lisp-ra (sap-ref-sap fp (- (* (1+ return-pc-save-offset)
-                                                     sb!vm::n-word-bytes))))
-                      (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
-                      (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
-                  (cond ((and (sap> lisp-ocfp fp)
-                              (control-stack-pointer-valid-p lisp-ocfp)
-                              (ra-pointer-valid-p lisp-ra)
-                              (sap> c-ocfp fp)
-                              (control-stack-pointer-valid-p c-ocfp)
-                              (ra-pointer-valid-p c-ra))
-                         ;; Look forward another step to check their validity.
-                         (let ((lisp-ok (handle lisp-ocfp))
-                               (c-ok (handle c-ocfp)))
-                           (cond ((and lisp-ok c-ok)
-                                  ;; Both still seem valid - choose the lisp frame.
-                                  #!+freebsd
-                                  (if (sap> lisp-ocfp c-ocfp)
-                                      (values t lisp-ra lisp-ocfp)
-                                      (values t c-ra c-ocfp))
-                                  #!-freebsd
-                                  (values t lisp-ra lisp-ocfp))
-                                 (lisp-ok
-                                  ;; The lisp convention is looking good.
-                                  (values t lisp-ra lisp-ocfp))
-                                 (c-ok
-                                  ;; The C convention is looking good.
-                                  (values t c-ra c-ocfp))
-                                 (t
-                                  ;; Neither seems right?
-                                  (fail)))))
-                        ((and (sap> lisp-ocfp fp)
-                              (control-stack-pointer-valid-p lisp-ocfp)
-                              (ra-pointer-valid-p lisp-ra))
-                         ;; The lisp convention is looking good.
-                         (values t lisp-ra lisp-ocfp))
-                        ((and (sap> c-ocfp fp)
-                              (control-stack-pointer-valid-p c-ocfp)
-                              #!-linux (ra-pointer-valid-p c-ra))
-                         ;; The C convention is looking good.
-                         (values t c-ra c-ocfp))
-                        (t
-                         (fail))))))))
-    (handle fp)))
+  (let ((ocfp (sap-ref-sap fp (sb!vm::frame-byte-offset ocfp-save-offset)))
+        (ra (sap-ref-sap fp (sb!vm::frame-byte-offset return-pc-save-offset))))
+    (if (and (control-stack-pointer-valid-p fp)
+             (sap> ocfp fp)
+             (control-stack-pointer-valid-p ocfp)
+             (ra-pointer-valid-p ra))
+        (values t ra ocfp)
+        (values nil (int-sap 0) (int-sap 0)))))
 
 ) ; #+x86 PROGN
 
@@ -746,8 +699,7 @@
           (#.ocfp-save-offset
            (stack-ref pointer stack-slot))
           (#.lra-save-offset
-           (sap-ref-sap pointer (- (* (1+ stack-slot)
-                                      sb!vm::n-word-bytes))))))))
+           (sap-ref-sap pointer (sb!vm::frame-byte-offset stack-slot)))))))
 
 (defun (setf get-context-value) (value frame stack-slot loc)
   (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
@@ -763,8 +715,8 @@
           (#.ocfp-save-offset
            (setf (stack-ref pointer stack-slot) value))
           (#.lra-save-offset
-           (setf (sap-ref-sap pointer (- (* (1+ stack-slot)
-                                            sb!vm::n-word-bytes))) value))))))
+           (setf (sap-ref-sap pointer (sb!vm::frame-byte-offset stack-slot))
+                 value))))))
 
 (defun foreign-function-backtrace-name (sap)
   (let ((name (sap-foreign-symbol sap)))
@@ -2102,8 +2054,9 @@ register."
                   ,@body))
              (stack-frame-offset (data-width offset)
                #!+(or x86 x86-64)
-               `(- (* (+ (sb!c:sc-offset-offset sc-offset) ,data-width ,offset)
-                      sb!vm:n-word-bytes))
+               `(sb!vm::frame-byte-offset (+ (sb!c:sc-offset-offset sc-offset)
+                                           (1- ,data-width)
+                                           ,offset))
                #!-(or x86 x86-64)
                (declare (ignore data-width))
                #!-(or x86 x86-64)
@@ -2289,8 +2242,9 @@ register."
                   ,@body))
              (stack-frame-offset (data-width offset)
                #!+(or x86 x86-64)
-               `(- (* (+ (sb!c:sc-offset-offset sc-offset) ,data-width ,offset)
-                      sb!vm:n-word-bytes))
+               `(sb!vm::frame-byte-offset (+ (sb!c:sc-offset-offset sc-offset)
+                                           (1- ,data-width)
+                                           ,offset))
                #!-(or x86 x86-64)
                (declare (ignore data-width))
                #!-(or x86 x86-64)

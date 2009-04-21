@@ -187,19 +187,19 @@
                ;; Lisp stack
                (etypecase val
                  (integer
-                  (storew (fixnumize val) fp (- (1+ (tn-offset y)))))
+                  (storew (fixnumize val) fp (frame-word-offset (tn-offset y))))
                  (symbol
                   (storew (+ nil-value (static-symbol-offset val))
-                          fp (- (1+ (tn-offset y)))))
+                          fp (frame-word-offset (tn-offset y))))
                  (character
                   (storew (logior (ash (char-code val) n-widetag-bits)
                                   character-widetag)
-                          fp (- (1+ (tn-offset y))))))))
+                          fp (frame-word-offset (tn-offset y)))))))
          (if (= (tn-offset fp) esp-offset)
              ;; C-call
              (storew x fp (tn-offset y))
            ;; Lisp stack
-           (storew x fp (- (1+ (tn-offset y))))))))))
+           (storew x fp (frame-word-offset (tn-offset y)))))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -405,7 +405,7 @@
       ((signed-stack unsigned-stack)
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
-           (storew x fp (- (1+ (tn-offset y)))))))))
+           (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

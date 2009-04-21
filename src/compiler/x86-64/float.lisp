@@ -32,8 +32,7 @@
              (declare (ignore kind))
              `(make-ea
                :qword :base rbp-tn
-               :disp (- (* (+ (tn-offset ,tn) 1)
-                           n-word-bytes)))))
+               :disp (frame-byte-offset (tn-offset ,tn)))))
   (defun ea-for-sf-stack (tn)
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
@@ -44,9 +43,14 @@
              (declare (ignore kind))
              `(make-ea
                :qword :base ,base
-               :disp (- (* (+ (tn-offset ,tn)
-                              (* 1 (ecase ,slot (:real 1) (:imag 2))))
-                           n-word-bytes)))))
+               :disp (frame-byte-offset
+                      (+ (tn-offset ,tn)
+                       (cond ((= (tn-offset ,base) rsp-offset)
+                              sp->fp-offset)
+                             ((= (tn-offset ,base) rbp-offset)
+                              0)
+                             (t (error "Unexpected offset.")))
+                       (ecase ,slot (:real 0) (:imag 1)))))))
   (defun ea-for-csf-real-stack (tn &optional (base rbp-tn))
     (ea-for-cxf-stack tn :single :real base))
   (defun ea-for-csf-imag-stack (tn &optional (base rbp-tn))
@@ -326,8 +330,7 @@
                                       (:double '((inst movsd ea x)))))
                            (let ((ea (make-ea
                                       :dword :base fp
-                                      :disp (- (* (1+ (tn-offset y))
-                                                  n-word-bytes)))))
+                                      :disp (frame-byte-offset (tn-offset y)))))
                              ,@(ecase format
                                  (:single '((inst movss ea x)))
                                  (:double '((inst movsd ea x))))))))))
@@ -728,7 +731,7 @@
         (inst movsd temp float)
         (move hi-bits temp))
        (double-stack
-        (loadw hi-bits ebp-tn (- (1+ (tn-offset float)))))
+        (loadw hi-bits ebp-tn (frame-word-offset (tn-offset float))))
        (descriptor-reg
         (loadw hi-bits float double-float-value-slot
                other-pointer-lowtag)))
@@ -750,7 +753,7 @@
         (inst movsd temp float)
         (move lo-bits temp))
        (double-stack
-        (loadw lo-bits ebp-tn (- (1+ (tn-offset float)))))
+        (loadw lo-bits ebp-tn (frame-word-offset (tn-offset float))))
        (descriptor-reg
         (loadw lo-bits float double-float-value-slot
                other-pointer-lowtag)))

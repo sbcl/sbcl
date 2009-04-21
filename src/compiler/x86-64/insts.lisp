@@ -1234,7 +1234,7 @@
         (emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
         ;; Convert stack tns into an index off RBP.
-        (let ((disp (- (* (1+ (tn-offset thing)) n-word-bytes))))
+        (let ((disp (frame-byte-offset (tn-offset thing))))
           (cond ((<= -128 disp 127)
                  (emit-mod-reg-r/m-byte segment #b01 reg #b101)
                  (emit-byte segment disp))

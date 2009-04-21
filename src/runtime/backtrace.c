@@ -324,55 +324,21 @@ ra_pointer_p (void *ra)
 static int
 x86_call_context (void *fp, void **ra, void **ocfp)
 {
-  void *lisp_ocfp;
-  void *lisp_ra;
   void *c_ocfp;
   void *c_ra;
-  int lisp_valid_p, c_valid_p;
+  int c_valid_p;
 
   if (!stack_pointer_p(fp))
     return 0;
 
   c_ocfp    = *((void **) fp);
   c_ra      = *((void **) fp + 1);
-  lisp_ocfp = *((void **) fp - 2);
-  lisp_ra   = *((void **) fp - 1);
 
-  lisp_valid_p = (lisp_ocfp > fp
-                  && stack_pointer_p(lisp_ocfp)
-                  && ra_pointer_p(lisp_ra));
   c_valid_p = (c_ocfp > fp
                && stack_pointer_p(c_ocfp)
                && ra_pointer_p(c_ra));
 
-  if (lisp_valid_p && c_valid_p) {
-    void *lisp_path_fp;
-    void *c_path_fp;
-    void *dummy;
-
-    int lisp_path_p = x86_call_context(lisp_ocfp, &lisp_path_fp, &dummy);
-    int c_path_p = x86_call_context(c_ocfp, &c_path_fp, &dummy);
-
-    if (lisp_path_p && c_path_p) {
-#if defined __FreeBSD__ && __FreeBSD_version > 400000
-      if (lisp_ocfp > c_ocfp)
-        *ra = lisp_ra, *ocfp = lisp_ocfp;
-      else
-        *ra = c_ra, *ocfp = c_ocfp;
-#else
-      *ra = lisp_ra, *ocfp = lisp_ocfp;
-#endif
-    }
-    else if (lisp_path_p)
-      *ra = lisp_ra, *ocfp = lisp_ocfp;
-    else if (c_path_p)
-      *ra = c_ra, *ocfp = c_ocfp;
-    else
-      return 0;
-  }
-  else if (lisp_valid_p)
-    *ra = lisp_ra, *ocfp = lisp_ocfp;
-  else if (c_valid_p)
+  if (c_valid_p)
     *ra = c_ra, *ocfp = c_ocfp;
   else
     return 0;

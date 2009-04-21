@@ -445,14 +445,23 @@
 
 ;;;; miscellaneous function call parameters
 
-;;; offsets of special stack frame locations
-(def!constant ocfp-save-offset 1)
+;;; Offsets of special stack frame locations relative to RBP.
+;;;
+;;; Consider the standard prologue PUSH RBP; MOV RBP, RSP: the return
+;;; address is at RBP+8, the old control stack frame pointer is at
+;;; RBP, the magic 3rd slot is at RBP-8. Then come the locals from
+;;; RBP-16 on.
 (def!constant return-pc-save-offset 0)
+(def!constant ocfp-save-offset 1)
 (def!constant code-save-offset 2)
+;;; Let SP be the stack pointer before CALLing, and FP is the frame
+;;; pointer after the standard prologue. SP +
+;;; FRAME-WORD-OFFSET(SP->FP-OFFSET + I) = FP + FRAME-WORD-OFFSET(I).
+(def!constant sp->fp-offset 2)
 
 (declaim (inline frame-word-offset))
 (defun frame-word-offset (index)
-  (- (1+ index)))
+  (- (1- index)))
 
 (declaim (inline frame-byte-offset))
 (defun frame-byte-offset (index)

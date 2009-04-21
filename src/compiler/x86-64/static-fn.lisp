@@ -16,9 +16,6 @@
   (:policy :safe)
   (:variant-vars function)
   (:vop-var vop)
-  ;;(:node-var node)
-  (:temporary (:sc unsigned-reg :offset ebx-offset
-                   :from (:eval 0) :to (:eval 2)) ebx)
   (:temporary (:sc unsigned-reg :offset ecx-offset
                    :from (:eval 0) :to (:eval 2)) ecx))
 
@@ -41,7 +38,8 @@
                (<= num-results register-arg-count))
     (error "either too many args (~W) or too many results (~W); max = ~W"
            num-args num-results register-arg-count))
-  (let ((num-temps (max num-args num-results)))
+  (let ((num-temps (max num-args num-results))
+        (node (gensym "NODE-")))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))
       (dotimes (i num-results)
         (let ((result-name (intern (format nil "RESULT-~D" i))))
@@ -73,28 +71,30 @@
         ,@(temps)
         (:temporary (:sc unsigned-reg) call-target)
         (:results ,@(results))
+        (:node-var ,node)
         (:generator ,(+ 50 num-args num-results)
          ,@(moves (temp-names) (arg-names))
 
-         ;; If speed not more important than size, duplicate the
+         ;; If speed is at least as important as size, duplicate the
          ;; effect of the ENTER with discrete instructions. Takes
-         ;; 2+1+3+2=8 bytes as opposed to 4+3=7 bytes.
-         (cond (t ;(policy node (>= speed space))
-                (inst mov ebx rsp-tn)
-                ;; Dummy for return address
+         ;; 3+4+4=11 bytes as opposed to 1+4=5 bytes.
+         (cond ((policy ,node (>= speed space))
+                (inst sub rsp-tn (fixnumize 3))
+                (inst mov (make-ea :qword :base rsp-tn
+                                   :disp (frame-byte-offset
+                                          (+ sp->fp-offset
+                                             -3
+                                             ocfp-save-offset)))
+                      rbp-tn)
+                (inst lea rbp-tn (make-ea :qword :base rsp-tn
+                                          :disp (frame-byte-offset
+                                                 (+ sp->fp-offset
+                                                    -3
+                                                    ocfp-save-offset)))))
+               (t
+                ;; Dummy for return address.
                 (inst push rbp-tn)
-                ;; Save the old-fp
-                (inst push rbp-tn)
-                ;; Ensure that at least three slots are available; one
-                ;; above, two more needed.
-                (inst sub rsp-tn (fixnumize 1))
-                (inst mov rbp-tn ebx))
-               #+(or) (t
-                (inst enter (fixnumize 2))
-                ;; The enter instruction pushes EBP and then copies
-                ;; ESP into EBP. We want the new EBP to be the
-                ;; original ESP, so we fix it up afterwards.
-                (inst add rbp-tn (fixnumize 1))))
+                (inst enter (fixnumize 1))))
 
          ,(if (zerop num-args)
               '(inst xor ecx ecx)
