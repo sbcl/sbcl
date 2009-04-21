@@ -212,9 +212,11 @@ the case of an entry point for a full call).
 @comment  node-name,  next,  previous,  up
 @section Additional Notes
 
-The low-hanging fruit here is going to be changing every call and
-return to use @code{CALL} and @code{RETURN} instructions instead of
-@code{JMP} instructions.
+The low-hanging fruit is going to be changing every call and return to
+use @code{CALL} and @code{RETURN} instructions instead of @code{JMP}
+instructions which is partly done on x86oids: a trampoline is
+@code{CALL}ed and that @code{JMP}s to the target which is sufficient
+to negate (most of?) the penalty.
 
 A more involved change would be to reduce the number of argument
 passing registers from three to two, which may be beneficial in terms

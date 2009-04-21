@@ -470,6 +470,17 @@
                (= (tn-offset return-pc) return-pc-save-offset))
     (error "return-pc not on stack in standard save location?")))
 
+;;; Instead of JMPing to TARGET, CALL a trampoline that saves the
+;;; return pc and jumps. Although this is an incredibly stupid trick
+;;; the paired CALL/RET instructions are a big win.
+(defun make-local-call (target)
+  (let ((tramp (gen-label)))
+    (inst call tramp)
+    (assemble (*elsewhere*)
+      (emit-label tramp)
+      (popw ebp-tn (frame-word-offset return-pc-save-offset))
+      (inst jmp target))))
+
 ;;; Non-TR local call for a fixed number of values passed according to
 ;;; the unknown values convention.
 ;;;
@@ -498,33 +509,13 @@
   (:move-args :local-call)
   (:info arg-locs callee target nvals)
   (:vop-var vop)
-  (:ignore nfp arg-locs args #+nil callee)
+  (:ignore nfp arg-locs args callee)
   (:node-var node)
   (:generator 5
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
-
-    (let ((ret-tn (callee-return-pc-tn callee)))
-      #+nil
-      (format t "*call-local ~S; tn-kind ~S; tn-save-tn ~S; its tn-kind ~S~%"
-              ret-tn (sb!c::tn-kind ret-tn) (sb!c::tn-save-tn ret-tn)
-              (sb!c::tn-kind (sb!c::tn-save-tn ret-tn)))
-
-      ;; Is the return-pc on the stack or in a register?
-      (sc-case ret-tn
-        ((sap-stack)
-         (unless (= (tn-offset ret-tn) return-pc-save-offset)
-           (error "ret-tn ~A in wrong stack slot" ret-tn))
-         #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
-                       (tn-offset ret-tn))
-         (storew (make-fixup nil :code-object RETURN)
-                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        (t
-         (error "ret-tn ~A in sap-reg" ret-tn))))
-
     (note-this-location vop :call-site)
-    (inst jmp target)
-    RETURN
+    (make-local-call target)
     (default-unknown-values vop values nvals node)
     (trace-table-entry trace-table-normal)))
 
@@ -538,33 +529,14 @@
   (:save-p t)
   (:move-args :local-call)
   (:info save callee target)
-  (:ignore args save nfp #+nil callee)
+  (:ignore args save nfp callee)
   (:vop-var vop)
   (:node-var node)
   (:generator 20
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
-
-    (let ((ret-tn (callee-return-pc-tn callee)))
-      #+nil
-      (format t "*multiple-call-local ~S; tn-kind ~S; tn-save-tn ~S; its tn-kind ~S~%"
-              ret-tn (sb!c::tn-kind ret-tn) (sb!c::tn-save-tn ret-tn)
-              (sb!c::tn-kind (sb!c::tn-save-tn ret-tn)))
-
-      ;; Is the return-pc on the stack or in a register?
-      (sc-case ret-tn
-        ((sap-stack)
-         #+nil (format t "*multiple-call-local: ret-tn on stack; offset=~S~%"
-                       (tn-offset ret-tn))
-         ;; Stack
-         (storew (make-fixup nil :code-object RETURN)
-                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        (t
-         (error "multiple-call-local: return-pc not on stack."))))
-
     (note-this-location vop :call-site)
-    (inst jmp target)
-    RETURN
+    (make-local-call target)
     (note-this-location vop :unknown-return)
     (receive-unknown-values values-start nvals start count node)
     (trace-table-entry trace-table-normal)))
@@ -585,33 +557,13 @@
   (:move-args :local-call)
   (:save-p t)
   (:info save callee target)
-  (:ignore args res save nfp #+nil callee)
+  (:ignore args res save nfp callee)
   (:vop-var vop)
   (:generator 5
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
-
-    (let ((ret-tn (callee-return-pc-tn callee)))
-
-      #+nil
-      (format t "*known-call-local ~S; tn-kind ~S; tn-save-tn ~S; its tn-kind ~S~%"
-              ret-tn (sb!c::tn-kind ret-tn) (sb!c::tn-save-tn ret-tn)
-              (sb!c::tn-kind (sb!c::tn-save-tn ret-tn)))
-
-      ;; Is the return-pc on the stack or in a register?
-      (sc-case ret-tn
-        ((sap-stack)
-         #+nil (format t "*known-call-local: ret-tn on stack; offset=~S~%"
-                       (tn-offset ret-tn))
-         ;; Stack
-         (storew (make-fixup nil :code-object RETURN)
-                 ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        (t
-         (error "known-call-local: return-pc not on stack."))))
-
     (note-this-location vop :call-site)
-    (inst jmp target)
-    RETURN
+    (make-local-call target)
     (note-this-location vop :known-return)
     (trace-table-entry trace-table-normal)))
 
