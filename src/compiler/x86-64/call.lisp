@@ -176,12 +176,6 @@
 ;;; Nvals is the number of values that are to be received (should
 ;;; equal the length of Values).
 ;;;
-;;; MOVE-TEMP is a DESCRIPTOR-REG TN used as a temporary.
-;;;
-;;; This code exploits the fact that in the unknown-values convention,
-;;; a single value return returns at the return PC + 2, whereas a
-;;; return of other than one value returns directly at the return PC.
-;;;
 ;;; If 0 or 1 values are expected, then we just emit an instruction to
 ;;; reset the SP (which will only be executed when other than 1 value
 ;;; is returned.)
@@ -421,6 +415,23 @@
 
 ;;;; local call with unknown values convention return
 
+(defun check-ocfp-and-return-pc (old-fp return-pc)
+  #+nil
+  (format t "*known-return: old-fp ~S, tn-kind ~S; ~S ~S~%"
+          old-fp (sb!c::tn-kind old-fp) (sb!c::tn-save-tn old-fp)
+          (sb!c::tn-kind (sb!c::tn-save-tn old-fp)))
+  #+nil
+  (format t "*known-return: return-pc ~S, tn-kind ~S; ~S ~S~%"
+          return-pc (sb!c::tn-kind return-pc)
+          (sb!c::tn-save-tn return-pc)
+          (sb!c::tn-kind (sb!c::tn-save-tn return-pc)))
+  (unless (and (sc-is old-fp control-stack)
+               (= (tn-offset old-fp) ocfp-save-offset))
+    (error "ocfp not on stack in standard save location?"))
+  (unless (and (sc-is return-pc sap-stack)
+               (= (tn-offset return-pc) return-pc-save-offset))
+    (error "return-pc not on stack in standard save location?")))
+
 ;;; Non-TR local call for a fixed number of values passed according to
 ;;; the unknown values convention.
 ;;;
@@ -567,48 +578,10 @@
     (note-this-location vop :known-return)
     (trace-table-entry trace-table-normal)))
 
-;;; Return from known values call. We receive the return locations as
-;;; arguments to terminate their lifetimes in the returning function. We
-;;; restore FP and CSP and jump to the Return-PC.
-;;;
-;;; We can assume we know exactly where old-fp and return-pc are because
-;;; make-old-fp-save-location and make-return-pc-save-location always
-;;; return the same place.
-#+nil
-(define-vop (known-return)
-  (:args (old-fp)
-         (return-pc :scs (any-reg immediate-stack) :target rpc)
-         (vals :more t))
-  (:move-args :known-return)
-  (:info val-locs)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) rpc)
-  (:ignore val-locs vals)
-  (:vop-var vop)
-  (:generator 6
-    (trace-table-entry trace-table-fun-epilogue)
-    ;; Save the return-pc in a register 'cause the frame-pointer is
-    ;; going away. Note this not in the usual stack location so we
-    ;; can't use RET
-    (move rpc return-pc)
-    ;; Restore the stack.
-    (move rsp-tn rbp-tn)
-    ;; Restore the old fp. We know OLD-FP is going to be in its stack
-    ;; save slot, which is a different frame that than this one,
-    ;; so we don't have to worry about having just cleared
-    ;; most of the stack.
-    (move rbp-tn old-fp)
-    (inst jmp rpc)
-    (trace-table-entry trace-table-normal)))
-
 ;;; From Douglas Crosher
 ;;; Return from known values call. We receive the return locations as
 ;;; arguments to terminate their lifetimes in the returning function. We
 ;;; restore FP and CSP and jump to the Return-PC.
-;;;
-;;; The old-fp may be either in a register or on the stack in its
-;;; standard save locations - slot 0.
-;;;
-;;; The return-pc may be in a register or on the stack in any slot.
 (define-vop (known-return)
   (:args (old-fp)
          (return-pc)
@@ -618,27 +591,14 @@
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
+    (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
-    ;; return-pc may be either in a register or on the stack.
-    (sc-case return-pc
-      ((sap-stack)
-       (unless (and (sc-is old-fp control-stack)
-                    (= (tn-offset old-fp) ocfp-save-offset))
-         (error "known-return: ocfp not on stack in standard save location?"))
-       (unless (and (sc-is return-pc sap-stack)
-                    (= (tn-offset return-pc) return-pc-save-offset))
-         (error
-          "known-return: return-pc not on stack in standard save location?"))
-
-       ;; Zot all of the stack except for the old-fp and return-pc.
-       (inst lea rsp-tn
-             (make-ea :qword :base rbp-tn
-                      :disp (frame-byte-offset ocfp-save-offset)))
-       (inst pop rbp-tn)
-       (inst ret (* (tn-offset return-pc) n-word-bytes)))
-      (t
-       (error "known-return, return-pc not on stack")))
-
+    ;; Zot all of the stack except for the old-fp and return-pc.
+    (inst lea rsp-tn
+          (make-ea :qword :base rbp-tn
+                   :disp (frame-byte-offset ocfp-save-offset)))
+    (inst pop rbp-tn)
+    (inst ret)
     (trace-table-entry trace-table-normal)))
 
 ;;;; full call
@@ -887,30 +847,19 @@
   (:args (args :scs (any-reg control-stack) :target rsi)
          (function :scs (descriptor-reg control-stack) :target rax)
          (old-fp)
-         (ret-addr))
+         (return-pc))
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 0)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
   (:temporary (:sc unsigned-reg) call-target)
-;  (:ignore ret-addr old-fp)
   (:generator 75
+    (check-ocfp-and-return-pc old-fp return-pc)
     ;; Move these into the passing locations if they are not already there.
     (move rsi args)
     (move rax function)
-
-    ;; The following assumes that the return-pc and old-fp are on the
-    ;; stack in their standard save locations - Check this.
-    (unless (and (sc-is old-fp control-stack)
-                 (= (tn-offset old-fp) ocfp-save-offset))
-            (error "tail-call-variable: ocfp not on stack in standard save location?"))
-    (unless (and (sc-is ret-addr sap-stack)
-                 (= (tn-offset ret-addr) return-pc-save-offset))
-            (error "tail-call-variable: ret-addr not on stack in standard save location?"))
-
-
+    ;; And jump to the assembly routine.
     (inst lea call-target
           (make-ea :qword
                    :disp (make-fixup 'tail-call-variable :assembly-routine)))
-    ;; And jump to the assembly routine.
     (inst jmp call-target)))
 
 ;;;; unknown values return
@@ -930,34 +879,17 @@
          (value))
   (:ignore value)
   (:generator 6
+    (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
-    ;; Code structure lifted from known-return.
-    (sc-case return-pc
-      ((sap-stack)
-       ;; Note that this will only work right if, when old-fp is on
-       ;; the stack, it has a lower tn-offset than return-pc. One of
-       ;; the comments in known-return indicate that this is the case
-       ;; (in that it will be in its save location), but we may wish
-       ;; to assert that (in either the weaker or stronger forms).
-       ;; Should this ever not be the case, we should load old-fp into
-       ;; a temp reg while we fix the stack.
-       (unless (and (sc-is old-fp control-stack)
-                    (= (tn-offset old-fp) ocfp-save-offset))
-         (error "ocfp not on stack in standard save location?"))
-       (unless (and (sc-is return-pc sap-stack)
-                    (= (tn-offset return-pc) return-pc-save-offset))
-         (error "return-pc not on stack in standard save location?"))
-       ;; Drop stack above old-fp
-       (inst lea rsp-tn (make-ea :qword :base rbp-tn
-                                 :disp (frame-byte-offset (tn-offset old-fp))))
-       ;; Set single-value return flag
-       (inst clc)
-       ;; Restore the old frame pointer
-       (inst pop rbp-tn)
-       ;; And return, dropping the rest of the stack as we go.
-       (inst ret (* (tn-offset return-pc) n-word-bytes)))
-      (t
-       (error "return pc not on stack")))))
+    ;; Drop stack above old-fp
+    (inst lea rsp-tn (make-ea :qword :base rbp-tn
+                              :disp (frame-byte-offset (tn-offset old-fp))))
+    ;; Clear the multiple-value return flag
+    (inst clc)
+    ;; Restore the old frame pointer
+    (inst pop rbp-tn)
+    ;; And return, dropping the rest of the stack as we go.
+    (inst ret)))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
 ;;; values. The VALUES are required to be set up in the standard
@@ -972,12 +904,10 @@
          (values :more t))
   (:ignore values)
   (:info nvals)
-
   ;; In the case of other than one value, we need these registers to
   ;; tell the caller where they are and how many there are.
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
   (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
-
   ;; We need to stretch the lifetime of return-pc past the argument
   ;; registers so that we can default the argument registers without
   ;; trashing return-pc.
@@ -989,6 +919,7 @@
                    :from :eval) a2)
 
   (:generator 6
+    (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
     (move rbx rbp-tn)
@@ -1046,7 +977,6 @@
          (return-pc :target rax)
          (vals :scs (any-reg) :target rsi)
          (nvals :scs (any-reg) :target rcx))
-
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 2)) rsi)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 3)) rcx)
@@ -1056,8 +986,8 @@
                    :from (:eval 0)) a0)
   (:temporary (:sc unsigned-reg :from (:eval 1)) old-fp-temp)
   (:node-var node)
-
   (:generator 13
+    (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
     ;; Load the return-pc.
     (move rax return-pc)
@@ -1066,7 +996,6 @@
       (let ((not-single (gen-label)))
         (inst cmp nvals (fixnumize 1))
         (inst jmp :ne not-single)
-
         ;; Return with one value.
         (loadw a0 vals -1)
         ;; Clear the stack. We load old-fp into a register before clearing
