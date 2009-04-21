@@ -235,7 +235,7 @@ LsingleValue:
 
 /* FIXME Restore the NPX state. */
 
-	/* return value is already in rax where lisp expects it */
+	mov	%rdx,%rax	# c-val
 	leave
 	ret
 	SIZE(GNAME(call_into_lisp))
