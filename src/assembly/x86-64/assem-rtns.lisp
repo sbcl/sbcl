@@ -135,11 +135,11 @@
   (inst cmp ecx (fixnumize 3))
   (inst jmp :le REGISTER-ARGS)
 
-  ;; Save the OLD-FP and RETURN-PC because the blit it going to trash
-  ;; those stack locations. Save the ECX, because the loop is going
-  ;; to trash it.
-  (pushw rbp-tn -1)
-  (loadw ebx rbp-tn -2)
+  ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
+  ;; those stack locations. Save the ECX, because the loop is going to
+  ;; trash it.
+  (pushw rbp-tn (frame-word-offset ocfp-save-offset))
+  (loadw ebx rbp-tn (frame-word-offset return-pc-save-offset))
   (inst push ecx)
 
   ;; Do the blit. Because we are coping from smaller addresses to
@@ -147,25 +147,27 @@
   ;; our way down.
   (inst shr ecx 3)                      ; fixnum to raw words
   (inst std)                            ; count down
-  (inst lea edi (make-ea :qword :base rbp-tn :disp (- n-word-bytes)))
+  (inst lea edi (make-ea :qword :base rbp-tn :disp (frame-byte-offset 0)))
   (inst sub esi (fixnumize 1))
   (inst rep)
   (inst movs :qword)
   (inst cld)
 
   ;; Load the register arguments carefully.
-  (loadw edx rbp-tn -1)
+  (loadw edx rbp-tn (frame-word-offset ocfp-save-offset))
 
   ;; Restore OLD-FP and ECX.
   (inst pop ecx)
-  (popw rbp-tn -1)                      ; overwrites a0
+  ;; Overwrites a1
+  (popw rbp-tn (frame-word-offset ocfp-save-offset))
 
   ;; Blow off the stack above the arguments.
   (inst lea rsp-tn (make-ea :qword :base edi :disp n-word-bytes))
 
   ;; remaining register args
-  (loadw edi rbp-tn -2)
-  (loadw esi rbp-tn -3)
+  (inst mov edi edx)
+  (loadw edx rbp-tn (frame-word-offset 0))
+  (loadw esi rbp-tn (frame-word-offset 2))
 
   ;; Push the (saved) return-pc so it looks like we just called.
   (inst push ebx)
@@ -187,7 +189,7 @@
         (make-ea :qword :base rbp-tn :disp (* -3 n-word-bytes)))
 
   ;; Push the return-pc so it looks like we just called.
-  (pushw rbp-tn -2)    ; XXX dan ?
+  (pushw rbp-tn (frame-word-offset return-pc-save-offset))
 
   ;; And away we go.
   (inst jmp (make-ea :byte :base eax

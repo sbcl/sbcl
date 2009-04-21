@@ -31,13 +31,13 @@
      (:temp edi unsigned-reg edi-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst jecxz zero-values)
+  (inst jecxz ZERO-VALUES)
   (inst cmp ecx (fixnumize 1))
-  (inst jmp :e one-value)
+  (inst jmp :e ONE-VALUE)
   (inst cmp ecx (fixnumize 2))
-  (inst jmp :e two-values)
+  (inst jmp :e TWO-VALUES)
   (inst cmp ecx (fixnumize 3))
-  (inst jmp :e three-values)
+  (inst jmp :e THREE-VALUES)
 
   ;; Save the count, because the loop is going to destroy it.
   (inst mov edx ecx)
@@ -135,11 +135,11 @@
   (inst cmp ecx (fixnumize 3))
   (inst jmp :le REGISTER-ARGS)
 
-  ;; Save the OLD-FP and RETURN-PC because the blit it going to trash
-  ;; those stack locations. Save the ECX, because the loop is going
-  ;; to trash it.
-  (pushw ebp-tn -1)
-  (loadw ebx ebp-tn -2)
+  ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
+  ;; those stack locations. Save the ECX, because the loop is going to
+  ;; trash it.
+  (pushw ebp-tn (frame-word-offset ocfp-save-offset))
+  (loadw ebx ebp-tn (frame-word-offset return-pc-save-offset))
   (inst push ecx)
 
   ;; Do the blit. Because we are coping from smaller addresses to
@@ -147,25 +147,27 @@
   ;; our way down.
   (inst shr ecx 2)                      ; fixnum to raw words
   (inst std)                            ; count down
-  (inst lea edi (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
+  (inst lea edi (make-ea :dword :base ebp-tn :disp (frame-byte-offset 0)))
   (inst sub esi (fixnumize 1))
   (inst rep)
   (inst movs :dword)
   (inst cld)
 
   ;; Load the register arguments carefully.
-  (loadw edx ebp-tn -1)
+  (loadw edx ebp-tn (frame-word-offset ocfp-save-offset))
 
   ;; Restore OLD-FP and ECX.
   (inst pop ecx)
-  (popw ebp-tn -1)                      ; overwrites a0
+  ;; Overwrites a1
+  (popw ebp-tn (frame-word-offset ocfp-save-offset))
 
   ;; Blow off the stack above the arguments.
   (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
 
   ;; remaining register args
-  (loadw edi ebp-tn -2)
-  (loadw esi ebp-tn -3)
+  (inst mov edi edx)
+  (loadw edx ebp-tn (frame-word-offset 0))
+  (loadw esi ebp-tn (frame-word-offset 2))
 
   ;; Push the (saved) return-pc so it looks like we just called.
   (inst push ebx)
@@ -184,7 +186,7 @@
         (make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
 
   ;; Push the return-pc so it looks like we just called.
-  (pushw ebp-tn -2)
+  (pushw ebp-tn (frame-word-offset return-pc-save-offset))
 
   ;; And away we go.
   (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag)))
@@ -207,10 +209,10 @@
     (inst jmp :z error))
 
   (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
-  (inst jmp :e exit)
+  (inst jmp :e EXIT)
 
   (loadw catch catch catch-block-previous-catch-slot)
-  (inst jmp loop)
+  (inst jmp LOOP)
 
   EXIT
 
@@ -241,7 +243,7 @@
   (inst cmp uwp
         (make-ea-for-object-slot block unwind-block-current-uwp-slot 0))
   ;; If a match, return to context in arg block.
-  (inst jmp :e do-exit)
+  (inst jmp :e DO-EXIT)
 
   ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.
   ;; Important! Must save (and return) the arg 'block' for later use!!

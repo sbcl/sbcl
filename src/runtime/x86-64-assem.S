@@ -210,8 +210,9 @@ Ldone:
 
 	/* Alloc new frame. */
 	mov	%rsp,%rbx	# The current sp marks start of new frame.
+	push	%rbp		# dummy for return address
 	push	%rbp		# fp in save location S0
-	sub	$16,%rsp	# Ensure 3 slots are allocated, one above.
+	sub	$8,%rsp	        # Ensure 3 slots are allocated, two above.
 	mov	%rbx,%rbp	# Switch to new frame.
 
 Lcall:

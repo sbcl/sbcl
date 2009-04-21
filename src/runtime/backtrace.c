@@ -335,8 +335,8 @@ x86_call_context (void *fp, void **ra, void **ocfp)
 
   c_ocfp    = *((void **) fp);
   c_ra      = *((void **) fp + 1);
-  lisp_ocfp = *((void **) fp - 1);
-  lisp_ra   = *((void **) fp - 2);
+  lisp_ocfp = *((void **) fp - 2);
+  lisp_ra   = *((void **) fp - 1);
 
   lisp_valid_p = (lisp_ocfp > fp
                   && stack_pointer_p(lisp_ocfp)

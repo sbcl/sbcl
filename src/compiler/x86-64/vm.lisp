@@ -446,9 +446,17 @@
 ;;;; miscellaneous function call parameters
 
 ;;; offsets of special stack frame locations
-(def!constant ocfp-save-offset 0)
-(def!constant return-pc-save-offset 1)
+(def!constant ocfp-save-offset 1)
+(def!constant return-pc-save-offset 0)
 (def!constant code-save-offset 2)
+
+(declaim (inline frame-word-offset))
+(defun frame-word-offset (index)
+  (- (1+ index)))
+
+(declaim (inline frame-byte-offset))
+(defun frame-byte-offset (index)
+  (* (frame-word-offset index) n-word-bytes))
 
 (def!constant lra-save-offset return-pc-save-offset) ; ?
 

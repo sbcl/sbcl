@@ -40,13 +40,12 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst pop eax)
                 (inst push ebp-tn)
-                (inst lea
-                      ebp-tn
-                      (make-ea :dword :base esp-tn :disp n-word-bytes))
-                (inst sub esp-tn (fixnumize 2))
-                (inst push eax)  ; callers return addr
+                (inst lea ebp-tn (make-ea :dword
+                                          :base esp-tn
+                                          :disp (* 2 n-word-bytes)))
+                (inst sub esp-tn (fixnumize 1))
+                (inst push (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
                 (inst mov ecx (fixnumize 2)) ; arg count
                 (inst jmp
                       (make-ea :dword
@@ -86,7 +85,7 @@
     (move eax x)                          ; must use eax for 64-bit result
     (inst sar eax n-fixnum-tag-bits)      ; remove *4 fixnum bias
     (inst imul y)                         ; result in edx:eax
-    (inst jmp :no okay)                   ; still fixnum
+    (inst jmp :no OKAY)                   ; still fixnum
 
     ;; zzz jrd changed edx to ebx in here, as edx isn't listed as a temp, above
     ;;     pfw says that loses big -- edx is target for arg x and result res
@@ -130,11 +129,10 @@
   (inst test x fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
-  (inst pop eax)
   (inst push ebp-tn)
-  (inst lea ebp-tn (make-ea :dword :base esp-tn :disp n-word-bytes))
-  (inst sub esp-tn (fixnumize 2))
-  (inst push eax)
+  (inst lea ebp-tn (make-ea :dword :base esp-tn :disp (* 2 n-word-bytes)))
+  (inst sub esp-tn (fixnumize 1))
+  (inst push (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
   (inst mov ecx (fixnumize 1))    ; arg count
   (inst jmp (make-ea :dword
                      :disp (+ nil-value (static-fun-offset '%negate))))
@@ -174,7 +172,8 @@
                 (move ecx esp-tn)
                 (inst sub esp-tn (fixnumize 3))
                 (inst mov (make-ea :dword
-                                   :base ecx :disp (fixnumize -1))
+                                   :base ecx
+                                   :disp (frame-byte-offset ocfp-save-offset))
                       ebp-tn)
                 (move ebp-tn ecx)
                 (inst mov ecx (fixnumize 2))
@@ -189,7 +188,7 @@
                     (:g `((inst cmp x (1+ nil-value)))))
                 (inst ret))
              #-sb-assembling
-                          `(define-vop (,name)
+             `(define-vop (,name)
                 (:translate ,translate)
                 (:policy :safe)
                 (:save-p t)
@@ -244,7 +243,7 @@
   (inst sub esp-tn (fixnumize 3))
   (inst mov (make-ea :dword
                      :base ecx
-                     :disp (fixnumize -1))
+                     :disp (frame-byte-offset ocfp-save-offset))
         ebp-tn)
   (move ebp-tn ecx)
   (inst mov ecx (fixnumize 2))
@@ -301,7 +300,7 @@
   (inst sub esp-tn (fixnumize 3))
   (inst mov (make-ea :dword
                      :base ecx
-                     :disp (fixnumize -1))
+                     :disp (frame-byte-offset ocfp-save-offset))
         ebp-tn)
   (move ebp-tn ecx)
   (inst mov ecx (fixnumize 2))

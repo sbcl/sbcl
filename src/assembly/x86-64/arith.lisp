@@ -36,17 +36,16 @@
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
-                (inst clc)
+                (inst clc) ; single-value return
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst pop rax)
                 (inst push rbp-tn)
-                (inst lea
-                      rbp-tn
-                      (make-ea :qword :base rsp-tn :disp n-word-bytes))
-                (inst sub rsp-tn (fixnumize 2))
-                (inst push rax)              ; callers return addr
+                (inst lea rbp-tn (make-ea :qword
+                                          :base rsp-tn
+                                          :disp (* 2 n-word-bytes)))
+                (inst sub rsp-tn (fixnumize 1))
+                (inst push (make-ea :qword :base rbp-tn :disp (- n-word-bytes)))
                 (inst mov rcx (fixnumize 2)) ; arg count
                 (inst jmp
                       (make-ea :qword
@@ -127,11 +126,10 @@
   (inst test x fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
-  (inst pop rax)
   (inst push rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp n-word-bytes))
-  (inst sub rsp-tn (fixnumize 2))
-  (inst push rax)
+  (inst lea rbp-tn (make-ea :qword :base rsp-tn :disp (* 2 n-word-bytes)))
+  (inst sub rsp-tn (fixnumize 1))
+  (inst push (make-ea :qword :base rbp-tn :disp (- n-word-bytes)))
   (inst mov rcx (fixnumize 1))    ; arg count
   (inst jmp (make-ea :qword
                      :disp (+ nil-value (static-fun-offset '%negate))))
@@ -163,7 +161,7 @@
                 (inst mov rcx x)
                 (inst or rcx y)
                 (inst test rcx fixnum-tag-mask)
-                (inst jmp :nz DO-STATIC-FUN)
+                (inst jmp :nz DO-STATIC-FUN)  ; are both fixnums?
 
                 (inst cmp x y)
                 (inst ret)
@@ -173,7 +171,7 @@
                 (inst sub rsp-tn (fixnumize 3))
                 (inst mov (make-ea :qword
                                    :base rcx
-                                   :disp (fixnumize -1))
+                                   :disp (frame-byte-offset ocfp-save-offset))
                       rbp-tn)
                 (move rbp-tn rcx)
                 (inst mov rcx (fixnumize 2))
@@ -238,7 +236,7 @@
   (inst sub rsp-tn (fixnumize 3))
   (inst mov (make-ea :qword
                      :base rcx
-                     :disp (fixnumize -1))
+                     :disp (frame-byte-offset ocfp-save-offset))
         rbp-tn)
   (move rbp-tn rcx)
   (inst mov rcx (fixnumize 2))
@@ -295,7 +293,7 @@
   (inst sub rsp-tn (fixnumize 3))
   (inst mov (make-ea :qword
                      :base rcx
-                     :disp (fixnumize -1))
+                     :disp (frame-byte-offset ocfp-save-offset))
         rbp-tn)
   (move rbp-tn rcx)
   (inst mov rcx (fixnumize 2))

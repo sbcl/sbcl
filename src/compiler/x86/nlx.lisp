@@ -293,7 +293,7 @@
           (make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
 
     ;; Push the return-pc so it looks like we just called.
-    (pushw ebp-tn -2)
+    (pushw ebp-tn (frame-word-offset return-pc-save-offset))
 
     ;; Call it
     (inst jmp (make-ea :dword :base block

@@ -1796,7 +1796,7 @@
                     y))
              ((sc-is x control-stack)
               (inst test (make-ea :byte :base ebp-tn
-                                  :disp (- (* (1+ offset) n-word-bytes)))
+                                  :disp (frame-byte-offset offset))
                     y))
              (t
               (inst test x y)))))
@@ -2078,7 +2078,7 @@
   (:printer byte ((op #b11000010) (imm nil :type 'imm-word-16))
             '(:name :tab imm))
   (:emitter
-   (cond (stack-delta
+   (cond ((and stack-delta (not (zerop stack-delta)))
           (emit-byte segment #b11000010)
           (emit-word segment stack-delta))
          (t

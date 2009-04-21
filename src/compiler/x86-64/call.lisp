@@ -133,7 +133,7 @@
 
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (popw rbp-tn (- (1+ return-pc-save-offset)))
+    (popw rbp-tn (frame-word-offset return-pc-save-offset))
 
     ;; If copy-more-arg follows it will allocate the correct stack
     ;; size. The stack is not allocated first here as this may expose
@@ -260,7 +260,7 @@
 
             (inst cmp rcx-tn (fixnumize i))
             (inst jmp :be default-lab)
-            (loadw rdx-tn rbx-tn (- (1+ i)))
+            (loadw rdx-tn rbx-tn (frame-word-offset i))
             (inst mov tn rdx-tn)))
 
         (emit-label defaulting-done)
@@ -298,7 +298,7 @@
       (emit-label no-stack-args)
       (inst lea rdi-tn
             (make-ea :qword :base rbp-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Load RAX with NIL so we can quickly store it, and set up
       ;; stuff for the loop.
       (inst mov rax-tn nil-value)
@@ -311,7 +311,7 @@
       ;; and then default the remaining stack arguments.
       (emit-label regs-defaulted)
       ;; Save EDI.
-      (storew rdi-tn rbx-tn (- (1+ 1)))
+      (storew rdi-tn rbx-tn (frame-word-offset 1))
       ;; Compute the number of stack arguments, and if it's zero or
       ;; less, don't copy any stack arguments.
       (inst sub rcx-tn (fixnumize register-arg-count))
@@ -327,19 +327,19 @@
       ;; Compute a pointer to where the stack args go.
       (inst lea rdi-tn
             (make-ea :qword :base rbp-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Save ESI, and compute a pointer to where the args come from.
-      (storew rsi-tn rbx-tn (- (1+ 2)))
+      (storew rsi-tn rbx-tn (frame-word-offset 2))
       (inst lea rsi-tn
             (make-ea :qword :base rbx-tn
-                     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
+                     :disp (frame-byte-offset register-arg-count)))
       ;; Do the copy.
       (inst shr rcx-tn word-shift)              ; make word count
       (inst std)
       (inst rep)
       (inst movs :qword)
       ;; Restore RSI.
-      (loadw rsi-tn rbx-tn (- (1+ 2)))
+      (loadw rsi-tn rbx-tn (frame-word-offset 2))
       ;; Now we have to default the remaining args. Find out how many.
       (inst sub rax-tn (fixnumize (- nvals register-arg-count)))
       (inst neg rax-tn)
@@ -355,7 +355,7 @@
       (inst stos rax-tn)
       ;; Restore EDI, and reset the stack.
       (emit-label restore-edi)
-      (loadw rdi-tn rbx-tn (- (1+ 1)))
+      (loadw rdi-tn rbx-tn (frame-word-offset 1))
       (inst mov rsp-tn rbx-tn)
       (inst cld))))
   (values))
@@ -387,7 +387,7 @@
 
     (cond ((location= start (first *register-arg-tns*))
            (inst push (first *register-arg-tns*))
-           (inst lea start (make-ea :qword :base rsp-tn :disp 8)))
+           (inst lea start (make-ea :qword :base rsp-tn :disp n-word-bytes)))
           (t (inst mov start rsp-tn)
              (inst push (first *register-arg-tns*))))
     (inst mov count (fixnumize 1))
@@ -464,12 +464,14 @@
       ;; Is the return-pc on the stack or in a register?
       (sc-case ret-tn
         ((sap-stack)
+         (unless (= (tn-offset ret-tn) return-pc-save-offset)
+           (error "ret-tn ~A in wrong stack slot" ret-tn))
          #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
                        (tn-offset ret-tn))
          (inst lea return-label (make-fixup nil :code-object RETURN))
-         (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
-        ((sap-reg)
-         (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
+         (storew return-label rbp-tn (frame-word-offset (tn-offset ret-tn))))
+        (t
+         (error "ret-tn ~A in sap-reg" ret-tn))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -507,10 +509,9 @@
                        (tn-offset ret-tn))
          ;; Stack
          (inst lea return-label (make-fixup nil :code-object RETURN))
-         (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
-        ((sap-reg)
-         ;; Register
-         (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
+         (storew return-label rbp-tn (frame-word-offset (tn-offset ret-tn))))
+        (t
+         (error "multiple-call-local: return-pc not on stack."))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -556,10 +557,9 @@
                        (tn-offset ret-tn))
          ;; Stack
          (inst lea return-label (make-fixup nil :code-object RETURN))
-         (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
-        ((sap-reg)
-         ;; Register
-         (inst lea ret-tn (make-fixup nil :code-object RETURN)))))
+         (storew return-label rbp-tn (frame-word-offset (tn-offset ret-tn))))
+        (t
+         (error "known-call-local: return-pc not on stack."))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -621,39 +621,23 @@
     (trace-table-entry trace-table-fun-epilogue)
     ;; return-pc may be either in a register or on the stack.
     (sc-case return-pc
-      ((sap-reg)
-       (sc-case old-fp
-         ((control-stack)
-          (cond ((zerop (tn-offset old-fp))
-                 ;; Zot all of the stack except for the old-fp.
-                 (inst lea rsp-tn (make-ea :qword :base rbp-tn
-                                           :disp (- (* (1+ ocfp-save-offset)
-                                                       n-word-bytes))))
-                 ;; Restore the old fp from its save location on the stack,
-                 ;; and zot the stack.
-                 (inst pop rbp-tn))
-
-                (t
-                 (cerror "Continue anyway"
-                         "VOP return-local doesn't work if old-fp (in slot ~
-                          ~S) is not in slot 0"
-                         (tn-offset old-fp)))))
-
-         ((any-reg descriptor-reg)
-          ;; Zot all the stack.
-          (move rsp-tn rbp-tn)
-          ;; Restore the old-fp.
-          (move rbp-tn old-fp)))
-
-       ;; Return; return-pc is in a register.
-       (inst jmp return-pc))
-
       ((sap-stack)
+       (unless (and (sc-is old-fp control-stack)
+                    (= (tn-offset old-fp) ocfp-save-offset))
+         (error "known-return: ocfp not on stack in standard save location?"))
+       (unless (and (sc-is return-pc sap-stack)
+                    (= (tn-offset return-pc) return-pc-save-offset))
+         (error
+          "known-return: return-pc not on stack in standard save location?"))
+
+       ;; Zot all of the stack except for the old-fp and return-pc.
        (inst lea rsp-tn
              (make-ea :qword :base rbp-tn
-                      :disp (- (* (1+ (tn-offset return-pc)) n-word-bytes))))
-       (move rbp-tn old-fp)
-       (inst ret (* (tn-offset return-pc) n-word-bytes))))
+                      :disp (frame-byte-offset ocfp-save-offset)))
+       (inst pop rbp-tn)
+       (inst ret (* (tn-offset return-pc) n-word-bytes)))
+      (t
+       (error "known-return, return-pc not on stack")))
 
     (trace-table-entry trace-table-normal)))
 
@@ -820,20 +804,20 @@
                                       ;; FIXME: FORMAT T for stale
                                       ;; diagnostic output (several of
                                       ;; them around here), ick
-                                      (format t "** tail-call old-fp not S0~%")
+                                      (error "** tail-call old-fp not S0~%")
                                       (move old-fp-tmp old-fp)
                                       (storew old-fp-tmp
                                               rbp-tn
-                                              (- (1+ ocfp-save-offset)))))
+                                              (frame-word-offset ocfp-save-offset))))
                                    ((any-reg descriptor-reg)
-                                    (format t "** tail-call old-fp in reg not S0~%")
+                                    (error "** tail-call old-fp in reg not S0~%")
                                     (storew old-fp
                                             rbp-tn
-                                            (- (1+ ocfp-save-offset)))))
+                                            (frame-word-offset ocfp-save-offset))))
 
                           ;; For tail call, we have to push the
                           ;; return-pc so that it looks like we CALLed
-                          ;; drspite the fact that we are going to JMP.
+                          ;; despite the fact that we are going to JMP.
                           (inst push return-pc)
                           ))
                        (t
@@ -855,7 +839,8 @@
                                '(inst sub rsp-tn (fixnumize 3)))
 
                           ;; Save the fp
-                          (storew rbp-tn new-fp (- (1+ ocfp-save-offset)))
+                          (storew rbp-tn new-fp
+                                  (frame-word-offset ocfp-save-offset))
 
                           (move rbp-tn new-fp) ; NB - now on new stack frame.
                           )))
@@ -886,7 +871,7 @@
                (trace-table-entry trace-table-normal)))))
 
   (define-full-call call nil :fixed nil)
-  (define-full-call call-named t  :fixed nil)
+  (define-full-call call-named t :fixed nil)
   (define-full-call multiple-call nil :unknown nil)
   (define-full-call multiple-call-named t :unknown nil)
   (define-full-call tail-call nil :tail nil)
@@ -930,15 +915,15 @@
 
 ;;;; unknown values return
 
-;;; Return a single-value using the Unknown-Values convention. Specifically,
-;;; we jump to clear the stack and jump to return-pc+3.
-;;;
-;;; We require old-fp to be in a register, because we want to reset RSP before
-;;; restoring RBP. If old-fp were still on the stack, it could get clobbered
-;;; by a signal.
+;;; Return a single-value using the Unknown-Values convention.
 ;;;
 ;;; pfw--get wired-tn conflicts sometimes if register sc specd for args
 ;;; having problems targeting args to regs -- using temps instead.
+;;;
+;;; First off, modifying the return-pc defeats the branch-prediction
+;;; optimizations on modern CPUs quite handily. Second, we can do all
+;;; this without needing a temp register. Fixed the latter, at least.
+;;; -- AB 2006/Feb/04
 (define-vop (return-single)
   (:args (old-fp)
          (return-pc)
@@ -948,55 +933,31 @@
     (trace-table-entry trace-table-fun-epilogue)
     ;; Code structure lifted from known-return.
     (sc-case return-pc
-      ((sap-reg)
-       ;; return PC in register for some reason (local call?)
-       ;; we jmp to the return pc after fixing the stack and frame.
-       (sc-case old-fp
-         ((control-stack)
-          ;; ofp on stack must be in slot 0 (the traditional storage place).
-          ;; Drop the stack above it and pop it off.
-          (cond ((zerop (tn-offset old-fp))
-                 (inst lea rsp-tn (make-ea :dword :base rbp-tn
-                                           :disp (- (* (1+ ocfp-save-offset)
-                                                       n-word-bytes))))
-                 (inst pop rbp-tn))
-                (t
-                 ;; Should this ever happen, we do the same as above, but
-                 ;; using (tn-offset old-fp) instead of ocfp-save-offset
-                 ;; (which is 0 anyway, see src/compiler/x86/vm.lisp) and
-                 ;; then lea rsp again against itself with a displacement
-                 ;; of (* (tn-offset old-fp) n-word-bytes) to clear the
-                 ;; rest of the stack.
-                 (cerror "Continue anyway"
-                         "VOP return-single doesn't work if old-fp (in slot ~S) is not in slot 0" (tn-offset old-fp)))))
-         ((any-reg descriptor-reg)
-          ;; ofp in reg, drop the stack and load the real fp.
-          (move rsp-tn rbp-tn)
-          (move rbp-tn old-fp)))
-
-       ;; Set single-value-return flag
-       (inst clc)
-       ;; And return
-       (inst jmp return-pc))
-
       ((sap-stack)
        ;; Note that this will only work right if, when old-fp is on
        ;; the stack, it has a lower tn-offset than return-pc. One of
        ;; the comments in known-return indicate that this is the case
        ;; (in that it will be in its save location), but we may wish
        ;; to assert that (in either the weaker or stronger forms).
-       ;; Should this ever not be the case, we should load old-fp
-       ;; into a temp reg while we fix the stack.
-       ;; Drop stack above return-pc
-       (inst lea rsp-tn (make-ea :dword :base rbp-tn
-                                 :disp (- (* (1+ (tn-offset return-pc))
-                                             n-word-bytes))))
+       ;; Should this ever not be the case, we should load old-fp into
+       ;; a temp reg while we fix the stack.
+       (unless (and (sc-is old-fp control-stack)
+                    (= (tn-offset old-fp) ocfp-save-offset))
+         (error "ocfp not on stack in standard save location?"))
+       (unless (and (sc-is return-pc sap-stack)
+                    (= (tn-offset return-pc) return-pc-save-offset))
+         (error "return-pc not on stack in standard save location?"))
+       ;; Drop stack above old-fp
+       (inst lea rsp-tn (make-ea :qword :base rbp-tn
+                                 :disp (frame-byte-offset (tn-offset old-fp))))
        ;; Set single-value return flag
        (inst clc)
        ;; Restore the old frame pointer
-       (move rbp-tn old-fp)
+       (inst pop rbp-tn)
        ;; And return, dropping the rest of the stack as we go.
-       (inst ret (* (tn-offset return-pc) n-word-bytes))))))
+       (inst ret (* (tn-offset return-pc) n-word-bytes)))
+      (t
+       (error "return pc not on stack")))))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
 ;;; values. The VALUES are required to be set up in the standard
@@ -1038,8 +999,10 @@
     (move rbp-tn old-fp)
     ;; Clear as much of the stack as possible, but not past the return
     ;; address.
-    (inst lea rsp-tn (make-ea :qword :base rbx
-                              :disp (- (* (max nvals 2) n-word-bytes))))
+    (inst lea rsp-tn
+          (make-ea :qword :base rbx
+                   :disp (frame-byte-offset (max (1- nvals)
+                                                 return-pc-save-offset))))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
@@ -1053,16 +1016,17 @@
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of RBX instead of RBP.
     (cond ((zerop nvals)
-           ;; Return popping the return address and the OCFP.
-           (inst ret n-word-bytes))
+           ;; Return popping the return address and what's earlier in
+           ;; the frame.
+           (inst ret (* return-pc-save-offset n-word-bytes)))
           ((= nvals 1)
-           ;; Return popping the return, leaving 1 slot. Can this
-           ;; happen, or is a single value return handled elsewhere?
-           (inst ret))
+           ;; This is handled in RETURN-SINGLE.
+           (error "nvalues is 1"))
           (t
-           (inst jmp (make-ea :qword :base rbx
-                              :disp (- (* (1+ (tn-offset return-pc))
-                                          n-word-bytes))))))
+           ;; Thou shalt not JMP unto thy return address.
+           (inst push (make-ea :qword :base rbx
+                               :disp (frame-byte-offset (tn-offset return-pc))))
+           (inst ret)))
 
     (trace-table-entry trace-table-normal)))
 
@@ -1113,8 +1077,8 @@
         ;; clear the multiple-value return flag
         (inst clc)
         ;; Out of here.
-        (inst jmp rax)
-
+        (inst push rax)
+        (inst ret)
         ;; Nope, not the single case. Jump to the assembly routine.
         (emit-label not-single)))
     (move rsi vals)

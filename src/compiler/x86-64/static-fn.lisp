@@ -16,7 +16,7 @@
   (:policy :safe)
   (:variant-vars function)
   (:vop-var vop)
-  (:node-var node)
+  ;;(:node-var node)
   (:temporary (:sc unsigned-reg :offset ebx-offset
                    :from (:eval 0) :to (:eval 2)) ebx)
   (:temporary (:sc unsigned-reg :offset ecx-offset
@@ -79,15 +79,17 @@
          ;; If speed not more important than size, duplicate the
          ;; effect of the ENTER with discrete instructions. Takes
          ;; 2+1+3+2=8 bytes as opposed to 4+3=7 bytes.
-         (cond ((policy node (>= speed space))
+         (cond (t ;(policy node (>= speed space))
                 (inst mov ebx rsp-tn)
+                ;; Dummy for return address
+                (inst push rbp-tn)
                 ;; Save the old-fp
                 (inst push rbp-tn)
                 ;; Ensure that at least three slots are available; one
                 ;; above, two more needed.
-                (inst sub rsp-tn (fixnumize 2))
+                (inst sub rsp-tn (fixnumize 1))
                 (inst mov rbp-tn ebx))
-               (t
+               #+(or) (t
                 (inst enter (fixnumize 2))
                 ;; The enter instruction pushes EBP and then copies
                 ;; ESP into EBP. We want the new EBP to be the

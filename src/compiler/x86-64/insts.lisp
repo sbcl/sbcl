@@ -2583,7 +2583,7 @@
   (:printer byte ((op #b11000010) (imm nil :type 'imm-word-16))
             '(:name :tab imm))
   (:emitter
-   (cond (stack-delta
+   (cond ((and stack-delta (not (zerop stack-delta)))
           (emit-byte segment #b11000010)
           (emit-word segment stack-delta))
          (t

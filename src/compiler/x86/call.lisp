@@ -212,7 +212,7 @@
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)
       (inst jmp :c regs-defaulted)
-      ;; Default the unsuppled registers.
+      ;; Default the unsupplied registers.
       (let* ((2nd-tn-ref (tn-ref-across values))
              (2nd-tn (tn-ref-tn 2nd-tn-ref)))
         (inst mov 2nd-tn nil-value)
@@ -395,7 +395,7 @@
 
     (cond ((location= start (first *register-arg-tns*))
            (inst push (first *register-arg-tns*))
-           (inst lea start (make-ea :dword :base esp-tn :disp 4)))
+           (inst lea start (make-ea :dword :base esp-tn :disp n-word-bytes)))
           (t (inst mov start esp-tn)
              (inst push (first *register-arg-tns*))))
     (inst mov count (fixnumize 1))
@@ -471,12 +471,14 @@
       ;; Is the return-pc on the stack or in a register?
       (sc-case ret-tn
         ((sap-stack)
+         (unless (= (tn-offset ret-tn) return-pc-save-offset)
+           (error "ret-tn ~A in wrong stack slot" ret-tn))
          #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
                        (tn-offset ret-tn))
-         (storew (make-fixup nil :code-object return)
+         (storew (make-fixup nil :code-object RETURN)
                  ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        ((sap-reg)
-         (inst lea ret-tn (make-fixup nil :code-object return)))))
+        (t
+         (error "ret-tn ~A in sap-reg" ret-tn))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -512,11 +514,10 @@
          #+nil (format t "*multiple-call-local: ret-tn on stack; offset=~S~%"
                        (tn-offset ret-tn))
          ;; Stack
-         (storew (make-fixup nil :code-object return)
+         (storew (make-fixup nil :code-object RETURN)
                  ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        ((sap-reg)
-         ;; Register
-         (inst lea ret-tn (make-fixup nil :code-object return)))))
+        (t
+         (error "multiple-call-local: return-pc not on stack."))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -560,11 +561,10 @@
          #+nil (format t "*known-call-local: ret-tn on stack; offset=~S~%"
                        (tn-offset ret-tn))
          ;; Stack
-         (storew (make-fixup nil :code-object return)
+         (storew (make-fixup nil :code-object RETURN)
                  ebp-tn (frame-word-offset (tn-offset ret-tn))))
-        ((sap-reg)
-         ;; Register
-         (inst lea ret-tn (make-fixup nil :code-object return)))))
+        (t
+         (error "known-call-local: return-pc not on stack."))))
 
     (note-this-location vop :call-site)
     (inst jmp target)
@@ -636,52 +636,25 @@
 
     ;; return-pc may be either in a register or on the stack.
     (sc-case return-pc
-      ((sap-reg)
-       (sc-case old-fp
-         ((control-stack)
-
-          #+nil (format t "*known-return: old-fp ~S on stack; offset=~S~%"
-                        old-fp (tn-offset old-fp))
-
-          (cond ((zerop (tn-offset old-fp))
-                 ;; Zot all of the stack except for the old-fp.
-                 (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                           :disp (frame-byte-offset ocfp-save-offset)))
-                 ;; Restore the old fp from its save location on the stack,
-                 ;; and zot the stack.
-                 (inst pop ebp-tn))
-
-                (t
-                 (cerror "Continue anyway"
-                         "VOP return-local doesn't work if old-fp (in slot ~
-                          ~S) is not in slot 0"
-                         (tn-offset old-fp)))))
-
-         ((any-reg descriptor-reg)
-          ;; Zot all the stack.
-          (move esp-tn ebp-tn)
-          ;; Restore the old-fp.
-          (move ebp-tn old-fp)))
-
-       ;; Return; return-pc is in a register.
-       (inst jmp return-pc))
-
       ((sap-stack)
-
        #+nil (format t "*known-return: return-pc ~S on stack; offset=~S~%"
                      return-pc (tn-offset return-pc))
+       (unless (and (sc-is old-fp control-stack)
+                    (= (tn-offset old-fp) ocfp-save-offset))
+         (error "known-return: ocfp not on stack in standard save location?"))
+       (unless (and (sc-is return-pc sap-stack)
+                    (= (tn-offset return-pc) return-pc-save-offset))
+         (error
+          "known-return: return-pc not on stack in standard save location?"))
 
        ;; Zot all of the stack except for the old-fp and return-pc.
        (inst lea esp-tn
              (make-ea :dword :base ebp-tn
-                      :disp (frame-byte-offset (tn-offset return-pc))))
-       ;; Restore the old fp. old-fp may be either on the stack in its
-       ;; save location or in a register, in either case this restores it.
-       (move ebp-tn old-fp)
-       ;; The return pops the return address (4 bytes), then we need
-       ;; to pop all the slots before the return-pc which includes the
-       ;; 4 bytes for the old-fp.
-       (inst ret (* (tn-offset return-pc) n-word-bytes))))
+                      :disp (frame-byte-offset ocfp-save-offset)))
+       (inst pop ebp-tn)
+       (inst ret (* (tn-offset return-pc) n-word-bytes)))
+      (t
+       (error "known-return, return-pc not on stack")))
 
     (trace-table-entry trace-table-normal)))
 
@@ -848,13 +821,13 @@
                                       ;; FIXME: FORMAT T for stale
                                       ;; diagnostic output (several of
                                       ;; them around here), ick
-                                      (format t "** tail-call old-fp not S0~%")
+                                      (error "** tail-call old-fp not S0~%")
                                       (move old-fp-tmp old-fp)
                                       (storew old-fp-tmp
                                               ebp-tn
                                               (frame-word-offset ocfp-save-offset))))
                                    ((any-reg descriptor-reg)
-                                    (format t "** tail-call old-fp in reg not S0~%")
+                                    (error "** tail-call old-fp in reg not S0~%")
                                     (storew old-fp
                                             ebp-tn
                                             (frame-word-offset ocfp-save-offset))))
@@ -883,7 +856,8 @@
                                '(inst sub esp-tn (fixnumize 3)))
 
                           ;; Save the fp
-                          (storew ebp-tn new-fp (frame-word-offset ocfp-save-offset))
+                          (storew ebp-tn new-fp
+                                  (frame-word-offset ocfp-save-offset))
 
                           (move ebp-tn new-fp) ; NB - now on new stack frame.
                           )))
@@ -952,12 +926,7 @@
 
 ;;;; unknown values return
 
-;;; Return a single-value using the Unknown-Values convention. Specifically,
-;;; we jump to clear the stack and jump to return-pc+2.
-;;;
-;;; We require old-fp to be in a register, because we want to reset ESP before
-;;; restoring EBP. If old-fp were still on the stack, it could get clobbered
-;;; by a signal.
+;;; Return a single-value using the Unknown-Values convention.
 ;;;
 ;;; pfw--get wired-tn conflicts sometimes if register sc specd for args
 ;;; having problems targeting args to regs -- using temps instead.
@@ -975,53 +944,31 @@
     (trace-table-entry trace-table-fun-epilogue)
     ;; Code structure lifted from known-return.
     (sc-case return-pc
-      ((sap-reg)
-       ;; return PC in register for some reason (local call?)
-       ;; we jmp to the return pc after fixing the stack and frame.
-       (sc-case old-fp
-         ((control-stack)
-          ;; ofp on stack must be in slot 0 (the traditional storage place).
-          ;; Drop the stack above it and pop it off.
-          (cond ((zerop (tn-offset old-fp))
-                 (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                           :disp (frame-byte-offset ocfp-save-offset)))
-                 (inst pop ebp-tn))
-                (t
-                 ;; Should this ever happen, we do the same as above, but
-                 ;; using (tn-offset old-fp) instead of ocfp-save-offset
-                 ;; (which is 0 anyway, see src/compiler/x86/vm.lisp) and
-                 ;; then lea esp again against itself with a displacement
-                 ;; of (* (tn-offset old-fp) n-word-bytes) to clear the
-                 ;; rest of the stack.
-                 (cerror "Continue anyway"
-                         "VOP return-single doesn't work if old-fp (in slot ~S) is not in slot 0" (tn-offset old-fp)))))
-         ((any-reg descriptor-reg)
-          ;; ofp in reg, drop the stack and load the real fp.
-          (move esp-tn ebp-tn)
-          (move ebp-tn old-fp)))
-
-       ;; Set single-value-return flag
-       (inst clc)
-       ;; And return
-       (inst jmp return-pc))
-
       ((sap-stack)
        ;; Note that this will only work right if, when old-fp is on
        ;; the stack, it has a lower tn-offset than return-pc. One of
        ;; the comments in known-return indicate that this is the case
        ;; (in that it will be in its save location), but we may wish
        ;; to assert that (in either the weaker or stronger forms).
-       ;; Should this ever not be the case, we should load old-fp
-       ;; into a temp reg while we fix the stack.
-       ;; Drop stack above return-pc
+       ;; Should this ever not be the case, we should load old-fp into
+       ;; a temp reg while we fix the stack.
+       (unless (and (sc-is old-fp control-stack)
+                    (= (tn-offset old-fp) ocfp-save-offset))
+         (error "ocfp not on stack in standard save location?"))
+       (unless (and (sc-is return-pc sap-stack)
+                    (= (tn-offset return-pc) return-pc-save-offset))
+         (error "return-pc not on stack in standard save location?"))
+       ;; Drop stack above old-fp
        (inst lea esp-tn (make-ea :dword :base ebp-tn
-                                 :disp (frame-byte-offset (tn-offset return-pc))))
+                                 :disp (frame-byte-offset (tn-offset old-fp))))
        ;; Set single-value return flag
        (inst clc)
        ;; Restore the old frame pointer
-       (move ebp-tn old-fp)
+       (inst pop ebp-tn)
        ;; And return, dropping the rest of the stack as we go.
-       (inst ret (* (tn-offset return-pc) n-word-bytes))))))
+       (inst ret (* (tn-offset return-pc) n-word-bytes)))
+      (t
+       (error "return pc not on stack")))))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
 ;;; values. The VALUES are required to be set up in the standard
@@ -1053,18 +1000,27 @@
                    :from :eval) a2)
 
   (:generator 6
+    (unless (and (sc-is old-fp control-stack)
+                 (= (tn-offset old-fp) ocfp-save-offset))
+      (error "ocfp not on stack in standard save location?"))
+    (unless (and (sc-is return-pc sap-stack)
+                 (= (tn-offset return-pc) return-pc-save-offset))
+      (error "return-pc not on stack in standard save location?"))
+
     (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
     (move ebx ebp-tn)
     (if (zerop nvals)
-        (inst xor ecx ecx) ; smaller
-      (inst mov ecx (fixnumize nvals)))
+        (inst xor ecx ecx)              ; smaller
+        (inst mov ecx (fixnumize nvals)))
     ;; Restore the frame pointer.
     (move ebp-tn old-fp)
     ;; Clear as much of the stack as possible, but not past the return
     ;; address.
-    (inst lea esp-tn (make-ea :dword :base ebx
-                              :disp (- (* (max nvals 2) n-word-bytes))))
+    (inst lea esp-tn
+          (make-ea :dword :base ebx
+                   :disp (frame-byte-offset (max (1- nvals)
+                                                 return-pc-save-offset))))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
@@ -1072,21 +1028,23 @@
         (inst mov first nil-value)
         (dolist (tn (cdr arg-tns))
           (inst mov tn first))))
-    ;; Set multi-value return flag.
+    ;; Set the multiple value return flag.
     (inst stc)
     ;; And away we go. Except that return-pc is still on the
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of EBX instead of EBP.
     (cond ((zerop nvals)
-           ;; Return popping the return address and the OCFP.
-           (inst ret n-word-bytes))
+           ;; Return popping the return address and what's earlier in
+           ;; the frame.
+           (inst ret (* return-pc-save-offset n-word-bytes)))
           ((= nvals 1)
-           ;; Return popping the return, leaving 1 slot. Can this
-           ;; happen, or is a single value return handled elsewhere?
-           (inst ret))
+           ;; This is handled in RETURN-SINGLE.
+           (error "nvalues is 1"))
           (t
-           (inst jmp (make-ea :dword :base ebx
-                              :disp (frame-byte-offset (tn-offset return-pc))))))
+           ;; Thou shalt not JMP unto thy return address.
+           (inst push (make-ea :dword :base ebx
+                               :disp (frame-byte-offset (tn-offset return-pc))))
+           (inst ret)))
 
     (trace-table-entry trace-table-normal)))
 
@@ -1133,11 +1091,11 @@
         (move old-fp-temp old-fp)
         (move esp-tn ebp-tn)
         (move ebp-tn old-fp-temp)
-        ;; Set the single-value return flag.
+        ;; clear the multiple-value return flag
         (inst clc)
         ;; Out of here.
-        (inst jmp eax)
-
+        (inst push eax)
+        (inst ret)
         ;; Nope, not the single case. Jump to the assembly routine.
         (emit-label not-single)))
     (move esi vals)
@@ -1191,10 +1149,10 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-           (inst jecxz just-alloc-frame))
+           (inst jecxz JUST-ALLOC-FRAME))
           (t
            (inst cmp ecx-tn (fixnumize fixed))
-           (inst jmp :be just-alloc-frame)))
+           (inst jmp :be JUST-ALLOC-FRAME)))
 
     ;; Allocate the space on the stack.
     ;; stack = ebp - (max 3 frame-size) - (nargs - fixed)
@@ -1217,7 +1175,7 @@
            ;; Number to copy = nargs-3
            (inst sub ecx-tn (fixnumize register-arg-count))
            ;; Everything of interest in registers.
-           (inst jmp :be do-regs))
+           (inst jmp :be DO-REGS))
           (t
            ;; Number to copy = nargs-fixed
            (inst sub ecx-tn (fixnumize fixed))))
@@ -1268,7 +1226,7 @@
               ( nil )
               ;; Store it relative to ebp
               (inst mov (make-ea :dword :base ebp-tn
-                                 :disp (- (* 4
+                                 :disp (- (* n-word-bytes
                                              (+ 1 (- i fixed)
                                                 (max 3 (sb-allocated-size 'stack))))))
                     (nth i *register-arg-tns*))
@@ -1281,9 +1239,9 @@
               (if (zerop i)
                   (inst test ecx-tn ecx-tn)
                 (inst cmp ecx-tn (fixnumize i)))
-              (inst jmp :eq done)))
+              (inst jmp :eq DONE)))
 
-    (inst jmp done)
+    (inst jmp DONE)
 
     JUST-ALLOC-FRAME
     (inst lea esp-tn
@@ -1352,12 +1310,12 @@
       (inst lea dst (make-ea :dword :base ecx :index ecx))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       (inst shr ecx 2)
+       (inst shr ecx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
        ;; Set up the result.
        (move result dst)
-       ;; Jump into the middle of the loop, 'cause that's were we want
+       ;; Jump into the middle of the loop, 'cause that's where we want
        ;; to start.
        (inst jmp enter)
        (emit-label loop)
@@ -1403,7 +1361,7 @@
     ;; Point to the first more-arg, not above it.
     (inst lea context (make-ea :dword :base esp-tn
                                :index count :scale 1
-                               :disp (- (+ (fixnumize fixed) 4))))
+                               :disp (- (+ (fixnumize fixed) n-word-bytes))))
     (unless (zerop fixed)
       (inst sub count (fixnumize fixed)))))
 

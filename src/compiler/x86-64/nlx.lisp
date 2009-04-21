@@ -274,7 +274,7 @@
           (make-ea :qword :base rbp-tn :disp (* -3 n-word-bytes)))
 
     ;; Push the return-pc so it looks like we just called.
-    (pushw rbp-tn -2)
+    (pushw rbp-tn (frame-word-offset return-pc-save-offset))
 
     ;; Call it
     (inst jmp (make-ea :qword :base block
