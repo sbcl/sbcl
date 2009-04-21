@@ -20,13 +20,13 @@
 #+sb-assembling ;; We don't want a vop for this one.
 (define-assembly-routine
     (return-multiple (:return-style :none))
-    (;; These four are really arguments.
-     (:temp eax unsigned-reg rax-offset)
-     (:temp ebx unsigned-reg rbx-offset)
+    (;; These are really arguments.
      (:temp ecx unsigned-reg rcx-offset)
      (:temp esi unsigned-reg rsi-offset)
 
      ;; These we need as temporaries.
+     (:temp eax unsigned-reg rax-offset)
+     (:temp ebx unsigned-reg rbx-offset)
      (:temp edx unsigned-reg rdx-offset)
      (:temp edi unsigned-reg rdi-offset))
 
@@ -39,18 +39,22 @@
   (inst cmp ecx (fixnumize 3))
   (inst jmp :e THREE-VALUES)
 
+  (inst mov ebx rbp-tn)
   ;; Save the count, because the loop is going to destroy it.
   (inst mov edx ecx)
-
+  (inst mov eax (make-ea :qword :base rbp-tn
+                         :disp (frame-byte-offset return-pc-save-offset)))
+  (inst mov rbp-tn (make-ea :qword :base rbp-tn
+                            :disp (frame-byte-offset ocfp-save-offset)))
   ;; Blit the values down the stack. Note: there might be overlap, so
   ;; we have to be careful not to clobber values before we've read
-  ;; them. Because the stack builds down, we are coping to a larger
+  ;; them. Because the stack builds down, we are copying to a larger
   ;; address. Therefore, we need to iterate from larger addresses to
   ;; smaller addresses. pfw-this says copy ecx words from esi to edi
   ;; counting down.
-  (inst shr ecx 3)                      ; fixnum to raw word count
+  (inst shr ecx (1- n-lowtag-bits))
   (inst std)                            ; count down
-  (inst sub esi 8)                      ; ?
+  (inst sub esi n-word-bytes)
   (inst lea edi (make-ea :qword :base ebx :disp (- n-word-bytes)))
   (inst rep)
   (inst movs :qword)
@@ -69,39 +73,56 @@
 
   ;; And back we go.
   (inst stc)
-  (inst jmp eax)
+  (inst push eax)
+  (inst ret)
 
   ;; Handle the register arg cases.
   ZERO-VALUES
-  (move rsp-tn ebx)
+  (inst mov ebx rbp-tn)
   (inst mov edx nil-value)
   (inst mov edi edx)
   (inst mov esi edx)
+  (inst lea rsp-tn
+        (make-ea :qword :base ebx
+                 :disp (frame-byte-offset ocfp-save-offset)))
   (inst stc)
-  (inst jmp eax)
+  (inst pop rbp-tn)
+  (inst ret)
 
-  ONE-VALUE ; Note: we can get this, because the return-multiple vop
-            ; doesn't check for this case when size > speed.
+  ;; Note: we can get this, because the return-multiple vop doesn't
+  ;; check for this case when size > speed.
+  ONE-VALUE
   (loadw edx esi -1)
-  (inst mov rsp-tn ebx)
+  (inst lea rsp-tn
+        (make-ea :qword :base rbp-tn
+                 :disp (frame-byte-offset ocfp-save-offset)))
   (inst clc)
-  (inst jmp eax)
+  (inst pop rbp-tn)
+  (inst ret)
 
   TWO-VALUES
+  (inst mov ebx rbp-tn)
   (loadw edx esi -1)
   (loadw edi esi -2)
   (inst mov esi nil-value)
-  (inst lea rsp-tn (make-ea :qword :base ebx :disp (* -2 n-word-bytes)))
+  (inst lea rsp-tn
+        (make-ea :qword :base ebx
+                 :disp (frame-byte-offset ocfp-save-offset)))
   (inst stc)
-  (inst jmp eax)
+  (inst pop rbp-tn)
+  (inst ret)
 
   THREE-VALUES
+  (inst mov ebx rbp-tn)
   (loadw edx esi -1)
   (loadw edi esi -2)
   (loadw esi esi -3)
-  (inst lea rsp-tn (make-ea :qword :base ebx :disp (* -3 n-word-bytes)))
+  (inst lea rsp-tn
+        (make-ea :qword :base ebx
+                 :disp (frame-byte-offset ocfp-save-offset)))
   (inst stc)
-  (inst jmp eax))
+  (inst pop rbp-tn)
+  (inst ret))
 
 ;;;; TAIL-CALL-VARIABLE
 
@@ -145,7 +166,7 @@
   ;; Do the blit. Because we are coping from smaller addresses to
   ;; larger addresses, we have to start at the largest pair and work
   ;; our way down.
-  (inst shr ecx 3)                      ; fixnum to raw words
+  (inst shr ecx (1- n-lowtag-bits))
   (inst std)                            ; count down
   (inst lea edi (make-ea :qword :base rbp-tn :disp (frame-byte-offset 0)))
   (inst sub esi (fixnumize 1))

@@ -173,16 +173,20 @@
              (loadw (tn-ref-tn values) start -1)
              (emit-label no-values)))
           (t
+           ;; FIXME: this is mostly copied from
+           ;; DEFAULT-UNKNOWN-VALUES.
            (collect ((defaults))
              (do ((i 0 (1+ i))
                   (tn-ref values (tn-ref-across tn-ref)))
                  ((null tn-ref))
                (let ((default-lab (gen-label))
-                     (tn (tn-ref-tn tn-ref)))
-                 (defaults (cons default-lab tn))
-
+                     (tn (tn-ref-tn tn-ref))
+                     (first-stack-arg-p (= i register-arg-count)))
+                 (defaults (cons default-lab (cons tn first-stack-arg-p)))
                  (inst cmp count (fixnumize i))
                  (inst jmp :le default-lab)
+                 (when first-stack-arg-p
+                   (storew edx-tn ebx-tn -1))
                  (sc-case tn
                    ((descriptor-reg any-reg)
                     (loadw tn start (frame-word-offset i)))
@@ -192,9 +196,11 @@
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
                (assemble (*elsewhere*)
-                 (dolist (def (defaults))
-                   (emit-label (car def))
-                   (inst mov (cdr def) nil-value))
+                 (dolist (default (defaults))
+                   (emit-label (car default))
+                   (when (cddr default)
+                     (inst push edx-tn))
+                   (inst mov (second default) nil-value))
                  (inst jmp defaulting-done))))))
     (inst mov esp-tn sp)))
 
@@ -228,7 +234,7 @@
     (move num ecx)
     (inst shr ecx word-shift)           ; word count for <rep movs>
     ;; If we got zero, we be done.
-    (inst jecxz done)
+    (inst jecxz DONE)
     ;; Copy them down.
     (inst std)
     (inst rep)

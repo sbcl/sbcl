@@ -234,13 +234,11 @@
       ;; Fake other registers so it looks like we returned with all the
       ;; registers filled in.
       (move rbx-tn rsp-tn)
-      (inst push rdx-tn)
       (inst jmp default-stack-slots)
 
       (emit-label regs-defaulted)
 
       (inst mov rax-tn nil-value)
-      (storew rdx-tn rbx-tn -1)
       (collect ((defaults))
         (do ((i register-arg-count (1+ i))
              (val (do ((i 0 (1+ i))
@@ -249,11 +247,16 @@
                   (tn-ref-across val)))
             ((null val))
           (let ((default-lab (gen-label))
-                (tn (tn-ref-tn val)))
-            (defaults (cons default-lab tn))
+                (tn (tn-ref-tn val))
+                (first-stack-arg-p (= i register-arg-count)))
+            (defaults (cons default-lab (cons tn first-stack-arg-p)))
 
             (inst cmp rcx-tn (fixnumize i))
             (inst jmp :be default-lab)
+            (when first-stack-arg-p
+              ;; There are stack args so the frame of the callee is
+              ;; still there, save RDX in its first slot temporalily.
+              (storew rdx-tn rbx-tn -1))
             (loadw rdx-tn rbx-tn (frame-word-offset i))
             (inst mov tn rdx-tn)))
 
@@ -268,7 +271,14 @@
               (emit-label default-stack-slots)
               (dolist (default defaults)
                 (emit-label (car default))
-                (inst mov (cdr default) rax-tn))
+                (when (cddr default)
+                  ;; We are setting the first stack argument to NIL.
+                  ;; The callee's stack frame is dead, save RDX by
+                  ;; pushing it to the stack, it will end up at same
+                  ;; place as in the (STOREW RDX-TN RBX-TN -1) case
+                  ;; above.
+                  (inst push rdx-tn))
+                (inst mov (second default) rax-tn))
               (inst jmp defaulting-done)
               (trace-table-entry trace-table-normal)))))))
    (t
@@ -284,12 +294,12 @@
       ;; Default the register args, and set up the stack as if we
       ;; entered the MV return point.
       (inst mov rbx-tn rsp-tn)
-      (inst push rdx-tn)
       (inst mov rdi-tn nil-value)
-      (inst push rdi-tn)
       (inst mov rsi-tn rdi-tn)
       ;; Compute a pointer to where to put the [defaulted] stack values.
       (emit-label no-stack-args)
+      (inst push rdx-tn)
+      (inst push rdi-tn)
       (inst lea rdi-tn
             (make-ea :qword :base rbp-tn
                      :disp (frame-byte-offset register-arg-count)))
@@ -376,6 +386,7 @@
 (defun receive-unknown-values (args nargs start count)
   (declare (type tn args nargs start count))
   (let ((variable-values (gen-label))
+        (stack-values (gen-label))
         (done (gen-label)))
     (inst jmp :c variable-values)
 
@@ -388,6 +399,12 @@
     (inst jmp done)
 
     (emit-label variable-values)
+    ;; The stack frame is burnt and RETurned from if there are no
+    ;; stack values. In this case quickly reallocate sufficient space.
+    (inst cmp nargs (fixnumize register-arg-count))
+    (inst jmp :g stack-values)
+    (inst sub rsp-tn nargs)
+    (emit-label stack-values)
     ;; dtc: this writes the registers onto the stack even if they are
     ;; not needed, only the number specified in rcx are used and have
     ;; stack allocated to them. No harm is done.
@@ -888,7 +905,7 @@
     (inst clc)
     ;; Restore the old frame pointer
     (inst pop rbp-tn)
-    ;; And return, dropping the rest of the stack as we go.
+    ;; And return.
     (inst ret)))
 
 ;;; Do unknown-values return of a fixed (other than 1) number of
@@ -920,20 +937,23 @@
 
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
+    (when (= nvals 1)
+      ;; This is handled in RETURN-SINGLE.
+      (error "nvalues is 1"))
     (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
     (move rbx rbp-tn)
     (if (zerop nvals)
         (zeroize rcx) ; smaller
-      (inst mov rcx (fixnumize nvals)))
-    ;; Restore the frame pointer.
-    (move rbp-tn old-fp)
-    ;; Clear as much of the stack as possible, but not past the return
-    ;; address.
+        (inst mov rcx (fixnumize nvals)))
+    ;; Clear as much of the stack as possible, but not past the old
+    ;; frame address.
     (inst lea rsp-tn
           (make-ea :qword :base rbx
-                   :disp (frame-byte-offset (max (1- nvals)
-                                                 return-pc-save-offset))))
+                   :disp (frame-byte-offset
+                          (if (< register-arg-count nvals)
+                              (1- nvals)
+                              ocfp-save-offset))))
     ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
@@ -946,15 +966,14 @@
     ;; And away we go. Except that return-pc is still on the
     ;; stack and we've changed the stack pointer. So we have to
     ;; tell it to index off of RBX instead of RBP.
-    (cond ((zerop nvals)
-           ;; Return popping the return address and what's earlier in
-           ;; the frame.
-           (inst ret (* return-pc-save-offset n-word-bytes)))
-          ((= nvals 1)
-           ;; This is handled in RETURN-SINGLE.
-           (error "nvalues is 1"))
+    (cond ((<= nvals register-arg-count)
+           (inst pop rbp-tn)
+           (inst ret))
           (t
-           ;; Thou shalt not JMP unto thy return address.
+           ;; Some values are on the stack after RETURN-PC and OLD-FP,
+           ;; can't return normally and some slots of the frame will
+           ;; be used as temporaries by the receiver.
+           (move rbp-tn old-fp)
            (inst push (make-ea :qword :base rbx
                                :disp (frame-byte-offset (tn-offset return-pc))))
            (inst ret)))
@@ -973,24 +992,19 @@
 ;;;  RCX -- number of values to find there.
 ;;;  RSI -- pointer to where to find the values.
 (define-vop (return-multiple)
-  (:args (old-fp :to (:eval 1) :target old-fp-temp)
-         (return-pc :target rax)
+  (:args (old-fp)
+         (return-pc)
          (vals :scs (any-reg) :target rsi)
          (nvals :scs (any-reg) :target rcx))
-  (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 2)) rsi)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 3)) rcx)
-  (:temporary (:sc unsigned-reg :offset rbx-offset :from (:eval 0)) rbx)
   (:temporary (:sc unsigned-reg) return-asm)
   (:temporary (:sc descriptor-reg :offset (first *register-arg-offsets*)
                    :from (:eval 0)) a0)
-  (:temporary (:sc unsigned-reg :from (:eval 1)) old-fp-temp)
   (:node-var node)
   (:generator 13
     (check-ocfp-and-return-pc old-fp return-pc)
     (trace-table-entry trace-table-fun-epilogue)
-    ;; Load the return-pc.
-    (move rax return-pc)
     (unless (policy node (> space speed))
       ;; Check for the single case.
       (let ((not-single (gen-label)))
@@ -998,22 +1012,17 @@
         (inst jmp :ne not-single)
         ;; Return with one value.
         (loadw a0 vals -1)
-        ;; Clear the stack. We load old-fp into a register before clearing
-        ;; the stack.
-        (move old-fp-temp old-fp)
-        (move rsp-tn rbp-tn)
-        (move rbp-tn old-fp-temp)
+        (inst lea rsp-tn (make-ea :qword :base rbp-tn
+                                  :disp (frame-byte-offset ocfp-save-offset)))
         ;; clear the multiple-value return flag
         (inst clc)
         ;; Out of here.
-        (inst push rax)
+        (inst pop rbp-tn)
         (inst ret)
         ;; Nope, not the single case. Jump to the assembly routine.
         (emit-label not-single)))
     (move rsi vals)
     (move rcx nvals)
-    (move rbx rbp-tn)
-    (move rbp-tn old-fp)
     (inst lea return-asm
           (make-ea :qword :disp (make-fixup 'return-multiple
                                             :assembly-routine)))

@@ -152,28 +152,34 @@
              (loadw (tn-ref-tn values) start -1)
              (emit-label no-values)))
           (t
+           ;; FIXME: this is mostly copied from
+           ;; DEFAULT-UNKNOWN-VALUES.
            (collect ((defaults))
              (do ((i 0 (1+ i))
                   (tn-ref values (tn-ref-across tn-ref)))
                  ((null tn-ref))
                (let ((default-lab (gen-label))
-                     (tn (tn-ref-tn tn-ref)))
-                 (defaults (cons default-lab tn))
-
+                     (tn (tn-ref-tn tn-ref))
+                     (first-stack-arg-p (= i register-arg-count)))
+                 (defaults (cons default-lab (cons tn first-stack-arg-p)))
                  (inst cmp count (fixnumize i))
                  (inst jmp :le default-lab)
+                 (when first-stack-arg-p
+                   (storew rdx-tn rbx-tn -1))
                  (sc-case tn
                    ((descriptor-reg any-reg)
-                    (loadw tn start (- (1+ i))))
+                    (loadw tn start (frame-word-offset i)))
                    ((control-stack)
-                    (loadw move-temp start (- (1+ i)))
+                    (loadw move-temp start (frame-word-offset i))
                     (inst mov tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
                (assemble (*elsewhere*)
-                 (dolist (def (defaults))
-                   (emit-label (car def))
-                   (inst mov (cdr def) nil-value))
+                 (dolist (default (defaults))
+                   (emit-label (car default))
+                   (when (cddr default)
+                     (inst push rdx-tn))
+                   (inst mov (second default) nil-value))
                  (inst jmp defaulting-done))))))
     (inst mov rsp-tn sp)))
 
