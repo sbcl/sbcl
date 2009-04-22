@@ -4,7 +4,7 @@
 # This ensures that SBCL_PWD is a path understandable to SBCL.
 
 sbcl_pwd() {
-    if [ "$OSTYPE" = "cygwin" ] ; then
+    if [ "${OSTYPE:-}" = "cygwin" ] ; then
 	SBCL_PWD="`cygpath -m \"$(pwd)\"`"
     else
 	SBCL_PWD="`pwd`"
