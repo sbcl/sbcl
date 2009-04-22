@@ -1081,7 +1081,7 @@
                       (n-bin #'echo-n-bin))
             (:constructor %make-echo-stream (input-stream output-stream))
             (:copier nil))
-  unread-stuff)
+  (unread-stuff nil :type boolean))
 (def!method print-object ((x echo-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream
@@ -1106,47 +1106,55 @@
 
 (macrolet ((in-fun (name in-fun out-fun &rest args)
              `(defun ,name (stream ,@args)
-                (or (pop (echo-stream-unread-stuff stream))
-                    (let* ((in (echo-stream-input-stream stream))
-                           (out (echo-stream-output-stream stream))
-                           (result (if eof-error-p
-                                       (,in-fun in ,@args)
-                                       (,in-fun in nil in))))
-                      (cond
-                        ((eql result in) eof-value)
-                        (t (,out-fun result out) result)))))))
+                (let* ((unread-stuff-p (echo-stream-unread-stuff stream))
+                       (in (echo-stream-input-stream stream))
+                       (out (echo-stream-output-stream stream))
+                       (result (if eof-error-p
+                                   (,in-fun in ,@args)
+                                   (,in-fun in nil in))))
+                  (setf (echo-stream-unread-stuff stream) nil)
+                  (cond
+                    ((eql result in) eof-value)
+                    ;; If unread-stuff was true, the character read
+                    ;; from the input stream was previously echoed.
+                    (t (unless unread-stuff-p (,out-fun result out)) result))))))
   (in-fun echo-in read-char write-char eof-error-p eof-value)
   (in-fun echo-bin read-byte write-byte eof-error-p eof-value))
 
 (defun echo-n-bin (stream buffer start numbytes eof-error-p)
-  (let ((new-start start)
-        (read 0))
-    (loop
-     (let ((thing (pop (echo-stream-unread-stuff stream))))
-       (cond
-         (thing
-          (setf (aref buffer new-start) thing)
-          (incf new-start)
-          (incf read)
-          (when (= read numbytes)
-            (return-from echo-n-bin numbytes)))
-         (t (return nil)))))
-    (let ((bytes-read (read-n-bytes (echo-stream-input-stream stream) buffer
-                                    new-start (- numbytes read) nil)))
-      (cond
-        ((not eof-error-p)
-         (write-sequence buffer (echo-stream-output-stream stream)
-                         :start new-start :end (+ new-start bytes-read))
-         (+ bytes-read read))
-        ((> numbytes (+ read bytes-read))
-         (write-sequence buffer (echo-stream-output-stream stream)
-                         :start new-start :end (+ new-start bytes-read))
-         (error 'end-of-file :stream stream))
-        (t
-         (write-sequence buffer (echo-stream-output-stream stream)
-                         :start new-start :end (+ new-start bytes-read))
-         (aver (= numbytes (+ new-start bytes-read)))
-         numbytes)))))
+  (let ((bytes-read 0))
+    ;; Note: before ca 1.0.27.18, the logic for handling unread
+    ;; characters never could have worked, so probably nobody has ever
+    ;; tried doing bivalent block I/O through an echo stream; this may
+    ;; not work either.
+    (when (echo-stream-unread-stuff stream)
+      (let* ((char (read-char stream))
+             (octets (octets-to-string
+                      (string char)
+                      :external-format
+                      (stream-external-format
+                       (echo-stream-input-stream stream))))
+             (octet-count (length octets))
+             (blt-count (min octet-count numbytes)))
+        (replace buffer octets :start1 start :end1 (+ start blt-count))
+        (incf start blt-count)
+        (decf numbytes blt-count)))
+    (incf bytes-read (read-n-bytes (echo-stream-input-stream stream) buffer
+                                   start numbytes nil))
+    (cond
+      ((not eof-error-p)
+       (write-sequence buffer (echo-stream-output-stream stream)
+                       :start start :end (+ start bytes-read))
+       bytes-read)
+      ((> numbytes bytes-read)
+       (write-sequence buffer (echo-stream-output-stream stream)
+                       :start start :end (+ start bytes-read))
+       (error 'end-of-file :stream stream))
+      (t
+       (write-sequence buffer (echo-stream-output-stream stream)
+                       :start start :end (+ start bytes-read))
+       (aver (= numbytes (+ start bytes-read)))
+       numbytes))))
 
 ;;;; STRING-INPUT-STREAM stuff
 

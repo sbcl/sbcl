@@ -73,6 +73,19 @@
            (get-output-stream-string out-stream))
          ;; (Before the fix, the LET* expression just signalled an error.)
          "a"))
+;;; ... and yet, a little over 6 years on, echo-streams were still
+;;; broken when a read-char followed the unread/peek sequence.  Do
+;;; people not actually use echo-streams?  RMK, 2009-04-02.
+(assert (string=
+         (let* ((in-stream (make-string-input-stream "abc"))
+                (out-stream (make-string-output-stream))
+                (echo-stream (make-echo-stream in-stream out-stream)))
+           (unread-char (read-char echo-stream) echo-stream)
+           (peek-char nil echo-stream)
+           (read-char echo-stream)
+           (get-output-stream-string out-stream))
+         ;; before ca. 1.0.27.18, the LET* returned "aa"
+         "a"))
 
 ;;; Reported by Fredrik Sandstrom to sbcl-devel 2005-05-17 ("Bug in
 ;;; peek-char"):
@@ -337,3 +350,22 @@
   (let ((v (make-array 5 :fill-pointer 0 :element-type 'standard-char)))
     (format v "foo")
     (assert (equal (coerce "foo" 'base-string) v))))
+
+;;; Circa 1.0.27.18, echo-streams were changed somewhat, so that
+;;; unread-char on an echo-stream propagated the character down to the
+;;; echo-stream's input stream.  (All other implementations but CMUCL
+;;; seemed to do this).  The most useful argument for this behavior
+;;; involves cases where an input operation on an echo-stream finishes
+;;; up by unreading a delimiter, and the user wants to proceed to use the
+;;; underlying stream, e.g.,
+(assert (equal
+         (with-input-from-string (in "foo\"bar\"")
+           (with-open-stream (out (make-broadcast-stream))
+             (with-open-stream (echo (make-echo-stream in out))
+               (read echo)))
+           (read in))
+         ;; Before ca 1.0.27.18, the implicit UNREAD-CHAR at the end of
+         ;; the first READ wouldn't get back to IN, so the second READ
+         ;; returned BAR, not "BAR" (and then subsequent reads would
+         ;; lose).
+         "bar"))

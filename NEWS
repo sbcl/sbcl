@@ -8,6 +8,9 @@ changes in sbcl-1.0.28 relative to 1.0.27:
   * improvement: on x86/x86-64 Lisp call frames now have the same layout as C
     frames, allowing for instance more reliable backtraces.
   * optimization: faster local calls on x86/x86-64
+  * minor incompatible changes: echo-streams now propagate unread-char to the
+    underlying input stream, and no longer permit unreading more than one
+    character.
 
 changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)

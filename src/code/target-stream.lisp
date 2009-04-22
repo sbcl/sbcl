@@ -109,13 +109,13 @@
          (out (two-way-stream-output-stream stream)))
     (case operation
       (:listen
-       (or (not (null (echo-stream-unread-stuff stream)))
-           (if (ansi-stream-p in)
-               (or (/= (the fixnum (ansi-stream-in-index in))
-                       +ansi-stream-in-buffer-length+)
-                   (funcall (ansi-stream-misc in) in :listen))
-               (stream-misc-dispatch in :listen))))
-      (:unread (push arg1 (echo-stream-unread-stuff stream)))
+       (if (ansi-stream-p in)
+           (or (/= (the fixnum (ansi-stream-in-index in))
+                   +ansi-stream-in-buffer-length+)
+               (funcall (ansi-stream-misc in) in :listen))
+           (stream-misc-dispatch in :listen)))
+      (:unread (setf (echo-stream-unread-stuff stream) t)
+               (unread-char arg1 in))
       (:element-type
        (let ((in-type (stream-element-type in))
              (out-type (stream-element-type out)))
@@ -133,26 +133,25 @@
        ;; echo-stream specific, or PEEK-CHAR because it is peeking code.
        ;; -- mrd 2002-11-18
        ;;
-       ;; UNREAD-CHAR-P indicates whether the current character was one
-       ;; that was previously unread.  In that case, we need to ensure that
-       ;; the semantics for UNREAD-CHAR are held; the character should
-       ;; not be echoed again.
-       (let ((unread-char-p nil))
+       ;; UNREAD-P indicates whether the next character on IN was one
+       ;; that was previously unread.  In that case, we need to ensure
+       ;; that the semantics for UNREAD-CHAR are held; the character
+       ;; should not be echoed again.
+       (let ((unread-p nil)
+             ;; The first peek shouldn't touch the unread-stuff slot.
+             (initial-peek-p t))
          (flet ((outfn (c)
-                  (unless unread-char-p
+                  (unless unread-p
                     (if (ansi-stream-p out)
                         (funcall (ansi-stream-out out) out c)
                         ;; gray-stream
                         (stream-write-char out c))))
                 (infn ()
-                  ;; Obtain input from unread buffer or input stream,
-                  ;; and set the flag appropriately.
-                  (cond ((not (null (echo-stream-unread-stuff stream)))
-                         (setf unread-char-p t)
-                         (pop (echo-stream-unread-stuff stream)))
-                        (t
-                         (setf unread-char-p nil)
-                         (read-char in (first arg2) :eof)))))
+                  (if initial-peek-p
+                      (setf unread-p (echo-stream-unread-stuff stream))
+                      (setf (echo-stream-unread-stuff stream) nil))
+                  (setf initial-peek-p nil)
+                  (read-char in (first arg2) :eof)))
            (generalized-peeking-mechanism
             arg1 (second arg2) char
             (infn)
