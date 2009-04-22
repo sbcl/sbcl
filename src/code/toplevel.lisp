@@ -291,13 +291,13 @@ command-line.")
 (defvar +++ nil #!+sb-doc "the previous value of ++")
 (defvar -   nil #!+sb-doc "the form currently being evaluated")
 
-(defun interactive-eval (form)
+(defun interactive-eval (form &key (eval #'eval))
   #!+sb-doc
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
 +++, ++, +, ///, //, /, and -."
   (setf - form)
   (unwind-protect
-       (let ((results (multiple-value-list (eval form))))
+       (let ((results (multiple-value-list (funcall eval form))))
          (setf /// //
                // /
                / results

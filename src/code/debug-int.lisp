@@ -2565,6 +2565,15 @@ register."
             (debug-signal 'frame-fun-mismatch
                           :code-location loc :form form :frame frame))
           (funcall res frame))))))
+
+;;; EVAL-IN-FRAME
+
+(defun eval-in-frame (frame form)
+  (declare (type frame frame))
+  #!+sb-doc
+  "Evaluate FORM in the lexical context of FRAME's current code location,
+   returning the results of the evaluation."
+  (funcall (preprocess-for-eval form (frame-code-location frame)) frame))
 
 ;;;; breakpoints
 

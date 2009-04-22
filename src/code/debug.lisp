@@ -806,9 +806,21 @@ reset to ~S."
                        (t
                         (funcall cmd-fun))))))))))))
 
+(defvar *auto-eval-in-frame* t
+  #!+sb-doc
+  "When set (the default), evaluations in the debugger's command loop occur
+   relative to the current frame's environment without the need of debugger
+   forms that explicitly control this kind of evaluation.")
+
+(defun debug-eval (expr)
+  (if (and (fboundp 'compile) *auto-eval-in-frame*)
+      (sb!di:eval-in-frame *current-frame* expr)
+      (eval expr)))
+
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
-  (let ((values (multiple-value-list (interactive-eval expr))))
+  (let ((values (multiple-value-list
+                 (interactive-eval expr :eval #'debug-eval))))
     (/noshow "done with EVAL in DEBUG-EVAL-PRINT")
     (dolist (value values)
       (fresh-line *debug-io*)
