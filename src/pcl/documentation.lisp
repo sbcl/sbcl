@@ -60,7 +60,7 @@
            new-value))
     (function
      (let ((name (%fun-name x)))
-       (when (and name (typep name '(or symbol cons)))
+       (when (valid-function-name-p name)
          (setf (info :function :documentation name) new-value)))))
   new-value)
 
