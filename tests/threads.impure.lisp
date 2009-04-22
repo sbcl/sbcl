@@ -873,6 +873,9 @@
 |     (mp:make-process #'roomy)))
 |#
 
+;;; KLUDGE: No deadlines while waiting on lutex-based condition variables. This test
+;;; would just hang.
+#-sb-lutex
 (with-test (:name (:condition-variable :wait-multiple))
   (loop repeat 40 do
         (let ((waitqueue (sb-thread:make-waitqueue :name "Q"))
