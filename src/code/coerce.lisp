@@ -13,16 +13,17 @@
 
 (macrolet ((def (name result access src-type &optional typep)
              `(defun ,name (object ,@(if typep '(type) ()))
+                (declare (type ,(ecase src-type
+                                       (:list 'list)
+                                       (:vector 'vector)
+                                       (:sequence 'sequence)) object))
                 (do* ((index 0 (1+ index))
-                      (length (length (the ,(ecase src-type
-                                              (:list 'list)
-                                              (:vector 'vector)
-                                              (:sequence 'sequence))
-                                           object)))
+                      (length (length object))
                       (result ,result)
                       (in-object object))
-                     ((= index length) result)
+                     ((>= index length) result)
                   (declare (fixnum length index))
+                  (declare (type vector result))
                   (setf (,access result index)
                         ,(ecase src-type
                            (:list '(pop in-object))
@@ -39,12 +40,13 @@
     aref :sequence t))
 
 (defun vector-to-list* (object)
+  (declare (type vector object))
   (let ((result (list nil))
         (length (length object)))
     (declare (fixnum length))
     (do ((index 0 (1+ index))
          (splice result (cdr splice)))
-        ((= index length) (cdr result))
+        ((>= index length) (cdr result))
       (declare (fixnum index))
       (rplacd splice (list (aref object index))))))
 
