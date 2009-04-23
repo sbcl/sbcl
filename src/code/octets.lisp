@@ -135,26 +135,6 @@ one-past-the-end"
     (,definer aref (simple-array (unsigned-byte 8) (*)))
     (,definer sap-ref-8 system-area-pointer)))
 
-;;; maps into TO-SEQ from elements of FROM-SEQ via MAPPER.  MAPPER
-;;; returns two values: the number of elments stored in TO-SEQ, and
-;;; the number used up from FROM-SEQ.  MAPPER is responsible for
-;;; getting out if either sequence runs out of room.
-(declaim (inline varimap))
-(defun varimap (to-seq to-start to-end from-start from-end mapper)
-  (declare (optimize speed (safety 0))
-           (type array-range to-start to-end from-start from-end)
-           (type function mapper))
-  (loop with from-size of-type array-range = 0
-        and to-size of-type array-range = 0
-        for to-pos of-type array-range = to-start then (+ to-pos to-size)
-        for from-pos of-type array-range = from-start then (+ from-pos from-size)
-        while (and (< to-pos to-end)
-                   (< from-pos from-end))
-        do (multiple-value-bind (ts fs) (funcall mapper to-pos from-pos)
-             (setf to-size ts
-                   from-size fs))
-        finally (return (values to-seq to-pos from-pos))))
-
 ;;; FIXME: find out why the comment about SYMBOLICATE below is true
 ;;; and fix it, or else replace with SYMBOLICATE.
 ;;;
@@ -489,11 +469,11 @@ one-past-the-end"
                  (type ,type array)
                  (type array-range sstart send astart aend)
                  (function mapper))
-        (varimap string sstart send
-                 astart aend
-                 (lambda (spos apos)
-                   (setf (char string spos) (code-char (funcall mapper (,accessor array apos))))
-                   (values 1 1)))))))
+        (loop for spos from sstart below send
+           for apos from astart below aend
+           do (setf (char string spos)
+                    (code-char (funcall mapper (,accessor array apos))))
+           finally (return (values string spos apos)))))))
 (instantiate-octets-definition define-latin->string*)
 
 (defmacro define-latin1->string* (accessor type)
@@ -517,7 +497,7 @@ one-past-the-end"
 (defmacro define-latin->string (accessor type)
   (let ((name (make-od-name 'latin->string accessor)))
     `(progn
-      (declaim (inline latin->string))
+      (declaim (inline ,name))
       (defun ,name (array astart aend mapper)
         (declare (optimize speed (safety 0))
                  (type ,type array)
