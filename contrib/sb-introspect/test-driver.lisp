@@ -71,6 +71,10 @@
 (assert (matchp-name :method-combination 'cl-user::r 26))
 (assert (matchp-name :setf-expander 'cl-user::s 27))
 
+(let ((fin (make-instance 'sb-mop:funcallable-standard-object)))
+  (sb-mop:set-funcallable-instance-function fin #'cl-user::one)
+  (assert (matchp fin 2)))
+
 (sb-profile:profile cl-user::one)
 (assert (matchp-name :function 'cl-user::one 2))
 (sb-profile:unprofile cl-user::one)

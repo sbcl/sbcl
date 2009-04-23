@@ -71,7 +71,7 @@ include the pathname of the file and the position of the definition."
 
 (declaim (ftype (function (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
-  (let* ((function-object (sb-kernel::%closure-fun function))
+  (let* ((function-object (sb-kernel::%fun-fun function))
          (function-header (sb-kernel:fun-code-header function-object)))
     (sb-kernel:%code-debug-info function-header)))
 
@@ -556,7 +556,7 @@ constant pool."
     ((or null sb-impl::funcallable-instance)
      nil)
     (function
-     (sb-kernel::%closure-fun functoid))))
+     (sb-kernel::%fun-fun functoid))))
 
 (defun collect-xref (kind-index wanted-name)
   (let ((ret nil))
