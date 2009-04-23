@@ -1,5 +1,14 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.28 relative to 1.0.27:
+  * bug fix: pretty printing malformed DEFPACKAGE forms (thanks to Sidney
+    Markowitz)
+  * bug fix: running regressions tests in shells without OSTYPE set now works.
+    (reported by Harald Hanche-Olsen)
+  * bug fix: more robust static space exhaustion signalling from
+    MAKE-STATIC-VECTOR (thanks to Daniel Lowe)
+  * bug fix: (SETF DOCUMENTATION) for anonymous function now throws the
+    docstring away instead of storing it under names such as (LAMBDA (X)).
+    (reported by Leslie Polzer)
   * bug fix: timers could go off in the wrong order, be delayed indefinitely
     (thanks to Ole Arndt for the patch)
   * bug fix: RESTART-FRAME and RETURN-FROM-FRAME stack corruption

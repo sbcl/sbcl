@@ -200,5 +200,11 @@
   (assert (string= "#1=(#2=(#2# . #3=(#1# . #3#)))"
                    (with-output-to-string (s)
                      (write '#1=(#2=(#2# . #3=(#1# . #3#))) :stream s)))))
+
+;;; Printing malformed defpackage forms without errors.
+(with-test (:name :pprint-defpackage)
+  (with-open-stream (null (make-broadcast-stream))
+    (pprint '(defpackage :foo nil))
+    (pprint '(defpackage :foo 42))))
 
 ;;; success
