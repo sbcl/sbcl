@@ -476,7 +476,8 @@ of specialized arrays is supported."
 (defun data-vector-ref-with-offset (array index offset)
   (hairy-data-vector-ref array (+ index offset)))
 
-(declaim (ftype (function (array integer integer &optional t) nil) signal-invalid-array-index-error))
+(declaim (ftype (function (array integer integer &optional t) nil)
+                invalid-array-index-error))
 (defun invalid-array-index-error (array index bound &optional axis)
   (error 'invalid-array-index-error
          :array array

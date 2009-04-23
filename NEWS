@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.28 relative to 1.0.27:
+  * bug fix: some error messages for out-of-bound array indexes confused the
+    index and the bound. (thanks to Stas Boukarev)
   * bug fix: pretty printing malformed DEFPACKAGE forms (thanks to Sidney
     Markowitz)
   * bug fix: running regressions tests in shells without OSTYPE set now works.

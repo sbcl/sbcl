@@ -261,3 +261,16 @@
                         (= 3 (type-error-datum e))
                         (equal '(integer 0 (3)) (type-error-expected-type e)))
                :right)))))))
+
+(with-test (:name :out-of-bounds-error-details)
+  (assert (eq :good
+              (handler-case
+                  (flet ((test (array i)
+                           (aref array i)))
+                    (test (eval '(vector 0 1 2 3)) 6))
+                (sb-int:invalid-array-index-error (e)
+                  (when (and (equal '(integer 0 (4))
+                                    (type-error-expected-type e))
+                             (eql 6 (type-error-datum e)))
+                    :good))))))
+

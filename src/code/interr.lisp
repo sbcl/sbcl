@@ -260,7 +260,7 @@
          :format-arguments (list key-name)))
 
 (deferr invalid-array-index-error (array bound index)
-  (invalid-array-index-error array bound index))
+  (invalid-array-index-error array index bound))
 
 (deferr object-not-simple-array-error (object)
   (error 'type-error
