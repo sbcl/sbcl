@@ -1,5 +1,15 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.28 relative to 1.0.27:
+  * minor incompatible changes: echo-streams now propagate unread-char to the
+    underlying input stream, and no longer permit unreading more than one
+    character.
+  * improvement: on x86/x86-64 Lisp call frames now have the same layout as C
+    frames, allowing for instance more reliable backtraces.
+  * improvement: the debugger REPL can now reference lexical variables
+    by name directly for code compiled with (DEBUG 3).
+  * improvement: errors from malformed declarations now have better source
+    paths associated with them. (thanks to Tobias Rittweiler)
+  * optimization: faster local calls on x86/x86-64
   * bug fix: some error messages for out-of-bound array indexes confused the
     index and the bound. (thanks to Stas Boukarev)
   * bug fix: pretty printing malformed DEFPACKAGE forms (thanks to Sidney
@@ -16,14 +26,6 @@ changes in sbcl-1.0.28 relative to 1.0.27:
   * bug fix: RESTART-FRAME and RETURN-FROM-FRAME stack corruption
   * bug fix: the discriminating function for PRINT-OBJECT no longer preserves
     potentially-invalid effective methods in its cache.
-  * improvement: on x86/x86-64 Lisp call frames now have the same layout as C
-    frames, allowing for instance more reliable backtraces.
-  * optimization: faster local calls on x86/x86-64
-  * minor incompatible changes: echo-streams now propagate unread-char to the
-    underlying input stream, and no longer permit unreading more than one
-    character.
-  * improvement: the debugger REPL can now reference lexical variables
-    by name directly for code compiled with (DEBUG 3).
 
 changes in sbcl-1.0.27 relative to 1.0.26:
   * new port: support added for x86-64 OpenBSD. (thanks to Josh Elsasser)

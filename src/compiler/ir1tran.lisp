@@ -1470,14 +1470,20 @@
         (*post-binding-variable-lexenv* nil))
     (dolist (decl decls)
       (dolist (spec (rest decl))
-        (unless (consp spec)
-          (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
-        (multiple-value-bind (new-env new-result-type)
-            (process-1-decl spec lexenv vars fvars binding-form-p context)
-          (setq lexenv new-env)
-          (unless (eq new-result-type *wild-type*)
-            (setq result-type
-                  (values-type-intersection result-type new-result-type))))))
+        (progv
+            ;; Kludge: EVAL calls this function to deal with LOCALLY.
+            (when (eq context :compile) (list '*current-path*))
+            (when (eq context :compile) (list (or (get-source-path spec)
+                                                  (get-source-path decl)
+                                                  *current-path*)))
+          (unless (consp spec)
+            (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
+          (multiple-value-bind (new-env new-result-type)
+              (process-1-decl spec lexenv vars fvars binding-form-p context)
+            (setq lexenv new-env)
+            (unless (eq new-result-type *wild-type*)
+              (setq result-type
+                    (values-type-intersection result-type new-result-type)))))))
     (values lexenv result-type *post-binding-variable-lexenv*)))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
