@@ -315,5 +315,5 @@
                         (level int)
                         (optname int)
                         (optval (* t))
-                        (optlen (* int))))) ;;; should be socklen-t!
-)
+                        (optlen (* int)))) ;;; should be socklen-t!
+ )
