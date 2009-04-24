@@ -457,7 +457,7 @@
     (let* ((forms (if for-value `(,form) `(,form nil)))
            (res (ir1-convert-lambda-body
                  forms ()
-                 :debug-name (debug-name 'top-level-form form))))
+                 :debug-name (debug-name 'top-level-form #+sb-xc-host nil #-sb-xc-host form))))
       (setf (functional-entry-fun res) res
             (functional-arg-documentation res) ()
             (functional-kind res) :toplevel)
@@ -707,8 +707,7 @@
                       (not (fun-lexically-notinline-p cmacro-fun-name)))
                  (let ((res (careful-expand-macro cmacro-fun form)))
                    (if (eq res form)
-                       (ir1-convert-common-functoid start next result form
-                                                    op)
+                       (ir1-convert-common-functoid start next result form op)
                        (ir1-convert start next result res)))
                  (ir1-convert-common-functoid start next result form op)))))))
 

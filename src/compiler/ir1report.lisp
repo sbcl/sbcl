@@ -432,12 +432,13 @@ has written, having proved that it is unreachable."))
   (let ((ep (first (block-succ (component-head component)))))
     (aver ep) ; else no entry points??
     (multiple-value-bind (form context)
-        (find-original-source
-         (node-source-path (block-start-node ep)))
+        (find-original-source (node-source-path (block-start-node ep)))
       (declare (ignore form))
       (let ((*print-level* 2)
             (*print-pretty* nil))
-        (format nil "~{~{~S~^ ~}~^ => ~}" context)))))
+        (format nil "~{~{~S~^ ~}~^ => ~}"
+                #+sb-xc-host (list (list (caar context)))
+                #-sb-xc-host context)))))
 
 ;;;; condition system interface
 
