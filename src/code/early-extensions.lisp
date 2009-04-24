@@ -878,18 +878,18 @@
 ;;; guts of complex systems anyway, I replaced it too.)
 (defmacro aver (expr)
   `(unless ,expr
-     (%failed-aver ,(format nil "~A" expr))))
+     (%failed-aver ',expr)))
 
-(defun %failed-aver (expr-as-string)
+(defun %failed-aver (expr)
   ;; hackish way to tell we're in a cold sbcl and output the
-  ;; message before signallign error, as it may be this is too
+  ;; message before signalling error, as it may be this is too
   ;; early in the cold init.
   (when (find-package "SB!C")
     (fresh-line)
     (write-line "failed AVER:")
-    (write-line expr-as-string)
+    (write expr)
     (terpri))
-  (bug "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
+  (bug "~@<failed AVER: ~2I~_~A~:>" expr))
 
 (defun bug (format-control &rest format-arguments)
   (error 'bug
