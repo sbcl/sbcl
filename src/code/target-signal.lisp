@@ -210,6 +210,11 @@
   (declare (ignore signal code context))
   (sb!thread::run-interruption))
 
+;;; the handler for SIGCHLD signals for RUN-PROGRAM
+(defun sigchld-handler  (signal code context)
+  (declare (ignore signal code context))
+  (sb!impl::get-processes-status-changes))
+
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
   "Enable all the default signals that Lisp knows how to deal with."
@@ -224,6 +229,7 @@
   (enable-interrupt sigsys #'sigsys-handler)
   (enable-interrupt sigalrm #'sigalrm-handler)
   (enable-interrupt sigpipe #'sigpipe-handler)
+  (enable-interrupt sigchld #'sigchld-handler)
   #!+hpux (ignore-interrupt sigxcpu)
   (unblock-gc-signals)
   (unblock-deferrable-signals)

@@ -97,23 +97,23 @@
 ;;;; Import wait3(2) from Unix.
 
 #-win32
-(define-alien-routine ("wait3" c-wait3) sb-alien:int
+(define-alien-routine ("waitpid" c-waitpid) sb-alien:int
+  (pid sb-alien:int)
   (status sb-alien:int :out)
-  (options sb-alien:int)
-  (rusage sb-alien:int))
+  (options sb-alien:int))
 
 #-win32
-(defun wait3 (&optional do-not-hang check-for-stopped)
+(defun waitpid (pid &optional do-not-hang check-for-stopped)
   #+sb-doc
-  "Return any available status information on child process. "
+  "Return any available status information on child process with PID."
   (multiple-value-bind (pid status)
-      (c-wait3 (logior (if do-not-hang
-                           sb-unix:wnohang
-                           0)
-                       (if check-for-stopped
-                           sb-unix:wuntraced
-                           0))
-               0)
+      (c-waitpid pid
+                 (logior (if do-not-hang
+                             sb-unix:wnohang
+                             0)
+                         (if check-for-stopped
+                             sb-unix:wuntraced
+                             0)))
     (cond ((or (minusp pid)
                (zerop pid))
            nil)
@@ -154,7 +154,7 @@
 ;;; accesses it, that's why we need without-interrupts.
 (defmacro with-active-processes-lock (() &body body)
   #-win32
-  `(sb-thread::with-system-mutex (*active-processes-lock* :allow-with-interrupts t)
+  `(sb-thread::with-system-mutex (*active-processes-lock*)
      ,@body)
   #+win32
   `(progn ,@body))
@@ -320,36 +320,28 @@ status slot."
    (setf *active-processes* (delete process *active-processes*)))
   process)
 
-;;; the handler for SIGCHLD signals that RUN-PROGRAM establishes
-#-win32
-(defun sigchld-handler (ignore1 ignore2 ignore3)
-  (declare (ignore ignore1 ignore2 ignore3))
-  (get-processes-status-changes))
-
 (defun get-processes-status-changes ()
-  #-win32
-  (loop
-   (multiple-value-bind (pid what code core)
-       (wait3 t t)
-     (unless pid
-       (return))
-     (let ((proc (with-active-processes-lock ()
-                   (find pid *active-processes* :key #'process-pid))))
-       (when proc
-         (setf (process-%status proc) what)
-         (setf (process-exit-code proc) code)
-         (setf (process-core-dumped proc) core)
-         (when (process-status-hook proc)
-           (funcall (process-status-hook proc) proc))
-         (when (position what #(:exited :signaled))
-           (with-active-processes-lock ()
-             (setf *active-processes*
-                   (delete proc *active-processes*))))))))
-  #+win32
   (let (exited)
     (with-active-processes-lock ()
       (setf *active-processes*
-            (delete-if (lambda (proc)
+            (delete-if #-win32
+                       (lambda (proc)
+                         ;; Wait only on pids belonging to processes
+                         ;; started by RUN-PROGRAM. There used to be a
+                         ;; WAIT3 call here, but that makes direct
+                         ;; WAIT, WAITPID usage impossible due to the
+                         ;; race with the SIGCHLD signal handler.
+                         (multiple-value-bind (pid what code core)
+                             (waitpid (process-pid proc) t t)
+                           (when pid
+                             (setf (process-%status proc) what)
+                             (setf (process-exit-code proc) code)
+                             (setf (process-core-dumped proc) core)
+                             (when (process-status-hook proc)
+                               (push proc exited))
+                             t)))
+                       #+win32
+                       (lambda (proc)
                          (multiple-value-bind (ok code)
                              (get-exit-code-process (process-pid proc))
                            (when (and (plusp ok) (/= code 259))
@@ -361,8 +353,8 @@ status slot."
                        *active-processes*)))
     ;; Can't call the hooks before all the processes have been deal
     ;; with, as calling a hook may cause re-entry to
-    ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using wait3,
-    ;; but in the Windows implementation is would be deeply bad.
+    ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using waitpid,
+    ;; but in the Windows implementation it would be deeply bad.
     (dolist (proc exited)
       (let ((hook (process-status-hook proc)))
         (when hook
@@ -673,9 +665,6 @@ Users Manual for details about the PROCESS structure."#-win32"
   #-win32
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
-  ;; Make sure that the interrupt handler is installed.
-  #-win32
-  (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
   (labels (;; It's friendly to allow the caller to pass any string
@@ -727,7 +716,8 @@ Users Manual for details about the PROCESS structure."#-win32"
                                       (values stdout output-stream)
                                       (get-descriptor-for ,@args))))
                            ,@body))
-                      (with-open-pty (((pty-name pty-stream) (pty cookie)) &body body)
+                      (with-open-pty (((pty-name pty-stream) (pty cookie))
+                                      &body body)
                         #+win32 `(declare (ignore ,pty ,cookie))
                         #+win32 `(let (,pty-name ,pty-stream) ,@body)
                         #-win32 `(multiple-value-bind (,pty-name ,pty-stream)
@@ -759,34 +749,37 @@ Users Manual for details about the PROCESS structure."#-win32"
                      ;; Make sure we are not notified about the child
                      ;; death before we have installed the PROCESS
                      ;; structure in *ACTIVE-PROCESSES*.
-                     (with-active-processes-lock ()
-                       (with-args-vec (args-vec simple-args)
-                         (with-environment-vec (environment-vec environment)
-                           (let ((child
-                                  (without-gcing
-                                    (spawn progname args-vec
-                                           stdin stdout stderr
-                                           (if search 1 0)
-                                           environment-vec pty-name
-                                           (if wait 1 0)))))
-                             (when (= child -1)
-                               (error "couldn't fork child process: ~A"
-                                      (strerror)))
-                             (setf proc (apply
-                                         #'make-process
-                                         :pid child
-                                         :input input-stream
-                                         :output output-stream
-                                         :error error-stream
-                                         :status-hook status-hook
-                                         :cookie cookie
-                                         #-win32 (list :pty pty-stream
-                                                       :%status :running)
-                                         #+win32 (if wait
-                                                     (list :%status :exited
-                                                           :exit-code child)
-                                                     (list :%status :running))))
-                             (push proc *active-processes*))))))))))
+                     (let (child)
+                       (with-active-processes-lock ()
+                         (with-args-vec (args-vec simple-args)
+                           (with-environment-vec (environment-vec environment)
+                             (setq child (without-gcing
+                                           (spawn progname args-vec
+                                                  stdin stdout stderr
+                                                  (if search 1 0)
+                                                  environment-vec pty-name
+                                                  (if wait 1 0))))
+                             (when (plusp child)
+                               (setf proc
+                                     (apply
+                                      #'make-process
+                                      :pid child
+                                      :input input-stream
+                                      :output output-stream
+                                      :error error-stream
+                                      :status-hook status-hook
+                                      :cookie cookie
+                                      #-win32 (list :pty pty-stream
+                                                    :%status :running)
+                                      #+win32 (if wait
+                                                  (list :%status :exited
+                                                        :exit-code child)
+                                                  (list :%status :running))))
+                               (push proc *active-processes*)))))
+                       ;; Report the error outside the lock.
+                       (when (= child -1)
+                         (error "couldn't fork child process: ~A"
+                                (strerror)))))))))
         (dolist (fd *close-in-parent*)
           (sb-unix:unix-close fd))
         (unless proc

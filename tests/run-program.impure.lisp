@@ -120,3 +120,18 @@
                                        :search t :wait t)))
     (when file
       (delete-file file))))
+
+;;; This used to crash on Darwin and trigger recursive lock errors on
+;;; every platform.
+(with-test (:name (:run-program :stress))
+  ;; Do it a hundred times in batches of 10 so that with a low limit
+  ;; of the number of processes the test can have a chance to pass.
+  (loop
+   repeat 10 do
+   (map nil
+        #'sb-ext:process-wait
+        (loop repeat 10
+              collect
+              (sb-ext:run-program "/bin/echo" '
+                                  ("It would be nice if this didn't crash.")
+                                  :wait nil :output nil)))))
