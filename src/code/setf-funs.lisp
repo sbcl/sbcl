@@ -42,11 +42,16 @@
                    (or (info :setf :inverse sym)
                        (info :setf :expander sym))
                    (not (member sym ignore)))
-          (let ((type (type-specifier (info :function :type sym))))
-            (aver (consp type))
-            #!-sb-fluid (res `(declaim (inline (setf ,sym))))
-            (res (compute-one-setter sym type))))))
-    `(progn ,@(res))))
+          (res sym))))
+    `(progn
+      ,@(mapcan
+         (lambda (sym)
+           (let ((type (type-specifier (info :function :type sym))))
+             (aver (consp type))
+             (list
+              #!-sb-fluid `(declaim (inline (setf ,sym)))
+              (compute-one-setter sym type))))
+         (sort (res) #'string<)))))
 
 ) ; EVAL-WHEN
 

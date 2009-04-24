@@ -64,7 +64,7 @@
     #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
     (:or signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))
   (!def-primitive-type-alias untagged-num
-    (:or . #.(print (union (cdr '#1#) (cdr '#2#))))))
+    (:or . #.(sort (copy-list (union (cdr '#1#) (cdr '#2#))) #'string<))))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")

@@ -1458,7 +1458,7 @@ the first."
       (do-mfuns sb!c::*untagged-unsigned-modular-class*)
       (do-mfuns sb!c::*untagged-signed-modular-class*)
       (do-mfuns sb!c::*tagged-modular-class*)))
-  `(progn ,@(forms)))
+  `(progn ,@(sort (forms) #'string< :key #'cadr)))
 
 ;;; KLUDGE: these out-of-line definitions can't use the modular
 ;;; arithmetic, as that is only (currently) defined for constant
