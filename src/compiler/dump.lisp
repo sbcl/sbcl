@@ -974,6 +974,15 @@
   (let* ((pname (symbol-name s))
          (pname-length (length pname))
          (pkg (symbol-package s)))
+    ;; see comment in genesis: we need this here for repeatable fasls
+    #+sb-xc-host
+    (multiple-value-bind (cl-symbol cl-status)
+        (find-symbol (symbol-name s) sb!int:*cl-package*)
+      (when (and (eq s cl-symbol)
+                 (eq cl-status :external))
+        ;; special case, to work around possible xc host "design
+        ;; choice" weirdness in COMMON-LISP package
+        (setq pkg sb!int:*cl-package*)))
 
     (cond ((null pkg)
            (dump-fop* pname-length

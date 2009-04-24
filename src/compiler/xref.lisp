@@ -152,12 +152,17 @@
          (member (symbol-package what)
                  (load-time-value (list* (find-package "COMMON-LISP")
                                          (find-package "KEYWORD")
+                                         #+sb-xc-host (find-package "SB-XC")
                                          (remove-if-not
                                           (lambda (package)
                                             (= (mismatch "SB!"
                                                          (package-name package))
                                                3))
-                                          (list-all-packages)))))))
+                                          (list-all-packages)))))
+         #+sb-xc-host ; again, special case like in genesis and dump
+         (multiple-value-bind (cl-symbol cl-status)
+             (find-symbol (symbol-name what) sb!int:*cl-package*)
+           (and (eq what cl-symbol) (eq cl-status :external)))))
     (t t)))
 
 (defun record-xref (kind what context node path)
