@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes in sbcl-1.0.28 relative to 1.0.27:
+  * a number of bugs in cross-compilation have been fixed, with the ultimate
+    result that building under (at least) clisp should be much more reliable.
   * minor incompatible changes: echo-streams now propagate unread-char to the
     underlying input stream, and no longer permit unreading more than one
     character.

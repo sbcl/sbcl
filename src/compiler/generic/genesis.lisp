@@ -86,7 +86,8 @@
   `(simple-array (unsigned-byte 8) (,+smallvec-length+)))
 
 (defun make-smallvec ()
-  (make-array +smallvec-length+ :element-type '(unsigned-byte 8)))
+  (make-array +smallvec-length+ :element-type '(unsigned-byte 8)
+              :initial-element 0))
 
 ;;; a big vector, implemented as a vector of SMALLVECs
 ;;;
@@ -918,46 +919,8 @@ core and return a descriptor to it."
     ;; Set slot 0 = the layout of the layout.
     (write-wordindexed result sb!vm:instance-slots-offset *layout-layout*)
 
-    ;; Set the CLOS hash value.
+    ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
-    ;; Note: CMU CL didn't set these in genesis, but instead arranged
-    ;; for them to be set at cold init time. That resulted in slightly
-    ;; kludgy-looking code, but there were at least two things to be
-    ;; said for it:
-    ;;   1. It put the hash values under the control of the target Lisp's
-    ;;      RANDOM function, so that CLOS behavior would be nearly
-    ;;      deterministic (instead of depending on the implementation of
-    ;;      RANDOM in the cross-compilation host, and the state of its
-    ;;      RNG when genesis begins).
-    ;;   2. It automatically ensured that all hash values in the target Lisp
-    ;;      were part of the same sequence, so that we didn't have to worry
-    ;;      about the possibility of the first hash value set in genesis
-    ;;      being precisely equal to the some hash value set in cold init time
-    ;;      (because the target Lisp RNG has advanced to precisely the same
-    ;;      state that the host Lisp RNG was in earlier).
-    ;; Point 1 should not be an issue in practice because of the way we do our
-    ;; build procedure in two steps, so that the SBCL that we end up with has
-    ;; been created by another SBCL (whose RNG is under our control).
-    ;; Point 2 is more of an issue. If ANSI had provided a way to feed
-    ;; entropy into an RNG, we would have no problem: we'd just feed
-    ;; some specialized genesis-time-only pattern into the RNG state
-    ;; before using it. However, they didn't, so we have a slight
-    ;; problem. We address it by generating the hash values using a
-    ;; different algorithm than we use in ordinary operation.
-    (let (;; The expression here is pretty arbitrary, we just want
-          ;; to make sure that it's not something which is (1)
-          ;; evenly distributed and (2) not foreordained to arise in
-          ;; the target Lisp's (RANDOM-LAYOUT-CLOS-HASH) sequence
-          ;; and show up as the CLOS-HASH value of some other
-          ;; LAYOUT.
-          (hash-value
-           (1+ (mod (logxor (logand   (random-layout-clos-hash) 15253)
-                            (logandc2 (random-layout-clos-hash) 15253)
-                            1)
-                    (1- sb!kernel:layout-clos-hash-limit)))))
-      (cold-set-layout-slot result 'clos-hash
-                            (make-fixnum-descriptor hash-value)))
-
     ;; Set other slot values.
     ;;
     ;; leave CLASSOID uninitialized for now
@@ -1245,13 +1208,21 @@ core and return a descriptor to it."
 ;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
 ;;; to be stored in *!INITIAL-LAYOUTS*.
 (defun cold-list-all-layouts ()
-  (let ((result *nil-descriptor*))
+  (let ((layouts nil)
+        (result *nil-descriptor*))
     (maphash (lambda (key stuff)
-               (cold-push (cold-cons (cold-intern key)
-                                     (first stuff))
-                          result))
+               (push (cons key (first stuff)) layouts))
              *cold-layouts*)
-    result))
+    (flet ((sorter (x y)
+             (let ((xpn (package-name (symbol-package-for-target-symbol x)))
+                   (ypn (package-name (symbol-package-for-target-symbol y))))
+               (cond
+                 ((string= x y) (string< xpn ypn))
+                 (t (string< x y))))))
+      (setq layouts (sort layouts #'sorter :key #'car)))
+    (dolist (layout layouts result)
+      (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
+                 result))))
 
 ;;; Establish initial values for magic symbols.
 ;;;
@@ -1288,7 +1259,15 @@ core and return a descriptor to it."
       (let* ((cold-package (car cold-package-symbols-entry))
              (symbols (cdr cold-package-symbols-entry))
              (shadows (package-shadowing-symbols cold-package))
-             (documentation (base-string-to-core (documentation cold-package t)))
+             (documentation (base-string-to-core
+                             ;; KLUDGE: NIL punned as 0-length string.
+                             (unless
+                                 ;; don't propagate the arbitrary
+                                 ;; docstring from host packages into
+                                 ;; the core
+                                 (or (eql cold-package *cl-package*)
+                                     (eql cold-package *keyword-package*))
+                               (documentation cold-package t))))
              (internal-count 0)
              (external-count 0)
              (internal *nil-descriptor*)
@@ -1542,12 +1521,23 @@ core and return a descriptor to it."
                  sym nil offset desired))))))
 
 (defun list-all-fdefn-objects ()
-  (let ((result *nil-descriptor*))
+  (let ((fdefns nil)
+        (result *nil-descriptor*))
     (maphash (lambda (key value)
-               (declare (ignore key))
-               (cold-push value result))
+               (push (cons key value) fdefns))
              *cold-fdefn-objects*)
-    result))
+    (flet ((sorter (x y)
+             (let* ((xbn (fun-name-block-name x))
+                    (ybn (fun-name-block-name y))
+                    (xbnpn (package-name (symbol-package-for-target-symbol xbn)))
+                    (ybnpn (package-name (symbol-package-for-target-symbol ybn))))
+               (cond
+                 ((eql xbn ybn) (consp x))
+                 ((string= xbn ybn) (string< xbnpn ybnpn))
+                 (t (string< xbn ybn))))))
+      (setq fdefns (sort fdefns #'sorter :key #'car)))
+    (dolist (fdefn fdefns result)
+      (cold-push (cdr fdefn) result))))
 
 ;;;; fixups and related stuff
 
@@ -1657,23 +1647,29 @@ core and return a descriptor to it."
 
 #!+x86
 (defun output-load-time-code-fixups ()
-  (maphash
-   (lambda (code-object-address fixup-offsets)
-     (let ((fixup-vector
-            (allocate-vector-object
-             *dynamic* sb!vm:n-word-bits (length fixup-offsets)
-             sb!vm:simple-array-unsigned-byte-32-widetag)))
-       (do ((index sb!vm:vector-data-offset (1+ index))
-            (fixups fixup-offsets (cdr fixups)))
-           ((null fixups))
-         (write-wordindexed fixup-vector index
-                            (make-random-descriptor (car fixups))))
-       ;; KLUDGE: The fixup vector is stored as the first constant,
-       ;; not as a separately-named slot.
-       (write-wordindexed (make-random-descriptor code-object-address)
-                          sb!vm:code-constants-offset
-                          fixup-vector)))
-   *load-time-code-fixups*))
+  (let ((fixup-infos nil))
+    (maphash
+     (lambda (code-object-address fixup-offsets)
+       (push (cons code-object-address fixup-offsets) fixup-infos))
+     *load-time-code-fixups*)
+    (setq fixup-infos (sort fixup-infos #'< :key #'car))
+    (dolist (fixup-info fixup-infos)
+      (let ((code-object-address (car fixup-info))
+            (fixup-offsets (cdr fixup-info)))
+        (let ((fixup-vector
+               (allocate-vector-object
+                *dynamic* sb!vm:n-word-bits (length fixup-offsets)
+                sb!vm:simple-array-unsigned-byte-32-widetag)))
+          (do ((index sb!vm:vector-data-offset (1+ index))
+               (fixups fixup-offsets (cdr fixups)))
+              ((null fixups))
+            (write-wordindexed fixup-vector index
+                               (make-random-descriptor (car fixups))))
+          ;; KLUDGE: The fixup vector is stored as the first constant,
+          ;; not as a separately-named slot.
+          (write-wordindexed (make-random-descriptor code-object-address)
+                             sb!vm:code-constants-offset
+                             fixup-vector))))))
 
 ;;; Given a pointer to a code object and an offset relative to the
 ;;; tail of the code object's header, return an offset relative to the
@@ -1897,15 +1893,19 @@ core and return a descriptor to it."
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
 ;;; target-load.lisp refers to.
 (defun foreign-symbols-to-core ()
-  (let ((result *nil-descriptor*))
+  (let ((symbols nil)
+        (result *nil-descriptor*))
     (maphash (lambda (symbol value)
-               (cold-push (cold-cons (base-string-to-core symbol)
-                                     (number-to-core value))
-                          result))
+               (push (cons symbol value) symbols))
              *cold-foreign-symbol-table*)
+    (setq symbols (sort symbols #'string< :key #'car))
+    (dolist (symbol symbols)
+      (cold-push (cold-cons (base-string-to-core (car symbol))
+                            (number-to-core (cdr symbol)))
+                 result))
     (cold-set (cold-intern 'sb!kernel:*!initial-foreign-symbols*) result))
   (let ((result *nil-descriptor*))
-    (dolist (rtn *cold-assembler-routines*)
+    (dolist (rtn (sort (copy-list *cold-assembler-routines*) #'string< :key #'car))
       (cold-push (cold-cons (cold-intern (car rtn))
                             (number-to-core (cdr rtn)))
                  result))

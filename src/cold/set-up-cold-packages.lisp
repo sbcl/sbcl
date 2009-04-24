@@ -60,8 +60,6 @@
                        ;; cold init.
                        :nicknames nil
                        :use nil)))
-        #-clisp ; As of "2.27 (released 2001-07-17) (built 3215971334)"
-                ; CLISP didn't support DOCUMENTATION on PACKAGE values.
         (progn
           #!+sb-doc (setf (documentation package t)
                           (package-data-doc package-data)))

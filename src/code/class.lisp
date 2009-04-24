@@ -106,6 +106,7 @@
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
                  (dolist (x *!initial-layouts*)
+                   (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))
                    (setf (gethash (car x) *forward-referenced-layouts*)
                          (cdr x)))
                  (/show0 "done processing *!INITIAL-LAYOUTS*")))
