@@ -153,7 +153,8 @@
            (list
             (symbolicate "OBJECT-NOT-" (sb!vm:saetp-primitive-type-name saetp))
             (format nil "Object is not of type ~A."
-                    (specifier-type
-                     `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
+                    (type-specifier
+                     (specifier-type
+                      `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))))))
          sb!vm:*specialized-array-element-type-properties*))
 

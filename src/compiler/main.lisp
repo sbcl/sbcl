@@ -805,7 +805,8 @@
 ;;; error condition (possibly recording some extra location
 ;;; information).
 (defun read-for-compile-file (stream position)
-  (handler-case (read stream nil stream)
+  (handler-case
+      (read-preserving-whitespace stream nil stream)
     (reader-error (condition)
      (error 'input-error-in-compile-file
             :condition condition
