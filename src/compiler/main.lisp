@@ -1550,7 +1550,7 @@
         ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
         (*info-environment* *info-environment*)
         (*compiler-sset-counter* 0)
-        (*gensym-counter* 0))
+        (sb!xc:*gensym-counter* 0))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values

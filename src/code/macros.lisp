@@ -452,13 +452,8 @@ invoked. In that case it will store into PLACE and start over."
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
   (if (integerp n)
-      (let ((dummy-list nil)
-            (keeper (gensym "KEEPER-")))
-        ;; We build DUMMY-LIST, a list of variables to bind to useless
-        ;; values, then we explicitly IGNORE those bindings and return
-        ;; KEEPER, the only thing we're really interested in right now.
-        (dotimes (i n)
-          (push (gensym "IGNORE-") dummy-list))
+      (let ((dummy-list (make-gensym-list n))
+            (keeper (sb!xc:gensym "KEEPER")))
         `(multiple-value-bind (,@dummy-list ,keeper) ,form
            (declare (ignore ,@dummy-list))
            ,keeper))

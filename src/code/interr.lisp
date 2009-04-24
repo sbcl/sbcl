@@ -22,40 +22,38 @@
 (sb!xc:defmacro deferr (name args &rest body)
   (let* ((rest-pos (position '&rest args))
          (required (if rest-pos (subseq args 0 rest-pos) args))
-         (fp (gensym))
-         (context (gensym))
-         (sc-offsets (gensym))
          (fn-name (symbolicate name "-HANDLER")))
-    `(progn
-       ;; FIXME: Having a separate full DEFUN for each error doesn't
-       ;; seem to add much value, and it takes a lot of space. Perhaps
-       ;; we could do this dispatch with a big CASE statement instead?
-       (defun ,fn-name (name ,fp ,context ,sc-offsets)
-         ;; FIXME: It would probably be good to do *STACK-TOP-HINT*
-         ;; tricks to hide this internal error-handling logic from the
-         ;; poor high level user, so his debugger tells him about
-         ;; where his error was detected instead of telling him where
-         ;; he ended up inside the system error-handling logic.
-         (declare (ignorable name ,fp ,context ,sc-offsets))
-         (let (,@(let ((offset -1))
-                   (mapcar (lambda (var)
-                             `(,var (sb!di::sub-access-debug-var-slot
-                                     ,fp
-                                     (nth ,(incf offset)
-                                          ,sc-offsets)
-                                     ,context)))
-                           required))
-               ,@(when rest-pos
-                   `((,(nth (1+ rest-pos) args)
-                      (mapcar (lambda (sc-offset)
-                                (sb!di::sub-access-debug-var-slot
-                                 ,fp
-                                 sc-offset
-                                 ,context))
-                              (nthcdr ,rest-pos ,sc-offsets))))))
-           ,@body))
-       (setf (svref *internal-errors* ,(error-number-or-lose name))
-             #',fn-name))))
+    (with-unique-names (fp context sc-offsets)
+      `(progn
+         ;; FIXME: Having a separate full DEFUN for each error doesn't
+         ;; seem to add much value, and it takes a lot of space. Perhaps
+         ;; we could do this dispatch with a big CASE statement instead?
+         (defun ,fn-name (name ,fp ,context ,sc-offsets)
+           ;; FIXME: It would probably be good to do *STACK-TOP-HINT*
+           ;; tricks to hide this internal error-handling logic from the
+           ;; poor high level user, so his debugger tells him about
+           ;; where his error was detected instead of telling him where
+           ;; he ended up inside the system error-handling logic.
+           (declare (ignorable name ,fp ,context ,sc-offsets))
+           (let (,@(let ((offset -1))
+                        (mapcar (lambda (var)
+                                  `(,var (sb!di::sub-access-debug-var-slot
+                                          ,fp
+                                          (nth ,(incf offset)
+                                           ,sc-offsets)
+                                          ,context)))
+                                required))
+                 ,@(when rest-pos
+                     `((,(nth (1+ rest-pos) args)
+                        (mapcar (lambda (sc-offset)
+                                  (sb!di::sub-access-debug-var-slot
+                                   ,fp
+                                   sc-offset
+                                   ,context))
+                         (nthcdr ,rest-pos ,sc-offsets))))))
+             ,@body))
+        (setf (svref *internal-errors* ,(error-number-or-lose name))
+              #',fn-name)))))
 
 ) ; EVAL-WHEN
 

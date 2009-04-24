@@ -41,7 +41,7 @@
                (sb!xc:macroexpand-1 form environment)
              (if expanded
                  (sb!xc:get-setf-expansion expansion environment)
-                 (let ((new-var (gensym "NEW")))
+                 (let ((new-var (sb!xc:gensym "NEW")))
                    (values nil nil (list new-var)
                            `(setq ,form ,new-var) form)))))
           ;; Local functions inhibit global SETF methods.
@@ -104,7 +104,7 @@ GET-SETF-EXPANSION directly."
                                  environment))))
 
 (defun get-setf-method-inverse (form inverse setf-fun environment)
-  (let ((new-var (gensym "NEW"))
+  (let ((new-var (sb!xc:gensym "NEW"))
         (vars nil)
         (vals nil)
         (args nil))
@@ -404,21 +404,19 @@ GET-SETF-EXPANSION directly."
          (destructuring-bind
              (lambda-list (&rest store-variables) &body body)
              rest
-           (let ((whole-var (gensym "WHOLE-"))
-                 (access-form-var (gensym "ACCESS-FORM-"))
-                 (env-var (gensym "ENVIRONMENT-")))
+           (with-unique-names (whole access-form environment)
              (multiple-value-bind (body local-decs doc)
                  (parse-defmacro `(,lambda-list ,@store-variables)
-                                 whole-var body access-fn 'defsetf
-                                 :environment env-var
+                                 whole body access-fn 'defsetf
+                                 :environment environment
                                  :anonymousp t)
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (assign-setf-macro
                    ',access-fn
-                   (lambda (,access-form-var ,env-var)
+                   (lambda (,access-form ,environment)
                      ,@local-decs
-                     (%defsetf ,access-form-var ,(length store-variables)
-                               (lambda (,whole-var)
+                     (%defsetf ,access-form ,(length store-variables)
+                               (lambda (,whole)
                                  ,body)))
                    nil
                    ',doc))))))

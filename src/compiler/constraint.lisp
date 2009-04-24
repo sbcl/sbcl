@@ -158,7 +158,7 @@
                                #-sb-xc-host ignore
                                #-sb-xc-host constraint-universe-end)
       (let* ((constraint-universe #+sb-xc-host '*constraint-universe*
-                                  #-sb-xc-host (gensym))
+                                  #-sb-xc-host (sb!xc:gensym "UNIVERSE"))
              (with-array-data
                 #+sb-xc-host '(progn)
                 #-sb-xc-host `(with-array-data

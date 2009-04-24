@@ -341,8 +341,8 @@
         (declare (notinline find-classoid))
         ,@(let ((pf (dd-print-function defstruct))
                 (po (dd-print-object defstruct))
-                (x (gensym))
-                (s (gensym)))
+                (x (sb!xc:gensym "OBJECT"))
+                (s (sb!xc:gensym "STREAM")))
             ;; Giving empty :PRINT-OBJECT or :PRINT-FUNCTION options
             ;; leaves PO or PF equal to NIL. The user-level effect is
             ;; to generate a PRINT-OBJECT method specialized for the type,
@@ -1447,7 +1447,7 @@
             (types)
             (vals))
     (dolist (slot (dd-slots defstruct))
-      (let ((dum (gensym))
+      (let ((dum (sb!xc:gensym "DUM"))
             (name (dsd-name slot)))
         (arglist `((,(keywordicate name) ,dum) ,(dsd-default slot)))
         (types (dsd-type slot))
@@ -1744,8 +1744,8 @@
               :dd-type dd-type))
          (dd-slots (dd-slots dd))
          (dd-length (1+ (length slot-names)))
-         (object-gensym (gensym "OBJECT"))
-         (new-value-gensym (gensym "NEW-VALUE-"))
+         (object-gensym (sb!xc:gensym "OBJECT"))
+         (new-value-gensym (sb!xc:gensym "NEW-VALUE-"))
          (delayed-layout-form `(%delayed-get-compiler-layout ,class-name)))
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type

@@ -444,20 +444,18 @@
 ;;; if the table is a synchronized table.
 (defmacro dohash (((key-var value-var) table &key result locked) &body body)
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (let* ((gen (gensym))
-           (n-more (gensym))
-           (n-table (gensym))
-           (iter-form `(with-hash-table-iterator (,gen ,n-table)
+    (with-unique-names (gen n-more n-table)
+      (let ((iter-form `(with-hash-table-iterator (,gen ,n-table)
                          (loop
                            (multiple-value-bind (,n-more ,key-var ,value-var) (,gen)
                              ,@decls
                              (unless ,n-more (return ,result))
                              ,@forms)))))
-      `(let ((,n-table ,table))
-         ,(if locked
-              `(with-locked-hash-table (,n-table)
-                 ,iter-form)
-              iter-form)))))
+        `(let ((,n-table ,table))
+           ,(if locked
+                `(with-locked-hash-table (,n-table)
+                   ,iter-form)
+                iter-form))))))
 
 ;;;; hash cache utility
 
@@ -523,10 +521,10 @@
          (default-values (if (and (consp default) (eq (car default) 'values))
                              (cdr default)
                              (list default)))
-         (args-and-values (gensym))
+         (args-and-values (sb!xc:gensym "ARGS-AND-VALUES"))
          (args-and-values-size (+ nargs values))
-         (n-index (gensym))
-         (n-cache (gensym)))
+         (n-index (sb!xc:gensym "INDEX"))
+         (n-cache (sb!xc:gensym "CACHE")))
 
     (unless (= (length default-values) values)
       (error "The number of default values ~S differs from :VALUES ~W."
@@ -541,7 +539,7 @@
               (values-refs)
               (values-names))
       (dotimes (i values)
-        (let ((name (gensym)))
+        (let ((name (sb!xc:gensym "VALUE")))
           (values-names name)
           (values-refs `(svref ,args-and-values (+ ,nargs ,i)))
           (sets `(setf (svref ,args-and-values (+ ,nargs ,i)) ,name))))
@@ -619,42 +617,40 @@
   (let ((default-values (if (and (consp default) (eq (car default) 'values))
                             (cdr default)
                             (list default)))
-        (arg-names (mapcar #'car args)))
-    (collect ((values-names))
-      (dotimes (i values)
-        (values-names (gensym)))
-      (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
-        `(progn
-           (define-hash-cache ,name ,args ,@options)
-           (defun ,name ,arg-names
-             ,@decls
-             ,doc
-             (cond #!+sb-show
-                   ((not (boundp '*hash-caches-initialized-p*))
-                    ;; This shouldn't happen, but it did happen to me
-                    ;; when revising the type system, and it's a lot
-                    ;; easier to figure out what what's going on with
-                    ;; that kind of problem if the system can be kept
-                    ;; alive until cold boot is complete. The recovery
-                    ;; mechanism should definitely be conditional on
-                    ;; some debugging feature (e.g. SB-SHOW) because
-                    ;; it's big, duplicating all the BODY code. -- WHN
-                    (/show0 ,name " too early in cold init, uncached")
-                    (/show0 ,(first arg-names) "=..")
-                    (/hexstr ,(first arg-names))
-                    ,@body)
-                   (t
-                    (multiple-value-bind ,(values-names)
-                        (,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
-                      (if (and ,@(mapcar (lambda (val def)
-                                           `(eq ,val ,def))
-                                         (values-names) default-values))
-                          (multiple-value-bind ,(values-names)
-                              (progn ,@body)
-                            (,(symbolicate name "-CACHE-ENTER") ,@arg-names
-                             ,@(values-names))
-                            (values ,@(values-names)))
-                          (values ,@(values-names))))))))))))
+        (arg-names (mapcar #'car args))
+        (values-names (make-gensym-list values)))
+    (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
+      `(progn
+        (define-hash-cache ,name ,args ,@options)
+        (defun ,name ,arg-names
+          ,@decls
+          ,doc
+          (cond #!+sb-show
+                ((not (boundp '*hash-caches-initialized-p*))
+                 ;; This shouldn't happen, but it did happen to me
+                 ;; when revising the type system, and it's a lot
+                 ;; easier to figure out what what's going on with
+                 ;; that kind of problem if the system can be kept
+                 ;; alive until cold boot is complete. The recovery
+                 ;; mechanism should definitely be conditional on some
+                 ;; debugging feature (e.g. SB-SHOW) because it's big,
+                 ;; duplicating all the BODY code. -- WHN
+                 (/show0 ,name " too early in cold init, uncached")
+                 (/show0 ,(first arg-names) "=..")
+                 (/hexstr ,(first arg-names))
+                 ,@body)
+                (t
+                 (multiple-value-bind ,values-names
+                     (,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
+                   (if (and ,@(mapcar (lambda (val def)
+                                        `(eq ,val ,def))
+                                      values-names default-values))
+                       (multiple-value-bind ,values-names
+                           (progn ,@body)
+                         (,(symbolicate name "-CACHE-ENTER") ,@arg-names
+                           ,@values-names)
+                         (values ,@values-names))
+                       (values ,@values-names))))))))))
 
 (defmacro define-cached-synonym
     (name &optional (original (symbolicate "%" name)))
@@ -1058,7 +1054,7 @@
   (let ((first? t)
         maybe-print-space
         (reversed-prints nil)
-        (stream (gensym "STREAM")))
+        (stream (sb!xc:gensym "STREAM")))
     (flet ((sref (slot-name)
              `(,(symbolicate conc-name slot-name) structure)))
       (dolist (slot-desc slot-descs)

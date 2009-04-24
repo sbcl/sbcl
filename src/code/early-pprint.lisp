@@ -16,7 +16,7 @@
 (defmacro with-pretty-stream ((stream-var
                                &optional (stream-expression stream-var))
                               &body body)
-  (let ((flet-name (gensym "WITH-PRETTY-STREAM-")))
+  (let ((flet-name (sb!xc:gensym "WITH-PRETTY-STREAM")))
     `(flet ((,flet-name (,stream-var)
               ,@body))
        (let ((stream ,stream-expression))
@@ -58,9 +58,9 @@
                       ((t) *terminal-io*)
                       (t ,stream))))))
     (let* ((object-var (if object (gensym) nil))
-           (block-name (gensym "PPRINT-LOGICAL-BLOCK-"))
+           (block-name (sb!xc:gensym "PPRINT-LOGICAL-BLOCK-"))
            (count-name (gensym "PPRINT-LOGICAL-BLOCK-LENGTH-"))
-           (pp-pop-name (gensym "PPRINT-POP-"))
+           (pp-pop-name (sb!xc:gensym "PPRINT-POP-"))
            (body
             ;; FIXME: It looks as though PPRINT-LOGICAL-BLOCK might
             ;; expand into a boatload of code, since DESCEND-INTO is a

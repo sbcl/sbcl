@@ -85,10 +85,10 @@
    Named form when it appears in the compiler input. Lambda-List is a DEFMACRO
    style lambda-list used to parse the arguments. The Body should return a
    list of subforms suitable for a \"~{~S ~}\" format string."
-  (let ((n-whole (gensym)))
+  (with-unique-names (whole)
     `(setf (gethash ',name *source-context-methods*)
-           (lambda (,n-whole)
-             (destructuring-bind ,lambda-list ,n-whole ,@body)))))
+           (lambda (,whole)
+             (destructuring-bind ,lambda-list ,whole ,@body)))))
 
 (define-source-context defstruct (name-or-options &rest slots)
   (declare (ignore slots))

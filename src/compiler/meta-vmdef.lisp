@@ -1759,16 +1759,15 @@
 ;;; Call the emit function for TEMPLATE, linking the result in at the
 ;;; end of BLOCK.
 (defmacro emit-template (node block template args results &optional info)
-  (let ((n-first (gensym))
-        (n-last (gensym)))
+  (with-unique-names (first last)
     (once-only ((n-node node)
                 (n-block block)
                 (n-template template))
-      `(multiple-value-bind (,n-first ,n-last)
+      `(multiple-value-bind (,first ,last)
            (funcall (template-emit-function ,n-template)
                     ,n-node ,n-block ,n-template ,args ,results
                     ,@(when info `(,info)))
-         (insert-vop-sequence ,n-first ,n-last ,n-block nil)))))
+         (insert-vop-sequence ,first ,last ,n-block nil)))))
 
 ;;; VOP Name Node Block Arg* Info* Result*
 ;;;
@@ -1934,37 +1933,34 @@
 ;;; represented by a local conflicts bit-vector and the IR2-BLOCK
 ;;; containing the location.
 (defmacro do-live-tns ((tn-var live block &optional result) &body body)
-  (let ((n-conf (gensym))
-        (n-bod (gensym))
-        (i (gensym))
-        (ltns (gensym)))
+  (with-unique-names (conf bod i ltns)
     (once-only ((n-live live)
                 (n-block block))
       `(block nil
-         (flet ((,n-bod (,tn-var) ,@body))
+         (flet ((,bod (,tn-var) ,@body))
            ;; Do component-live TNs.
            (dolist (,tn-var (ir2-component-component-tns
                              (component-info
                               (block-component
                                (ir2-block-block ,n-block)))))
-             (,n-bod ,tn-var))
+             (,bod ,tn-var))
 
            (let ((,ltns (ir2-block-local-tns ,n-block)))
              ;; Do TNs always-live in this block and live :MORE TNs.
-             (do ((,n-conf (ir2-block-global-tns ,n-block)
-                           (global-conflicts-next-blockwise ,n-conf)))
-                 ((null ,n-conf))
-               (when (or (eq (global-conflicts-kind ,n-conf) :live)
-                         (let ((,i (global-conflicts-number ,n-conf)))
+             (do ((,conf (ir2-block-global-tns ,n-block)
+                         (global-conflicts-next-blockwise ,conf)))
+                 ((null ,conf))
+               (when (or (eq (global-conflicts-kind ,conf) :live)
+                         (let ((,i (global-conflicts-number ,conf)))
                            (and (eq (svref ,ltns ,i) :more)
                                 (not (zerop (sbit ,n-live ,i))))))
-                 (,n-bod (global-conflicts-tn ,n-conf))))
+                 (,bod (global-conflicts-tn ,conf))))
              ;; Do TNs locally live in the designated live set.
              (dotimes (,i (ir2-block-local-tn-count ,n-block) ,result)
                (unless (zerop (sbit ,n-live ,i))
                  (let ((,tn-var (svref ,ltns ,i)))
                    (when (and ,tn-var (not (eq ,tn-var :more)))
-                     (,n-bod ,tn-var)))))))))))
+                     (,bod ,tn-var)))))))))))
 
 ;;; Iterate over all the IR2 blocks in PHYSENV, in emit order.
 (defmacro do-physenv-ir2-blocks ((block-var physenv &optional result)

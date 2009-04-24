@@ -759,7 +759,8 @@
   ;; Constant CLASS and TYPE is an overwhelmingly common special case,
   ;; and we can implement it much more efficiently than the general case.
   (if (and (keywordp class) (keywordp type))
-      (let ((info (type-info-or-lose class type)))
+      (let (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
+            (info (type-info-or-lose class type)))
         (with-unique-names (value foundp)
           `(multiple-value-bind (,value ,foundp)
                (get-info-value ,name
@@ -769,11 +770,8 @@
              (values ,value ,foundp))))
       whole))
 
-(defun (setf info) (new-value
-                    class
-                    type
-                    name
-                    &optional (env-list nil env-list-p))
+(defun (setf info)
+    (new-value class type name &optional (env-list nil env-list-p))
   (let* ((info (type-info-or-lose class type))
          (tin (type-info-number info)))
     (when (type-info-validate-function info)
@@ -793,13 +791,8 @@
   ;; does not accept them at all, and older SBCLs give a full warning.
   ;; So the easy thing is to hide this optimization from all xc hosts.
   #-sb-xc-host
-  (define-compiler-macro (setf info) (&whole whole
-                                             new-value
-                                             class
-                                             type
-                                             name
-                                             &optional (env-list nil
-                                                                 env-list-p))
+  (define-compiler-macro (setf info)
+      (&whole whole new-value class type name &optional (env-list nil env-list-p))
     ;; Constant CLASS and TYPE is an overwhelmingly common special case,
     ;; and we can resolve it much more efficiently than the general
     ;; case.

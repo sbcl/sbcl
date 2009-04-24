@@ -41,7 +41,7 @@
     (if (= (length vars) 1)
       `(let ((,(car vars) ,value-form))
          ,@body)
-      (let ((ignore (gensym)))
+      (let ((ignore (sb!xc:gensym)))
         `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
                                          &rest ,ignore)
                                   (declare (ignore ,ignore))
@@ -500,7 +500,7 @@ evaluated as a PROGN."
                 (k '() (list* (cadr l) (car l) k)))
                ((or (null l) (not (member (car l) keys)))
                 (values (nreverse k) l)))))
-    (let ((block-tag (gensym))
+    (let ((block-tag (sb!xc:gensym "BLOCK"))
           (temp-var (gensym))
           (data
            (macrolet (;; KLUDGE: This started as an old DEFMACRO
@@ -533,7 +533,7 @@ evaluated as a PROGN."
                                                     &rest forms)
                                             (cddr clause))
                          (list (car clause) ;name=0
-                               (gensym) ;tag=1
+                               (sb!xc:gensym "TAG") ;tag=1
                                (transform-keywords :report report ;keywords=2
                                                    :interactive interactive
                                                    :test test)
@@ -601,7 +601,7 @@ evaluated as a PROGN."
                                                             (and (consp x)
                                                                  (eq 'lambda (car x))
                                                                  (setf lambda-form x))))))
-                                            (let ((name (gensym "LAMBDA")))
+                                            (let ((name (sb!xc:gensym "LAMBDA")))
                                               (push `(,name ,@(cdr lambda-form)) local-funs)
                                               (list type `(function ,name)))
                                             binding))))
@@ -646,13 +646,13 @@ specification."
                    (handler-case (return-from ,normal-return ,form)
                      ,@(remove no-error-clause cases)))))))
         (let* ((local-funs nil)
-               (annotated-cases (mapcar (lambda (case)
-                                          (let ((tag (gensym "TAG"))
-                                                (fun (gensym "FUN")))
-                                            (destructuring-bind (type ll &body body) case
-                                              (push `(,fun ,ll ,@body) local-funs)
-                                              (list tag type ll fun))))
-                                        cases)))
+               (annotated-cases
+                (mapcar (lambda (case)
+                          (with-unique-names (tag fun)
+                            (destructuring-bind (type ll &body body) case
+                              (push `(,fun ,ll ,@body) local-funs)
+                              (list tag type ll fun))))
+                        cases)))
           (with-unique-names (block var form-fun)
             `(dx-flet ((,form-fun ()
                          #!-x86 ,form

@@ -21,7 +21,7 @@
 ;;; Automatically handle *PRINT-LEVEL* abbreviation. If we are too
 ;;; deep, then a #\# is printed to STREAM and BODY is ignored.
 (defmacro descend-into ((stream) &body body)
-  (let ((flet-name (gensym)))
+  (let ((flet-name (sb!xc:gensym "DESCEND")))
     `(flet ((,flet-name ()
               ,@body))
        (cond ((and (null *print-readably*)
@@ -189,8 +189,7 @@
               t))))))
 
 (defmacro with-circularity-detection ((object stream) &body body)
-  (let ((marker (gensym "WITH-CIRCULARITY-DETECTION-"))
-        (body-name (gensym "WITH-CIRCULARITY-DETECTION-BODY-")))
+  (with-unique-names (marker body-name)
     `(labels ((,body-name ()
                ,@body))
       (cond ((not *print-circle*)

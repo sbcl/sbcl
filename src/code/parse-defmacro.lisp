@@ -321,8 +321,7 @@
                                          :maximum ,explicit-maximum))))))
               *arg-tests*))
       (when key-seen
-        (let ((problem (gensym "KEY-PROBLEM-"))
-              (info (gensym "INFO-")))
+        (with-unique-names (problem info)
           (push `(multiple-value-bind (,problem ,info)
                      (verify-keywords ,rest-name
                                       ',keys

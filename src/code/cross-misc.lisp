@@ -125,6 +125,15 @@
   (declare (type symbol symbol))
   (sxhash symbol))
 
+(defvar sb!xc:*gensym-counter* 0)
+
+(defun sb!xc:gensym (&optional (thing "G"))
+  (declare (type string thing))
+  (let ((n sb!xc:*gensym-counter*))
+    (prog1
+        (make-symbol (concatenate 'string thing (write-to-string n :base 10 :radix nil :pretty nil)))
+      (incf sb!xc:*gensym-counter*))))
+
 ;;; These functions are needed for constant-folding.
 (defun sb!kernel:simple-array-nil-p (object)
   (when (typep object 'array)

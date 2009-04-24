@@ -42,7 +42,7 @@
   (multiple-value-bind (whole wholeless-arglist)
       (if (eq '&whole (car arglist))
           (values (cadr arglist) (cddr arglist))
-          (values (gensym) arglist))
+          (values (sb!xc:gensym) arglist))
     (multiple-value-bind (forms decls)
         (parse-body body :doc-string-allowed nil)
       `(progn

@@ -206,8 +206,8 @@
            (,get-setf-expansion-fun-name place env)
          (when (cdr stores)
            (error "multiple store variables for ~S" place))
-         (let ((newval (gensym))
-               (n-place (gensym))
+         (let ((newval (sb!xc:gensym))
+               (n-place (sb!xc:gensym))
                (mask (compute-attribute-mask attributes ,translations-name)))
            (values `(,@temps ,n-place)
                    `(,@values ,get)
@@ -398,10 +398,10 @@
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
-    (let ((n-args (gensym))
-          (n-node (or node (gensym)))
-          (n-decls (gensym))
-          (n-lambda (gensym))
+    (let ((n-args (sb!xc:gensym))
+          (n-node (or node (sb!xc:gensym)))
+          (n-decls (sb!xc:gensym))
+          (n-lambda (sb!xc:gensym))
           (decls-body `(,@decls ,@body)))
       (multiple-value-bind (parsed-form vars)
           (parse-deftransform lambda-list
@@ -496,7 +496,7 @@
 ;;; the rest of the optimizer function's lambda-list. LTN-ANNOTATE
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
-(defmacro defoptimizer (what (lambda-list &optional (n-node (gensym))
+(defmacro defoptimizer (what (lambda-list &optional (n-node (sb!xc:gensym))
                                           &rest vars)
                              &body body)
   (let ((name (if (symbolp what) what

@@ -201,15 +201,14 @@
 ;;; them, the backquoted material will be recognizable to the
 ;;; pretty-printer.
 (macrolet ((def (b-name name)
-             (let ((args (gensym "ARGS")))
                ;; FIXME: This function should be INLINE so that the lists
                ;; aren't consed twice, but I ran into an optimizer bug the
                ;; first time I tried to make this work for BACKQ-LIST. See
                ;; whether there's still an optimizer bug, and fix it if so, and
                ;; then make these INLINE.
-               `(defun ,b-name (&rest ,args)
-                  (declare (truly-dynamic-extent ,args))
-                  (apply #',name ,args)))))
+               `(defun ,b-name (&rest rest)
+                  (declare (truly-dynamic-extent rest))
+                  (apply #',name rest))))
   (def backq-list list)
   (def backq-list* list*)
   (def backq-append append)

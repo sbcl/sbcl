@@ -145,8 +145,8 @@
                            ,@body))))
                     (:local
                      (/show0 ":LOCAL case")
-                     (let* ((var (gensym))
-                            (initval (if initial-value (gensym)))
+                     (let* ((var (sb!xc:gensym "VAR"))
+                            (initval (if initial-value (sb!xc:gensym "INITVAL")))
                             (info (make-local-alien-info :type alien-type))
                             (inner-body
                              `((note-local-alien-type ',info ,var)
@@ -608,7 +608,7 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
        (let ((stub (alien-fun-type-stub type)))
          (unless stub
            (setf stub
-                 (let ((fun (gensym))
+                 (let ((fun (sb!xc:gensym "FUN"))
                        (parms (make-gensym-list (length args))))
                    (compile nil
                             `(lambda (,fun ,@parms)

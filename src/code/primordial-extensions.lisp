@@ -131,16 +131,15 @@
   (let ((block-name (when env
                       (car (find-if #'car (sb!c::lexenv-blocks env))))))
     (if block-name
-        (gensym (format nil "~A[~A]" name block-name))
-        (gensym name))))
-
+        (sb!xc:gensym (format nil "~A[~A]" name block-name))
+        (sb!xc:gensym name))))
 
 ;;; Compile a version of BODY for all TYPES, and dispatch to the
 ;;; correct one based on the value of VAR. This was originally used
 ;;; only for strings, hence the name. Renaming it to something more
 ;;; generic might not be a bad idea.
 (defmacro string-dispatch ((&rest types) var &body body)
-  (let ((fun (gensym "STRING-DISPATCH-FUN-")))
+  (let ((fun (sb!xc:gensym "STRING-DISPATCH-FUN")))
     `(flet ((,fun (,var)
               ,@body))
        (declare (inline ,fun))

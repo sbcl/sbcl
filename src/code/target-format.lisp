@@ -116,8 +116,8 @@
             (intern (format nil
                             "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
                             char)))
-        (directive (gensym))
-        (directives (if lambda-list (car (last lambda-list)) (gensym))))
+        (directive (sb!xc:gensym "DIRECTIVE"))
+        (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
@@ -133,7 +133,7 @@
        (%set-format-directive-interpreter ,char #',defun-name))))
 
 (sb!xc:defmacro def-format-interpreter (char lambda-list &body body)
-  (let ((directives (gensym)))
+  (let ((directives (sb!xc:gensym "DIRECTIVES")))
     `(def-complex-format-interpreter ,char (,@lambda-list ,directives)
        ,@body
        ,directives)))

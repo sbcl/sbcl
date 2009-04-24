@@ -339,14 +339,7 @@
 ;;; function to call that fixes up the result returning any useful values, such
 ;;; as the result. This macro may evaluate its arguments more than once.
 (sb!xc:defmacro subtract-bignum-loop (a len-a b len-b res len-res return-fun)
-  (let ((borrow (gensym))
-        (a-digit (gensym))
-        (a-sign (gensym))
-        (b-digit (gensym))
-        (b-sign (gensym))
-        (i (gensym))
-        (v (gensym))
-        (k (gensym)))
+  (with-unique-names (borrow a-digit a-sign b-digit b-sign i v k)
     `(let* ((,borrow 1)
             (,a-sign (%sign-digit ,a ,len-a))
             (,b-sign (%sign-digit ,b ,len-b)))
@@ -482,38 +475,30 @@
                                 from-end)
   (sb!int:once-only ((n-dest dest)
                      (n-src src))
-    (let ((n-start1 (gensym))
-          (n-end1 (gensym))
-          (n-start2 (gensym))
-          (n-end2 (gensym))
-          (i1 (gensym))
-          (i2 (gensym))
-          (end1 (or end1 `(%bignum-length ,n-dest)))
-          (end2 (or end2 `(%bignum-length ,n-src))))
-      (if from-end
-          `(let ((,n-start1 ,start1)
-                 (,n-start2 ,start2))
-             (do ((,i1 (1- ,end1) (1- ,i1))
-                  (,i2 (1- ,end2) (1- ,i2)))
-                 ((or (< ,i1 ,n-start1) (< ,i2 ,n-start2)))
-               (declare (fixnum ,i1 ,i2))
-               (%bignum-set ,n-dest ,i1
-                            (%bignum-ref ,n-src ,i2))))
-          (if (eql start1 start2)
-              `(let ((,n-end1 (min ,end1 ,end2)))
-                 (do ((,i1 ,start1 (1+ ,i1)))
-                     ((>= ,i1 ,n-end1))
-                   (declare (type bignum-index ,i1))
-                   (%bignum-set ,n-dest ,i1
-                                (%bignum-ref ,n-src ,i1))))
-              `(let ((,n-end1 ,end1)
-                     (,n-end2 ,end2))
-                 (do ((,i1 ,start1 (1+ ,i1))
-                      (,i2 ,start2 (1+ ,i2)))
-                     ((or (>= ,i1 ,n-end1) (>= ,i2 ,n-end2)))
-                   (declare (type bignum-index ,i1 ,i2))
-                   (%bignum-set ,n-dest ,i1
-                                (%bignum-ref ,n-src ,i2)))))))))
+    (with-unique-names (n-start1 n-end1 n-start2 n-end2 i1 i2)
+      (let ((end1 (or end1 `(%bignum-length ,n-dest)))
+            (end2 (or end2 `(%bignum-length ,n-src))))
+        (if from-end
+            `(let ((,n-start1 ,start1)
+                   (,n-start2 ,start2))
+              (do ((,i1 (1- ,end1) (1- ,i1))
+                   (,i2 (1- ,end2) (1- ,i2)))
+                  ((or (< ,i1 ,n-start1) (< ,i2 ,n-start2)))
+                (declare (fixnum ,i1 ,i2))
+                (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))
+            (if (eql start1 start2)
+                `(let ((,n-end1 (min ,end1 ,end2)))
+                  (do ((,i1 ,start1 (1+ ,i1)))
+                      ((>= ,i1 ,n-end1))
+                    (declare (type bignum-index ,i1))
+                    (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i1))))
+                `(let ((,n-end1 ,end1)
+                       (,n-end2 ,end2))
+                  (do ((,i1 ,start1 (1+ ,i1))
+                       (,i2 ,start2 (1+ ,i2)))
+                      ((or (>= ,i1 ,n-end1) (>= ,i2 ,n-end2)))
+                    (declare (type bignum-index ,i1 ,i2))
+                    (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))))))))
 
 (sb!xc:defmacro with-bignum-buffers (specs &body body)
   #!+sb-doc
@@ -908,13 +893,9 @@
 
 ;;; This negates bignum-len digits of bignum, storing the resulting digits into
 ;;; result (possibly EQ to bignum) and returning whatever end-carry there is.
-(sb!xc:defmacro bignum-negate-loop (bignum
-                                    bignum-len
-                                    &optional (result nil resultp))
-  (let ((carry (gensym))
-        (end (gensym))
-        (value (gensym))
-        (last (gensym)))
+(sb!xc:defmacro bignum-negate-loop
+    (bignum bignum-len &optional (result nil resultp))
+  (with-unique-names (carry end value last)
     `(let* (,@(if (not resultp) `(,last))
             (,carry
              (multiple-value-bind (,value ,carry)

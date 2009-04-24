@@ -39,7 +39,7 @@
     (error "either too many args (~W) or too many results (~W); max = ~W"
            num-args num-results register-arg-count))
   (let ((num-temps (max num-args num-results))
-        (node (gensym "NODE-")))
+        (node (sb!xc:gensym "NODE")))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))
       (dotimes (i num-results)
         (let ((result-name (intern (format nil "RESULT-~D" i))))

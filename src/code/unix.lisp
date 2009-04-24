@@ -1075,8 +1075,7 @@ corresponds to NAME, or NIL if there is none."
 
 ;;; not checked for linux...
 (defmacro fd-set (offset fd-set)
-  (let ((word (gensym))
-        (bit (gensym)))
+  (with-unique-names (word bit)
     `(multiple-value-bind (,word ,bit) (floor ,offset
                                               sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
@@ -1086,8 +1085,7 @@ corresponds to NAME, or NIL if there is none."
 
 ;;; not checked for linux...
 (defmacro fd-clr (offset fd-set)
-  (let ((word (gensym))
-        (bit (gensym)))
+  (with-unique-names (word bit)
     `(multiple-value-bind (,word ,bit) (floor ,offset
                                               sb!vm:n-machine-word-bits)
        (setf (deref (slot ,fd-set 'fds-bits) ,word)
@@ -1098,8 +1096,7 @@ corresponds to NAME, or NIL if there is none."
 
 ;;; not checked for linux...
 (defmacro fd-isset (offset fd-set)
-  (let ((word (gensym))
-        (bit (gensym)))
+  (with-unique-names (word bit)
     `(multiple-value-bind (,word ,bit) (floor ,offset
                                               sb!vm:n-machine-word-bits)
        (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))

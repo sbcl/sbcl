@@ -1507,7 +1507,7 @@
   (check-type ctran symbol)
   (check-type lvar symbol)
   (let ((post-binding-lexenv-p (not (null post-binding-lexenv)))
-        (post-binding-lexenv (or post-binding-lexenv (gensym))))
+        (post-binding-lexenv (or post-binding-lexenv (sb!xc:gensym "LEXENV"))))
     `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
                         ,post-binding-lexenv-p
                         (lambda (,ctran ,lvar ,post-binding-lexenv)

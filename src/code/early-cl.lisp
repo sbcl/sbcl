@@ -12,7 +12,7 @@
 (in-package "SB!KERNEL")
 
 ;;; Common Lisp special variables which have SB-XC versions
-(proclaim '(special sb!xc:*macroexpand-hook*))
+(proclaim '(special sb!xc:*macroexpand-hook* sb!xc:*gensym-counter*))
 
 ;;; the Common Lisp defined type spec symbols
 (defparameter *!standard-type-names*

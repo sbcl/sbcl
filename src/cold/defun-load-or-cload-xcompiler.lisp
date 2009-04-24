@@ -115,6 +115,7 @@
                     "DEPOSIT-FIELD" "DPB"
                     "FBOUNDP" "FDEFINITION" "FMAKUNBOUND"
                     "FIND-CLASS"
+                    "GENSYM" "*GENSYM-COUNTER*"
                     "GET-SETF-EXPANSION"
                     "LDB" "LDB-TEST"
                     "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"

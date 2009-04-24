@@ -306,7 +306,7 @@
       `(,*expander-next-arg-macro*
         ,*default-format-error-control-string*
         ,(or offset *default-format-error-offset*))
-      (let ((symbol (gensym "FORMAT-ARG-")))
+      (let ((symbol (sb!xc:gensym "FORMAT-ARG")))
         (push (cons symbol (or offset *default-format-error-offset*))
               *simple-args*)
         symbol)))
@@ -315,34 +315,32 @@
   (once-only ((params params))
     (if specs
         (collect ((expander-bindings) (runtime-bindings))
-                 (dolist (spec specs)
-                   (destructuring-bind (var default) spec
-                     (let ((symbol (gensym)))
-                       (expander-bindings
-                        `(,var ',symbol))
-                       (runtime-bindings
-                        `(list ',symbol
-                               (let* ((param-and-offset (pop ,params))
-                                      (offset (car param-and-offset))
-                                      (param (cdr param-and-offset)))
-                                 (case param
-                                   (:arg `(or ,(expand-next-arg offset)
-                                              ,,default))
-                                   (:remaining
-                                    (setf *only-simple-args* nil)
-                                    '(length args))
-                                   ((nil) ,default)
-                                   (t param))))))))
-                 `(let ,(expander-bindings)
-                    `(let ,(list ,@(runtime-bindings))
-                       ,@(if ,params
-                             (error
-                              'format-error
-                              :complaint
-                              "too many parameters, expected no more than ~W"
-                              :args (list ,(length specs))
-                              :offset (caar ,params)))
-                       ,,@body)))
+          (dolist (spec specs)
+            (destructuring-bind (var default) spec
+              (let ((symbol (sb!xc:gensym "FVAR")))
+                (expander-bindings
+                 `(,var ',symbol))
+                (runtime-bindings
+                 `(list ',symbol
+                   (let* ((param-and-offset (pop ,params))
+                          (offset (car param-and-offset))
+                          (param (cdr param-and-offset)))
+                     (case param
+                       (:arg `(or ,(expand-next-arg offset) ,,default))
+                       (:remaining
+                        (setf *only-simple-args* nil)
+                        '(length args))
+                       ((nil) ,default)
+                       (t param))))))))
+          `(let ,(expander-bindings)
+            `(let ,(list ,@(runtime-bindings))
+              ,@(if ,params
+                    (error
+                     'format-error
+                     :complaint "too many parameters, expected no more than ~W"
+                     :args (list ,(length specs))
+                     :offset (caar ,params)))
+              ,,@body)))
         `(progn
            (when ,params
              (error 'format-error
@@ -357,8 +355,8 @@
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
-        (directive (gensym))
-        (directives (if lambda-list (car (last lambda-list)) (gensym))))
+        (directive (sb!xc:gensym "DIRECTIVE"))
+        (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (,directive ,directives)
          ,@(if lambda-list
@@ -374,7 +372,7 @@
 
 ;;; FIXME: only used in this file, could be SB!XC:DEFMACRO in EVAL-WHEN
 (defmacro def-format-directive (char lambda-list &body body)
-  (let ((directives (gensym))
+  (let ((directives (sb!xc:gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
     (loop
@@ -505,7 +503,7 @@
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
-    (let ((n-arg (gensym)))
+    (let ((n-arg (sb!xc:gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (if ,base
              (format-print-integer stream ,n-arg ,colonp ,atsignp
@@ -1249,7 +1247,7 @@
     (collect ((param-names) (bindings))
       (dolist (param-and-offset params)
         (let ((param (cdr param-and-offset)))
-          (let ((param-name (gensym)))
+          (let ((param-name (sb!xc:gensym "PARAM")))
             (param-names param-name)
             (bindings `(,param-name
                         ,(case param

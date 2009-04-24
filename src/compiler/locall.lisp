@@ -217,8 +217,7 @@
                  ;; KLUDGE: (NOT (< ...)) instead of >= avoids one round of
                  ;; deftransforms and lambda-conversion.
                  `((,(if (zerop min) t `(not (< ,n-supplied ,max)))
-                    ,(let ((n-context (gensym))
-                           (n-count (gensym)))
+                    ,(with-unique-names (n-context n-count)
                        `(multiple-value-bind (,n-context ,n-count)
                             (%more-arg-context ,n-supplied ,max)
                           (locally
