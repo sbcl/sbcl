@@ -48,7 +48,7 @@
 ;;;; Lisp types used by syscalls
 
 (deftype unix-pathname () 'simple-string)
-(deftype unix-fd () `(integer 0 ,most-positive-fixnum))
+(deftype unix-fd () `(integer 0 ,sb!xc:most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
 (deftype unix-pid () '(unsigned-byte 32))

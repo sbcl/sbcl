@@ -4155,7 +4155,7 @@
                        (start-1 (1- ,',start))
                        (current-heap-size (- ,',end ,',start))
                        (keyfun ,keyfun))
-                   (declare (type (integer -1 #.(1- most-positive-fixnum))
+                   (declare (type (integer -1 #.(1- sb!xc:most-positive-fixnum))
                                   start-1))
                    (declare (type index current-heap-size))
                    (declare (type function keyfun))

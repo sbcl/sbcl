@@ -338,8 +338,8 @@
     (etypecase key
       (integer (sxhash key))
       (float (macrolet ((frob (type)
-                          (let ((lo (coerce most-negative-fixnum type))
-                                (hi (coerce most-positive-fixnum type)))
+                          (let ((lo (coerce sb!xc:most-negative-fixnum type))
+                                (hi (coerce sb!xc:most-positive-fixnum type)))
                             `(cond (;; This clause allows FIXNUM-sized integer
                                     ;; values to be handled without consing.
                                     (<= ,lo key ,hi)
