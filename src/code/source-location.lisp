@@ -36,11 +36,13 @@
     #+sb-xc-host
     (let ((src (position "src" dir :test #'string=
                          :from-end t)))
-      (if src
-          (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
-                  (subseq dir src) (pathname-name untruename))
-          ;; FIXME: just output/stuff-groveled-from-headers.lisp
-          (namestring untruename)))
+      (cond
+        (src (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
+                     (subseq dir src) (pathname-name untruename)))
+        (t (aver (string-equal (car (last dir)) "output"))
+           (aver (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
+           (aver (string-equal (pathname-type untruename) "lisp"))
+           "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.LISP")))
     #-sb-xc-host
     (if (and dir (eq (first dir) :absolute))
         (namestring untruename)

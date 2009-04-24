@@ -509,6 +509,10 @@
 ;;; purposes.
 (defvar *current-reversed-cold-toplevels*)
 
+;;; the head of a list of DEBUG-SOURCEs which need to be patched when
+;;; the cold core starts up
+(defvar *current-debug-sources*)
+
 ;;; the name of the object file currently being cold loaded (as a string, not a
 ;;; pathname), or NIL if we're not currently cold loading any object file
 (defvar *cold-load-filename* nil)
@@ -1357,6 +1361,7 @@ core and return a descriptor to it."
   (cold-set '*!initial-fdefn-objects* (list-all-fdefn-objects))
 
   (cold-set '*!reversed-cold-toplevels* *current-reversed-cold-toplevels*)
+  (cold-set '*!initial-debug-sources* *current-debug-sources*)
 
   #!+(or x86 x86-64)
   (progn
@@ -2403,6 +2408,10 @@ core and return a descriptor to it."
         (setf (gethash warm-name *cold-fset-warm-names*) t))
     (static-fset cold-name fn)))
 
+(define-cold-fop (fop-note-debug-source :pushp nil)
+  (let ((debug-source (pop-stack)))
+    (cold-push debug-source *current-debug-sources*)))
+
 (define-cold-fop (fop-fdefinition)
   (cold-fdefinition-object (pop-stack)))
 
@@ -3218,6 +3227,7 @@ initially undefined function references:~2%")
                                      #!-gencgc sb!vm:dynamic-0-space-start))
            (*nil-descriptor* (make-nil-descriptor))
            (*current-reversed-cold-toplevels* *nil-descriptor*)
+           (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
                               0
                               sb!vm:unbound-marker-widetag))

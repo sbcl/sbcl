@@ -65,21 +65,6 @@
 
 ;;;; compiling and loading more of the system
 
-(let* ((sys *default-pathname-defaults*)
-       (src
-        (merge-pathnames
-         (make-pathname :directory '(:relative "src" :wild-inferiors)
-                        :name :wild :type :wild)
-         sys))
-       (contrib
-        (merge-pathnames
-         (make-pathname :directory '(:relative "contrib" :wild-inferiors)
-                        :name :wild :type :wild)
-         sys)))
-  (setf (logical-pathname-translations "SYS")
-        `(("SYS:SRC;**;*.*.*" ,src)
-          ("SYS:CONTRIB;**;*.*.*" ,contrib))))
-
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
 ;;;

@@ -1704,3 +1704,24 @@ system's syntax for files."
       ;; might be cute to search in "SYS:TRANSLATIONS;<name>.LISP"
       (error "logical host ~S not found" host)))
 
+(defun !pathname-cold-init ()
+  (let* ((sys *default-pathname-defaults*)
+         (src
+          (merge-pathnames
+           (make-pathname :directory '(:relative "src" :wild-inferiors)
+                          :name :wild :type :wild)
+           sys))
+         (contrib
+          (merge-pathnames
+           (make-pathname :directory '(:relative "contrib" :wild-inferiors)
+                          :name :wild :type :wild)
+           sys))
+         (output
+          (merge-pathnames
+           (make-pathname :directory '(:relative "output" :wild-inferiors)
+                          :name :wild :type :wild)
+           sys)))
+    (setf (logical-pathname-translations "SYS")
+          `(("SYS:SRC;**;*.*.*" ,src)
+            ("SYS:CONTRIB;**;*.*.*" ,contrib)
+            ("SYS:OUTPUT;**;*.*.*" ,output)))))

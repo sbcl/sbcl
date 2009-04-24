@@ -639,6 +639,17 @@ bug.~:@>")
         (name (pop-stack)))
     (setf (fdefinition name) fn)))
 
+(define-fop (fop-note-debug-source 174 :pushp nil)
+  (warn "~@<FOP-NOTE-DEBUG-SOURCE seen in ordinary load (not cold load) -- ~
+very strange!  If you didn't do something to cause this, please report it as ~
+a bug.~@:>")
+  ;; as with COLD-FSET above, we are going to be lenient with coming
+  ;; across this fop in a warm SBCL.
+  (let ((debug-source (pop-stack)))
+    (setf (sb!c::debug-source-compiled debug-source) (get-universal-time)
+          (sb!c::debug-source-created debug-source)
+          (file-write-date (sb!c::debug-source-namestring debug-source)))))
+
 ;;; Modify a slot in a CONSTANTS object.
 (define-cloned-fops (fop-alter-code 140 :pushp nil) (fop-byte-alter-code 141)
   (let ((value (pop-stack))

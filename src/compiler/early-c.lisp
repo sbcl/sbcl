@@ -106,6 +106,7 @@
 (defvar *info-environment*)
 (defvar *lexenv*)
 (defvar *source-info*)
+(defvar *source-plist*)
 (defvar *trace-table*)
 (defvar *undefined-warnings*)
 (defvar *warnings-p*)

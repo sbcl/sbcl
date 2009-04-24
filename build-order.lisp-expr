@@ -497,6 +497,7 @@
 
  ("src/compiler/trace-table") ; needs EMIT-LABEL macro from compiler/assem.lisp
 
+ ("src/code/debug-info")
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ;; trace table definitions from compiler/trace-table.lisp.
  ("src/compiler/dump")
@@ -530,8 +531,6 @@
 
  ("src/compiler/tn")
  ("src/compiler/life")
-
- ("src/code/debug-info")
 
  ("src/compiler/debug-dump")
  ("src/compiler/generic/utils")

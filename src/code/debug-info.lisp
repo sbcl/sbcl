@@ -278,12 +278,14 @@
   (name (missing-arg) :type t)
   ;; A list of DEBUG-SOURCE structures describing where the code for this
   ;; component came from, in the order that they were read.
-  ;;
-  ;; KLUDGE: comment from CMU CL:
-  ;;   *** NOTE: the offset of this slot is wired into the fasl dumper
-  ;;   *** so that it can backpatch the source info when compilation
-  ;;   *** is complete.
   (source nil))
+
+(defconstant +debug-info-source-index+
+  (let* ((dd (find-defstruct-description 'debug-info))
+         (slots (dd-slots dd))
+         (source (locally (declare (notinline find)) ; bug 117 bogowarning
+                   (find 'source slots :key #'dsd-name))))
+    (dsd-index source)))
 
 (def!struct (compiled-debug-info
              (:include debug-info)
@@ -301,3 +303,13 @@
   ;; works? Would this break if we used a more general memory map? --
   ;; WHN 20000120
   (fun-map (missing-arg) :type simple-vector :read-only t))
+
+(defvar *!initial-debug-sources*)
+
+(defun !debug-info-cold-init ()
+  (let ((now (get-universal-time)))
+    (dolist (debug-source *!initial-debug-sources*)
+      (let* ((namestring (debug-source-namestring debug-source))
+             (timestamp (file-write-date namestring)))
+        (setf (debug-source-created debug-source) timestamp
+              (debug-source-compiled debug-source) now)))))

@@ -210,9 +210,6 @@
                do (entries `((eql ,n-supplied ,n)
                              (%funcall ,(force ep) ,@(subseq temps 0 n)))))
          `(lambda (,n-supplied ,@temps)
-            ;; FIXME: Make sure that INDEX type distinguishes between
-            ;; target and host. (Probably just make the SB!XC:DEFTYPE
-            ;; different from CL:DEFTYPE.)
             (declare (type index ,n-supplied))
             (cond
              ,@(if more (butlast (entries)) (entries))
