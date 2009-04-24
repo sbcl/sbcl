@@ -813,7 +813,7 @@
 ;;; sticking them in this hash-table. This is initially null. We
 ;;; create the hashtable if we do any unpacking.
 (defvar *repack-blocks*)
-(declaim (type (or hash-table null) *repack-blocks*))
+(declaim (type list *repack-blocks*))
 
 ;;; Set the LIVE-TNS vectors in all :FINITE SBs to represent the TNs
 ;;; live at the end of BLOCK.
@@ -1036,7 +1036,7 @@
                (let ((vop (tn-ref-vop ref)))
                  (if (eq (vop-info-name (vop-info vop)) 'move-operand)
                      (delete-vop vop)
-                     (setf (gethash (vop-block vop) *repack-blocks*) t))))))
+                     (pushnew (vop-block vop) *repack-blocks*))))))
       (zot (tn-reads tn))
       (zot (tn-writes tn))))
 
@@ -1063,9 +1063,7 @@
         (node (vop-node (tn-ref-vop op)))
         (fallback nil))
     (flet ((unpack-em (victims)
-             (unless *repack-blocks*
-               (setq *repack-blocks* (make-hash-table :test 'eq)))
-             (setf (gethash (vop-block (tn-ref-vop op)) *repack-blocks*) t)
+             (pushnew (vop-block (tn-ref-vop op)) *repack-blocks*)
              (dolist (victim victims)
                (event unpack-tn node)
                (unpack-tn victim))
@@ -1591,11 +1589,9 @@
               (unless *repack-blocks* (return))
               (let ((orpb *repack-blocks*))
                 (setq *repack-blocks* nil)
-                (maphash (lambda (block v)
-                           (declare (ignore v))
-                           (event repack-block)
-                           (pack-load-tns block))
-                         orpb))))
+                (dolist (block orpb)
+                  (event repack-block)
+                  (pack-load-tns block)))))
 
          (values))
     (clean-up-pack-structures)))
