@@ -417,8 +417,8 @@
   (note nil :type (or string null))
   ;; a list of the names of the Effects and Affected attributes for
   ;; this VOP
-  (effects '(any) :type list)
-  (affected '(any) :type list)
+  (effects '#1=(any) :type list)
+  (affected '#1# :type list)
   ;; a list of the names of functions this VOP is a translation of and
   ;; the policy that allows this translation to be done. :FAST is a
   ;; safe default, since it isn't a safe policy.

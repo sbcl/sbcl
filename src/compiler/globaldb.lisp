@@ -302,16 +302,15 @@
                   (new-type-info
                    (make-type-info :name ',type
                                    :class class-info
-                                   :number new-type-number)))
+                                   :number new-type-number
+                                   :type ',type-spec)))
              (setf (aref *info-types* new-type-number) new-type-info)
              (push new-type-info (class-info-types class-info)))))
-       ;; Arrange for TYPE-INFO-DEFAULT and TYPE-INFO-TYPE to be set
-       ;; at cold load time. (They can't very well be set at
-       ;; cross-compile time, since they differ between the
-       ;; cross-compiler and the target. The DEFAULT slot values
-       ;; differ because they're compiled closures, and the TYPE slot
-       ;; values differ in the use of SB!XC symbols instead of CL
-       ;; symbols.)
+       ;; Arrange for TYPE-INFO-DEFAULT and
+       ;; TYPE-INFO-VALIDATE-FUNCTION to be set at cold load
+       ;; time. (They can't very well be set at cross-compile time,
+       ;; since they differ between host and target and are
+       ;; host-compiled closures.)
        (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
                 (setf (type-info-validate-function type-info)
                       ,',validate-function)
@@ -326,8 +325,7 @@
                        ;; NIL) instead of full-blown (LAMBDA (X) NIL).
                        (lambda (name)
                          (declare (ignorable name))
-                         ,',default))
-                (setf (type-info-type type-info) ',',type-spec))
+                         ,',default)))
              *!reversed-type-info-init-forms*))
      ',type))
 
@@ -1299,14 +1297,14 @@
 (!cold-init-forms
   (/show0 "beginning *INFO-CLASSES* init, calling MAKE-HASH-TABLE")
   (setf *info-classes*
-        (make-hash-table :test 'eq :size #.(hash-table-size *info-classes*)))
+        (make-hash-table :test 'eq :size #.(* 2 (hash-table-count *info-classes*))))
   (/show0 "done with MAKE-HASH-TABLE in *INFO-CLASSES* init")
   (dolist (class-info-name '#.(let ((result nil))
                                 (maphash (lambda (key value)
                                            (declare (ignore value))
                                            (push key result))
                                          *info-classes*)
-                                result))
+                                (sort result #'string<)))
     (let ((class-info (make-class-info class-info-name)))
       (setf (gethash class-info-name *info-classes*)
             class-info)))
@@ -1332,7 +1330,14 @@
                          (list (type-info-name info-type)
                                (class-info-name (type-info-class info-type))
                                (type-info-number info-type)
-                               (type-info-type info-type))))
+                               ;; KLUDGE: for repeatable xc fasls, to
+                               ;; avoid different cross-compiler
+                               ;; treatment of equal constants here we
+                               ;; COPY-TREE, which is not in general a
+                               ;; valid identity transformation
+                               ;; [e.g. on (EQL (FOO))] but is OK for
+                               ;; all the types we use here.
+                               (copy-tree (type-info-type info-type)))))
                      *info-types*)))
   (/show0 "done with *INFO-TYPES* initialization"))
 

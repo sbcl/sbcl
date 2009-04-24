@@ -39,7 +39,11 @@
     (error "either too many args (~W) or too many results (~W); max = ~W"
            num-args num-results register-arg-count))
   (let ((num-temps (max num-args num-results))
-        (node (sb!xc:gensym "NODE")))
+        (node (sb!xc:gensym "NODE"))
+        (new-ebp-ea
+         '(make-ea :dword
+           :disp (frame-byte-offset (+ sp->fp-offset -3 ocfp-save-offset))
+           :base esp-tn)))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))
       (dotimes (i num-results)
         (let ((result-name (intern (format nil "RESULT-~D" i))))
@@ -78,26 +82,17 @@
          ;; effect of the ENTER with discrete instructions. Takes
          ;; 3+4+4=11 bytes as opposed to 1+4=5 bytes.
          (cond ((policy ,node (>= speed space))
-                (inst sub esp-tn (fixnumize 3))
-                (inst mov (make-ea :dword :base esp-tn
-                                   :disp (frame-byte-offset
-                                          (+ sp->fp-offset
-                                             -3
-                                             ocfp-save-offset)))
-                      ebp-tn)
-                (inst lea ebp-tn (make-ea :dword :base esp-tn
-                                          :disp (frame-byte-offset
-                                                 (+ sp->fp-offset
-                                                    -3
-                                                    ocfp-save-offset)))))
+                (inst sub esp-tn ,(fixnumize 3))
+                (inst mov ,new-ebp-ea ebp-tn)
+                (inst lea ebp-tn ,new-ebp-ea))
                (t
                 ;; Dummy for return address.
                 (inst push ebp-tn)
-                (inst enter (fixnumize 1))))
+                (inst enter ,(fixnumize 1))))
 
          ,(if (zerop num-args)
               '(inst xor ecx ecx)
-              `(inst mov ecx (fixnumize ,num-args)))
+              `(inst mov ecx ,(fixnumize num-args)))
 
          (note-this-location vop :call-site)
          ;; Old CMU CL comment:

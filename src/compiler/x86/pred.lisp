@@ -134,33 +134,25 @@
          (setf then temp))
        (inst cmov (first flags) res then))))
 
-(macrolet ((def-move-if (name type reg &optional stack)
-               (when stack (setf stack (list stack)))
-
+(macrolet ((def-move-if (name type reg stack)
                `(define-vop (,name move-if)
-                  (:args (then :scs (immediate ,reg ,@stack) :to :eval
+                  (:args (then :scs (immediate ,reg ,stack) :to :eval
                                :target temp
                                :load-if (not (or (sc-is then immediate)
-                                                 (and (sc-is then ,@stack)
+                                                 (and (sc-is then ,stack)
                                                       (not (location= else res))))))
-                         (else :scs (immediate ,reg ,@stack) :target res
-                               :load-if (not (sc-is else immediate ,@stack))))
+                         (else :scs (immediate ,reg ,stack) :target res
+                               :load-if (not (sc-is else immediate ,stack))))
                   (:arg-types ,type ,type)
                   (:results (res :scs (,reg)
                                  :from (:argument 1)))
                   (:result-types ,type))))
-  (def-move-if move-if/t
-      t descriptor-reg control-stack)
-  (def-move-if move-if/fx
-      tagged-num any-reg control-stack)
-  (def-move-if move-if/unsigned
-      unsigned-num unsigned-reg unsigned-stack)
-  (def-move-if move-if/signed
-      signed-num signed-reg signed-stack)
-  (def-move-if move-if/char
-      character character-reg character-stack)
-  (def-move-if move-if/sap
-      system-area-pointer sap-reg sap-stack))
+  (def-move-if move-if/t t descriptor-reg control-stack)
+  (def-move-if move-if/fx tagged-num any-reg control-stack)
+  (def-move-if move-if/unsigned unsigned-num unsigned-reg unsigned-stack)
+  (def-move-if move-if/signed signed-num signed-reg signed-stack)
+  (def-move-if move-if/char character character-reg character-stack)
+  (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))
 
 
 ;;;; conditional VOPs
