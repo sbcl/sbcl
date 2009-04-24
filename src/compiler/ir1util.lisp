@@ -1685,10 +1685,26 @@
                                  ((atom y) (file-coalesce-p y))
                                (unless (file-coalesce-p (car y))
                                  (return nil)))))
-                       ;; We *could* coalesce base-strings as well, but we'd need
-                       ;; a separate hash-table for that, since we are not allowed to
-                       ;; coalesce base-strings with non-base-strings.
-                       (typep x '(or (vector character) bit-vector)))))
+                       ;; We *could* coalesce base-strings as well,
+                       ;; but we'd need a separate hash-table for
+                       ;; that, since we are not allowed to coalesce
+                       ;; base-strings with non-base-strings.
+                       (typep x
+                              '(or bit-vector
+                                ;; in the cross-compiler, we coalesce
+                                ;; all strings with the same contents,
+                                ;; because we will end up dumping them
+                                ;; as base-strings anyway.  In the
+                                ;; real compiler, we're not allowed to
+                                ;; coalesce regardless of string
+                                ;; specialized element type, so we
+                                ;; KLUDGE by coalescing only character
+                                ;; strings (the common case) and
+                                ;; punting on the other types.
+                                #+sb-xc-host
+                                string
+                                #-sb-xc-host
+                                (vector character))))))
              (coalescep (x)
                (if faslp (file-coalesce-p x) (core-coalesce-p x))))
       (if (and (boundp '*constants*) (coalescep object))

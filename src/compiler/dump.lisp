@@ -208,7 +208,8 @@
            (type string x))
   (unless *cold-load-dump*
     (let ((handle (cdr (assoc
-                        (array-element-type x)
+                        #+sb-xc-host 'base-char ; for repeatable xc fasls
+                        #-sb-xc-host (array-element-type x)
                         (gethash x (fasl-output-equal-table fasl-output))))))
       (cond
         (handle (dump-push handle fasl-output) t)
@@ -238,7 +239,9 @@
            (type string x))
   (unless *cold-load-dump*
     (let ((handle (dump-pop fasl-output)))
-      (push (cons (array-element-type x) handle)
+      (push (cons #+sb-xc-host 'base-char ; repeatable xc fasls
+                  #-sb-xc-host (array-element-type x)
+                  handle)
             (gethash x (fasl-output-equal-table fasl-output)))
       (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
       (dump-push handle fasl-output)))
