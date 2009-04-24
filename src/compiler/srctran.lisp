@@ -1096,7 +1096,7 @@
              (t
               ;; (float x (+0.0)) => (or (member -0.0) (float x (0.0)))
               ;; (float x -0.0) => (or (member -0.0) (float x (0.0)))
-              (list (make-member-type :members (list (float -0.0 hi-val)))
+              (list (make-member-type :members (list (float (load-time-value (make-unportable-float :single-float-negative-zero)) hi-val)))
                     (make-numeric-type :class (numeric-type-class type)
                                        :format (numeric-type-format type)
                                        :complexp :real

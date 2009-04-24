@@ -1349,9 +1349,9 @@
 ;;; possible extension for the enthusiastic: printing floats in bases
 ;;; other than base 10.
 (defconstant single-float-min-e
-  (nth-value 1 (decode-float least-positive-single-float)))
+  (- 2 sb!vm:single-float-bias sb!vm:single-float-digits))
 (defconstant double-float-min-e
-  (nth-value 1 (decode-float least-positive-double-float)))
+  (- 2 sb!vm:double-float-bias sb!vm:double-float-digits))
 #!+long-float
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
@@ -1481,7 +1481,20 @@
           (values (float 0.0e0 original-x) 1)
           (let* ((ex (locally (declare (optimize (safety 0)))
                        (the fixnum
-                         (round (* exponent (log 2e0 10))))))
+                         (round (* exponent
+                                   ;; this is the closest double float
+                                   ;; to (log 2 10), but expressed so
+                                   ;; that we're not vulnerable to the
+                                   ;; host lisp's interpretation of
+                                   ;; arithmetic.  (FIXME: it turns
+                                   ;; out that sbcl itself is off by 1
+                                   ;; ulp in this value, which is a
+                                   ;; little unfortunate.)
+                                   (load-time-value
+                                    #!-long-float
+                                    (sb!kernel:make-double-float 1070810131 1352628735)
+                                    #!+long-float
+                                    (error "(log 2 10) not computed")))))))
                  (x (if (minusp ex)
                         (if (float-denormalized-p x)
                             #!-long-float

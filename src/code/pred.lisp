@@ -361,8 +361,9 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
 #!+sb-test
 (let ((test-cases `((0.0 ,(load-time-value (make-unportable-float :single-float-negative-zero)) t)
                     (0.0 1.0 nil)
-                    (#c(1 0) #c(1.0 0) t)
-                    (#c(1.1 0) #c(11/10 0) nil) ; due to roundoff error
+                    (#c(1 0) #c(1.0 0.0) t)
+                    (#c(0 1) #c(0.0 1.0) t)
+                    (#c(1.1 0.0) #c(11/10 0) nil) ; due to roundoff error
                     ("Hello" "hello" t)
                     ("Hello" #(#\h #\E #\l #\l #\o) t)
                     ("Hello" "goodbye" nil))))

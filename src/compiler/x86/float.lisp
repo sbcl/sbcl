@@ -189,18 +189,23 @@
   ((fp-constant) (single-reg double-reg #!+long-float long-reg))
   (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
     (with-empty-tn@fp-top(y)
-      (cond ((zerop value)
+      (cond ((or (eql value 0f0) (eql value 0d0) #!+long-float (eql value 0l0))
              (inst fldz))
             ((= value 1e0)
              (inst fld1))
+            #!+long-float
             ((= value (coerce pi *read-default-float-format*))
              (inst fldpi))
+            #!+long-float
             ((= value (log 10e0 2e0))
              (inst fldl2t))
+            #!+long-float
             ((= value (log 2.718281828459045235360287471352662e0 2e0))
              (inst fldl2e))
+            #!+long-float
             ((= value (log 2e0 10e0))
              (inst fldlg2))
+            #!+long-float
             ((= value (log 2e0 2.718281828459045235360287471352662e0))
              (inst fldln2))
             (t (warn "ignoring bogus i387 constant ~A" value))))))

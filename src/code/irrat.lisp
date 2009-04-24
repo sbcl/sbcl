@@ -808,8 +808,13 @@
              (values
               (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0)
               0))
-            ((let ((threshold #.(/ least-positive-double-float
-                                   double-float-epsilon))
+            ((let ((threshold
+                    ;; (/ least-positive-double-float double-float-epsilon)
+                    (load-time-value
+                     #!-long-float
+                     (sb!kernel:make-double-float #x1fffff #xfffffffe)
+                     #!+long-float
+                     (error "(/ least-positive-long-float long-float-epsilon)")))
                    (traps (ldb sb!vm::float-sticky-bits
                                (sb!vm:floating-point-modes))))
                 ;; Overflow raised or (underflow raised and rho <
@@ -886,10 +891,22 @@
   ;; influences the choices of these constants but doesn't say how to
   ;; choose them.  We'll just assume his choices matches our
   ;; implementation of log1p.
-  (let ((t0 #.(/ 1 (sqrt 2.0d0)))
+  (let ((t0 (load-time-value
+             #!-long-float
+             (sb!kernel:make-double-float #x3fe6a09e #x667f3bcd)
+             #!+long-float
+             (error "(/ (sqrt 2l0))")))
+        ;; KLUDGE: if repeatable fasls start failing under some weird
+        ;; xc host, this 1.2d0 might be a good place to examine: while
+        ;; it _should_ be the same in all vaguely-IEEE754 hosts, 1.2
+        ;; is not exactly representable, so something could go wrong.
         (t1 1.2d0)
         (t2 3d0)
-        (ln2 #.(log 2d0))
+        (ln2 (load-time-value
+              #!-long-float
+              (sb!kernel:make-double-float #x3fe62e42 #xfefa39ef)
+              #!+long-float
+              (error "(log 2l0)")))
         (x (float (realpart z) 1.0d0))
         (y (float (imagpart z) 1.0d0)))
     (multiple-value-bind (rho k)
@@ -987,16 +1004,11 @@
       ;; space 0 to get maybe-inline functions inlined
       (declare (optimize (speed 3) (space 0)))
     (cond ((> (abs x)
-              ;; FIXME: this form is hideously broken wrt
-              ;; cross-compilation portability.  Much else in this
-              ;; file is too, of course, sometimes hidden by
-              ;; constant-folding, but this one in particular clearly
-              ;; depends on host and target
-              ;; MOST-POSITIVE-DOUBLE-FLOATs being equal.  -- CSR,
-              ;; 2003-04-20
-              #.(/ (+ (log 2.0d0)
-                      (log most-positive-double-float))
-                   4d0))
+              (load-time-value
+               #!-long-float
+               (sb!kernel:make-double-float #x406633ce #x8fb9f87e)
+               #!+long-float
+               (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)")))
            (coerce-to-complex-type (float-sign x)
                                    (float-sign y) z))
           (t
