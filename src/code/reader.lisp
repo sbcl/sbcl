@@ -499,17 +499,20 @@ standard Lisp readtable when NIL."
           (*inch-ptr* 0))
      ,@body))
 
-(defun check-for-recursive-read (recursive-p operator-name)
-  (when (and recursive-p
-             (not (and (boundp '*read-buffer*)
-                       (boundp '*read-buffer-length*)
-                       (boundp '*ouch-ptr*)
-                       (boundp '*inch-ptr*))))
-    (error 'simple-reader-error
-           :format-control "~A was invoked with RECURSIVE-P being true outside ~
-                            of a recursive read operation."
-           :format-arguments `(,operator-name))))
+(declaim (inline read-buffer-boundp))
+(defun read-buffer-boundp ()
+  (and (boundp '*read-buffer*)
+       (boundp '*read-buffer-length*)
+       (boundp '*ouch-ptr*)
+       (boundp '*inch-ptr*)))
 
+(defun check-for-recursive-read (stream recursive-p operator-name)
+  (when (and recursive-p (not (read-buffer-boundp)))
+    (simple-reader-error
+     stream
+     "~A was invoked with RECURSIVE-P being true outside ~
+      of a recursive read operation."
+     `(,operator-name))))
 
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
@@ -555,7 +558,7 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
-  (check-for-recursive-read recursive-p 'read-preserving-whitespace)
+  (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
   (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
 
 ;;; Return NIL or a list with one thing, depending.
@@ -575,7 +578,7 @@ standard Lisp readtable when NIL."
                        (recursive-p nil))
   #!+sb-doc
   "Read the next Lisp value from STREAM, and return it."
-  (check-for-recursive-read recursive-p 'read)
+  (check-for-recursive-read stream recursive-p 'read)
   (let ((result (%read-preserving-whitespace stream eof-error-p eof-value
                                              recursive-p)))
     ;; This function generally discards trailing whitespace. If you
@@ -595,7 +598,7 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
-  (check-for-recursive-read recursive-p 'read-delimited-list)
+  (check-for-recursive-read input-stream recursive-p 'read-delimited-list)
   (flet ((%read-delimited-list (endchar input-stream)
            (do ((char (flush-whitespace input-stream)
                       (flush-whitespace input-stream))
