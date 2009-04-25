@@ -37,8 +37,9 @@
     (let ((src (position "src" dir :test #'string=
                          :from-end t)))
       (cond
-        (src (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
-                     (subseq dir src) (pathname-name untruename)))
+        ((and src (not (string= (car (last dir)) "output")))
+         (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
+                 (subseq dir src) (pathname-name untruename)))
         (t (aver (string-equal (car (last dir)) "output"))
            (aver (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
            (aver (string-equal (pathname-type untruename) "lisp"))
