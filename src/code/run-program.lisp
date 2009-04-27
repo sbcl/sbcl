@@ -759,7 +759,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                                                   (if search 1 0)
                                                   environment-vec pty-name
                                                   (if wait 1 0))))
-                             (when (plusp child)
+                             (unless (= child -1)
                                (setf proc
                                      (apply
                                       #'make-process
