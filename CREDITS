@@ -677,6 +677,12 @@ Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
   under CLISP.
 
+Gabor Melis:
+  He mainly worked on robustness related to signal handling, threads,
+  timers with small excursions to constraint propagation, weak hash
+  tables (based on CMUCL code) and optimizing x86/x86-64 calling
+  convention.
+
 Perry E. Metzger:
   He ported SBCL to NetBSD with newer signals, building on the
   work of Valtteri Vuorikoski.  He also provided various cleanups to

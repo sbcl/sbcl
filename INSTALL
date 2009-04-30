@@ -26,7 +26,7 @@ INSTALLING SBCL
 
   The following command installs SBCL and related documentation under
   the "/usr/local" directory:
-  
+
     # INSTALL_ROOT=/usr/local sh install.sh
 
   You can also install SBCL as a user, under your home directory:
@@ -191,7 +191,7 @@ INSTALLING SBCL
 
     * Check that the host lisp you're building with is known to work as
       an SBCL build host, and that your operating system is supported.
-      
+
     * Try to do a build without loading any initialization files
       for the cross-compilation host (for example
       "sh make.sh 'sbcl --userinit /dev/null --sysinit /dev/null'").
@@ -213,7 +213,7 @@ INSTALLING SBCL
   itself, it's a good idea.) Follow the "CVS Repository" link on
   <http://sourceforge.net/projects/sbcl> for instructions.
 
-2.5. Supported platforms 
+2.5. Supported platforms
 
   Last updated for SBCL 0.9.3.74 (2005-08-20).
 
@@ -230,23 +230,22 @@ INSTALLING SBCL
 
     SBCL
     CMUCL
-    OpenMCL
+    CCL (formerly known as OpenMCL)
     ABCL (recent versions only)
 
     Note that every release isn't tested with every possible host
     compiler.  You're most likely to get a clean build with SBCL itself
-    as host, otherwise OpenMCL on a PPC and CMUCL elsewhere.
+    as host, otherwise CCL on a PPC and CMUCL elsewhere.
 
   Supported operating systems and architectures:
 
-                           x86 PPC Alpha Sparc HPPA MIPS MIPSel x86-64
-    Linux 2.2, 2.4, 2.6     X   X    X     X    X    X     X      X
-    FreeBSD                 X
+                           x86 x86-64 PPC Sparc Alpha MIPS MIPSel
+    Linux 2.2, 2.4, 2.6     X     X    X    X     X     X     X
+    Darwin (Mac OS X)       X     X    X
+    Solaris                 X               X
+    FreeBSD                 X     X
+    NetBSD                  X          X
     OpenBSD 3.4, 3.5        X
-    NetBSD                  X
-    Solaris                 X              X
-    Tru64                            X
-    Darwin (Mac OS X)       X   X
     Windows                 X
 
     Some operating systems are more equal than others: most of the
