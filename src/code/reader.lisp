@@ -440,15 +440,11 @@ standard Lisp readtable when NIL."
 ;;;; implementation of the read buffer
 
 (defvar *read-buffer*)
-(defvar *read-buffer-length*)
-;;; FIXME: Is it really helpful to have *READ-BUFFER-LENGTH* be a
-;;; separate variable instead of just calculating it on the fly as
-;;; (LENGTH *READ-BUFFER*)?
 
 (defvar *inch-ptr*) ; *OUCH-PTR* always points to next char to write.
 (defvar *ouch-ptr*) ; *INCH-PTR* always points to next char to read.
 
-(declaim (type index *read-buffer-length* *inch-ptr* *ouch-ptr*))
+(declaim (type index *inch-ptr* *ouch-ptr*))
 (declaim (type (simple-array character (*)) *read-buffer*))
 
 (declaim (inline reset-read-buffer))
@@ -460,7 +456,7 @@ standard Lisp readtable when NIL."
 (declaim (inline ouch-read-buffer))
 (defun ouch-read-buffer (char)
   ;; When buffer overflow
-  (when (>= *ouch-ptr* *read-buffer-length*)
+  (when (>= *ouch-ptr* (length *read-buffer*))
     ;; Size should be doubled.
     (grow-read-buffer))
   (setf (elt *read-buffer* *ouch-ptr*) char)
@@ -470,8 +466,7 @@ standard Lisp readtable when NIL."
   (let* ((rbl (length *read-buffer*))
          (new-length (* 2 rbl))
          (new-buffer (make-string new-length)))
-    (setq *read-buffer* (replace new-buffer *read-buffer*))
-    (setq *read-buffer-length* new-length)))
+    (setq *read-buffer* (replace new-buffer *read-buffer*))))
 
 (defun inch-read-buffer ()
   (if (>= *inch-ptr* *ouch-ptr*)
@@ -494,7 +489,6 @@ standard Lisp readtable when NIL."
 
 (defmacro with-read-buffer (() &body body)
   `(let* ((*read-buffer* (make-string 128))
-          (*read-buffer-length* 128)
           (*ouch-ptr* 0)
           (*inch-ptr* 0))
      ,@body))
@@ -502,7 +496,6 @@ standard Lisp readtable when NIL."
 (declaim (inline read-buffer-boundp))
 (defun read-buffer-boundp ()
   (and (boundp '*read-buffer*)
-       (boundp '*read-buffer-length*)
        (boundp '*ouch-ptr*)
        (boundp '*inch-ptr*)))
 
