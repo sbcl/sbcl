@@ -229,6 +229,12 @@
                                            attribute-names
                                            'get-setf-expansion)))
 
+;;; Otherwise the source locations for DEFTRANSFORM, DEFKNOWN, &c
+;;; would be off by one toplevel form as their source locations are
+;;; determined before cross-compiling where the above PROGN is not
+;;; seen.
+#+sb-xc (progn)
+
 ;;; And now for some gratuitous pseudo-abstraction...
 ;;;
 ;;; ATTRIBUTES-UNION
