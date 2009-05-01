@@ -222,10 +222,6 @@
 
 ;;;; 32-bit logical operations
 
-(defknown merge-bits ((unsigned-byte 5) sb!vm:word sb!vm:word)
-  sb!vm:word
-  (foldable flushable movable))
-
 (defknown word-logical-not (sb!vm:word) sb!vm:word
   (foldable flushable movable))
 

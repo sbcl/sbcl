@@ -633,22 +633,6 @@
   (:arg-types * (:constant (signed-byte 9)))
   (:variant-cost 6))
 
-;;;; 32-bit logical operations
-
-(define-vop (merge-bits) ; not implemented, even used ?
-  (:translate merge-bits)
-  (:args (shift :scs (signed-reg unsigned-reg))
-         (prev :scs (unsigned-reg))
-         (next :scs (unsigned-reg)))
-  (:arg-types tagged-num unsigned-num unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:ignore shift prev next)
-  (:generator 4
-    (inst li 0 result)
-    (inst break 0)))
-
 
 ;;;; modular functions
 (define-modular-fun +-mod32 (x y) + :untagged nil 32)

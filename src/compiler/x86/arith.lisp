@@ -1213,21 +1213,6 @@
 
 ;;;; 32-bit logical operations
 
-(define-vop (merge-bits)
-  (:translate merge-bits)
-  (:args (shift :scs (signed-reg unsigned-reg) :target ecx)
-         (prev :scs (unsigned-reg) :target result)
-         (next :scs (unsigned-reg)))
-  (:arg-types tagged-num unsigned-num unsigned-num)
-  (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 0)) ecx)
-  (:results (result :scs (unsigned-reg) :from (:argument 1)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 4
-    (move ecx shift)
-    (move result prev)
-    (inst shrd result next :cl)))
-
 ;;; Only the lower 5 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)

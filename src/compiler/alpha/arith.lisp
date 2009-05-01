@@ -602,27 +602,6 @@
 
 ;;;; 32-bit logical operations
 
-(define-vop (merge-bits)
-  (:translate merge-bits)
-  (:args (shift :scs (signed-reg unsigned-reg))
-         (prev :scs (unsigned-reg))
-         (next :scs (unsigned-reg)))
-  (:arg-types tagged-num unsigned-num unsigned-num)
-  (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
-  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) res)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 4
-    (let ((done (gen-label)))
-      (inst srl next shift res)
-      (inst beq shift done)
-      (inst subq zero-tn shift temp)
-      (inst sll prev temp temp)
-      (inst bis res temp res)
-      (emit-label done)
-      (move res result))))
-
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
   (:args (num :scs (unsigned-reg))
