@@ -239,7 +239,7 @@ os_init(char *argv[], char *envp[])
      * Since randomization is currently implemented only on x86 kernels,
      * don't do this trick on other platforms.
      */
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     if ((major_version == 2
          /* Some old kernels will apparently lose unsupported personality flags
           * on exec() */
@@ -283,10 +283,12 @@ os_init(char *argv[], char *envp[])
             fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
         }
     }
+#ifdef LISP_FEATURE_X86
     /* Use SSE detector.  Recent versions of Linux enable SSE support
      * on SSE capable CPUs.  */
     /* FIXME: Are there any old versions that does not support SSE?  */
     fast_bzero_pointer = fast_bzero_detect;
+#endif
 #endif
 }
 

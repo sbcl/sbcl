@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * bug fix: disable address space randomization Linux/x86-64 as well,
+    not just x86-64. (reported by Ken Olum)
+
 changes in sbcl-1.0.28 relative to 1.0.27:
   * a number of bugs in cross-compilation have been fixed, with the ultimate
     result that building under (at least) clisp should be much more reliable.
