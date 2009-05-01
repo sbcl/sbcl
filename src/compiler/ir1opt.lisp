@@ -42,6 +42,22 @@
 ;;; The result value is cached in the LVAR-%DERIVED-TYPE slot. If the
 ;;; slot is true, just return that value, otherwise recompute and
 ;;; stash the value there.
+(eval-when (:compile-toplevel :execute)
+  (#+sb-xc-host cl:defmacro
+   #-sb-xc-host sb!xc:defmacro
+        lvar-type-using (lvar accessor)
+     `(let ((uses (lvar-uses ,lvar)))
+        (cond ((null uses) *empty-type*)
+              ((listp uses)
+               (do ((res (,accessor (first uses))
+                         (values-type-union (,accessor (first current))
+                                            res))
+                    (current (rest uses) (rest current)))
+                   ((or (null current) (eq res *wild-type*))
+                    res)))
+              (t
+               (,accessor uses))))))
+
 #!-sb-fluid (declaim (inline lvar-derived-type))
 (defun lvar-derived-type (lvar)
   (declare (type lvar lvar))
@@ -49,24 +65,119 @@
       (setf (lvar-%derived-type lvar)
             (%lvar-derived-type lvar))))
 (defun %lvar-derived-type (lvar)
-  (declare (type lvar lvar))
-  (let ((uses (lvar-uses lvar)))
-    (cond ((null uses) *empty-type*)
-          ((listp uses)
-           (do ((res (node-derived-type (first uses))
-                     (values-type-union (node-derived-type (first current))
-                                        res))
-                (current (rest uses) (rest current)))
-               ((or (null current) (eq res *wild-type*))
-                res)))
-          (t
-           (node-derived-type uses)))))
+  (lvar-type-using lvar node-derived-type))
 
 ;;; Return the derived type for LVAR's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
 (declaim (ftype (sfunction (lvar) ctype) lvar-type))
 (defun lvar-type (lvar)
   (single-value-type (lvar-derived-type lvar)))
+
+;;; LVAR-CONSERVATIVE-TYPE
+;;;
+;;; Certain types refer to the contents of an object, which can
+;;; change without type derivation noticing: CONS types and ARRAY
+;;; types suffer from this:
+;;;
+;;;  (let ((x (the (cons fixnum fixnum) (cons a b))))
+;;;     (setf (car x) c)
+;;;     (+ (car x) (cdr x)))
+;;;
+;;; Python doesn't realize that the SETF CAR can change the type of X -- so we
+;;; cannot use LVAR-TYPE which gets the derived results. Worse, still, instead
+;;; of (SETF CAR) we might have a call to a user-defined function FOO which
+;;; does the same -- so there is no way to use the derived information in
+;;; general.
+;;;
+;;; So, the conservative option is to use the derived type if the leaf has
+;;; only a single ref -- in which case there cannot be a prior call that
+;;; mutates it. Otherwise we use the declared type or punt to the most general
+;;; type we know to be correct for sure.
+(defun lvar-conservative-type (lvar)
+  (let ((derived-type (lvar-type lvar))
+        (t-type *universal-type*))
+    ;; Recompute using NODE-CONSERVATIVE-TYPE instead of derived type if
+    ;; necessary -- picking off some easy cases up front.
+    (cond ((or (eq derived-type t-type)
+               ;; Can't use CSUBTYPEP!
+               (type= derived-type (specifier-type 'list))
+               (type= derived-type (specifier-type 'null)))
+           derived-type)
+          ((and (cons-type-p derived-type)
+                (eq t-type (cons-type-car-type derived-type))
+                (eq t-type (cons-type-cdr-type derived-type)))
+           derived-type)
+          ((and (array-type-p derived-type)
+                (or (not (array-type-complexp derived-type))
+                    (let ((dimensions (array-type-dimensions derived-type)))
+                      (or (eq '* dimensions)
+                          (every (lambda (dim) (eq '* dim)) dimensions)))))
+           derived-type)
+          ((type-needs-conservation-p derived-type)
+           (single-value-type (lvar-type-using lvar node-conservative-type)))
+          (t
+           derived-type))))
+
+(defun node-conservative-type (node)
+  (let* ((derived-values-type (node-derived-type node))
+         (derived-type (single-value-type derived-values-type)))
+    (if (ref-p node)
+        (let ((leaf (ref-leaf node)))
+          (if (and (basic-var-p leaf)
+                   (cdr (leaf-refs leaf)))
+              (coerce-to-values
+               (if (eq :declared (leaf-where-from leaf))
+                   (leaf-type leaf)
+                   (conservative-type derived-type)))
+              derived-values-type))
+        derived-values-type)))
+
+(defun conservative-type (type)
+  (cond ((or (eq type *universal-type*)
+             (eq type (specifier-type 'list))
+             (eq type (specifier-type 'null)))
+         type)
+        ((cons-type-p type)
+         (specifier-type 'cons))
+        ((array-type-p type)
+         (if (array-type-complexp type)
+             (make-array-type
+              ;; ADJUST-ARRAY may change dimensions, but rank stays same.
+              :dimensions
+              (let ((old (array-type-dimensions type)))
+                (if (eq '* old)
+                    old
+                    (mapcar (constantly '*) old)))
+              ;; Complexity cannot change.
+              :complexp (array-type-complexp type)
+              ;; Element type cannot change.
+              :element-type (array-type-element-type type)
+              :specialized-element-type (array-type-specialized-element-type type))
+             ;; Simple arrays cannot change at all.
+             type))
+        (t
+         ;; If the type contains some CONS types, the conservative type contains all
+         ;; of them.
+         (when (types-equal-or-intersect type (specifier-type 'cons))
+           (setf type (type-union type (specifier-type 'cons))))
+         ;; Similarly for non-simple arrays -- it should be possible to preserve
+         ;; more information here, but really...
+         (let ((non-simple-arrays (specifier-type '(and array (not simple-array)))))
+           (when (types-equal-or-intersect type non-simple-arrays)
+             (setf type (type-union type non-simple-arrays))))
+         type)))
+
+(defun type-needs-conservation-p (type)
+  (cond ((eq type *universal-type*)
+         ;; Excluding T is necessary, because we do want type derivation to
+         ;; be able to narrow it down in case someone (most like a macro-expansion...)
+         ;; actually declares something as having type T.
+         nil)
+        ((or (cons-type-p type) (and (array-type-p type) (array-type-complexp type)))
+         ;; Covered by the next case as well, but this is a quick test.
+         t)
+        ((types-equal-or-intersect type (specifier-type '(or cons (and array (not simple-array)))))
+         t)))
 
 ;;; If LVAR is an argument of a function, return a type which the
 ;;; function checks LVAR for.
@@ -1262,19 +1373,27 @@
 
 ;;;; local call optimization
 
-;;; Propagate TYPE to LEAF and its REFS, marking things changed. If
-;;; the leaf type is a function type, then just leave it alone, since
-;;; TYPE is never going to be more specific than that (and
-;;; TYPE-INTERSECTION would choke.)
+;;; Propagate TYPE to LEAF and its REFS, marking things changed.
+;;;
+;;; If the leaf type is a function type, then just leave it alone, since TYPE
+;;; is never going to be more specific than that (and TYPE-INTERSECTION would
+;;; choke.)
+;;;
+;;; Also, if the type is one requiring special care don't touch it if the leaf
+;;; has multiple references -- otherwise LVAR-CONSERVATIVE-TYPE is screwed.
 (defun propagate-to-refs (leaf type)
   (declare (type leaf leaf) (type ctype type))
-  (let ((var-type (leaf-type leaf)))
-    (unless (fun-type-p var-type)
+  (let ((var-type (leaf-type leaf))
+        (refs (leaf-refs leaf)))
+    (unless (or (fun-type-p var-type)
+                (and (cdr refs)
+                     (eq :declared (leaf-where-from leaf))
+                     (type-needs-conservation-p var-type)))
       (let ((int (type-approx-intersection2 var-type type)))
         (when (type/= int var-type)
           (setf (leaf-type leaf) int)
           (let ((s-int (make-single-value-type int)))
-            (dolist (ref (leaf-refs leaf))
+            (dolist (ref refs)
               (derive-node-type ref s-int)
               ;; KLUDGE: LET var substitution
               (let* ((lvar (node-lvar ref)))

@@ -524,31 +524,6 @@ WORKAROUND:
 
   c. (fixed in 0.8.4.23)
 
-201: "Incautious type inference from compound types"
-  a. (reported by APD sbcl-devel 2002-09-17)
-    (DEFUN FOO (X)
-      (LET ((Y (CAR (THE (CONS INTEGER *) X))))
-        (SETF (CAR X) NIL)
-        (FORMAT NIL "~S IS ~S, Y = ~S"
-                (CAR X)
-                (TYPECASE (CAR X)
-                  (INTEGER 'INTEGER)
-                  (T '(NOT INTEGER)))
-                Y)))
-
-    (FOO ' (1 . 2)) => "NIL IS INTEGER, Y = 1"
-
-  b.
-    * (defun foo (x)
-        (declare (type (array * (4 4)) x))
-        (let ((y x))
-          (setq x (make-array '(4 4)))
-          (adjust-array y '(3 5))
-          (= (array-dimension y 0) (eval `(array-dimension ,y 0)))))
-    FOO
-    * (foo (make-array '(4 4) :adjustable t))
-    NIL
-
 205: "environment issues in cross compiler"
   (These bugs have no impact on user code, but should be fixed or
   documented.)

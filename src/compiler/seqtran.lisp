@@ -1053,7 +1053,9 @@
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
 (defoptimizer (car derive-type) ((cons))
-  (let ((type (lvar-type cons))
+  ;; This and CDR needs to use LVAR-CONSERVATIVE-TYPE because type inference
+  ;; gets confused by things like (SETF CAR).
+  (let ((type (lvar-conservative-type cons))
         (null-type (specifier-type 'null)))
     (cond ((eq type null-type)
            null-type)
@@ -1061,7 +1063,7 @@
            (cons-type-car-type type)))))
 
 (defoptimizer (cdr derive-type) ((cons))
-  (let ((type (lvar-type cons))
+  (let ((type (lvar-conservative-type cons))
         (null-type (specifier-type 'null)))
     (cond ((eq type null-type)
            null-type)

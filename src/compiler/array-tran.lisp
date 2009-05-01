@@ -475,7 +475,9 @@
                                (array index))
   (unless (constant-lvar-p axis)
     (give-up-ir1-transform "The axis is not constant."))
-  (let ((array-type (lvar-type array))
+  ;; Dimensions may change thanks to ADJUST-ARRAY, so we need the
+  ;; conservative type.
+  (let ((array-type (lvar-conservative-type array))
         (axis (lvar-value axis)))
     (let ((dims (array-type-dimensions-or-give-up array-type)))
       (unless (listp dims)
