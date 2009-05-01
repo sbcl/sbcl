@@ -1069,6 +1069,21 @@
     (let ((usage-after (sb-kernel::dynamic-usage)))
       (when (< (+ usage-before 2000000) usage-after)
         (error "Leak")))))
+
+;;; PROGV compilation and type checking when the declared type
+;;; includes a FUNCTION subtype.
+(declaim (type (or (function (t) (values boolean &optional)) string)
+               *hairy-progv-var*))
+(defvar *hairy-progv-var* #'null)
+(with-test (:name :hairy-progv-type-checking)
+  (assert (eq :error
+              (handler-case
+                  (progv '(*hairy-progv-var*) (list (eval 42))
+                    *hairy-progv-var*)
+                (type-error () :error))))
+  (assert (equal "GOOD!"
+                 (progv '(*hairy-progv-var*) (list (eval "GOOD!"))
+                    *hairy-progv-var*))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
@@ -1820,18 +1835,4 @@
 (setf *mystery* :mystery)
 (assert (eq :ok (test-mystery (make-thing :slot :mystery))))
 
-;;; PROGV compilation and type checking when the declared type
-;;; includes a FUNCTION subtype.
-(declaim (type (or (function (t) (values boolean &optional)) string)
-               *hairy-progv-var*))
-(defvar *hairy-progv-var* #'null)
-(with-test (:name :hairy-progv-type-checking)
-  (assert (eq :error
-              (handler-case
-                  (progv '(*hairy-progv-var*) (list (eval 42))
-                    *hairy-progv-var*)
-                (type-error () :error))))
-  (assert (equal "GOOD!"
-                 (progv '(*hairy-progv-var*) (list (eval "GOOD!"))
-                    *hairy-progv-var*))))
 ;;; success
