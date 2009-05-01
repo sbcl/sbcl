@@ -456,11 +456,13 @@ standard Lisp readtable when NIL."
 (declaim (inline ouch-read-buffer))
 (defun ouch-read-buffer (char)
   ;; When buffer overflow
-  (when (>= *ouch-ptr* (length *read-buffer*))
+  (let ((op *ouch-ptr*))
+    (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+    (when (>= op (length *read-buffer*))
     ;; Size should be doubled.
-    (grow-read-buffer))
-  (setf (elt *read-buffer* *ouch-ptr*) char)
-  (setq *ouch-ptr* (1+ *ouch-ptr*)))
+      (grow-read-buffer))
+    (setf (elt *read-buffer* op) char)
+    (setq *ouch-ptr* (1+ op))))
 
 (defun grow-read-buffer ()
   (let* ((rbl (length *read-buffer*))
