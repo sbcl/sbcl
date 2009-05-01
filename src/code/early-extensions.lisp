@@ -789,7 +789,7 @@
       ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
       ;; check.
       (let ((type (info :variable :type symbol)))
-        (unless (sb!kernel::%%typep new-value type)
+        (unless (sb!kernel::%%typep new-value type nil)
           (let ((spec (type-specifier type)))
             (error 'simple-type-error
                    :format-control "Cannot ~@? to ~S (not of type ~S.)"

@@ -31,7 +31,7 @@
            (if (ctype-p specifier)
                specifier
                (specifier-type specifier))))
-(defun %%typep (object type)
+(defun %%typep (object type &optional (strict t))
   (declare (type ctype type))
   (etypecase type
     (named-type
@@ -111,16 +111,16 @@
      #+sb-xc-host (ctypep object type)
      #-sb-xc-host (classoid-typep (layout-of object) type object))
     (union-type
-     (some (lambda (union-type-type) (%%typep object union-type-type))
+     (some (lambda (union-type-type) (%%typep object union-type-type strict))
            (union-type-types type)))
     (intersection-type
      (every (lambda (intersection-type-type)
-              (%%typep object intersection-type-type))
+              (%%typep object intersection-type-type strict))
             (intersection-type-types type)))
     (cons-type
      (and (consp object)
-          (%%typep (car object) (cons-type-car-type type))
-          (%%typep (cdr object) (cons-type-cdr-type type))))
+          (%%typep (car object) (cons-type-car-type type) strict)
+          (%%typep (cdr object) (cons-type-cdr-type type) strict)))
     (character-set-type
      (and (characterp object)
          (let ((code (char-code object))
@@ -137,16 +137,16 @@
        (if (typep reparse 'unknown-type)
            (error "unknown type specifier: ~S"
                   (unknown-type-specifier reparse))
-           (%%typep object reparse))))
+           (%%typep object reparse strict))))
     (negation-type
-     (not (%%typep object (negation-type-type type))))
+     (not (%%typep object (negation-type-type type) strict)))
     (hairy-type
      ;; Now the tricky stuff.
      (let* ((hairy-spec (hairy-type-specifier type))
             (symbol (car hairy-spec)))
        (ecase symbol
          (and
-          (every (lambda (spec) (%%typep object (specifier-type spec)))
+          (every (lambda (spec) (%%typep object (specifier-type spec) strict))
                  (rest hairy-spec)))
          ;; Note: it should be safe to skip OR here, because union
          ;; types can always be represented as UNION-TYPE in general
@@ -155,7 +155,7 @@
          (not
           (unless (proper-list-of-length-p hairy-spec 2)
             (error "invalid type specifier: ~S" hairy-spec))
-          (not (%%typep object (specifier-type (cadr hairy-spec)))))
+          (not (%%typep object (specifier-type (cadr hairy-spec)) strict)))
          (satisfies
           (unless (proper-list-of-length-p hairy-spec 2)
             (error "invalid type specifier: ~S" hairy-spec))
@@ -163,8 +163,11 @@
     (alien-type-type
      (sb!alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (fun-type
-     (error "Function types are not a legal argument to TYPEP:~%  ~S"
-            (type-specifier type)))))
+     (if strict
+         (error "Function types are not a legal argument to TYPEP:~%  ~S"
+                (type-specifier type))
+         (and (functionp object)
+              (csubtypep (specifier-type (sb!impl::%fun-type object)) type))))))
 
 ;;; Do a type test from a class cell, allowing forward reference and
 ;;; redefinition.

@@ -3,6 +3,9 @@
     not just x86-64. (reported by Ken Olum)
   * bug fix: #201; type inference for CONS and ARRAY types could derive
     wrong results in the presence of eg. RPLACA or ADJUST-ARRAY.
+  * bug fix: special variables with a proclaimed specific subtype of FUNCTION
+    could not be assigned to or bound with PROGV. (reported by Lorenz
+    Mösenlechner)
 
 changes in sbcl-1.0.28 relative to 1.0.27:
   * a number of bugs in cross-compilation have been fixed, with the ultimate
