@@ -461,11 +461,14 @@
 (deftransform array-rank ((array))
   (let ((array-type (lvar-type array)))
     (let ((dims (array-type-dimensions-or-give-up array-type)))
-      (if (not (listp dims))
-          (give-up-ir1-transform
-           "The array rank is not known at compile time: ~S"
-           dims)
-          (length dims)))))
+      (cond ((listp dims)
+             (length dims))
+            ((eq t (array-type-complexp array-type))
+             '(%array-rank array))
+            (t
+             `(if (array-header-p array)
+                  (%array-rank array)
+                  1))))))
 
 ;;; If we know the dimensions at compile time, just use it. Otherwise,
 ;;; if we can tell that the axis is in bounds, convert to

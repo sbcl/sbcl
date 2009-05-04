@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * optimization: multidimensional array accesses in the absence of type
+    information regarding array rank are approximately 10% faster due to
+    open coding of ARRAY-RANK.
   * bug fix: disable address space randomization Linux/x86-64 as well,
     not just x86-64. (reported by Ken Olum)
   * bug fix: #201; type inference for CONS and ARRAY types could derive
