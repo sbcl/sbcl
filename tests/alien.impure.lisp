@@ -252,4 +252,46 @@
   (handler-bind ((warning #'error))
     (compile nil '(lambda () (multiple-value-list (bug-316075))))))
 
+
+;;; Bug #316325: "return values of alien calls assumed truncated to
+;;; correct width on x86"
+#+x86-64
+(sb-alien::define-alien-callback truncation-test (unsigned 64)
+    ((foo (unsigned 64)))
+  foo)
+#+x86
+(sb-alien::define-alien-callback truncation-test (unsigned 32)
+    ((foo (unsigned 32)))
+  foo)
+
+#+(or x86-64 x86)
+(with-test (:name bug-316325)
+  ;; This test works by defining a callback function that provides an
+  ;; identity transform over a full-width machine word, then calling
+  ;; it as if it returned a narrower type and checking to see if any
+  ;; noise in the high bits of the result are properly ignored.
+  (macrolet ((verify (type input output)
+               `(with-alien ((fun (* (function ,type
+                                               #+x86-64 (unsigned 64)
+                                               #+x86 (unsigned 32)))
+                                  :local (alien-sap truncation-test)))
+                  (let ((result (alien-funcall fun ,input)))
+                    (assert (= result ,output))))))
+    #+x86-64
+    (progn
+      (verify (unsigned 64) #x8000000000000000 #x8000000000000000)
+      (verify (signed 64)   #x8000000000000000 #x-8000000000000000)
+      (verify (signed 64)   #x7fffffffffffffff #x7fffffffffffffff)
+      (verify (unsigned 32) #x0000000180000042 #x80000042)
+      (verify (signed 32)   #x0000000180000042 #x-7fffffbe)
+      (verify (signed 32)   #xffffffff7fffffff #x7fffffff))
+    #+x86
+    (progn
+      (verify (unsigned 32) #x80000042 #x80000042)
+      (verify (signed 32)   #x80000042 #x-7fffffbe)
+      (verify (signed 32)   #x7fffffff #x7fffffff))
+    (verify (unsigned 16) #x00018042 #x8042)
+    (verify (signed 16)   #x003f8042 #x-7fbe)
+    (verify (signed 16)   #x003f7042 #x7042)))
+
 ;;; success

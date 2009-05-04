@@ -364,8 +364,8 @@
   (declare (ignore type))
   'system-area-pointer)
 
-(define-alien-type-method (system-area-pointer :alien-rep) (type)
-  (declare (ignore type))
+(define-alien-type-method (system-area-pointer :alien-rep) (type context)
+  (declare (ignore type context))
   'system-area-pointer)
 
 (define-alien-type-method (system-area-pointer :naturalize-gen) (type alien)
@@ -502,8 +502,11 @@
 (defun compute-lisp-rep-type (type)
   (invoke-alien-type-method :lisp-rep type))
 
-(defun compute-alien-rep-type (type)
-  (invoke-alien-type-method :alien-rep type))
+;;; CONTEXT is either :NORMAL (the default) or :RESULT (alien function
+;;; return values).  See the :ALIEN-REP method for INTEGER for
+;;; details.
+(defun compute-alien-rep-type (type &optional (context :normal))
+  (invoke-alien-type-method :alien-rep type context))
 
 ;;;; default methods
 
@@ -521,8 +524,8 @@
   (declare (ignore type))
   nil)
 
-(define-alien-type-method (root :alien-rep) (type)
-  (declare (ignore type))
+(define-alien-type-method (root :alien-rep) (type context)
+  (declare (ignore type context))
   '*)
 
 (define-alien-type-method (root :naturalize-gen) (type alien)
@@ -588,10 +591,25 @@
   (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
         (alien-integer-type-bits type)))
 
-(define-alien-type-method (integer :alien-rep) (type)
-  (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
-        (alien-integer-type-bits type)))
+(define-alien-type-method (integer :alien-rep) (type context)
+  ;; When returning integer values that are narrower than a machine
+  ;; register from a function, some platforms leave the higher bits of
+  ;; the register uninitialized.  On those platforms, we use an
+  ;; alien-rep of the full register width when checking for purposes
+  ;; of return values and override the naturalize method to perform
+  ;; the sign extension (in compiler/target/c-call.lisp).
+  (ecase context
+    ((:normal #!-(or x86 x86-64) :result)
+     (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
+           (alien-integer-type-bits type)))
+    #!+(or x86 x86-64)
+    (:result
+     (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
+           sb!vm:n-word-bits))))
 
+;;; As per the comment in the :ALIEN-REP method above, this is defined
+;;; elsewhere for x86oids.
+#!-(or x86 x86-64)
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)
@@ -787,7 +805,8 @@
 (define-alien-type-method (float :lisp-rep) (type)
   (alien-float-type-type type))
 
-(define-alien-type-method (float :alien-rep) (type)
+(define-alien-type-method (float :alien-rep) (type context)
+  (declare (ignore context))
   (alien-float-type-type type))
 
 (define-alien-type-method (float :naturalize-gen) (type alien)

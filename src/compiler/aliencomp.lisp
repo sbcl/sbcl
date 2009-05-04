@@ -715,7 +715,8 @@
       (error "Something is broken."))
     (values-specifier-type
      (compute-alien-rep-type
-      (alien-fun-type-result-type type)))))
+      (alien-fun-type-result-type type)
+      :result))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
               ((function type &rest args) node ltn-policy)
