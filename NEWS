@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * optimization: compiler now generates faster typechecking code for
+    array dimensions.
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.

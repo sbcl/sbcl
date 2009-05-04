@@ -340,16 +340,27 @@
         (dims (array-type-dimensions type)))
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
-      (collect ((res))
-        (when (eq (array-type-dimensions stype) '*)
-          (res `(= (array-rank ,obj) ,(length dims))))
-        (do ((i 0 (1+ i))
-             (dim dims (cdr dim)))
-            ((null dim))
-          (let ((dim (car dim)))
-            (unless (eq dim '*)
-              (res `(= (array-dimension ,obj ,i) ,dim)))))
-        (res)))))
+      (cond ((cdr dims)
+             `((array-header-p ,obj)
+               ,@(when (eq (array-type-dimensions stype) '*)
+                       `((= (%array-rank ,obj) ,(length dims))))
+               ,@(loop for d in dims
+                       for i from 0
+                       unless (eq '* d)
+                       collect `(= (%array-dimension ,obj ,i) ,d))))
+            ((and dims (csubtypep stype (specifier-type 'simple-array)))
+             `((not (array-header-p ,obj))
+               ,@(unless (eq '* (car dims))
+                         `((= (vector-length ,obj) ,@dims)))))
+            ((and dims (csubtypep stype (specifier-type '(and array (not simple-array)))))
+             `((array-header-p ,obj)
+               ,@(unless (eq '* (car dims))
+                         `((= (%array-dimension ,obj 0) ,@dims)))))
+            (dims
+             (unless (eq '* (car dims))
+               `((if (array-header-p ,obj)
+                     (= (%array-dimension ,obj 0) ,@dims)
+                     (= (vector-length ,obj) ,@dims)))))))))
 
 ;;; Return forms to test that OBJ has the element-type specified by
 ;;; type specified by TYPE, where STYPE is the type we have checked
