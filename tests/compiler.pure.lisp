@@ -2871,3 +2871,9 @@
                          (adjust-array y '(3 5))
                          (array-dimension y 0))))))
     (assert (= 3 (funcall f (make-array '(4 4) :adjustable t))))))
+
+(with-test (:name :with-timeout-code-deletion-note)
+  (handler-bind ((sb-ext:code-deletion-note #'error))
+    (compile nil `(lambda ()
+                    (sb-ext:with-timeout 0
+                      (sleep 1))))))

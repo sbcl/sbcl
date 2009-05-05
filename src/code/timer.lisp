@@ -368,6 +368,9 @@ triggers."
       (set-system-timer))
     (run-timer timer)))
 
+(defun timeout-cerror ()
+  (cerror "Continue" 'sb!ext::timeout))
+
 (defmacro sb!ext:with-timeout (expires &body body)
   #!+sb-doc
   "Execute the body, asynchronously interrupting it and signalling a TIMEOUT
@@ -390,14 +393,13 @@ against asynchronous unwinds, this doesn't solve the fundamental issue, as all
 the frames potentially unwound through need to be proofed, which includes both
 system and application code -- and in essence proofing everything will make
 the system uninterruptible."
-  (with-unique-names (timer)
-    ;; FIXME: a temporary compatibility workaround for CLX, if unsafe
-    ;; unwinds are handled revisit it.
-    `(if (> ,expires 0)
-         (let ((,timer (make-timer (lambda ()
-                                     (cerror "Continue" 'sb!ext::timeout)))))
-           (schedule-timer ,timer ,expires)
-           (unwind-protect
-                (progn ,@body)
-             (unschedule-timer ,timer)))
-         (progn ,@body))))
+  `(dx-flet ((timeout-body () ,@body))
+     (let ((expires ,expires))
+       ;; FIXME: a temporary compatibility workaround for CLX, if unsafe
+       ;; unwinds are handled revisit it.
+       (if (> expires 0)
+           (let ((timer (make-timer #'timeout-cerror)))
+             (schedule-timer timer expires)
+             (unwind-protect (timeout-body)
+               (unschedule-timer timer)))
+           (timeout-body)))))
