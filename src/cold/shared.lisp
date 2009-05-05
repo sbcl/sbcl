@@ -416,7 +416,6 @@
 
 ;;; like HOST-CLOAD-STEM, except that we don't bother to compile
 (defun host-load-stem (stem flags)
-  (declare (ignore flags)) ; (It's only relevant when compiling.)
   (load (stem-object-path stem flags :host-compile)))
 (compile 'host-load-stem)
 
