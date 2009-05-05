@@ -34,6 +34,6 @@
 (do-stems-and-flags (stem flags)
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
-          (objname (stem-object-path stem :target-compile)))
+          (objname (stem-object-path stem flags :target-compile)))
       (unless (output-up-to-date-wrt-input-p objname srcname)
         (target-compile-stem stem flags)))))

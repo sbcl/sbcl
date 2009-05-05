@@ -56,6 +56,15 @@
   ;; GENESIS) only by SBCL code, and it doesn't care about particular
   ;; extensions, so we can use something arbitrary.
   ".lisp-obj")
+(defvar *target-assem-obj-suffix*
+  ;; Target fasl files from SB!C:ASSEMBLE-FILE are LOADed via GENESIS.
+  ;; The source files are compiled once as assembly files and once as
+  ;; normal lisp files.  In the past, they were kept separate by
+  ;; clever symlinking in the source tree, but that became less clean
+  ;; as ports to host environments without symlinks started appearing.
+  ;; In order to keep them separate, we have the assembled versions
+  ;; with a separate suffix.
+  ".assem-obj")
 
 ;;; a function of one functional argument, which calls its functional argument
 ;;; in an environment suitable for compiling the target. (This environment
@@ -205,27 +214,59 @@
              (,flags (rest ,stem-and-flags)))
          ,@body))))
 
+;;; Given a STEM, remap the path component "/target/" to a suitable
+;;; target directory.
+(defun stem-remap-target (stem)
+  (let ((position (search "/target/" stem)))
+    (if position
+      (concatenate 'string
+                   (subseq stem 0 (1+ position))
+                   #!+x86 "x86"
+                   #!+x86-64 "x86-64"
+                   #!+sparc "sparc"
+                   #!+ppc "ppc"
+                   #!+mips "mips"
+                   #!+alpha "alpha"
+                   #!+hppa "hppa"
+                   (subseq stem (+ position 7)))
+      stem)))
+(compile 'stem-remap-target)
+
 ;;; Determine the source path for a stem.
 (defun stem-source-path (stem)
-  (concatenate 'string "" stem ".lisp"))
+  (concatenate 'string "" (stem-remap-target stem) ".lisp"))
 (compile 'stem-source-path)
 
-;;; Determine the object path for a stem/mode combination.
-(defun stem-object-path (stem mode)
+;;; Determine the object path for a stem/flags/mode combination.
+(defun stem-object-path (stem flags mode)
   (multiple-value-bind
         (obj-prefix obj-suffix)
       (ecase mode
         (:host-compile (values *host-obj-prefix* *host-obj-suffix*))
-        (:target-compile (values *target-obj-prefix* *target-obj-suffix*)))
-    (concatenate 'string obj-prefix stem obj-suffix)))
+        (:target-compile (values *target-obj-prefix*
+                                 (if (find :assem flags)
+                                     *target-assem-obj-suffix*
+                                     *target-obj-suffix*))))
+    (concatenate 'string obj-prefix (stem-remap-target stem) obj-suffix)))
 (compile 'stem-object-path)
 
 ;;; Check for stupid typos in FLAGS list keywords.
 (let ((stems (make-hash-table :test 'equal)))
   (do-stems-and-flags (stem flags)
-    (if (gethash stem stems)
-      (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
-      (setf (gethash stem stems) t))
+    ;; We do duplicate stem comparison based on the object path in
+    ;; order to cover the case of stems with an :assem flag, which
+    ;; have two entries but separate object paths for each.  KLUDGE:
+    ;; We have to bind *target-obj-prefix* here because it's normally
+    ;; set up later in the build process and we don't actually care
+    ;; what it is so long as it doesn't change while we're checking
+    ;; for duplicate stems.
+    (let* ((*target-obj-prefix* "")
+           (object-path (stem-object-path stem flags :target-compile)))
+      (if (gethash object-path stems)
+          (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
+          (setf (gethash object-path stems) t)))
+    ;; FIXME: We should make sure that the :assem flag is only used
+    ;; when paired with :not-host.
     (let ((set-difference (set-difference flags *expected-stem-flags*)))
       (when set-difference
         (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
@@ -254,7 +295,7 @@
          ;; port, it might or might be a good idea to do the rewrite.
          ;; -- WHN 19990815
          (src (stem-source-path stem))
-         (obj (stem-object-path stem mode))
+         (obj (stem-object-path stem flags mode))
          (tmp-obj (concatenate 'string obj "-tmp"))
 
          (compile-file (ecase mode
@@ -376,7 +417,7 @@
 ;;; like HOST-CLOAD-STEM, except that we don't bother to compile
 (defun host-load-stem (stem flags)
   (declare (ignore flags)) ; (It's only relevant when compiling.)
-  (load (stem-object-path stem :host-compile)))
+  (load (stem-object-path stem flags :host-compile)))
 (compile 'host-load-stem)
 
 ;;;; tools to compile SBCL sources to create object files which will

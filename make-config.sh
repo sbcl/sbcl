@@ -137,27 +137,6 @@ if [ "$sbcl_arch" = "" ] ; then
 fi
 printf ":%s" "$sbcl_arch" >> $ltf
 
-for d in src/compiler src/assembly; do
-    echo //setting up symlink $d/target
-    original_dir=`pwd`
-    remove_dir_safely "$d/target"
-    cd ./$d
-    if [ -d $sbcl_arch ] ; then
-        link_or_copy $sbcl_arch target
-    else
-        echo "missing sbcl_arch directory $PWD/$sbcl_arch"
-        exit 1
-    fi
-    cd "$original_dir"
-done
-
-echo //setting up symlink src/compiler/assembly
-remove_dir_safely src/compiler/assembly
-original_dir=`pwd`
-cd src/compiler
-link_or_copy ../assembly assembly
-cd "$original_dir"
-
 echo //setting up OS-dependent information
 original_dir=`pwd`
 cd ./src/runtime/

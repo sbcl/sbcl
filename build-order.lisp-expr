@@ -601,14 +601,14 @@
  ("src/compiler/generic/late-type-vops")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
- ;; normal lisp files, and once by sb-c:assemble-file.  We play some
- ;; symlink games to make sure we don't scribble over anything we
- ;; shouldn't, but these are actually the same files:
+ ;; normal lisp files, and once by sb-c:assemble-file.  We use a
+ ;; different suffix / "file type" for the :assem versions to make
+ ;; sure we don't scribble over anything we shouldn't.
 
- ("src/compiler/assembly/target/assem-rtns")
- ("src/compiler/assembly/target/array")
- ("src/compiler/assembly/target/arith")
- ("src/compiler/assembly/target/alloc")
+ ("src/assembly/target/assem-rtns")
+ ("src/assembly/target/array")
+ ("src/assembly/target/arith")
+ ("src/assembly/target/alloc")
  ("src/assembly/target/assem-rtns" :assem :not-host)
  ("src/assembly/target/array"      :assem :not-host)
  ("src/assembly/target/arith"      :assem :not-host)
