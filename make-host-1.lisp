@@ -32,7 +32,7 @@
 
 ;;; propagate structure offset and other information to the C runtime
 ;;; support code.
-(host-cload-stem "src/compiler/generic/genesis")
+(host-cload-stem "src/compiler/generic/genesis" nil)
 (sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
 #+cmu (ext:quit)
 #+clisp (ext:quit)

@@ -19,11 +19,7 @@
 (let ((reversed-target-object-file-names nil))
   (do-stems-and-flags (stem flags)
     (unless (position :not-target flags)
-      (push (target-compile-stem stem
-                                :trace-file (find :trace-file flags)
-                                 :assem-p (find :assem flags)
-                                 :ignore-failure-p (find :ignore-failure-p
-                                                         flags))
+      (push (target-compile-stem stem flags)
             reversed-target-object-file-names)
       #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
   (setf *target-object-file-names*

@@ -10,7 +10,7 @@
   (with-open-file (s "output/object-filenames-for-genesis.lisp-expr"
                      :direction :input)
     (read s)))
-(host-load-stem "src/compiler/generic/genesis")
+(host-load-stem "src/compiler/generic/genesis" nil)
 (sb!vm:genesis :object-file-names *target-object-file-names*
                :c-header-dir-name "output/genesis-2"
                :symbol-table-file-name "src/runtime/sbcl.nm"

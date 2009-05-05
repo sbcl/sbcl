@@ -162,9 +162,7 @@
   ;; routines.
   (do-stems-and-flags (stem flags)
     (unless (find :not-host flags)
-      (funcall load-or-cload-stem
-               stem
-               :ignore-failure-p (find :ignore-failure-p flags))
+      (funcall load-or-cload-stem stem flags)
       #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
 
   ;; If the cross-compilation host is SBCL itself, we can use the

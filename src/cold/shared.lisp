@@ -101,135 +101,6 @@
     (rename-file x path)))
 (compile 'rename-file-a-la-unix)
 
-;;; a wrapper for compilation/assembly, used mostly to centralize
-;;; the procedure for finding full filenames from "stems"
-;;;
-;;; Compile the source file whose basic name is STEM, using some
-;;; standard-for-the-SBCL-build-process procedures to generate the
-;;; full pathnames of source file and object file. Return the pathname
-;;; of the object file for STEM. Several &KEY arguments are accepted:
-;;;   :SRC-PREFIX, :SRC-SUFFIX =
-;;;      strings to be concatenated to STEM to produce source filename
-;;;   :OBJ-PREFIX, :OBJ-SUFFIX =
-;;;      strings to be concatenated to STEM to produce object filename
-;;;   :TMP-OBJ-SUFFIX-SUFFIX =
-;;;      string to be appended to the name of an object file to produce
-;;;      the name of a temporary object file
-;;;   :COMPILE-FILE, :IGNORE-FAILURE-P =
-;;;     :COMPILE-FILE is a function to use for compiling the file
-;;;     (with the same calling conventions as ANSI CL:COMPILE-FILE).
-;;;     If the third return value (FAILURE-P) of this function is
-;;;     true, a continuable error will be signalled, unless
-;;;     :IGNORE-FAILURE-P is set, in which case only a warning will be
-;;;     signalled.
-(defun compile-stem (stem
-                     &key
-                     (obj-prefix "")
-                     (obj-suffix (error "missing OBJ-SUFFIX"))
-                     (tmp-obj-suffix-suffix "-tmp")
-                     (src-prefix "")
-                     (src-suffix ".lisp")
-                     (compile-file #'compile-file)
-                     trace-file
-                     ignore-failure-p)
-
-  (declare (type function compile-file))
-
-  (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
-         ;; Lisp Way, although it works just fine for common UNIX environments.
-         ;; Should it come to pass that the system is ported to environments
-         ;; where version numbers and so forth become an issue, it might become
-         ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
-         ;; machinery instead of just using strings. In the absence of such a
-         ;; port, it might or might be a good idea to do the rewrite.
-         ;; -- WHN 19990815
-         (src (concatenate 'string src-prefix stem src-suffix))
-         (obj (concatenate 'string obj-prefix stem obj-suffix))
-         (tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
-
-    (ensure-directories-exist obj :verbose t)
-
-    ;; We're about to set about building a new object file. First, we
-    ;; delete any preexisting object file in order to avoid confusing
-    ;; ourselves later should we happen to bail out of compilation
-    ;; with an error.
-    (when (probe-file obj)
-      (delete-file obj))
-
-    ;; Original comment:
-    ;;
-    ;;   Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP
-    ;;   mangles relative pathnames passed as :OUTPUT-FILE arguments,
-    ;;   but works OK with absolute pathnames.
-    ;;
-    ;; following discussion on cmucl-imp 2002-07
-    ;; "COMPILE-FILE-PATHNAME", it would seem safer to deal with
-    ;; absolute pathnames all the time; it is no longer clear that the
-    ;; original behaviour in CLISP was wrong or that the current
-    ;; behaviour is right; and in any case absolutifying the pathname
-    ;; insulates us against changes of behaviour. -- CSR, 2002-08-09
-    (setf tmp-obj
-          ;; (Note that this idiom is taken from the ANSI
-          ;; documentation for TRUENAME.)
-          (with-open-file (stream tmp-obj
-                                  :direction :output
-                                  ;; Compilation would overwrite the
-                                  ;; temporary object anyway and overly
-                                  ;; strict implementations default
-                                  ;; to :ERROR.
-                                  :if-exists :supersede)
-            (close stream)
-            (truename stream)))
-    ;; and some compilers (e.g. OpenMCL) will complain if they're
-    ;; asked to write over a file that exists already (and isn't
-    ;; recognizeably a fasl file), so
-    (when (probe-file tmp-obj)
-      (delete-file tmp-obj))
-
-    ;; Try to use the compiler to generate a new temporary object file.
-    (flet ((report-recompile-restart (stream)
-             (format stream "Recompile file ~S" src))
-           (report-continue-restart (stream)
-             (format stream "Continue, using possibly bogus file ~S" obj)))
-      (tagbody
-       retry-compile-file
-         (multiple-value-bind (output-truename warnings-p failure-p)
-            (if trace-file
-                (funcall compile-file src :output-file tmp-obj
-                         :trace-file t)
-                (funcall compile-file src :output-file tmp-obj ))
-           (declare (ignore warnings-p))
-           (cond ((not output-truename)
-                  (error "couldn't compile ~S" src))
-                 (failure-p
-                  (if ignore-failure-p
-                      (warn "ignoring FAILURE-P return value from compilation of ~S"
-                            src)
-                      (unwind-protect
-                           (restart-case
-                               (error "FAILURE-P was set when creating ~S."
-                                      obj)
-                             (recompile ()
-                               :report report-recompile-restart
-                               (go retry-compile-file))
-                             (continue ()
-                               :report report-continue-restart
-                               (setf failure-p nil)))
-                        ;; Don't leave failed object files lying around.
-                        (when (and failure-p (probe-file tmp-obj))
-                          (delete-file tmp-obj)
-                          (format t "~&deleted ~S~%" tmp-obj)))))
-                 ;; Otherwise: success, just fall through.
-                 (t nil)))))
-
-    ;; If we get to here, compilation succeeded, so it's OK to rename
-    ;; the temporary output file to the permanent object file.
-    (rename-file-a-la-unix tmp-obj obj)
-
-    ;; nice friendly traditional return value
-    (pathname obj)))
-(compile 'compile-stem)
-
 ;;; other miscellaneous tools
 (load "src/cold/read-from-file.lisp")
 (load "src/cold/rename-package-carefully.lisp")
@@ -334,6 +205,21 @@
              (,flags (rest ,stem-and-flags)))
          ,@body))))
 
+;;; Determine the source path for a stem.
+(defun stem-source-path (stem)
+  (concatenate 'string "" stem ".lisp"))
+(compile 'stem-source-path)
+
+;;; Determine the object path for a stem/mode combination.
+(defun stem-object-path (stem mode)
+  (multiple-value-bind
+        (obj-prefix obj-suffix)
+      (ecase mode
+        (:host-compile (values *host-obj-prefix* *host-obj-suffix*))
+        (:target-compile (values *target-obj-prefix* *target-obj-suffix*)))
+    (concatenate 'string obj-prefix stem obj-suffix)))
+(compile 'stem-object-path)
+
 ;;; Check for stupid typos in FLAGS list keywords.
 (let ((stems (make-hash-table :test 'equal)))
   (do-stems-and-flags (stem flags)
@@ -346,6 +232,122 @@
                set-difference)))))
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
+
+;;; a wrapper for compilation/assembly, used mostly to centralize
+;;; the procedure for finding full filenames from "stems"
+;;;
+;;; Compile the source file whose basic name is STEM, using some
+;;; standard-for-the-SBCL-build-process procedures to generate the
+;;; full pathnames of source file and object file. Return the pathname
+;;; of the object file for STEM.
+;;;
+;;; STEM and FLAGS are as per DO-STEMS-AND-FLAGS.  MODE is one of
+;;; :HOST-COMPILE and :TARGET-COMPILE.
+(defun compile-stem (stem flags mode)
+
+  (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
+         ;; Lisp Way, although it works just fine for common UNIX environments.
+         ;; Should it come to pass that the system is ported to environments
+         ;; where version numbers and so forth become an issue, it might become
+         ;; urgent to rewrite this using the fancy Common Lisp PATHNAME
+         ;; machinery instead of just using strings. In the absence of such a
+         ;; port, it might or might be a good idea to do the rewrite.
+         ;; -- WHN 19990815
+         (src (stem-source-path stem))
+         (obj (stem-object-path stem mode))
+         (tmp-obj (concatenate 'string obj "-tmp"))
+
+         (compile-file (ecase mode
+                         (:host-compile #'compile-file)
+                         (:target-compile (if (find :assem flags)
+                                              *target-assemble-file*
+                                              *target-compile-file*))))
+         (trace-file (find :trace-file flags))
+         (ignore-failure-p (find :ignore-failure-p flags)))
+    (declare (type function compile-file))
+
+    (ensure-directories-exist obj :verbose t)
+
+    ;; We're about to set about building a new object file. First, we
+    ;; delete any preexisting object file in order to avoid confusing
+    ;; ourselves later should we happen to bail out of compilation
+    ;; with an error.
+    (when (probe-file obj)
+      (delete-file obj))
+
+    ;; Original comment:
+    ;;
+    ;;   Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP
+    ;;   mangles relative pathnames passed as :OUTPUT-FILE arguments,
+    ;;   but works OK with absolute pathnames.
+    ;;
+    ;; following discussion on cmucl-imp 2002-07
+    ;; "COMPILE-FILE-PATHNAME", it would seem safer to deal with
+    ;; absolute pathnames all the time; it is no longer clear that the
+    ;; original behaviour in CLISP was wrong or that the current
+    ;; behaviour is right; and in any case absolutifying the pathname
+    ;; insulates us against changes of behaviour. -- CSR, 2002-08-09
+    (setf tmp-obj
+          ;; (Note that this idiom is taken from the ANSI
+          ;; documentation for TRUENAME.)
+          (with-open-file (stream tmp-obj
+                                  :direction :output
+                                  ;; Compilation would overwrite the
+                                  ;; temporary object anyway and overly
+                                  ;; strict implementations default
+                                  ;; to :ERROR.
+                                  :if-exists :supersede)
+            (close stream)
+            (truename stream)))
+    ;; and some compilers (e.g. OpenMCL) will complain if they're
+    ;; asked to write over a file that exists already (and isn't
+    ;; recognizeably a fasl file), so
+    (when (probe-file tmp-obj)
+      (delete-file tmp-obj))
+
+    ;; Try to use the compiler to generate a new temporary object file.
+    (flet ((report-recompile-restart (stream)
+             (format stream "Recompile file ~S" src))
+           (report-continue-restart (stream)
+             (format stream "Continue, using possibly bogus file ~S" obj)))
+      (tagbody
+       retry-compile-file
+         (multiple-value-bind (output-truename warnings-p failure-p)
+            (if trace-file
+                (funcall compile-file src :output-file tmp-obj
+                         :trace-file t)
+                (funcall compile-file src :output-file tmp-obj ))
+           (declare (ignore warnings-p))
+           (cond ((not output-truename)
+                  (error "couldn't compile ~S" src))
+                 (failure-p
+                  (if ignore-failure-p
+                      (warn "ignoring FAILURE-P return value from compilation of ~S"
+                            src)
+                      (unwind-protect
+                           (restart-case
+                               (error "FAILURE-P was set when creating ~S."
+                                      obj)
+                             (recompile ()
+                               :report report-recompile-restart
+                               (go retry-compile-file))
+                             (continue ()
+                               :report report-continue-restart
+                               (setf failure-p nil)))
+                        ;; Don't leave failed object files lying around.
+                        (when (and failure-p (probe-file tmp-obj))
+                          (delete-file tmp-obj)
+                          (format t "~&deleted ~S~%" tmp-obj)))))
+                 ;; Otherwise: success, just fall through.
+                 (t nil)))))
+
+    ;; If we get to here, compilation succeeded, so it's OK to rename
+    ;; the temporary output file to the permanent object file.
+    (rename-file-a-la-unix tmp-obj obj)
+
+    ;; nice friendly traditional return value
+    (pathname obj)))
+(compile 'compile-stem)
 
 ;;; Execute function FN in an environment appropriate for compiling the
 ;;; cross-compiler's source code in the cross-compilation host.
@@ -364,26 +366,17 @@
 ;;; Process a file as source code for the cross-compiler, compiling it
 ;;; (if necessary) in the appropriate environment, then loading it
 ;;; into the cross-compilation host Common lisp.
-(defun host-cload-stem (stem &key ignore-failure-p)
+(defun host-cload-stem (stem flags)
   (let ((compiled-filename (in-host-compilation-mode
                             (lambda ()
-                              (compile-stem
-                               stem
-                               :obj-prefix *host-obj-prefix*
-                               :obj-suffix *host-obj-suffix*
-                               :compile-file #'cl:compile-file
-                               :ignore-failure-p ignore-failure-p)))))
+                              (compile-stem stem flags :host-compile)))))
     (load compiled-filename)))
 (compile 'host-cload-stem)
 
 ;;; like HOST-CLOAD-STEM, except that we don't bother to compile
-(defun host-load-stem (stem &key ignore-failure-p)
-  (declare (ignore ignore-failure-p)) ; (It's only relevant when
-  ;; compiling.) KLUDGE: It's untidy to have the knowledge of how to
-  ;; construct complete filenames from stems in here as well as in
-  ;; COMPILE-STEM. It should probably be factored out somehow. -- WHN
-  ;; 19990815
-  (load (concatenate 'simple-string *host-obj-prefix* stem *host-obj-suffix*)))
+(defun host-load-stem (stem flags)
+  (declare (ignore flags)) ; (It's only relevant when compiling.)
+  (load (stem-object-path stem :host-compile)))
 (compile 'host-load-stem)
 
 ;;;; tools to compile SBCL sources to create object files which will
@@ -391,17 +384,10 @@
 
 ;;; Run the cross-compiler on a file in the source directory tree to
 ;;; produce a corresponding file in the target object directory tree.
-(defun target-compile-stem (stem &key assem-p ignore-failure-p trace-file)
+(defun target-compile-stem (stem flags)
   (funcall *in-target-compilation-mode-fn*
            (lambda ()
-             (compile-stem stem
-                           :obj-prefix *target-obj-prefix*
-                           :obj-suffix *target-obj-suffix*
-                          :trace-file trace-file
-                           :ignore-failure-p ignore-failure-p
-                           :compile-file (if assem-p
-                                             *target-assemble-file*
-                                             *target-compile-file*)))))
+             (compile-stem stem flags :target-compile))))
 (compile 'target-compile-stem)
 
 ;;; (This function is not used by the build process, but is intended

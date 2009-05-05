@@ -33,12 +33,7 @@
 
 (do-stems-and-flags (stem flags)
   (unless (position :not-target flags)
-    (let ((srcname (concatenate 'string stem ".lisp"))
-          (objname (concatenate 'string
-                                *target-obj-prefix*
-                                stem
-                                *target-obj-suffix*)))
+    (let ((srcname (stem-source-path stem))
+          (objname (stem-object-path stem :target-compile)))
       (unless (output-up-to-date-wrt-input-p objname srcname)
-        (target-compile-stem stem
-                             :assem-p (find :assem flags)
-                             :ignore-failure-p (find :ignore-failure-p flags))))))
+        (target-compile-stem stem flags)))))
