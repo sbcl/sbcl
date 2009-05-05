@@ -398,5 +398,12 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+cat > $tmpfilename <<EOF
+(and (eval-when (:compile-toplevel) (error "oops AND")))
+(or (eval-when (:compile-toplevel) (error "oops OR")))
+(cond (t (eval-when (:compile-toplevel) (error "oops COND"))))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

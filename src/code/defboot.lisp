@@ -82,7 +82,9 @@
                            ,n-result
                            (cond ,@more))))
                   (if (eq t test)
-                      `(progn ,@forms)
+                      ;; THE to perserve non-toplevelness for FOO in
+                      ;;   (COND (T (FOO)))
+                      `(the t (progn ,@forms))
                       `(if ,test
                            (progn ,@forms)
                            ,(when more `(cond ,@more))))))))))
@@ -101,7 +103,9 @@ evaluated as a PROGN."
 
 (defmacro-mundanely and (&rest forms)
   (cond ((endp forms) t)
-        ((endp (rest forms)) (first forms))
+        ((endp (rest forms))
+         ;; Preserve non-toplevelness of the form!
+         `(the t ,(first forms)))
         (t
          `(if ,(first forms)
               (and ,@(rest forms))
@@ -109,7 +113,9 @@ evaluated as a PROGN."
 
 (defmacro-mundanely or (&rest forms)
   (cond ((endp forms) nil)
-        ((endp (rest forms)) (first forms))
+        ((endp (rest forms))
+         ;; Preserve non-toplevelness of the form!
+         `(the t ,(first forms)))
         (t
          (let ((n-result (gensym)))
            `(let ((,n-result ,(first forms)))

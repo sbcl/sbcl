@@ -4,6 +4,9 @@
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.
+  * bug fix: some forms of AND, OR, and COND resulted in expansions that could
+    result in their subforms being treated as top level forms. (reported by
+    James Knight)
   * bug fix: disable address space randomization Linux/x86-64 as well,
     not just x86-64. (reported by Ken Olum)
   * bug fix: #201; type inference for CONS and ARRAY types could derive
