@@ -190,6 +190,8 @@
          (abort-ir1-transform "too many indices for pointer deref: ~W"
                               (length indices)))
        (let ((element-type (alien-pointer-type-to alien-type)))
+         (unless element-type
+           (give-up-ir1-transform "unable to open code deref of wild pointer type"))
          (if indices
              (let ((bits (alien-type-bits element-type))
                    (alignment (alien-type-alignment element-type)))

@@ -10,8 +10,13 @@
   * bug fix: some forms of AND, OR, and COND resulted in expansions that could
     result in their subforms being treated as top level forms. (reported by
     James Knight)
+  * bug fix: On x86/x86-64 alien functions declared to return integers shorter
+    than a machine register could leave garbage in the high bits of the
+    result register (bug 316325).
   * bug fix: disable address space randomization Linux/x86-64 as well,
     not just x86-64. (reported by Ken Olum)
+  * bug fix: Attempting to DEREF an (ALIEN (* T)) would produce a WARNING and
+    generate incorrect code.
   * bug fix: #201; type inference for CONS and ARRAY types could derive
     wrong results in the presence of eg. RPLACA or ADJUST-ARRAY.
   * bug fix: special variables with a proclaimed specific subtype of FUNCTION
