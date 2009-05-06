@@ -1,6 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-  * optimization: compiler now generates faster typechecking code for
-    array dimensions.
+  * optimization: compiler now generates faster array typechecking code.
   * optimization: ARRAY-DIMENSION is now faster for multidimensional and
     non-simple arrays.
   * optimization: multidimensional array accesses in the absence of type
