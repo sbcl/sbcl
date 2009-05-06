@@ -331,21 +331,9 @@ of specialized arrays is supported."
                 (defvar ,table-name)
                 (defmacro ,name (array-var)
                  `(the function
-                    (let ((tag 0)
-                          (offset
-                           #.(ecase sb!c:*backend-byte-order*
-                               (:little-endian
-                                (- sb!vm:other-pointer-lowtag))
-                               (:big-endian
-                                (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
-                      ;; WIDETAG-OF needs extra code to handle LIST and
-                      ;; FUNCTION lowtags. We're only dispatching on
-                      ;; other pointers, so let's do the lowtag
-                      ;; extraction manually.
+                    (let ((tag 0))
                       (when (sb!vm::%other-pointer-p ,array-var)
-                        (setf tag
-                              (sb!sys:sap-ref-8 (int-sap (get-lisp-obj-address ,array-var))
-                                                offset)))
+                        (setf tag (%other-pointer-widetag ,array-var)))
                       ;; SYMBOL-GLOBAL-VALUE is a performance hack
                       ;; for threaded builds.
                       (svref (sb!vm::symbol-global-value ',',table-name) tag)))))))

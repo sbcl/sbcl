@@ -185,3 +185,7 @@ corresponding primitive types.")
 (defun find-saetp (element-type)
   (find element-type sb!vm:*specialized-array-element-type-properties*
         :key #'sb!vm:saetp-specifier :test #'equal))
+
+(defun find-saetp-by-ctype (ctype)
+  (find ctype sb!vm:*specialized-array-element-type-properties*
+        :key #'sb!vm:saetp-ctype :test #'csubtypep))

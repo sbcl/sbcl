@@ -334,6 +334,9 @@
 ;;; Return forms to test that OBJ has the rank and dimensions
 ;;; specified by TYPE, where STYPE is the type we have checked against
 ;;; (which is the same but for dimensions and element type).
+;;;
+;;; Secondary return value is true if generated tests passing imply
+;;; that the array has a header.
 (defun test-array-dimensions (obj type stype)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
@@ -341,44 +344,50 @@
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
       (cond ((cdr dims)
-             `((array-header-p ,obj)
-               ,@(when (eq (array-type-dimensions stype) '*)
-                       `((= (%array-rank ,obj) ,(length dims))))
-               ,@(loop for d in dims
-                       for i from 0
-                       unless (eq '* d)
-                       collect `(= (%array-dimension ,obj ,i) ,d))))
-            ((and dims (csubtypep stype (specifier-type 'simple-array)))
-             `((not (array-header-p ,obj))
-               ,@(unless (eq '* (car dims))
-                         `((= (vector-length ,obj) ,@dims)))))
-            ((and dims (csubtypep stype (specifier-type '(and array (not simple-array)))))
-             `((array-header-p ,obj)
-               ,@(unless (eq '* (car dims))
-                         `((= (%array-dimension ,obj 0) ,@dims)))))
-            (dims
-             (unless (eq '* (car dims))
-               `((if (array-header-p ,obj)
-                     (= (%array-dimension ,obj 0) ,@dims)
-                     (= (vector-length ,obj) ,@dims)))))))))
+             (values `((array-header-p ,obj)
+                       ,@(when (eq (array-type-dimensions stype) '*)
+                               `((= (%array-rank ,obj) ,(length dims))))
+                       ,@(loop for d in dims
+                               for i from 0
+                               unless (eq '* d)
+                               collect `(= (%array-dimension ,obj ,i) ,d)))
+                     t))
+            ((not dims)
+             (values `((array-header-p ,obj)
+                       (= (%array-rank ,obj) 0))
+                     t))
+            ((not (array-type-complexp type))
+             (values (unless (eq '* (car dims))
+                       `((= (vector-length ,obj) ,@dims)))
+                     nil))
+            (t
+             (values (unless (eq '* (car dims))
+                       `((if (array-header-p ,obj)
+                             (= (%array-dimension ,obj 0) ,@dims)
+                             (= (vector-length ,obj) ,@dims))))
+                     nil))))))
 
-;;; Return forms to test that OBJ has the element-type specified by
-;;; type specified by TYPE, where STYPE is the type we have checked
-;;; against (which is the same but for dimensions and element type).
-(defun test-array-element-type (obj type stype)
+;;; Return forms to test that OBJ has the element-type specified by type
+;;; specified by TYPE, where STYPE is the type we have checked against (which
+;;; is the same but for dimensions and element type). If HEADERP is true, OBJ
+;;; is guaranteed to be an array-header.
+(defun test-array-element-type (obj type stype headerp)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
         (eltype (array-type-specialized-element-type type)))
-    (unless (type= eltype (array-type-specialized-element-type stype))
-      (with-unique-names (data)
-        `((do ((,data ,obj (%array-data-vector ,data)))
-              ((not (array-header-p ,data))
-               ;; KLUDGE: this isn't in fact maximally efficient,
-               ;; because though we know that DATA is a (SIMPLE-ARRAY *
-               ;; (*)), we will still check to see if the lowtag is
-               ;; appropriate.
-               (typep ,data
-                      '(simple-array ,(type-specifier eltype) (*))))))))))
+    (unless (or (type= eltype (array-type-specialized-element-type stype))
+                (eq eltype *wild-type*))
+      (let ((typecode (sb!vm:saetp-typecode (find-saetp-by-ctype eltype))))
+        (with-unique-names (data)
+         (if (and headerp (not (array-type-complexp stype)))
+             ;; If we know OBJ is an array header, and that the array is
+             ;; simple, we also know there is exactly one indirection to
+             ;; follow.
+             `((eq (%other-pointer-widetag (%array-data-vector ,obj)) ,typecode))
+             `((do ((,data ,(if headerp `(%array-data-vector ,obj) obj)
+                           (%array-data-vector ,data)))
+                   ((not (array-header-p ,data))
+                    (eq (%other-pointer-widetag ,data) ,typecode))))))))))
 
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
@@ -391,11 +400,13 @@
              ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
              (not (unknown-type-p (array-type-element-type type)))
              (eq (array-type-complexp stype) (array-type-complexp type)))
-        (once-only ((n-obj obj))
-          `(and (,pred ,n-obj)
-                ,@(test-array-dimensions n-obj type stype)
-                ,@(test-array-element-type n-obj type stype)))
-        `(%typep ,obj ',(type-specifier type)))))
+          (once-only ((n-obj obj))
+            (multiple-value-bind (tests headerp)
+                (test-array-dimensions n-obj type stype)
+              `(and (,pred ,n-obj)
+                    ,@tests
+                    ,@(test-array-element-type n-obj type stype headerp))))
+          `(%typep ,obj ',(type-specifier type)))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly

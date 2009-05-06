@@ -32,6 +32,18 @@
 (defun widetag-of (x)
   (widetag-of x))
 
+;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags. When
+;;; we're only dealing with other pointers (eg. when dispatching on array
+;;; element type), this is going to be faster.
+(declaim (inline %other-pointer-widetag))
+(defun %other-pointer-widetag (x)
+  (sb!sys:sap-ref-8 (int-sap (get-lisp-obj-address x))
+                    #.(ecase sb!c:*backend-byte-order*
+                        (:little-endian
+                         (- sb!vm:other-pointer-lowtag))
+                        (:big-endian
+                         (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
+
 ;;; Return a System-Area-Pointer pointing to the data for the vector
 ;;; X, which must be simple.
 ;;;
