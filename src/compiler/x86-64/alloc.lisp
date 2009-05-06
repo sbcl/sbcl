@@ -90,12 +90,12 @@
       (storew length result vector-length-slot other-pointer-lowtag))))
 
 (define-vop (allocate-vector-on-stack)
-  (:args (type :scs (unsigned-reg))
-         (length :scs (any-reg))
+  (:args (type :scs (unsigned-reg) :to :save)
+         (length :scs (any-reg) :to :eval :target zero)
          (words :scs (any-reg) :target ecx))
   (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
-  (:temporary (:sc any-reg :offset eax-offset :from (:argument 2)) zero)
-  (:temporary (:sc any-reg :offset edi-offset :from (:argument 0)) res)
+  (:temporary (:sc any-reg :offset eax-offset :from :eval) zero)
+  (:temporary (:sc any-reg :offset edi-offset) res)
   (:results (result :scs (descriptor-reg) :from :load))
   (:arg-types positive-fixnum
               positive-fixnum
@@ -122,7 +122,6 @@
     (inst rep)
     (inst stos zero)))
 
-(in-package "SB!VM")
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)

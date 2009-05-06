@@ -634,4 +634,16 @@
                      (declare (dynamic-extent z))
                      (print z)
                      t)))))
+
+;;; On x86 and x86-64 upto 1.0.28.16 LENGTH and WORDS argument
+;;; tns to ALLOCATE-VECTOR-ON-STACK could be packed in the same
+;;; location, leading to all manner of badness. ...reproducing this
+;;; reliably is hard, but this it at least used to break on x86-64.
+(defun length-and-words-packed-in-same-tn (m)
+  (declare (optimize speed (safety 0) (debug 0) (space 0)))
+  (let ((array (make-array (max 1 m) :element-type 'fixnum)))
+    (declare (dynamic-extent array))
+    (array-total-size array)))
+(with-test (:name :length-and-words-packed-in-same-tn)
+  (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 

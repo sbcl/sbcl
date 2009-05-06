@@ -4,6 +4,8 @@
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.
+  * bug fix: potential miscompilation of array stack allocation on x86 and
+    x86-64. (reported by Time Tossavainen)
   * bug fix: some forms of AND, OR, and COND resulted in expansions that could
     result in their subforms being treated as top level forms. (reported by
     James Knight)
