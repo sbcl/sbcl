@@ -954,12 +954,6 @@
                    '(:ansi-cl :function make-array)
                    '(:ansi-cl :function sb!xc:upgraded-array-element-type))))
 
-(define-condition displaced-to-array-too-small-error
-    (reference-condition simple-error)
-  ()
-  (:default-initargs
-      :references (list '(:ansi-cl :function adjust-array))))
-
 (define-condition type-warning (reference-condition simple-warning)
   ()
   (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))

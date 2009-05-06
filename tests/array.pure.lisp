@@ -163,16 +163,17 @@
 ;;; BUG 315: "no bounds check for access to displaced array"
 ;;;  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
 ;;;  test suite.
-(multiple-value-bind (val err)
-    (ignore-errors
-      (locally (declare (optimize (safety 3) (speed 0)))
-        (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
-                              :initial-element #\space :adjustable t))
-               (y (make-array 10 :fill-pointer 4 :element-type 'character
-                              :displaced-to x)))
-          (adjust-array x '(5))
-          (char y 5))))
-  (assert (and (not val) (typep err 'sb-kernel:displaced-to-array-too-small-error))))
+(locally (declare (optimize (safety 3) (speed 0)))
+      (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
+                            :initial-element #\space :adjustable t))
+             (y (make-array 10 :fill-pointer 4 :element-type 'character
+                            :displaced-to x)))
+        (handler-case
+            (adjust-array x '(5))
+          (error (e)
+            (assert (typep e 'sb-int:simple-reference-error))
+            (assert (equal '((:ansi-cl function adjust-array))
+                           (sb-int:reference-condition-references e)))))))
 
 ;;; MISC.527: bit-vector bitwise operations used LENGTH to get a size
 ;;; of a vector

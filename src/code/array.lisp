@@ -30,7 +30,8 @@
   (def %array-available-elements)
   (def %array-data-vector)
   (def %array-displacement)
-  (def %array-displaced-p))
+  (def %array-displaced-p)
+  (def %array-diplaced-from))
 
 (defun %array-rank (array)
   (%array-rank array))
@@ -217,6 +218,7 @@
                  (setf (%array-fill-pointer-p array) nil)))
           (setf (%array-available-elements array) total-size)
           (setf (%array-data-vector array) data)
+          (setf (%array-displaced-from array) nil)
           (cond (displaced-to
                  (when (or initial-element-p initial-contents-p)
                    (error "Neither :INITIAL-ELEMENT nor :INITIAL-CONTENTS ~
@@ -226,7 +228,8 @@
                             (array-total-size displaced-to))
                      (error "~S doesn't have enough elements." displaced-to))
                    (setf (%array-displacement array) offset)
-                   (setf (%array-displaced-p array) t)))
+                   (setf (%array-displaced-p array) t)
+                   (%save-displaced-array-backpointer array data)))
                 (t
                  (setf (%array-displaced-p array) nil)))
           (let ((axis 0))
@@ -699,25 +702,7 @@ of specialized arrays is supported."
          (error "Axis number ~W is too big; ~S only has ~D dimension~:P."
                 axis-number array (%array-rank array)))
         (t
-         ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
-         ;;
-         ;;   "If A is displaced to B, the consequences are
-         ;;   unspecified if B is adjusted in such a way that it no
-         ;;   longer has enough elements to satisfy A.
-         ;;
-         ;; In situations where this matters we should be doing a
-         ;; bounds-check, which in turn uses ARRAY-DIMENSION -- so
-         ;; this seems like a good place to signal an error.
-         (multiple-value-bind (target offset) (array-displacement array)
-           (when (and target
-                      (> (array-total-size array)
-                         (- (array-total-size target) offset)))
-               (error 'displaced-to-array-too-small-error
-                      :format-control "~@<The displaced-to array is too small. ~S ~
-                                      elements after offset required, ~S available.~:@>"
-                      :format-arguments (list (array-total-size array)
-                                              (- (array-total-size target) offset))))
-           (%array-dimension array axis-number)))))
+         (%array-dimension array axis-number))))
 
 (defun array-dimensions (array)
   #!+sb-doc
@@ -894,7 +879,7 @@ of specialized arrays is supported."
                    (set-array-header array array-data array-size
                                  (get-new-fill-pointer array array-size
                                                        fill-pointer)
-                                 0 dimensions nil)
+                                 0 dimensions nil nil)
                    (if (array-header-p array)
                        ;; simple multidimensional or single dimensional array
                        (make-array dimensions
@@ -921,7 +906,7 @@ of specialized arrays is supported."
                    (set-array-header array displaced-to array-size
                                      (get-new-fill-pointer array array-size
                                                            fill-pointer)
-                                     displacement dimensions t)
+                                     displacement dimensions t nil)
                    ;; simple multidimensional or single dimensional array
                    (make-array dimensions
                                :element-type element-type
@@ -951,7 +936,7 @@ of specialized arrays is supported."
                      (set-array-header array new-data new-length
                                        (get-new-fill-pointer array new-length
                                                              fill-pointer)
-                                       0 dimensions nil)
+                                       0 dimensions nil nil)
                      new-data))))
             (t
              (let ((old-length (%array-available-elements array))
@@ -977,12 +962,12 @@ of specialized arrays is supported."
                                        initial-element-p))
                    (if (adjustable-array-p array)
                        (set-array-header array new-data new-length
-                                         nil 0 dimensions nil)
+                                         nil 0 dimensions nil nil)
                        (let ((new-array
                               (make-array-header
                                sb!vm:simple-array-widetag array-rank)))
                          (set-array-header new-array new-data new-length
-                                           nil 0 dimensions nil)))))))))))
+                                           nil 0 dimensions nil t)))))))))))
 
 
 (defun get-new-fill-pointer (old-array new-array-size fill-pointer)
@@ -1062,9 +1047,36 @@ of specialized arrays is supported."
      vector)
     (t (subseq vector 0 new-length))))
 
+(defun %save-displaced-array-backpointer (array data)
+  (when (array-header-p data)
+    (let* ((old (%array-displaced-from data))
+           (new (cons (make-weak-pointer array) old)))
+      (loop until (eq old (%compare-and-swap-array-displaced-from data old new))
+            do (setf old (%array-displaced-from data)
+                     new (rplacd new (remove-if-not #'weak-pointer-value old)))))))
+
 ;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions
-                         &optional displacedp)
+                         displacedp newp)
+  (if newp
+      (setf (%array-displaced-from array) nil)
+      ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
+      ;;
+      ;;   "If A is displaced to B, the consequences are unspecified if B is
+      ;;   adjusted in such a way that it no longer has enough elements to
+      ;;   satisfy A.
+      ;;
+      ;; so check the backpointers and signal an error if appropriate.
+      (dolist (p (%array-displaced-from array))
+        (let ((from (weak-pointer-value p)))
+          (when from
+            (let ((requires (+ (%array-available-elements from)
+                               (%array-displacement from))))
+              (unless (>= length requires)
+                (error 'simple-reference-error
+                       :format-control "Cannot shrink ~S to ~S elements: displaced array ~S requires at least ~S elements."
+                       :format-arguments (list 'adjust-array length from requires))))))))
+  (%save-displaced-array-backpointer array data)
   (setf (%array-data-vector array) data)
   (setf (%array-available-elements array) length)
   (cond (fill-pointer

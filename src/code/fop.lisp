@@ -417,7 +417,8 @@
                            (dimensions () (cons (pop-stack) dimensions)))
                           ((zerop i) dimensions)
                         (declare (type index i)))
-                      nil)
+                      nil
+                      t)
     res))
 
 (define-fop (fop-single-float-vector 84)

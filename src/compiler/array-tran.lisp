@@ -414,6 +414,7 @@
                                ,@(when element-type
                                    '(:element-type element-type))))
              (setf (%array-displaced-p header) nil)
+             (setf (%array-displaced-from header) nil)
              ,@(let ((axis -1))
                  (mapcar (lambda (dim)
                            `(setf (%array-dimension header ,(incf axis))
@@ -498,10 +499,11 @@
                  ((t)
                   '(%array-dimension array 0))
                  ((nil)
-                  '(length array))
+                  '(vector-length array))
                  ((:maybe)
-                  (give-up-ir1-transform
-                   "can't tell whether array is simple"))))
+                  `(if (array-header-p array)
+                       (%array-dimension array axis)
+                       (vector-length array)))))
               (t
                '(%array-dimension array axis)))))))
 

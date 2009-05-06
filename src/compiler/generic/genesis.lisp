@@ -2265,6 +2265,7 @@ core and return a descriptor to it."
     (write-wordindexed result sb!vm:array-data-slot data-vector)
     (write-wordindexed result sb!vm:array-displacement-slot *nil-descriptor*)
     (write-wordindexed result sb!vm:array-displaced-p-slot *nil-descriptor*)
+    (write-wordindexed result sb!vm:array-displaced-from-slot *nil-descriptor*)
     (let ((total-elements 1))
       (dotimes (axis rank)
         (let ((dim (pop-stack)))

@@ -131,6 +131,13 @@
                :ref-known (flushable foldable)
                :set-trans (setf %array-displaced-p)
                :set-known (unsafe))
+  (displaced-from :type list
+                  :ref-trans %array-displaced-from
+                  :ref-known (flushable)
+                  :set-trans (setf %array-displaced-from)
+                  :set-known (unsafe)
+                  :cas-trans %compare-and-swap-array-displaced-from
+                  :cas-known (unsafe))
   (dimensions :rest-p t))
 
 (define-primitive-object (vector :type vector

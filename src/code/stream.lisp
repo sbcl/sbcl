@@ -1604,7 +1604,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                 (setf workspace new-workspace
                       offset-current current)
                 (set-array-header buffer workspace new-length
-                                  current+1 0 new-length nil))
+                                  current+1 0 new-length nil nil))
               (setf (fill-pointer buffer) current+1))
           (setf (char workspace offset-current) character))))
     current+1))
@@ -1638,7 +1638,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                       offset-current current
                       offset-dst-end dst-end)
                 (set-array-header buffer workspace new-length
-                                  dst-end 0 new-length nil))
+                                  dst-end 0 new-length nil nil))
               (setf (fill-pointer buffer) dst-end))
           (replace workspace string
                    :start1 offset-current :start2 start :end2 end)))
