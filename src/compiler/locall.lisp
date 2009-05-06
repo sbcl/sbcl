@@ -65,7 +65,7 @@
                 (let* ((other (trivial-lambda-var-ref-lvar use)))
                   (unless (eq other lvar)
                     (handle-nested-dynamic-extent-lvars dx other)))))))
-      (cons lvar
+      (cons (cons dx lvar)
             (if (listp uses)
                 (loop for use in uses
                       when (use-good-for-dx-p use dx)
@@ -95,8 +95,8 @@
                           (make-lexenv :default (node-lexenv call)
                                        :cleanup cleanup))
                     (push entry (lambda-entries (node-home-lambda entry)))
-                    (dolist (lvar dx-lvars)
-                      (setf (lvar-dynamic-extent lvar) cleanup)))))
+                    (dolist (cell dx-lvars)
+                      (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially

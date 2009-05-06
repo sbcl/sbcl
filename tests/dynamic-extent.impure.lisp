@@ -153,6 +153,13 @@
     (true v)
     nil))
 
+(defun force-make-array-on-stack (n)
+  (declare (optimize safety))
+  (let ((v (make-array (min n 1))))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
 ;;; MAKE-STRUCTURE
 
 (declaim (inline make-fp-struct-1))
@@ -477,6 +484,7 @@
   (assert-no-consing (dx-value-cell 13))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-array-on-stack))
+  (assert-no-consing (force-make-array-on-stack 128))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
   (#+raw-instance-init-vops assert-no-consing

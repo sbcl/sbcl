@@ -465,8 +465,6 @@
   kind
   mess-up
   (info :test info))
-(defmacro cleanup-nlx-info (cleanup)
-  `(cleanup-info ,cleanup))
 
 ;;; A PHYSENV represents the result of physical environment analysis.
 ;;;

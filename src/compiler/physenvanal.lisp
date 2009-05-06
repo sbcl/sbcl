@@ -251,7 +251,7 @@
     (setf (nlx-info-target info) new-block)
     (setf (nlx-info-safe-p info) (exit-should-check-tag-p exit))
     (push info (physenv-nlx-info env))
-    (push info (cleanup-nlx-info cleanup))
+    (push info (cleanup-info cleanup))
     (when (member (cleanup-kind cleanup) '(:catch :unwind-protect))
       (setf (node-lexenv (block-last new-block))
             (node-lexenv entry))))
@@ -328,40 +328,41 @@
   (declare (type component component))
   (dolist (lambda (component-lambdas component))
     (loop for entry in (lambda-entries lambda)
-            for cleanup = (entry-cleanup entry)
-            do (when (eq (cleanup-kind cleanup) :dynamic-extent)
-                 (collect ((real-dx-lvars))
-                   (loop for what in (cleanup-info cleanup)
-                         do (etypecase what
-                              (lvar
-                               (if (lvar-good-for-dx-p what t component)
-                                   (let ((real (principal-lvar what)))
+          for cleanup = (entry-cleanup entry)
+          do (when (eq (cleanup-kind cleanup) :dynamic-extent)
+               (collect ((real-dx-lvars))
+                 (loop for what in (cleanup-info cleanup)
+                       do (etypecase what
+                            (cons
+                             (let ((lvar (cdr what)))
+                               (if (lvar-good-for-dx-p lvar (car what) component)
+                                   (let ((real (principal-lvar lvar)))
                                      (setf (lvar-dynamic-extent real) cleanup)
                                      (real-dx-lvars real))
-                                   (setf (lvar-dynamic-extent what) nil)))
-                              (node ; DX closure
-                               (let* ((call what)
-                                      (arg (first (basic-combination-args call)))
-                                      (funs (lvar-value arg))
-                                      (dx nil))
-                                 (dolist (fun funs)
-                                   (binding* ((() (leaf-dynamic-extent fun)
-                                               :exit-if-null)
-                                              (xep (functional-entry-fun fun)
-                                               :exit-if-null)
-                                              (closure (physenv-closure
-                                                        (get-lambda-physenv xep))))
-                                     (cond (closure
-                                            (setq dx t))
-                                           (t
-                                            (setf (leaf-dynamic-extent fun) nil)))))
-                                 (when dx
-                                   (setf (lvar-dynamic-extent arg) cleanup)
-                                   (real-dx-lvars arg))))))
-                   (let ((real-dx-lvars (delete-duplicates (real-dx-lvars))))
-                     (setf (cleanup-info cleanup) real-dx-lvars)
-                     (setf (component-dx-lvars component)
-                           (append real-dx-lvars (component-dx-lvars component))))))))
+                                   (setf (lvar-dynamic-extent lvar) nil))))
+                            (node       ; DX closure
+                             (let* ((call what)
+                                    (arg (first (basic-combination-args call)))
+                                    (funs (lvar-value arg))
+                                    (dx nil))
+                               (dolist (fun funs)
+                                 (binding* ((() (leaf-dynamic-extent fun)
+                                             :exit-if-null)
+                                            (xep (functional-entry-fun fun)
+                                                 :exit-if-null)
+                                            (closure (physenv-closure
+                                                      (get-lambda-physenv xep))))
+                                   (cond (closure
+                                          (setq dx t))
+                                         (t
+                                          (setf (leaf-dynamic-extent fun) nil)))))
+                               (when dx
+                                 (setf (lvar-dynamic-extent arg) cleanup)
+                                 (real-dx-lvars arg))))))
+                 (let ((real-dx-lvars (delete-duplicates (real-dx-lvars))))
+                   (setf (cleanup-info cleanup) real-dx-lvars)
+                   (setf (component-dx-lvars component)
+                         (append real-dx-lvars (component-dx-lvars component))))))))
   (values))
 
 ;;;; cleanup emission
@@ -404,7 +405,7 @@
                (reanalyze-funs fun)
                (code `(%funcall ,fun))))
             ((:block :tagbody)
-             (dolist (nlx (cleanup-nlx-info cleanup))
+             (dolist (nlx (cleanup-info cleanup))
                (code `(%lexical-exit-breakup ',nlx))))
             (:dynamic-extent
              (when (not (null (cleanup-info cleanup)))

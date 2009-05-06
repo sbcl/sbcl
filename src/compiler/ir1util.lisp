@@ -191,7 +191,7 @@
            (setf (lvar-dynamic-extent old) nil)
            (unless (lvar-dynamic-extent new)
              (setf (lvar-dynamic-extent new) it)
-             (setf (cleanup-info it) (substitute new old (cleanup-info it)))))
+             (setf (cleanup-info it) (subst new old (cleanup-info it)))))
          (when (lvar-dynamic-extent new)
            (do-uses (node new)
              (node-ends-block node))))
