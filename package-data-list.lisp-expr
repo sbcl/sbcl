@@ -145,7 +145,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                ;; are IN-PACKAGE SB-C. It would probably be cleaner
                ;; to move at least most of them to files which are
                ;; IN-PACKAGE SB-ASSEM.
-               "BRANCH" "DO-SSET-ELEMENTS" "FLUSHABLE" "MAKE-SSET" "SSET"
+               "BRANCH" "DO-SSET-ELEMENTS" "MAKE-SSET" "SSET"
                "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"))
 
    #s(sb-cold:package-data
@@ -190,7 +190,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM"
                  #!+sb-dyncount "SB-DYNCOUNT" "SB!EXT" "SB!FASL" "SB!INT"
                  "SB!KERNEL" "SB!SYS")
-      :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
+      :reexport ("SLOT" "CODE-INSTRUCTIONS")
       :export ("%ALIEN-FUNCALL"
                "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
@@ -269,6 +269,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "FIXUP-NOTE-KIND"
                "FIXUP-NOTE-FIXUP"
                "FIXUP-NOTE-POSITION"
+               "FLUSHABLE"
                "FOLDABLE"
                "FORCE-TN-TO-STACK"
                "FUN-INFO-DERIVE-TYPE" "FUN-INFO-IR2-CONVERT"
@@ -328,7 +329,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "TN-REF-NEXT" "TN-REF-NEXT-REF" "TN-REF-P" "TN-REF-TARGET"
                "TN-REF-TN" "TN-REF-VOP" "TN-REF-WRITE-P" "TN-SC" "TN-VALUE"
                "TRACE-TABLE-ENTRY" "TYPE-CHECK-ERROR" "UNBIND" "UNBIND-TO-HERE"
-               "UNSAFE" "UNWIND" "UWP-ENTRY"
+               "UNSAFE" "UNSAFELY-FLUSHABLE" "UNWIND" "UWP-ENTRY"
                "VERIFY-ARG-COUNT" "WRITE-PACKED-BIT-VECTOR"
                "WRITE-VAR-INTEGER" "WRITE-VAR-STRING" "XEP-ALLOCATE-FRAME"
                "LABEL-ID" "FIXUP" "FIXUP-FLAVOR" "FIXUP-NAME" "FIXUP-OFFSET"
