@@ -164,16 +164,18 @@
 ;;;  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
 ;;;  test suite.
 (locally (declare (optimize (safety 3) (speed 0)))
-      (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
-                            :initial-element #\space :adjustable t))
-             (y (make-array 10 :fill-pointer 4 :element-type 'character
-                            :displaced-to x)))
-        (handler-case
-            (adjust-array x '(5))
-          (error (e)
-            (assert (typep e 'sb-int:simple-reference-error))
-            (assert (equal '((:ansi-cl function adjust-array))
-                           (sb-int:reference-condition-references e)))))))
+  (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
+                        :initial-element #\space :adjustable t))
+         (y (make-array 10 :fill-pointer 4 :element-type 'character
+                        :displaced-to x)))
+    (assert (eq x (adjust-array x '(5))))
+    (assert (eq :error (handler-case
+                           (char y 0)
+                         (sb-int:invalid-array-error (e)
+                           (assert (eq y (type-error-datum e)))
+                           (assert (equal `(vector character 10)
+                                          (type-error-expected-type e)))
+                           :error))))))
 
 ;;; MISC.527: bit-vector bitwise operations used LENGTH to get a size
 ;;; of a vector

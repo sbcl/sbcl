@@ -1110,6 +1110,21 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                ;; Extract the bound from (INTEGER 0 (BOUND))
                (caaddr (type-error-expected-type condition)))))))
 
+(define-condition invalid-array-error (reference-condition type-error) ()
+  (:report
+   (lambda (condition stream)
+     (let ((*print-array* nil))
+       (format stream
+               "~@<Displaced array originally of type ~S has been invalidated ~
+                due its displaced-to array ~S having become too small to hold ~
+                it: the displaced array's dimensions have all been set to zero ~
+                to trap accesses to it.~:@>"
+               (type-error-expected-type condition)
+               (array-displacement (type-error-datum condition))))))
+  (:default-initargs
+      :references
+      (list '(:ansi-cl :function adjust-array))))
+
 (define-condition index-too-large-error (type-error)
   ()
   (:report

@@ -236,12 +236,14 @@
          :operands (list this that)))
 
 (deferr object-not-type-error (object type)
-  (error (if (and (%instancep object)
-                  (layout-invalid (%instance-layout object)))
-             'layout-invalid
-             'type-error)
-         :datum object
-         :expected-type type))
+  (if (invalid-array-p object)
+      (invalid-array-error object)
+      (error (if (and (%instancep object)
+                      (layout-invalid (%instance-layout object)))
+                 'layout-invalid
+                 'type-error)
+             :datum object
+             :expected-type type)))
 
 (deferr layout-invalid-error (object layout)
   (error 'layout-invalid

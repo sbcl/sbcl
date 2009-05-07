@@ -176,7 +176,8 @@
     (extended-char 'extended-char)
     ((member t) 'boolean)
     (keyword 'keyword)
-    ((or array complex) (type-specifier (ctype-of object)))
+    ((or array complex)
+     (type-specifier (ctype-of object)))
     (t
      (let* ((classoid (layout-classoid (layout-of object)))
             (name (classoid-name classoid)))

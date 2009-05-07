@@ -467,14 +467,33 @@ of specialized arrays is supported."
 (defun data-vector-ref-with-offset (array index offset)
   (hairy-data-vector-ref array (+ index offset)))
 
+(defun invalid-array-p (array)
+  (and (array-header-p array)
+       (consp (%array-displaced-p array))))
+
+(declaim (ftype (function (array) nil) invalid-array-error))
+(defun invalid-array-error (array)
+  (aver (array-header-p array))
+  ;; Array invalidation stashes the original dimensions here...
+  (let ((dims (%array-displaced-p array))
+        (et (array-element-type array)))
+    (error 'invalid-array-error
+           :datum array
+           :expected-type
+           (if (cdr dims)
+               `(array ,et ,dims)
+               `(vector ,et ,@dims)))))
+
 (declaim (ftype (function (array integer integer &optional t) nil)
                 invalid-array-index-error))
 (defun invalid-array-index-error (array index bound &optional axis)
-  (error 'invalid-array-index-error
-         :array array
-         :axis axis
-         :datum index
-         :expected-type `(integer 0 (,bound))))
+  (if (invalid-array-p array)
+      (invalid-array-error array)
+      (error 'invalid-array-index-error
+             :array array
+             :axis axis
+             :datum index
+             :expected-type `(integer 0 (,bound)))))
 
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
 (defun %array-row-major-index (array subscripts
@@ -837,6 +856,8 @@ of specialized arrays is supported."
                            displaced-to displaced-index-offset)
   #!+sb-doc
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
+  (when (invalid-array-p array)
+    (invalid-array-error array))
   (let ((dimensions (if (listp dimensions) dimensions (list dimensions))))
     (cond ((/= (the fixnum (length (the list dimensions)))
                (the fixnum (array-rank array)))
@@ -1035,36 +1056,76 @@ of specialized arrays is supported."
      vector)
     (t (subseq vector 0 new-length))))
 
+;;; BIG THREAD SAFETY NOTE
+;;;
+;;; ADJUST-ARRAY/SET-ARRAY-HEADER, and its callees are very
+;;; thread unsafe. They are nonatomic, and can mess with parallel
+;;; code using the same arrays.
+;;;
+;;; A likely seeming fix is an additional level of indirection:
+;;; ARRAY-HEADER -> ARRAY-INFO -> ... where ARRAY-HEADER would
+;;; hold nothing but the pointer to ARRAY-INFO, and ARRAY-INFO
+;;; would hold everything ARRAY-HEADER now holds. This allows
+;;; consing up a new ARRAY-INFO and replacing it atomically in
+;;; the ARRAY-HEADER.
+;;;
+;;; %WALK-DISPLACED-ARRAY-BACKPOINTERS is an especially nasty
+;;; one: not only is it needed extremely rarely, which makes
+;;; any thread safety bugs involving it look like rare random
+;;; corruption, but because it walks the chain *upwards*, which
+;;; may violate user expectations.
+
 (defun %save-displaced-array-backpointer (array data)
-  (when (array-header-p data)
-    (let* ((old (%array-displaced-from data))
-           (new (cons (make-weak-pointer array) old)))
-      (loop until (eq old (%compare-and-swap-array-displaced-from data old new))
-            do (setf old (%array-displaced-from data)
-                     new (rplacd new (remove-if-not #'weak-pointer-value old)))))))
+  (flet ((purge (pointers)
+           (remove-if (lambda (value)
+                        (or (not value) (eq array value)))
+                      pointers
+                      :key #'weak-pointer-value)))
+    ;; Add backpointer to the new data vector if it has a header.
+    (when (array-header-p data)
+      (setf (%array-displaced-from data)
+            (cons (make-weak-pointer array)
+                  (purge (%array-displaced-from data)))))
+    ;; Remove old backpointer, if any.
+    (let ((old-data (%array-data-vector array)))
+      (when (and (neq data old-data) (array-header-p old-data))
+        (setf (%array-displaced-from old-data)
+              (purge (%array-displaced-from old-data)))))))
+
+(defun %walk-displaced-array-backpointers (array new-length)
+  (dolist (p (%array-displaced-from array))
+    (let ((from (weak-pointer-value p)))
+      (when (and from (eq array (%array-data-vector from)))
+        (let ((requires (+ (%array-available-elements from)
+                           (%array-displacement from))))
+          (unless (>= new-length requires)
+            ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
+            ;;
+            ;;   "If A is displaced to B, the consequences are unspecified if B is
+            ;;   adjusted in such a way that it no longer has enough elements to
+            ;;   satisfy A.
+            ;;
+            ;; since we're hanging on a weak pointer here, we can't signal an
+            ;; error right now: the array that we're looking at might be
+            ;; garbage. Instead, we set all dimensions to zero so that next
+            ;; safe access to the displaced array will trap. Additionally, we
+            ;; save the original dimensions, so we can signal a more
+            ;; understandable error when the time comes.
+            (%walk-displaced-array-backpointers from 0)
+            (setf (%array-fill-pointer from) 0
+                  (%array-available-elements from) 0
+                  (%array-displaced-p from) (array-dimensions array))
+            (dotimes (i (%array-rank from))
+              (setf (%array-dimension from i) 0))))))))
 
 ;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions
                          displacedp newp)
   (if newp
       (setf (%array-displaced-from array) nil)
-      ;; ANSI sayeth (ADJUST-ARRAY dictionary entry):
-      ;;
-      ;;   "If A is displaced to B, the consequences are unspecified if B is
-      ;;   adjusted in such a way that it no longer has enough elements to
-      ;;   satisfy A.
-      ;;
-      ;; so check the backpointers and signal an error if appropriate.
-      (dolist (p (%array-displaced-from array))
-        (let ((from (weak-pointer-value p)))
-          (when from
-            (let ((requires (+ (%array-available-elements from)
-                               (%array-displacement from))))
-              (unless (>= length requires)
-                (error 'simple-reference-error
-                       :format-control "Cannot shrink ~S to ~S elements: displaced array ~S requires at least ~S elements."
-                       :format-arguments (list 'adjust-array length from requires))))))))
-  (%save-displaced-array-backpointer array data)
+      (%walk-displaced-array-backpointers array length))
+  (when displacedp
+    (%save-displaced-array-backpointer array data))
   (setf (%array-data-vector array) data)
   (setf (%array-available-elements array) length)
   (cond (fill-pointer
