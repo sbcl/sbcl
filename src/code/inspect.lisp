@@ -108,17 +108,12 @@ evaluated expressions.
              (return-from %inspect (reread)))))))))
 
 (defun eval-for-inspect (command stream)
-  (let ((result-list (restart-case (multiple-value-list (eval command))
+  (let ((result-list (restart-case
+                         (multiple-value-list (interactive-eval command))
                        (nil () :report "Return to the inspector."
                           (format stream "~%returning to the inspector~%")
                           (return-from eval-for-inspect nil)))))
-    ;; FIXME: Much of this interactive-EVAL logic is shared with
-    ;; the main REPL EVAL and with the debugger EVAL. The code should
-    ;; be shared explicitly.
-    (setf /// // // / / result-list)
-    (setf +++ ++ ++ + + - - command)
-    (setf *** ** ** * * (car /))
-    (format stream "~&~{~S~%~}" /)))
+    (format stream "~&~{~S~%~}" result-list)))
 
 (defun tty-display-inspected-parts (description named-p elements stream)
   (format stream "~%~A" description)

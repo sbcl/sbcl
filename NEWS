@@ -22,6 +22,8 @@
   * bug fix: special variables with a proclaimed specific subtype of FUNCTION
     could not be assigned to or bound with PROGV. (reported by Lorenz
     Mösenlechner)
+  * bug fix: the value of CL:- in the inspector was the previous expression
+    evaluated rather than the expression being evaluated.
 
 changes in sbcl-1.0.28 relative to 1.0.27:
   * a number of bugs in cross-compilation have been fixed, with the ultimate
