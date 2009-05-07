@@ -174,23 +174,6 @@
   (:policy :fast)
   (:translate symbol-value))
 
-(defknown locked-symbol-global-value-add (symbol fixnum) fixnum ())
-
-(define-vop (locked-symbol-global-value-add)
-    (:args (object :scs (descriptor-reg) :to :result)
-           (value :scs (any-reg) :target result))
-  (:arg-types * tagged-num)
-  (:results (result :scs (any-reg) :from (:argument 1)))
-  (:policy :fast)
-  (:translate locked-symbol-global-value-add)
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:generator 4
-    (move result value)
-    (inst add (make-ea-for-object-slot object symbol-value-slot
-                                       other-pointer-lowtag)
-          value :lock)))
-
 #!+sb-thread
 (define-vop (boundp)
   (:translate boundp)

@@ -11,14 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(defmacro atomic-incf/symbol (symbol-name &optional (delta 1))
-  #!-sb-thread
-  `(incf ,symbol-name ,delta)
-  #!+sb-thread
-  `(locally
-    (declare (optimize (safety 0) (speed 3)))
-    (sb!vm::locked-symbol-global-value-add ',symbol-name ,delta)))
-
 ;;;; these are initialized in cold init
 
 (defvar *in-without-gcing*)

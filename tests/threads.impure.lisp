@@ -456,7 +456,8 @@
 
 (format t "~&interrupt test done~%")
 
-(defparameter *interrupt-count* 0)
+(defstruct counter (n 0 :type sb-vm:word))
+(defvar *interrupt-counter* (make-counter))
 
 (declaim (notinline check-interrupt-count))
 (defun check-interrupt-count (i)
@@ -471,16 +472,16 @@
                                       (princ cond)
                                       (sb-debug:backtrace
                                        most-positive-fixnum))))
-              (loop (check-interrupt-count *interrupt-count*)))))))
+              (loop (check-interrupt-count (counter-n *interrupt-counter*))))))))
   (let ((func (lambda ()
                 (princ ".")
                 (force-output)
-                (sb-impl::atomic-incf/symbol *interrupt-count*))))
-    (setq *interrupt-count* 0)
+                (sb-ext:atomic-incf (counter-n *interrupt-counter*)))))
+    (setf (counter-n *interrupt-counter*) 0)
     (dotimes (i 100)
       (sleep (random 0.1d0))
       (interrupt-thread c func))
-    (loop until (= *interrupt-count* 100) do (sleep 0.1))
+    (loop until (= (counter-n *interrupt-counter*) 100) do (sleep 0.1))
     (terminate-thread c)
     (wait-for-threads (list c))))
 
