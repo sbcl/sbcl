@@ -456,11 +456,10 @@ one level.
 @comment  node-name,  next,  previous,  up
 @section Handling of Types
 
-The most unusual features of the SBCL compiler (which is very
-similar to the original CMUCL compiler, also known as @dfn{Python})
-is its unusually sophisticated understanding of the Common Lisp type
-system and its unusually conservative approach to the implementation
-of type declarations.
+One of the most important features of the SBCL compiler (similar to
+the original CMUCL compiler, also known as @dfn{Python}) is its fairly
+sophisticated understanding of the Common Lisp type system and its
+conservative approach to the implementation of type declarations.
 
 These two features reward the use of type declarations throughout
 development, even when high performance is not a concern. Also, as
@@ -493,21 +492,28 @@ involving the @code{satisfies} type specifier.
 @subsection Declarations as Assertions
 @findex safety
 
-The SBCL compiler treats type declarations differently from most
-other Lisp compilers. Under default compilation policy the compiler
-doesn't blindly believe type declarations, but considers them
-assertions about the program that should be checked: all type
-declarations that have not been proven to always hold are asserted at
-runtime.
+The SBCL compiler treats type declarations differently from most other
+Lisp compilers. Under default compilation policy the compiler doesn't
+blindly believe type declarations, but considers them assertions about
+the program that should be checked: all type declarations that have
+not been proven to always hold are asserted at runtime.
 
 @quotation
 @emph{Remaining bugs in the compiler's handling of types unfortunately
 provide some exceptions to this rule, see @ref{Implementation
-Limitations}).}
+Limitations}.}
 @end quotation
 
-There are three type checking policies available in SBCL,
-selectable via @code{optimize} declarations.
+CLOS slot types form a notable exception. Types declared using the
+@code{:type} slot option in @code{defclass} are asserted if and only
+if the class was defined in @emph{safe code} and the slot access
+location is in @emph{safe code} as well. This laxness does not pose
+any internal consistency issues, as the CLOS slot types are not
+available for the type inferencer, nor do CLOS slot types provide any
+efficiency benefits.
+
+There are three type checking policies available in SBCL, selectable
+via @code{optimize} declarations.
 
 @table @strong
 

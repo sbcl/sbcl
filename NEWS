@@ -5,6 +5,7 @@
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.
+  * documentation: CLOS slot typechecing policy has been documented.
   * bug fix: potential miscompilation of array stack allocation on x86 and
     x86-64. (reported by Time Tossavainen)
   * bug fix: some forms of AND, OR, and COND resulted in expansions that could
