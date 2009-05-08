@@ -104,84 +104,17 @@
       (inst cmp result unbound-marker-widetag)
       (inst jmp :e unbound))))
 
-;;; these next two cf the sparc version, by jrd.
-;;; FIXME: Deref this ^ reference.
-
-
-;;; The compiler likes to be able to directly SET symbols.
-#!+sb-thread
-(define-vop (set)
-  (:args (symbol :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
-  (:temporary (:sc descriptor-reg) tls)
-  ;;(:policy :fast-safe)
-  (:generator 4
-    (let ((global-val (gen-label))
-          (done (gen-label)))
-      (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
-      (inst cmp (make-ea :qword :base thread-base-tn :scale 1 :index tls)
-            no-tls-value-marker-widetag)
-      (inst jmp :z global-val)
-      (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls)
-            value)
-      (inst jmp done)
-      (emit-label global-val)
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (emit-label done))))
-
-;; unithreaded it's a lot simpler ...
-#!-sb-thread
-(define-vop (set cell-set)
+(define-vop (%set-symbol-global-value cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
-;;; With Symbol-Value, we check that the value isn't the trap object. So
-;;; Symbol-Value of NIL is NIL.
-#!+sb-thread
-(define-vop (symbol-value)
-  (:translate symbol-value)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to (:result 1)))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 9
-    (let* ((check-unbound-label (gen-label))
-           (err-lab (generate-error-code vop 'unbound-symbol-error object))
-           (ret-lab (gen-label)))
-      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst mov value (make-ea :qword :base thread-base-tn
-                               :index value :scale 1))
-      (inst cmp value no-tls-value-marker-widetag)
-      (inst jmp :ne check-unbound-label)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      (emit-label check-unbound-label)
-      (inst cmp value unbound-marker-widetag)
-      (inst jmp :e err-lab)
-      (emit-label ret-lab))))
-
-#!+sb-thread
-(define-vop (fast-symbol-value symbol-value)
-  ;; KLUDGE: not really fast, in fact, because we're going to have to
-  ;; do a full lookup of the thread-local area anyway.  But half of
-  ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
-  ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
-  ;; CSR, 2003-04-22
+(define-vop (fast-symbol-global-value cell-ref)
+  (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symbol-value)
-  (:generator 8
-    (let ((ret-lab (gen-label)))
-      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst mov value
-            (make-ea :qword :base thread-base-tn :index value :scale 1))
-      (inst cmp value no-tls-value-marker-widetag)
-      (inst jmp :ne ret-lab)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      (emit-label ret-lab))))
+  (:translate symbol-global-value))
 
-#!-sb-thread
-(define-vop (symbol-value)
-  (:translate symbol-value)
+(define-vop (symbol-global-value)
   (:policy :fast-safe)
+  (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -192,11 +125,75 @@
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
+#!+sb-thread
+(progn
+  (define-vop (set)
+    (:args (symbol :scs (descriptor-reg))
+           (value :scs (descriptor-reg any-reg)))
+    (:temporary (:sc descriptor-reg) tls)
+    (:generator 4
+      (let ((global-val (gen-label))
+            (done (gen-label)))
+        (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
+        (inst cmp (make-ea :qword :base thread-base-tn :scale 1 :index tls)
+              no-tls-value-marker-widetag)
+        (inst jmp :z global-val)
+        (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls)
+              value)
+        (inst jmp done)
+        (emit-label global-val)
+        (storew value symbol symbol-value-slot other-pointer-lowtag)
+        (emit-label done))))
+
+  ;; With Symbol-Value, we check that the value isn't the trap object. So
+  ;; Symbol-Value of NIL is NIL.
+  (define-vop (symbol-value)
+    (:translate symbol-value)
+    (:policy :fast-safe)
+    (:args (object :scs (descriptor-reg) :to (:result 1)))
+    (:results (value :scs (descriptor-reg any-reg)))
+    (:vop-var vop)
+    (:save-p :compute-only)
+    (:generator 9
+      (let* ((check-unbound-label (gen-label))
+             (err-lab (generate-error-code vop 'unbound-symbol-error object))
+             (ret-lab (gen-label)))
+        (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+        (inst mov value (make-ea :qword :base thread-base-tn
+                                 :index value :scale 1))
+        (inst cmp value no-tls-value-marker-widetag)
+        (inst jmp :ne check-unbound-label)
+        (loadw value object symbol-value-slot other-pointer-lowtag)
+        (emit-label check-unbound-label)
+        (inst cmp value unbound-marker-widetag)
+        (inst jmp :e err-lab)
+        (emit-label ret-lab))))
+
+  (define-vop (fast-symbol-value symbol-value)
+    ;; KLUDGE: not really fast, in fact, because we're going to have to
+    ;; do a full lookup of the thread-local area anyway.  But half of
+    ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
+    ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
+    ;; CSR, 2003-04-22
+    (:policy :fast)
+    (:translate symbol-value)
+    (:generator 8
+      (let ((ret-lab (gen-label)))
+        (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+        (inst mov value
+              (make-ea :qword :base thread-base-tn :index value :scale 1))
+        (inst cmp value no-tls-value-marker-widetag)
+        (inst jmp :ne ret-lab)
+        (loadw value object symbol-value-slot other-pointer-lowtag)
+        (emit-label ret-lab)))))
+
 #!-sb-thread
-(define-vop (fast-symbol-value cell-ref)
-  (:variant symbol-value-slot other-pointer-lowtag)
-  (:policy :fast)
-  (:translate symbol-value))
+(progn
+  (define-vop (symbol-value symbol-global-value)
+    (:translate symbol-value))
+  (define-vop (fast-symbol-value fast-symbol-global-value)
+    (:translate symbol-value))
+  (define-vop (set %set-symbol-global-value)))
 
 #!+sb-thread
 (define-vop (boundp)

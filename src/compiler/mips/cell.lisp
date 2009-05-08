@@ -102,6 +102,13 @@
     (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
     (inst srl temp n-fixnum-tag-bits)
     (inst sll res temp n-fixnum-tag-bits)))
+
+;;; On unithreaded builds these are just copies of the non-global versions.
+(define-vop (%set-symbol-global-value set))
+(define-vop (symbol-global-value symbol-value)
+  (:translate symbol-global-value))
+(define-vop (fast-symbol-global-value fast-symbol-value)
+  (:translate symbol-global-value))
 
 ;;;; Fdefinition (fdefn) objects.
 

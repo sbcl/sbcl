@@ -769,33 +769,43 @@
 ;;;   foo => 13, (constantp 'foo) => t
 ;;;
 ;;; ...in which case you frankly deserve to lose.
-(defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep))
+(defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep) bind)
   (declare (symbol symbol))
-  (multiple-value-bind (what continue)
-      (when (eq :constant (info :variable :kind symbol))
-        (cond ((eq symbol t)
-               (values "Veritas aeterna. (can't ~@?)" nil))
-              ((eq symbol nil)
-               (values "Nihil ex nihil. (can't ~@?)" nil))
-              ((keywordp symbol)
-               (values "Can't ~@?." nil))
-              (t
-               (values "Constant modification: attempt to ~@?." t))))
-    (when what
-      (if continue
-          (cerror "Modify the constant." what action symbol)
-          (error what action symbol)))
-    (when valuep
-      ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
-      ;; check.
-      (let ((type (info :variable :type symbol)))
-        (unless (sb!kernel::%%typep new-value type nil)
-          (let ((spec (type-specifier type)))
-            (error 'simple-type-error
-                   :format-control "Cannot ~@? to ~S (not of type ~S.)"
-                   :format-arguments (list action symbol new-value spec)
-                   :datum new-value
-                   :expected-type spec))))))
+  (flet ((describe-action ()
+           (ecase action
+             (set "set SYMBOL-VALUE of ~S")
+             (progv "bind ~S")
+             (compare-and-swap "compare-and-swap SYMBOL-VALUE of ~S")
+             (defconstant "define ~S as a constant")
+             (makunbound "make ~S unbound"))))
+    (let ((kind (info :variable :kind symbol)))
+      (multiple-value-bind (what continue)
+          (cond ((eq :constant kind)
+                 (cond ((eq symbol t)
+                        (values "Veritas aeterna. (can't ~@?)" nil))
+                       ((eq symbol nil)
+                        (values "Nihil ex nihil. (can't ~@?)" nil))
+                       ((keywordp symbol)
+                        (values "Can't ~@?." nil))
+                       (t
+                        (values "Constant modification: attempt to ~@?." t))))
+                ((and bind (eq :global kind))
+                 (values "Can't ~@? (global variable)." nil)))
+        (when what
+          (if continue
+              (cerror "Modify the constant." what (describe-action) symbol)
+              (error what (describe-action) symbol)))
+        (when valuep
+          ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
+          ;; check.
+          (let ((type (info :variable :type symbol)))
+            (unless (sb!kernel::%%typep new-value type nil)
+              (let ((spec (type-specifier type)))
+                (error 'simple-type-error
+                       :format-control "Cannot ~@? to ~S (not of type ~S.)"
+                       :format-arguments (list action (describe-action) new-value spec)
+                       :datum new-value
+                       :expected-type spec))))))))
   (values))
 
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary

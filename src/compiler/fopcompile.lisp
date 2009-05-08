@@ -47,11 +47,7 @@
                  (fopcompilable-p macroexpansion)
                  ;; Punt on :ALIEN variables
                  (let ((kind (info :variable :kind form)))
-                   (or (eq kind :special)
-                       ;; Not really a global, but a variable for
-                       ;; which no information exists.
-                       (eq kind :global)
-                       (eq kind :constant))))))
+                   (member kind '(:special :constant :global :unknown))))))
       (and (listp form)
            (ignore-errors (list-length form))
            (multiple-value-bind (macroexpansion macroexpanded-p)
@@ -158,11 +154,10 @@
                    for value = (if (consp binding)
                                    (second binding)
                                    nil)
-                   ;; Only allow binding lexicals,
-                   ;; since special bindings can't be
-                   ;; easily expressed with fops.
+                   ;; Only allow binding locals, since special bindings can't
+                   ;; be easily expressed with fops.
                    always (and (eq (info :variable :kind name)
-                                   :global)
+                                   :unknown)
                                (let ((*lexenv* (ecase operator
                                                  (let orig-lexenv)
                                                  (let* *lexenv*))))

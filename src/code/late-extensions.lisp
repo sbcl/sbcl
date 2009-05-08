@@ -108,7 +108,7 @@ EXPERIMENTAL: Interface subject to change."
                            (,n-old ,old)
                            (,n-new ,new))
                        (declare (symbol ,n-symbol))
-                       (about-to-modify-symbol-value ,n-symbol "compare-and-swap SYMBOL-VALUE of ~S" ,n-new)
+                       (about-to-modify-symbol-value ,n-symbol 'compare-and-swap ,n-new)
                        (%compare-and-swap-symbol-value ,n-symbol ,n-old ,n-new)))))
            (if (sb!xc:constantp name env)
                (let ((cname (constant-form-value name env)))
@@ -230,3 +230,42 @@ EXPERIMENTAL: Interface subject to change."
             (warn "Problem running ~A hook ~S:~%  ~A" kind hook c)
             (with-simple-restart (continue "Skip this ~A hook." kind)
               (error "Problem running ~A hook ~S:~%  ~A" kind hook c)))))))
+
+;;;; DEFGLOBAL
+
+(defmacro-mundanely defglobal (name value &optional (doc nil docp))
+  #!+sb-doc
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME both at compile- and load-time, but only if NAME is not
+already bound.
+
+Global variables share their values between all threads, and cannot be
+locally bound, declared special, defined as constants, and neither bound
+nor defined as symbol macros.
+
+See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
+  `(progn
+     (eval-when (:compile-toplevel)
+       (let ((boundp (boundp ',name)))
+         (%compiler-defglobal ',name (unless boundp ,value) boundp)))
+     (eval-when (:load-toplevel :execute)
+       (let ((boundp (boundp ',name)))
+         (%defglobal ',name (unless boundp ,value) boundp ',doc ,docp
+                     (sb!c:source-location))))))
+
+(defun %compiler-defglobal (name value boundp)
+  (sb!xc:proclaim `(global ,name))
+  (unless boundp
+    #-sb-xc-host
+    (set-symbol-global-value name value)
+    #+sb-xc-host
+    (set name value))
+  (sb!xc:proclaim `(always-bound ,name)))
+
+(defun %defglobal (name value boundp doc docp source-location)
+  (%compiler-defglobal name value boundp)
+  (when docp
+    (setf (fdocumentation name 'variable) doc))
+  (sb!c:with-source-location (source-location)
+    (setf (info :source-location :variable name) source-location))
+  name)

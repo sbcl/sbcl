@@ -241,7 +241,7 @@
       (let ((kind (info :variable :kind name))
             (type (info :variable :type name))
             (where-from (info :variable :where-from name)))
-        (when (and (eq where-from :assumed) (eq kind :global))
+        (when (eq kind :unknown)
           (note-undefined-reference name :variable))
         (setf (gethash name *free-vars*)
               (case kind
@@ -639,7 +639,10 @@
         ;; KLUDGE: If the reference is dead, convert using SYMBOL-VALUE
         ;; which is not flushable, so that unbound dead variables signal
         ;; an error (bug 412).
-        (ir1-convert start next result `(symbol-value ',name))
+        (ir1-convert start next result
+                     (if (eq (global-var-kind var) :global)
+                         `(symbol-global-value ',name)
+                         `(symbol-value ',name)))
         (etypecase var
           (leaf
            (when (lambda-var-p var)
@@ -1212,6 +1215,16 @@
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
+      ;; While CLHS seems to allow local SPECIAL declarations for constants,
+      ;; whatever the semantics are supposed to be is not at all clear to me
+      ;; -- since constants aren't allowed to be bound it should be a no-op as
+      ;; no-one can observe the difference portably, but specials are allowed
+      ;; to be bound... yet nowhere does it say that the special declaration
+      ;; removes the constantness. Call it a spec bug and prohibit it. Same
+      ;; for GLOBAL variables.
+      (let ((kind (info :variable :kind name)))
+        (unless (member kind '(:special :unknown))
+          (error "Can't declare ~(~A~) variable locally special: ~S" kind name)))
       (program-assert-symbol-home-package-unlocked
        context name "declaring ~A special")
       (let ((var (find-in-bindings vars name)))

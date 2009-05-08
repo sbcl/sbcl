@@ -312,7 +312,8 @@
                 (:special "special variable")
                 (:macro "symbol macro")
                 (:constant "constant")
-                (:global "undefined variable")
+                (:global "global variable")
+                (:unknown "undefined variable")
                 (:alien nil))))
     (pprint-logical-block (s nil)
       (cond
@@ -330,7 +331,7 @@
        ((boundp x)
         (format s "~&~@<It is a ~A; its ~_value is ~S.~:>"
                 wot (symbol-value x)))
-       ((not (eq kind :global))
+       ((not (eq kind :unknown))
         (format s "~&~@<It is a ~A; no current value.~:>" wot)))
 
       (when (eq (info :variable :where-from x) :declared)

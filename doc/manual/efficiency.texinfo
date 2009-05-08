@@ -4,10 +4,11 @@
 @cindex Efficiency
 
 @menu
-* Slot access::                 
-* Dynamic-extent allocation::   
-* Modular arithmetic::          
-* Miscellaneous Efficiency Issues::  
+* Slot access::
+* Dynamic-extent allocation::
+* Modular arithmetic::
+* Global and Always-Bound variables::
+* Miscellaneous Efficiency Issues::
 @end menu
 
 @node  Slot access
@@ -222,6 +223,36 @@ combinations; and @code{ash} with the positive second
 argument. ``Good'' widths are 32 on HPPA, MIPS, PPC, Sparc and x86 and
 64 on Alpha.  While it is possible to support smaller widths as well,
 currently this is not implemented.
+
+@node  Global and Always-Bound variables
+@comment  node-name,  next,  previous,  up
+@section Global and Always-Bound variables
+
+@include macro-sb-ext-defglobal.texinfo
+
+@deftp {Declaration} sb-ext:global
+
+Syntax: @code{(sb-ext:global symbol*)}
+
+Only valid as a global proclamation.
+
+Specifies that the named symbols cannot be proclaimed or locally
+declared @code{special}. Proclaiming an already special or constant
+variable name as @code{global} signal an error. Allows more efficient
+value lookup in threaded environments in addition to expressing
+programmer intention.
+@end deftp
+
+@deftp {Declaration} sb-ext:always-bound
+
+Syntax: @code{(sb-ext:always-bound symbol*)}
+
+Only valid as a global proclamation.
+
+Specifies that the named symbols is always bound. Inhibits @code{makunbound}
+of the named symbols. Proclaiming an unbound symbol as @code{always-bound} signals
+an error. Allows compiler to elide boundness checks from value lookups.
+@end deftp
 
 @node  Miscellaneous Efficiency Issues
 @comment  node-name,  next,  previous,  up

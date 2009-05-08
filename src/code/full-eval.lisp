@@ -236,7 +236,10 @@
     (cond
       ((eq type :constant)
        ;; Horrible place for this, but it works.
-       (ip-error "Can't bind constant symbol ~S" symbol))
+       (ip-error "Can't bind constant symbol: ~S" symbol))
+      ((eq type :global)
+       ;; Ditto...
+       (ip-error "Can't bind a global variable: ~S" symbol))
       ((eq type :special) t)
       ((member symbol declared-specials :test #'eq)
        t)

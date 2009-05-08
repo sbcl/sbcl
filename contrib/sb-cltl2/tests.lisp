@@ -6,7 +6,7 @@
 ;;;; more information.
 
 (defpackage :sb-cltl2-tests
-  (:use :sb-cltl2 :cl :sb-rt))
+  (:use :sb-cltl2 :cl :sb-rt :sb-ext))
 
 (in-package :sb-cltl2-tests)
 
@@ -209,6 +209,16 @@
     (var-info #:undefined)
   (nil nil nil))
 
+(declaim (global this-is-global))
+(deftest global-variable
+    (var-info this-is-global)
+  (:global nil nil))
+
+(defglobal this-is-global-too 42)
+(deftest global-variable.2
+    (var-info this-is-global-too)
+  (:global nil ((always-bound . t))))
+
 ;;;; FUNCTION-INFORMATION
 
 (defmacro fun-info (var &environment env)
@@ -269,4 +279,3 @@
       (fun-info identity))
   (:function nil ((inline . inline)
                   (ftype function (t) (values t &optional)))))
-

@@ -170,14 +170,35 @@
          (kind (first form))
          (args (rest form)))
     (case kind
-      (special
+      ((special global)
+       (flet ((make-special (name old)
+                (unless (member old '(:special :unknown))
+                  (error "Cannot proclaim a ~(~A~) variable special: ~S" old name))
+                (with-single-package-locked-error
+                    (:symbol name "globally declaring ~A special")
+                  (setf (info :variable :kind name) :special)))
+              (make-global (name old)
+                (unless (member old '(:global :unknown))
+                  (error "Cannot proclaim a ~(~A~) variable global: ~S" old name))
+                (with-single-package-locked-error
+                    (:symbol name "globally declaring ~A global")
+                  (setf (info :variable :kind name) :global))))
+         (let ((fun (if (eq 'special kind) #'make-special #'make-global)))
+           (dolist (name args)
+            (unless (symbolp name)
+              (error "Can't declare a non-symbol as ~S: ~S" kind name))
+            (funcall fun name (info :variable :kind name))))))
+      (always-bound
        (dolist (name args)
          (unless (symbolp name)
-           (error "can't declare a non-symbol as SPECIAL: ~S" name))
+           (error "Can't proclaim a non-symbol as ~S: ~S" kind name))
+         (unless (boundp name)
+           (error "Can't proclaim an unbound symbol as ~S: ~S" kind name))
+         (when (eq :constant (info :variable :kind name))
+           (error "Can't proclaim a constant variable as ~S: ~S" kind name))
          (with-single-package-locked-error
-             (:symbol name "globally declaring ~A special")
-           (about-to-modify-symbol-value name "proclaim ~S as SPECIAL")
-           (setf (info :variable :kind name) :special))))
+             (:symbol name "globally declaring ~A always bound")
+           (setf (info :variable :always-bound name) t))))
       (type
        (if *type-system-initialized*
            (let ((type (specifier-type (first args))))

@@ -99,18 +99,19 @@ invoked. In that case it will store into PLACE and start over."
       (:symbol name "defining ~A as a symbol-macro"))
   (sb!c:with-source-location (source-location)
     (setf (info :source-location :symbol-macro name) source-location))
-  (ecase (info :variable :kind name)
-    ((:macro :global nil)
-     (setf (info :variable :kind name) :macro)
-     (setf (info :variable :macro-expansion name) expansion))
-    (:special
-     (error 'simple-program-error
-            :format-control "Symbol macro name already declared special: ~S."
-            :format-arguments (list name)))
-    (:constant
-     (error 'simple-program-error
-            :format-control "Symbol macro name already declared constant: ~S."
-            :format-arguments (list name))))
+  (let ((kind (info :variable :kind name)))
+    (ecase kind
+     ((:macro :unknown)
+      (setf (info :variable :kind name) :macro)
+      (setf (info :variable :macro-expansion name) expansion))
+     ((:special :global)
+      (error 'simple-program-error
+             :format-control "Symbol macro name already declared ~A: ~S."
+             :format-arguments (list kind name)))
+     (:constant
+      (error 'simple-program-error
+             :format-control "Symbol macro name already defined as a constant: ~S."
+             :format-arguments (list name)))))
   name)
 
 ;;;; DEFINE-COMPILER-MACRO

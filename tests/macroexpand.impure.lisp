@@ -13,13 +13,13 @@
 
 ;;; From Matthew Swank on cll 2005-10-06
 
-(defmacro defglobal (name &optional value)
+(defmacro defglobal* (name &optional value)
   (let ((internal (gensym)))
     `(progn
        (defparameter ,internal ,value)
        (define-symbol-macro ,name ,internal))))
 
-(defglobal glob)
+(defglobal* glob)
 
 (assert (= (let ((glob 4)) glob)))
 (assert (null glob))

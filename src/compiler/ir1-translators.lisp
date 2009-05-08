@@ -373,7 +373,7 @@ destructuring lambda list, and the FORMS evaluate to the expansion."
           (program-assert-symbol-home-package-unlocked
            context name "binding ~A as a local symbol-macro"))
         (let ((kind (info :variable :kind name)))
-          (when (member kind '(:special :constant))
+          (when (member kind '(:special :constant :global))
             (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
                   kind name)))
         ;; A magical cons that MACROEXPAND-1 understands.
@@ -509,9 +509,9 @@ Return VALUE without evaluating it."
       (dolist (lambda lambdas)
         (setf (functional-allocator lambda) allocator)))))
 
-(defmacro with-fun-name-leaf ((leaf thing start &key global) &body body)
+(defmacro with-fun-name-leaf ((leaf thing start &key global-function) &body body)
   `(multiple-value-bind (,leaf allocate-p)
-       (if ,global
+       (if ,global-function
            (find-global-fun ,thing t)
            (fun-name-leaf ,thing))
      (if allocate-p
@@ -535,7 +535,7 @@ be a lambda expression."
 ;;; expansions, and doesn't nag about undefined functions.
 ;;; Used for optimizing things like (FUNCALL 'FOO).
 (def-ir1-translator global-function ((thing) start next result)
-  (with-fun-name-leaf (leaf thing start :global t)
+  (with-fun-name-leaf (leaf thing start :global-function t)
     (reference-leaf start next result leaf)))
 
 (defun constant-global-fun-name (thing)
@@ -592,7 +592,7 @@ be a lambda expression."
            (with-fun-name-leaf (leaf (second function) start)
              (ir1-convert start next result `(,leaf ,@args))))
           ((eq op 'global-function)
-           (with-fun-name-leaf (leaf (second function) start :global t)
+           (with-fun-name-leaf (leaf (second function) start :global-function t)
              (ir1-convert start next result `(,leaf ,@args))))
           (t
            (let ((ctran (make-ctran))
@@ -937,7 +937,7 @@ care."
                  (compiler-style-warn
                   "~S is being set even though it was declared to be ignored."
                   name)))
-             (if (and (global-var-p leaf) (eq :global (global-var-kind leaf)))
+             (if (and (global-var-p leaf) (eq :unknown (global-var-kind leaf)))
                  ;; For undefined variables go through SET, so that we can catch
                  ;; constant modifications.
                  (ir1-convert start next result `(set ',name ,value-form))

@@ -43,7 +43,7 @@
        (if (boundp name)
            (if (typep name '(or boolean keyword))
                ;; Non-continuable error.
-               (about-to-modify-symbol-value name "define ~S as a constant")
+               (about-to-modify-symbol-value name 'defconstant)
                (let ((old (symbol-value name)))
                  (unless (eql value old)
                    (multiple-value-bind (ignore aborted)
@@ -57,7 +57,7 @@
                      (when aborted
                        (return-from sb!c::%defconstant name))))))
            (warn "redefining a MAKUNBOUND constant: ~S" name)))
-      (:global
+      (:unknown
        ;; (This is OK -- undefined variables are of this kind. So we
        ;; don't warn or error or anything, just fall through.)
        )

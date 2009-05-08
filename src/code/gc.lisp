@@ -13,9 +13,6 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-(declaim (special sb!vm:*read-only-space-free-pointer*
-                  sb!vm:*static-space-free-pointer*))
-
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro def-c-var-fun (lisp-fun c-var-name)
     `(defun ,lisp-fun ()

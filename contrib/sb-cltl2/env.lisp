@@ -111,7 +111,7 @@ CARS of the alist include:
 
 (declaim (ftype (sfunction
                  (symbol &optional (or null lexenv))
-                 (values (member nil :special :lexical :symbol-macro :constant)
+                 (values (member nil :special :lexical :symbol-macro :constant :global)
                          boolean
                          list))
                 variable-information))
@@ -138,6 +138,9 @@ binding:
     NAME refers to a named constant defined using DEFCONSTANT, or NAME
     is a keyword.
 
+  :GLOBAL
+    NAME refers to a global variable. (SBCL specific extension.)
+
 The second value is true if NAME is bound locally. This is currently
 always NIL for special variables, although arguably it should be T
 when there is a lexically apparent binding for the special variable.
@@ -159,8 +162,12 @@ CARS of the alist include:
     T if there is explicit type declaration or proclamation associated
     with NAME. The type specifier may be equivalent to or a supertype
     of the original declaration. If the CDR is T the alist element may
-    be omitted."
+    be omitted.
+
+Additionally, the SBCL specific SB-EXT:ALWAYS-BOUND declaration will
+appear with CDR as T if the variable has been declared always bound."
   (let* ((*lexenv* (or env (make-null-lexenv)))
+         (kind (info :variable :kind name))
          (var (lexenv-find name vars))
          binding localp dx ignorep type)
     (etypecase var
@@ -181,8 +188,10 @@ CARS of the alist include:
          ;; -- though it is _possible_ to declare them ignored, but
          ;; we don't keep the information around.
          (sb-c::global-var
-          (setf binding :special
-                ;; FIXME: Lexically apparent binding or not?
+          (setf binding (if (eq :global kind)
+                            :global
+                            :special)
+                ;; FIXME: Lexically apparent binding or not for specials?
                 localp nil))
          (sb-c::constant
           (setf binding :constant
@@ -191,11 +200,10 @@ CARS of the alist include:
        (setf binding :symbol-macro
              localp t))
        (null
-        (let ((global-type (info :variable :type name))
-              (kind (info :variable :kind name)))
+        (let ((global-type (info :variable :type name)))
           (setf binding (case kind
                           (:macro :symbol-macro)
-                          (:global nil)
+                          (:unknown nil)
                           (t kind))
                 type (if (eq *universal-type* global-type)
                          nil
@@ -208,6 +216,8 @@ CARS of the alist include:
               (when (and type (neq *universal-type* type))
                 (push (cons 'type (type-specifier type)) alist))
               (when dx (push (cons 'dynamic-extent t) alist))
+              (when (info :variable :always-bound name)
+                (push (cons 'sb-ext:always-bound t) alist))
               alist))))
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)

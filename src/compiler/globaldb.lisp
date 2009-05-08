@@ -1059,10 +1059,16 @@
 (define-info-type
   :class :variable
   :type :kind
-  :type-spec (member :special :constant :macro :global :alien)
+  :type-spec (member :special :constant :macro :global :alien :unknown)
   :default (if (typep name '(or boolean keyword))
                :constant
-               :global))
+               :unknown))
+
+(define-info-type
+  :class :variable
+  :type :always-bound
+  :type-spec boolean
+  :default nil)
 
 ;;; the declared type for this variable
 (define-info-type

@@ -100,6 +100,13 @@
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst bic res #.(ash lowtag-mask -1) res)))
+
+;;; On unithreaded builds these are just copies of the non-global versions.
+(define-vop (%set-symbol-global-value set))
+(define-vop (symbol-global-value symbol-value)
+  (:translate symbol-global-value))
+(define-vop (fast-symbol-global-value fast-symbol-value)
+  (:translate symbol-global-value))
 
 ;;;; fdefinition (FDEFN) objects
 

@@ -10,6 +10,9 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
+
+(declaim (special sb!vm:*read-only-space-free-pointer*
+                  sb!vm:*static-space-free-pointer*))
 
 ;;;; type format database
 

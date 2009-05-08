@@ -141,12 +141,18 @@
        (let ((unsafe (policy node (zerop safety)))
              (name (leaf-source-name leaf)))
          (ecase (global-var-kind leaf)
-           ((:special :global)
+           ((:special :unknown)
             (aver (symbolp name))
             (let ((name-tn (emit-constant name)))
-              (if unsafe
+              (if (or unsafe (info :variable :always-bound name))
                   (vop fast-symbol-value node block name-tn res)
                   (vop symbol-value node block name-tn res))))
+           (:global
+            (aver (symbolp name))
+            (let ((name-tn (emit-constant name)))
+              (if (or unsafe (info :variable :always-bound name))
+                  (vop fast-symbol-global-value node block name-tn res)
+                  (vop symbol-global-value node block name-tn res))))
            (:global-function
             (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
               (if unsafe
@@ -298,10 +304,13 @@
                (vop value-cell-set node block tn val)
                (emit-move node block val tn)))))
       (global-var
+       (aver (symbolp (leaf-source-name leaf)))
        (ecase (global-var-kind leaf)
          ((:special)
-          (aver (symbolp (leaf-source-name leaf)))
-          (vop set node block (emit-constant (leaf-source-name leaf)) val)))))
+          (vop set node block (emit-constant (leaf-source-name leaf)) val))
+         ((:global)
+          (vop %set-symbol-global-value node
+               block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs
       (emit-move node block val (first locs))
       (move-lvar-result node block locs lvar)))
@@ -1452,7 +1461,7 @@
                             (dolist (var vars)
                               ;; CLHS says "bound and then made to have no value" -- user
                               ;; should not be able to tell the difference between that and this.
-                              (about-to-modify-symbol-value var "bind ~S")
+                              (about-to-modify-symbol-value var 'progv)
                               (%primitive bind unbound-marker var))))
                         (,bind (vars vals)
                           (declare (optimize (speed 2) (debug 0)
@@ -1462,7 +1471,7 @@
                                 (t
                                  (let ((val (car vals))
                                        (var (car vars)))
-                                   (about-to-modify-symbol-value var "bind ~S" val)
+                                   (about-to-modify-symbol-value var 'progv val t)
                                    (%primitive bind val var))
                                  (,bind (cdr vars) (cdr vals))))))
                  (,bind ,vars ,vals))

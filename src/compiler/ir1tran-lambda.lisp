@@ -33,9 +33,12 @@
     (compiler-error "The variable ~S occurs more than once in the lambda list."
                     name))
   (let ((kind (info :variable :kind name)))
-    (when (or (keywordp name) (eq kind :constant))
-      (compiler-error "The name of the lambda variable ~S is already in use to name a constant."
-                      name))
+    (cond ((or (keywordp name) (eq kind :constant))
+           (compiler-error "The name of the lambda variable ~S is already in use to name a constant."
+                           name))
+          ((eq :global kind)
+           (compiler-error "The name of the lambda variable ~S is already in use to name a global variable."
+                           name)))
     (cond ((eq kind :special)
            (let ((specvar (find-free-var name)))
              (make-lambda-var :%source-name name

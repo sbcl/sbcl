@@ -689,7 +689,7 @@
 (def!struct (global-var (:include basic-var))
   ;; kind of variable described
   (kind (missing-arg)
-        :type (member :special :global-function :global)))
+        :type (member :special :global-function :global :unknown)))
 (defprinter (global-var :identity t)
   %source-name
   #!+sb-show id

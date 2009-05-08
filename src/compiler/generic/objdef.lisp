@@ -322,7 +322,9 @@
   ;; first data slot, and if you subtract 7 you get a symbol header.
 
   ;; also the CAR of NIL-as-end-of-list
-  (value :init :unbound :ref-known (flushable) :ref-trans symbol-global-value)
+  (value :init :unbound
+         :set-trans %set-symbol-global-value
+         :set-known (unsafe))
   ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
   ;; care for this reason, as hash values must be fixnums.
   (hash :set-trans %set-symbol-hash)

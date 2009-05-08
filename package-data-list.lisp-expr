@@ -265,6 +265,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "ENTRY-NODE-INFO-NLX-TAG" "ENTRY-NODE-INFO-ST-TOP"
                "PHYSENV-DEBUG-LIVE-TN" "PHYSENV-LIVE-TN"
                "FAST-SYMBOL-VALUE"
+               "FAST-SYMBOL-GLOBAL-VALUE"
                "FIND-SAVED-FP-AND-PC"
                "FIXUP-NOTE-KIND"
                "FIXUP-NOTE-FIXUP"
@@ -630,6 +631,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
                "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
 
+               ;; global lexicals, access to global symbol values
+               "DEFGLOBAL"
+               "SYMBOL-GLOBAL-VALUE"
+
                ;; package-locking stuff
                #!+sb-package-locks "PACKAGE-LOCKED-P"
                #!+sb-package-locks "LOCK-PACKAGE"
@@ -665,7 +670,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*MUFFLED-WARNINGS*"
 
                ;; extended declarations..
-               "FREEZE-TYPE" "INHIBIT-WARNINGS"
+               "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
                "MAYBE-INLINE"
 
                ;; ..and variables to control compiler policy
@@ -1694,7 +1699,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "INFINITE-ERROR-PROTECT"
                "FIND-CALLER-NAME-AND-FRAME"
                "FIND-INTERRUPTED-NAME-AND-FRAME"
-               "%SET-SYMBOL-VALUE" "%SET-SYMBOL-PACKAGE"
+               "%SET-SYMBOL-VALUE" "%SET-SYMBOL-GLOBAL-VALUE" "%SET-SYMBOL-PACKAGE"
                "OUTPUT-SYMBOL-NAME" "%COERCE-NAME-TO-FUN"
                "INVOKE-MACROEXPAND-HOOK" "DEFAULT-STRUCTURE-PRINT"
                "LAYOUT" "LAYOUT-LENGTH" "LAYOUT-PURE" "DSD-RAW-TYPE"

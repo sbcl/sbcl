@@ -328,19 +328,17 @@ of specialized arrays is supported."
 ;;; vectors or not simple.
 (macrolet ((def (name table-name)
              `(progn
-                (defvar ,table-name)
+                (defglobal ,table-name (make-array ,sb!vm:widetag-mask))
                 (defmacro ,name (array-var)
-                 `(the function
-                    (let ((tag 0))
-                      (when (sb!vm::%other-pointer-p ,array-var)
-                        (setf tag (%other-pointer-widetag ,array-var)))
-                      ;; SYMBOL-GLOBAL-VALUE is a performance hack
-                      ;; for threaded builds.
-                      (svref (sb!vm::symbol-global-value ',',table-name) tag)))))))
-  (def !find-data-vector-setter *data-vector-setters*)
-  (def !find-data-vector-setter/check-bounds *data-vector-setters/check-bounds*)
-  (def !find-data-vector-reffer *data-vector-reffers*)
-  (def !find-data-vector-reffer/check-bounds *data-vector-reffers/check-bounds*))
+                  `(the function
+                     (let ((tag 0))
+                       (when (sb!vm::%other-pointer-p ,array-var)
+                         (setf tag (%other-pointer-widetag ,array-var)))
+                       (svref ,',table-name tag)))))))
+  (def !find-data-vector-setter **data-vector-setters**)
+  (def !find-data-vector-setter/check-bounds **data-vector-setters/check-bounds**)
+  (def !find-data-vector-reffer **data-vector-reffers**)
+  (def !find-data-vector-reffer/check-bounds **data-vector-reffers/check-bounds**))
 
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
@@ -445,16 +443,16 @@ of specialized arrays is supported."
                         collect `(setf (svref ,symbol ,widetag)
                                        (,deffer ,saetp ,check-form))))))
   (defun !hairy-data-vector-reffer-init ()
-    (define-reffers *data-vector-reffers* define-reffer
+    (define-reffers **data-vector-reffers** define-reffer
       (progn)
       #'slow-hairy-data-vector-ref)
-    (define-reffers *data-vector-setters* define-setter
+    (define-reffers **data-vector-setters** define-setter
       (progn)
       #'slow-hairy-data-vector-set)
-    (define-reffers *data-vector-reffers/check-bounds* define-reffer
+    (define-reffers **data-vector-reffers/check-bounds** define-reffer
       (%check-bound vector (length vector))
       #'slow-hairy-data-vector-ref/check-bounds)
-    (define-reffers *data-vector-setters/check-bounds* define-setter
+    (define-reffers **data-vector-setters/check-bounds** define-setter
       (%check-bound vector (length vector))
       #'slow-hairy-data-vector-set/check-bounds)))
 

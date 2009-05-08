@@ -32,11 +32,23 @@
   #!+sb-doc
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))
-  (about-to-modify-symbol-value symbol "set SYMBOL-VALUE of ~S" new-value)
+  (about-to-modify-symbol-value symbol 'set new-value)
   (%set-symbol-value symbol new-value))
 
 (defun %set-symbol-value (symbol new-value)
   (%set-symbol-value symbol new-value))
+
+(defun symbol-global-value (symbol)
+  #!+sb-doc
+  "Return the SYMBOL's current global value. Identical to SYMBOL-VALUE,
+in single-threaded builds: in multithreaded builds bound values are
+distinct from the global value. Can also be SETF."
+  (declare (optimize (safety 1)))
+  (symbol-global-value symbol))
+
+(defun set-symbol-global-value (symbol new-value)
+  (about-to-modify-symbol-value symbol 'set new-value)
+  (sb!kernel:%set-symbol-global-value symbol new-value))
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)
@@ -47,7 +59,9 @@
   #!+sb-doc
   "Make SYMBOL unbound, removing any value it may currently have."
   (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
-    (about-to-modify-symbol-value symbol "make ~S unbound")
+    (when (and (info :variable :always-bound symbol))
+      (error "Can't make ~A variable unbound: ~S" 'always-bound symbol))
+    (about-to-modify-symbol-value symbol 'makunbound)
     (%makunbound symbol)
     symbol))
 

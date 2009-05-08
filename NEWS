@@ -1,4 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * new feature: SB-EXT:DEFGLOBAL macro allows defining global non-special
+    variables.
+  * new feature: SB-EXT:ALWAYS-BOUND proclamation inhibits MAKUNBOUND, and
+    allows the compiler to safely elide boundedness checks for special
+    variables.
+  * new feature: SB-EXT:GLOBAL proclamation inhibits SPECIAL proclamations for
+    the symbol, prohibits both lexical and dynamic binding. This is mainly an
+    efficiency measure for threaded platforms, but also valueable in
+    expressing intent.
   * optimization: compiler now generates faster array typechecking code.
   * optimization: ARRAY-DIMENSION is now faster for multidimensional and
     non-simple arrays.
@@ -25,6 +34,7 @@
     Mösenlechner)
   * bug fix: the value of CL:- in the inspector was the previous expression
     evaluated rather than the expression being evaluated.
+  * bug fix: constants can no longer be locally declared special.
 
 changes in sbcl-1.0.28 relative to 1.0.27:
   * a number of bugs in cross-compilation have been fixed, with the ultimate
