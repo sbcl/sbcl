@@ -11,14 +11,6 @@
 
 (in-package "SB!VM")
 
-;;; FIXME: It's clever using :SUFFIX -LOWTAG for these things, but
-;;; it's a pain for people just learning to find their way around the
-;;; code who want to use lexical search to figure out where things
-;;; like EVEN-FIXNUM-LOWTAG are defined. Remove the :SUFFIXes and just
-;;; expand out the full names. Or even define them in DEF
-;;; EVEN-FIXNUM-LOWTAG style so searches like
-;;; 'def.*even-fixnum-lowtag' can find them.
-
 ;;; Tags for the main low-level types are stored in the low n (usually three)
 ;;; bits to identify the type of a machine word.  Certain constraints
 ;;; apply:
@@ -46,29 +38,32 @@
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  (defenum (:suffix -lowtag)
-    even-fixnum
-    instance-pointer
-    other-immediate-0
-    pad0 pad1 pad2
-    other-immediate-1
-    list-pointer
-    odd-fixnum
-    fun-pointer
-    other-immediate-2
-    pad3 pad4 pad5
-    other-immediate-3
-    other-pointer)
+  (defenum ()
+    even-fixnum-lowtag
+    instance-pointer-lowtag
+    other-immediate-0-lowtag
+    pad0-lowtag
+    pad1-lowtag pad2-lowtag
+    other-immediate-1-lowtag
+    list-pointer-lowtag
+    odd-fixnum-lowtag
+    fun-pointer-lowtag
+    other-immediate-2-lowtag
+    pad3-lowtag
+    pad4-lowtag
+    pad5-lowtag
+    other-immediate-3-lowtag
+    other-pointer-lowtag)
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  (defenum (:suffix -lowtag)
-    even-fixnum
-    instance-pointer
-    other-immediate-0
-    list-pointer
-    odd-fixnum
-    fun-pointer
-    other-immediate-1
-    other-pointer))
+  (defenum ()
+    even-fixnum-lowtag
+    instance-pointer-lowtag
+    other-immediate-0-lowtag
+    list-pointer-lowtag
+    odd-fixnum-lowtag
+    fun-pointer-lowtag
+    other-immediate-1-lowtag
+    other-pointer-lowtag))
 
 (def!constant nil-value
     (+ static-space-start n-word-bytes other-pointer-lowtag))
@@ -111,8 +106,7 @@
 ;;;   JNE   tag, label
 ;;;
 ;;; rather than two separate tests and jumps
-(defenum (:suffix -widetag
-          ;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
+(defenum (;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09
           :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
@@ -121,105 +115,105 @@
   ;; ports; add #b1000 if you want to know the values for 64-bit ports.
   ;; And note that the numbers get a little scrambled further down.
   ;;   --njf, 2004-08-09
-  bignum                            ; 00001010
-  ratio                             ; 00001110
-  single-float                      ; 00010010
-  double-float                      ; 00010110
-  complex                           ; 00011010
-  complex-single-float              ; 00011110
-  complex-double-float              ; 00100010
+  bignum-widetag                            ; 00001010
+  ratio-widetag                             ; 00001110
+  single-float-widetag                      ; 00010010
+  double-float-widetag                      ; 00010110
+  complex-widetag                           ; 00011010
+  complex-single-float-widetag              ; 00011110
+  complex-double-float-widetag              ; 00100010
 
-  code-header                       ; 00100110
+  code-header-widetag                       ; 00100110
 
-  simple-fun-header                 ; 00101010
-  closure-header                    ; 00101110
-  funcallable-instance-header       ; 00110010
+  simple-fun-header-widetag                 ; 00101010
+  closure-header-widetag                    ; 00101110
+  funcallable-instance-header-widetag       ; 00110010
 
-  return-pc-header                  ; 00110110
-  value-cell-header                 ; 00111010
-  symbol-header                     ; 00111110
-  character                         ; 01000010
-  sap                               ; 01000110
-  unbound-marker                    ; 01001010
-  weak-pointer                      ; 01001110
-  instance-header                   ; 01010010
-  fdefn                             ; 01010110
+  return-pc-header-widetag                  ; 00110110
+  value-cell-header-widetag                 ; 00111010
+  symbol-header-widetag                     ; 00111110
+  character-widetag                         ; 01000010
+  sap-widetag                               ; 01000110
+  unbound-marker-widetag                    ; 01001010
+  weak-pointer-widetag                      ; 01001110
+  instance-header-widetag                   ; 01010010
+  fdefn-widetag                             ; 01010110
 
-  no-tls-value-marker               ; 01011010
+  no-tls-value-marker-widetag               ; 01011010
   #!-(and sb-lutex sb-thread)
-  unused01
+  unused01-widetag
   #!+(and sb-lutex sb-thread)
-  lutex                             ; 01011110
-  unused02                          ; 01100010
-  unused03                          ; 01100110
-  unused04                          ; 01101010
-  unused05                          ; 01101110
-  unused06                          ; 01110010
-  unused07                          ; 01110110
+  lutex-widetag                             ; 01011110
+  unused02-widetag                          ; 01100010
+  unused03-widetag                          ; 01100110
+  unused04-widetag                          ; 01101010
+  unused05-widetag                          ; 01101110
+  unused06-widetag                          ; 01110010
+  unused07-widetag                          ; 01110110
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused08                          ; 01111010
+  unused08-widetag                          ; 01111010
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused09                          ; 01111110
+  unused09-widetag                          ; 01111110
 
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused10                          ; 10000010
+  unused10-widetag                          ; 10000010
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused11                          ; 10000110
+  unused11-widetag                          ; 10000110
 
-  simple-array-unsigned-byte-2      ; 10001010
-  simple-array-unsigned-byte-4      ; 10001110
-  simple-array-unsigned-byte-7      ; 10010010
-  simple-array-unsigned-byte-8      ; 10010110
-  simple-array-unsigned-byte-15     ; 10011010
-  simple-array-unsigned-byte-16     ; 10011110
-  simple-array-nil                  ; 10100010
-  simple-base-string                ; 10100110
-  #!+sb-unicode simple-character-string
-  simple-bit-vector                 ; 10101010
-  simple-vector                     ; 10101110
+  simple-array-unsigned-byte-2-widetag      ; 10001010
+  simple-array-unsigned-byte-4-widetag      ; 10001110
+  simple-array-unsigned-byte-7-widetag      ; 10010010
+  simple-array-unsigned-byte-8-widetag      ; 10010110
+  simple-array-unsigned-byte-15-widetag     ; 10011010
+  simple-array-unsigned-byte-16-widetag     ; 10011110
+  simple-array-nil-widetag                  ; 10100010
+  simple-base-string-widetag                ; 10100110
+  #!+sb-unicode simple-character-string-widetag
+  simple-bit-vector-widetag                 ; 10101010
+  simple-vector-widetag                     ; 10101110
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-29     ; 10110010
-  simple-array-unsigned-byte-31     ; 10110110
-  simple-array-unsigned-byte-32     ; 10111010
+  simple-array-unsigned-byte-29-widetag     ; 10110010
+  simple-array-unsigned-byte-31-widetag     ; 10110110
+  simple-array-unsigned-byte-32-widetag     ; 10111010
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-60
+  simple-array-unsigned-byte-60-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-63
+  simple-array-unsigned-byte-63-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-64
-  simple-array-signed-byte-8        ; 10111110
-  simple-array-signed-byte-16       ; 11000010
+  simple-array-unsigned-byte-64-widetag
+  simple-array-signed-byte-8-widetag        ; 10111110
+  simple-array-signed-byte-16-widetag       ; 11000010
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-signed-byte-30       ; 11000110
-  simple-array-signed-byte-32       ; 11001010
+  simple-array-signed-byte-30-widetag       ; 11000110
+  simple-array-signed-byte-32-widetag       ; 11001010
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-signed-byte-61
+  simple-array-signed-byte-61-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-signed-byte-64
-  simple-array-single-float         ; 11001110
-  simple-array-double-float         ; 11010010
-  simple-array-complex-single-float ; 11010110
-  simple-array-complex-double-float ; 11011010
-  simple-array                      ; 11011110
-  complex-vector-nil                ; 11100010
-  complex-base-string               ; 11100110
-  #!+sb-unicode complex-character-string
-  complex-bit-vector                ; 11101010
-  complex-vector                    ; 11101110
-  complex-array                     ; 11110010
+  simple-array-signed-byte-64-widetag
+  simple-array-single-float-widetag         ; 11001110
+  simple-array-double-float-widetag         ; 11010010
+  simple-array-complex-single-float-widetag ; 11010110
+  simple-array-complex-double-float-widetag ; 11011010
+  simple-array-widetag                      ; 11011110
+  complex-vector-nil-widetag                ; 11100010
+  complex-base-string-widetag               ; 11100110
+  #!+sb-unicode complex-character-string-widetag
+  complex-bit-vector-widetag                ; 11101010
+  complex-vector-widetag                    ; 11101110
+  complex-array-widetag                     ; 11110010
 
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused12                          ; 11110110
+  unused12-widetag                          ; 11110110
   #!+(and #.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
           (not sb-unicode))
-  unused13                          ; 11111010
+  unused13-widetag                          ; 11111010
   #!+(and #.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
           (not sb-unicode))
-  unused14                          ; 11111110
+  unused14-widetag                          ; 11111110
 )
 
 ;;; the different vector subtypes
-(defenum (:prefix vector- :suffix -subtype)
-  normal
-  unused
-  valid-hashing)
+(defenum ()
+  vector-normal-subtype
+  vector-unused-subtype
+  vector-valid-hashing-subtype)

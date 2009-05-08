@@ -259,7 +259,7 @@
     dfd))
 
 ;;; Give names to elements of a numeric sequence.
-(defmacro defenum ((&key (prefix "") (suffix "") (start 0) (step 1))
+(defmacro defenum ((&key (start 0) (step 1))
                    &rest identifiers)
   (let ((results nil)
         (index 0)
@@ -267,11 +267,11 @@
         (step (eval step)))
     (dolist (id identifiers)
       (when id
-        (multiple-value-bind (root docs)
+        (multiple-value-bind (sym docs)
             (if (consp id)
                 (values (car id) (cdr id))
                 (values id nil))
-          (push `(def!constant ,(symbolicate prefix root suffix)
+          (push `(def!constant ,sym
                    ,(+ start (* step index))
                    ,@docs)
                 results)))

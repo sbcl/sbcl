@@ -80,3 +80,9 @@
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.
 (def!constant tls-size 4096)
+
+(defenum ()
+  trace-table-normal
+  trace-table-call-site
+  trace-table-fun-prologue
+  trace-table-fun-epilogue)

@@ -113,30 +113,24 @@
 
 ;;;; Other non-type constants.
 
-(defenum (:suffix -flag)
-  atomic
-  interrupted)
+(defenum ()
+  atomic-flag
+  interrupted-flag)
 
-(defenum (:suffix -trap :start 8)
-  halt
-  pending-interrupt
-  error
-  cerror
-  breakpoint
-  fun-end-breakpoint
-  after-breakpoint
-  unused
-  pseudo-atomic
-  object-not-list
-  object-not-instance
-  single-step-around
-  single-step-before)
-
-(defenum (:prefix trace-table-)
-  normal
-  call-site
-  fun-prologue
-  fun-epilogue)
+(defenum (:start 8)
+  halt-trap
+  pending-interrupt-trap
+  error-trap
+  cerror-trap
+  breakpoint-trap
+  fun-end-breakpoint-trap
+  after-breakpoint-trap
+  unused-trap
+  pseudo-atomic-trap
+  object-not-list-trap
+  object-not-instance-trap
+  single-step-around-trap
+  single-step-before-trap)
 
 ;;;; Static symbols.
 

@@ -143,25 +143,19 @@
 
 ;;;; other miscellaneous constants
 
-(defenum (:suffix -trap :start 8)
-  halt
-  pending-interrupt
-  error
-  cerror
-  breakpoint
-  fun-end-breakpoint
-  single-step-breakpoint
+(defenum (:start 8)
+  halt-trap
+  pending-interrupt-trap
+  error-trap
+  cerror-trap
+  breakpoint-trap
+  fun-end-breakpoint-trap
+  single-step-breakpoint-trap
   ;; Stepper actually not implemented on Alpha, but these constants
   ;; are still needed to avoid undefined variable warnings during sbcl
   ;; build.
-  single-step-around
-  single-step-before)
-
-(defenum (:prefix trace-table-)
-  normal
-  call-site
-  fun-prologue
-  fun-epilogue)
+  single-step-around-trap
+  single-step-before-trap)
 
 ;;;; static symbols
 

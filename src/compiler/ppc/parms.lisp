@@ -153,28 +153,21 @@
 
 ;;;; Other miscellaneous constants.
 
-(defenum (:suffix -trap :start 8)
-  halt
-  pending-interrupt
-  error
-  cerror
-  breakpoint
-  fun-end-breakpoint
-  after-breakpoint
-  fixnum-additive-overflow
-  single-step-around
-  single-step-before)
+(defenum (:start 8)
+  halt-trap
+  pending-interrupt-trap
+  error-trap
+  cerror-trap
+  breakpoint-trap
+  fun-end-breakpoint-trap
+  after-breakpoint-trap
+  fixnum-additive-overflow-trap
+  single-step-around-trap
+  single-step-before-trap)
 
-(defenum (:prefix object-not- :suffix -trap :start 24)
-  list
-  instance)
-
-(defenum (:prefix trace-table-)
-  normal
-  call-site
-  fun-prologue
-  fun-epilogue)
-
+(defenum (:start 24)
+  object-not-list-trap
+  object-not-instance-trap)
 
 ;;;; Static symbols.
 
