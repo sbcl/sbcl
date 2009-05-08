@@ -276,7 +276,7 @@
 
 (defun quit (&key recklessly-p (unix-status 0))
   #!+sb-doc
-  "Terminate the current Lisp. *EXIT-HOOKS* are pending unwind-protect
+  "Terminate the current Lisp. *EXIT-HOOKS* and pending unwind-protect
 cleanup forms are run unless RECKLESSLY-P is true. On UNIX-like
 systems, UNIX-STATUS is used as the status code."
   (declare (type (signed-byte 32) unix-status))

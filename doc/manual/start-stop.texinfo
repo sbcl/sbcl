@@ -3,11 +3,11 @@
 @chapter Starting and Stopping
 
 @menu
-* Starting SBCL::
-* Stopping SBCL::
-* Command Line Options::
-* Initialization Files::
-* Initialization and Exit Hooks::
+* Starting SBCL::               
+* Stopping SBCL::               
+* Command Line Options::        
+* Initialization Files::        
+* Initialization and Exit Hooks::  
 @end menu
 
 @node Starting SBCL
@@ -15,9 +15,9 @@
 @section Starting SBCL
 
 @menu
-* Running from Shell::
-* Running from Emacs::
-* Shebang Scripts::
+* Running from Shell::          
+* Running from Emacs::          
+* Shebang Scripts::             
 @end menu
 
 @node Running from Shell
@@ -97,10 +97,10 @@ Hello, World!
 @section Stopping SBCL
 
 @menu
-* Quit::
-* End of File::
-* Saving a Core Image::
-* Exit on Errors::
+* Quit::                        
+* End of File::                 
+* Saving a Core Image::         
+* Exit on Errors::              
 @end menu
 
 @node Quit
@@ -184,8 +184,8 @@ passed on to the user program even if they was intended for the
 runtime system or the Lisp system.
 
 @menu
-* Runtime Options::
-* Toplevel Options::
+* Runtime Options::             
+* Toplevel Options::            
 @end menu
 
 @node Runtime Options
@@ -255,7 +255,7 @@ chance to see it.
 
 @item --sysinit @var{filename}
 Load filename instead of the default system initialization file
-(@pxref{System Initialization File}.)
+(@pxref{Initialization Files}.)
 
 @item --no-sysinit
 Don't load a system-wide initialization file.  If this option is given,
@@ -263,7 +263,7 @@ the @code{--sysinit} option is ignored.
 
 @item --userinit @var{filename}
 Load filename instead of the default user initialization file
-(@pxref{User Initialization File}.)
+(@pxref{Initialization Files}.)
 
 @item --no-userinit
 Don't load a user initialization file.  If this option is given,
@@ -271,10 +271,9 @@ the @code{--userinit} option is ignored.
 
 @item --eval @var{command}
 After executing any initialization file, but before starting the
-read-eval-print loop on standard input, read and evaluate the com-
-mand given. More than one @code{--eval} option can be used, and all
-will be read and executed, in the order they appear on the command
-line.
+read-eval-print loop on standard input, read and evaluate the command
+given. More than one @code{--eval} option can be used, and all will be
+read and executed, in the order they appear on the command line.
 
 @item --load @var{filename}
 This is equivalent to @code{--eval '(load "@var{filename}")'}. The
@@ -307,80 +306,41 @@ shebang line, it is ignored.
 
 @end table
 
-
 @node Initialization Files
 @comment  node-name,  next,  previous,  up
 @section Initialization Files
-
-This section covers initialization files processed at startup, which
-can be used to customize the lisp environment.
-
-@menu
-* System Initialization File::
-* User Initialization File::
-* Initialization File Semantics::
-* Initialization Examples::
-@end menu
-
-@node System Initialization File
-@comment  node-name,  next,  previous,  up
-@subsection System Initialization File
-
-Site-wide startup script. Unless overridden with the command line
-option @code{--sysinit} defaults to @file{@env{SBCL_HOME}/sbclrc}, or
-if that doesn't exist to @file{/etc/sbclrc}.
-
-No system initialization file is required.
-
-@node User Initialization File
-@comment  node-name,  next,  previous,  up
-@subsection User Initialization File
-
-Per-user startup script. Unless overridden with the command line
-option @code{--userinit} defaults to @file{@env{HOME}/.sbclrc}.
-
-No user initialization file is required.
-
-@node Initialization File Semantics
-@comment  node-name,  next,  previous,  up
-@subsection Initialization File Semantics
 
 SBCL processes initialization files with @code{read} and @code{eval},
 not @code{load}; hence initialization files can be used to set startup
 @code{*package*} and @code{*readtable*}, and for proclaiming a global
 optimization policy.
 
-@node Initialization Examples
-@comment  node-name,  next,  previous,  up
-@subsection Initialization Examples
+@itemize @w{}
+@item
+@strong{System Initialization File}
 
-Some examples of what you may consider doing in the initialization
-files follow.
+Defaults to @file{@env{$SBCL_HOME}/sbclrc}, or if that doesn't exist to
+@file{/etc/sbclrc}. Can be overridden with the command line option
+@code{--sysinit} or @code{--no-sysinit}.
 
-@menu
-* Automatic Recompilation of Stale Fasls::
-@end menu
+The system initialization file is intended for system administrators
+and software packagers to configure locations of installed third party
+modules, etc.
 
-@node Automatic Recompilation of Stale Fasls
-@comment  node-name,  next,  previous,  up
-@subsubsection Automatic Recompilation of Stale Fasls
+@item
+@strong{User Initialization File}
 
-SBCL fasl-format is at current stage of development undergoing
-non-backwards compatible changes fairly often. The following snippet
-handles recompilation automatically for ASDF-based systems.
+Defaults to @file{@env{$HOME}/.sbclrc}. Can be overridden with the
+command line option @code{--userinit} or @code{--no-userinit}.
 
-@lisp
-(require :asdf)
+The user initialization file is intended for personal customizations,
+such as loading certain modules at startup, defining convenience
+functions to use in the REPL, handling automatic recompilation
+of FASLs (@pxref{FASL Format}), etc.
 
-;;; If a fasl was stale, try to recompile and load (once).
-(defmethod asdf:perform :around ((o asdf:load-op)
-                                 (c asdf:cl-source-file))
-   (handler-case (call-next-method o c)
-      ;; If a fasl was stale, try to recompile and load (once).
-      (sb-ext:invalid-fasl ()
-         (asdf:perform (make-instance 'asdf:compile-op) c)
-         (call-next-method))))
-@end lisp
+@end itemize
+
+Neither initialization file is required.
 
 @node Initialization and Exit Hooks
 @comment  node-name,  next,  previous,  up

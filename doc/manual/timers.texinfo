@@ -2,12 +2,12 @@
 @comment  node-name,  next,  previous,  up
 @chapter Timers
 
-SBCL supports a system-wide scheduler implemented on top of
+SBCL supports a system-wide event scheduler implemented on top of
 @code{setitimer} that also works with threads but does not require a
 separate scheduler thread.
 
-@menu
-@end menu
+The following example schedules a timer that writes ``Hello, word'' after
+two seconds.
 
 @lisp
 (schedule-timer (make-timer (lambda ()
@@ -15,6 +15,30 @@ separate scheduler thread.
                               (force-output)))
                 2)
 @end lisp
+
+It should be noted that writing timer functions requires special care,
+as the dynamic environment in which they run is unpredictable: dynamic
+variable bindings, locks held, etc, all depend on whatever code was
+running when the timer fired. The following example should serve as
+a cautionary tale:
+
+@lisp
+(defvar *foo* nil)
+
+(defun show-foo ()
+  (format t "~&foo=~S~%" *foo*)
+  (force-output t))
+
+(defun demo ()
+  (schedule-timer (make-timer #'show-foo) 0.5)
+  (schedule-timer (make-timer #'show-foo) 1.5)
+  (let ((*foo* t))
+    (sleep 1.0))
+  (let ((*foo* :surprise!))
+    (sleep 2.0)))
+@end lisp
+
+@section Timer Dictionary
 
 @include struct-sb-ext-timer.texinfo
 @include fun-sb-ext-make-timer.texinfo

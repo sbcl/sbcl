@@ -156,8 +156,8 @@ to the @code{sb-ext:compiler-note}, and is used for problems which are
 too mild for the standard condition classes, typically hints about how
 efficiency might be improved. The @code{sb-ext:code-deletion-note}, a
 subtype of @code{compiler-note}, is signalled when the compiler
-deletes user-supplied code, usually after proving that the code in
-question is unreachable.
+deletes user-supplied code after proving that the code in question is
+unreachable.
 
 Future work for SBCL includes expanding this hierarchy of types to
 allow more fine-grained control over emission of diagnostic messages.

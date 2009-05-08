@@ -83,7 +83,8 @@ both TCP and UDP sockets. @xref{Networking}.
 
 @item Introspective Facilities
 @code{sb-introspect} module offers numerous introspective extensions,
-including access to function lambda-lists.
+including access to function lambda-lists and a cross referencing
+facility.
 
 @item Operating System Interface
 @code{sb-ext} contains a number of functions for running external
@@ -104,8 +105,8 @@ streams} API proposed by Franz Inc. @xref{Simple Streams}.
 Profiler}.
 
 @code{sb-sprof} is a statistical profiler, capable of call-graph
-generation and instruction level profiling. @xref{Statistical
-Profiler}.
+generation and instruction level profiling, which also supports
+allocation profiling. @xref{Statistical Profiler}.
 
 @item Customization Hooks
 SBCL contains a number of extra-standard customization hooks that
@@ -121,11 +122,7 @@ access functionality described in @cite{Common Lisp The Language, 2nd
 Edition} which were removed from the language during the ANSI
 standardization process.
 
-@item Executable Fasl Packaging
-@code{sb-executable} can be used to concatenate multiple fasls into a
-single executable (though the presence of an SBCL runtime and core image
-is still required to run it).
-
+@item Executable Delivery
 The @code{:executable} argument to @ref{Function
 sb-ext:save-lisp-and-die} can produce a `standalone' executable
 containing both an image of the current Lisp session and an SBCL
@@ -161,6 +158,7 @@ implementation.
 
 @menu
 * Declarations::                
+* FASL Format::                 
 * Compiler-only Implementation::  
 * Defining Constants::          
 * Style Warnings::              
@@ -174,6 +172,35 @@ Declarations are generally treated as assertions. This general
 principle, and its implications, and the bugs which still keep the
 compiler from quite satisfying this principle, are discussed in
 @ref{Declarations as Assertions}.
+
+
+@node FASL Format
+@comment  node-name,  next,  previous,  up
+@subsection FASL Format
+
+SBCL fasl-format is binary compatible only with the exact SBCL version
+it was generated with. While this is obviously suboptimal, it has
+proven more robust than trying to maintain fasl compatibility across
+versions: accidentally breaking things is far too easy, and can lead
+to hard to diagnose bugs.
+
+The following snippet handles fasl recompilation automatically for
+ASDF-based systems, and makes a good candidate for inclusion in
+the user or system initialization file (@pxref{Initialization Files}.)
+
+@lisp
+(require :asdf)
+
+;;; If a fasl was stale, try to recompile and load (once).
+(defmethod asdf:perform :around ((o asdf:load-op)
+                                 (c asdf:cl-source-file))
+   (handler-case (call-next-method o c)
+      ;; If a fasl was stale, try to recompile and load (once).
+      (sb-ext:invalid-fasl ()
+         (asdf:perform (make-instance 'asdf:compile-op) c)
+         (call-next-method))))
+@end lisp
+
 
 @node Compiler-only Implementation
 @comment  node-name,  next,  previous,  up
@@ -446,17 +473,15 @@ learn about Common Lisp, some books stand out:
 
 @table @cite
 
-@c FIXME: Ask Seibel if he minds us referring to the preview
-@c 
-@c @item Practical Common Lisp, by Peter Seibel
-@c A forthcoming book from APress with a web free preview at
-@c @uref{http://www.gigamonkeys.com/book/}. An excellent introduction to
-@c the language, covering both the basics and ``advanced topics'' like
-@c macros, CLOS, and packages.
+@item Practical Common Lisp, by Peter Seibel
+An excellent introduction to the language, covering both the basics
+and ``advanced topics'' like macros, CLOS, and packages. Available
+both in print format and on the web: @uref{http://www.gigamonkeys.com/book/}. 
 
-@item ANSI Common Lisp, by Paul Graham
-Introduces most of the language, though some parts (eg. CLOS) are
-covered only lightly.
+@item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
+Good information on general Common Lisp programming, and many
+nontrivial examples. Whether or not your work is AI, it's a very good
+book to look at.
 
 @item On Lisp, by Paul Graham
 An in-depth treatment of macros, but not recommended as a first Common
@@ -465,20 +490,15 @@ guard against non-standard usages, and since it doesn't really even
 try to cover the language as a whole, focusing solely on macros.
 Downloadable from @uref{http://www.paulgraham.com/onlisp.html}.
 
-@item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
-Good information on general Common Lisp programming, and many
-nontrivial examples. Whether or not your work is AI, it's a very good
-book to look at.
-
 @item Object-Oriented Programming In Common Lisp, by Sonya Keene
-@c With the exception of @cite{Practical Common Lisp} 
-None the books above emphasize CLOS, but this one does. Even if you're
-very knowledgeable about object oriented programming in the abstract,
-it's worth looking at this book if you want to do any OO in Common
-Lisp. Some abstractions in CLOS (especially multiple dispatch) go
-beyond anything you'll see in most OO systems, and there are a number
-of lesser differences as well. This book tends to help with the
-culture shock.
+With the exception of @cite{Practical Common Lisp} most introductory
+books don't emphasize CLOS. This one does. Even if you're very
+knowledgeable about object oriented programming in the abstract, it's
+worth looking at this book if you want to do any OO in Common Lisp.
+Some abstractions in CLOS (especially multiple dispatch) go beyond
+anything you'll see in most OO systems, and there are a number of
+lesser differences as well. This book tends to help with the culture
+shock.
 
 @item Art Of Metaobject Programming, by Gregor Kiczales et al.
 Currently to prime source of information on the Common Lisp Metaobject
