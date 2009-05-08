@@ -105,7 +105,6 @@
 #-sb-xc-host (defsetf schar %scharset)
 #-sb-xc-host (defsetf sbit %sbitset)
 (defsetf %array-dimension %set-array-dimension)
-(defsetf sb!kernel:%raw-bits sb!kernel:%set-raw-bits)
 (defsetf sb!kernel:%vector-raw-bits sb!kernel:%set-vector-raw-bits)
 #-sb-xc-host (defsetf symbol-value set)
 #-sb-xc-host (defsetf symbol-plist %set-symbol-plist)
@@ -136,7 +135,6 @@
 ;;; from kernel.lisp
 (in-package "SB!KERNEL")
 (defsetf code-header-ref code-header-set)
-(defsetf %raw-bits %set-raw-bits)
 
 ;;; from serve-event.lisp
 (in-package "SB!IMPL")

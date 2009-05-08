@@ -129,15 +129,6 @@
 (defun code-header-set (code-obj index new)
   (code-header-set code-obj index new))
 
-(defun %raw-bits (object offset)
-  (declare (type index offset))
-  (sb!kernel:%raw-bits object offset))
-
-(defun %set-raw-bits (object offset value)
-  (declare (type index offset))
-  (declare (type sb!vm:word value))
-  (setf (sb!kernel:%raw-bits object offset) value))
-
 (defun %vector-raw-bits (object offset)
   (declare (type index offset))
   (sb!kernel:%vector-raw-bits object offset))

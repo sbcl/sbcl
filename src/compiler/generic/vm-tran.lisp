@@ -73,31 +73,6 @@
                          sb!vm:bignum-digits-offset
                          index offset))
 
-#!+x86
-(progn
-(define-source-transform sb!kernel:%vector-raw-bits (thing index)
-  `(sb!kernel:%raw-bits-with-offset ,thing ,index 2))
-
-(define-source-transform sb!kernel:%raw-bits (thing index)
-  `(sb!kernel:%raw-bits-with-offset ,thing ,index 0))
-
-(define-source-transform sb!kernel:%set-vector-raw-bits (thing index value)
-  `(sb!kernel:%set-raw-bits-with-offset ,thing ,index 2 ,value))
-
-(define-source-transform sb!kernel:%set-raw-bits (thing index value)
-  `(sb!kernel:%set-raw-bits-with-offset ,thing ,index 0 ,value))
-
-(deftransform sb!kernel:%raw-bits-with-offset ((thing index offset) * * :node node)
-  (fold-index-addressing 'sb!kernel:%raw-bits-with-offset
-                         sb!vm:n-word-bits sb!vm:other-pointer-lowtag
-                         0 index offset))
-
-(deftransform sb!kernel:%set-raw-bits-with-offset ((thing index offset value) * *)
-  (fold-index-addressing 'sb!kernel:%set-raw-bits-with-offset
-                         sb!vm:n-word-bits sb!vm:other-pointer-lowtag
-                         0 index offset t))
-) ; PROGN
-
 ;;; The layout is stored in slot 0.
 (define-source-transform %instance-layout (x)
   `(truly-the layout (%instance-ref ,x 0)))
@@ -332,7 +307,7 @@
                          (:little-endian '(byte ,bits (* bit ,bits)))
                          (:big-endian '(byte ,bits (- sb!vm:n-word-bits
                                                       (* (1+ bit) ,bits)))))
-                      (%raw-bits vector (+ word sb!vm:vector-data-offset)))))
+                      (%vector-raw-bits vector word))))
             (deftransform data-vector-set ((vector index new-value)
                                            (,type * *))
               `(multiple-value-bind (word bit)
@@ -342,7 +317,7 @@
                                (:big-endian
                                 '(byte ,bits (- sb!vm:n-word-bits
                                                 (* (1+ bit) ,bits)))))
-                            (%raw-bits vector (+ word sb!vm:vector-data-offset)))
+                            (%vector-raw-bits vector word))
                        new-value)))))))
   (frob simple-bit-vector 1)
   (frob (simple-array (unsigned-byte 2) (*)) 2)
@@ -380,24 +355,23 @@
                         ;; are handled by the (1- length), below.
                         ;; CSR, 2002-04-24
                         result-bit-array
-                        (do ((index sb!vm:vector-data-offset (1+ index))
-                             (end-1 (+ sb!vm:vector-data-offset
-                                       ;; bit-vectors of length 1-32
-                                       ;; need precisely one (SETF
-                                       ;; %RAW-BITS), done here in the
-                                       ;; epilogue. - CSR, 2002-04-24
-                                       (truncate (truly-the index (1- length))
-                                                 sb!vm:n-word-bits))))
+                        (do ((index 0 (1+ index))
+                             ;; bit-vectors of length 1-32 need
+                             ;; precisely one (SETF %VECTOR-RAW-BITS),
+                             ;; done here in the epilogue. - CSR,
+                             ;; 2002-04-24
+                             (end-1 (truncate (truly-the index (1- length))
+                                              sb!vm:n-word-bits)))
                             ((>= index end-1)
-                             (setf (%raw-bits result-bit-array index)
-                                   (,',wordfun (%raw-bits bit-array-1 index)
-                                               (%raw-bits bit-array-2 index)))
+                             (setf (%vector-raw-bits result-bit-array index)
+                                   (,',wordfun (%vector-raw-bits bit-array-1 index)
+                                               (%vector-raw-bits bit-array-2 index)))
                              result-bit-array)
                           (declare (optimize (speed 3) (safety 0))
                                    (type index index end-1))
-                          (setf (%raw-bits result-bit-array index)
-                                (,',wordfun (%raw-bits bit-array-1 index)
-                                            (%raw-bits bit-array-2 index))))))))))
+                          (setf (%vector-raw-bits result-bit-array index)
+                                (,',wordfun (%vector-raw-bits bit-array-1 index)
+                                            (%vector-raw-bits bit-array-2 index))))))))))
  (def bit-and word-logical-and)
  (def bit-ior word-logical-or)
  (def bit-xor word-logical-xor)
@@ -427,29 +401,27 @@
           ;; n-word-bits cases are handled by the (1- length), below.
           ;; CSR, 2002-04-24
           result-bit-array
-          (do ((index sb!vm:vector-data-offset (1+ index))
-               (end-1 (+ sb!vm:vector-data-offset
-                         ;; bit-vectors of length 1 to n-word-bits need
-                         ;; precisely one (SETF %RAW-BITS), done here in
-                         ;; the epilogue. - CSR, 2002-04-24
-                         (truncate (truly-the index (1- length))
-                                   sb!vm:n-word-bits))))
+          (do ((index 0 (1+ index))
+               ;; bit-vectors of length 1 to n-word-bits need precisely
+               ;; one (SETF %VECTOR-RAW-BITS), done here in the
+               ;; epilogue. - CSR, 2002-04-24
+               (end-1 (truncate (truly-the index (1- length))
+                                sb!vm:n-word-bits)))
               ((>= index end-1)
-               (setf (%raw-bits result-bit-array index)
-                     (word-logical-not (%raw-bits bit-array index)))
+               (setf (%vector-raw-bits result-bit-array index)
+                     (word-logical-not (%vector-raw-bits bit-array index)))
                result-bit-array)
             (declare (optimize (speed 3) (safety 0))
                      (type index index end-1))
-            (setf (%raw-bits result-bit-array index)
-                  (word-logical-not (%raw-bits bit-array index))))))))
+            (setf (%vector-raw-bits result-bit-array index)
+                  (word-logical-not (%vector-raw-bits bit-array index))))))))
 
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
   `(and (= (length x) (length y))
         (let ((length (length x)))
           (or (= length 0)
-              (do* ((i sb!vm:vector-data-offset (+ i 1))
-                    (end-1 (+ sb!vm:vector-data-offset
-                              (floor (1- length) sb!vm:n-word-bits))))
+              (do* ((i 0 (+ i 1))
+                    (end-1 (floor (1- length) sb!vm:n-word-bits)))
                    ((>= i end-1)
                     (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
                            (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
@@ -461,7 +433,7 @@
                                      (:little-endian 0)
                                      (:big-endian
                                       '(- sb!vm:n-word-bits extra))))
-                             (%raw-bits x i)))
+                             (%vector-raw-bits x i)))
                            (numy
                             (logand
                              (ash mask
@@ -469,13 +441,13 @@
                                      (:little-endian 0)
                                      (:big-endian
                                       '(- sb!vm:n-word-bits extra))))
-                             (%raw-bits y i))))
+                             (%vector-raw-bits y i))))
                       (declare (type (integer 1 #.sb!vm:n-word-bits) extra)
                                (type sb!vm:word mask numx numy))
                       (= numx numy)))
                 (declare (type index i end-1))
-                (let ((numx (%raw-bits x i))
-                      (numy (%raw-bits y i)))
+                (let ((numx (%vector-raw-bits x i))
+                      (numy (%vector-raw-bits y i)))
                   (declare (type sb!vm:word numx numy))
                   (unless (= numx numy)
                     (return nil))))))))
@@ -485,11 +457,10 @@
   `(let ((length (length sequence)))
     (if (zerop length)
         0
-        (do ((index sb!vm:vector-data-offset (1+ index))
+        (do ((index 0 (1+ index))
              (count 0)
-             (end-1 (+ sb!vm:vector-data-offset
-                       (truncate (truly-the index (1- length))
-                                 sb!vm:n-word-bits))))
+             (end-1 (truncate (truly-the index (1- length))
+                              sb!vm:n-word-bits)))
             ((>= index end-1)
              (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
                     (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
@@ -499,7 +470,7 @@
                                                (:little-endian 0)
                                                (:big-endian
                                                 '(- sb!vm:n-word-bits extra))))
-                                  (%raw-bits sequence index))))
+                                  (%vector-raw-bits sequence index))))
                (declare (type (integer 1 #.sb!vm:n-word-bits) extra))
                (declare (type sb!vm:word mask bits))
                (incf count (logcount bits))
@@ -512,7 +483,7 @@
                          count))))
           (declare (type index index count end-1)
                    (optimize (speed 3) (safety 0)))
-          (incf count (logcount (%raw-bits sequence index)))))))
+          (incf count (logcount (%vector-raw-bits sequence index)))))))
 
 (deftransform fill ((sequence item) (simple-bit-vector bit) *
                     :policy (>= speed space))
@@ -525,19 +496,18 @@
            (value ,value))
        (if (= length 0)
            sequence
-           (do ((index sb!vm:vector-data-offset (1+ index))
-                (end-1 (+ sb!vm:vector-data-offset
-                          ;; bit-vectors of length 1 to n-word-bits need
-                          ;; precisely one (SETF %RAW-BITS), done here
-                          ;; in the epilogue. - CSR, 2002-04-24
-                          (truncate (truly-the index (1- length))
-                                    sb!vm:n-word-bits))))
+           (do ((index 0 (1+ index))
+                ;; bit-vectors of length 1 to n-word-bits need precisely
+                ;; one (SETF %VECTOR-RAW-BITS), done here in the
+                ;; epilogue. - CSR, 2002-04-24
+                (end-1 (truncate (truly-the index (1- length))
+                                 sb!vm:n-word-bits)))
                ((>= index end-1)
-                (setf (%raw-bits sequence index) value)
+                (setf (%vector-raw-bits sequence index) value)
                 sequence)
              (declare (optimize (speed 3) (safety 0))
                       (type index index end-1))
-             (setf (%raw-bits sequence index) value))))))
+             (setf (%vector-raw-bits sequence index) value))))))
 
 (deftransform fill ((sequence item) (simple-base-string base-char) *
                     :policy (>= speed space))
@@ -554,8 +524,8 @@
            (value ,value))
       (multiple-value-bind (times rem)
           (truncate length sb!vm:n-word-bytes)
-        (do ((index sb!vm:vector-data-offset (1+ index))
-             (end (+ times sb!vm:vector-data-offset)))
+        (do ((index 0 (1+ index))
+             (end times))
             ((>= index end)
              (let ((place (* times sb!vm:n-word-bytes)))
                (declare (fixnum place))
@@ -564,7 +534,7 @@
                  (setf (schar sequence (the index (+ place j))) item))))
           (declare (optimize (speed 3) (safety 0))
                    (type index index))
-          (setf (%raw-bits sequence index) value))))))
+          (setf (%vector-raw-bits sequence index) value))))))
 
 ;;;; %BYTE-BLT
 

@@ -157,21 +157,6 @@
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:signed-word) sb!vm:word
     (unsafe always-translatable))
 
-;;; %RAW-{REF,SET}-FOO VOPs should be declared as taking a RAW-VECTOR
-;;; as their first argument (clarity and to match these DEFKNOWNs).
-;;; We declare RAW-VECTOR as a primitive type so the VOP machinery
-;;; will accept our VOPs as legitimate.  --njf, 2004-08-10
-
-(defknown %raw-bits (t fixnum) sb!vm:word
-  (foldable flushable))
-#!+x86
-(defknown %raw-bits-with-offset (t fixnum fixnum) sb!vm:word
-  (flushable always-translatable))
-(defknown (%set-raw-bits) (t fixnum sb!vm:word) sb!vm:word
-  (unsafe))
-#!+x86
-(defknown (%set-raw-bits-with-offset) (t fixnum fixnum sb!vm:word) sb!vm:word
-  (unsafe always-translatable))
 ;;; These two are mostly used for bit-bashing operations.
 (defknown %vector-raw-bits (t fixnum) sb!vm:word
   (flushable))

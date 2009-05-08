@@ -200,7 +200,7 @@
                    ;; than this.  The problem is that a non-SIMPLE
                    ;; BIT-VECTOR could be displaced to another, with a
                    ;; non-zero offset -- so that significantly more
-                   ;; work needs to be done using the %RAW-BITS
+                   ;; work needs to be done using the %VECTOR-RAW-BITS
                    ;; approach.  This will probably do for now.
                    (sxhash-recurse (copy-seq x) depthoid))
                   (t (logxor 191020317 (sxhash (array-rank x))))))

@@ -478,24 +478,6 @@
 ;;; what type of vector it is.
 ;;;
 
-(define-vop (raw-bits word-index-ref)
-  (:note "raw-bits VOP")
-  (:translate %raw-bits)
-  (:results (value :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:variant 0 other-pointer-lowtag))
-
-(define-vop (set-raw-bits word-index-set)
-  (:note "setf raw-bits VOP")
-  (:translate %set-raw-bits)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg zero immediate))
-         (value :scs (unsigned-reg)))
-  (:arg-types * positive-fixnum unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:variant 0 other-pointer-lowtag))
-
 (define-vop (vector-raw-bits word-index-ref)
   (:note "vector-raw-bits VOP")
   (:translate %vector-raw-bits)

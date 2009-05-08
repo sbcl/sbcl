@@ -53,11 +53,10 @@
         ((= length 0) (mix result (sxhash 0)))
         (t
          (mixf result (sxhash (length x)))
-         (do* ((i sb!vm:vector-data-offset (+ i 1))
+         (do* ((i 0 (+ i 1))
                ;; FIXME: should we respect DEPTHOID?  SXHASH on
                ;; strings doesn't seem to...
-               (end-1 (+ sb!vm:vector-data-offset
-                         (floor (1- length) sb!vm:n-word-bits))))
+               (end-1 (floor (1- length) sb!vm:n-word-bits)))
               ((= i end-1)
                (let ((num
                       (logand
@@ -67,14 +66,14 @@
                                (:big-endian
                                 '(- sb!vm:n-word-bits
                                     (mod length sb!vm:n-word-bits)))))
-                       (%raw-bits x i))))
+                       (%vector-raw-bits x i))))
                  (mix result ,(ecase sb!c:*backend-byte-order*
                                 (:little-endian
                                  '(logand num most-positive-fixnum))
                                 (:big-endian
                                  '(ash num (- sb!vm:n-lowtag-bits)))))))
            (declare (type index i end-1))
-           (let ((num (%raw-bits x i)))
+           (let ((num (%vector-raw-bits x i)))
              (mixf result ,(ecase sb!c:*backend-byte-order*
                              (:little-endian
                               '(logand num most-positive-fixnum))
