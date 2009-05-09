@@ -145,7 +145,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                ;; are IN-PACKAGE SB-C. It would probably be cleaner
                ;; to move at least most of them to files which are
                ;; IN-PACKAGE SB-ASSEM.
-               "BRANCH" "DO-SSET-ELEMENTS" "MAKE-SSET" "SSET"
+               "BRANCH" "DO-SSET-ELEMENTS" "FLUSHABLE" "MAKE-SSET" "SSET"
                "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"))
 
    #s(sb-cold:package-data
@@ -190,7 +190,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM"
                  #!+sb-dyncount "SB-DYNCOUNT" "SB!EXT" "SB!FASL" "SB!INT"
                  "SB!KERNEL" "SB!SYS")
-      :reexport ("SLOT" "CODE-INSTRUCTIONS")
+      :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
       :export ("%ALIEN-FUNCALL"
                "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
