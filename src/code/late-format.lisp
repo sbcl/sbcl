@@ -350,8 +350,8 @@
 
 ;;;; format directive machinery
 
-;;; FIXME: only used in this file, could be SB!XC:DEFMACRO in EVAL-WHEN
-(defmacro def-complex-format-directive (char lambda-list &body body)
+(eval-when (:compile-toplevel :execute)
+(#+sb-xc-host defmacro #-sb-xc-host sb!xc:defmacro def-complex-format-directive (char lambda-list &body body)
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
@@ -370,8 +370,7 @@
                  ,@body)))
        (%set-format-directive-expander ,char #',defun-name))))
 
-;;; FIXME: only used in this file, could be SB!XC:DEFMACRO in EVAL-WHEN
-(defmacro def-format-directive (char lambda-list &body body)
+(#+sb-xc-host defmacro #-sb-xc-host sb!xc:defmacro def-format-directive (char lambda-list &body body)
   (let ((directives (sb!xc:gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
@@ -385,6 +384,7 @@
        ,@declarations
        (values (progn ,@body-without-decls)
                ,directives))))
+) ; EVAL-WHEN
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 

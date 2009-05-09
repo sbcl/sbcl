@@ -286,8 +286,8 @@
 ;;;
 ;;; FIXME: was rewritten, should be tested (or rewritten again, this
 ;;; time using ONCE-ONLY, *then* tested)
-;;; FIXME: become SB!XC:DEFMACRO inside EVAL-WHEN (COMPILE EVAL)?
-(defmacro with-pathname ((pathname pathname-designator) &body body)
+(eval-when (:compile-toplevel :execute)
+(sb!xc:defmacro with-pathname ((pathname pathname-designator) &body body)
   (let ((pd0 (gensym)))
     `(let* ((,pd0 ,pathname-designator)
             (,pathname (etypecase ,pd0
@@ -296,7 +296,7 @@
                          (file-stream (file-name ,pd0)))))
        ,@body)))
 
-(defmacro with-native-pathname ((pathname pathname-designator) &body body)
+(sb!xc:defmacro with-native-pathname ((pathname pathname-designator) &body body)
   (let ((pd0 (gensym)))
     `(let* ((,pd0 ,pathname-designator)
             (,pathname (etypecase ,pd0
@@ -307,7 +307,7 @@
                          (file-stream (file-name ,pd0)))))
        ,@body)))
 
-(defmacro with-host ((host host-designator) &body body)
+(sb!xc:defmacro with-host ((host host-designator) &body body)
   ;; Generally, redundant specification of information in software,
   ;; whether in code or in comments, is bad. However, the ANSI spec
   ;; for this is messy enough that it's hard to hold in short-term
@@ -363,6 +363,7 @@
                              ,hd0))
                      (host ,hd0))))
       ,@body)))
+) ; EVAL-WHEN
 
 (defun find-host (host-designator &optional (errorp t))
   (with-host (host host-designator)

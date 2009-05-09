@@ -281,9 +281,8 @@
                    :start2 src :end2 (+ src commainterval)))
         new-string))))
 
-;;; FIXME: This is only needed in this file, could be defined with
-;;; SB!XC:DEFMACRO inside EVAL-WHEN
-(defmacro interpret-format-integer (base)
+(eval-when (:compile-toplevel :execute)
+(sb!xc:defmacro interpret-format-integer (base)
   `(if (or colonp atsignp params)
        (interpret-bind-defaults
            ((mincol 0) (padchar #\space) (commachar #\,) (commainterval 3))
@@ -294,6 +293,7 @@
              (*print-radix* nil)
              (*print-escape* nil))
          (output-object (next-arg) stream))))
+) ; EVAL-WHEN
 
 (def-format-interpreter #\D (colonp atsignp params)
   (interpret-format-integer 10))

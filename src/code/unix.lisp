@@ -27,12 +27,6 @@
 
 (/show0 "unix.lisp 21")
 
-(defmacro def-enum (inc cur &rest names)
-  (flet ((defform (name)
-           (prog1 (when name `(defconstant ,name ,cur))
-             (setf cur (funcall inc cur 1)))))
-    `(progn ,@(mapcar #'defform names))))
-
 ;;; Given a C-level zero-terminated array of C strings, return a
 ;;; corresponding Lisp-level list of SIMPLE-STRINGs.
 (defun c-strings->string-list (c-strings)
@@ -63,7 +57,8 @@
 ;;; macros in this file, are only used in this file, and could be
 ;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
 
-(defmacro syscall ((name &rest arg-types) success-form &rest args)
+(eval-when (:compile-toplevel :execute)
+(sb!xc:defmacro syscall ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -75,7 +70,7 @@
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
 ;;; never really get an error.
-(defmacro syscall* ((name &rest arg-types) success-form &rest args)
+(sb!xc:defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -84,15 +79,10 @@
           (error "Syscall ~A failed: ~A" ,name (strerror))
           ,success-form))))
 
-(/show0 "unix.lisp 109")
-
-(defmacro void-syscall ((name &rest arg-types) &rest args)
-  `(syscall (,name ,@arg-types) (values t 0) ,@args))
-
-(defmacro int-syscall ((name &rest arg-types) &rest args)
+(sb!xc:defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values result 0) ,@args))
 
-(defmacro with-restarted-syscall ((&optional (value (gensym))
+(sb!xc:defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
                                   syscall-form &rest body)
   #!+sb-doc
@@ -104,6 +94,12 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
         (unless #!-win32 (eql ,errno sb!unix:eintr) #!+win32 nil
           (return (values ,value ,errno))))
      ,@body))
+) ; EVAL-WHEN
+
+;;; FIXME: This could go in the above EVAL-WHEN, but it's used by
+;;; SB-EXECUTABLE.
+(defmacro void-syscall ((name &rest arg-types) &rest args)
+  `(syscall (,name ,@arg-types) (values t 0) ,@args))
 
 #!+win32
 (progn
