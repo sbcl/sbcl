@@ -341,10 +341,9 @@
                                         (real-dx-lvars real)))
                                      (t
                                       (do-uses (use lvar)
-                                        (let ((source (find-original-source (node-source-path use))))
-                                          (unless (symbolp source)
-                                            (compiler-notify "could not stack allocate the result of ~S"
-                                                             source))))
+                                        (unless (ref-p use)
+                                          (compiler-notify "could not stack allocate the result of ~S"
+                                                           (find-original-source (node-source-path use)))))
                                       (setf (lvar-dynamic-extent lvar) nil)))))
                             (node       ; DX closure
                              (let* ((call what)

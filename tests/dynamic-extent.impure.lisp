@@ -654,4 +654,45 @@
     (array-total-size array)))
 (with-test (:name :length-and-words-packed-in-same-tn)
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
+
+(with-test (:name :handler-case-bogus-compiler-note)
+  (handler-bind ((compiler-note #'error))
+    ;; Taken from SWANK, used to signal a bogus stack allocation
+    ;; failure note.
+    (compile nil
+             `(lambda (files fasl-dir load)
+                (let ((needs-recompile nil))
+                  (dolist (src files)
+                    (let ((dest (binary-pathname src fasl-dir)))
+                      (handler-case
+                          (progn
+                            (when (or needs-recompile
+                                      (not (probe-file dest))
+                                      (file-newer-p src dest))
+                              (setq needs-recompile t)
+                              (ensure-directories-exist dest)
+                              (compile-file src :output-file dest :print nil :verbose t))
+                            (when load
+                              (load dest :verbose t)))
+                        (serious-condition (c)
+                          (handle-loadtime-error c dest))))))))))
+
+(with-test (:name :dx-compiler-notes)
+  (let ((n 0))
+    (handler-bind ((compiler-note (lambda (c)
+                                    (declare (ignore cc))
+                                    (incf n))))
+      (compile nil `(lambda (x)
+                      (let ((v (make-array x)))
+                        (declare (dynamic-extent v))
+                        (length v))))
+      (assert (= 1 n))
+      (compile nil `(lambda (x)
+                      (let ((y (if (plusp x)
+                                   (true x)
+                                   (true (- x)))))
+                        (declare (dynamic-extent y))
+                        (print y)
+                        nil)))
+      (assert (= 3 n)))))
 
