@@ -468,7 +468,8 @@
                              (ok-lvar-lambda-var (first args) constraints)
                              (if (ctype-p val)
                                  val
-                                 (specifier-type val))
+                                 (let ((*compiler-error-context* use))
+                                   (specifier-type val)))
                              nil)))))
                  ((eq eql)
                   (let* ((arg1 (first args))

@@ -182,10 +182,8 @@
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
         (values context t)
-        (let* ((path (or (and (boundp '*current-path*) *current-path*)
-                         (if context
-                             (node-source-path context)
-                             nil)))
+        (let* ((path (or (and (node-p context) (node-source-path context))
+                         (and (boundp '*current-path*) *current-path*)))
                (old
                 (find (when path (source-path-original-source path))
                       (remove-if #'null old-contexts)
