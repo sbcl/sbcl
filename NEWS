@@ -37,6 +37,9 @@
   * bug fix: the value of CL:- in the inspector was the previous expression
     evaluated rather than the expression being evaluated.
   * bug fix: constants can no longer be locally declared special.
+  * bug fix: signals delivered to threads started from foreign land (read:
+    directly by pthread_create, not by MAKE-THREAD) are redirected to a Lisp
+    thread by blocking all signals and resignalling.
 
 changes in sbcl-1.0.28 relative to 1.0.27:
   * a number of bugs in cross-compilation have been fixed, with the ultimate

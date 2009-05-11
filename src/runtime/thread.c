@@ -92,6 +92,7 @@ static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
 #endif
+pthread_key_t lisp_thread = 0;
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -126,6 +127,9 @@ initial_thread_trampoline(struct thread *th)
     lispobj function;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     lispobj *args = NULL;
+#endif
+#ifdef LISP_FEATURE_SB_THREAD
+    pthread_setspecific(lisp_thread, (void *)1);
 #endif
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
@@ -263,6 +267,7 @@ new_thread_trampoline(struct thread *th)
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
     check_deferrables_blocked_or_lose(0);
     check_gc_signals_unblocked_or_lose(0);
+    pthread_setspecific(lisp_thread, (void *)1);
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
@@ -492,6 +497,9 @@ kern_return_t mach_thread_init(mach_port_t thread_exception_port);
 
 void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
+#ifdef LISP_FEATURE_SB_THREAD
+    pthread_key_create(&lisp_thread, 0);
+#endif
     if(th) {
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
         setup_mach_exception_handling_thread();

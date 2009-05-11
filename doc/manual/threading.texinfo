@@ -20,7 +20,8 @@ threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 * Semaphores::
 * Waitqueue/condition variables::
 * Sessions/Debugging::
-* Implementation (Linux x86)::
+* Foreign threads::
+* Implementation (Linux x86/x86-64)::
 @end menu
 
 @node Threading basics
@@ -238,7 +239,28 @@ input stream is managed by calls to @code{sb-thread:get-foreground}
 @code{sb-ext:quit} terminates all threads in the current session, but
 leaves other sessions running.
 
-@node Implementation (Linux x86)
+@node Foreign threads
+@comment  node-name,  next,  previous,  up
+@section Foreign threads
+
+Direct calls to @code{pthread_create} (instead of @code{MAKE-THREAD})
+create threads that SBCL is not aware of, these are called foreign
+threads. Currently, it is not possible to run Lisp code in such
+threads. This means that the Lisp side signal handlers cannot work.
+The best solution is to start foreign threads with signals blocked,
+but since third party libraries may create threads, it is not always
+feasible to do so. As a workaround, upon receiving a signal in a
+foreign thread, SBCL changes the thread's sigmask to block all signals
+that it wants to handle and resends the signal to the current process
+which should land in a thread that does not block it, that is, a Lisp
+thread.
+
+The resignalling trick cannot work for synchronously triggered signals
+(SIGSEGV and co), take care not to trigger any. Resignalling for
+synchronously triggered signals in foreign threads is subject to
+@code{--lose-on-corruption}, see @ref{Runtime Options}.
+
+@node Implementation (Linux x86/x86-64)
 @comment  node-name,  next,  previous,  up
 @section Implementation (Linux x86/x86-64)
 

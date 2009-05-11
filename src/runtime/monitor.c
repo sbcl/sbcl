@@ -454,6 +454,10 @@ sub_monitor(void)
     if (!ldb_in) {
 #ifndef LISP_FEATURE_WIN32
         ldb_in = fopen("/dev/tty","r+");
+        if (ldb_in == NULL) {
+            perror("Error opening /dev/tty");
+            ldb_in = stdin;
+        }
 #else
         ldb_in = stdin;
 #endif

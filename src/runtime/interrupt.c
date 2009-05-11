@@ -68,6 +68,19 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
+/* When we catch an internal error, should we pass it back to Lisp to
+ * be handled in a high-level way? (Early in cold init, the answer is
+ * 'no', because Lisp is still too brain-dead to handle anything.
+ * After sufficient initialization has been completed, the answer
+ * becomes 'yes'.) */
+boolean internal_errors_enabled = 0;
+
+#ifndef LISP_FEATURE_WIN32
+static
+void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
+#endif
+union interrupt_handler interrupt_handlers[NSIG];
+
 /* Under Linux on some architectures, we appear to have to restore the
  * FPU control word from the context, as after the signal is delivered
  * we appear to have a null FPU control word. */
@@ -79,6 +92,54 @@
 #define RESTORE_FP_CONTROL_WORD(context,void_context)           \
     os_context_t *context = arch_os_get_context(&void_context);
 #endif
+
+/* Foreign code may want to start some threads on its own.
+ * Non-targetted, truly asynchronous signals can be delivered to
+ * basically any thread, but invoking Lisp handlers in such foregign
+ * threads is really bad, so let's resignal it.
+ *
+ * This should at least bring attention to the problem, but it cannot
+ * work for SIGSEGV and similar. It is good enough for timers, and
+ * maybe all deferrables. */
+
+static void
+add_handled_signals(sigset_t *sigset)
+{
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (!(ARE_SAME_HANDLER(interrupt_low_level_handlers[i], SIG_DFL)) ||
+            !(ARE_SAME_HANDLER(interrupt_handlers[i].c, SIG_DFL))) {
+            sigaddset(sigset, i);
+        }
+    }
+}
+
+void block_signals(sigset_t *what, sigset_t *where, sigset_t *old);
+
+static boolean
+maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
+{
+#ifdef LISP_FEATURE_SB_THREAD
+    if (!pthread_getspecific(lisp_thread)) {
+        if (!(sigismember(&deferrable_sigset,signal))) {
+            corruption_warning_and_maybe_lose
+                ("Received signal %d in non-lisp thread %lu, resignalling to a lisp thread.",
+                 signal,
+                 pthread_self());
+        }
+        {
+            sigset_t sigset;
+            sigemptyset(&sigset);
+            add_handled_signals(&sigset);
+            block_signals(&sigset, 0, 0);
+            block_signals(&sigset, os_context_sigmask_addr(context), 0);
+            kill(getpid(), signal);
+        }
+        return 1;
+    } else
+#endif
+        return 0;
+}
 
 /* These are to be used in signal handlers. Currently all handlers are
  * called from one of:
@@ -98,10 +159,11 @@
  * kernel properly, so we fix it up ourselves in the
  * arch_os_get_context(..) function. -- CSR, 2002-07-23
  */
-#define SAVE_ERRNO(context,void_context)                        \
+#define SAVE_ERRNO(signal,context,void_context)                 \
     {                                                           \
         int _saved_errno = errno;                               \
         RESTORE_FP_CONTROL_WORD(context,void_context);          \
+        if (!maybe_resignal_to_lisp_thread(signal, context))    \
         {
 
 #define RESTORE_ERRNO                                           \
@@ -531,20 +593,6 @@ check_interrupt_context_or_lose(os_context_t *context)
     }
 #endif
 }
-
-/* When we catch an internal error, should we pass it back to Lisp to
- * be handled in a high-level way? (Early in cold init, the answer is
- * 'no', because Lisp is still too brain-dead to handle anything.
- * After sufficient initialization has been completed, the answer
- * becomes 'yes'.) */
-boolean internal_errors_enabled = 0;
-
-#ifndef LISP_FEATURE_WIN32
-static
-void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
-#endif
-union interrupt_handler interrupt_handlers[NSIG];
-
 
 /*
  * utility routines used by various signal handlers
@@ -1100,10 +1148,9 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
-
     if(!maybe_defer_handler(interrupt_handle_now,data,signal,info,context))
         interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
@@ -1123,7 +1170,7 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
 static void
 low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
 
@@ -1209,7 +1256,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
 #ifndef LISP_FEATURE_WIN32
     if ((signal == SIGILL) || (signal == SIGBUS)
 #ifndef LISP_FEATURE_LINUX
@@ -1598,7 +1645,7 @@ see_if_sigaction_nodefer_works(void)
 static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
     sigset_t unblock;
 
     sigemptyset(&unblock);
@@ -1611,7 +1658,7 @@ unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 static void
 low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
     sigset_t unblock;
 
     sigemptyset(&unblock);
@@ -1624,7 +1671,7 @@ low_level_unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 static void
 low_level_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
-    SAVE_ERRNO(context,void_context);
+    SAVE_ERRNO(signal,context,void_context);
     (*interrupt_low_level_handlers[signal])(signal, info, context);
     RESTORE_ERRNO;
 }
