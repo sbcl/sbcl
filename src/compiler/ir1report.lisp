@@ -174,49 +174,61 @@
 ;;; list of things that are going to be printed out in the error
 ;;; message, and can thus be blown off when they appear in the source
 ;;; context.
-(defun find-error-context (args)
+;;;
+;;; If OLD-CONTEXTS is passed in, and includes a context with the
+;;; same original source path as the new context would have, the old
+;;; context is reused instead, and a secondary value of T is returned.
+(defun find-error-context (args &optional old-contexts)
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
-        context
-        (let ((path (or (and (boundp '*current-path*) *current-path*)
-                        (if context
-                            (node-source-path context)
-                            nil))))
-          (when (and *source-info* path)
-            (multiple-value-bind (form src-context) (find-original-source path)
-              (collect ((full nil cons)
-                        (short nil cons))
-                (let ((forms (source-path-forms path))
-                      (n 0))
-                  (dolist (src (if (member (first forms) args)
-                                   (rest forms)
-                                   forms))
-                    (if (>= n *enclosing-source-cutoff*)
-                        (short (stringify-form (if (consp src)
-                                                   (car src)
-                                                   src)
-                                               nil))
-                        (full (stringify-form src)))
-                    (incf n)))
+        (values context t)
+        (let* ((path (or (and (boundp '*current-path*) *current-path*)
+                         (if context
+                             (node-source-path context)
+                             nil)))
+               (old
+                (find (when path (source-path-original-source path))
+                      (remove-if #'null old-contexts)
+                      :test #'equal
+                      :key #'compiler-error-context-original-source-path)))
+          (if old
+              (values old t)
+              (when (and *source-info* path)
+                (multiple-value-bind (form src-context) (find-original-source path)
+                  (collect ((full nil cons)
+                            (short nil cons))
+                    (let ((forms (source-path-forms path))
+                          (n 0))
+                      (dolist (src (if (member (first forms) args)
+                                       (rest forms)
+                                       forms))
+                        (if (>= n *enclosing-source-cutoff*)
+                            (short (stringify-form (if (consp src)
+                                                       (car src)
+                                                       src)
+                                                   nil))
+                            (full (stringify-form src)))
+                        (incf n)))
 
-                (let* ((tlf (source-path-tlf-number path))
-                       (file-info (source-info-file-info *source-info*)))
-                  (make-compiler-error-context
-                   :enclosing-source (short)
-                   :source (full)
-                   :original-source (stringify-form form)
-                   :context src-context
-                   :file-name (file-info-name file-info)
-                   :file-position
-                   (multiple-value-bind (ignore pos)
-                       (find-source-root tlf *source-info*)
-                     (declare (ignore ignore))
-                     pos)
-                   :original-source-path
-                   (source-path-original-source path)
-                   :lexenv (if context
-                               (node-lexenv context)
-                               (if (boundp '*lexenv*) *lexenv* nil)))))))))))
+                    (let* ((tlf (source-path-tlf-number path))
+                           (file-info (source-info-file-info *source-info*)))
+                      (values
+                       (make-compiler-error-context
+                        :enclosing-source (short)
+                        :source (full)
+                        :original-source (stringify-form form)
+                        :context src-context
+                        :file-name (file-info-name file-info)
+                        :file-position
+                        (multiple-value-bind (ignore pos)
+                            (find-source-root tlf *source-info*)
+                          (declare (ignore ignore))
+                          pos)
+                        :original-source-path (source-path-original-source path)
+                        :lexenv (if context
+                                    (node-lexenv context)
+                                    (if (boundp '*lexenv*) *lexenv* nil)))
+                       nil))))))))))
 
 ;;;; printing error messages
 
@@ -527,9 +539,11 @@ has written, having proved that it is unreachable."))
            (res (or found
                     (make-undefined-warning :name name :kind kind))))
       (unless found (push res *undefined-warnings*))
-      (when (or (not *undefined-warning-limit*)
-                (< (undefined-warning-count res) *undefined-warning-limit*))
-        (push (find-error-context (list name))
-              (undefined-warning-warnings res)))
-      (incf (undefined-warning-count res))))
+      (multiple-value-bind (context old)
+          (find-error-context (list name) (undefined-warning-warnings res))
+        (unless old
+          (when (or (not *undefined-warning-limit*)
+                    (< (undefined-warning-count res) *undefined-warning-limit*))
+            (push context (undefined-warning-warnings res)))
+          (incf (undefined-warning-count res))))))
   (values))

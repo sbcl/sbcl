@@ -53,7 +53,7 @@
 ;;; The system is complete now, all standard functions are
 ;;; defined.
 (sb-kernel::ctype-of-cache-clear)
-(setq sb-c::*flame-on-necessarily-undefined-function* t)
+(setq sb-c::*flame-on-necessarily-undefined-thing* t)
 
 ;;; Clean up stray symbols from the CL-USER package.
 (do-symbols (symbol "CL-USER")

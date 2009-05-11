@@ -32,9 +32,9 @@
                   *lexenv* *fun-names-in-this-file*
                   *allow-instrumenting*))
 
-;;; Whether call of a function which cannot be defined causes a full
+;;; Whether reference to a thing which cannot be defined causes a full
 ;;; warning.
-(defvar *flame-on-necessarily-undefined-function* nil)
+(defvar *flame-on-necessarily-undefined-thing* nil)
 
 (defvar *check-consistency* nil)
 
@@ -188,11 +188,19 @@
                   (incf *aborted-compilation-unit-count*))
                 (summarize-compilation-unit (not succeeded-p)))))))))
 
-;;; Is FUN-NAME something that no conforming program can rely on
-;;; defining as a function?
-(defun fun-name-reserved-by-ansi-p (fun-name)
-  (eq (symbol-package (fun-name-block-name fun-name))
-      *cl-package*))
+;;; Is NAME something that no conforming program can rely on
+;;; defining?
+(defun name-reserved-by-ansi-p (name kind)
+  (ecase kind
+    (:function
+     (eq (symbol-package (fun-name-block-name name))
+         *cl-package*))
+    (:type
+     (let ((symbol (typecase name
+                     (symbol name)
+                     ((cons symbol) (car name))
+                     (t (return-from name-reserved-by-ansi-p nil)))))
+       (eq (symbol-package symbol) *cl-package*)))))
 
 ;;; This is to be called at the end of a compilation unit. It signals
 ;;; any residual warnings about unknown stuff, then prints the total
@@ -200,91 +208,101 @@
 ;;; aborted by throwing out. ABORT-COUNT is the number of dynamically
 ;;; enclosed nested compilation units that were aborted.
 (defun summarize-compilation-unit (abort-p)
-  (unless abort-p
-    (handler-bind ((style-warning #'compiler-style-warning-handler)
-                   (warning #'compiler-warning-handler))
+  (let (summary)
+    (unless abort-p
+      (handler-bind ((style-warning #'compiler-style-warning-handler)
+                     (warning #'compiler-warning-handler))
 
-      (let ((undefs (sort *undefined-warnings* #'string<
-                          :key (lambda (x)
-                                 (let ((x (undefined-warning-name x)))
-                                   (if (symbolp x)
-                                       (symbol-name x)
-                                       (prin1-to-string x)))))))
-        (dolist (undef undefs)
-          (let ((name (undefined-warning-name undef))
-                (kind (undefined-warning-kind undef))
-                (warnings (undefined-warning-warnings undef))
-                (undefined-warning-count (undefined-warning-count undef)))
-            (dolist (*compiler-error-context* warnings)
-              (if #-sb-xc-host (and (eq kind :function)
-                                    (fun-name-reserved-by-ansi-p name)
-                                    *flame-on-necessarily-undefined-function*)
-                  #+sb-xc-host nil
-                  (case name
-                    ((declare)
-                     (compiler-warn
-                      "~@<There is no function named ~S. References to ~S in ~
-                       some contexts (like starts of blocks) have special ~
-                       meaning, but here it would have to be a function, ~
-                       and that shouldn't be right.~:@>"
-                      name name))
-                    (t
-                     (compiler-warn
-                      "~@<The ~(~A~) ~S is undefined, and its name is ~
-                       reserved by ANSI CL so that even if it were ~
-                       defined later, the code doing so would not be ~
-                       portable.~:@>"
-                      kind name)))
-                  (if (eq kind :variable)
-                      (compiler-warn "undefined ~(~A~): ~S" kind name)
-                      (compiler-style-warn "undefined ~(~A~): ~S" kind name))))
-            (let ((warn-count (length warnings)))
-              (when (and warnings (> undefined-warning-count warn-count))
-                (let ((more (- undefined-warning-count warn-count)))
-                  (if (eq kind :variable)
-                      (compiler-warn
-                       "~W more use~:P of undefined ~(~A~) ~S"
-                       more kind name)
-                      (compiler-style-warn
-                       "~W more use~:P of undefined ~(~A~) ~S"
-                       more kind name)))))))
+        (let ((undefs (sort *undefined-warnings* #'string<
+                            :key (lambda (x)
+                                   (let ((x (undefined-warning-name x)))
+                                     (if (symbolp x)
+                                         (symbol-name x)
+                                         (prin1-to-string x)))))))
+          (dolist (kind '(:variable :function :type))
+            (let ((names (mapcar #'undefined-warning-name
+                                   (remove kind undefs :test #'neq
+                                           :key #'undefined-warning-kind))))
+              (when names (push (cons kind names) summary))))
+          (dolist (undef undefs)
+            (let ((name (undefined-warning-name undef))
+                  (kind (undefined-warning-kind undef))
+                  (warnings (undefined-warning-warnings undef))
+                  (undefined-warning-count (undefined-warning-count undef)))
+              (dolist (*compiler-error-context* warnings)
+                (if #-sb-xc-host (and (member kind '(:function :type))
+                                      (name-reserved-by-ansi-p name kind)
+                                      *flame-on-necessarily-undefined-thing*)
+                    #+sb-xc-host nil
+                    (ecase kind
+                      (:function
+                       (case name
+                         ((declare)
+                          (compiler-warn
+                           "~@<There is no function named ~S. References to ~S ~
+                            in some contexts (like starts of blocks) have ~
+                            special meaning, but here it would have to be a ~
+                            function, and that shouldn't be right.~:@>" name
+                            name))
+                         (t
+                          (compiler-warn
+                           "~@<The function ~S is undefined, and its name is ~
+                            reserved by ANSI CL so that even if it were ~
+                            defined later, the code doing so would not be ~
+                            portable.~:@>" name))))
+                      (:type
+                       (if (and (consp name) (eq 'quote (car name)))
+                           (compiler-warn
+                            "~@<Undefined type ~S. The name starts with ~S: ~
+                             probably use of a quoted type name in a context ~
+                             where the name is not evaluated.~:@>"
+                            name 'quote)
+                           (compiler-warn
+                            "~@<Undefined type ~S. Note that name ~S is ~
+                             reserved by ANSI CL, so code defining a type with ~
+                             that name would not be portable.~:@>" name
+                             name))))
+                    (if (eq kind :variable)
+                        (compiler-warn "undefined ~(~A~): ~S" kind name)
+                        (compiler-style-warn "undefined ~(~A~): ~S" kind name))))
+              (let ((warn-count (length warnings)))
+                (when (and warnings (> undefined-warning-count warn-count))
+                  (let ((more (- undefined-warning-count warn-count)))
+                    (if (eq kind :variable)
+                        (compiler-warn
+                         "~W more use~:P of undefined ~(~A~) ~S"
+                         more kind name)
+                        (compiler-style-warn
+                         "~W more use~:P of undefined ~(~A~) ~S"
+                         more kind name))))))))))
 
-        (dolist (kind '(:variable :function :type))
-          (let ((summary (mapcar #'undefined-warning-name
-                                 (remove kind undefs :test #'neq
-                                         :key #'undefined-warning-kind))))
-            (when summary
-              (if (eq kind :variable)
-                  (compiler-warn
-                   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
-                    ~%  ~{~<~%  ~1:;~S~>~^ ~}"
-                   (cdr summary) kind summary)
-                  (compiler-style-warn
-                   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
-                   ~%  ~{~<~%  ~1:;~S~>~^ ~}"
-                   (cdr summary) kind summary))))))))
-
-  (unless (and (not abort-p)
-               (zerop *aborted-compilation-unit-count*)
-               (zerop *compiler-error-count*)
-               (zerop *compiler-warning-count*)
-               (zerop *compiler-style-warning-count*)
-               (zerop *compiler-note-count*))
-    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
-      (format *error-output* "~&compilation unit ~:[finished~;aborted~]~
-                             ~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
-                             ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
-                             ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
-                             ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
-                             ~[~:;~:*~&  printed ~W note~:P~]"
-              abort-p
-              *aborted-compilation-unit-count*
-              *compiler-error-count*
-              *compiler-warning-count*
-              *compiler-style-warning-count*
-              *compiler-note-count*))
-    (terpri *error-output*)
-    (force-output *error-output*)))
+    (unless (and (not abort-p)
+                 (zerop *aborted-compilation-unit-count*)
+                 (zerop *compiler-error-count*)
+                 (zerop *compiler-warning-count*)
+                 (zerop *compiler-style-warning-count*)
+                 (zerop *compiler-note-count*))
+      (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+        (format *error-output* "~&compilation unit ~:[finished~;aborted~]"
+                abort-p)
+        (dolist (cell summary)
+          (destructuring-bind (kind &rest names) cell
+            (format *error-output*
+                    "~&  Undefined ~(~A~)~p:~
+                     ~%    ~{~<~% ~1:;~S~>~^ ~}"
+                    kind (length names) names)))
+        (format *error-output* "~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
+                                ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
+                                ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
+                                ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
+                                ~[~:;~:*~&  printed ~W note~:P~]"
+                *aborted-compilation-unit-count*
+                *compiler-error-count*
+                *compiler-warning-count*
+                *compiler-style-warning-count*
+                *compiler-note-count*))
+      (terpri *error-output*)
+      (force-output *error-output*))))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
@@ -1185,6 +1203,7 @@
 
   (catch 'process-toplevel-form-error-abort
     (let* ((path (or (get-source-path form) (cons form path)))
+           (*current-path* path)
            (*compiler-error-bailout*
             (lambda (&optional condition)
               (convert-and-maybe-compile
@@ -1248,9 +1267,7 @@
                  ;; sequence of steps in ANSI's "3.2.3.1 Processing of
                  ;; Top Level Forms".
                  #-sb-xc-host
-                 (let ((expanded
-                        (let ((*current-path* path))
-                          (preprocessor-macroexpand-1 form))))
+                 (let ((expanded (preprocessor-macroexpand-1 form)))
                    (cond ((eq expanded form)
                           (when compile-time-too
                             (eval-in-lexenv form *lexenv*))

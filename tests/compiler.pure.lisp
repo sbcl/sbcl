@@ -2877,3 +2877,22 @@
     (compile nil `(lambda ()
                     (sb-ext:with-timeout 0
                       (sleep 1))))))
+
+(with-test (:name :full-warning-for-undefined-type-in-cl)
+  (assert (eq :full
+              (handler-case
+                  (compile nil `(lambda (x) (the replace x)))
+                (style-warning ()
+                  :style)
+                (warning ()
+                  :full)))))
+
+(with-test (:name :single-warning-for-single-undefined-type)
+  (let ((n 0))
+    (handler-bind ((warning (lambda (c)
+                              (declare (ignore c))
+                              (incf n))))
+      (compile nil `(lambda (x) (the #:no-type x)))
+      (assert (= 1 n))
+      (compile nil `(lambda (x) (the 'fixnum x)))
+      (assert (= 2 n)))))
