@@ -8,6 +8,8 @@
     the symbol, prohibits both lexical and dynamic binding. This is mainly an
     efficiency measure for threaded platforms, but also valueable in
     expressing intent.
+  * improvement: SBCL now emits a compiler note where stack allocation was
+    requested but could not be provided.
   * optimization: compiler now generates faster array typechecking code.
   * optimization: ARRAY-DIMENSION is now faster for multidimensional and
     non-simple arrays.

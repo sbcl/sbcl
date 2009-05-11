@@ -335,11 +335,17 @@
                        do (etypecase what
                             (cons
                              (let ((lvar (cdr what)))
-                               (if (lvar-good-for-dx-p lvar (car what) component)
-                                   (let ((real (principal-lvar lvar)))
-                                     (setf (lvar-dynamic-extent real) cleanup)
-                                     (real-dx-lvars real))
-                                   (setf (lvar-dynamic-extent lvar) nil))))
+                               (cond ((lvar-good-for-dx-p lvar (car what) component)
+                                      (let ((real (principal-lvar lvar)))
+                                        (setf (lvar-dynamic-extent real) cleanup)
+                                        (real-dx-lvars real)))
+                                     (t
+                                      (do-uses (use lvar)
+                                        (let ((source (find-original-source (node-source-path use))))
+                                          (unless (symbolp source)
+                                            (compiler-notify "could not stack allocate the result of ~S"
+                                                             source))))
+                                      (setf (lvar-dynamic-extent lvar) nil)))))
                             (node       ; DX closure
                              (let* ((call what)
                                     (arg (first (basic-combination-args call)))
