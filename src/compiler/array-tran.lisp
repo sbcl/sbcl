@@ -297,7 +297,7 @@
            `(let ((array ,creation-form))
              (multiple-value-bind (vector)
                  (%data-vector-and-index array 0)
-               (fill vector initial-element))
+               (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
              array)))))
 
 ;;; The integer type restriction on the length ensures that it will be
