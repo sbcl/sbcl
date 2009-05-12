@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * minor incompatible change: SAVE-LISP-AND-DIE :TOPLEVEL function is now
+    allowed to return, which causes SBCL to quit with exit status 0. Previously
+    if the function returned with a small integer return value, that value
+    was accidentally reused as the exit status.
   * new feature: SB-EXT:DEFGLOBAL macro allows defining global non-special
     variables.
   * new feature: SB-EXT:ALWAYS-BOUND proclamation inhibits MAKUNBOUND, and
@@ -19,6 +23,8 @@
   * improvement: pretty-printing loop has been implemented properly. (thanks
     to Tobias Rittweiler)
   * documentation: CLOS slot typechecing policy has been documented.
+  * bug fix: exit status from QUIT when called under --script was lost
+    (reported by Hubert Kauker)
   * bug fix: MAKE-ARRAY for non-zero :INITIAL-ELEMENT always used the
     same implementation of FILL to initialize the array, even if a more
     efficient one was available (reported by Stas Boukarev, thanks to

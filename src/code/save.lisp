@@ -49,8 +49,8 @@ The following &KEY arguments are defined:
   :TOPLEVEL
      The function to run when the created core file is resumed. The
      default function handles command line toplevel option processing
-     and runs the top level read-eval-print loop. This function should
-     not return.
+     and runs the top level read-eval-print loop. This function returning
+     is equivalent to (SB-EXT:QUIT :UNIX-STATUS 0) being called.
 
   :EXECUTABLE
      If true, arrange to combine the SBCL runtime and the core image
@@ -126,7 +126,9 @@ sufficiently motivated to do lengthy fixes."
              (handling-end-of-the-world
                (reinit)
                #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
-               (funcall toplevel)))
+               (progn
+                 (funcall toplevel)
+                 (sb!ext:quit))))
            (foreign-bool (value)
              (if value 1 0))
            (save-core (gc)

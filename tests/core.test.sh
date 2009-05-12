@@ -20,6 +20,12 @@ use_test_subdirectory
 tmpcore=$TEST_FILESTEM.core
 tmpoutput=$TEST_FILESTEM.txt
 
+run_sbcl <<EOF
+  (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42))
+EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit
+check_status_maybe_lose "SAVE-LISP-AND-DIE :TOPLEVEL" $? 0 "(saved core ran)"
+
 # In sbcl-0.7.7 SAVE-LISP-AND-DIE didn't work at all because of
 # flakiness caused by consing/GC/purify twice-and-at-least-twice
 # mismatch grot.

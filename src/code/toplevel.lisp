@@ -398,14 +398,12 @@ command-line.")
     t))
 
 (defun process-script (script)
-  (let ((pathname (native-pathname script))
-        (ok nil))
-    (unwind-protect
-         (with-open-file (f pathname :element-type :default)
-           (maybe-skip-shebang-line f)
-           (load f :verbose nil :print nil)
-           (setf ok t))
-      (quit :unix-status (if ok 0 1)))))
+  (let ((pathname (native-pathname script)))
+    (handling-end-of-the-world
+      (with-open-file (f pathname :element-type :default)
+        (maybe-skip-shebang-line f)
+        (load f :verbose nil :print nil)
+        (quit)))))
 
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
