@@ -8,15 +8,21 @@
     the symbol, prohibits both lexical and dynamic binding. This is mainly an
     efficiency measure for threaded platforms, but also valueable in
     expressing intent.
-  * improvement: SBCL now emits a compiler note where stack allocation was
-    requested but could not be provided.
   * optimization: compiler now generates faster array typechecking code.
   * optimization: ARRAY-DIMENSION is now faster for multidimensional and
     non-simple arrays.
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.
+  * improvement: SBCL now emits a compiler note where stack allocation was
+    requested but could not be provided.
+  * improvement: pretty-printing loop has been implemented properly. (thanks
+    to Tobias Rittweiler)
   * documentation: CLOS slot typechecing policy has been documented.
+  * bug fix: MAKE-ARRAY for non-zero :INITIAL-ELEMENT always used the
+    same implementation of FILL to initialize the array, even if a more
+    efficient one was available (reported by Stas Boukarev, thanks to
+    Paul Khuong)
   * bug fix: potential miscompilation of array stack allocation on x86 and
     x86-64. (reported by Time Tossavainen)
   * bug fix: some forms of AND, OR, and COND resulted in expansions that could

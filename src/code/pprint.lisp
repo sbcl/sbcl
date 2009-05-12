@@ -1300,6 +1300,43 @@ line break."
     (pprint-fill stream (pprint-pop))
     (pprint-tagbody-guts stream)))
 
+;;; Each clause in this list will get its own line.
+(defvar *loop-seperating-clauses*
+  '(:and
+    :where :for
+    :initially :finally
+    :do :doing
+    :collect :collecting
+    :append :appending
+    :nconc :nconcing
+    :count :counting
+    :sum :summing
+    :maximize :maximizing
+    :minimize :minimizing
+    :if :when :unless :end
+    :for :while :until :repeat :always :never :thereis
+    ))
+
+(defun pprint-loop (stream list &rest noise)
+  (declare (ignore noise))
+  (destructuring-bind (loop-symbol . clauses) list
+    (write-char #\( stream)
+    (output-object loop-symbol stream)
+    (when clauses
+      (write-char #\space stream)
+      (pprint-logical-block (stream clauses :prefix "" :suffix "")
+        (output-object (pprint-pop) stream)
+        (pprint-exit-if-list-exhausted)
+        (write-char #\space stream)
+        (loop for thing = (pprint-pop)
+              when (and (symbolp thing)
+                        (member thing  *loop-seperating-clauses* :test #'string=))
+                do (pprint-newline :mandatory stream)
+              do (output-object thing stream)
+              do (pprint-exit-if-list-exhausted)
+              do (write-char #\space stream))))
+    (write-char #\) stream)))
+
 (defun pprint-fun-call (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~:_~}~:>")
@@ -1391,7 +1428,7 @@ line break."
                           (etypecase pprint-typecase)
                           #+nil (handler-bind ...)
                           #+nil (handler-case ...)
-                          #+nil (loop ...)
+                          (loop pprint-loop)
                           (multiple-value-bind pprint-progv)
                           (multiple-value-setq pprint-block)
                           (pprint-logical-block pprint-block)
