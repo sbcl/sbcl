@@ -102,6 +102,7 @@ union interrupt_handler interrupt_handlers[NSIG];
  * work for SIGSEGV and similar. It is good enough for timers, and
  * maybe all deferrables. */
 
+#ifdef LISP_FEATURE_SB_THREAD
 static void
 add_handled_signals(sigset_t *sigset)
 {
@@ -115,6 +116,7 @@ add_handled_signals(sigset_t *sigset)
 }
 
 void block_signals(sigset_t *what, sigset_t *where, sigset_t *old);
+#endif
 
 static boolean
 maybe_resignal_to_lisp_thread(int signal, os_context_t *context)

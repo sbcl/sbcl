@@ -54,6 +54,7 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
     pthread_mutex_unlock(thread->state_lock);
 }
 
+extern pthread_key_t lisp_thread;
 #endif
 
 extern int kill_safely(os_thread_t os_thread, int signal);
@@ -69,7 +70,6 @@ union per_thread_data {
 
 extern struct thread *all_threads;
 extern int dynamic_values_bytes;
-extern pthread_key_t lisp_thread;
 
 #if defined(LISP_FEATURE_DARWIN)
 #define CONTROL_STACK_ALIGNMENT_BYTES 8192 /* darwin wants page-aligned stacks */
