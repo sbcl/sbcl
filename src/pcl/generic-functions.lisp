@@ -466,7 +466,7 @@
                                                  fun-name
                                                  &key &allow-other-keys))
 
-(defgeneric initialize-instance (gf &key &allow-other-keys))
+(defgeneric initialize-instance (instance &rest initargs &key &allow-other-keys))
 
 (defgeneric make-instance (class &rest initargs &key &allow-other-keys))
 
@@ -480,10 +480,9 @@
 
 (defgeneric reader-method-class (class direct-slot &rest initargs))
 
-(defgeneric reinitialize-instance (gf &rest args &key &allow-other-keys))
+(defgeneric reinitialize-instance (instance &rest initargs &key &allow-other-keys))
 
-(defgeneric shared-initialize (generic-function
-                               slot-names
+(defgeneric shared-initialize (instance slot-names &rest initargs
                                &key &allow-other-keys))
 
 (defgeneric update-dependent (metaobject dependent &rest initargs))
