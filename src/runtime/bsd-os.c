@@ -70,7 +70,11 @@ static void freebsd_init();
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <dlfcn.h>
+#ifdef LISP_FEATURE_X86
+#include <machine/cpu.h>
+#endif
 
 static void openbsd_init();
 #endif
@@ -481,9 +485,16 @@ os_get_runtime_executable_path()
 #endif
 
 #ifdef __OpenBSD__
+
+int openbsd_use_fxsave = 0;
+
 void
 openbsd_init()
 {
+#ifdef LISP_FEATURE_X86
+    int mib[2];
+    size_t size;
+#endif
     /*
      * Show a warning if it looks like the memory available after
      * allocating the spaces won't be at least this much.
@@ -494,6 +505,14 @@ openbsd_init()
     const int wantfree = 32 * 1024 * 1024;
 #endif
     struct rlimit rl;
+
+#ifdef LISP_FEATURE_X86
+    /* Save the machdep.osfxsr sysctl for use by os_restore_fp_control() */
+    mib[0] = CTL_MACHDEP;
+    mib[1] = CPU_OSFXSR;
+    size = sizeof (openbsd_use_fxsave);
+    sysctl(mib, 2, &openbsd_use_fxsave, &size, NULL, 0);
+#endif
 
     /* OpenBSD, like NetBSD, counts mmap()ed space against the
      * process's data size limit. If the soft limit is lower than the

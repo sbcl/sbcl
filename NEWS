@@ -24,6 +24,8 @@
   * improvement: pretty-printing loop has been implemented properly. (thanks
     to Tobias Rittweiler)
   * documentation: CLOS slot typechecing policy has been documented.
+  * bug fix: better floating point exception handling on x86/OpenBSD.
+    (thanks to Josh Elsasser)
   * bug fix: exit status from QUIT when called under --script was lost
     (reported by Hubert Kauker)
   * bug fix: MAKE-ARRAY for non-zero :INITIAL-ELEMENT always used the

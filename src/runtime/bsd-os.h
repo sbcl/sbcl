@@ -65,6 +65,9 @@ extern int sig_memory_fault;
 
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
+#if defined(LISP_FEATURE_X86)
+extern int openbsd_use_fxsave;
+#endif
 
 #elif defined __NetBSD__
 

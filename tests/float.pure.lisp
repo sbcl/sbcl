@@ -93,7 +93,7 @@
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on '(or :ppc :darwin (and :x86 :openbsd))) ;; bug 372
+            :fails-on '(or :ppc :darwin)) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -125,12 +125,13 @@
 (funcall (compile nil '(lambda () (tan (tan (round 0))))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :ppc :darwin (and (or :x86 :x86-64)
-                                             (or :netbsd :openbsd))))
+            :fails-on '(or :ppc :darwin (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1
                   (ignore-errors
                     (sb-sys:without-interrupts
+                     (sb-int:set-floating-point-modes :current-exceptions nil
+                                                      :accrued-exceptions nil)
                      (loop repeat 2 summing most-positive-double-float)
                      (sleep 2))))
                  'floating-point-overflow)))

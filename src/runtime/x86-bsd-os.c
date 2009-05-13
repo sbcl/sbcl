@@ -19,6 +19,12 @@
 #include "machine/npx.h"
 #endif
 
+#if defined(LISP_FEATURE_OPENBSD)
+#include <machine/frame.h>
+#include <machine/npx.h>
+#include <stddef.h>
+#endif
+
 /* KLUDGE: There is strong family resemblance in the signal context
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
@@ -235,5 +241,21 @@ os_restore_fp_control(os_context_t *context)
      * so, to match the behavior?  */
     os_restore_tls_segment_register(context);
 #endif
+}
+#endif
+
+#if defined(LISP_FEATURE_OPENBSD)
+void
+os_restore_fp_control(os_context_t *context)
+{
+    struct sigframe *frame;
+    union savefpu *fpu;
+
+    frame = (struct sigframe *)((char*)context - offsetof(struct sigframe, sf_sc));
+    fpu = frame->sf_fpstate;
+    if (openbsd_use_fxsave)
+        __asm__ __volatile__ ("fldcw %0" : : "m" (fpu->sv_xmm.sv_env.en_cw));
+    else
+        __asm__ __volatile__ ("fldcw %0" : : "m" (fpu->sv_87.sv_env.en_cw));
 }
 #endif
