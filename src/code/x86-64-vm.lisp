@@ -34,32 +34,12 @@
 ;;; some other package, perhaps SB-KERNEL.
 (define-alien-type os-context-t (struct os-context-t-struct))
 
-;;;; MACHINE-TYPE and MACHINE-VERSION
+;;;; MACHINE-TYPE
 
 (defun machine-type ()
   #!+sb-doc
   "Return a string describing the type of the local machine."
   "X86-64")
-
-;;; arch-specific support for CL:MACHINE-VERSION, defined OAOO elsewhere
-(defun get-machine-version ()
-  #!+linux
-  (with-open-file (stream "/proc/cpuinfo"
-                          ;; Even on Linux it's an option to build
-                          ;; kernels without /proc filesystems, so
-                          ;; degrade gracefully.
-                          :if-does-not-exist nil)
-    (loop with line while (setf line (read-line stream nil))
-          ;; The field "model name" exists on kernel 2.4.21-rc6-ac1
-          ;; anyway, with values e.g.
-          ;;   "AMD Athlon(TM) XP 2000+"
-          ;;   "Intel(R) Pentium(R) M processor 1300MHz"
-          ;; which seem comparable to the information in the example
-          ;; in the MACHINE-VERSION page of the ANSI spec.
-          when (eql (search "model name" line) 0)
-          return (string-trim " " (subseq line (1+ (position #\: line))))))
-  #!-linux
-  nil)
 
 ;;;; :CODE-OBJECT fixups
 

@@ -51,6 +51,11 @@
 #include <sys/bsdtty.h> /* for TIOCGPGRP */
 #endif
 
+#ifdef LISP_FEATURE_BSD
+  #include <sys/param.h>
+  #include <sys/sysctl.h>
+#endif
+
 #include "wrap.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
@@ -432,5 +437,18 @@ main(int argc, char *argv[])
     defconstant("fpe-fltsub", -1);
 #endif
 #endif // !WIN32
+
+#ifdef LISP_FEATURE_BSD
+    printf(";;; sysctl(3) names\n");
+    printf("(in-package \"SB!IMPL\")\n\n");
+    defconstant("ctl-kern", CTL_KERN);
+    defconstant("ctl-hw", CTL_HW);
+    defconstant("ctl-maxname", CTL_MAXNAME);
+    defconstant("kern-ostype", KERN_OSTYPE);
+    defconstant("kern-osrelease", KERN_OSRELEASE);
+    defconstant("hw-model", HW_MODEL);
+    defconstant("hw-pagesize", HW_PAGESIZE);
+    printf("\n");
+#endif
     return 0;
 }

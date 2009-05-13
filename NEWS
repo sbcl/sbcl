@@ -20,6 +20,7 @@
     open coding of ARRAY-RANK.
   * improvement: SBCL now emits a compiler note where stack allocation was
     requested but could not be provided.
+  * improvement: better MACHINE-VERSION responses. (thanks to Josh Elsasser)
   * improvement: pretty-printing loop has been implemented properly. (thanks
     to Tobias Rittweiler)
   * documentation: CLOS slot typechecing policy has been documented.

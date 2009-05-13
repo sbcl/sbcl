@@ -7,17 +7,11 @@
 (define-alien-type os-context-register-t unsigned-long-long)
 
 
-;;;; MACHINE-TYPE and MACHINE-VERSION
+;;;; MACHINE-TYPE
 
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "MIPS")
-
-;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
-(defun get-machine-version ()
-  #!+little-endian "little-endian"
-  #!-little-endian "big-endian")
-
 
 ;;;; FIXUP-CODE-OBJECT
 

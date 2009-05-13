@@ -41,3 +41,6 @@
       (error "Unix system call getrusage failed: ~A." (strerror utime)))
     (values utime stime majflt)))
 
+;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
+(defun get-machine-version ()
+  nil)

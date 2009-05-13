@@ -4,7 +4,7 @@
 ;;;; Carnegie Mellon University, and has been placed in the public
 ;;;; domain.
 
-(in-package "SB!SYS")
+(in-package "SB!IMPL")
 
 ;;;; Check that target machine features are set up consistently with
 ;;;; this file.
@@ -12,25 +12,52 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (error "The :BSD feature is missing, we shouldn't be doing this code."))
 
+(define-alien-routine ("sysctl" %sysctl) int
+  (name (* int))
+  (namelen unsigned-int)
+  (oldp (* t))
+  (oldlenp (* sb!unix:size-t))
+  (newp (* t))
+  (newlen sb!unix:size-t))
+
+(defun sysctl (type &rest name)
+  #!+sb-doc
+  "Retrieves an integer or string value with the given name."
+  (let ((name-len (length name)))
+    (when (> name-len ctl-maxname)
+      (error "sysctl name ~S is too long" name))
+    (with-alien ((name-array (array int #.ctl-maxname))
+                 (result-len sb!unix:size-t))
+      (dotimes (off name-len)
+        (setf (deref name-array off) (elt name off)))
+      (ecase type
+        (:int
+         (with-alien ((result int))
+           (setf result-len (alien-size int :bytes))
+           (unless (minusp (%sysctl (cast name-array (* int)) name-len
+                                    (addr result) (addr result-len) nil 0))
+             result)))
+        (:str
+         (unless (minusp (%sysctl (cast name-array (* int)) name-len
+                                  nil (addr result-len) nil 0))
+           (with-alien ((result (* char) (make-alien char result-len)))
+             (if (minusp (%sysctl (cast name-array (* int)) name-len
+                                  result (addr result-len) nil 0))
+                 (free-alien result)
+                 (sb!unix::newcharstar-string result)))))))))
+
 (defun software-type ()
   #!+sb-doc
   "Return a string describing the supporting software."
-  (the string ; (to force error in case of unsupported BSD variant)
-       #!+FreeBSD "FreeBSD"
-       #!+OpenBSD "OpenBSD"
-       #!+NetBSD "NetBSD"
-       #!+Darwin "Darwin"))
+  (sysctl :str ctl-kern kern-ostype))
 
 (defun software-version ()
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
    if not available."
-  (or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (with-output-to-string (stream)
-                           (sb!ext:run-program "/usr/bin/uname" `("-r")
-                                               :output stream))))))
+  (or sb!sys::*software-version*
+      (setf sb!sys::*software-version*
+            (sysctl :str ctl-kern kern-osrelease))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
@@ -45,5 +72,11 @@
 
 ;;; Return the system page size.
 (defun get-page-size ()
-  ;; FIXME: probably should call getpagesize()
-  4096)
+  (sysctl :int ctl-hw hw-pagesize))
+
+;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
+(defun get-machine-version ()
+  ;; FIXME: on Darwin we would prefer machdep.cpu.brand_string -- but I can't
+  ;; seem to grab it using sysctl() -- but the shell tool finds it. When
+  ;; someone has the time, check out how Darwin shell sysctl does it.
+  (sysctl :str ctl-hw hw-model))

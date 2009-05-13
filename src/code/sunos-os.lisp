@@ -49,3 +49,7 @@
   ;; FIXME II: this could well be wrong
   #!+sparc 8192
   #!+(or x86 x86-64) 4096)
+
+;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
+(defun get-machine-version ()
+  nil)

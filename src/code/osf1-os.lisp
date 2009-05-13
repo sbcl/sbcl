@@ -47,3 +47,7 @@
   ;; FIXME: Or we could just get rid of this, since the uses of it look
   ;; disposable.
   4096)
+
+;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
+(defun get-machine-version ()
+  nil)

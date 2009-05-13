@@ -5,35 +5,11 @@
 (define-alien-type os-context-t (struct os-context-t-struct))
 
 
-;;;; MACHINE-TYPE and MACHINE-VERSION
+;;;; MACHINE-TYPE
 
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "PowerPC")
-
-;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
-(defun get-machine-version ()
-  #!+linux
-  (with-open-file (stream "/proc/cpuinfo"
-                          ;; /proc is optional even in Linux, so
-                          ;; fail gracefully.
-                          :if-does-not-exist nil)
-    (loop with line while (setf line (read-line stream nil))
-          ;; hoping "cpu" exists and gives something useful in
-          ;; all relevant Linuxen...
-          ;;
-          ;; from Lars Brinkhoff sbcl-devel 26 Jun 2003:
-          ;;   I examined different versions of Linux/PPC at
-          ;;   http://lxr.linux.no/ (the file that outputs
-          ;;   /proc/cpuinfo is arch/ppc/kernel/setup.c, if
-          ;;   you want to check), and all except 2.0.x
-          ;;   seemed to do the same thing as far as the
-          ;;   "cpu" field is concerned, i.e. it always
-          ;;   starts with the (C-syntax) string "cpu\t\t: ".
-          when (eql (search "cpu" line) 0)
-          return (string-trim " " (subseq line (1+ (position #\: line))))))
-  #!-linux
-  nil)
 
 ;;;; FIXUP-CODE-OBJECT
 

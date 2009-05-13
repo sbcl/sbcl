@@ -13,15 +13,11 @@
 ;;; See x86-vm.lisp for a description of this.
 (define-alien-type os-context-t (struct os-context-t-struct))
 
-;;;; MACHINE-TYPE and MACHINE-VERSION
+;;;; MACHINE-TYPE
 
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "SPARC")
-
-;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
-(defun get-machine-version ()
-  nil)
 
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))

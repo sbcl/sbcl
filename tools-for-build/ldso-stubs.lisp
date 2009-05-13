@@ -326,6 +326,8 @@ ldso_stub__ ## fct: ;                  \\
                    "dlerror"
                    "dlopen"
                    "dlsym")
+                 #!+bsd
+                 '("sysctl")
                  #!+os-provides-dladdr
                  '("dladdr")
                  #!-sunos ;; !defined(SVR4)
