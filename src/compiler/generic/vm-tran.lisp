@@ -106,7 +106,11 @@
           ((simple-array nil (*))
            (data-vector-ref string index))))))
 
-(deftransform hairy-data-vector-ref ((array index) (array t) *)
+;;; This and the corresponding -SET transform work equally well on non-simple
+;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
+;;; where it actually helped with non-simple arrays -- to the contrary, it
+;;; only made for bigger and up 1o 100% slower code.
+(deftransform hairy-data-vector-ref ((array index) (simple-array t) *)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
         (declared-element-ctype (extract-declared-element-type array)))
@@ -188,8 +192,12 @@
           ((simple-array nil (*))
            (data-vector-set string index new-value))))))
 
+;;; This and the corresponding -REF transform work equally well on non-simple
+;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
+;;; where it actually helped with non-simple arrays -- to the contrary, it
+;;; only made for bigger and up 1o 100% slower code.
 (deftransform hairy-data-vector-set ((array index new-value)
-                                     (array t t)
+                                     (simple-array t t)
                                      *)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
