@@ -845,7 +845,8 @@
              (declare (ignore extra-type))
              `(deftransform ,name ((array index ,@extra))
                 (let ((type (lvar-type array))
-                      (element-type (extract-upgraded-element-type array)))
+                      (element-type (extract-upgraded-element-type array))
+                      (declared-type (extract-declared-element-type array)))
                   ;; If an element type has been declared, we want to
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array
@@ -860,12 +861,19 @@
                               ;; to inline the access completely.
                               (not (null (array-type-complexp type))))
                       (give-up-ir1-transform
-                       "Upgraded element type of array is not known at compile time."))))
-                `(,',transform-to array
-                                  (%check-bound array
-                                                (array-dimension array 0)
-                                                index)
-                                  ,@',extra))))
+                       "Upgraded element type of array is not known at compile time.")))
+                  ,(if extra
+                       ``(truly-the ,declared-type
+                                    (,',transform-to array
+                                                     (%check-bound array
+                                                                   (array-dimension array 0)
+                                                                   index)
+                                                     (the ,declared-type ,@',extra)))
+                       ``(the ,declared-type
+                           (,',transform-to array
+                                            (%check-bound array
+                                                          (array-dimension array 0)
+                                                          index))))))))
   (define hairy-data-vector-ref/check-bounds
       hairy-data-vector-ref nil nil)
   (define hairy-data-vector-set/check-bounds

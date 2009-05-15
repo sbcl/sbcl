@@ -618,7 +618,7 @@
 (assert (equal (check-embedded-thes 3 0  2 :a) '(2 :a)))
 (assert (typep (check-embedded-thes 3 0  4 2.5f0) 'type-error))
 
-(assert (equal (check-embedded-thes 1 0  4 :b) '(4 :b)))
+(assert (equal (check-embedded-thes 1 0  3 :b) '(3 :b)))
 (assert (typep (check-embedded-thes 1 0  1.0 2.5f0) 'type-error))
 
 

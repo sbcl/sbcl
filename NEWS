@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * minor incompatible change: under weak type checking policy integer
+    types are weakened less aggressively.
   * minor incompatible change: SAVE-LISP-AND-DIE :TOPLEVEL function is now
     allowed to return, which causes SBCL to quit with exit status 0. Previously
     if the function returned with a small integer return value, that value

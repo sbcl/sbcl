@@ -528,8 +528,9 @@ provides full type checks.
 Used when @code{(or (>= safety 2) (>= safety speed 1))}.
 
 @item Weak Type Checks
-Declared types may be simplified into faster to check supertypes: for example,
-@code{(and unsigned-byte fixnum)} is simplified into @code{fixnum}.
+Declared types may be simplified into faster to check supertypes: for
+example, @code{(or (integer -17 -7) (integer 7 17))} is simplified
+into @code{(integer -17 17)}.
 
 @strong{Note}: it is relatively easy to corrupt the heap when weak
 type checks are used if the program contains type-errors.

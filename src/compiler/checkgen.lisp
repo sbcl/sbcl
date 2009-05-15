@@ -77,39 +77,69 @@
         (t
          (fun-guessed-cost 'typep)))))
 
+(defun weaken-integer-type (type)
+  (cond ((union-type-p type)
+         (let* ((types (union-type-types type))
+                (one (pop types))
+                (low (numeric-type-low one))
+                (high (numeric-type-high one)))
+           (flet ((maximize (bound)
+                    (if (and bound high)
+                        (setf high (max high bound))
+                        (setf high nil)))
+                  (minimize (bound)
+                    (if (and bound low)
+                        (setf low (min low bound))
+                        (setf low nil))))
+             (dolist (a types)
+               (minimize (numeric-type-low a))
+               (maximize (numeric-type-high a))))
+           (specifier-type `(integer ,(or low '*) ,(or high '*)))))
+        (t
+         (aver (integer-type-p type))
+         type)))
+
 (defun-cached
     (weaken-type :hash-bits 8
                  :hash-function (lambda (x)
                                   (logand (type-hash-value x) #xFF)))
     ((type eq))
   (declare (type ctype type))
-  (let ((min-cost (type-test-cost type))
-        (min-type type)
-        (found-super nil))
-    (dolist (x *backend-type-predicates*)
-      (let* ((stype (car x))
-             (samep (type= stype type)))
-        (when (or samep
-                  (and (csubtypep type stype)
-                       (not (union-type-p stype))))
-          (let ((stype-cost (type-test-cost stype)))
-            (when (or (< stype-cost min-cost)
-                      samep)
-              ;; If the supertype is equal in cost to the type, we
-              ;; prefer the supertype. This produces a closer
-              ;; approximation of the right thing in the presence of
-              ;; poor cost info.
-              (setq found-super t
-                    min-type stype
-                    min-cost stype-cost))))))
-    ;; This used to return the *UNIVERSAL-TYPE* if no supertype was found,
-    ;; but that's too liberal: it's far too easy for the user to create
-    ;; a union type (which are excluded above), and then trick the compiler
-    ;; into trusting the union type... and finally ending up corrupting the
-    ;; heap once a bad object sneaks past the missing type check.
-    (if found-super
-        min-type
-        type)))
+  (cond ((named-type-p type)
+         type)
+        ((csubtypep type (specifier-type 'integer))
+         ;; KLUDGE: Simple range checks are not that expensive, and we *don't*
+         ;; want to accidentally lose eg. array bounds checks due to weakening,
+         ;; so for integer types we simply collapse all ranges into one.
+         (weaken-integer-type type))
+        (t
+         (let ((min-cost (type-test-cost type))
+               (min-type type)
+               (found-super nil))
+           (dolist (x *backend-type-predicates*)
+             (let* ((stype (car x))
+                    (samep (type= stype type)))
+               (when (or samep
+                         (and (csubtypep type stype)
+                              (not (union-type-p stype))))
+                 (let ((stype-cost (type-test-cost stype)))
+                   (when (or (< stype-cost min-cost)
+                             samep)
+                     ;; If the supertype is equal in cost to the type, we
+                     ;; prefer the supertype. This produces a closer
+                     ;; approximation of the right thing in the presence of
+                     ;; poor cost info.
+                     (setq found-super t
+                           min-type stype
+                           min-cost stype-cost))))))
+           ;; This used to return the *UNIVERSAL-TYPE* if no supertype was found,
+           ;; but that's too liberal: it's far too easy for the user to create
+           ;; a union type (which are excluded above), and then trick the compiler
+           ;; into trusting the union type... and finally ending up corrupting the
+           ;; heap once a bad object sneaks past the missing type check.
+           (if found-super
+               min-type
+               type)))))
 
 (defun weaken-values-type (type)
   (declare (type ctype type))
