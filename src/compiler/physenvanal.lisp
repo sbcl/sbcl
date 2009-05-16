@@ -342,8 +342,9 @@
                                      (t
                                       (do-uses (use lvar)
                                         (unless (ref-p use)
-                                          (compiler-notify "could not stack allocate the result of ~S"
-                                                           (find-original-source (node-source-path use)))))
+                                          (let ((*compiler-error-context* use))
+                                            (compiler-notify "could not stack allocate the result of ~S"
+                                                             (find-original-source (node-source-path use))))))
                                       (setf (lvar-dynamic-extent lvar) nil)))))
                             (node       ; DX closure
                              (let* ((call what)
