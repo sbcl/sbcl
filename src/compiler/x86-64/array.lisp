@@ -343,7 +343,7 @@
                             complex-offset)
                          other-pointer-lowtag))))))
 
-(define-vop (data-vector-ref/simple-array-single-float)
+(define-vop (data-vector-ref-with-offset/simple-array-single-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -361,7 +361,7 @@
    (inst shr dword-index 1)
    (inst movss value (make-ea-for-float-ref object dword-index offset 4))))
 
-(define-vop (data-vector-ref-c/simple-array-single-float)
+(define-vop (data-vector-ref-c-with-offset/simple-array-single-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -375,7 +375,7 @@
   (:generator 4
    (inst movss value (make-ea-for-float-ref object index offset 4))))
 
-(define-vop (data-vector-set/simple-array-single-float)
+(define-vop (data-vector-set-with-offset/simple-array-single-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -397,7 +397,7 @@
    (unless (location= result value)
      (inst movss result value))))
 
-(define-vop (data-vector-set-c/simple-array-single-float)
+(define-vop (data-vector-set-c-with-offset/simple-array-single-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -415,7 +415,7 @@
    (unless (location= result value)
      (inst movss result value))))
 
-(define-vop (data-vector-ref/simple-array-double-float)
+(define-vop (data-vector-ref-with-offset/simple-array-double-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -444,7 +444,7 @@
   (:generator 6
    (inst movsd value (make-ea-for-float-ref object index offset 8))))
 
-(define-vop (data-vector-set/simple-array-double-float)
+(define-vop (data-vector-set-with-offset/simple-array-double-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -463,7 +463,7 @@
    (unless (location= result value)
      (inst movsd result value))))
 
-(define-vop (data-vector-set-c/simple-array-double-float)
+(define-vop (data-vector-set-c-with-offset/simple-array-double-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -484,7 +484,7 @@
 
 ;;; complex float variants
 
-(define-vop (data-vector-ref/simple-array-complex-single-float)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-single-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -503,7 +503,7 @@
       (inst movss imag-tn (make-ea-for-float-ref object index offset 8
                                                  :complex-offset 4)))))
 
-(define-vop (data-vector-ref-c/simple-array-complex-single-float)
+(define-vop (data-vector-ref-c-with-offset/simple-array-complex-single-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -521,7 +521,7 @@
       (inst movss imag-tn (make-ea-for-float-ref object index offset 8
                                                  :complex-offset 4)))))
 
-(define-vop (data-vector-set/simple-array-complex-single-float)
+(define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -549,7 +549,7 @@
       (unless (location= value-imag result-imag)
         (inst movss result-imag value-imag)))))
 
-(define-vop (data-vector-set-c/simple-array-complex-single-float)
+(define-vop (data-vector-set-c-with-offset/simple-array-complex-single-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -576,7 +576,7 @@
       (unless (location= value-imag result-imag)
         (inst movss result-imag value-imag)))))
 
-(define-vop (data-vector-ref/simple-array-complex-double-float)
+(define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -595,7 +595,7 @@
       (inst movsd imag-tn (make-ea-for-float-ref object index offset 16 :scale 2
                                                  :complex-offset 8)))))
 
-(define-vop (data-vector-ref-c/simple-array-complex-double-float)
+(define-vop (data-vector-ref-c-with-offset/simple-array-complex-double-float)
   (:note "inline array access")
   (:translate data-vector-ref-with-offset)
   (:policy :fast-safe)
@@ -613,7 +613,7 @@
       (inst movsd imag-tn (make-ea-for-float-ref object index offset 16 :scale 2
                                                  :complex-offset 8)))))
 
-(define-vop (data-vector-set/simple-array-complex-double-float)
+(define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -642,7 +642,7 @@
       (unless (location= value-imag result-imag)
         (inst movsd result-imag value-imag)))))
 
-(define-vop (data-vector-set-c/simple-array-complex-double-float)
+(define-vop (data-vector-set-c-with-offset/simple-array-complex-double-float)
   (:note "inline array store")
   (:translate data-vector-set-with-offset)
   (:policy :fast-safe)
@@ -676,7 +676,7 @@
 (macrolet ((define-data-vector-frobs (ptype mov-inst type
                                             8-bit-tns-p &rest scs)
   `(progn
-    (define-vop (,(symbolicate "DATA-VECTOR-REF/" ptype))
+    (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
       (:translate data-vector-ref-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg))
@@ -693,7 +693,7 @@
                        :disp (- (+ (* vector-data-offset n-word-bytes)
                                    offset)
                                 other-pointer-lowtag)))))
-    (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" ptype))
+    (define-vop (,(symbolicate "DATA-VECTOR-REF-C-WITH-OFFSET/" ptype))
       (:translate data-vector-ref-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg)))
@@ -709,7 +709,7 @@
                        :disp (- (+ (* vector-data-offset n-word-bytes)
                                    index offset)
                                 other-pointer-lowtag)))))
-    (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
+    (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
       (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -734,7 +734,7 @@
                                     other-pointer-lowtag))
               ,(if 8-bit-tns-p 'value 'al-tn))
         (move result ,(if 8-bit-tns-p 'value 'rax))))
-    (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" ptype))
+    (define-vop (,(symbolicate "DATA-VECTOR-SET-C-WITH-OFFSET/" ptype))
       (:translate data-vector-set-with-offset)
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -772,7 +772,7 @@
 ;;; unsigned-byte-16
 (macrolet ((define-data-vector-frobs (ptype mov-inst type &rest scs)
     `(progn
-      (define-vop (,(symbolicate "DATA-VECTOR-REF/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
         (:translate data-vector-ref-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
@@ -789,7 +789,7 @@
                          :disp (- (+ (* vector-data-offset n-word-bytes)
                                      (* offset 2))
                                   other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-REF-C-WITH-OFFSET/" ptype))
         (:translate data-vector-ref-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg)))
@@ -806,7 +806,7 @@
                                      (* 2 index)
                                      (* 2 offset))
                                   other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -831,7 +831,7 @@
                 ax-tn)
           (move result eax)))
 
-      (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-SET-C-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -864,7 +864,7 @@
 
 (macrolet ((define-data-vector-frobs (ptype mov-inst type &rest scs)
     `(progn
-      (define-vop (,(symbolicate "DATA-VECTOR-REF/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
         (:translate data-vector-ref-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
@@ -881,7 +881,7 @@
                          :disp (- (+ (* vector-data-offset n-word-bytes)
                                      (* offset 4))
                                   other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-REF-C-WITH-OFFSET/" ptype))
         (:translate data-vector-ref-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg)))
@@ -898,7 +898,7 @@
                                      (* 4 index)
                                      (* 4 offset))
                                   other-pointer-lowtag)))))
-      (define-vop (,(symbolicate "DATA-VECTOR-SET/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -923,7 +923,7 @@
                 eax-tn)
           (move result rax)))
 
-      (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" ptype))
+      (define-vop (,(symbolicate "DATA-VECTOR-SET-C-WITH-OFFSET/" ptype))
         (:translate data-vector-set-with-offset)
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg) :to (:eval 0))
