@@ -22,6 +22,9 @@
   * optimization: multidimensional array accesses in the absence of type
     information regarding array rank are approximately 10% faster due to
     open coding of ARRAY-RANK.
+  * optimization: result of (FILL (MAKE-ARRAY ...) ...) and (REPLACE
+    (MAKE-ARRAY ...) ...) can be stack allocated if the result of MAKE-ARRAY
+    form can be.
   * improvement: SBCL now emits a compiler note where stack allocation was
     requested but could not be provided.
   * improvement: better MACHINE-VERSION responses. (thanks to Josh Elsasser)

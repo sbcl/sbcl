@@ -14,7 +14,13 @@
            nil)
 
 (defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args) node dx)
-  (declare (ignore node dx))
+  t)
+
+(defoptimizer (make-array stack-allocate-result) ((&rest args) node dx)
+  ;; The actual stack allocation decision will be made on the basis of what
+  ;; ALLOCATE-VECTOR, but this is needed so that (FILL (MAKE-ARRAY N) X) and
+  ;; (REPLACE (MAKE-ARRAY (LENGTH V)) V) can potentially stack allocate the
+  ;; new vector.
   t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)

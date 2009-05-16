@@ -422,8 +422,15 @@
 
 (defun known-dx-combination-p (use dx)
   (and (eq (combination-kind use) :known)
-       (awhen (fun-info-stack-allocate-result (combination-fun-info use))
-         (funcall it use dx))))
+       (let ((info (combination-fun-info use)))
+         (or (awhen (fun-info-stack-allocate-result info)
+               (funcall it use dx))
+             (awhen (fun-info-result-arg info)
+               (let ((args (combination-args use)))
+                 (lvar-good-for-dx-p (if (zerop it)
+                                         (car args)
+                                         (nth it args))
+                                     dx)))))))
 
 (defun dx-combination-p (use dx)
   (and (combination-p use)

@@ -131,7 +131,10 @@
   (templates nil :type list)
   ;; If non-null, then this function is a unary type predicate for
   ;; this type.
-  (predicate-type nil :type (or ctype null)))
+  (predicate-type nil :type (or ctype null))
+  ;; If non-null, the index of the argument which becomes the result
+  ;; of the function.
+  (result-arg nil :type (or index null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))
@@ -200,12 +203,14 @@
                                 (:destroyed-constant-args (or function null)))
                           *)
                 %defknown))
-(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args)
+(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args
+                  result-arg)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type
                              :optimizer optimizer
-                             :destroyed-constant-args destroyed-constant-args))
+                             :destroyed-constant-args destroyed-constant-args
+                             :result-arg result-arg))
         (target-env *info-environment*))
     (dolist (name names)
       (let ((old-fun-info (info :function :info name)))

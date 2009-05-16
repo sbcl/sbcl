@@ -485,13 +485,15 @@
                          (:start index) (:end sequence-end)) sequence
   (unsafe)
   :derive-type #'result-type-first-arg
-  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1)
+  :result-arg 0)
 
 (defknown replace (sequence sequence &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
   :derive-type #'result-type-first-arg
-  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1)
+  :result-arg 0)
 
 (defknown remove
   (t sequence &rest t &key (:from-end t) (:test callable)

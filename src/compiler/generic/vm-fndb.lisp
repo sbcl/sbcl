@@ -88,6 +88,10 @@
 (defknown %set-symbol-hash (symbol hash)
   t (unsafe))
 
+(defknown vector-fill* (t t t t) vector
+  (unsafe)
+  :result-arg 0)
+
 (defknown vector-length (vector) index (flushable))
 
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
