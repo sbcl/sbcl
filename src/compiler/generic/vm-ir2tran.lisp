@@ -16,13 +16,6 @@
 (defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args) node dx)
   t)
 
-(defoptimizer (make-array stack-allocate-result) ((&rest args) node dx)
-  ;; The actual stack allocation decision will be made on the basis of what
-  ;; ALLOCATE-VECTOR, but this is needed so that (FILL (MAKE-ARRAY N) X) and
-  ;; (REPLACE (MAKE-ARRAY (LENGTH V)) V) can potentially stack allocate the
-  ;; new vector.
-  t)
-
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar
@@ -161,6 +154,52 @@
       (emit-fixed-alloc node block name words type lowtag result lvar)
       (emit-inits node block name result lowtag words `((:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
+
+(defoptimizer (initialize-vector ir2-convert)
+    ((vector &rest initial-contents) node block)
+  (let* ((vector-ctype (lvar-type vector))
+         (elt-ctype (if (array-type-p vector-ctype)
+                        (array-type-specialized-element-type vector-ctype)
+                        (bug "Unknow vector type in IR2 conversion for ~S."
+                             'initialize-vector)))
+         (saetp (find-saetp-by-ctype elt-ctype))
+         (lvar (node-lvar node))
+         (locs (lvar-result-tns lvar (list (primitive-type vector-ctype))))
+         (result (first locs))
+         (elt-ptype (primitive-type elt-ctype))
+         (tmp (make-normal-tn elt-ptype)))
+    (emit-move node block (lvar-tn node block vector) result)
+    (flet ((compute-setter ()
+             (macrolet
+                 ((frob ()
+                    (let ((*package* (find-package :sb!vm))
+                          (clauses nil))
+                      (map nil (lambda (s)
+                                 (when (sb!vm:saetp-specifier s)
+                                   (push
+                                    `(,(sb!vm:saetp-typecode s)
+                                       (lambda (index tn)
+                                         #!+(or x86 x86-64)
+                                         (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
+                                                            (sb!vm:saetp-primitive-type-name s))
+                                              node block result index tn 0 tn)
+                                         #!-(or x86 x86-64)
+                                         (vop ,(symbolicate "DATA-VECTOR-SET/"
+                                                            (sb!vm:saetp-primitive-type-name s))
+                                              node block result index tn tn)))
+                                    clauses)))
+                           sb!vm:*specialized-array-element-type-properties*)
+                      `(ecase (sb!vm:saetp-typecode saetp)
+                         ,@(nreverse clauses)))))
+               (frob)))
+           (tnify (index)
+             (constant-tn (find-constant index))))
+      (let ((setter (compute-setter))
+            (length (length initial-contents)))
+        (dotimes (i length)
+          (emit-move node block (lvar-tn node block (pop initial-contents)) tmp)
+          (funcall setter (tnify i) tmp))))
+    (move-lvar-result node block locs lvar)))
 
 ;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options

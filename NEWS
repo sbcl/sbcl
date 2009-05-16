@@ -25,8 +25,18 @@
   * optimization: result of (FILL (MAKE-ARRAY ...) ...) and (REPLACE
     (MAKE-ARRAY ...) ...) can be stack allocated if the result of MAKE-ARRAY
     form can be.
+  * optimization: result of call to VECTOR can now be stack allocated.
+  * optimization: MAKE-ARRAY with :INITIAL-CONTENTS is now vastly faster
+    as long as the resulting array is one-dimensional and has a known
+    element type. In particular, :INITIAL-CONTENTS (LIST ...) where the
+    length of the list matches the known length of the vector does not
+    allocate the list as an intermediate step. Ditto for VECTOR and simple
+    backquoted forms.
+  * optimization: MAKE-ARRAY can now stack allocate in the presence of
+    :INITIAL-CONTENTS and :INITIAL-ELEMENT as long as the result has a
+    known element type, and is known to be simple and one dimensional.
   * improvement: SBCL now emits a compiler note where stack allocation was
-    requested but could not be provided.
+    requested but could not be provided (not in all cases, unfortunately)
   * improvement: better MACHINE-VERSION responses. (thanks to Josh Elsasser)
   * improvement: pretty-printing loop has been implemented properly. (thanks
     to Tobias Rittweiler)

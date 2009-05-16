@@ -1554,9 +1554,9 @@
 ;;; arguments.
 (defun splice-fun-args (lvar fun num-args)
   #!+sb-doc
-  "If LVAR is a call to FUN with NUM-ARGS args, change those arguments
-   to feed directly to the LVAR-DEST of LVAR, which must be a
-   combination."
+  "If LVAR is a call to FUN with NUM-ARGS args, change those arguments to feed
+directly to the LVAR-DEST of LVAR, which must be a combination. If FUN
+is :ANY, the function name is not checked."
   (declare (type lvar lvar)
            (type symbol fun)
            (type index num-args))
@@ -1566,7 +1566,8 @@
     (unless (combination-p inside)
       (give-up-ir1-transform))
     (let ((inside-fun (combination-fun inside)))
-      (unless (eq (lvar-fun-name inside-fun) fun)
+      (unless (or (eq fun :any)
+                  (eq (lvar-fun-name inside-fun) fun))
         (give-up-ir1-transform))
       (let ((inside-args (combination-args inside)))
         (unless (= (length inside-args) num-args)
@@ -1587,7 +1588,40 @@
                 (combination-kind inside) :known)
           (setf (node-derived-type inside) *wild-type*)
           (flush-dest lvar)
-          (values))))))
+          inside-args)))))
+
+;;; Eliminate keyword arguments from the call (leaving the
+;;; parameters in place.
+;;;
+;;;    (FOO ... :BAR X :QUUX Y)
+;;; becomes
+;;;    (FOO ... X Y)
+;;;
+;;; SPECS is a list of (:KEYWORD PARAMETER) specifications.
+;;; Returns the list of specified parameters names in the
+;;; order they appeared in the call. N-POSITIONAL is the
+;;; number of positional arguments in th call.
+(defun eliminate-keyword-args (call n-positional specs)
+  (let* ((specs (copy-tree specs))
+         (all (combination-args call))
+         (new-args (reverse (subseq all 0 n-positional)))
+         (key-args (subseq all n-positional))
+         (parameters nil))
+    (loop while key-args
+          do (let* ((key (pop key-args))
+                    (val (pop key-args))
+                    (keyword (if (constant-lvar-p key)
+                                 (lvar-value key)
+                                 (give-up-ir1-transform)))
+                    (spec (or (assoc keyword specs :test #'eq)
+                              (give-up-ir1-transform))))
+               (push val new-args)
+               (flush-dest key)
+               (push (second spec) parameters)
+               ;; In case of duplicate keys.
+               (setf (second spec) (gensym))))
+    (setf (combination-args call) (reverse new-args))
+    (reverse parameters)))
 
 (defun extract-fun-args (lvar fun num-args)
   (declare (type lvar lvar)
@@ -2040,3 +2074,12 @@
                 (eq (global-var-kind leaf) :global-function)
                 (not (null (member (leaf-source-name leaf) names
                                    :test #'equal))))))))
+
+(defun lvar-matches (lvar &key fun-names arg-count)
+  (let ((use (lvar-use lvar)))
+    (and (combination-p use)
+         (or (not fun-names)
+             (member (combination-fun-source-name use)
+                     fun-names :test #'eq))
+         (or (not arg-count)
+             (= arg-count (length (combination-args use)))))))

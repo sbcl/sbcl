@@ -93,14 +93,14 @@ useful. At present, SBCL implements stack allocation for
 @code{&rest} lists, when these are declared @code{dynamic-extent}.
 
 @item
-@code{cons}, @code{list} and @code{list*}, when the result is bound to
-a variable declared @code{dynamic-extent}.
+@code{cons}, @code{list}, @code{list*}, and @code{vector} when the
+result is bound to a variable declared @code{dynamic-extent}.
 
 @item
 simple forms of @code{make-array}, whose result is bound to a variable
 declared @code{dynamic-extent}: stack allocation is possible only if
-the resulting array is one-dimensional, and the call has no keyword
-arguments with the exception of @code{:element-type}.
+the resulting array is known to be both simple and one-dimensional,
+and has a constant @code{:element-type}.
 
 @strong{Note}: stack space is limited, so allocation of a large vector
 may cause stack overflow. For this reason potentially large vectors,

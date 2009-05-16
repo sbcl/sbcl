@@ -209,6 +209,10 @@ enough to eliminate something like ':initial-element 0'.  Such an optimization
 is valid if the vector is being allocated in the heap, but not if it is being
 allocated on the stack.  You could remove this optimization, but that makes
 the heap-allocated case somewhat slower...)
+
+To do this, extend ALLOCATE-VECTOR with ALLOW-JUNK argument, and when
+stack allocating don't zero if it is true -- and probably ALLOW-JUNK iff
+the vector is a specialized one (cannot have pointers.)
 --------------------------------------------------------------------------------
 #28
 a. Accessing raw slots in structure instances is more inefficient than

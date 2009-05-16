@@ -88,6 +88,11 @@
 (defknown %set-symbol-hash (symbol hash)
   t (unsafe))
 
+(defknown initialize-vector ((simple-array * (*)) &rest t)
+  (simple-array * (*))
+  (always-translatable)
+  :result-arg 0)
+
 (defknown vector-fill* (t t t t) vector
   (unsafe)
   :result-arg 0)

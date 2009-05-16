@@ -1289,6 +1289,7 @@
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
+        (maybe-propagate-dynamic-extent call new-fun)
         (locall-analyze-component *current-component*))))
   (values))
 

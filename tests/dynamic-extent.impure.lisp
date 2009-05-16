@@ -147,15 +147,51 @@
 
 ;;; MAKE-ARRAY
 
-(defun-with-dx make-array-on-stack ()
+(defun force-make-array-on-stack (n)
+  (declare (optimize safety))
+  (let ((v (make-array (min n 1))))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-1 ()
   (let ((v (make-array '(42) :element-type 'single-float)))
     (declare (dynamic-extent v))
     (true v)
     nil))
 
-(defun force-make-array-on-stack (n)
-  (declare (optimize safety))
-  (let ((v (make-array (min n 1))))
+(defun-with-dx make-array-on-stack-2 (n x)
+  (declare (integer n))
+  (let ((v (make-array n :initial-contents x)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-3 (x y z)
+  (let ((v (make-array 3
+                       :element-type 'fixnum :initial-contents (list x y z)
+                       :element-type t :initial-contents x)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-4 ()
+  (let ((v (make-array 3 :initial-contents '(1 2 3))))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+;;; Unfortunately VECTOR-FILL* conses right now, so this one
+;;; doesn't pass yet.
+#+nil
+(defun-with-dx make-array-on-stack-5 ()
+  (let ((v (make-array 3 :initial-element 12 :element-type t)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx vector-on-stack (x y)
+  (let ((v (vector 1 x 2 y 3)))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
     nil))
@@ -483,8 +519,14 @@
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
   (assert-no-consing (cons-on-stack 42))
-  (assert-no-consing (make-array-on-stack))
   (assert-no-consing (force-make-array-on-stack 128))
+  (assert-no-consing (make-array-on-stack-1))
+  (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
+  (assert-no-consing (make-array-on-stack-3 9 8 7))
+  (assert-no-consing (make-array-on-stack-4))
+  #+nil
+  (assert-no-consing (make-array-on-stack-5))
+  (assert-no-consing (vector-on-stack :x :y))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
   (#+raw-instance-init-vops assert-no-consing
