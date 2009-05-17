@@ -21,7 +21,7 @@
               initial-element-default
               n-bits
               primitive-type-name
-              &key (n-pad-elements 0) complex-typecode (importance 0)
+              &key (n-pad-elements 0) complex-typecode (importance 0) fixnum-p
               &aux (typecode
                     (symbol-value (symbolicate primitive-type-name "-WIDETAG")))))
             (:copier nil))
@@ -30,6 +30,8 @@
   ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
   ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
   (ctype nil :type (or ctype null))
+  ;; true if the elements are tagged fixnums
+  (fixnum-p nil :type boolean :read-only t)
   ;; what we get when the low-level vector-creation logic zeroes all
   ;; the bits (which also serves as the default value of MAKE-ARRAY's
   ;; :INITIAL-ELEMENT keyword)
@@ -115,14 +117,16 @@
           :importance 12)
          #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
          ((unsigned-byte 29) 0 32 simple-array-unsigned-byte-29
-          :importance 8)
+          :importance 8
+          :fixnum-p t)
          ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31
           :importance 11)
          ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32
           :importance 11)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
          ((unsigned-byte 60) 0 64 simple-array-unsigned-byte-60
-          :importance 8)
+          :importance 8
+          :fixnum-p t)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
          ((unsigned-byte 63) 0 64 simple-array-unsigned-byte-63
           :importance 9)
@@ -138,13 +142,15 @@
          ;; not (SIGNED-BYTE 30)
          #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
          (fixnum 0 32 simple-array-signed-byte-30
-          :importance 8)
+          :importance 8
+          :fixnum-p t)
          ((signed-byte 32) 0 32 simple-array-signed-byte-32
           :importance 7)
          ;; KLUDGE: see above KLUDGE for the 32-bit case
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
          (fixnum 0 64 simple-array-signed-byte-61
-          :importance 8)
+          :importance 8
+          :fixnum-p t)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
          ((signed-byte 64) 0 64 simple-array-signed-byte-64
           :importance 7)
@@ -159,6 +165,18 @@
           simple-array-complex-long-float
           :importance 1)
          (t 0 #.sb!vm:n-word-bits simple-vector :importance 18))))
+
+(defun valid-bit-bash-saetp-p (saetp)
+  ;; BIT-BASHing isn't allowed on simple vectors that contain pointers
+  (and (not (eq t (sb!vm:saetp-specifier saetp)))
+       ;; Disallowing (VECTOR NIL) also means that we won't transform
+       ;; sequence functions into bit-bashing code and we let the
+       ;; generic sequence functions signal errors if necessary.
+       (not (zerop (sb!vm:saetp-n-bits saetp)))
+       ;; Due to limitations with the current BIT-BASHing code, we can't
+       ;; BIT-BASH reliably on arrays whose element types are larger
+       ;; than the word size.
+       (<= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)))
 
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list

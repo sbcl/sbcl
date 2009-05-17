@@ -520,22 +520,18 @@
                     (end end)
                     :force-inline t
                     :check-fill-pointer t)
-    (macrolet ((frob ()
-                 `(locally (declare (optimize (safety 0) (speed 3)))
-                    (do ((i start (1+ i)))
-                        ((= i end) sequence)
-                     (declare (index i))
-                     (setf (aref data i) item)))))
-      (etypecase data
-        #!+sb-unicode
-        ((simple-array character (*))
-         (let ((item (locally (declare (optimize (safety 3)))
-                       (the character item))))
-           (frob)))
-        ((simple-array base-char (*))
-         (let ((item (locally (declare (optimize (safety 3)))
-                       (the base-char item))))
-           (frob)))))))
+    ;; DEFTRANSFORM for FILL will turn these into
+    ;; calls to UB*-BASH-FILL.
+    (etypecase data
+      #!+sb-unicode
+      ((simple-array character (*))
+       (let ((item (locally (declare (optimize (safety 3)))
+                     (the character item))))
+         (fill data item :start start :end end)))
+      ((simple-array base-char (*))
+       (let ((item (locally (declare (optimize (safety 3)))
+                     (the base-char item))))
+         (fill data item :start start :end end))))))
 
 (defun fill (sequence item &key (start 0) end)
   #!+sb-doc

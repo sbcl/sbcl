@@ -516,9 +516,90 @@
                     (vector t &key (:start t) (:end t))
                     *
                     :node node)
-  (let ((type (lvar-type seq))
-        (element-type (type-specifier (extract-upgraded-element-type seq))))
-    (cond ((and (neq '* element-type) (policy node (> speed space)))
+  (let* ((element-ctype (extract-upgraded-element-type seq))
+         (element-type (type-specifier element-ctype))
+         (type (lvar-type seq))
+         (saetp (unless (eq *wild-type* element-ctype)
+                  (find-saetp-by-ctype element-ctype))))
+    (cond ((eq *wild-type* element-ctype)
+           (delay-ir1-transform node :constraint)
+           `(vector-fill* seq item start end))
+          ((and saetp (sb!vm::valid-bit-bash-saetp-p saetp))
+           (let* ((n-bits (sb!vm:saetp-n-bits saetp))
+                  (basher-name (format nil "UB~D-BASH-FILL" n-bits))
+                  (basher (or (find-symbol basher-name
+                                           (load-time-value (find-package :sb!kernel)))
+                              (abort-ir1-transform
+                               "Unknown fill basher, please report to sbcl-devel: ~A"
+                               basher-name)))
+                  (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
+                              ((member element-type '(character base-char)) :char)
+                              ((eq element-type 'single-float) :single-float)
+                              ((eq element-type 'double-float) :double-float)
+                              (t :bits)))
+                  ;; BASH-VALUE is a word that we can repeatedly smash
+                  ;; on the array: for less-than-word sized elements it
+                  ;; contains multiple copies of the fill item.
+                  (bash-value
+                   (if (constant-lvar-p item)
+                       (let ((tmp (lvar-value item)))
+                         (unless (ctypep tmp element-ctype)
+                           (abort-ir1-transform "~S is not ~S" tmp element-type))
+                         (let* ((bits
+                                 (ldb (byte n-bits 0)
+                                      (ecase kind
+                                        (:tagged
+                                         (ash tmp sb!vm:n-fixnum-tag-bits))
+                                        (:char
+                                         (char-code tmp))
+                                        (:bits
+                                         tmp)
+                                        (:single-float
+                                         (single-float-bits tmp))
+                                        (:double-float
+                                         (logior (ash (double-float-high-bits tmp) 32)
+                                                 (double-float-low-bits tmp))))))
+                                (res bits))
+                           (loop for i of-type sb!vm:word from n-bits by n-bits
+                                 until (= i sb!vm:n-word-bits)
+                                 do (setf res (ldb (byte sb!vm:n-word-bits 0)
+                                                   (logior res (ash bits i)))))
+                           res))
+                       `(let* ((bits (ldb (byte ,n-bits 0)
+                                          ,(ecase kind
+                                                  (:tagged
+                                                   `(ash item ,sb!vm:n-fixnum-tag-bits))
+                                                  (:char
+                                                   `(char-code item))
+                                                  (:bits
+                                                   `item)
+                                                  (:single-float
+                                                   `(single-float-bits item))
+                                                  (:double-float
+                                                   `(logior (ash (double-float-high-bits item) 32)
+                                                            (double-float-low-bits item))))))
+                               (res bits))
+                          (declare (type sb!vm:word res))
+                          ,@(unless (= sb!vm:n-word-bits n-bits)
+                                    `((loop for i of-type sb!vm:word from ,n-bits by ,n-bits
+                                            until (= i sb!vm:n-word-bits)
+                                            do (setf res
+                                                     (ldb (byte ,sb!vm:n-word-bits 0)
+                                                          (logior res (ash bits (truly-the (integer 0 ,(- sb!vm:n-word-bits n-bits)) i))))))))
+                          res))))
+             (values
+              `(with-array-data ((data seq)
+                                 (start start)
+                                 (end end)
+                                 :check-fill-pointer t)
+                 (declare (type (simple-array ,element-type 1) data))
+                 (declare (type index start end))
+                 (declare (optimize (safety 0) (speed 3))
+                          (muffle-conditions compiler-note))
+                 (,basher ,bash-value data start (- end start))
+                 seq)
+              `((declare (type ,element-type item))))))
+          ((policy node (> speed space))
            (values
             `(with-array-data ((data seq)
                                (start start)
@@ -625,20 +706,6 @@
 (def!constant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
-(eval-when (:compile-toplevel)
-(defun valid-bit-bash-saetp-p (saetp)
-  ;; BIT-BASHing isn't allowed on simple vectors that contain pointers
-  (and (not (eq t (sb!vm:saetp-specifier saetp)))
-       ;; Disallowing (VECTOR NIL) also means that we won't transform
-       ;; sequence functions into bit-bashing code and we let the
-       ;; generic sequence functions signal errors if necessary.
-       (not (zerop (sb!vm:saetp-n-bits saetp)))
-       ;; Due to limitations with the current BIT-BASHing code, we can't
-       ;; BIT-BASH reliably on arrays whose element types are larger
-       ;; than the word size.
-       (<= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)))
-) ; EVAL-WHEN
-
 ;;; FIXME: In the copy loops below, we code the loops in a strange
 ;;; fashion:
 ;;;
@@ -694,7 +761,7 @@
                 (unless (<= 0 start2 end2 len2)
                   (sequence-bounding-indices-bad-error seq2 start2 end2))))
           ,',(cond
-               ((and saetp (valid-bit-bash-saetp-p saetp))
+               ((and saetp (sb!vm:valid-bit-bash-saetp-p saetp))
                 (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
                        (bash-function (intern (format nil "UB~D-BASH-COPY"
                                                       n-element-bits)

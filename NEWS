@@ -14,6 +14,9 @@
     the symbol, prohibits both lexical and dynamic binding. This is mainly an
     efficiency measure for threaded platforms, but also valueable in
     expressing intent.
+  * optimization: the compiler uses a specialized version of FILL when the
+    element type is know in more cases, making eg. (UNSIGNED-BYTE 8) case
+    almost 90% faster.
   * optimization: accesses to potentially non-simple arrays where element type
     is known are 50% faster.
   * optimization: compiler now generates faster array typechecking code.

@@ -957,7 +957,8 @@
                                      standard bashed)
               ;; fill vectors
               ;; a) the standard slow way
-              (fill standard c :start offset :end (+ offset n))
+              (locally (declare (notinline fill))
+                (fill standard c :start offset :end (+ offset n)))
               ;; b) the blazingly fast way
               (let ((value (loop for i from 0 by bitsize
                                  until (= i sb-vm:n-word-bits)

@@ -343,11 +343,14 @@
                     (not (eql default-initial-element (lvar-value initial-element)))))
            (let ((parameters (eliminate-keyword-args
                               call 1 '((:element-type element-type)
-                                       (:initial-element initial-element)))))
+                                       (:initial-element initial-element))))
+                 (init (if (constant-lvar-p initial-element)
+                           (lvar-value initial-element)
+                           'initial-element)))
              `(lambda (length ,@parameters)
                 (declare (ignorable ,@parameters))
                 (truly-the ,result-spec
-                           (fill ,alloc-form (the ,elt-spec initial-element))))))
+                           (fill ,alloc-form (the ,elt-spec ,init))))))
           ;; just :ELEMENT-TYPE, or maybe with :INITIAL-ELEMENT EQL to the
           ;; default
           (t

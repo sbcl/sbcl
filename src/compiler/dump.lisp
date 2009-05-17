@@ -610,10 +610,6 @@
      (dump-complex-double-float (realpart x) (imagpart x) file))
     #!+long-float
     ((complex long-float)
-     ;; (There's no easy way to mix #!+LONG-FLOAT and #-SB-XC-HOST
-     ;; conditionalization at read time, so we do this SB-XC-HOST
-     ;; conditional at runtime instead.)
-     #+sb-xc-host (error "can't dump COMPLEX-LONG-FLOAT in cross-compiler")
      (dump-fop 'fop-complex-long-float file)
      (dump-long-float (realpart x) file)
      (dump-long-float (imagpart x) file))
