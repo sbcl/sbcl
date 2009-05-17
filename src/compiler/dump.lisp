@@ -568,12 +568,10 @@
 
 (defun dump-complex (x file)
   (typecase x
-    #-sb-xc-host
     ((complex single-float)
      (dump-fop 'fop-complex-single-float file)
      (dump-integer-as-n-bytes (single-float-bits (realpart x)) 4 file)
      (dump-integer-as-n-bytes (single-float-bits (imagpart x)) 4 file))
-    #-sb-xc-host
     ((complex double-float)
      (dump-fop 'fop-complex-double-float file)
      (let ((re (realpart x)))

@@ -2896,3 +2896,13 @@
       (assert (= 1 n))
       (compile nil `(lambda (x) (the 'fixnum x)))
       (assert (= 2 n)))))
+
+(with-test (:name :complex-subtype-dumping-in-xc)
+  (assert
+   (= sb-vm:complex-single-float-widetag
+      (sb-kernel:widetag-of
+       (sb-vm:saetp-initial-element-default (sb-c::find-saetp '(complex single-float))))))
+  (assert
+   (= sb-vm:complex-double-float-widetag
+      (sb-kernel:widetag-of
+       (sb-vm:saetp-initial-element-default (sb-c::find-saetp '(complex double-float)))))))
