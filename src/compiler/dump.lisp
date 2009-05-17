@@ -566,22 +566,48 @@
      (dump-fop 'fop-long-float file)
      (dump-long-float x file))))
 
+(defun dump-complex-single-float (re im file)
+  (declare (single-float re im))
+  (dump-fop 'fop-complex-single-float file)
+  (dump-integer-as-n-bytes (single-float-bits re) 4 file)
+  (dump-integer-as-n-bytes (single-float-bits im) 4 file))
+
+(defun dump-complex-double-float (re im file)
+  (declare (double-float re im))
+  (dump-fop 'fop-complex-double-float file)
+  (dump-integer-as-n-bytes (double-float-low-bits re) 4 file)
+  (dump-integer-as-n-bytes (double-float-high-bits re) 4 file)
+  (dump-integer-as-n-bytes (double-float-low-bits im) 4 file)
+  (dump-integer-as-n-bytes (double-float-high-bits im) 4 file))
+
+(defun dump-complex-rational (re im file)
+  (sub-dump-object re file)
+  (sub-dump-object im file)
+  (dump-fop 'fop-complex file))
+
+#+sb-xc-host
+(defun dump-complex (x file)
+  (let ((re (realpart x))
+        (im (imagpart x)))
+    (cond ((and (typep re 'single-float)
+                (typep im 'single-float))
+           (dump-complex-single-float re im file))
+          ((and (typep re 'double-float)
+                (typep im 'double-float))
+           (dump-complex-double-float re im file))
+          ((and (typep re 'rational)
+                (typep im 'rational))
+           (dump-complex-rational re im file))
+          (t
+           (bug "Complex number too complex: ~S" x)))))
+
+#-sb-xc-host
 (defun dump-complex (x file)
   (typecase x
     ((complex single-float)
-     (dump-fop 'fop-complex-single-float file)
-     (dump-integer-as-n-bytes (single-float-bits (realpart x)) 4 file)
-     (dump-integer-as-n-bytes (single-float-bits (imagpart x)) 4 file))
+     (dump-complex-single-float (realpart x) (imagpart x) file))
     ((complex double-float)
-     (dump-fop 'fop-complex-double-float file)
-     (let ((re (realpart x)))
-       (declare (double-float re))
-       (dump-integer-as-n-bytes (double-float-low-bits re) 4 file)
-       (dump-integer-as-n-bytes (double-float-high-bits re) 4 file))
-     (let ((im (imagpart x)))
-       (declare (double-float im))
-       (dump-integer-as-n-bytes (double-float-low-bits im) 4 file)
-       (dump-integer-as-n-bytes (double-float-high-bits im) 4 file)))
+     (dump-complex-double-float (realpart x) (imagpart x) file))
     #!+long-float
     ((complex long-float)
      ;; (There's no easy way to mix #!+LONG-FLOAT and #-SB-XC-HOST
@@ -592,9 +618,7 @@
      (dump-long-float (realpart x) file)
      (dump-long-float (imagpart x) file))
     (t
-     (sub-dump-object (realpart x) file)
-     (sub-dump-object (imagpart x) file)
-     (dump-fop 'fop-complex file))))
+     (dump-complex-rational (realpart x) (imagpart x) file))))
 
 ;;;; symbol dumping
 
