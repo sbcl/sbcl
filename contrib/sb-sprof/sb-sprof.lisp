@@ -562,14 +562,11 @@ profiling")
               (with-alien ((scp (* os-context-t) :local scp))
                 (let* ((pc-ptr (sb-vm:context-pc scp))
                        (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
-                  ;; For some reason completely bogus small values for the
-                  ;; frame pointer are returned every now and then, leading
-                  ;; to segfaults. Try to avoid these cases.
-                  ;;
-                  ;; FIXME: Do a more thorough sanity check on ebp, or figure
-                  ;; out why this is happening.
-                  ;; -- JES, 2005-01-11
-                  (when (< fp 4096)
+                  ;; foreign code might not have a useful frame
+                  ;; pointer in ebp/rbp, so make sure it looks
+                  ;; reasonable before walking the stack
+                  (unless (sb-di::control-stack-pointer-valid-p (sb-sys:int-sap fp))
+                    (record samples pc-ptr)
                     (return-from sigprof-handler nil))
                   (incf (samples-trace-count samples))
                   (pushnew self (samples-sampled-threads samples))
