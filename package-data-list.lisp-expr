@@ -1100,7 +1100,6 @@ possibly temporariliy, because it might be used internally."
                "READ-SEQUENCE-OR-DIE"
                "RENAME-KEY-ARGS"
                "MISSING-ARG"
-               "UNIX-NAMESTRING" ; FIXME: perhaps belongs in package SB!UNIX
                "FEATUREP"
                "FLUSH-STANDARD-OUTPUT-STREAMS"
                "WITH-UNIQUE-NAMES" "MAKE-GENSYM-LIST"

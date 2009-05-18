@@ -437,49 +437,6 @@
            (multiple-value-setq (q r) (truncate q 10))
            (setf (schar res i) (schar "0123456789" r))))))
 
-;;;; UNIX-NAMESTRING
-
-(defun empty-relative-pathname-spec-p (x)
-  (or (equal x "")
-      (and (pathnamep x)
-           (or (equal (pathname-directory x) '(:relative))
-               ;; KLUDGE: I'm not sure this second check should really
-               ;; have to be here. But on sbcl-0.6.12.7,
-               ;; (PATHNAME-DIRECTORY (PATHNAME "")) is NIL, and
-               ;; (PATHNAME "") seems to act like an empty relative
-               ;; pathname, so in order to work with that, I test
-               ;; for NIL here. -- WHN 2001-05-18
-               (null (pathname-directory x)))
-           (null (pathname-name x))
-           (null (pathname-type x)))
-      ;; (The ANSI definition of "pathname specifier" has
-      ;; other cases, but none of them seem to admit the possibility
-      ;; of being empty and relative.)
-      ))
-
-;;; Convert PATHNAME into a string that can be used with UNIX system
-;;; calls, or return NIL if no match is found. Wild-cards are expanded.
-;;;
-;;; FIXME: apart from the error checking (for wildness and for
-;;; existence) and conversion to physical pathanme, this is redundant
-;;; with UNPARSE-NATIVE-UNIX-NAMESTRING; one should probably be
-;;; written in terms of the other.
-;;;
-;;; FIXME: actually this (I think) works not just for Unix.
-(defun unix-namestring (pathname-spec &optional (for-input t))
-  (let* ((namestring (physicalize-pathname (merge-pathnames pathname-spec)))
-         (matches nil)) ; an accumulator for actual matches
-    (when (wild-pathname-p namestring)
-      (error 'simple-file-error
-             :pathname namestring
-             :format-control "bad place for a wild pathname"))
-    (!enumerate-matches (match namestring nil :verify-existence for-input)
-                        (push match matches))
-    (case (length matches)
-      (0 nil)
-      (1 (first matches))
-      (t (bug "!ENUMERATE-MATCHES returned more than one match on a non-wild pathname")))))
-
 ;;;; TRUENAME, PROBE-FILE, FILE-AUTHOR, FILE-WRITE-DATE.
 
 ;;; Rewritten in 12/2007 by RMK, replacing 13+ year old CMU code that
@@ -686,9 +643,9 @@ or if PATHSPEC is a wild pathname."
   "Rename FILE to have the specified NEW-NAME. If FILE is a stream open to a
   file, then the associated file is renamed."
   (let* ((original (truename file))
-         (original-namestring (unix-namestring original t))
+         (original-namestring (native-namestring original :as-file t))
          (new-name (merge-pathnames new-name original))
-         (new-namestring (unix-namestring new-name nil)))
+         (new-namestring (native-namestring new-name :as-file t)))
     (unless new-namestring
       (error 'simple-file-error
              :pathname new-name
@@ -709,7 +666,9 @@ or if PATHSPEC is a wild pathname."
 (defun delete-file (file)
   #!+sb-doc
   "Delete the specified FILE."
-  (let ((namestring (unix-namestring file t)))
+  (let* ((truename (probe-file file))
+         (namestring (when truename
+                       (native-namestring truename :as-file t))))
     (when (streamp file)
       (close file :abort t))
     (unless namestring

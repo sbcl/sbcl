@@ -2405,13 +2405,14 @@
         (:io     (values   t   t sb!unix:o_rdwr))
         (:probe  (values   t nil sb!unix:o_rdonly)))
     (declare (type index mask))
-    (let* ((pathname (merge-pathnames filename))
-           (namestring
-            (cond ((unix-namestring pathname input))
-                  ((and input (eq if-does-not-exist :create))
-                   (unix-namestring pathname nil))
-                  ((and (eq direction :io) (not if-does-not-exist-given))
-                   (unix-namestring pathname nil)))))
+    (let* ((pathname (physicalize-pathname (merge-pathnames filename)))
+           (truename (probe-file pathname))
+           (namestring (cond (truename
+                              (native-namestring truename :as-file t))
+                             ((or (not input)
+                                  (and input (eq if-does-not-exist :create))
+                                  (and (eq direction :io) (not if-does-not-exist-given)))
+                              (native-namestring pathname :as-file t)))))
       ;; Process if-exists argument if we are doing any output.
       (cond (output
              (unless if-exists-given
@@ -2629,7 +2630,8 @@
       (cond (new-name
              (setf (fd-stream-pathname stream) new-name)
              (setf (fd-stream-file stream)
-                   (unix-namestring new-name nil))
+                   (native-namestring (physicalize-pathname new-name)
+                                      :as-file t))
              t)
             (t
              (fd-stream-pathname stream)))))

@@ -473,11 +473,14 @@
         (:io (values t t sb-unix:o_rdwr))
         (:probe (values t nil sb-unix:o_rdonly)))
     (declare (type sb-int:index mask))
-    (let ((name (cond ((sb-int:unix-namestring pathname input))
-                      ((and input (eq if-does-not-exist :create))
-                       (sb-int:unix-namestring pathname nil))
-                      ((and (eq direction :io) (not if-does-not-exist-given))
-                       (sb-int:unix-namestring pathname nil)))))
+    (let* ((phys (sb-int:physicalize-pathname (merge-pathnames pathname)))
+           (true (probe-file phys))
+           (name (cond (true
+                        (sb-ext:native-namestring true :as-file t))
+                       ((or (not input)
+                            (and input (eq if-does-not-exist :create))
+                            (and (eq direction :io) (not if-does-not-exist-given)))
+                        (sb-ext:native-namestring phys :as-file t)))))
       ;; Process if-exists argument if we are doing any output.
       (cond (output
              (unless if-exists-given
