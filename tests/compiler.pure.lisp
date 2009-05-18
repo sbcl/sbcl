@@ -2906,3 +2906,14 @@
    (= sb-vm:complex-double-float-widetag
       (sb-kernel:widetag-of
        (sb-vm:saetp-initial-element-default (sb-c::find-saetp '(complex double-float)))))))
+
+(with-test (:name :complex-single-float-fill)
+  (assert (every (lambda (x) (= #c(1.0 2.0) x))
+                 (funcall
+                  (compile nil
+                           `(lambda (n x)
+                              (make-array (list n)
+                                          :element-type '(complex single-float)
+                                          :initial-element x)))
+                  10
+                  #c(1.0 2.0)))))

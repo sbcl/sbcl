@@ -214,12 +214,26 @@
                     (values (typep host-object target-type) t))
                    (t
                     (values nil t))))
-            (;; Complexes suffer the same kind of problems as arrays
+            (;; Complexes suffer the same kind of problems as arrays.
+             ;; Our dumping logic is based on contents, however, so
+             ;; reasoning about them should be safe
              (and (not (hairy-type-p (values-specifier-type target-type)))
                   (sb!xc:subtypep target-type 'cl:complex))
              (if (complexp host-object)
-                 (warn-and-give-up) ; general-case complexes being way too hard
-                 (values nil t))) ; but "obviously not a complex" being easy
+                 (let ((re (realpart host-object))
+                       (im (imagpart host-object)))
+                   (if (or (and (eq target-type 'complex)
+                                (typep re 'rational) (typep im 'rational))
+                           (and (equal target-type '(cl:complex single-float))
+                                (typep re 'single-float) (typep im 'single-float))
+                           (and (equal target-type '(cl:complex double-float))
+                                (typep re 'double-float) (typep im 'double-float)))
+                       (values t t)
+                       (progn
+                         ;; We won't know how to dump it either.
+                         (warn "Host complex too complex: ~S" host-object)
+                         (warn-and-give-up))))
+                 (values nil t)))
             ;; Some types require translation between the cross-compilation
             ;; host Common Lisp and the target SBCL.
             ((target-type-is-in '(classoid))

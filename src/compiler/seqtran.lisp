@@ -535,8 +535,14 @@
                   (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
                               ((member element-type '(character base-char)) :char)
                               ((eq element-type 'single-float) :single-float)
+                              #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                               ((eq element-type 'double-float) :double-float)
-                              (t :bits)))
+                              #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                              ((equal element-type '(complex single-float))
+                               :complex-single-float)
+                              (t
+                               (aver (integer-type-p element-ctype))
+                               :bits)))
                   ;; BASH-VALUE is a word that we can repeatedly smash
                   ;; on the array: for less-than-word sized elements it
                   ;; contains multiple copies of the fill item.
@@ -556,9 +562,14 @@
                                          tmp)
                                         (:single-float
                                          (single-float-bits tmp))
+                                        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                                         (:double-float
                                          (logior (ash (double-float-high-bits tmp) 32)
-                                                 (double-float-low-bits tmp))))))
+                                                 (double-float-low-bits tmp)))
+                                        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                        (:complex-single-float
+                                         (logior (ash (single-float-bits (imagpart tmp)) 32)
+                                                 (single-float-bits (realpart tmp)))))))
                                 (res bits))
                            (loop for i of-type sb!vm:word from n-bits by n-bits
                                  until (= i sb!vm:n-word-bits)
@@ -575,9 +586,14 @@
                                                    `item)
                                                   (:single-float
                                                    `(single-float-bits item))
+                                                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
                                                   (:double-float
                                                    `(logior (ash (double-float-high-bits item) 32)
-                                                            (double-float-low-bits item))))))
+                                                            (double-float-low-bits item)))
+                                                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                                                  (:complex-single-float
+                                                   `(logior (ash (single-float-bits (imagpart item)) 32)
+                                                            (single-float-bits (realpart item)))))))
                                (res bits))
                           (declare (type sb!vm:word res))
                           ,@(unless (= sb!vm:n-word-bits n-bits)
