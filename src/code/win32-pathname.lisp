@@ -14,10 +14,26 @@
 (defun extract-device (namestr start end)
   (declare (type simple-string namestr)
            (type index start end))
-  (if (and (>= end (+ start 2))
-           (alpha-char-p (char namestr start))
-           (eql (char namestr (1+ start)) #\:))
-      (values (string (char namestr start)) (+ start 2))
+  (if (>= end (+ start 2))
+      (let ((c0 (char namestr start))
+            (c1 (char namestr (1+ start))))
+        (cond ((and (eql c1 #\:) (alpha-char-p c0))
+               ;; "X:" style, saved as X
+               (values (string (char namestr start)) (+ start 2)))
+              ((and (member c0 '(#\/ #\\)) (eql c0 c1))
+               ;; "//UNC" style, saved as UNC
+               ;; FIXME: at unparsing time we tell these apart by length,
+               ;; which seems a bit lossy -- presumably one-letter UNC
+               ;; hosts can exist as well. That seems a less troublesome
+               ;; restriction than disallowing UNC hosts whose names match
+               ;; logical pathname hosts... Time will tell -- both LispWorks
+               ;; and ACL use the host component for UNC hosts, so maybe
+               ;; we will end up there as well.
+               (let ((p (or (position c0 namestr :start (+ start 3) :end end)
+                            end)))
+                 (values (subseq namestr (+ start 2) p) p)))
+              (t
+               (values nil start))))
       (values nil start)))
 
 (defun split-at-slashes-and-backslashes (namestr start end)
@@ -145,10 +161,16 @@
 
 (defun unparse-win32-device (pathname)
   (declare (type pathname pathname))
-  (let ((device (pathname-device pathname)))
-    (if (or (null device) (eq device :unspecific))
-        ""
-        (concatenate 'simple-string (string device) ":"))))
+  (let ((device (pathname-device pathname))
+        (directory (pathname-directory pathname)))
+    (cond ((or (null device) (eq device :unspecific))
+           "")
+          ((= 1 (length device))
+           (concatenate 'simple-string device ":"))
+          ((and (consp directory) (eq :relative (car directory)))
+           (error "No printed representation for a relative UNC pathname."))
+          (t
+           (concatenate 'simple-string "\\\\" device)))))
 
 (defun unparse-win32-piece (thing)
   (etypecase thing
@@ -275,8 +297,7 @@
     (coerce
      (with-output-to-string (s)
        (when device
-         (write-string device s)
-         (write-char #\: s))
+         (write-string (unparse-win32-device pathname) s))
        (tagbody
           (when directory
             (ecase (pop directory)
