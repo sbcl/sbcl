@@ -80,80 +80,127 @@
              :offset (1- end)))
     (%shrink-vector result dst)))
 
-(defvar *ignore-wildcards* nil)
-
-(/show0 "filesys.lisp 86")
-
 (defun maybe-make-pattern (namestr start end)
   (declare (type simple-string namestr)
            (type index start end))
-  (if *ignore-wildcards*
-      (subseq namestr start end)
-      (collect ((pattern))
-        (let ((quoted nil)
-              (any-quotes nil)
-              (last-regular-char nil)
-              (index start))
-          (flet ((flush-pending-regulars ()
-                   (when last-regular-char
-                     (pattern (if any-quotes
-                                  (remove-backslashes namestr
-                                                      last-regular-char
-                                                      index)
-                                  (subseq namestr last-regular-char index)))
-                     (setf any-quotes nil)
-                     (setf last-regular-char nil))))
-            (loop
-              (when (>= index end)
-                (return))
-              (let ((char (schar namestr index)))
-                (cond (quoted
-                       (incf index)
-                       (setf quoted nil))
-                      ((char= char #\\)
-                       (setf quoted t)
-                       (setf any-quotes t)
-                       (unless last-regular-char
-                         (setf last-regular-char index))
-                       (incf index))
-                      ((char= char #\?)
-                       (flush-pending-regulars)
-                       (pattern :single-char-wild)
-                       (incf index))
-                      ((char= char #\*)
-                       (flush-pending-regulars)
-                       (pattern :multi-char-wild)
-                       (incf index))
-                      ((char= char #\[)
-                       (flush-pending-regulars)
-                       (let ((close-bracket
-                              (position #\] namestr :start index :end end)))
-                         (unless close-bracket
-                           (error 'namestring-parse-error
-                                  :complaint "#\\[ with no corresponding #\\]"
-                                  :namestring namestr
-                                  :offset index))
-                         (pattern (cons :character-set
-                                        (subseq namestr
-                                                (1+ index)
-                                                close-bracket)))
-                         (setf index (1+ close-bracket))))
-                      (t
-                       (unless last-regular-char
-                         (setf last-regular-char index))
-                       (incf index)))))
-            (flush-pending-regulars)))
-        (cond ((null (pattern))
-               "")
-              ((null (cdr (pattern)))
-               (let ((piece (first (pattern))))
-                 (typecase piece
-                   ((member :multi-char-wild) :wild)
-                   (simple-string piece)
-                   (t
-                    (make-pattern (pattern))))))
+  (collect ((pattern))
+    (let ((quoted nil)
+          (any-quotes nil)
+          (last-regular-char nil)
+          (index start))
+      (flet ((flush-pending-regulars ()
+               (when last-regular-char
+                 (pattern (if any-quotes
+                              (remove-backslashes namestr
+                                                  last-regular-char
+                                                  index)
+                              (subseq namestr last-regular-char index)))
+                 (setf any-quotes nil)
+                 (setf last-regular-char nil))))
+        (loop
+          (when (>= index end)
+            (return))
+          (let ((char (schar namestr index)))
+            (cond (quoted
+                   (incf index)
+                   (setf quoted nil))
+                  ((char= char #\\)
+                   (setf quoted t)
+                   (setf any-quotes t)
+                   (unless last-regular-char
+                     (setf last-regular-char index))
+                   (incf index))
+                  ((char= char #\?)
+                   (flush-pending-regulars)
+                   (pattern :single-char-wild)
+                   (incf index))
+                  ((char= char #\*)
+                   (flush-pending-regulars)
+                   (pattern :multi-char-wild)
+                   (incf index))
+                  ((char= char #\[)
+                   (flush-pending-regulars)
+                   (let ((close-bracket
+                          (position #\] namestr :start index :end end)))
+                     (unless close-bracket
+                       (error 'namestring-parse-error
+                              :complaint "#\\[ with no corresponding #\\]"
+                              :namestring namestr
+                              :offset index))
+                     (pattern (cons :character-set
+                                    (subseq namestr
+                                            (1+ index)
+                                            close-bracket)))
+                     (setf index (1+ close-bracket))))
+                  (t
+                   (unless last-regular-char
+                     (setf last-regular-char index))
+                   (incf index)))))
+        (flush-pending-regulars)))
+    (cond ((null (pattern))
+           "")
+          ((null (cdr (pattern)))
+           (let ((piece (first (pattern))))
+             (typecase piece
+               ((member :multi-char-wild) :wild)
+               (simple-string piece)
+               (t
+                (make-pattern (pattern))))))
+          (t
+           (make-pattern (pattern))))))
+
+(defun unparse-physical-piece (thing)
+  (etypecase thing
+    ((member :wild) "*")
+    (simple-string
+     (let* ((srclen (length thing))
+            (dstlen srclen))
+       (dotimes (i srclen)
+         (case (schar thing i)
+           ((#\* #\? #\[)
+            (incf dstlen))))
+       (let ((result (make-string dstlen))
+             (dst 0))
+         (dotimes (src srclen)
+           (let ((char (schar thing src)))
+             (case char
+               ((#\* #\? #\[)
+                (setf (schar result dst) #\\)
+                (incf dst)))
+             (setf (schar result dst) char)
+             (incf dst)))
+         result)))
+    (pattern
+     (with-output-to-string (s)
+       (dolist (piece (pattern-pieces thing))
+         (etypecase piece
+           (simple-string
+            (write-string piece s))
+           (symbol
+            (ecase piece
+              (:multi-char-wild
+               (write-string "*" s))
+              (:single-char-wild
+               (write-string "?" s))))
+           (cons
+            (case (car piece)
+              (:character-set
+               (write-string "[" s)
+               (write-string (cdr piece) s)
+               (write-string "]" s))
               (t
-               (make-pattern (pattern)))))))
+               (error "invalid pattern piece: ~S" piece))))))))))
+
+(defun make-matcher (piece)
+  (cond ((eq piece :wild)
+         (constantly t))
+        ((typep piece 'pattern)
+         (lambda (other)
+           (when (stringp other)
+             (pattern-matches piece other))))
+        (t
+         (lambda (other)
+           (equal piece other)))))
 
 (/show0 "filesys.lisp 160")
 
@@ -175,267 +222,22 @@
 (/show0 "filesys.lisp 200")
 
 
-;;;; wildcard matching stuff
-
-;;; Return a list of all the Lispy filenames (not including e.g. the
-;;; Unix magic "." and "..") in the directory named by DIRECTORY-NAME.
-(defun directory-lispy-filenames (directory-name)
-  (with-alien ((adlf (* c-string)
-                     (alien-funcall (extern-alien
-                                     "alloc_directory_lispy_filenames"
-                                     (function (* c-string) c-string))
-                                    directory-name)))
-    (if (null-alien adlf)
-        (error 'simple-file-error
-               :pathname directory-name
-               :format-control "~@<couldn't read directory ~S: ~2I~_~A~:>"
-               :format-arguments (list directory-name (strerror)))
-        (unwind-protect
-            (c-strings->string-list adlf)
-          (alien-funcall (extern-alien "free_directory_lispy_filenames"
-                                       (function void (* c-string)))
-                         adlf)))))
-
-(/show0 "filesys.lisp 498")
-
-;; TODO: the implementation !enumerate-matches is some hairy stuff
-;; that we mostly don't need.  Couldn't we use POSIX fts(3) to walk
-;; the file system and PATHNAME-MATCH-P to select matches, at least on
-;; Unices?
-(defmacro !enumerate-matches ((var pathname &optional result
-                                   &key (verify-existence t)
-                                   (follow-links t))
-                              &body body)
-  `(block nil
-     (%enumerate-matches (pathname ,pathname)
-                         ,verify-existence
-                         ,follow-links
-                         (lambda (,var) ,@body))
-     ,result))
-
-(/show0 "filesys.lisp 500")
-
-;;; Call FUNCTION on matches.
-;;;
-;;; KLUDGE: this assumes that an absolute pathname is indicated to the
-;;; operating system by having a directory separator as the first
-;;; character in the directory part.  This is true for Win32 pathnames
-;;; and for Unix pathnames, but it isn't true for LispM pathnames (and
-;;; their bastard offspring, logical pathnames.  Also it assumes that
-;;; Unix pathnames have an empty or :unspecific device, and that
-;;; windows drive letters are the only kinds of non-empty/:UNSPECIFIC
-;;; devices.
-(defun %enumerate-matches (pathname verify-existence follow-links function)
-  (/noshow0 "entering %ENUMERATE-MATCHES")
-  (when (pathname-type pathname)
-    (unless (pathname-name pathname)
-      (error "cannot supply a type without a name:~%  ~S" pathname)))
-  (when (and (integerp (pathname-version pathname))
-             (member (pathname-type pathname) '(nil :unspecific)))
-    (error "cannot supply a version without a type:~%  ~S" pathname))
-  (let ((host (pathname-host pathname))
-        (device (pathname-device pathname))
-        (directory (pathname-directory pathname)))
-    (/noshow0 "computed HOST and DIRECTORY")
-    (let* ((dirstring (if directory
-                          (ecase (first directory)
-                            (:absolute (host-unparse-directory-separator host))
-                            (:relative ""))
-                          ""))
-           (devstring (if (and device (not (eq device :unspecific)))
-                          (concatenate 'simple-string (string device) (string #\:))
-                          ""))
-           (headstring (concatenate 'simple-string devstring dirstring)))
-      (if directory
-          (%enumerate-directories headstring (rest directory) pathname
-                                  verify-existence follow-links nil function)
-          (%enumerate-files headstring pathname verify-existence function)))))
-
-;;; Call FUNCTION on directories.
-(defun %enumerate-directories (head tail pathname verify-existence
-                               follow-links nodes function
-                               &aux (host (pathname-host pathname)))
-  (declare (simple-string head))
-  #!+win32
-  (setf follow-links nil)
-  (macrolet ((unix-xstat (name)
-               `(if follow-links
-                    (sb!unix:unix-stat ,name)
-                    (sb!unix:unix-lstat ,name)))
-             (with-directory-node-noted ((head) &body body)
-               `(multiple-value-bind (res dev ino mode)
-                    (unix-xstat ,head)
-                  (when (and res (eql (logand mode sb!unix:s-ifmt)
-                                      sb!unix:s-ifdir))
-                    (let ((nodes (cons (cons dev ino) nodes)))
-                      ,@body))))
-             (with-directory-node-removed ((head) &body body)
-               `(multiple-value-bind (res dev ino mode)
-                    (unix-xstat ,head)
-                  (when (and res (eql (logand mode sb!unix:s-ifmt)
-                                      sb!unix:s-ifdir))
-                    (let ((nodes (remove (cons dev ino) nodes :test #'equal)))
-                      ,@body)))))
-    (if tail
-        (let ((piece (car tail)))
-          (etypecase piece
-            (simple-string
-             (let ((head (concatenate 'string head piece)))
-               (with-directory-node-noted (head)
-                 (%enumerate-directories
-                  (concatenate 'string head
-                               (host-unparse-directory-separator host))
-                  (cdr tail) pathname
-                  verify-existence follow-links
-                  nodes function))))
-            ((member :wild-inferiors)
-             ;; now with extra error case handling from CLHS
-             ;; 19.2.2.4.3 -- CSR, 2004-01-24
-             (when (member (cadr tail) '(:up :back))
-               (error 'simple-file-error
-                      :pathname pathname
-                      :format-control "~@<invalid use of ~S after :WILD-INFERIORS~@:>."
-                      :format-arguments (list (cadr tail))))
-             (%enumerate-directories head (rest tail) pathname
-                                     verify-existence follow-links
-                                     nodes function)
-             (dolist (name (directory-lispy-filenames head))
-               (let ((subdir (concatenate 'string head name)))
-                 (multiple-value-bind (res dev ino mode)
-                     (unix-xstat subdir)
-                   (declare (type (or fixnum null) mode))
-                   (when (and res (eql (logand mode sb!unix:s-ifmt)
-                                       sb!unix:s-ifdir))
-                     (unless (dolist (dir nodes nil)
-                               (when (and (eql (car dir) dev)
-                                          #!+win32 ;; KLUDGE
-                                          (not (zerop ino))
-                                          (eql (cdr dir) ino))
-                                 (return t)))
-                       (let ((nodes (cons (cons dev ino) nodes))
-                             (subdir (concatenate 'string subdir (host-unparse-directory-separator host))))
-                         (%enumerate-directories subdir tail pathname
-                                                 verify-existence follow-links
-                                                 nodes function))))))))
-            ((or pattern (member :wild))
-             (dolist (name (directory-lispy-filenames head))
-               (when (or (eq piece :wild) (pattern-matches piece name))
-                 (let ((subdir (concatenate 'string head name)))
-                   (multiple-value-bind (res dev ino mode)
-                       (unix-xstat subdir)
-                     (declare (type (or fixnum null) mode))
-                     (when (and res
-                                (eql (logand mode sb!unix:s-ifmt)
-                                     sb!unix:s-ifdir))
-                       (let ((nodes (cons (cons dev ino) nodes))
-                             (subdir (concatenate 'string subdir (host-unparse-directory-separator host))))
-                         (%enumerate-directories subdir (rest tail) pathname
-                                                 verify-existence follow-links
-                                                 nodes function))))))))
-          ((member :up)
-           (when (string= head (host-unparse-directory-separator host))
-             (error 'simple-file-error
-                    :pathname pathname
-                    :format-control "~@<invalid use of :UP after :ABSOLUTE.~@:>"))
-           (with-directory-node-removed (head)
-             (let ((head (concatenate 'string head "..")))
-               (with-directory-node-noted (head)
-                 (%enumerate-directories (concatenate 'string head (host-unparse-directory-separator host))
-                                         (rest tail) pathname
-                                         verify-existence follow-links
-                                         nodes function)))))
-          ((member :back)
-           ;; :WILD-INFERIORS is handled above, so the only case here
-           ;; should be (:ABSOLUTE :BACK)
-           (aver (string= head (host-unparse-directory-separator host)))
-           (error 'simple-file-error
-                  :pathname pathname
-                  :format-control "~@<invalid use of :BACK after :ABSOLUTE.~@:>"))))
-        (%enumerate-files head pathname verify-existence function))))
-
-;;; Call FUNCTION on files.
-(defun %enumerate-files (directory pathname verify-existence function)
-  (declare (simple-string directory))
-  (/noshow0 "entering %ENUMERATE-FILES")
-  (let ((name (%pathname-name pathname))
-        (type (%pathname-type pathname))
-        (version (%pathname-version pathname)))
-    (/noshow0 "computed NAME, TYPE, and VERSION")
-    (cond ((member name '(nil :unspecific))
-           (/noshow0 "UNSPECIFIC, more or less")
-           (let ((directory (coerce directory 'string)))
-             (when (or (not verify-existence)
-                       (sb!unix:unix-file-kind directory))
-               (funcall function directory))))
-          ((or (pattern-p name)
-               (pattern-p type)
-               (eq name :wild)
-               (eq type :wild))
-           (/noshow0 "WILD, more or less")
-           ;; I IGNORE-ERRORS here just because the original CMU CL
-           ;; code did. I think the intent is that it's not an error
-           ;; to request matches to a wild pattern when no matches
-           ;; exist, but I haven't tried to figure out whether
-           ;; everything is kosher. (E.g. what if we try to match a
-           ;; wildcard but we don't have permission to read one of the
-           ;; relevant directories?) -- WHN 2001-04-17
-           (dolist (complete-filename (ignore-errors
-                                        (directory-lispy-filenames directory)))
-             (multiple-value-bind
-                 (file-name file-type file-version)
-                 (let ((*ignore-wildcards* t))
-                   (extract-name-type-and-version
-                    complete-filename 0 (length complete-filename)))
-               (when (and (components-match file-name name)
-                          (components-match file-type type)
-                          (components-match file-version version))
-                 (funcall function
-                          (concatenate 'string
-                                       directory
-                                       complete-filename))))))
-          (t
-           (/noshow0 "default case")
-           (let ((file (concatenate 'string directory name)))
-             (/noshow "computed basic FILE")
-             (unless (or (null type) (eq type :unspecific))
-               (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
-               (setf file (concatenate 'string file "." type)))
-             (unless (member version '(nil :newest :wild :unspecific))
-               (/noshow0 "tweaking FILE for more-or-less-:WILD case")
-               (setf file (concatenate 'string file "."
-                                       (quick-integer-to-string version))))
-             (/noshow0 "finished possibly tweaking FILE")
-             (when (or (not verify-existence)
-                       (sb!unix:unix-file-kind file t))
-               (/noshow0 "calling FUNCTION on FILE")
-               (funcall function file)))))))
-
-(/noshow0 "filesys.lisp 603")
-
-;;; FIXME: Why do we need this?
-(defun quick-integer-to-string (n)
-  (declare (type integer n))
-  (cond ((not (fixnump n))
-         (write-to-string n :base 10 :radix nil))
-        ((zerop n) "0")
-        ((eql n 1) "1")
-        ((minusp n)
-         (concatenate 'simple-base-string "-"
-                      (the simple-base-string (quick-integer-to-string (- n)))))
-        (t
-         (do* ((len (1+ (truncate (integer-length n) 3)))
-               (res (make-string len :element-type 'base-char))
-               (i (1- len) (1- i))
-               (q n)
-               (r 0))
-              ((zerop q)
-               (incf i)
-               (replace res res :start2 i :end2 len)
-               (%shrink-vector res (- len i)))
-           (declare (simple-string res)
-                    (fixnum len i r q))
-           (multiple-value-setq (q r) (truncate q 10))
-           (setf (schar res i) (schar "0123456789" r))))))
+;;;; Grabbing the kind of file when we have a namestring.
+(defun native-file-kind (namestring)
+  (multiple-value-bind (existsp errno ino mode)
+      #!-win32
+      (sb!unix:unix-lstat namestring)
+      #!+win32
+      (sb!unix:unix-stat namestring)
+    (declare (ignore errno ino))
+    (when existsp
+      (let ((ifmt (logand mode sb!unix:s-ifmt)))
+       (case ifmt
+         (#.sb!unix:s-ifreg :file)
+         (#.sb!unix:s-ifdir :directory)
+         #!-win32
+         (#.sb!unix:s-iflnk :symlink)
+         (t :special))))))
 
 ;;;; TRUENAME, PROBE-FILE, FILE-AUTHOR, FILE-WRITE-DATE.
 
@@ -719,7 +521,284 @@ system."
 
 ;;;; DIRECTORY
 
-(/show0 "filesys.lisp 800")
+(defun directory (pathspec &key (resolve-symlinks t))
+  #!+sb-doc
+  "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
+given pathname. Note that the interaction between this ANSI-specified
+TRUENAMEing and the semantics of the Unix filesystem (symbolic links..) means
+this function can sometimes return files which don't have the same directory
+as PATHNAME. If :RESOLVE-SYMLINKS is NIL, don't resolve symbolic links in
+matching filenames."
+  (let (;; We create one entry in this hash table for each truename,
+        ;; as an asymptotically efficient way of removing duplicates
+        ;; (which can arise when e.g. multiple symlinks map to the
+        ;; same truename).
+        (truenames (make-hash-table :test #'equal)))
+    (labels ((record (pathname)
+               (let ((truename (if resolve-symlinks
+                                   ;; FIXME: Why not not TRUENAME?  As reported by
+                                   ;; Milan Zamazal sbcl-devel 2003-10-05, using
+                                   ;; TRUENAME causes a race condition whereby
+                                   ;; removal of a file during the directory
+                                   ;; operation causes an error.  It's not clear
+                                   ;; what the right thing to do is, though.  --
+                                   ;; CSR, 2003-10-13
+                                   (query-file-system pathname :truename nil)
+                                   (query-file-system pathname :existence nil))))
+                 (when truename
+                   (setf (gethash (namestring truename) truenames)
+                         truename))))
+             (do-physical-pathnames (pathname)
+               (aver (not (logical-pathname-p pathname)))
+               (let* ((name (pathname-name pathname))
+                      (type (pathname-type pathname))
+                      ;; KLUDGE: We want #p"/foo" to match #p"/foo/,
+                      ;; so cobble up a directory name component from
+                      ;; name and type -- just take care with "*.*"!
+                      (dirname (if (and (eq :wild name) (eq :wild type))
+                                   "*"
+                                   (with-output-to-string (s)
+                                     (when name
+                                       (write-string (unparse-physical-piece name) s))
+                                     (when type
+                                       (write-string "." s)
+                                       (write-string (unparse-physical-piece type) s)))))
+                      (dir (maybe-make-pattern dirname 0 (length dirname)))
+                      (match-name (make-matcher name))
+                      (match-type (make-matcher type))
+                      (match-dir (make-matcher dir)))
+                 (map-matching-directories
+                  (if (or name type)
+                      (lambda (directory)
+                        (map-matching-files #'record
+                                            directory
+                                            match-name
+                                            match-type
+                                            match-dir))
+                      #'record)
+                  pathname)))
+             (do-pathnames (pathname)
+               (if (logical-pathname-p pathname)
+                   (let ((host (intern-logical-host (pathname-host pathname))))
+                     (dolist (x (logical-host-canon-transls host))
+                       (destructuring-bind (from to) x
+                         (let ((intersections
+                                (pathname-intersections pathname from)))
+                           (dolist (p intersections)
+                             (do-pathnames (translate-pathname p from to)))))))
+                   (do-physical-pathnames pathname))))
+      (declare (truly-dynamic-extent #'record))
+      (do-pathnames (merge-pathnames pathspec)))
+    (mapcar #'cdr
+            ;; Sorting isn't required by the ANSI spec, but sorting into some
+            ;; canonical order seems good just on the grounds that the
+            ;; implementation should have repeatable behavior when possible.
+            (sort (loop for namestring being each hash-key in truenames
+                        using (hash-value truename)
+                        collect (cons namestring truename))
+                  #'string<
+                  :key #'car))))
+
+;;; Given a native namestring, provides a WITH-HASH-TABLE-ITERATOR style
+;;; interface to mapping over namestrings of entries in the corresponding
+;;; directory.
+(defmacro with-native-directory-iterator ((iterator namestring &key errorp) &body body)
+  (with-unique-names (one-iter)
+    `(dx-flet
+         ((iterate (,one-iter)
+            (declare (type function ,one-iter))
+            (macrolet ((,iterator ()
+                         `(funcall ,',one-iter)))
+              ,@body)))
+       (call-with-native-directory-iterator #'iterate ,namestring ,errorp))))
+
+(defun call-with-native-directory-iterator (function namestring errorp)
+  (declare (type (or null string) namestring)
+           (function function))
+  (let (dp)
+    (when namestring
+      (dx-flet
+          ((one-iter ()
+             (tagbody
+              :next
+                (let ((ent (sb!unix:unix-readdir dp nil)))
+                  (when ent
+                    (let ((name (sb!unix:unix-dirent-name ent)))
+                      (when name
+                        (cond ((equal "." name)
+                               (go :next))
+                              ((equal ".." name)
+                               (go :next))
+                              (t
+                               (return-from one-iter name))))))))))
+        (unwind-protect
+             (progn
+               (setf dp (sb!unix:unix-opendir namestring errorp))
+               (when dp
+                 (funcall function #'one-iter)))
+          (when dp
+            (sb!unix:unix-closedir dp nil)))))))
+
+;;; This is our core directory access interface that we use to implement
+;;; DIRECTORY.
+(defun map-directory (function directory &key (files t) (directories t) (errorp t))
+  #!+sb-doc
+  "Call FUNCTION with the pathname for each entry in DIRECTORY as follows: if
+FILES is true (the default), FUNCTION is called for each file in the
+directory; if DIRECTORIES is true (the default), FUNCTION is called for each
+subdirectory. If ERRORP is true (the default) signal an error if DIRECTORY
+does not exist, cannot be read, etc.
+
+On platforms supporting symbolic links the decision to call FUNCTION with its
+pathname depends on the resolution of the link: if it points to a directory,
+it is considered a directory entry. Whether it is considered a file or a
+directory, the provided pathname is not fully resolved, but rather names the
+symbolic link as an immediate child of DIRECTORY.
+
+Experimental: interface subject to change."
+  (let* ((fun (%coerce-callable-to-fun function))
+         (realname (or (query-file-system directory :existence errorp)
+                       (return-from map-directory nil)))
+         (host (pathname-host realname))
+         ;; We want the trailing separator: better to ask the
+         ;; provide it rather than reason about its presence here.
+         (dirname (native-namestring realname :as-file nil)))
+    (with-native-directory-iterator (next dirname :errorp errorp)
+      (loop for name = (next)
+            while name
+            do (let* ((full (concatenate 'string dirname name))
+                      (kind (native-file-kind full)))
+                 (when kind
+                   (case kind
+                     (:directory
+                      (when directories
+                        (funcall fun (parse-native-namestring
+                                      full host realname :as-directory t))))
+                     (:symlink
+                      (let* ((tmpname (parse-native-namestring
+                                       full host realname :as-directory nil))
+                             (truename (query-file-system tmpname :truename nil)))
+                        (if (or (not truename)
+                                (or (pathname-name truename) (pathname-type truename)))
+                            (when files
+                              (funcall fun tmpname))
+                            (when directories
+                              (funcall fun (parse-native-namestring
+                                            full host realname :as-directory t))))))
+                     (t
+                      ;; Anything else parses as a file.
+                      (when files
+                        (funcall fun (parse-native-namestring
+                                      full host realname :as-directory nil)))))))))))
+
+;;; Part of DIRECTORY: implements matching the directory spec. Calls FUNCTION
+;;; with all DIRECTORIES that match the directory portion of PATHSPEC.
+(defun map-matching-directories (function pathspec)
+  (let* ((dir (pathname-directory pathspec))
+         (length (length dir))
+         (wild (position-if (lambda (elt)
+                              (or (eq :wild elt) (typep elt 'pattern)))
+                            dir))
+         (wild-inferiors (position :wild-inferiors dir))
+         (end (cond ((and wild wild-inferiors)
+                     (min wild wild-inferiors))
+                    (t
+                     (or wild wild-inferiors length))))
+         (rest (subseq dir end))
+         (starting-point (make-pathname :directory (subseq dir 0 end)
+                                        :device (pathname-device pathspec)
+                                        :host (pathname-host pathspec)
+                                        :name nil
+                                        :type nil
+                                        :version nil)))
+    (cond (wild-inferiors
+           (map-wild-inferiors function rest starting-point))
+          (wild
+           (map-wild function rest starting-point))
+          (t
+           ;; Nothing wild -- the directory matches itself.
+           (funcall function starting-point)))))
+
+(defun last-directory-piece (pathname)
+  (car (last (pathname-directory pathname))))
+
+;;; Part of DIRECTORY: implements iterating over a :WILD or pattern component
+;;; in the directory spec.
+(defun map-wild (function more directory)
+  (let ((this (pop more))
+        (next (car more)))
+    (flet ((cont (subdirectory)
+             (cond ((not more)
+                    ;; end of the line
+                    (funcall function subdirectory))
+                   ((or (eq :wild next) (typep next 'pattern))
+                    (lambda (pathname)
+                      (map-wild function more pathname)))
+                   ((eq :wild-inferiors next)
+                    (lambda (pathname)
+                      (map-wild-inferiors function more pathname)))
+                   (t
+                    (lambda (pathname)
+                      (let ((this (pathname-directory pathname)))
+                        (when (equal next (car (last this)))
+                          (map-matching-directories
+                           function
+                           (make-pathname :directory (append this more)
+                                          :defaults pathname)))))))))
+      (map-directory
+       (if (eq :wild this)
+           #'cont
+           (lambda (sub)
+             (awhen (pattern-matches this (last-directory-piece sub))
+               (funcall #'cont it))))
+       directory
+       :files nil
+       :directories t
+       :errorp nil))))
+
+;;; Part of DIRECTORY: implements iterating over a :WILD-INFERIORS component
+;;; in the directory spec.
+(defun map-wild-inferiors (function more directory)
+  (loop while (member (car more) '(:wild :wild-inferiors))
+        do (pop more))
+  (let ((next (car more))
+        (rest (cdr more)))
+    (unless more
+      (funcall function directory))
+    (map-directory
+     (cond ((not more)
+            (lambda (pathname)
+              (funcall function pathname)
+              (map-wild-inferiors function more pathname)))
+           (t
+            (lambda (pathname)
+              (let ((this (pathname-directory pathname)))
+                (when (equal next (car (last this)))
+                  (map-matching-directories
+                   function
+                   (make-pathname :directory (append this rest)
+                                  :defaults pathname)))
+                (map-wild-inferiors function more pathname)))))
+     directory
+     :files nil
+     :directories t
+     :errorp nil)))
+
+;;; Part of DIRECTORY: implements iterating over files in a directory, and matching
+;;; them.
+(defun map-matching-files (function directory match-name match-type match-dir)
+  (map-directory
+   (lambda (file)
+     (let ((pname (pathname-name file))
+           (ptype (pathname-type file)))
+       (when (if (or pname ptype)
+                 (and (funcall match-name pname) (funcall match-type ptype))
+                 (funcall match-dir (last-directory-piece file)))
+         (funcall function file))))
+   directory
+   :files t
+   :directories t
+   :errorp nil))
 
 ;;; NOTE: There is a fair amount of hair below that is probably not
 ;;; strictly necessary.
@@ -897,77 +976,6 @@ system."
                 (mapcar (lambda (x) (cons (simple-intersection
                                            (car one) (car two)) x))
                         (intersect-directory-helper (cdr one) (cdr two)))))))))
-
-(defun directory (pathname &key (resolve-symlinks t))
-  #!+sb-doc
-  "Return a list of PATHNAMEs, each the TRUENAME of a file that matched the
-   given pathname. Note that the interaction between this ANSI-specified
-   TRUENAMEing and the semantics of the Unix filesystem (symbolic links..)
-   means this function can sometimes return files which don't have the same
-   directory as PATHNAME.  If :RESOLVE-SYMLINKS is NIL, don't resolve
-   symbolic links in matching filenames."
-  (let (;; We create one entry in this hash table for each truename,
-        ;; as an asymptotically efficient way of removing duplicates
-        ;; (which can arise when e.g. multiple symlinks map to the
-        ;; same truename).
-        (filenames (make-hash-table :test #'equal))
-        ;; FIXME: Possibly this MERGE-PATHNAMES call should only
-        ;; happen once we get a physical pathname.
-        (merged-pathname (merge-pathnames pathname)))
-    (labels ((do-physical-directory (pathname)
-               (aver (not (logical-pathname-p pathname)))
-               (!enumerate-matches (match pathname)
-                 (let* ((*ignore-wildcards* t)
-                        ;; FIXME: Why not TRUENAME?  As reported by
-                        ;; Milan Zamazal sbcl-devel 2003-10-05, using
-                        ;; TRUENAME causes a race condition whereby
-                        ;; removal of a file during the directory
-                        ;; operation causes an error.  It's not clear
-                        ;; what the right thing to do is, though.  --
-                        ;; CSR, 2003-10-13
-                        (filename (if resolve-symlinks
-                                      (query-file-system match :truename nil)
-                                      (query-file-system match :existence nil))))
-                   (when filename
-                     (setf (gethash (namestring filename) filenames)
-                           filename)))))
-             (do-directory (pathname)
-               (if (logical-pathname-p pathname)
-                   (let ((host (intern-logical-host (pathname-host pathname))))
-                     (dolist (x (logical-host-canon-transls host))
-                       (destructuring-bind (from to) x
-                         (let ((intersections
-                                (pathname-intersections pathname from)))
-                           (dolist (p intersections)
-                             (do-directory (translate-pathname p from to)))))))
-                   (do-physical-directory pathname))))
-      (do-directory merged-pathname))
-    (mapcar #'cdr
-            ;; Sorting isn't required by the ANSI spec, but sorting
-            ;; into some canonical order seems good just on the
-            ;; grounds that the implementation should have repeatable
-            ;; behavior when possible.
-            (sort (loop for name being each hash-key in filenames
-                     using (hash-value filename)
-                     collect (cons name filename))
-                  #'string<
-                  :key #'car))))
-
-(/show0 "filesys.lisp 899")
-
-;;; predicate to order pathnames by; goes by name
-;; FIXME: Does anything use this?  It's not exported, and I don't find
-;; the name anywhere else.
-(defun pathname-order (x y)
-  (let ((xn (%pathname-name x))
-        (yn (%pathname-name y)))
-    (if (and xn yn)
-        (let ((res (string-lessp xn yn)))
-          (cond ((not res) nil)
-                ((= res (length (the simple-string xn))) t)
-                ((= res (length (the simple-string yn))) nil)
-                (t t)))
-        xn)))
 
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc

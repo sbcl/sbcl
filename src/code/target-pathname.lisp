@@ -1064,7 +1064,7 @@ system's syntax for files."
              (frob %pathname-directory directory-components-match)
              (frob %pathname-name)
              (frob %pathname-type)
-             (or (eq (%pathname-host wildname) *unix-host*)
+             (or (eq (%pathname-host wildname) *physical-host*)
                  (frob %pathname-version)))))))
 
 ;;; Place the substitutions into the pattern and return the string or pattern

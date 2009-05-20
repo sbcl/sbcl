@@ -132,51 +132,6 @@
   ;; 2002-05-09
   "")
 
-(defun unparse-unix-piece (thing)
-  (etypecase thing
-    ((member :wild) "*")
-    (simple-string
-     (let* ((srclen (length thing))
-            (dstlen srclen))
-       (dotimes (i srclen)
-         (case (schar thing i)
-           ((#\* #\? #\[)
-            (incf dstlen))))
-       (let ((result (make-string dstlen))
-             (dst 0))
-         (dotimes (src srclen)
-           (let ((char (schar thing src)))
-             (case char
-               ((#\* #\? #\[)
-                (setf (schar result dst) #\\)
-                (incf dst)))
-             (setf (schar result dst) char)
-             (incf dst)))
-         result)))
-    (pattern
-     (collect ((strings))
-       (dolist (piece (pattern-pieces thing))
-         (etypecase piece
-           (simple-string
-            (strings piece))
-           (symbol
-            (ecase piece
-              (:multi-char-wild
-               (strings "*"))
-              (:single-char-wild
-               (strings "?"))))
-           (cons
-            (case (car piece)
-              (:character-set
-               (strings "[")
-               (strings (cdr piece))
-               (strings "]"))
-              (t
-               (error "invalid pattern piece: ~S" piece))))))
-       (apply #'concatenate
-              'simple-string
-              (strings))))))
-
 (defun unparse-unix-directory-list (directory)
   (declare (type list directory))
   (collect ((pieces))
@@ -196,7 +151,7 @@
           ((member :wild-inferiors)
            (pieces "**/"))
           ((or simple-string pattern (member :wild))
-           (pieces (unparse-unix-piece dir))
+           (pieces (unparse-physical-piece dir))
            (pieces "/"))
           (t
            (error "invalid directory component: ~S" dir)))))
@@ -224,7 +179,7 @@
         (when (and (typep name 'string)
                    (string= name ""))
           (error "name is of length 0: ~S" pathname))
-        (strings (unparse-unix-piece name)))
+        (strings (unparse-physical-piece name)))
       (when type-supplied
         (unless name
           (error "cannot specify the type without a file: ~S" pathname))
@@ -232,7 +187,7 @@
           (when (position #\. type)
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
-        (strings (unparse-unix-piece type))))
+        (strings (unparse-physical-piece type))))
     (apply #'concatenate 'simple-string (strings))))
 
 (/show0 "filesys.lisp 406")
@@ -329,7 +284,7 @@
                      (typep pathname-name 'simple-string)
                      (position #\. pathname-name :start 1))
             (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-unix-piece pathname-name)))
+          (strings (unparse-physical-piece pathname-name)))
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
@@ -337,7 +292,7 @@
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")
-          (strings (unparse-unix-piece pathname-type))))
+          (strings (unparse-physical-piece pathname-type))))
       (apply #'concatenate 'simple-string (strings)))))
 
 (defun simplify-unix-namestring (src)

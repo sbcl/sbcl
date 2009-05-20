@@ -264,7 +264,7 @@ distinct from the global value. Can also be SETF."
       (let ((new (etypecase old
                    (index (1+ old))
                    (unsigned-byte (1+ old)))))
-        (declare (optimize (speed 3) (safety 0)(inhibit-warnings 3)))
+        (declare (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
         (setq *gensym-counter* new)))
     (multiple-value-bind (prefix int)
         (etypecase thing
@@ -273,9 +273,9 @@ distinct from the global value. Can also be SETF."
           (string (values (coerce thing 'simple-string) old)))
       (declare (simple-string prefix))
       (make-symbol
-       (concatenate 'simple-string prefix
-                    (the simple-string
-                         (quick-integer-to-string int)))))))
+       (with-output-to-string (s)
+         (write-string prefix s)
+         (%output-integer-in-base int 10 s))))))
 
 (defvar *gentemp-counter* 0)
 (declaim (type unsigned-byte *gentemp-counter*))

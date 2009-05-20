@@ -1257,7 +1257,7 @@
    (:external-format keyword))
   t)
 
-(defknown directory (pathname-designator &key (resolve-symlinks t))
+(defknown directory (pathname-designator &key (:resolve-symlinks t))
   list ())
 
 ;;;; from the "Conditions" chapter:

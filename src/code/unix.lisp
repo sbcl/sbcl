@@ -949,24 +949,6 @@ corresponds to NAME, or NIL if there is none."
 ;;; enough of them all in one place here that they should probably be
 ;;; removed by hand.
 
-;;;; support routines for dealing with Unix pathnames
-
-(defun unix-file-kind (name &optional check-for-links)
-  #!+sb-doc
-  "Return either :FILE, :DIRECTORY, :LINK, :SPECIAL, or NIL."
-  (declare (simple-string name))
-  (multiple-value-bind (res dev ino mode)
-      (if check-for-links (unix-lstat name) (unix-stat name))
-    (declare (type (or fixnum null) mode)
-             (ignore dev ino))
-    (when res
-      (let ((kind (logand mode s-ifmt)))
-        (cond ((eql kind s-ifdir) :directory)
-              ((eql kind s-ifreg) :file)
-              #!-win32
-              ((eql kind s-iflnk) :link)
-              (t :special))))))
-
 (defconstant micro-seconds-per-internal-time-unit
   (/ 1000000 sb!xc:internal-time-units-per-second))
 
@@ -1053,6 +1035,49 @@ corresponds to NAME, or NIL if there is none."
                                  (floor micro-seconds-per-internal-time-unit 2))
                               micro-seconds-per-internal-time-unit))))
         result))))
+
+;;;; opendir, readdir, closedir, and dirent-name
+
+(declaim (inline unix-opendir))
+(defun unix-opendir (namestring &optional (errorp t))
+  (let ((dir (alien-funcall
+              (extern-alien "sb_opendir"
+                            (function system-area-pointer c-string))
+              namestring)))
+    (if (zerop (sap-int dir))
+        (when errorp (simple-perror
+                      (format nil "Error opening directory ~S"
+                              namestring)))
+        dir)))
+
+(declaim (inline unix-readdir))
+(defun unix-readdir (dir &optional (errorp t) namestring)
+  (let ((ent (alien-funcall
+              (extern-alien "sb_readdir"
+                            (function system-area-pointer system-area-pointer))
+                            dir)))
+    (if (zerop (sap-int ent))
+        (when errorp (simple-perror
+                      (format nil "Error reading directory entry~@[ from ~S~]"
+                              namestring)))
+        ent)))
+
+(declaim (inline unix-closedir))
+(defun unix-closedir (dir &optional (errorp t) namestring)
+  (let ((r (alien-funcall
+            (extern-alien "sb_closedir" (function int system-area-pointer))
+            dir)))
+    (if (minusp r)
+        (when errorp (simple-perror
+                      (format nil "Error closing directory~@[ ~S~]"
+                              namestring)))
+        r)))
+
+(declaim (inline unix-dirent-name))
+(defun unix-dirent-name (ent)
+  (alien-funcall
+   (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
+   ent))
 
 ;;;; A magic constant for wait3().
 ;;;;

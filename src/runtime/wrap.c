@@ -62,73 +62,6 @@ extern char **environ;
  * stuff needed by CL:DIRECTORY and other Lisp directory operations
  */
 
-/* Unix directory operations think of "." and ".." as filenames, but
- * Lisp directory operations do not. */
-int
-is_lispy_filename(const char *filename)
-{
-    return strcmp(filename, ".") && strcmp(filename, "..");
-}
-
-/* Return a zero-terminated array of strings holding the Lispy filenames
- * (i.e. excluding the Unix magic "." and "..") in the named directory. */
-char**
-alloc_directory_lispy_filenames(const char *directory_name)
-{
-    DIR *dir_ptr = opendir(directory_name);
-    char **result = 0;
-
-    if (dir_ptr) { /* if opendir success */
-
-        struct voidacc va;
-
-        if (0 == voidacc_ctor(&va)) { /* if voidacc_ctor success */
-            struct dirent *dirent_ptr;
-
-            while ( (dirent_ptr = readdir(dir_ptr)) ) { /* until end of data */
-                char* original_name = dirent_ptr->d_name;
-                if (is_lispy_filename(original_name)) {
-                    /* strdup(3) is in Linux and *BSD. If you port
-                     * somewhere else that doesn't have it, it's easy
-                     * to reimplement. */
-                    char* dup_name = strdup(original_name);
-                    if (!dup_name) { /* if strdup failure */
-                        goto dtors;
-                    }
-                    if (voidacc_acc(&va, dup_name)) { /* if acc failure */
-                        goto dtors;
-                    }
-                }
-            }
-            result = (char**)voidacc_give_away_result(&va);
-        }
-
-    dtors:
-        voidacc_dtor(&va);
-        /* ignoring closedir(3) return code, since what could we do?
-         *
-         * "Never ask questions you don't want to know the answer to."
-         * -- William Irving Zumwalt (Rich Cook, _The Wizardry Quested_) */
-        closedir(dir_ptr);
-    }
-
-    return result;
-}
-
-/* Free a result returned by alloc_directory_lispy_filenames(). */
-void
-free_directory_lispy_filenames(char** directory_lispy_filenames)
-{
-    char** p;
-
-    /* Free the strings. */
-    for (p = directory_lispy_filenames; *p; ++p) {
-        free(*p);
-    }
-
-    /* Free the table of strings. */
-    free(directory_lispy_filenames);
-}
 
 /*
  * readlink(2) stuff
@@ -193,6 +126,42 @@ char * sb_realpath (char *path)
     }
     return(ret);
 #endif
+}
+
+/* readdir, closedir, and dirent name accessor. The first three are not strictly
+ * necessary, but should save us some #!+netbsd in the build, and this also allows
+ * building Windows versions using the non-ANSI variants of FindFirstFile &co
+ * under the same API. (Use a structure that appends the handle to the WIN32_FIND_DATA
+ * as the return value from sb_opendir, on sb_readdir grab the name from the previous
+ * call and save the new one.) Nikodemus thought he would have to do that to support
+ * DIRECTORY on UNC paths, but turns out opendir &co do TRT on Windows already -- so
+ * leaving that bit of tedium for a later date, once we figure out the whole *A vs. *W
+ * issue out properly. ...FIXME, obviously, as per above.
+ *
+ * Once that is done, the lisp side functions are best named OS-OPENDIR, etc.
+ */
+extern DIR *
+sb_opendir(char * name)
+{
+    return opendir(name);
+}
+
+extern struct dirent *
+sb_readdir(DIR * dirp)
+{
+    return readdir(dirp);
+}
+
+extern int
+sb_closedir(DIR * dirp)
+{
+    return closedir(dirp);
+}
+
+extern char *
+sb_dirent_name(struct dirent * ent)
+{
+    return ent->d_name;
 }
 
 /*

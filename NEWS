@@ -15,7 +15,6 @@
     efficiency measure for threaded platforms, but also valueable in
     expressing intent.
   * new feature: UNC pathnames are now understood by the system on Windows.
-    However, DIRECTORY does not yet support them -- but OPEN &co do.
   * optimization: the compiler uses a specialized version of FILL when the
     element type is know in more cases, making eg. (UNSIGNED-BYTE 8) case
     almost 90% faster.

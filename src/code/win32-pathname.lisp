@@ -172,51 +172,6 @@
           (t
            (concatenate 'simple-string "\\\\" device)))))
 
-(defun unparse-win32-piece (thing)
-  (etypecase thing
-    ((member :wild) "*")
-    (simple-string
-     (let* ((srclen (length thing))
-            (dstlen srclen))
-       (dotimes (i srclen)
-         (case (schar thing i)
-           ((#\* #\? #\[)
-            (incf dstlen))))
-       (let ((result (make-string dstlen))
-             (dst 0))
-         (dotimes (src srclen)
-           (let ((char (schar thing src)))
-             (case char
-               ((#\* #\? #\[)
-                (setf (schar result dst) #\\)
-                (incf dst)))
-             (setf (schar result dst) char)
-             (incf dst)))
-         result)))
-    (pattern
-     (collect ((strings))
-       (dolist (piece (pattern-pieces thing))
-         (etypecase piece
-           (simple-string
-            (strings piece))
-           (symbol
-            (ecase piece
-              (:multi-char-wild
-               (strings "*"))
-              (:single-char-wild
-               (strings "?"))))
-           (cons
-            (case (car piece)
-              (:character-set
-               (strings "[")
-               (strings (cdr piece))
-               (strings "]"))
-              (t
-               (error "invalid pattern piece: ~S" piece))))))
-       (apply #'concatenate
-              'simple-string
-              (strings))))))
-
 (defun unparse-win32-directory-list (directory)
   (declare (type list directory))
   (collect ((pieces))
@@ -236,7 +191,7 @@
           ((member :wild-inferiors)
            (pieces "**\\"))
           ((or simple-string pattern (member :wild))
-           (pieces (unparse-unix-piece dir))
+           (pieces (unparse-physical-piece dir))
            (pieces "\\"))
           (t
            (error "invalid directory component: ~S" dir)))))
@@ -264,7 +219,7 @@
         (when (and (typep name 'string)
                    (string= name ""))
           (error "name is of length 0: ~S" pathname))
-        (strings (unparse-unix-piece name)))
+        (strings (unparse-physical-piece name)))
       (when type-supplied
         (unless name
           (error "cannot specify the type without a file: ~S" pathname))
@@ -272,7 +227,7 @@
           (when (position #\. type)
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
-        (strings (unparse-unix-piece type))))
+        (strings (unparse-physical-piece type))))
     (apply #'concatenate 'simple-string (strings))))
 
 (defun unparse-win32-namestring (pathname)
@@ -283,9 +238,7 @@
                (unparse-win32-file pathname)))
 
 (defun unparse-native-win32-namestring (pathname as-file)
-  (declare (type pathname pathname)
-           ;; Windows doesn't like directory names with trailing slashes.
-           (ignore as-file))
+  (declare (type pathname pathname))
   (let* ((device (pathname-device pathname))
          (directory (pathname-directory pathname))
          (name (pathname-name pathname))
@@ -294,28 +247,27 @@
          (type (pathname-type pathname))
          (type-present-p (typep type '(not (member nil :unspecific))))
          (type-string (if type-present-p type "")))
+    (when name-present-p
+      (setf as-file nil))
     (coerce
      (with-output-to-string (s)
        (when device
          (write-string (unparse-win32-device pathname) s))
-       (tagbody
-          (when directory
-            (ecase (pop directory)
-              (:absolute (write-char #\\ s))
-              (:relative)))
-          (unless directory (go :done))
-        :subdir
-          (let ((piece (pop directory)))
-            (typecase piece
-              ((member :up) (write-string ".." s))
-              (string (write-string piece s))
-              (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
-                        piece)))
-            (when (or directory name)
-              (write-char #\\ s)))
-          (when directory
-            (go :subdir))
-        :done)
+       (when directory
+         (ecase (car directory)
+           (:absolute (write-char #\\ s))
+           (:relative)))
+       (loop for (piece . subdirs) on (cdr directory)
+          do (typecase piece
+               ((member :up) (write-string ".." s))
+               (string (write-string piece s))
+               (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
+                         piece)))
+          if (or subdirs (stringp name))
+          do (write-char #\\ s)
+          else
+          do (unless as-file
+               (write-char #\\ s)))
        (if name-present-p
            (progn
              (unless (stringp name-string) ;some kind of wild field
@@ -375,7 +327,7 @@
                      (typep pathname-name 'simple-string)
                      (position #\. pathname-name :start 1))
             (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-unix-piece pathname-name)))
+          (strings (unparse-physical-piece pathname-name)))
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
@@ -383,7 +335,7 @@
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")
-          (strings (unparse-unix-piece pathname-type))))
+          (strings (unparse-physical-piece pathname-type))))
       (apply #'concatenate 'simple-string (strings)))))
 
 ;; FIXME: This has been converted rather blindly from the Unix
