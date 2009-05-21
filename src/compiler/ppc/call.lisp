@@ -1208,7 +1208,7 @@ default-value-8
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ,error ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (frob arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs)
   (frob type-check-error object-not-type-error sb!c::%type-check-error

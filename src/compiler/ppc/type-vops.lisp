@@ -144,7 +144,7 @@
                                                 ((lowtag-mask) type-codes)))
                          (move result value))
                        `((let ((err-lab
-                                (generate-error-code vop ,error-code value)))
+                                (generate-error-code vop ',error-code value)))
                            (test-type value err-lab t (,@type-codes) :temp temp)
                            (move result value))))))))
        ,@(when ptype
@@ -175,7 +175,7 @@
 
 (define-vop (check-signed-byte-32 check-type)
   (:generator 45
-    (let ((nope (generate-error-code vop object-not-signed-byte-32-error value))
+    (let ((nope (generate-error-code vop 'object-not-signed-byte-32-error value))
           (yep (gen-label)))
       (inst andi. temp value #x3)
       (inst beq yep)
@@ -239,7 +239,7 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 45
     (let ((nope
-           (generate-error-code vop object-not-unsigned-byte-32-error value))
+           (generate-error-code vop 'object-not-unsigned-byte-32-error value))
           (yep (gen-label))
           (fixnum (gen-label))
           (single-word (gen-label)))
@@ -299,7 +299,7 @@
 (define-vop (check-symbol check-type)
   (:generator 12
     (let ((drop-thru (gen-label))
-          (error (generate-error-code vop object-not-symbol-error value)))
+          (error (generate-error-code vop 'object-not-symbol-error value)))
       (inst cmpw value null-tn)
       (inst beq drop-thru)
       (test-type value error t (symbol-header-widetag) :temp temp)
@@ -318,7 +318,7 @@
 
 (define-vop (check-cons check-type)
   (:generator 8
-    (let ((error (generate-error-code vop object-not-cons-error value)))
+    (let ((error (generate-error-code vop 'object-not-cons-error value)))
       (inst cmpw value null-tn)
       (inst beq error)
       (test-type value error t (list-pointer-lowtag) :temp temp)

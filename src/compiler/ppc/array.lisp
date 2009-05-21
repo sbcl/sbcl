@@ -78,7 +78,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
-    (let ((error (generate-error-code vop invalid-array-index-error
+    (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
       (inst cmplw index bound)
       (inst bge error)
