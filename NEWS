@@ -10,6 +10,8 @@
     :HASH-FUNCTION argument. Refer to user manual for details.
   * new feature: SB-EXT:DEFGLOBAL macro allows defining global non-special
     variables.
+  * new feature: SB-EXT:GET-TIME-OF-DAY provides access to seconds and
+    microseconds since the Unix epoch on all platforms.
   * new feature: SB-EXT:ALWAYS-BOUND proclamation inhibits MAKUNBOUND, and
     allows the compiler to safely elide boundedness checks for special
     variables.

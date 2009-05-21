@@ -95,9 +95,7 @@ Includes both \"system\" and \"user\" time."
   #!+sb-doc
   "Return a single integer for the current time of day in universal time
 format."
-  (multiple-value-bind (res secs) (sb!unix:unix-gettimeofday)
-    (declare (ignore res))
-    (+ secs unix-to-universal-time)))
+  (+ (get-time-of-day) unix-to-universal-time))
 
 (defun get-decoded-time ()
   #!+sb-doc

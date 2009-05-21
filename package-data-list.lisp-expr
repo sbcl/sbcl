@@ -586,8 +586,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "COMPARE-AND-SWAP"
                "ATOMIC-INCF"
 
-               ;; Timing information
+               ;; Time related things
                "CALL-WITH-TIMING"
+               "GET-TIME-OF-DAY"
 
                ;; People have various good reasons to mess with the GC.
                "*AFTER-GC-HOOKS*"

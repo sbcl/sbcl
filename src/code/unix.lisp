@@ -838,39 +838,6 @@ corresponds to NAME, or NIL if there is none."
   (struct timezone
     (tz-minuteswest int)                ; minutes west of Greenwich
     (tz-dsttime int)))                  ; type of dst correction
-
-;;; If it works, UNIX-GETTIMEOFDAY returns 5 values: T, the seconds
-;;; and microseconds of the current time of day, the timezone (in
-;;; minutes west of Greenwich), and a daylight-savings flag. If it
-;;; doesn't work, it returns NIL and the errno.
-#!-sb-fluid (declaim (inline unix-gettimeofday))
-(defun unix-gettimeofday ()
-  #!+(and x86-64 darwin)
-  (with-alien ((tv (struct timeval)))
-    ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
-    ;; gettimeofday occasionally fails. passing in a null pointer for
-    ;; the timezone struct seems to work around the problem. I can't
-    ;; find any instances in the SBCL where we actually ues the
-    ;; timezone values, so we just punt for the moment.
-    (syscall* ("gettimeofday" (* (struct timeval))
-                              (* (struct timezone)))
-              (values t
-                      (slot tv 'tv-sec)
-                      (slot tv 'tv-usec))
-              (addr tv)
-              nil))
-  #!-(and x86-64 darwin)
-  (with-alien ((tv (struct timeval))
-               (tz (struct timezone)))
-    (syscall* ("gettimeofday" (* (struct timeval))
-                              (* (struct timezone)))
-              (values t
-                      (slot tv 'tv-sec)
-                      (slot tv 'tv-usec)
-                      (slot tz 'tz-minuteswest)
-                      (slot tz 'tz-dsttime))
-              (addr tv)
-              (addr tz))))
 
 
 ;; Type of the second argument to `getitimer' and
@@ -956,12 +923,40 @@ corresponds to NAME, or NIL if there is none."
 ;;; Windows build.
 #!-win32
 (progn
+
+  #!-sb-fluid (declaim (inline get-time-of-day))
+  (defun get-time-of-day ()
+    "Return the number of seconds and microseconds since the beginning og
+the UNIX epoch (January 1st 1970.)"
+    #!+darwin
+    (with-alien ((tv (struct timeval)))
+      ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
+      ;; gettimeofday occasionally fails. passing in a null pointer for the
+      ;; timezone struct seems to work around the problem. NS notes: Darwin
+      ;; manpage says the timezone is not used anymore in their implementation
+      ;; at all.
+      (syscall* ("gettimeofday" (* (struct timeval))
+                                (* (struct timezone)))
+                (values (slot tv 'tv-sec)
+                        (slot tv 'tv-usec))
+                (addr tv)
+                nil))
+    #!-(and x86-64 darwin)
+    (with-alien ((tv (struct timeval))
+                 (tz (struct timezone)))
+      (syscall* ("gettimeofday" (* (struct timeval))
+                                (* (struct timezone)))
+                (values (slot tv 'tv-sec)
+                        (slot tv 'tv-usec))
+                (addr tv)
+                (addr tz))))
+
   (declaim (inline system-internal-run-time
                    system-real-time-values))
 
   (defun system-real-time-values ()
-    (multiple-value-bind (_ sec usec) (unix-gettimeofday)
-      (declare (ignore _) (type (unsigned-byte 32) sec usec))
+    (multiple-value-bind (sec usec) (get-time-of-day)
+      (declare (type (unsigned-byte 32) sec usec))
       (values sec (truncate usec micro-seconds-per-internal-time-unit))))
 
   ;; There are two optimizations here that actually matter (on 32-bit
@@ -1035,6 +1030,17 @@ corresponds to NAME, or NIL if there is none."
                                  (floor micro-seconds-per-internal-time-unit 2))
                               micro-seconds-per-internal-time-unit))))
         result))))
+
+;;; FIXME, KLUDGE: GET-TIME-OF-DAY used to be UNIX-GETTIMEOFDAY, and had a
+;;; primary return value indicating sucess, and also returned timezone
+;;; information -- though the timezone data was not there on Darwin.
+;;; Now we have GET-TIME-OF-DAY, but it turns out that despite SB-UNIX being
+;;; an implementation package UNIX-GETTIMEOFDAY has users in the wild.
+;;; So we're stuck with it for a while -- maybe delete it towards the end
+;;; of 2009.
+(defun unix-gettimeofday ()
+  (multiple-value-bind (sec usec) (get-time-of-day)
+    (values t sec usec nil nil)))
 
 ;;;; opendir, readdir, closedir, and dirent-name
 

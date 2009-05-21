@@ -530,6 +530,51 @@
   (with-process-times (creation-time exit-time kernel-time user-time)
     (values (floor (+ user-time kernel-time) 100ns-per-internal-time-unit))))
 
+(define-alien-type hword (unsigned 16))
+
+(define-alien-type systemtime
+    (struct systemtime
+            (year hword)
+            (month hword)
+            (weekday hword)
+            (day hword)
+            (hour hword)
+            (minute hword)
+            (second hword)
+            (millisecond hword)))
+
+;; Obtained with, but the XC can't deal with that -- but
+;; it's not like the value is ever going to change...
+;; (with-alien ((filetime filetime)
+;;              (epoch systemtime))
+;;   (setf (slot epoch 'year) 1970
+;;         (slot epoch 'month) 1
+;;         (slot epoch 'day) 1
+;;         (slot epoch 'hour) 0
+;;         (slot epoch 'minute) 0
+;;         (slot epoch 'second) 0
+;;         (slot epoch 'millisecond) 0)
+;;   (syscall (("SystemTimeToFileTime" 8) void
+;;             (* systemtime) (* filetime))
+;;            filetime
+;;            (addr epoch)
+;;            (addr filetime)))
+(defconstant +unix-epoch-filetime+ 116444736000000000)
+
+#!-sb-fluid
+(declaim (inline get-time-of-day))
+(defun get-time-of-day ()
+  "Return the number of seconds and microseconds since the beginning og the
+UNIX epoch: January 1st 1970."
+  (with-alien ((system-time filetime))
+    (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
+             (multiple-value-bind (sec 100ns)
+                 (floor (- system-time +unix-epoch-filetime+)
+                        (* 100ns-per-internal-time-unit
+                           internal-time-units-per-second))
+               (values sec (floor 100ns 10)))
+             (addr system-time))))
+
 ;; SETENV
 ;; The SetEnvironmentVariable function sets the contents of the specified
 ;; environment variable for the current process.
