@@ -516,6 +516,10 @@
                                   (init-wrapper 'progn)
                                   (values 1))
   (let* ((var-name (symbolicate "*" name "-CACHE-VECTOR*"))
+         (probes-name (when *profile-hash-cache*
+                       (symbolicate "*" name "-CACHE-PROBES*")))
+         (misses-name (when *profile-hash-cache*
+                      (symbolicate "*" name "-CACHE-MISSES*")))
          (nargs (length args))
          (size (ash 1 hash-bits))
          (default-values (if (and (consp default) (eq (car default) 'values))
@@ -525,7 +529,7 @@
          (args-and-values-size (+ nargs values))
          (n-index (sb!xc:gensym "INDEX"))
          (n-cache (sb!xc:gensym "CACHE")))
-
+    (declare (ignorable probes-name misses-name))
     (unless (= (length default-values) values)
       (error "The number of default values ~S differs from :VALUES ~W."
              default values))
@@ -555,20 +559,16 @@
           (incf n)))
 
       (when *profile-hash-cache*
-        (let ((n-probe (symbolicate "*" name "-CACHE-PROBES*"))
-              (n-miss (symbolicate "*" name "-CACHE-MISSES*")))
-          (inits `(setq ,n-probe 0))
-          (inits `(setq ,n-miss 0))
-          (forms `(defvar ,n-probe))
-          (forms `(defvar ,n-miss))
-          (forms `(declaim (fixnum ,n-miss ,n-probe)))))
+        (inits `(setq ,probes-name 0))
+        (inits `(setq ,misses-name 0))
+        (forms `(declaim (fixnum ,probes-name ,misses-name))))
 
       (let ((fun-name (symbolicate name "-CACHE-LOOKUP")))
         (inlines fun-name)
         (forms
          `(defun ,fun-name ,(arg-vars)
             ,@(when *profile-hash-cache*
-                `((incf ,(symbolicate  "*" name "-CACHE-PROBES*"))))
+                `((incf ,probes-name)))
             (let* ((,n-index (,hash-function ,@(arg-vars)))
                    (,n-cache ,var-name)
                    (,args-and-values (svref ,n-cache ,n-index)))
@@ -577,7 +577,7 @@
                      (values ,@(values-refs)))
                     (t
                      ,@(when *profile-hash-cache*
-                         `((incf ,(symbolicate  "*" name "-CACHE-MISSES*"))))
+                         `((incf ,misses-name)))
                      ,default))))))
 
       (let ((fun-name (symbolicate name "-CACHE-ENTER")))
@@ -603,6 +603,9 @@
 
       `(progn
          (defvar ,var-name)
+         ,@(when *profile-hash-cache*
+             `((defvar ,probes-name)
+               (defvar ,misses-name)))
          (declaim (type (simple-vector ,size) ,var-name))
          #!-sb-fluid (declaim (inline ,@(inlines)))
          (,init-wrapper ,@(inits))
