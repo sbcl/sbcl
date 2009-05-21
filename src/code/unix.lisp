@@ -56,9 +56,12 @@
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
 ;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
+;;;
+;;; SB-EXECUTABLE, at least, uses one of these macros; other libraries
+;;; and programs have been known to use them as well.  Perhaps they
+;;; should live in SB-SYS or even SB-EXT?
 
-(eval-when (:compile-toplevel :execute)
-(sb!xc:defmacro syscall ((name &rest arg-types) success-form &rest args)
+(defmacro syscall ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -70,7 +73,7 @@
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
 ;;; never really get an error.
-(sb!xc:defmacro syscall* ((name &rest arg-types) success-form &rest args)
+(defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -79,10 +82,10 @@
           (error "Syscall ~A failed: ~A" ,name (strerror))
           ,success-form))))
 
-(sb!xc:defmacro int-syscall ((name &rest arg-types) &rest args)
+(defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values result 0) ,@args))
 
-(sb!xc:defmacro with-restarted-syscall ((&optional (value (gensym))
+(defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
                                   syscall-form &rest body)
   #!+sb-doc
@@ -94,10 +97,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
         (unless #!-win32 (eql ,errno sb!unix:eintr) #!+win32 nil
           (return (values ,value ,errno))))
      ,@body))
-) ; EVAL-WHEN
 
-;;; FIXME: This could go in the above EVAL-WHEN, but it's used by
-;;; SB-EXECUTABLE.
 (defmacro void-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values t 0) ,@args))
 
