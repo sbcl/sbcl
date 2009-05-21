@@ -696,11 +696,15 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; weak pointers and finalization
                "CANCEL-FINALIZATION"
                "FINALIZE"
-               "HASH-TABLE-WEAKNESS" "MAKE-WEAK-POINTER"
-               "WEAK-POINTER" "WEAK-POINTER-P" "WEAK-POINTER-VALUE"
+               "MAKE-WEAK-POINTER"
+               "WEAK-POINTER"
+               "WEAK-POINTER-P"
+               "WEAK-POINTER-VALUE"
 
-               ;; Hash table locking
+               ;; Hash table extensions
+               "DEFINE-HASH-TABLE-TEST"
                "HASH-TABLE-SYNCHRONIZED-P"
+               "HASH-TABLE-WEAKNESS"
                "WITH-LOCKED-HASH-TABLE"
 
                ;; If the user knows we're doing IEEE, he might reasonably
@@ -1122,7 +1126,6 @@ possibly temporariliy, because it might be used internally."
                "GET-FLOATING-POINT-MODES"
                "SET-FLOATING-POINT-MODES"
                "WITH-FLOAT-TRAPS-MASKED"
-               "DEFINE-HASH-TABLE-TEST"
 
                ;; compatibility hacks for old-style CMU CL data formats
                "UNIX-ENVIRONMENT-CMUCL-FROM-SBCL"

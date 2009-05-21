@@ -391,4 +391,65 @@
 
 )
 
+;;; DEFINE-HASH-TABLE-TEST
+
+(defstruct custom-hash-key name)
+(defun custom-hash-test (x y)
+  (equal (custom-hash-key-name x)
+         (custom-hash-key-name y)))
+(defun custom-hash-hash (x)
+  (sxhash (custom-hash-key-name x)))
+(define-hash-table-test custom-hash-test custom-hash-hash)
+(with-test (:name define-hash-table-test.1)
+  (let ((table (make-hash-table :test 'custom-hash-test)))
+    (setf (gethash (make-custom-hash-key :name "foo") table) :foo)
+    (setf (gethash (make-custom-hash-key :name "bar") table) :bar)
+    (assert (eq :foo (gethash (make-custom-hash-key :name "foo") table)))
+    (assert (eq :bar (gethash (make-custom-hash-key :name "bar") table)))
+    (assert (eq 'custom-hash-test (hash-table-test table))))
+  (let ((table (make-hash-table :test #'custom-hash-test)))
+    (setf (gethash (make-custom-hash-key :name "foo") table) :foo)
+    (setf (gethash (make-custom-hash-key :name "bar") table) :bar)
+    (assert (eq :foo (gethash (make-custom-hash-key :name "foo") table)))
+    (assert (eq :bar (gethash (make-custom-hash-key :name "bar") table)))
+    (assert (eq 'custom-hash-test (hash-table-test table)))))
+
+
+(defun head-eql (x y)
+  (every #'eql (subseq x 0 3) (subseq y 0 3)))
+(define-hash-table-test head-eql
+    (lambda (x)
+      (logand most-positive-fixnum
+              (reduce #'+ (map 'list #'sxhash (subseq x 0 3))))))
+(with-test (:name define-hash-table-test.2)
+  (let ((table (make-hash-table :test 'head-eql)))
+    (setf (gethash #(1 2 3 4) table) :|123|)
+    (setf (gethash '(2 3 4 7) table) :|234|)
+    (setf (gethash "foobar" table) :foo)
+    (assert (eq :|123| (gethash '(1 2 3 ! 6) table)))
+    (assert (eq :|234| (gethash #(2 3 4 0 2 1 a) table)))
+    (assert (eq :foo (gethash '(#\f #\o #\o 1 2 3) table)))
+    (assert (eq 'head-eql (hash-table-test table))))
+  (let ((table (make-hash-table :test #'head-eql)))
+    (setf (gethash #(1 2 3 4) table) :|123|)
+    (setf (gethash '(2 3 4 7) table) :|234|)
+    (setf (gethash "foobar" table) :foo)
+    (assert (eq :|123| (gethash '(1 2 3 ! 6) table)))
+    (assert (eq :|234| (gethash #(2 3 4 0 2 1 a) table)))
+    (assert (eq :foo (gethash '(#\f #\o #\o 1 2 3) table)))
+    (assert (eq 'head-eql (hash-table-test table)))))
+
+(with-test (:name make-hash-table/hash-fun)
+  (let ((table (make-hash-table
+                :test #'=
+                :hash-function (lambda (x)
+                                 (sxhash (coerce (abs x) 'double-float))))))
+    (incf (gethash 1 table 0))
+    (incf (gethash 1.0f0 table))
+    (incf (gethash 1.0d0 table))
+    (incf (gethash (complex 1.0f0 0.0f0) table))
+    (incf (gethash (complex 1.0d0 0.0d0) table))
+    (assert (= 5 (gethash 1 table)))
+    (assert (eq '= (hash-table-test table)))))
+
 ;;; success

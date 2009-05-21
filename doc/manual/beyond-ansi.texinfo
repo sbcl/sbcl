@@ -13,6 +13,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Customization Hooks for Users::
 * Tools To Help Developers::
 * Resolution of Name Conflicts::
+* Hash Table Extensions::
 * Miscellaneous Extensions::
 * Stale Extensions::
 * Efficiency Hacks::
@@ -27,7 +28,8 @@ specified by ANSI. Weak pointers allow references to objects to be
 maintained without keeping them from being garbage collected, and
 ``finalization'' hooks are available to cause code to be executed when
 an object has been garbage collected. Additionally users can specify
-their own cleanup actions to be executed with garbage collection.
+their own cleanup actions to be executed with garbage collection. See
+also @code{make-hash-table} for information on weak hash tables.
 
 @include fun-sb-ext-finalize.texinfo
 @include fun-sb-ext-cancel-finalization.texinfo
@@ -375,6 +377,23 @@ in whose favour the conflict should be resolved; for programmatic use,
 the @code{sb-ext:resolve-conflict} restart should be invoked with one
 argument, which should be a member of the list returned by the condition
 accessor @code{sb-ext:name-conflict-symbols}.
+
+@node    Hash Table Extensions
+@comment  node-name,  next,  previous,  up
+@section Hash Table Extensions
+
+Hash table extensions supported by SBCL are all controlled by keyword
+arguments to @code{make-hash-table}.
+
+@include fun-common-lisp-make-hash-table.texinfo
+
+@include macro-sb-ext-define-hash-table-test.texinfo
+
+@include macro-sb-ext-with-locked-hash-table.texinfo
+
+@include fun-sb-ext-hash-table-synchronized-p.texinfo
+
+@include fun-sb-ext-hash-table-weakness.texinfo
 
 @node    Miscellaneous Extensions
 @comment  node-name,  next,  previous,  up

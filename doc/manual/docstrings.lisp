@@ -83,7 +83,7 @@ you deserve to lose.")
   "Characters that might start an itemization in docstrings when
   at the start of a line.")
 
-(defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+&"
+(defparameter *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+&#'"
   "List of characters that make up symbols in a docstring.")
 
 (defparameter *symbol-delimiters* " ,.!?;")
@@ -226,6 +226,10 @@ symbols or lists of symbols."))
   (let ((kind (get-kind doc)))
     (format nil "~:(~A~) ~(~A~)" kind (name-using-kind/name kind (get-name doc) doc))))
 
+(defun short-package-name (package)
+  (car (sort (copy-list (cons (package-name package) (package-nicknames package)))
+             #'< :key #'length)))
+
 ;;; Definition titles for DOCUMENTATION instances
 
 (defgeneric title-using-kind/name (kind name doc))
@@ -236,12 +240,12 @@ symbols or lists of symbols."))
 
 (defmethod title-using-kind/name (kind (name symbol) doc)
   (declare (ignore kind))
-  (format nil "~A:~A" (package-name (get-package doc)) name))
+  (format nil "~A:~A" (short-package-name (get-package doc)) name))
 
 (defmethod title-using-kind/name (kind (name list) doc)
   (declare (ignore kind))
   (assert (setf-name-p name))
-  (format nil "(setf ~A:~A)" (package-name (get-package doc)) (second name)))
+  (format nil "(setf ~A:~A)" (short-package-name (get-package doc)) (second name)))
 
 (defmethod title-using-kind/name ((kind (eql 'method)) name doc)
   (format nil "~{~A ~}~A"
@@ -390,11 +394,22 @@ there is no corresponding docstring."
                       (clean (cdr x) :key key :optional optional))))))
          (clean (sb-introspect:function-lambda-list (get-name doc))))))))
 
+(defun get-string-name (x)
+  (let ((name (get-name x)))
+    (cond ((symbolp name)
+           (symbol-name name))
+          ((and (consp name) (eq 'setf (car name)))
+           (symbol-name (second name)))
+          ((stringp name)
+           name)
+          (t
+           (error "Don't know which symbol to use for name ~S" name)))))
+
 (defun documentation< (x y)
   (let ((p1 (position (get-kind x) *ordered-documentation-kinds*))
         (p2 (position (get-kind y) *ordered-documentation-kinds*)))
     (if (or (not (and p1 p2)) (= p1 p2))
-        (string< (string (get-name x)) (string (get-name y)))
+        (string< (get-string-name x) (get-string-name y))
         (< p1 p2))))
 
 ;;;; turning text into texinfo
@@ -415,39 +430,44 @@ with #\@. Optionally downcase the result."
 
 ;;; line markups
 
+(defvar *not-symbols* '("ANSI" "CLHS"))
+
 (defun locate-symbols (line)
   "Return a list of index pairs of symbol-like parts of LINE."
   ;; This would be a good application for a regex ...
-  (do ((result nil)
-       (begin nil)
-       (maybe-begin t)
-       (i 0 (1+ i)))
-      ((= i (length line))
-       ;; symbol at end of line
-       (when (and begin (or (> i (1+ begin))
-                            (not (member (char line begin) '(#\A #\I)))))
-         (push (list begin i) result))
-       (nreverse result))
-    (cond
-      ((and begin (find (char line i) *symbol-delimiters*))
-       ;; symbol end; remember it if it's not "A" or "I"
-       (when (or (> i (1+ begin)) (not (member (char line begin) '(#\A #\I))))
-         (push (list begin i) result))
-       (setf begin nil
-             maybe-begin t))
-      ((and begin (not (find (char line i) *symbol-characters*)))
-       ;; Not a symbol: abort
-       (setf begin nil))
-      ((and maybe-begin (not begin) (find (char line i) *symbol-characters*))
-       ;; potential symbol begin at this position
-       (setf begin i
-             maybe-begin nil))
-      ((find (char line i) *symbol-delimiters*)
-       ;; potential symbol begin after this position
-       (setf maybe-begin t))
-      (t
-       ;; Not reading a symbol, not at potential start of symbol
-       (setf maybe-begin nil)))))
+  (let (result)
+    (flet ((grab (start end)
+             (unless (member (subseq line start end) '("ANSI" "CLHS"))
+               (push (list start end) result))))
+      (do ((begin nil)
+           (maybe-begin t)
+           (i 0 (1+ i)))
+          ((= i (length line))
+           ;; symbol at end of line
+           (when (and begin (or (> i (1+ begin))
+                                (not (member (char line begin) '(#\A #\I)))))
+             (grab begin i))
+           (nreverse result))
+        (cond
+          ((and begin (find (char line i) *symbol-delimiters*))
+           ;; symbol end; remember it if it's not "A" or "I"
+           (when (or (> i (1+ begin)) (not (member (char line begin) '(#\A #\I))))
+             (grab begin i))
+           (setf begin nil
+                 maybe-begin t))
+          ((and begin (not (find (char line i) *symbol-characters*)))
+           ;; Not a symbol: abort
+           (setf begin nil))
+          ((and maybe-begin (not begin) (find (char line i) *symbol-characters*))
+           ;; potential symbol begin at this position
+           (setf begin i
+                 maybe-begin nil))
+          ((find (char line i) *symbol-delimiters*)
+           ;; potential symbol begin after this position
+           (setf maybe-begin t))
+          (t
+           ;; Not reading a symbol, not at potential start of symbol
+           (setf maybe-begin nil)))))))
 
 (defun texinfo-line (line)
   "Format symbols in LINE texinfo-style: either as code or as
@@ -686,7 +706,14 @@ followed another tabulation label or a tabulation body."
                "deffn"))
             (map 'string (lambda (char) (if (eql char #\-) #\Space char)) (string kind))
             (title-name doc)
-            (lambda-list doc))))
+            ;; &foo would be amusingly bold in the pdf thanks to TeX/Texinfo
+            ;; interactions,so we escape the ampersand -- amusingly for TeX.
+            ;; sbcl.texinfo defines macros that expand @&key and friends to &key.
+            (mapcar (lambda (name)
+                      (if (member name lambda-list-keywords)
+                          (format nil "@~A" name)
+                          name))
+                    (lambda-list doc)))))
 
 (defun texinfo-index (doc)
   (let ((title (title-name doc)))

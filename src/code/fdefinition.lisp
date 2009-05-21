@@ -235,6 +235,23 @@
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
+
+    ;; Check for hash-table stuff. Woe onto him that mixes encapsulation
+    ;; with this.
+    (when (and (symbolp name) (fboundp name)
+               (boundp '*user-hash-table-tests*))
+      (let ((old (symbol-function name)))
+        (declare (special *user-hash-table-tests*))
+        (dolist (spec *user-hash-table-tests*)
+          (cond ((eq old (second spec))
+                 ;; test-function
+                 (setf (second spec) new-value))
+                ((eq old (third spec))
+                 ;; hash-function
+                 (setf (third spec) new-value))))))
+
+    ;; FIXME: This is a good hook to have, but we should probably
+    ;; reserve it for users.
     (let ((fdefn (fdefinition-object name t)))
       ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
       ;; top level forms in the kernel core startup.

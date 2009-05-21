@@ -292,6 +292,9 @@ Defining it as a method combination type.
 @item
 Using it as the class-name argument to setf of find-class.
 
+@item
+Defining it as a hash table test using @code{sb-ext:define-hash-table-test}.
+
 @end enumerate
 
 @node Package Lock Dictionary

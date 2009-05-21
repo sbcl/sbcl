@@ -5,6 +5,9 @@
     allowed to return, which causes SBCL to quit with exit status 0. Previously
     if the function returned with a small integer return value, that value
     was accidentally reused as the exit status.
+  * new feature: SB-EXT:DEFINE-HASH-TABLE-TEST allows defining new arguments
+    to MAKE-HASH-TABLE :TEST, and MAKE-HASH-TABLE has been extended with
+    :HASH-FUNCTION argument. Refer to user manual for details.
   * new feature: SB-EXT:DEFGLOBAL macro allows defining global non-special
     variables.
   * new feature: SB-EXT:ALWAYS-BOUND proclamation inhibits MAKUNBOUND, and

@@ -126,62 +126,157 @@
 
 ;;;; user-defined hash table tests
 
-(defvar *hash-table-tests* nil)
+(defvar *user-hash-table-tests* nil)
 
-(defun define-hash-table-test (name test-fun hash-fun)
-  #!+sb-doc
-  "Define a new kind of hash table test."
-  (declare (type symbol name)
-           (type function test-fun hash-fun))
-  (setf *hash-table-tests*
-        (cons (list name test-fun hash-fun)
-              (remove name *hash-table-tests* :test #'eq :key #'car)))
+(defun register-hash-table-test (name hash-fun)
+  (declare (symbol name) (function hash-fun))
+  (unless (fboundp name)
+    (error "Cannot register ~S has a hash table test: undefined function."
+           name))
+  (with-single-package-locked-error
+      (:symbol name "defining ~S as a hash table test")
+    (let* ((test-fun (fdefinition name))
+           (this (list name test-fun hash-fun))
+           (spec (assoc name *user-hash-table-tests*)))
+      (cond (spec
+             (unless (and (eq (second spec) test-fun)
+                          (eq (third spec) hash-fun))
+               (style-warn "Redefining hash table test ~S." name)
+               (setf (cdr spec) (cdr this))))
+            (t
+             (push this *user-hash-table-tests*)))))
   name)
+
+(defmacro define-hash-table-test (name hash-function)
+  #!+sb-doc
+  "Defines NAME as a new kind of hash table test for use with the :TEST
+argument to MAKE-HASH-TABLE, and associates a default HASH-FUNCTION with it.
+
+NAME must be a symbol naming a global two argument equivalence predicate.
+Afterwards both 'NAME and #'NAME can be used with :TEST argument. In both
+cases HASH-TABLE-TEST will return the symbol NAME.
+
+HASH-FUNCTION must be a symbol naming a global hash function consistent with
+the predicate, or be a LAMBDA form implementing one in the current lexical
+environment. The hash function must compute the same hash code for any two
+objects for which NAME returns true, and subsequent calls with already hashed
+objects must always return the same hash code.
+
+Note: The :HASH-FUNCTION keyword argument to MAKE-HASH-TABLE can be used to
+override the specified default hash-function.
+
+Attempting to define NAME in a locked package as hash-table test causes a
+package lock violation.
+
+Examples:
+
+  ;;; 1.
+
+  ;; We want to use objects of type FOO as keys (by their
+  ;; names.) EQUALP would work, but would make the names
+  ;; case-insensitive -- wich we don't want.
+  (defstruct foo (name nil :type (or null string)))
+
+  ;; Define an equivalence test function and a hash function.
+  (defun foo-name= (f1 f2) (equal (foo-name f1) (foo-name f2)))
+  (defun sxhash-foo-name (f) (sxhash (foo-name f)))
+
+  (define-hash-table-test foo-name= sxhash-foo-name)
+
+  ;; #'foo-name would work too.
+  (defun make-foo-table () (make-hash-table :test 'foo-name=))
+
+  ;;; 2.
+
+  (defun == (x y) (= x y))
+
+  (define-hash-table-test ==
+    (lambda (x)
+      ;; Hash codes must be consistent with test, so
+      ;; not (SXHASH X), since
+      ;;   (= 1 1.0)                   => T
+      ;;   (= (SXHASH 1) (SXHASH 1.0)) => NIL
+      ;; Note: this doesn't deal with complex numbers or
+      ;; bignums too large to represent as double floats.
+      (sxhash (coerce x 'double-float))))
+
+  ;; #'== would work too
+  (defun make-number-table () (make-hash-table :test '==))
+"
+  (check-type name symbol)
+  (if (member name '(eq eql equal equalp))
+      (error "Cannot redefine standard hash table test ~S." name)
+      (cond ((symbolp hash-function)
+             `(register-hash-table-test ',name (symbol-function ',hash-function)))
+            ((and (consp hash-function) (eq 'lambda (car hash-function)))
+             `(register-hash-table-test ',name #',hash-function))
+            (t
+             (error "Malformed HASH-FUNCTION: ~S" hash-function)))))
 
 ;;;; construction and simple accessors
 
 (defconstant +min-hash-table-size+ 16)
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
 
-(defun make-hash-table (&key (test 'eql)
+(defun make-hash-table (&key
+                        (test 'eql)
                         (size +min-hash-table-size+)
                         (rehash-size 1.5)
                         (rehash-threshold 1)
+                        (hash-function nil)
                         (weakness nil)
                         (synchronized))
   #!+sb-doc
   "Create and return a new hash table. The keywords are as follows:
-     :TEST -- Indicates what kind of test to use.
-     :SIZE -- A hint as to how many elements will be put in this hash
-       table.
-     :REHASH-SIZE -- Indicates how to expand the table when it fills up.
-       If an integer, add space for that many elements. If a floating
-       point number (which must be greater than 1.0), multiply the size
-       by that amount.
-     :REHASH-THRESHOLD -- Indicates how dense the table can become before
-       forcing a rehash. Can be any positive number <=1, with density
-       approaching zero as the threshold approaches 0. Density 1 means an
-       average of one entry per bucket.
-     :WEAKNESS -- If NIL (the default) it is a normal non-weak hash table.
-       If one of :KEY, :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE it is a weak
-       hash table.
-       Depending on the type of weakness the lack of references to the
-       key and the value may allow for removal of the entry. If WEAKNESS
-       is :KEY and the key would otherwise be garbage the entry is eligible
-       for removal from the hash table. Similarly, if WEAKNESS is :VALUE
-       the life of an entry depends on its value's references. If WEAKNESS
-       is :KEY-AND-VALUE and either the key or the value would otherwise be
-       garbage the entry can be removed. If WEAKNESS is :KEY-OR-VALUE and
-       both the key and the value would otherwise be garbage the entry can
-       be removed.
-     :SYNCHRONIZED -- If NIL (the default), the hash-table may have
-       multiple concurrent readers, but results are undefined if a
-       thread writes to the hash-table concurrently with another
-       reader or writer. If T, all concurrent accesses are safe, but
-       note that CLHS 3.6 (Traversal Rules and Side Effects) remains
-       in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE. This keyword
-       argument is experimental, and may change incompatibly or be
-       removed in the future."
+
+  :TEST
+    Determines how keys are compared. Must a designator for one of the
+    standard hash table tests, or a hash table test defined using
+    SB-EXT:DEFINE-HASH-TABLE-TEST. Additionally, when an explicit
+    HASH-FUNCTION is provided (see below), any two argument equivalence
+    predicate can be used as the TEST.
+
+  :SIZE
+    A hint as to how many elements will be put in this hash table.
+
+  :REHASH-SIZE
+    Indicates how to expand the table when it fills up. If an integer, add
+    space for that many elements. If a floating point number (which must be
+    greater than 1.0), multiply the size by that amount.
+
+  :REHASH-THRESHOLD
+    Indicates how dense the table can become before forcing a rehash. Can be
+    any positive number <=1, with density approaching zero as the threshold
+    approaches 0. Density 1 means an average of one entry per bucket.
+
+  :HASH-FUNCTION
+    If NIL (the default), a hash function based on the TEST argument is used,
+    which then must be one of the standardized hash table test functions, or
+    one for which a default hash function has been defined using
+    SB-EXT:DEFINE-HASH-TABLE-TEST. If HASH-FUNCTION is specified, the TEST
+    argument can be any two argument predicate consistent with it. The
+    HASH-FUNCTION is expected to return a non-negative fixnum hash code.
+
+  :WEAKNESS
+    If NIL (the default) it is a normal non-weak hash table. If one
+    of :KEY, :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE it is a weak hash table.
+    Depending on the type of weakness the lack of references to the key and
+    the value may allow for removal of the entry. If WEAKNESS is :KEY and the
+    key would otherwise be garbage the entry is eligible for removal from the
+    hash table. Similarly, if WEAKNESS is :VALUE the life of an entry depends
+    on its value's references. If WEAKNESS is :KEY-AND-VALUE and either the
+    key or the value would otherwise be garbage the entry can be removed. If
+    WEAKNESS is :KEY-OR-VALUE and both the key and the value would otherwise
+    be garbage the entry can be removed.
+
+  :SYNCHRONIZED
+    If NIL (the default), the hash-table may have multiple concurrent readers,
+    but results are undefined if a thread writes to the hash-table
+    concurrently with another reader or writer. If T, all concurrent accesses
+    are safe, but note that CLHS 3.6 (Traversal Rules and Side Effects)
+    remains in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE. This keyword
+    argument is experimental, and may change incompatibly or be removed in the
+    future."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
   (multiple-value-bind (test test-fun hash-fun)
@@ -194,15 +289,42 @@
             ((or (eq test #'equalp) (eq test 'equalp))
              (values 'equalp #'equalp #'equalp-hash))
             (t
-             ;; FIXME: I'd like to remove *HASH-TABLE-TESTS* stuff.
-             ;; Failing that, I'd like to rename it to
-             ;; *USER-HASH-TABLE-TESTS*.
-             (dolist (info *hash-table-tests*
-                      (error "unknown :TEST for MAKE-HASH-TABLE: ~S"
-                             test))
+             ;; FIXME: It would be nice to have a compiler-macro
+             ;; that resolved this at compile time: we could grab
+             ;; the alist cell in a LOAD-TIME-VALUE, etc.
+             (dolist (info *user-hash-table-tests*
+                      (if hash-function
+                          (if (functionp test)
+                              (values (%fun-name test) test nil)
+                              (values test (%coerce-callable-to-fun test) nil))
+                       (error "Unknown :TEST for MAKE-HASH-TABLE: ~S"
+                              test)))
                (destructuring-bind (test-name test-fun hash-fun) info
                  (when (or (eq test test-name) (eq test test-fun))
                    (return (values test-name test-fun hash-fun)))))))
+    (when hash-function
+      (setf hash-fun
+            ;; Quickly check if the function has return return type which
+            ;; guarantees that the secondary return value is always NIL:
+            ;; (VALUES * &OPTIONAL), (VALUES * NULL ...) or (VALUES *
+            ;; &OPTIONAL NULL ...)
+            (let* ((actual (%coerce-callable-to-fun hash-function))
+                   (type-spec (%fun-type actual))
+                   (return-spec (when (consp type-spec)
+                                  (caddr type-spec)))
+                   (extra-vals (when (consp return-spec)
+                                 (cddr return-spec))))
+              (if (and (consp extra-vals)
+                       (or (eq 'null (car extra-vals))
+                           (and (eq '&optional (car extra-vals))
+                                (or (not (cdr extra-vals))
+                                    (eq 'null (cadr extra-vals))))))
+                  actual
+                  ;; If there is a potential secondary value, make sure we
+                  ;; don't accidentally claim EQ based hashing...
+                  (lambda (object)
+                    (declare (optimize (safety 0) (speed 3)))
+                    (values (funcall actual object) nil))))))
     (let* ((size (max +min-hash-table-size+
                       (min size
                            ;; SIZE is just a hint, so if the user asks
@@ -286,6 +408,10 @@
 #!+sb-doc
 (setf (fdocumentation 'hash-table-rehash-threshold 'function)
       "Return the rehash-threshold HASH-TABLE was created with.")
+
+#!+sb-doc
+(setf (fdocumentation 'hash-table-synchronized-p 'function)
+      "Returns T if HASH-TABLE is synchronized.")
 
 (defun hash-table-size (hash-table)
   #!+sb-doc

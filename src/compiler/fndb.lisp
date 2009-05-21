@@ -790,6 +790,7 @@
   (&key (:test callable) (:size unsigned-byte)
         (:rehash-size (or (integer 1) (float (1.0))))
         (:rehash-threshold (real 0 1))
+        (:hash-function (or null callable))
         (:weakness (member nil :key :value :key-and-value :key-or-value))
         (:synchronized t))
   hash-table

@@ -46,6 +46,21 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @ifnottex
 
+@c We use @&key, etc to escape & from TeX in lambda lists --
+@c so we need to define them for info as well.
+@macro &optional
+&optional
+@end macro
+@macro &rest
+&rest
+@end macro
+@macro &key
+&key
+@end macro
+@macro &body
+&body
+@end macro
+
 @node Top
 @comment  node-name,  next,  previous,  up
 @top sbcl
