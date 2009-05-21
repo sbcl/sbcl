@@ -33,7 +33,6 @@
 
 #include "runtime.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
-#include "alloc.h"
 #include "thread.h"
 #include "arch.h"
 #include "target-arch-os.h"
@@ -43,6 +42,7 @@
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"
 #include "interr.h"             /* for lose() */
+#include "alloc.h"
 #include "gc-internal.h"
 
 #ifdef LISP_FEATURE_WIN32
