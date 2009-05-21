@@ -550,7 +550,11 @@ matching filenames."
                          truename))))
              (do-physical-pathnames (pathname)
                (aver (not (logical-pathname-p pathname)))
-               (let* ((name (pathname-name pathname))
+               (let* (;; KLUDGE: Since we don't canonize pathnames on construction,
+                      ;; we really have to do it here to get #p"foo/." mean the same
+                      ;; as #p"foo/./".
+                      (pathname (canonicalize-pathname pathname))
+                      (name (pathname-name pathname))
                       (type (pathname-type pathname))
                       ;; KLUDGE: We want #p"/foo" to match #p"/foo/,
                       ;; so cobble up a directory name component from
@@ -598,6 +602,27 @@ matching filenames."
                         collect (cons namestring truename))
                   #'string<
                   :key #'car))))
+
+ (defun canonicalize-pathname (pathname)
+   ;; We're really only interested in :UNSPECIFIC -> NIL,
+   ;; and dealing with #p"foo/.." and #p"foo/."
+   (flet ((simplify (piece)
+            (unless (eq :unspecific piece)
+              piece)))
+     (let ((name (simplify (pathname-name pathname)))
+           (type (simplify (pathname-type pathname)))
+           (dir (pathname-directory pathname)))
+      (cond ((equal "." name)
+             (cond ((not type)
+                    (make-pathname :name nil :defaults pathname))
+                   ((equal "" type)
+                    (make-pathname :name nil
+                                   :type nil
+                                   :directory (butlast dir)
+                                   :defaults pathname))))
+            (t
+             (make-pathname :name name :type type :defaults pathname))))))
+
 
 ;;; Given a native namestring, provides a WITH-HASH-TABLE-ITERATOR style
 ;;; interface to mapping over namestrings of entries in the corresponding
@@ -657,39 +682,48 @@ symbolic link as an immediate child of DIRECTORY.
 
 Experimental: interface subject to change."
   (let* ((fun (%coerce-callable-to-fun function))
-         (realname (or (query-file-system directory :existence errorp)
-                       (return-from map-directory nil)))
-         (host (pathname-host realname))
-         ;; We want the trailing separator: better to ask the
-         ;; provide it rather than reason about its presence here.
-         (dirname (native-namestring realname :as-file nil)))
-    (with-native-directory-iterator (next dirname :errorp errorp)
-      (loop for name = (next)
-            while name
-            do (let* ((full (concatenate 'string dirname name))
-                      (kind (native-file-kind full)))
-                 (when kind
-                   (case kind
-                     (:directory
-                      (when directories
-                        (funcall fun (parse-native-namestring
-                                      full host realname :as-directory t))))
-                     (:symlink
-                      (let* ((tmpname (parse-native-namestring
-                                       full host realname :as-directory nil))
-                             (truename (query-file-system tmpname :truename nil)))
-                        (if (or (not truename)
-                                (or (pathname-name truename) (pathname-type truename)))
-                            (when files
-                              (funcall fun tmpname))
-                            (when directories
-                              (funcall fun (parse-native-namestring
-                                            full host realname :as-directory t))))))
-                     (t
-                      ;; Anything else parses as a file.
-                      (when files
-                        (funcall fun (parse-native-namestring
-                                      full host realname :as-directory nil)))))))))))
+         (physical (physicalize-pathname directory))
+         ;; Not QUERY-FILE-SYSTEM :EXISTENCE, since it doesn't work on Windows
+         ;; network shares.
+         (realname (sb!unix:unix-realpath (native-namestring physical :as-file t)))
+         (canonical (if realname
+                        (parse-native-namestring realname
+                                                 (pathname-host physical)
+                                                 (sane-default-pathname-defaults)
+                                                 :as-directory t)
+                        (return-from map-directory nil)))
+         (dirname (native-namestring canonical)))
+    (flet ((map-it (name dirp)
+             (funcall fun
+                      (merge-pathnames (parse-native-namestring
+                                        name nil physical :as-directory dirp)
+                                       physical))))
+      (with-native-directory-iterator (next dirname :errorp errorp)
+       (loop for name = (next)
+             while name
+             do (let* ((full (concatenate 'string dirname name))
+                       (kind (native-file-kind full)))
+                  (when kind
+                    (case kind
+                      (:directory
+                       (when directories
+                         (map-it name t)))
+                      (:symlink
+                       (let* ((tmpname (merge-pathnames
+                                        (parse-native-namestring
+                                         name nil physical :as-directory nil)
+                                        physical))
+                              (truename (query-file-system tmpname :truename nil)))
+                         (if (or (not truename)
+                                 (or (pathname-name truename) (pathname-type truename)))
+                             (when files
+                               (funcall fun tmpname))
+                             (when directories
+                               (map-it name t)))))
+                      (t
+                       ;; Anything else parses as a file.
+                       (when files
+                         (map-it name nil)))))))))))
 
 ;;; Part of DIRECTORY: implements matching the directory spec. Calls FUNCTION
 ;;; with all DIRECTORIES that match the directory portion of PATHSPEC.
@@ -717,7 +751,8 @@ Experimental: interface subject to change."
            (map-wild function rest starting-point))
           (t
            ;; Nothing wild -- the directory matches itself.
-           (funcall function starting-point)))))
+           (funcall function starting-point))))
+  nil)
 
 (defun last-directory-piece (pathname)
   (car (last (pathname-directory pathname))))

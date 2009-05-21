@@ -161,3 +161,14 @@
 (with-test (:name :file-write-date-integerp)
   (assert (integerp (file-write-date (user-homedir-pathname)))))
 
+;;; Canonicalization of pathnames for DIRECTORY
+(with-test (:name :directory-/.)
+  (assert (equal (directory #p".") (directory #p"./")))
+  (assert (equal (directory #p".") (directory #p""))))
+(with-test (:name :directory-/..)
+  (assert (equal (directory #p"..") (directory #p"../"))))
+(with-test (:name :directory-unspecific)
+  (assert (equal (directory #p".")
+                 (directory (make-pathname
+                             :name :unspecific
+                             :type :unspecific)))))
