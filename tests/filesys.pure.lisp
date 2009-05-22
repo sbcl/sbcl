@@ -92,10 +92,7 @@
   (assert (equal "C:\\FOO" (native-namestring "C:\\FOO")))
   (assert (equal "C:\\FOO" (native-namestring "C:/FOO")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
-  ;; FIXME: Other platforms don't do this: either fix Windows
-  ;; so that it works even with the same logic others use, or
-  ;; make this official. (Currently just a kludge.)
-  (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\"))))
+  (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\" :as-file t))))
 
 ;;; Test for NATIVE-PATHNAME / NATIVE-NAMESTRING stuff
 ;;;
@@ -104,43 +101,54 @@
 ;;; original namestring.
 (with-test (:name :random-native-namestrings)
   (let ((safe-chars
-        (coerce
-         (cons #\Newline
-               (loop for x from 32 to 127 collect (code-char x)))
-         'simple-base-string))
-       (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
-                           "[]" "*" "**" "/**" "**/" "/**/" "?"
-                           "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
-   (loop repeat 1000
-      for length = (random 32)
-      for native-namestring = (coerce
-                               (loop repeat length
-                                  collect
-                                  (char safe-chars
-                                        (random (length safe-chars))))
-                               'simple-base-string)
-      for pathname = (native-pathname native-namestring)
-      for nnn = (native-namestring pathname)
-      do (assert (string= nnn native-namestring)))
-   (loop repeat 1000
-      for native-namestring = (with-output-to-string (s)
-                                (loop
-                                   (let ((r (random 1.0)))
-                                     (cond
-                                       ((< r 1/20) (return))
-                                       ((< r 1/2)
-                                        (write-char
+         (coerce
+          (cons #\Newline
+                (loop for x from 32 to 127 collect (code-char x)))
+          'simple-base-string))
+        (tricky-sequences #("/../" "../" "/.." "." "/." "./" "/./"
+                            "[]" "*" "**" "/**" "**/" "/**/" "?"
+                            "\\*" "\\[]" "\\?" "\\*\\*" "*\\*")))
+    (loop repeat 1000
+          for length = (random 32)
+          for native-namestring = (coerce
+                                   (loop repeat length
+                                         collect
                                          (char safe-chars
-                                               (random (length safe-chars)))
-                                         s))
-                                       (t (write-string
-                                           (aref tricky-sequences
-                                                 (random
-                                                  (length tricky-sequences)))
-                                           s))))))
-      for pathname = (native-pathname native-namestring)
-      for tricky-nnn = (native-namestring pathname)
-      do (assert (string= tricky-nnn native-namestring)))))
+                                               (random (length safe-chars))))
+                                   'simple-base-string)
+          for pathname = (native-pathname native-namestring)
+          for nnn = (native-namestring pathname)
+          do #+win32
+             ;; We canonicalize to \ as the directory separator
+             ;; on windows -- though both \ and / are legal.
+             (setf native-namestring (substitute #\\ #\/ native-namestring))
+             (unless (string= nnn native-namestring)
+               (error "1: wanted ~S, got ~S" native-namestring nnn)))
+    (loop repeat 1000
+          for native-namestring = (with-output-to-string (s)
+                                    (write-string "mu" s)
+                                    (loop
+                                      (let ((r (random 1.0)))
+                                        (cond
+                                          ((< r 1/20) (return))
+                                          ((< r 1/2)
+                                           (write-char
+                                            (char safe-chars
+                                                  (random (length safe-chars)))
+                                            s))
+                                          (t (write-string
+                                              (aref tricky-sequences
+                                                    (random
+                                                     (length tricky-sequences)))
+                                              s))))))
+          for pathname = (native-pathname native-namestring)
+          for tricky-nnn = (native-namestring pathname)
+          do #+win32
+             ;; We canonicalize to \ as the directory separator
+             ;; on windows -- though both \ and / are legal.
+             (setf native-namestring (substitute #\\ #\/ native-namestring))
+             (unless (string= tricky-nnn native-namestring)
+               (error "2: wanted ~S, got ~S" native-namestring tricky-nnn)))))
 
 ;;; USER-HOMEDIR-PATHNAME and the extension SBCL-HOMEDIR-PATHNAME both
 ;;; used to call PARSE-NATIVE-NAMESTRING without supplying a HOST
@@ -157,7 +165,10 @@
                         'logical-pathname)))))
 
 (with-test (:name :file-author-stringp)
-  (assert (stringp (file-author (user-homedir-pathname)))))
+  #-win32
+  (assert (stringp (file-author (user-homedir-pathname))))
+  #+win32
+  (assert (not (file-author (user-homedir-pathname)))))
 (with-test (:name :file-write-date-integerp)
   (assert (integerp (file-write-date (user-homedir-pathname)))))
 

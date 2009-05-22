@@ -165,7 +165,7 @@
         (directory (pathname-directory pathname)))
     (cond ((or (null device) (eq device :unspecific))
            "")
-          ((= 1 (length device))
+          ((and (= 1 (length device)) (alpha-char-p (char device 0)))
            (concatenate 'simple-string device ":"))
           ((and (consp directory) (eq :relative (car directory)))
            (error "No printed representation for a relative UNC pathname."))

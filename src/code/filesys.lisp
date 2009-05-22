@@ -294,7 +294,8 @@
         (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
                                       atime mtime)
             (sb!unix:unix-stat filename)
-          (declare (ignore ino nlink gid rdev size atime))
+          (declare (ignore ino nlink gid rdev size atime
+                           #!+win32 uid))
           (if existsp
               (case query-for
                 (:existence (nth-value
@@ -322,7 +323,9 @@
                              ;; ... but without any trailing slash.
                              :as-directory (eql (logand  mode sb!unix:s-ifmt)
                                                 sb!unix:s-ifdir))))
-                (:author (sb!unix:uid-username uid))
+                (:author
+                 #!-win32
+                 (sb!unix:uid-username uid))
                 (:write-date (+ unix-to-universal-time mtime)))
               (progn
                 ;; SBCL has for many years had a policy that a pathname

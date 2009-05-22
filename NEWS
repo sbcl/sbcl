@@ -50,6 +50,7 @@
   * improvement: pretty-printing loop has been implemented properly. (thanks
     to Tobias Rittweiler)
   * documentation: CLOS slot typechecing policy has been documented.
+  * bug fix: FILE-AUTHOR no longer signals an error on Windows.
   * bug fix: SB-SPROF could be foiled by foreign code not have a frame
     pointer, leading to memory faults. (thanks to Bart Botta)
   * bug fix: better floating point exception handling on x86/OpenBSD.
