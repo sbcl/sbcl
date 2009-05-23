@@ -805,8 +805,8 @@
             (unless (sb!kernel::%%typep new-value type nil)
               (let ((spec (type-specifier type)))
                 (error 'simple-type-error
-                       :format-control "Cannot ~@? to ~S (not of type ~S.)"
-                       :format-arguments (list action (describe-action) new-value spec)
+                       :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
+                       :format-arguments (list (describe-action) symbol new-value spec)
                        :datum new-value
                        :expected-type spec))))))))
   (values))
