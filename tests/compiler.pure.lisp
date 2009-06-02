@@ -2917,3 +2917,9 @@
                                           :initial-element x)))
                   10
                   #c(1.0 2.0)))))
+
+(with-test (:name :regression-1.0.28.21)
+  (let ((fun (compile nil `(lambda (x) (typep x '(simple-array * 1))))))
+    (assert (funcall fun (vector 1 2 3)))
+    (assert (funcall fun "abc"))
+    (assert (not (funcall fun (make-array '(2 2)))))))

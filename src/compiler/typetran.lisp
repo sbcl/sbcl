@@ -335,8 +335,8 @@
 ;;; specified by TYPE, where STYPE is the type we have checked against
 ;;; (which is the same but for dimensions and element type).
 ;;;
-;;; Secondary return value is true if generated tests passing imply
-;;; that the array has a header.
+;;; Secondary return value is true if passing the generated tests implies that
+;;; the array has a header.
 (defun test-array-dimensions (obj type stype)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
@@ -357,9 +357,15 @@
                        (= (%array-rank ,obj) 0))
                      t))
             ((not (array-type-complexp type))
-             (values (unless (eq '* (car dims))
-                       `((= (vector-length ,obj) ,@dims)))
-                     nil))
+             (if (csubtypep stype (specifier-type 'vector))
+                 (values (unless (eq '* (car dims))
+                           `((= (vector-length ,obj) ,@dims)))
+                         nil)
+                 (values (if (eq '* (car dims))
+                             `((not (array-header-p ,obj)))
+                             `((not (array-header-p ,obj))
+                               (= (vector-length ,obj) ,@dims)))
+                         nil)))
             (t
              (values (unless (eq '* (car dims))
                        `((if (array-header-p ,obj)
