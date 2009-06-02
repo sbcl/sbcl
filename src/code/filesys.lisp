@@ -606,15 +606,33 @@ matching filenames."
                   #'string<
                   :key #'car))))
 
- (defun canonicalize-pathname (pathname)
-   ;; We're really only interested in :UNSPECIFIC -> NIL,
-   ;; and dealing with #p"foo/.." and #p"foo/."
-   (flet ((simplify (piece)
-            (unless (eq :unspecific piece)
-              piece)))
-     (let ((name (simplify (pathname-name pathname)))
-           (type (simplify (pathname-type pathname)))
-           (dir (pathname-directory pathname)))
+(defun canonicalize-pathname (pathname)
+  ;; We're really only interested in :UNSPECIFIC -> NIL, :BACK and :UP,
+  ;; and dealing with #p"foo/.." and #p"foo/."
+  (labels ((simplify (piece)
+             (unless (eq :unspecific piece)
+               piece))
+           (canonicalize-directory (directory)
+             (let (pieces)
+               (dolist (piece directory)
+                 (if (and pieces (member piece '(:back :up)))
+                     ;; FIXME: We should really canonicalize when we construct
+                     ;; pathnames. This is just wrong.
+                     (case (car pieces)
+                       ((:absolute :wild-inferiors)
+                        (error 'simple-file-error
+                               :format-control "Invalid use of ~S after ~S."
+                               :format-arguments (list piece (car pieces))
+                               :pathname pathname))
+                       ((:relative :up :back)
+                        (push piece pieces))
+                       (t
+                        (pop pieces)))
+                     (push piece pieces)))
+               (nreverse pieces))))
+    (let ((name (simplify (pathname-name pathname)))
+          (type (simplify (pathname-type pathname)))
+          (dir (canonicalize-directory (pathname-directory pathname))))
       (cond ((equal "." name)
              (cond ((not type)
                     (make-pathname :name nil :defaults pathname))
@@ -624,8 +642,9 @@ matching filenames."
                                    :directory (butlast dir)
                                    :defaults pathname))))
             (t
-             (make-pathname :name name :type type :defaults pathname))))))
-
+             (make-pathname :name name :type type
+                            :directory dir
+                            :defaults pathname))))))
 
 ;;; Given a native namestring, provides a WITH-HASH-TABLE-ITERATOR style
 ;;; interface to mapping over namestrings of entries in the corresponding

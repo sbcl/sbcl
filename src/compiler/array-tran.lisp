@@ -329,7 +329,7 @@
                   (truly-the ,result-spec
                    (initialize-vector ,alloc-form
                                       ,@(map 'list (lambda (elt)
-                                                     `(the ,elt-spec ,elt))
+                                                     `(the ,elt-spec ',elt))
                                              contents)))))))
           ;; any other :INITIAL-CONTENTS
           (initial-contents
