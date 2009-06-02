@@ -101,10 +101,10 @@
   (flet ((initialize-slot-from-initarg (class instance slotd)
            (let ((slot-initargs (slot-definition-initargs slotd)))
              (doplist (initarg value) initargs
-                      (when (memq initarg slot-initargs)
-                        (setf (slot-value-using-class class instance slotd)
-                              value)
-                        (return t)))))
+               (when (memq initarg slot-initargs)
+                 (setf (slot-value-using-class class instance slotd)
+                       value)
+                 (return t)))))
          (initialize-slot-from-initfunction (class instance slotd)
            ;; CLHS: If a before method stores something in a slot,
            ;; that slot won't be initialized from its :INITFORM, if any.
@@ -127,12 +127,9 @@
                   unless (initialize-slot-from-initarg class instance slotd)
                   collect slotd)))
       (dolist (slotd initfn-slotds)
-        (unless (eq (slot-definition-allocation slotd) :class)
-          ;; :ALLOCATION :CLASS slots use the :INITFORM when class is defined
-          ;; or redefined, not when instances are allocated.
-          (when (or (eq t slot-names)
-                    (memq (slot-definition-name slotd) slot-names))
-            (initialize-slot-from-initfunction class instance slotd)))))
+        (when (or (eq t slot-names)
+                  (memq (slot-definition-name slotd) slot-names))
+          (initialize-slot-from-initfunction class instance slotd))))
     instance))
 
 ;;; If initargs are valid return nil, otherwise signal an error.

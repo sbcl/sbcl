@@ -1707,5 +1707,16 @@
     (let ((base (slots (make-bug-357-c))))
       (assert (equal base (slots (make-instance 'bug-357-c))))
       (assert (equal base '(nil t2 3.1415927 -44 :ok t 9 -88 nil t 20))))))
+
+(defclass class-slot-shared-initialize ()
+  ((a :allocation :class :initform :ok)))
+(with-test (:name :class-slot-shared-initialize)
+  (let ((x (make-instance 'class-slot-shared-initialize)))
+    (assert (eq :ok (slot-value x 'a)))
+    (slot-makunbound x 'a)
+    (assert (not (slot-boundp x 'a)))
+    (shared-initialize x '(a))
+    (assert (slot-boundp x 'a))
+    (assert (eq :ok (slot-value x 'a)))))
 
 ;;;; success
