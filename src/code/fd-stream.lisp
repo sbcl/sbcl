@@ -2405,14 +2405,17 @@
         (:io     (values   t   t sb!unix:o_rdwr))
         (:probe  (values   t nil sb!unix:o_rdonly)))
     (declare (type index mask))
-    (let* ((pathname (physicalize-pathname (merge-pathnames filename)))
-           (truename (probe-file pathname))
+    (let* (;; PATHNAME is the pathname we associate with the stream.
+           (pathname (merge-pathnames filename))
+           (physical (physicalize-pathname pathname))
+           (truename (probe-file physical))
+           ;; NAMESTRING is the native namestring we open the file with.
            (namestring (cond (truename
                               (native-namestring truename :as-file t))
                              ((or (not input)
                                   (and input (eq if-does-not-exist :create))
                                   (and (eq direction :io) (not if-does-not-exist-given)))
-                              (native-namestring pathname :as-file t)))))
+                              (native-namestring physical :as-file t)))))
       ;; Process if-exists argument if we are doing any output.
       (cond (output
              (unless if-exists-given
@@ -2477,7 +2480,7 @@
                           (when (and output (= (logand orig-mode #o170000)
                                                #o40000))
                             (error 'simple-file-error
-                                   :pathname namestring
+                                   :pathname pathname
                                    :format-control
                                    "can't open ~S for output: is a directory"
                                    :format-arguments (list namestring)))

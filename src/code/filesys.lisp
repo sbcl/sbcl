@@ -450,7 +450,8 @@ or if PATHSPEC is a wild pathname."
   (let* ((original (truename file))
          (original-namestring (native-namestring original :as-file t))
          (new-name (merge-pathnames new-name original))
-         (new-namestring (native-namestring new-name :as-file t)))
+         (new-namestring (native-namestring (physicalize-pathname new-name)
+                                            :as-file t)))
     (unless new-namestring
       (error 'simple-file-error
              :pathname new-name
