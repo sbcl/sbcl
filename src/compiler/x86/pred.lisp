@@ -65,6 +65,10 @@
             ((unsigned-byte-32 unsigned-byte-31)
              unsigned-reg move-if/unsigned)
             (signed-byte-32 signed-reg move-if/signed)
+            ;; FIXME: Can't use CMOV with byte registers, and characters live
+            ;; in such outside of unicode builds. A better solution then just
+            ;; disabling MOVE-IF/CHAR should be possible, though.
+            #!+sb-unicode
             (character character-reg move-if/char)
 
             ((single-float complex-single-float
@@ -151,6 +155,8 @@
   (def-move-if move-if/fx tagged-num any-reg control-stack)
   (def-move-if move-if/unsigned unsigned-num unsigned-reg unsigned-stack)
   (def-move-if move-if/signed signed-num signed-reg signed-stack)
+  ;; FIXME: See *CMOV-PTYPE-REPRESENTATION-VOP* above.
+  #!+sb-unicode
   (def-move-if move-if/char character character-reg character-stack)
   (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))
 
