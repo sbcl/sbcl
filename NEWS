@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * IMPORTANT: bug database has moved from the BUGS file to Launchpad
+        https://bugs.launchpad.net/sbcl
+    Bugs can be reported directly there, or by sending email to
+        sbcl-bugs@lists.sourceforge.net
+    (no subscription required.)
   * minor incompatible change: under weak type checking policy integer
     types are weakened less aggressively.
   * minor incompatible change: SAVE-LISP-AND-DIE :TOPLEVEL function is now

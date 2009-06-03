@@ -1,0 +1,162 @@
+@node Getting Support and Reporting Bugs
+@comment  node-name,  next,  previous,  up
+@chapter Getting Support and Reporting Bugs
+
+@menu
+* Volunteer Support::           
+* Commercial Support::          
+* Reporting Bugs::              
+@end menu
+
+@node Volunteer Support
+@comment  node-name,  next,  previous,  up
+@section Volunteer Support
+
+Your primary source of SBCL support should probably be the mailing
+list @strong{sbcl-help}: in addition to other users SBCL developers
+monitor this list and are available for advice. As an anti-spam
+measure subcription is required for posting:
+
+@urlline{https://lists.sourceforge.net/lists/listinfo/sbcl-help}
+
+Remember that the people answering your question are volunteers, so
+you stand a much better chance of getting a good answer if you ask a
+good question.
+
+Before sending mail, check the list archives at either
+
+@urlline{http://sourceforge.net/mailarchive/forum.php?forum_name=sbcl-help}
+
+or
+
+@urlline{http://news.gmane.org/gmane.lisp.steel-bank.general}
+
+to see if your question has been answered already. Checking the bug
+database is also worth it @xref{Reporting Bugs}, to see if the issue
+is already known.
+
+For general advice on asking good questions, see
+
+@urlline{http://www.catb.org/~esr/faqs/smart-questions.html}.
+
+@node Commercial Support
+@comment  node-name,  next,  previous,  up
+@section Commercial Support
+
+There is no formal organization developing SBCL, but if you need a
+paid support arrangement or custom SBCL development, we maintain the
+list of companies and consultants below. Use it to identify service
+providers with appropriate skills and interests, and contact them
+directly.
+
+The SBCL project cannot verify the accuracy of the information or the
+competence of the people listed, and they have provided their own
+blurbs below: you must make your own judgement of suitability from the
+available information - refer to the links they provide, the CREDITS
+file, mailing list archives, CVS commit messages, and so on. Please
+feel free to ask for advice on the sbcl-help list.
+
+@table @strong
+@item Christophe Rhodes
+is a long-time SBCL developer, available for custom programming.
+
+Email: @email{csr21@@cam.ac.uk}
+
+@item Steel Bank Studio Ltd
+provides commercial SBCL support and custom development, is run by
+SBCL developer @emph{Nikodemus Siivola}, and has another SBCL
+developer @emph{Richard Kreuter} as an affiliated consultant.
+
+Website: @url{http://sb-studio.net/}
+
+Email: @email{info@@sb-studio.net}
+@end table
+
+@node Reporting Bugs
+@comment  node-name,  next,  previous,  up
+@section Reporting Bugs
+
+SBCL uses Launchpad to track bugs. The bug database is available at
+
+@urlline{https://bugs.launchpad.net/sbcl}
+
+Reporting bugs there requires registering at Launchpad. However, bugs
+can also be reported on the mailing list @strong{sbcl-bugs}, which is
+moderated but does @emph{not} require subscribing.
+
+Simply send email to @email{sbcl-bugs@@lists.sourceforge.net} and the
+bug will be checked and added to Launchpad by SBCL maintainers.
+
+@subsection How to Report Bugs Effectively
+
+Please include enough information in a bug report that someone reading
+it can reproduce the problem, i.e. don't write
+
+@example
+Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
+PRINT-OBJECT doesn't seem to work with *PRINT-LENGTH*. Is this a bug?
+@end example
+
+but instead
+
+@example
+Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
+In sbcl-1.2.3 running under OpenBSD 4.5 on my Alpha box, when
+I compile and load the file
+   (DEFSTRUCT (FOO (:PRINT-OBJECT (LAMBDA (X Y)
+                                    (LET ((*PRINT-LENGTH* 4))
+                                      (PRINT X Y)))))
+     X Y)
+then at the command line type
+   (MAKE-FOO)
+the program loops endlessly instead of printing the object.
+@end example
+
+A more in-depth discussion on reporting bugs effectively can be found
+at
+
+@urlline{http://www.chiark.greenend.org.uk/~sgtatham/bugs.html}.
+
+@subsection Signal Related Bugs
+
+If you run into a signal related bug, you are getting fatal errors
+such as @code{signal N is [un]blocked} or just hangs, and you want to
+send a useful bug report then:
+
+@enumerate
+
+@item
+Compile sbcl with ldb support (feature @code{:sb-ldb}, see
+@file{base-target-features.lisp-expr}) and change @code{#define QSHOW_SIGNAL 0} to
+@code{#define QSHOW_SIGNAL 1} in @file{src/runtime/runtime.h}.
+
+@item
+Isolate a smallish test case, run it.
+
+@item
+If it just hangs kill it with sigabrt: @code{kill -ABRT <pidof sbcl>}.
+
+@item
+Print the backtrace from ldb by typing @code{ba}.
+
+@item
+Attach gdb: @code{gdb -p <pidof sbcl>} and get backtraces for all threads:
+@code{thread apply all ba}.
+
+@item
+If multiple threads are in play then still in gdb, try to get Lisp
+backtrace for all threads: @code{thread apply all
+call_backtrace_from_fp($ebp, 100)}. Substitute $ebp with $rbp on
+x86-64. The backtraces will appear in the stdout of the SBCL process.
+
+@item
+Send a report with the backtraces and the output (both stdout and
+stderr) produced by SBCL.
+
+@item
+Don't forget to include OS and SBCL version.
+
+@item
+If available include, information on outcome of the same test with
+other versions of SBCL, OS, ...
+@end enumerate

@@ -44,6 +44,10 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @contents
 
+@macro urlline{text}
+@w{ } @w{ } @url{\text\}
+@end macro
+
 @ifnottex
 
 @c We use @&key, etc to escape & from TeX in lambda lists --
@@ -68,7 +72,8 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @insertcopying
 
 @menu
-* Introduction::                
+* Getting Support and Reporting Bugs::
+* Introduction::
 * Starting and Stopping::
 * Compiler::                    
 * Debugger::                    
@@ -92,6 +97,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @end ifnottex
 
+@include support-and-bugs.texinfo
 @include intro.texinfo
 @include start-stop.texinfo
 @include compiler.texinfo

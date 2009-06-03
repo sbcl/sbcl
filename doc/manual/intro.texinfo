@@ -24,16 +24,8 @@ Lisp.
 @section ANSI Conformance
 
 Essentially every type of non-conformance is considered a bug. (The
-exceptions involve internal inconsistencies in the standard.) In SBCL
-the master record of known bugs is in the @file{BUGS} file in the
-distribution.
-
-The recommended way to report bugs is through the @cite{sbcl-help} or
-@cite{sbcl-devel} mailing lists. For mailing list addresses,
-see @ref{SBCL Homepage}; note that as a spam-reduction measure you
-must subscribe before you can post.
-
-
+exceptions involve internal inconsistencies in the standard.)
+@xref{Reporting Bugs}.
 
 @node Extensions
 @comment  node-name,  next,  previous,  up
@@ -348,8 +340,8 @@ sb-ext:save-lisp-and-die}.
 
 @menu
 * SBCL Homepage::               
-* Additional Distributed Documentation::  
 * Online Documentation::        
+* Additional Documentation Files::  
 * Internals Documentation::     
 @end menu
 
@@ -363,9 +355,23 @@ archives of these mailing lists. Subscribing to the mailing lists
 @cite{sbcl-help} and @cite{sbcl-announce} is recommended: both are
 fairly low-volume, and help you keep abrest with SBCL development.
 
-@node Additional Distributed Documentation
+@node Online Documentation
 @comment  node-name,  next,  previous,  up
-@subsection Additional Distributed Documentation
+@subsection Online Documentation
+
+Documentation for non-ANSI extensions for various commands is
+available online from the SBCL executable itself. The extensions
+for functions which have their own command prompts (e.g. the debugger,
+and @code{inspect}) are documented in text available by typing
+@command{help} at their command prompts. The extensions for functions
+which don't have their own command prompt (such as @code{trace}) are
+described in their documentation strings, unless your SBCL was
+compiled with an option not to include documentation strings, in which
+case the documentation strings are only readable in the source code.
+
+@node Additional Documentation Files
+@comment  node-name,  next,  previous,  up
+@subsection Additional Documentation Files
 
 Besides this user manual both SBCL source and binary distributions
 include some other SBCL-specific documentation files, which should be
@@ -373,9 +379,6 @@ installed along with this manual in on your system, eg. in
 @file{/usr/local/share/doc/sbcl/}.
 
 @table @file
-
-@item BUGS
-Lists known bugs in the distribution.
 
 @item COPYING
 Licence and copyright summary.
@@ -391,24 +394,7 @@ information.
 @item NEWS
 Summarizes changes between various SBCL versions.
 
-@item SUPPORT
-Lists SBCL developers available for-pay development of SBCL.
-
 @end table
-
-@node Online Documentation
-@comment  node-name,  next,  previous,  up
-@subsection Online Documentation
-
-Documentation for non-ANSI extensions for various commands is
-available online from the SBCL executable itself. The extensions
-for functions which have their own command prompts (e.g. the debugger,
-and @code{inspect}) are documented in text available by typing
-@command{help} at their command prompts. The extensions for functions
-which don't have their own command prompt (such as @code{trace}) are
-described in their documentation strings, unless your SBCL was
-compiled with an option not to include documentation strings, in which
-case the documentation strings are only readable in the source code.
 
 @node Internals Documentation
 @comment  node-name,  next,  previous,  up
