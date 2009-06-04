@@ -259,5 +259,9 @@ INSTALLING SBCL
     by e.g. testing during the monthly freeze periods, and most
     importantly by reporting any problems.
 
-    If you need support beyond what is available on the mailing lists,
-    see "Consultants" in the "SUPPORT" file.
+    For further support, see Getting Support and Reporting Bugs
+    in the manual, or
+
+      http://www.sbcl.org/manual/Getting-Support-and-Reporting-Bugs.html
+
+    if you do not have the manual for some reason.

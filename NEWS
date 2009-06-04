@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * bug fix: on 64 bit platforms FILL worked incorrectly on arrays with
+    upgraded element type (COMPLEX SINGLE-FLOAT), regression from 1.0.28.55.
+    (thanks to Paul Khuong)
+
+changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad
         https://bugs.launchpad.net/sbcl
     Bugs can be reported directly there, or by sending email to

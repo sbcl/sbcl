@@ -1084,6 +1084,15 @@
   (assert (equal "GOOD!"
                  (progv '(*hairy-progv-var*) (list (eval "GOOD!"))
                     *hairy-progv-var*))))
+
+(with-test (:name :fill-complex-single-float)
+  (assert (eql #c(-1.0 2.0)
+               (aref (funcall
+                      (lambda ()
+                        (make-array 2
+                                    :element-type '(complex single-float)
+                                    :initial-element #c(-1.0 2.0))))
+                     0))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

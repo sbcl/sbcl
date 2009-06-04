@@ -138,7 +138,7 @@ do
       && echo " html $BUILD_ROOT$DOC_DIR/html/`basename $html`/index.html"
 done
 
-for f in BUGS SUPPORT CREDITS COPYING NEWS
+for f in BUGS CREDITS COPYING NEWS
 do
   cp $f "$BUILD_ROOT$DOC_DIR"/
 done
