@@ -518,30 +518,36 @@
   (assert-no-consing (test-let-var-subst2 17))
   (assert-no-consing (test-lvar-subst 11))
   (assert-no-consing (dx-value-cell 13))
-  (assert-no-consing (cons-on-stack 42))
-  (assert-no-consing (force-make-array-on-stack 128))
-  (assert-no-consing (make-array-on-stack-1))
-  (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
-  (assert-no-consing (make-array-on-stack-3 9 8 7))
-  (assert-no-consing (make-array-on-stack-4))
-  #+nil
-  (assert-no-consing (make-array-on-stack-5))
-  (assert-no-consing (vector-on-stack :x :y))
-  (assert-no-consing (make-foo1-on-stack 123))
-  (assert-no-consing (nested-good 42))
+  ;; Only for platforms with DX FIXED-ALLOC
+  #+(or hppa mips x86 x86-64)
+  (progn
+    (assert-no-consing (cons-on-stack 42))
+    (assert-no-consing (make-foo1-on-stack 123))
+    (assert-no-consing (nested-good 42))
+    (assert-no-consing (nested-dx-conses))
+    (assert-no-consing (dx-handler-bind 2))
+    (assert-no-consing (dx-handler-case 2)))
+  ;; Only for platforms with DX ALLOCATE-VECTOR
+  #+(or hppa mips x86 x86-64)
+  (progn
+    (assert-no-consing (force-make-array-on-stack 128))
+    (assert-no-consing (make-array-on-stack-1))
+    (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
+    (assert-no-consing (make-array-on-stack-3 9 8 7))
+    (assert-no-consing (make-array-on-stack-4))
+    #+nil
+    (assert-no-consing (make-array-on-stack-5))
+    (assert-no-consing (vector-on-stack :x :y)))
   (#+raw-instance-init-vops assert-no-consing
    #-raw-instance-init-vops progn
    (make-foo2-on-stack 1.24 1.23d0))
   (#+raw-instance-init-vops assert-no-consing
    #-raw-instance-init-vops progn
    (make-foo3-on-stack))
-  (assert-no-consing (nested-dx-conses))
   (assert-no-consing (nested-dx-lists))
   (assert-consing (nested-dx-not-used *a-cons*))
   (assert-no-consing (nested-evil-dx-used *a-cons*))
   (assert-no-consing (multiple-dx-uses))
-  (assert-no-consing (dx-handler-bind 2))
-  (assert-no-consing (dx-handler-case 2))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread
@@ -588,7 +594,10 @@
   (let ((a (make-array 11 :initial-element 0)))
     (declare (dynamic-extent a))
     (assert (every (lambda (x) (eql x 0)) a))))
-(assert-no-consing (bdowning-2005-iv-16))
+(with-test (:name :bdowning-2005-iv-16)
+  #+(or hppa mips x86 x86-64)
+  (assert-no-consing (bdowning-2005-iv-16))
+  (bdowning-2005-iv-16))
 
 (defun-with-dx let-converted-vars-dx-allocated-bug (x y z)
   (let* ((a (list x y z))
@@ -626,7 +635,9 @@
       (multiple-value-bind (y pos2) (read-from-string res nil nil :start pos)
         (assert (equalp f2 y))
         (assert (equalp f3 (read-from-string res nil nil :start pos2))))))
-  (assert-no-consing (assert (eql n (funcall fun nil)))))
+  #+(or hppa mips x86 x86-64)
+  (assert-no-consing (assert (eql n (funcall fun nil))))
+  (assert (eql n (funcall fun nil))))
 (macrolet ((def (n f1 f2 f3)
              (let ((name (sb-pcl::format-symbol :cl-user "DX-FLET-TEST.~A" n)))
                `(progn
