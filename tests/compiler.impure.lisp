@@ -1086,13 +1086,19 @@
                     *hairy-progv-var*))))
 
 (with-test (:name :fill-complex-single-float)
-  (assert (eql #c(-1.0 2.0)
-               (aref (funcall
-                      (lambda ()
-                        (make-array 2
-                                    :element-type '(complex single-float)
-                                    :initial-element #c(-1.0 2.0))))
-                     0))))
+  (assert (every (lambda (x) (eql x #c(-1.0 -2.0)))
+                 (funcall
+                  (lambda ()
+                    (make-array 2
+                                :element-type '(complex single-float)
+                                :initial-element #c(-1.0 -2.0)))))))
+
+(with-test (:name :make-array-symbol-as-initial-element)
+  (assert (every (lambda (x) (eq x 'a))
+                 (funcall
+                  (compile nil
+                           `(lambda ()
+                              (make-array 12 :initial-element 'a)))))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

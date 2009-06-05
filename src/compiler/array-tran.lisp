@@ -351,7 +351,7 @@
                               call 1 '((:element-type element-type)
                                        (:initial-element initial-element))))
                  (init (if (constant-lvar-p initial-element)
-                           (lvar-value initial-element)
+                           (list 'quote (lvar-value initial-element))
                            'initial-element)))
              `(lambda (length ,@parameters)
                 (declare (ignorable ,@parameters))
@@ -380,24 +380,74 @@
                                       default-initial-element
                                       elt-spec)))
            (let ((parameters (eliminate-keyword-args
-                              call 1 '((:element-type element-type)))))
+                              call 1 '((:element-type element-type)
+                                       (:initial-element initial-element)))))
              `(lambda (length ,@parameters)
                 (declare (ignorable ,@parameters))
                 ,alloc-form))))))
 
-(deftransform make-array ((dims &key
-                                element-type initial-element initial-contents)
-                          (integer &key
-                                   (:element-type (constant-arg *))
-                                   (:initial-element *)
-                                   (:initial-contents *))
-                          *
-                          :node call)
-  (transform-make-array-vector dims
-                               element-type
-                               initial-element
-                               initial-contents
-                               call))
+;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
+;;; specific must come first, otherwise suboptimal transforms will result for
+;;; some forms.
+
+(deftransform make-array ((dims &key initial-element element-type
+                                     adjustable fill-pointer)
+                          (t &rest *))
+  (when (null initial-element)
+    (give-up-ir1-transform))
+  (let* ((eltype (cond ((not element-type) t)
+                       ((not (constant-lvar-p element-type))
+                        (give-up-ir1-transform
+                         "ELEMENT-TYPE is not constant."))
+                       (t
+                        (lvar-value element-type))))
+         (eltype-type (ir1-transform-specifier-type eltype))
+         (saetp (find-if (lambda (saetp)
+                           (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
+                         sb!vm:*specialized-array-element-type-properties*))
+         (creation-form `(make-array dims
+                          :element-type ',(type-specifier (sb!vm:saetp-ctype saetp))
+                          ,@(when fill-pointer
+                                  '(:fill-pointer fill-pointer))
+                          ,@(when adjustable
+                                  '(:adjustable adjustable)))))
+
+    (unless saetp
+      (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
+
+    (cond ((and (constant-lvar-p initial-element)
+                (eql (lvar-value initial-element)
+                     (sb!vm:saetp-initial-element-default saetp)))
+           creation-form)
+          (t
+           ;; error checking for target, disabled on the host because
+           ;; (CTYPE-OF #\Null) is not possible.
+           #-sb-xc-host
+           (when (constant-lvar-p initial-element)
+             (let ((value (lvar-value initial-element)))
+               (cond
+                 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
+                  ;; this case will cause an error at runtime, so we'd
+                  ;; better WARN about it now.
+                  (warn 'array-initial-element-mismatch
+                        :format-control "~@<~S is not a ~S (which is the ~
+                                         ~S of ~S).~@:>"
+                        :format-arguments
+                        (list
+                         value
+                         (type-specifier (sb!vm:saetp-ctype saetp))
+                         'upgraded-array-element-type
+                         eltype)))
+                 ((not (ctypep value eltype-type))
+                  ;; this case will not cause an error at runtime, but
+                  ;; it's still worth STYLE-WARNing about.
+                  (compiler-style-warn "~S is not a ~S."
+                                       value eltype)))))
+           `(let ((array ,creation-form))
+             (multiple-value-bind (vector)
+                 (%data-vector-and-index array 0)
+               (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
+             array)))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
@@ -474,64 +524,18 @@
                               dims))
                (truly-the ,spec header)))))))
 
-(deftransform make-array ((dims &key initial-element element-type
-                                     adjustable fill-pointer)
-                          (t &rest *))
-  (when (null initial-element)
-    (give-up-ir1-transform))
-  (let* ((eltype (cond ((not element-type) t)
-                       ((not (constant-lvar-p element-type))
-                        (give-up-ir1-transform
-                         "ELEMENT-TYPE is not constant."))
-                       (t
-                        (lvar-value element-type))))
-         (eltype-type (ir1-transform-specifier-type eltype))
-         (saetp (find-if (lambda (saetp)
-                           (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
-                         sb!vm:*specialized-array-element-type-properties*))
-         (creation-form `(make-array dims
-                          :element-type ',(type-specifier (sb!vm:saetp-ctype saetp))
-                          ,@(when fill-pointer
-                                  '(:fill-pointer fill-pointer))
-                          ,@(when adjustable
-                                  '(:adjustable adjustable)))))
-
-    (unless saetp
-      (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
-
-    (cond ((and (constant-lvar-p initial-element)
-                (eql (lvar-value initial-element)
-                     (sb!vm:saetp-initial-element-default saetp)))
-           creation-form)
-          (t
-           ;; error checking for target, disabled on the host because
-           ;; (CTYPE-OF #\Null) is not possible.
-           #-sb-xc-host
-           (when (constant-lvar-p initial-element)
-             (let ((value (lvar-value initial-element)))
-               (cond
-                 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
-                  ;; this case will cause an error at runtime, so we'd
-                  ;; better WARN about it now.
-                  (warn 'array-initial-element-mismatch
-                        :format-control "~@<~S is not a ~S (which is the ~
-                                         ~S of ~S).~@:>"
-                        :format-arguments
-                        (list
-                         value
-                         (type-specifier (sb!vm:saetp-ctype saetp))
-                         'upgraded-array-element-type
-                         eltype)))
-                 ((not (ctypep value eltype-type))
-                  ;; this case will not cause an error at runtime, but
-                  ;; it's still worth STYLE-WARNing about.
-                  (compiler-style-warn "~S is not a ~S."
-                                       value eltype)))))
-           `(let ((array ,creation-form))
-             (multiple-value-bind (vector)
-                 (%data-vector-and-index array 0)
-               (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
-             array)))))
+(deftransform make-array ((dims &key element-type initial-element initial-contents)
+                          (integer &key
+                                   (:element-type (constant-arg *))
+                                   (:initial-element *)
+                                   (:initial-contents *))
+                          *
+                          :node call)
+  (transform-make-array-vector dims
+                               element-type
+                               initial-element
+                               initial-contents
+                               call))
 
 ;;;; miscellaneous properties of arrays
 

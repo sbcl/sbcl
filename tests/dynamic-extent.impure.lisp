@@ -181,9 +181,6 @@
     (true v)
     nil))
 
-;;; Unfortunately VECTOR-FILL* conses right now, so this one
-;;; doesn't pass yet.
-#+nil
 (defun-with-dx make-array-on-stack-5 ()
   (let ((v (make-array 3 :initial-element 12 :element-type t)))
     (declare (sb-int:truly-dynamic-extent v))
@@ -535,7 +532,6 @@
     (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
     (assert-no-consing (make-array-on-stack-3 9 8 7))
     (assert-no-consing (make-array-on-stack-4))
-    #+nil
     (assert-no-consing (make-array-on-stack-5))
     (assert-no-consing (vector-on-stack :x :y)))
   (#+raw-instance-init-vops assert-no-consing

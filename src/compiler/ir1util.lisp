@@ -1637,7 +1637,8 @@ is :ANY, the function name is not checked."
          (all (combination-args call))
          (new-args (reverse (subseq all 0 n-positional)))
          (key-args (subseq all n-positional))
-         (parameters nil))
+         (parameters nil)
+         (flushed-keys nil))
     (loop while key-args
           do (let* ((key (pop key-args))
                     (val (pop key-args))
@@ -1647,10 +1648,12 @@ is :ANY, the function name is not checked."
                     (spec (or (assoc keyword specs :test #'eq)
                               (give-up-ir1-transform))))
                (push val new-args)
-               (flush-dest key)
+               (push key flushed-keys)
                (push (second spec) parameters)
                ;; In case of duplicate keys.
                (setf (second spec) (gensym))))
+    (dolist (key flushed-keys)
+      (flush-dest key))
     (setf (combination-args call) (reverse new-args))
     (reverse parameters)))
 
