@@ -190,6 +190,22 @@
     (inst mov tmp value)
     (inst shr tmp n-positive-fixnum-bits)))
 
+(define-vop (fixnump/signed-byte-64 type-predicate)
+  (:args (value :scs (signed-reg)))
+  (:info)
+  (:conditional :z)
+  (:arg-types signed-num)
+  (:translate fixnump)
+  (:generator 5
+    ;; Hackers Delight, p. 53: signed
+    ;;    a <= x <= a + 2^n - 1
+    ;; is equivalent to unsigned
+    ;;    ((x-a) >> n) = 0
+    (inst mov rax-tn #.(- sb!xc:most-negative-fixnum))
+    (inst add rax-tn value)
+    (inst shr rax-tn #.(integer-length (- sb!xc:most-positive-fixnum
+                                          sb!xc:most-negative-fixnum)))))
+
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
