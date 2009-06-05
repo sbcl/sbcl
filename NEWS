@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
   * optimization: more efficient type-checks for FIXNUMs when the value
     is known to be a signed word on x86 and x86-64.
+  * improvement: failure to provide requested stack allocation compiler notes
+    provided in all cases (requested stack allocation not happening without a
+    note being issued is now considered a bug.)
   * bug fix: on 64 bit platforms FILL worked incorrectly on arrays with
     upgraded element type (COMPLEX SINGLE-FLOAT), regression from 1.0.28.55.
     (thanks to Paul Khuong)

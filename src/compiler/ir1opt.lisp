@@ -510,20 +510,8 @@
          (delete-ref node)
          (unlink-node node))
         (combination
-         (let ((kind (combination-kind node))
-               (info (combination-fun-info node)))
-           (when (and (eq kind :known) (fun-info-p info))
-             (let ((attr (fun-info-attributes info)))
-               (when (and (not (ir1-attributep attr call))
-                          ;; ### For now, don't delete potentially
-                          ;; flushable calls when they have the CALL
-                          ;; attribute. Someday we should look at the
-                          ;; functional args to determine if they have
-                          ;; any side effects.
-                          (if (policy node (= safety 3))
-                              (ir1-attributep attr flushable)
-                              (ir1-attributep attr unsafely-flushable)))
-                 (flush-combination node))))))
+         (when (flushable-combination-p node)
+           (flush-combination node)))
         (mv-combination
          (when (eq (basic-combination-kind node) :local)
            (let ((fun (combination-lambda node)))

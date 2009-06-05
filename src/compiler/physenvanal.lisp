@@ -340,11 +340,7 @@
                                         (setf (lvar-dynamic-extent real) cleanup)
                                         (real-dx-lvars real)))
                                      (t
-                                      (do-uses (use lvar)
-                                        (unless (ref-p use)
-                                          (let ((*compiler-error-context* use))
-                                            (compiler-notify "could not stack allocate the result of ~S"
-                                                             (find-original-source (node-source-path use))))))
+                                      (note-no-stack-allocation lvar)
                                       (setf (lvar-dynamic-extent lvar) nil)))))
                             (node       ; DX closure
                              (let* ((call what)

@@ -544,6 +544,7 @@ collection."
         ;; BODY is stuffed in a function to preserve the lexical
         ;; environment.
         `(flet ((,wpo () (progn ,@body)))
+           (declare (muffle-conditions compiler-note))
            ;; PINS are dx-allocated in case the compiler for some
            ;; unfathomable reason decides to allocate value-cells
            ;; for them -- since we have DX value-cells on x86oid

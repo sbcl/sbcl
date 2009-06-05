@@ -391,6 +391,34 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
+(defun flushable-combination-p (call)
+  (declare (combination call))
+  (let ((kind (combination-kind call))
+        (info (combination-fun-info call)))
+    (when (and (eq kind :known) (fun-info-p info))
+      (let ((attr (fun-info-attributes info)))
+        (when (and (not (ir1-attributep attr call))
+                   ;; FIXME: For now, don't consider potentially flushable
+                   ;; calls flushable when they have the CALL attribute.
+                   ;; Someday we should look at the functional args to
+                   ;; determine if they have any side effects.
+                   (if (policy call (= safety 3))
+                       (ir1-attributep attr flushable)
+                       (ir1-attributep attr unsafely-flushable)))
+          t)))))
+
+(defun note-no-stack-allocation (lvar &key flush)
+  (do-uses (use (principal-lvar lvar))
+    (unless (or
+             ;; Don't complain about not being able to stack allocate constants.
+             (and (ref-p use) (constant-p (ref-leaf use)))
+             ;; If we're flushing, don't complain if we can flush the combination.
+             (and flush (combination-p use) (flushable-combination-p use)))
+      (let ((*compiler-error-context* use))
+        (compiler-notify "could not stack allocate the result of ~S"
+                         (find-original-source (node-source-path use)))))))
+
+
 (declaim (ftype (sfunction (node (member nil t :truly) &optional (or null component))
                            boolean) use-good-for-dx-p))
 (declaim (ftype (sfunction (lvar (member nil t :truly) &optional (or null component))
@@ -415,9 +443,10 @@
 (defun lvar-good-for-dx-p (lvar dx &optional component)
   (let ((uses (lvar-uses lvar)))
     (if (listp uses)
-        (every (lambda (use)
-                 (use-good-for-dx-p use dx component))
-               uses)
+        (when uses
+          (every (lambda (use)
+                   (use-good-for-dx-p use dx component))
+                 uses))
         (use-good-for-dx-p uses dx component))))
 
 (defun known-dx-combination-p (use dx)
@@ -1198,6 +1227,8 @@
 (defun flush-dest (lvar)
   (declare (type (or lvar null) lvar))
   (unless (null lvar)
+    (when (lvar-dynamic-extent lvar)
+      (note-no-stack-allocation lvar :flush t))
     (setf (lvar-dest lvar) nil)
     (flush-lvar-externally-checkable-type lvar)
     (do-uses (use lvar)
