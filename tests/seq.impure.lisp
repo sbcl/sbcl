@@ -13,10 +13,11 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "test-util.lisp")
 (load "assertoid.lisp")
 
 (defpackage :seq-test
-  (:use :cl :assertoid))
+  (:use :cl :assertoid :test-util))
 
 (in-package :seq-test)
 
@@ -1100,5 +1101,21 @@
   (assert (raises-error? (fill l 0 :start 4)))
   (assert (raises-error? (fill l 0 :end 4)))
   (assert (raises-error? (fill l 0 :start 2 :end 1))))
+
+;;; Both :TEST and :TEST-NOT provided
+(with-test (:name :test-and-test-not-to-adjoin)
+  (let* ((wc 0)
+         (fun
+          (handler-bind (((and warning (not style-warning))
+                          (lambda (w) (incf wc))))
+            (compile nil `(lambda (item test test-not) (adjoin item '(1 2 3 :foo)
+                                                               :test test
+                                                               :test-not test-not))))))
+    (assert (= 1 wc))
+    (assert (eq :error
+                (handler-case
+                    (funcall fun 1 #'eql (complement #'eql))
+                  (error ()
+                    :error))))))
 
 ;;; success

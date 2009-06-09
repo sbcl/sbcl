@@ -7,6 +7,9 @@
   * bug fix: on 64 bit platforms FILL worked incorrectly on arrays with
     upgraded element type (COMPLEX SINGLE-FLOAT), regression from 1.0.28.55.
     (thanks to Paul Khuong)
+  * bug fix: better error signalling when calls to functions seeking elements
+    from lists (eg. ADJOIN) are compiled with both :TEST and :TEST-NOT.
+    (reported by Tobias Rittweiler)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad

@@ -317,6 +317,8 @@
            function-name key-functions variant)))
 
 (defun transform-list-item-seek (name item list key test test-not node)
+  (when (and test test-not)
+    (abort-ir1-transform "Both ~S and ~S supplied to ~S." :test :test-not name))
   ;; If TEST is EQL, drop it.
   (when (and test (lvar-fun-is test '(eql)))
     (setf test nil))
