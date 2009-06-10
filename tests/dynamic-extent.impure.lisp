@@ -780,4 +780,18 @@
     (assert-notes 0 `(lambda (other)
                        #'(lambda (s c n)
                            (ignore-errors (funcall other s c n)))))))
+
+;;; Stack allocating a value cell in HANDLER-CASE would blow up stack
+;;; in an unfortunate loop.
+(defun handler-case-eating-stack ()
+  (let ((sp nil))
+    (do ((n 0 (logand most-positive-fixnum (1+ n))))
+        ((>= n 1024))
+     (multiple-value-bind (value error) (ignore-errors)
+       (when (and value error) nil))
+      (if sp
+          (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
+          (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
+(with-test (:name :handler-case-eating-stack)
+  (assert-no-consing (handler-case-eating-stack)))
 
