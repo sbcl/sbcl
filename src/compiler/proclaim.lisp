@@ -233,11 +233,9 @@
                      ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
                      ;; broke late-proclaim.lisp.
                      (style-warn
-                      "new FTYPE proclamation~@
-                       ~S~@
-                       for ~S does not match old FTYPE proclamation~@
-                       ~S"
-                      ctype name old-type))))
+                      "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
+                       does not match the old FTYPE proclamation:~@:_  ~S~@:>"
+                      name (type-specifier ctype) (type-specifier old-type)))))
 
                ;; Now references to this function shouldn't be warned
                ;; about as undefined, since even if we haven't seen a
