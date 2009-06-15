@@ -197,6 +197,35 @@ Lisp filename syntax idiosyncrasies)."
 (sb-ext:quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/TRUENAME part 3" $?
+cleanup_test_subdirectory
+
+# DIRECTORY pattern matching
+use_test_subdirectory
+
+mkdir foo
+touch foo/aa.txt
+touch foo/aa.tmp
+mkdir far
+touch far/ab.txt
+touch far/ab.tmp
+mkdir qar
+touch qar/ac.txt
+touch qar/ac.tmp
+run_sbcl <<EOF
+(defun test (pattern &rest expected)
+  (let ((wanted (sort (mapcar #'truename expected) #'string< :key #'namestring))
+        (got (sort (directory pattern) #'string< :key #'namestring)))
+    (unless (equal wanted got)
+      (format t "wanted:~%  ~Sgot:~%  ~S" wanted got)
+      (error "wanted:~%  ~Sgot:~%  ~S" wanted got))))                 
+(test "*/a*.txt" "foo/aa.txt" "far/ab.txt" "qar/ac.txt")
+(test "fo*/a*.t*" "foo/aa.txt" "foo/aa.tmp")
+(test "*/*b.*" "far/ab.txt" "far/ab.tmp")
+(test "*a*/*.txt" "far/ab.txt" "qar/ac.txt")
+(test "*ar/*.txt" "far/ab.txt" "qar/ac.txt")
+(quit :unix-status $EXIT_LISP_WIN)
+EOF
+check_status_maybe_lose "DIRECTORY/PATTERNS" $?
 
 # Test whether ENSURE-DIRECTORIES-EXIST can create a directory whose
 # name contains a wildcard character (it used to get itself confused

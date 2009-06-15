@@ -704,6 +704,7 @@ directory, the provided pathname is not fully resolved, but rather names the
 symbolic link as an immediate child of DIRECTORY.
 
 Experimental: interface subject to change."
+  (declare (pathname-designator directory))
   (let* ((fun (%coerce-callable-to-fun function))
          (physical (physicalize-pathname directory))
          ;; Not QUERY-FILE-SYSTEM :EXISTENCE, since it doesn't work on Windows
@@ -807,8 +808,8 @@ Experimental: interface subject to change."
        (if (eq :wild this)
            #'cont
            (lambda (sub)
-             (awhen (pattern-matches this (last-directory-piece sub))
-               (funcall #'cont it))))
+             (when (pattern-matches this (last-directory-piece sub))
+               (funcall #'cont sub))))
        directory
        :files nil
        :directories t
