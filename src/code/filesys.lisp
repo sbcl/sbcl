@@ -560,15 +560,17 @@ matching filenames."
                       (pathname (canonicalize-pathname pathname))
                       (name (pathname-name pathname))
                       (type (pathname-type pathname))
-                      ;; KLUDGE: We want #p"/foo" to match #p"/foo/,
-                      ;; so cobble up a directory name component from
-                      ;; name and type -- just take care with "*.*"!
+                      ;; KLUDGE: We want #p"/foo" to match #p"/foo/, so cobble
+                      ;; up a directory name component from name and type --
+                      ;; and we need to take care with * as type: we want
+                      ;; "*.*", "x*.*", and "x.*" to match directories without
+                      ;; dots in their names...
                       (dirname (if (and (eq :wild name) (eq :wild type))
                                    "*"
                                    (with-output-to-string (s)
                                      (when name
                                        (write-string (unparse-physical-piece name) s))
-                                     (when type
+                                     (when (and type (not (and name (eq type :wild))))
                                        (write-string "." s)
                                        (write-string (unparse-physical-piece type) s)))))
                       (dir (maybe-make-pattern dirname 0 (length dirname)))

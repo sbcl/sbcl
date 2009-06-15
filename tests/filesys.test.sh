@@ -223,6 +223,10 @@ run_sbcl <<EOF
 (test "*/*b.*" "far/ab.txt" "far/ab.tmp")
 (test "*a*/*.txt" "far/ab.txt" "qar/ac.txt")
 (test "*ar/*.txt" "far/ab.txt" "qar/ac.txt")
+(test "f*.*" "far/" "foo/")
+(test "f*" "far/" "foo/")
+(test "*r" "far/" "qar/")
+(test "*r.*" "far/" "qar/")
 (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?
