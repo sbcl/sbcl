@@ -135,3 +135,14 @@
               (sb-ext:run-program "/bin/echo" '
                                   ("It would be nice if this didn't crash.")
                                   :wait nil :output nil)))))
+
+(with-test (:name (:run-program :pty-stream))
+  (assert (equal "OK"
+                 (subseq
+                  (with-output-to-string (s)
+                    (assert (= 42 (process-exit-code
+                                   (run-program "/bin/sh" '("-c" "echo OK; exit 42") :wait t
+                                                :pty s))))
+                    s)
+                  0
+                  2))))

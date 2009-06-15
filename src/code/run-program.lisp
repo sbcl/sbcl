@@ -440,7 +440,7 @@ status slot."
             (error "could not find a pty"))))))
 
 #-win32
-(defun open-pty (pty cookie)
+(defun open-pty (pty cookie &key (external-format :default))
   (when pty
     (multiple-value-bind
           (master slave name)
@@ -452,7 +452,7 @@ status slot."
           (unless new-fd
             (error "couldn't SB-UNIX:UNIX-DUP ~W: ~A" master (strerror errno)))
           (push new-fd *close-on-error*)
-          (copy-descriptor-to-stream new-fd pty cookie)))
+          (copy-descriptor-to-stream new-fd pty cookie external-format)))
       (values name
               (sb-sys:make-fd-stream master :input t :output t
                                      :element-type :default

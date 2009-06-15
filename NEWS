@@ -13,7 +13,10 @@
     from lists (eg. ADJOIN) are compiled with both :TEST and :TEST-NOT.
     (reported by Tobias Rittweiler)
   * bug fix: regression in DIRECTORY from 1.0.28.61, pattern matching of
-    directory components now works again.
+    directory components now works again. (reported by Michael Becker and
+    Gabriel Dos Reis)
+  * bug fix: :PTY option in RUN-PROGRAM was broken with stream arguments.
+    (reported by Elliot Slaughter, thanks to Stas Boukarev)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad
