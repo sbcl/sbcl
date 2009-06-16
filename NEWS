@@ -12,11 +12,9 @@
   * bug fix: better error signalling when calls to functions seeking elements
     from lists (eg. ADJOIN) are compiled with both :TEST and :TEST-NOT.
     (reported by Tobias Rittweiler)
-  * bug fix: regression in DIRECTORY from 1.0.28.61, pattern matching of
-    directory components now works again. (reported by Michael Becker and
-    Gabriel Dos Reis)
-  * bug fix: regression in DIRECTORY from 1.0.28.61, (DIRECTORY "X*.*") now
-    matches directories beginning with X in addition to files.
+  * bug fix: regressions in DIRECTORY from 1.0.28.61: pattern matching of
+    directory components now works as it used to. (various prolems reported by
+    Michael Becker, Gabriel Dos Reis, and Cyrus Harmon)
   * bug fix: :PTY option in RUN-PROGRAM was broken with stream arguments.
     (reported by Elliot Slaughter, thanks to Stas Boukarev)
 

@@ -211,6 +211,8 @@ touch far/ab.tmp
 mkdir qar
 touch qar/ac.txt
 touch qar/ac.tmp
+mkdir foo.moose
+touch foo.bar
 run_sbcl <<EOF
 (defun test (pattern &rest expected)
   (let ((wanted (sort (mapcar #'truename expected) #'string< :key #'namestring))
@@ -223,10 +225,13 @@ run_sbcl <<EOF
 (test "*/*b.*" "far/ab.txt" "far/ab.tmp")
 (test "*a*/*.txt" "far/ab.txt" "qar/ac.txt")
 (test "*ar/*.txt" "far/ab.txt" "qar/ac.txt")
-(test "f*.*" "far/" "foo/")
+(test "f*.*" "far/" "foo/" "foo.moose/" "foo.bar")
 (test "f*" "far/" "foo/")
 (test "*r" "far/" "qar/")
 (test "*r.*" "far/" "qar/")
+(test "f*.[mb]*" "foo.moose/" "foo.bar")
+(test "f*.m*.*")
+(test "f*.b*.*")
 (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?

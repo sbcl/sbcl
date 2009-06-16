@@ -560,31 +560,15 @@ matching filenames."
                       (pathname (canonicalize-pathname pathname))
                       (name (pathname-name pathname))
                       (type (pathname-type pathname))
-                      ;; KLUDGE: We want #p"/foo" to match #p"/foo/, so cobble
-                      ;; up a directory name component from name and type --
-                      ;; and we need to take care with * as type: we want
-                      ;; "*.*", "x*.*", and "x.*" to match directories without
-                      ;; dots in their names...
-                      (dirname (if (and (eq :wild name) (eq :wild type))
-                                   "*"
-                                   (with-output-to-string (s)
-                                     (when name
-                                       (write-string (unparse-physical-piece name) s))
-                                     (when (and type (not (and name (eq type :wild))))
-                                       (write-string "." s)
-                                       (write-string (unparse-physical-piece type) s)))))
-                      (dir (maybe-make-pattern dirname 0 (length dirname)))
                       (match-name (make-matcher name))
-                      (match-type (make-matcher type))
-                      (match-dir (make-matcher dir)))
+                      (match-type (make-matcher type)))
                  (map-matching-directories
                   (if (or name type)
                       (lambda (directory)
-                        (map-matching-files #'record
-                                            directory
-                                            match-name
-                                            match-type
-                                            match-dir))
+                        (map-matching-entries #'record
+                                              directory
+                                              match-name
+                                              match-type))
                       #'record)
                   pathname)))
              (do-pathnames (pathname)
@@ -693,11 +677,22 @@ matching filenames."
 ;;; DIRECTORY.
 (defun map-directory (function directory &key (files t) (directories t) (errorp t))
   #!+sb-doc
-  "Call FUNCTION with the pathname for each entry in DIRECTORY as follows: if
-FILES is true (the default), FUNCTION is called for each file in the
-directory; if DIRECTORIES is true (the default), FUNCTION is called for each
-subdirectory. If ERRORP is true (the default) signal an error if DIRECTORY
-does not exist, cannot be read, etc.
+  "Map over entries in DIRECTORY. Keyword arguments specify which entries to
+map over, and how:
+
+ :FILES
+    If true, call FUNCTION with the pathname of each file in DIRECTORY.
+    Defaults to T.
+
+ :DIRECTORIES
+   If true, call FUNCTION with a pathname for each subdirectory of DIRECTORY.
+   If :AS-FILES, the pathname used is a pathname designating the subdirectory
+   as a file in DIRECTORY. Otherwise the pathname used is a directory
+   pathname. Defaults to T.
+
+ :ERRORP
+   If true, signal an error if DIRECTORY does not exist, cannot be read, etc.
+   Defaults to T.
 
 On platforms supporting symbolic links the decision to call FUNCTION with its
 pathname depends on the resolution of the link: if it points to a directory,
@@ -708,6 +703,7 @@ symbolic link as an immediate child of DIRECTORY.
 Experimental: interface subject to change."
   (declare (pathname-designator directory))
   (let* ((fun (%coerce-callable-to-fun function))
+         (as-files (eq :as-files directories))
          (physical (physicalize-pathname directory))
          ;; Not QUERY-FILE-SYSTEM :EXISTENCE, since it doesn't work on Windows
          ;; network shares.
@@ -722,7 +718,8 @@ Experimental: interface subject to change."
     (flet ((map-it (name dirp)
              (funcall fun
                       (merge-pathnames (parse-native-namestring
-                                        name nil physical :as-directory dirp)
+                                        name nil physical
+                                        :as-directory (and dirp (not as-files)))
                                        physical))))
       (with-native-directory-iterator (next dirname :errorp errorp)
        (loop for name = (next)
@@ -845,20 +842,17 @@ Experimental: interface subject to change."
      :directories t
      :errorp nil)))
 
-;;; Part of DIRECTORY: implements iterating over files in a directory, and matching
-;;; them.
-(defun map-matching-files (function directory match-name match-type match-dir)
+;;; Part of DIRECTORY: implements iterating over entries in a directory, and
+;;; matching them.
+(defun map-matching-entries (function directory match-name match-type)
   (map-directory
    (lambda (file)
-     (let ((pname (pathname-name file))
-           (ptype (pathname-type file)))
-       (when (if (or pname ptype)
-                 (and (funcall match-name pname) (funcall match-type ptype))
-                 (funcall match-dir (last-directory-piece file)))
-         (funcall function file))))
+     (when (and (funcall match-name (pathname-name file))
+                (funcall match-type (pathname-type file)))
+       (funcall function file)))
    directory
    :files t
-   :directories t
+   :directories :as-files
    :errorp nil))
 
 ;;; NOTE: There is a fair amount of hair below that is probably not
