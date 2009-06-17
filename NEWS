@@ -4,6 +4,8 @@
   * improvement: failure to provide requested stack allocation compiler notes
     provided in all cases (requested stack allocation not happening without a
     note being issued is now considered a bug.)
+  * optimization: compiler is smarter about delegating argument type checks to
+    callees.
   * bug fix: on 64 bit platforms FILL worked incorrectly on arrays with
     upgraded element type (COMPLEX SINGLE-FLOAT), regression from 1.0.28.55.
     (thanks to Paul Khuong)

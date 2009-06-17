@@ -104,7 +104,12 @@
       (values iterator limit from-end
               #'sequence:iterator-step #'sequence:iterator-endp
               #'sequence:iterator-element #'(setf sequence:iterator-element)
-              #'sequence:iterator-index #'sequence:iterator-copy))))
+              #'sequence:iterator-index #'sequence:iterator-copy)))
+  (:method ((s t) &key from-end start end)
+    (declare (ignore from-end start end))
+    (error 'type-error
+           :datum s
+           :expected-type 'sequence)))
 
 ;;; the simple protocol: the simple iterator returns three values,
 ;;; STATE, LIMIT and FROM-END.

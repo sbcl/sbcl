@@ -315,28 +315,36 @@
           (t
            (values :too-hairy nil)))))
 
-;;; Do we want to do a type check?
+;;; Return T is the cast appears to be from the declaration of the callee,
+;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar))))
     (and (combination-p dest)
-         ;; The theory is that the type assertion is from a
-         ;; declaration in (or on) the callee, so the callee should be
-         ;; able to do the check. We want to let the callee do the
-         ;; check, because it is possible that by the time of call
-         ;; that declaration will be changed and we do not want to
-         ;; make people recompile all calls to a function when they
-         ;; were originally compiled with a bad declaration. (See also
-         ;; bug 35.)
-         (or (immediately-used-p lvar cast)
-             (binding* ((ctran (node-next cast) :exit-if-null)
-                        (next (ctran-next ctran)))
-               (and (cast-p next)
-                    (eq (node-dest next) dest)
-                    (eq (cast-type-check next) :external))))
-         (values-subtypep (lvar-externally-checkable-type lvar)
-                          (cast-type-to-check cast)))))
+         ;; The theory is that the type assertion is from a declaration on the
+         ;; callee, so the callee should be able to do the check. We want to
+         ;; let the callee do the check, because it is possible that by the
+         ;; time of call that declaration will be changed and we do not want
+         ;; to make people recompile all calls to a function when they were
+         ;; originally compiled with a bad declaration.
+         ;;
+         ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
+         ;; that occur before nodes that can cause observable side effects --
+         ;; most commonly other non-external casts: so the order in which
+         ;; possible type errors are signalled matches with the evaluation
+         ;; order.
+         ;;
+         ;; FIXME: We should let more cases be handled by the callee then we
+         ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
+         ;; This is not fixable quite here, though, because flow-analysis has
+         ;; deleted the LVAR of the cast by the time we get here, so there is
+         ;; no destination. Perhaps we should mark cases inserted by
+         ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
+         ;; deemed unreachable?
+         (almost-immediately-used-p lvar cast)
+         (values (values-subtypep (lvar-externally-checkable-type lvar)
+                                  (cast-type-to-check cast))))))
 
 ;;; Return true if CAST's value is an lvar whose type the back end is
 ;;; likely to be able to check (see GENERATE-TYPE-CHECKS). Since we

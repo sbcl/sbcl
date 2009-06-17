@@ -148,6 +148,43 @@
             (eq (ctran-next it) dest))
            (t (eq (block-start (first (block-succ (node-block node))))
                   (node-prev dest))))))
+
+;;; Return true if LVAR destination is executed after node with only
+;;; uninteresting nodes intervening.
+;;;
+;;; Uninteresting nodes are nodes in the same block which are either
+;;; REFs, external CASTs to the same destination, or known combinations
+;;; that never unwind.
+(defun almost-immediately-used-p (lvar node)
+  (declare (type lvar lvar)
+           (type node node))
+  (aver (eq (node-lvar node) lvar))
+  (let ((dest (lvar-dest lvar)))
+    (tagbody
+     :next
+       (let ((ctran (node-next node)))
+         (cond (ctran
+                (setf node (ctran-next ctran))
+                (if (eq node dest)
+                    (return-from almost-immediately-used-p t)
+                    (typecase node
+                      (ref
+                       (go :next))
+                      (cast
+                       (when (and (eq :external (cast-type-check node))
+                                  (eq dest (node-dest node)))
+                         (go :next)))
+                      (combination
+                       ;; KLUDGE: Unfortunately we don't have an attribute for
+                       ;; "never unwinds", so we just special case
+                       ;; %ALLOCATE-CLOSURES: it is easy to run into with eg.
+                       ;; FORMAT and a non-constant first argument.
+                       (when (eq '%allocate-closures (combination-fun-source-name node nil))
+                         (go :next))))))
+               (t
+                (when (eq (block-start (first (block-succ (node-block node))))
+                          (node-prev dest))
+                  (return-from almost-immediately-used-p t))))))))
 
 ;;;; lvar substitution
 
@@ -1884,9 +1921,10 @@ is :ANY, the function name is not checked."
 
 ;;; Return the source name of a combination. (This is an idiom
 ;;; which was used in CMU CL. I gather it always works. -- WHN)
-(defun combination-fun-source-name (combination)
-  (let ((ref (lvar-uses (combination-fun combination))))
-    (leaf-source-name (ref-leaf ref))))
+(defun combination-fun-source-name (combination &optional (errorp t))
+  (let ((leaf (ref-leaf (lvar-uses (combination-fun combination)))))
+    (when (or errorp (leaf-has-source-name-p leaf))
+      (leaf-source-name leaf))))
 
 ;;; Return the COMBINATION node that is the call to the LET FUN.
 (defun let-combination (fun)
