@@ -279,7 +279,9 @@ cd "$original_dir"
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
-    printf ' :stack-allocatable-closures :alien-callbacks :cycle-counter' >> $ltf
+    printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :alien-callbacks :cycle-counter' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | netbsd | openbsd | sunos | darwin | win32)
         printf ' :linkage-table' >> $ltf
@@ -292,10 +294,13 @@ if [ "$sbcl_arch" = "x86" ]; then
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
-    printf ' :stack-allocatable-closures :alien-callbacks :cycle-counter' >> $ltf
+    printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :alien-callbacks :cycle-counter' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
@@ -303,28 +308,28 @@ elif [ "$sbcl_arch" = "mips" ]; then
     # FIXME: integrate to grovel-features, mayhaps
     $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
     tools-for-build/determine-endianness >> $ltf
-elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
-    # Use a C program to detect which kind of glibc we're building on,
-    # to bandage across the break in source compatibility between
-    # versions 2.3.1 and 2.3.2
-    #
-    # FIXME: integrate to grovel-features, mayhaps
-    printf ' :gencgc :stack-allocatable-closures :linkage-table' >> $ltf
-    $GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
-    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
-elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
-    printf ' :gencgc :stack-allocatable-closures' >> $ltf
-    # We provide a dlopen shim, so a little lie won't hurt
-    printf " :os-provides-dlopen :linkage-table :alien-callbacks" >> $ltf
-    # The default stack ulimit under darwin is too small to run PURIFY.
-    # Best we can do is complain and exit at this stage
-    if [ "`ulimit -s`" = "512" ]; then
-        echo "Your stack size limit is too small to build SBCL."
-        echo "See the limit(1) or ulimit(1) commands and the README file."
-        exit 1
+elif [ "$sbcl_arch" = "ppc"]; then
+    printf ' :gencgc :stack-allocatable-closures :stacka-allocatable-lists' > $ltf
+    printf ' :linkage-table' >> $ltf
+    if [ "$sbcl_os" = "linux" ]; then
+        # Use a C program to detect which kind of glibc we're building on,
+        # to bandage across the break in source compatibility between
+        # versions 2.3.1 and 2.3.2
+        #
+        # FIXME: integrate to grovel-features, mayhaps
+	$GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
+	tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
+    elif [ "$sbcl_os" = "darwin" ]; then
+        # We provide a dlopen shim, so a little lie won't hurt
+	printf " :os-provides-dlopen :alien-callbacks" >> $ltf
+        # The default stack ulimit under darwin is too small to run PURIFY.
+        # Best we can do is complain and exit at this stage
+	if [ "`ulimit -s`" = "512" ]; then
+            echo "Your stack size limit is too small to build SBCL."
+            echo "See the limit(1) or ulimit(1) commands and the README file."
+            exit 1
+	fi
     fi
-elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "netbsd" ]; then
-    printf ' :gencgc :stack-allocatable-closures :linkage-table' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate
@@ -334,9 +339,12 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
         printf ' :linkage-table' >> $ltf
     fi
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
+elif [ "$sbcl_arch" = "hppa" ]; then
+    printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :stack-allocatable-lists' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

@@ -13,6 +13,7 @@
            sb!vm:instance-header-widetag sb!vm:instance-pointer-lowtag
            nil)
 
+#!+stack-allocatable-fixed-objects
 (defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args) node dx)
   t)
 
@@ -218,9 +219,7 @@
                  node block (list value-tn) (node-lvar node))))))))
 
 ;;; Stack allocation optimizers per platform support
-;;;
-;;; Platforms with stack-allocatable vectors
-#!+(or hppa mips x86 x86-64)
+#!+stack-allocatable-vectors
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
@@ -253,7 +252,7 @@
         (annotate-1-value-lvar arg)))))
 
 ;;; ...lists
-#!+(or alpha hppa mips ppc sparc x86 x86-64)
+#!+stack-allocatable-lists
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
     (declare (ignore node dx))
@@ -266,7 +265,7 @@
     t))
 
 ;;; ...conses
-#!+(or hppa mips x86 x86-64)
+#!+stack-allocatable-fixed-objects
 (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
   (declare (ignore node dx))
   t)

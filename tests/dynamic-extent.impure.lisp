@@ -503,20 +503,25 @@
 
 (defvar *a-cons* (cons nil nil))
 
-#+(or x86 x86-64 alpha ppc sparc mips hppa)
 (progn
+  #+stack-allocatable-closures
   (assert-no-consing (dxclosure 42))
-  (assert-no-consing (dxlength 1 2 3))
-  (assert-no-consing (dxlength t t t t t t))
-  (assert-no-consing (dxlength))
-  (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
-  (assert-no-consing (test-nip-values))
-  (assert-no-consing (test-let-var-subst1 17))
-  (assert-no-consing (test-let-var-subst2 17))
-  (assert-no-consing (test-lvar-subst 11))
+  #+stack-allocatable-lists
+  (progn
+    (assert-no-consing (dxlength 1 2 3))
+    (assert-no-consing (dxlength t t t t t t))
+    (assert-no-consing (dxlength))
+    (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
+    (assert-no-consing (test-nip-values))
+    (assert-no-consing (test-let-var-subst1 17))
+    (assert-no-consing (test-let-var-subst2 17))
+    (assert-no-consing (test-lvar-subst 11))
+    (assert-no-consing (nested-dx-lists))
+    (assert-consing (nested-dx-not-used *a-cons*))
+    (assert-no-consing (nested-evil-dx-used *a-cons*))
+    (assert-no-consing (multiple-dx-uses)))
   (assert-no-consing (dx-value-cell 13))
-  ;; Only for platforms with DX FIXED-ALLOC
-  #+(or hppa mips x86 x86-64)
+  #+stack-allocatable-fixed-objects
   (progn
     (assert-no-consing (cons-on-stack 42))
     (assert-no-consing (make-foo1-on-stack 123))
@@ -524,8 +529,7 @@
     (assert-no-consing (nested-dx-conses))
     (assert-no-consing (dx-handler-bind 2))
     (assert-no-consing (dx-handler-case 2)))
-  ;; Only for platforms with DX ALLOCATE-VECTOR
-  #+(or hppa mips x86 x86-64)
+  #+stack-allocatable-vectors
   (progn
     (assert-no-consing (force-make-array-on-stack 128))
     (assert-no-consing (make-array-on-stack-1))
@@ -540,10 +544,6 @@
   (#+raw-instance-init-vops assert-no-consing
    #-raw-instance-init-vops progn
    (make-foo3-on-stack))
-  (assert-no-consing (nested-dx-lists))
-  (assert-consing (nested-dx-not-used *a-cons*))
-  (assert-no-consing (nested-evil-dx-used *a-cons*))
-  (assert-no-consing (multiple-dx-uses))
   ;; Not strictly DX..
   (assert-no-consing (test-hash-table))
   #+sb-thread

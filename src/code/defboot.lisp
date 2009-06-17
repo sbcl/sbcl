@@ -617,9 +617,7 @@ evaluated as a PROGN."
               (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
                                     mapped-bindings))
                     *handler-clusters*)))
-         ;; KLUDGE: Only on platforms with DX FIXED-ALLOC. FIXME: Add a
-         ;; feature for that, so we can conditionalize on it neatly.
-         #!+(or hppa mips x86 x86-64)
+         #!+stack-allocatable-fixed-objects
          (declare (truly-dynamic-extent *handler-clusters*))
          (progn ,form)))))
 
