@@ -507,16 +507,17 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             complex-single-float-widetag
-                             complex-single-float-size
-                             node)
-       (let ((real-tn (complex-single-reg-real-tn x)))
-         (with-tn@fp-top(real-tn)
-           (inst fst (ea-for-csf-real-desc y))))
-       (let ((imag-tn (complex-single-reg-imag-tn x)))
-         (with-tn@fp-top(imag-tn)
-           (inst fst (ea-for-csf-imag-desc y)))))))
+    (:break x y node)
+    (with-fixed-allocation (y
+                            complex-single-float-widetag
+                            complex-single-float-size
+                            node)
+      (let ((real-tn (complex-single-reg-real-tn x)))
+        (with-tn@fp-top(real-tn)
+          (inst fst (ea-for-csf-real-desc y))))
+      (let ((imag-tn (complex-single-reg-imag-tn x)))
+        (with-tn@fp-top(imag-tn)
+          (inst fst (ea-for-csf-imag-desc y)))))))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 

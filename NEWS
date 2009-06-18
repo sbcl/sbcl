@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * new feature: SB-INTROSPECT:ALLOCATION-INFORMATION provides information
+    about object allocation.
   * optimization: more efficient type-checks for FIXNUMs when the value
     is known to be a signed word on x86 and x86-64.
   * improvement: failure to provide requested stack allocation compiler notes

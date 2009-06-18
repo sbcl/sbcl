@@ -266,6 +266,8 @@
 
 ;;; ...conses
 #!+stack-allocatable-fixed-objects
-(defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
-  (declare (ignore node dx))
-  t)
+(progn
+  (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
+    t)
+  (defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
+    t))

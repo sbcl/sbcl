@@ -24,19 +24,23 @@
 (defvar *source-location-thunks* nil)
 
 ;; Will be redefined in src/code/source-location.lisp.
-(defun source-location ()
+(defun source-location (&optional name)
+  (declare (ignore name))
   nil)
 
 ;; Will be redefined in src/code/source-location.lisp
 #-sb-xc-host
-(define-compiler-macro source-location ()
+(define-compiler-macro source-location (&optional name)
   (when (and (boundp '*source-info*)
              (symbol-value '*source-info*))
-    `(cons ,(make-file-info-namestring
-              *compile-file-pathname*
-              (sb!c:get-toplevelish-file-info (symbol-value '*source-info*)))
-           ,(when (boundp '*current-path*)
-                  (source-path-tlf-number (symbol-value '*current-path*))))))
+    (let ((form `(cons ,(make-file-info-namestring
+                         *compile-file-pathname*
+                         (sb!c:get-toplevelish-file-info (symbol-value '*source-info*)))
+                       ,(when (boundp '*current-path*)
+                              (source-path-tlf-number (symbol-value '*current-path*))))))
+      (when (eq 'replace name)
+        (break "early source location: ~S" form))
+      form)))
 
 ;; If the whole source location tracking machinery has been loaded
 ;; (detected by the type of SOURCE-LOCATION), execute BODY. Otherwise

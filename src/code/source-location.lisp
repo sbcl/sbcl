@@ -52,15 +52,19 @@
             nil))))
 
 #!+sb-source-locations
-(define-compiler-macro source-location (&environment env)
+(define-compiler-macro source-location (&optional name &environment env)
   (declare (ignore env))
-  #-sb-xc-host (make-definition-source-location))
+  #-sb-xc-host
+  (let ((loc (make-definition-source-location)))
+    (when (eq 'replace name)
+      (break "source location ~S" loc))
+    loc))
 
 ;; We need a regular definition of SOURCE-LOCATION for calls processed
 ;; during LOAD on a source file while *EVALUATOR-MODE* is :INTERPRET.
 #!+sb-source-locations
 (setf (symbol-function 'source-location)
-      (lambda () (make-definition-source-location)))
+      (lambda (&optional name) (declare (ignore name)) (make-definition-source-location)))
 
 (/show0 "/Processing source location thunks")
 #!+sb-source-locations

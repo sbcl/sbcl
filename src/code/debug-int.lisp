@@ -515,7 +515,7 @@
 (defun fun-word-offset (fun) (fun-word-offset fun))
 
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
-(defun control-stack-pointer-valid-p (x)
+(defun control-stack-pointer-valid-p (x &optional (aligned t))
   (declare (type system-area-pointer x))
   (let* (#!-stack-grows-downward-not-upward
          (control-stack-start
@@ -526,11 +526,11 @@
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
          (sap<= control-stack-start x)
-         (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask)))
+         (or (not aligned) (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask))))
     #!+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
          (sap> control-stack-end x)
-         (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask)))))
+         (or (not aligned) (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask))))))
 
 (declaim (inline component-ptr-from-pc))
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)

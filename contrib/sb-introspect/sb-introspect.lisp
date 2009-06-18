@@ -24,7 +24,8 @@
 
 (defpackage :sb-introspect
   (:use "CL")
-  (:export "FUNCTION-ARGLIST"
+  (:export "ALLOCATION-INFORMATION"
+           "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
@@ -618,5 +619,111 @@ definition-source pairs."
 macro MACRO-NAME is expanded. Returns a list of function name,
 definition-source pairs."
   (collect-xref #.(position :macroexpands sb-c::*xref-kinds*) macro-name))
+
+;;;; ALLOCATION INTROSPECTION
+
+(defun allocation-information (object)
+  #+sb-doc
+  "Returns information about the allocation of OBJECT. Primary return value
+indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
+or :FOREIGN.
+
+Possible secondary return value provides additional information about the
+allocation.
+
+For :HEAP objects the secondary value is a plist:
+
+  :SPACE
+    Inficates the heap segment the object is allocated in.
+
+  :GENERATION
+    Is the current generation of the object: 0 for nursery, 6 for pseudo-static
+    generation loaded from core. (GENCGC and :SPACE :DYNAMIC only.)
+
+  :LARGE
+    Indicates a \"large\" object subject to non-copying
+    promotion. (GENCGC and :SPACE :DYNAMIC only.)
+
+  :PINNED
+    Indicates that the page(s) on which the object resides are kept live due
+    to conservative references. Note that object may reside on a pinned page
+    even if :PINNED in NIL if the GC has not had the need to mark the the page
+    as pinned. (GENCGC and :SPACE :DYNAMIC only.)
+
+For :STACK objects secondary value is the thread on whose stack the object is
+allocated.
+
+Expected use-cases include introspection to gain insight into allocation and
+GC behaviour and restricting memoization to heap-allocated arguments.
+
+Experimental: interface subject to change."
+  ;; FIXME: Would be nice to provide the size of the object as well, though
+  ;; maybe that should be a separate function, and something like MAP-PARTS
+  ;; for mapping over parts of arbitrary objects so users can get "deep sizes"
+  ;; as well if they want to.
+  ;;
+  ;; FIXME: For the memoization use-case possibly we should also provide a
+  ;; simpler HEAP-ALLOCATED-P, since that doesn't require disabling the GC
+  ;; scanning threads for negative answers? Similarly, STACK-ALLOCATED-P for
+  ;; checking if an object has been stack-allocated by a given thread for
+  ;; testing purposes might not come amiss.
+  (if (typep object '(or fixnum character))
+      (values :immediate nil)
+      (let ((plist
+             (sb-sys:without-gcing
+               ;; Disable GC so the object cannot move to another page while
+               ;; we have the address.
+               (let* ((addr (sb-kernel:get-lisp-obj-address object))
+                      (space
+                       (cond ((< sb-vm:read-only-space-start addr
+                                 (* sb-vm:*read-only-space-free-pointer*
+                                    sb-vm:n-word-bytes))
+                              :read-only)
+                             ((< sb-vm:static-space-start addr
+                                 (* sb-vm:*static-space-free-pointer*
+                                    sb-vm:n-word-bytes))
+                              :static)
+                             ((< (sb-kernel:current-dynamic-space-start) addr
+                                 (sb-sys:sap-int (sb-kernel:dynamic-space-free-pointer)))
+                              :dynamic))))
+                 (when space
+                   #+gencgc
+                   (if (eq :dynamic space)
+                       (let ((index (sb-vm::find-page-index addr)))
+                         (symbol-macrolet ((page (sb-alien:deref sb-vm::page-table index)))
+                           (let ((flags (sb-alien:slot page 'sb-vm::flags)))
+                             (list :space space
+                                   :generation (sb-alien:slot page 'sb-vm::gen)
+                                   :write-protected (logbitp 0 flags)
+                                   :pinned (logbitp 5 flags)
+                                   :large (logbitp 6 flags)))))
+                       (list :space space))
+                   #-gencgc
+                   (list :space space))))))
+        (cond (plist
+               (values :heap plist))
+              (t
+               (let ((sap (sb-sys:int-sap (sb-kernel:get-lisp-obj-address object))))
+                 ;; FIXME: Check other stacks as well.
+                 #+sb-thread
+                 (dolist (thread (sb-thread:list-all-threads))
+                   (let ((c-start (sb-di::descriptor-sap
+                                   (sb-thread::%symbol-value-in-thread
+                                    'sb-vm:*control-stack-start*
+                                    thread)))
+                         (c-end (sb-di::descriptor-sap
+                                 (sb-thread::%symbol-value-in-thread
+                                  'sb-vm:*control-stack-end*
+                                  thread))))
+                     (when (and c-start c-end)
+                       (when (and (sb-sys:sap<= c-start sap)
+                                  (sb-sys:sap< sap c-end))
+                         (return-from allocation-information
+                           (values :stack thread))))))
+                 #-sb-thread
+                 (when (sb-vm:control-stack-pointer-valid-p sap nil)
+                   (return-from allocation-information
+                     (values :stack sb-thread::*current-thread*))))
+               :foreign)))))
 
 (provide 'sb-introspect)

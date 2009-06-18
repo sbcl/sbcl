@@ -145,5 +145,55 @@
 
 (load (merge-pathnames "xref-test.lisp" *load-pathname*))
 
+;;; Test allocation-information
+
+(defun tai (x kind info)
+  (multiple-value-bind (kind2 info2) (sb-introspect:allocation-information x)
+    (unless (eq kind kind2)
+      (error "wanted ~S, got ~S" kind kind2))
+    (assert (equal info info2))))
+
+(tai nil :heap '(:space :static))
+(tai t :heap '(:space :static))
+(tai 42 :immediate nil)
+(tai #'cons :heap
+     #+gencgc
+     '(:space :dynamic :generation 6 :write-protected t :pinned nil :large nil)
+     #-gencgc
+     '(:space :dynamic))
+(let ((x (list 1 2 3)))
+  (declare (dynamic-extent x))
+  (tai x :stack sb-thread:*current-thread*))
+#+sb-thread
+(progn
+  (defun thread-tai ()
+    (let ((x (list 1 2 3)))
+      (declare (dynamic-extent x))
+      (let ((child (sb-thread:make-thread
+                    (lambda ()
+                      (sb-introspect:allocation-information x)))))
+        (assert (equal (list :stack sb-thread:*current-thread*)
+                       (multiple-value-list (sb-thread:join-thread child)))))))
+  (thread-tai)
+  (defun thread-tai2 ()
+    (let* ((sem (sb-thread:make-semaphore))
+           (obj nil)
+           (child (sb-thread:make-thread
+                   (lambda ()
+                     (let ((x (list 1 2 3)))
+                       (declare (dynamic-extent x))
+                       (setf obj x)
+                       (sb-thread:wait-on-semaphore sem)))
+                   :name "child")))
+      (loop until obj)
+      (assert (equal (list :stack child)
+                     (multiple-value-list
+                      (sb-introspect:allocation-information obj))))
+      (sb-thread:signal-semaphore sem)
+      (sb-thread:join-thread child)
+      nil))
+  (thread-tai2))
+
 ;;;; Unix success convention for exit codes
 (sb-ext:quit :unix-status 0)
+
