@@ -37,14 +37,16 @@ read by the function THREAD-ERROR-THREAD."))
                (cell-error-name condition)
                (thread-error-thread condition)
                (ecase problem
-                 (:unbound "the symbol is unbound in thread.")
-                 (:dead "the thread has exited."))))))
+                 (:unbound-in-thread "the symbol is unbound in thread.")
+                 (:no-tls-value "the symbol has no thread-local value.")
+                 (:thread-dead "the thread has exited.")
+                 (:invalid-tls-value "the thread-local value is not valid."))))))
   #!+sb-doc
   (:documentation
-   "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to the
-symbol being unbound in target thread, or the target thread having exited. The
-offending symbol can be accessed using CELL-ERROR-NAME, and the offending
-thread using THREAD-ERROR-THREAD."))
+   "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to eg.
+the symbol not having a thread-local value, or the target thread having
+exited. The offending symbol can be accessed using CELL-ERROR-NAME, and the
+offending thread using THREAD-ERROR-THREAD."))
 
 (define-condition join-thread-error (thread-error) ()
   (:report (lambda (c s)
@@ -1085,17 +1087,40 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
                                            sb!vm::thread-next-slot)))))))
 
   (defun %symbol-value-in-thread (symbol thread)
-      ;; Prevent the thread from dying completely while we look for the TLS
-      ;; area...
+    ;; Prevent the thread from dying completely while we look for the TLS
+    ;; area...
     (with-all-threads-lock
-      (if (thread-alive-p thread)
-          (let* ((offset (* sb!vm:n-word-bytes
-                            (sb!vm::symbol-tls-index symbol)))
-                 (tl-val (sap-ref-word (%thread-sap thread) offset)))
-            (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
-                (values nil :unbound)
-                (values (make-lisp-obj tl-val) :bound)))
-          (values nil :dead))))
+      (loop
+        (if (thread-alive-p thread)
+            (let* ((epoch sb!kernel::*gc-epoch*)
+                   (offset (* sb!vm:n-word-bytes
+                              (sb!vm::symbol-tls-index symbol)))
+                   (tl-val (sap-ref-word (%thread-sap thread) offset)))
+              (cond ((zerop offset)
+                     (return (values nil :no-tls-value)))
+                    ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
+                         (eql tl-val sb!vm:unbound-marker-widetag))
+                     (return (values nil :unbound-in-thread)))
+                    (t
+                     (multiple-value-bind (obj ok) (make-lisp-obj tl-val nil)
+                       ;; The value we constructed may be invalid if a GC has
+                       ;; occurred. That is harmless, though, since OBJ is
+                       ;; either in a register or on stack, and we are
+                       ;; conservative on both on GENCGC -- so a bogus object
+                       ;; is safe here as long as we don't return it. If we
+                       ;; ever port threads to a non-conservative GC we must
+                       ;; pin the TL-VAL address before constructing OBJ, or
+                       ;; make WITH-ALL-THREADS-LOCK imply WITHOUT-GCING.
+                       ;;
+                       ;; The reason we don't just rely on TL-VAL pinning the
+                       ;; object is that the call to MAKE-LISP-OBJ may cause
+                       ;; bignum allocation, at which point TL-VAL might not
+                       ;; be alive anymore -- hence the epoch check.
+                       (when (eq epoch sb!kernel::*gc-epoch*)
+                         (if ok
+                             (return (values obj :ok))
+                             (return (values obj :invalid-tls-value))))))))
+            (return (values nil :thread-dead))))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
     (with-pinned-objects (value)
@@ -1103,17 +1128,15 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
       ;; area...
       (with-all-threads-lock
         (if (thread-alive-p thread)
-            (let* ((offset (* sb!vm:n-word-bytes
-                              (sb!vm::symbol-tls-index symbol)))
-                   (sap (%thread-sap thread))
-                   (tl-val (sap-ref-word sap offset)))
-              (cond ((eql tl-val sb!vm::no-tls-value-marker-widetag)
-                     (values nil :unbound))
+            (let ((offset (* sb!vm:n-word-bytes
+                             (sb!vm::symbol-tls-index symbol))))
+              (cond ((zerop offset)
+                     (values nil :no-tls-value))
                     (t
-                     (setf (sap-ref-word sap offset)
+                     (setf (sap-ref-word (%thread-sap thread) offset)
                            (get-lisp-obj-address value))
-                     (values value :bound))))
-            (values nil :dead))))))
+                     (values value :ok))))
+            (values nil :thread-dead))))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T
@@ -1127,11 +1150,11 @@ NIL, and a secondary value of NIL.
 Can also be used with SETF to change the thread-local value of SYMBOL.
 
 SYMBOL-VALUE-IN-THREAD is primarily intended as a debugging tool, and not as a
-mechanism form inter-thread communication."
+mechanism for inter-thread communication."
   (declare (symbol symbol) (thread thread))
   #!+sb-thread
   (multiple-value-bind (res status) (%symbol-value-in-thread symbol thread)
-    (if (eq :bound status)
+    (if (eq :ok status)
         (values res t)
         (if errorp
             (error 'symbol-value-in-thread-error
@@ -1146,14 +1169,14 @@ mechanism form inter-thread communication."
           (error 'symbol-value-in-thread-error
                  :name symbol
                  :thread thread
-                 :info (list :read :unbound))
+                 :info (list :read :unbound-in-thread))
           (values nil nil))))
 
 (defun (setf symbol-value-in-thread) (value symbol thread &optional (errorp t))
   (declare (symbol symbol) (thread thread))
   #!+sb-thread
   (multiple-value-bind (res status) (%set-symbol-value-in-thread symbol thread value)
-    (if (eq :bound status)
+    (if (eq :ok status)
         (values res t)
         (if errorp
             (error 'symbol-value-in-thread-error
@@ -1168,7 +1191,7 @@ mechanism form inter-thread communication."
           (error 'symbol-value-in-thread-error
                  :name symbol
                  :thread thread
-                 :info (list :write :unbound))
+                 :info (list :write :unbound-in-thread))
           (values nil nil))))
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)

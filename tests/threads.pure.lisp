@@ -180,28 +180,41 @@
       (assert (= 42 (join-thread child)))
       (assert (eq :from-child (symbol-value 'this-is-new))))))
 
-#+sb-thread
+;;; Disabled on Darwin due to deadlocks caused by apparent OS specific deadlocks,
+;;; wich _appear_ to be caused by malloc() and free() not being thread safe: an
+;;; interrupted malloc in one thread can apparently block a free in another. There
+;;; are also some indications that pthread_mutex_lock is not re-entrant.
+#+(and sb-thread (not darwin))
 (with-test (:name symbol-value-in-thread.3)
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (running t)
          (noise (make-thread (lambda ()
                                (loop while running
-                                     do (setf * (make-array 1024)))))))
-
-    (loop repeat 10000
-          do (let* ((mom-mark (cons t t))
-                    (kid-mark (cons t t))
-                    (child (make-thread (lambda ()
-                                          (wait-on-semaphore semaphore)
-                                          (let ((old (symbol-value-in-thread 'this-is-new parent)))
-                                            (setf (symbol-value-in-thread 'this-is-new parent)
-                                                  (make-array 24 :initial-element kid-mark))
-                                            old)))))
-               (progv '(this-is-new) (list (make-array 24 :initial-element mom-mark))
-                 (signal-semaphore semaphore)
-                 (assert (eq mom-mark (aref (join-thread child) 0)))
-                 (assert (eq kid-mark (aref (symbol-value 'this-is-new) 0))))))
+                                     do (setf * (make-array 1024))
+                                     ;; Busy-wait a bit so we don't TOTALLY flood the
+                                     ;; system with GCs: a GC occurring in the middle of
+                                     ;; S-V-I-T causes it to start over -- we want that
+                                     ;; to occur occasionally, but not _all_ the time.
+                                        (loop repeat (random 128)
+                                              do (setf ** *)))))))
+    (write-string "; ")
+    (dotimes (i 15000)
+      (when (zerop (mod i 200))
+        (write-char #\.)
+        (force-output))
+      (let* ((mom-mark (cons t t))
+             (kid-mark (cons t t))
+             (child (make-thread (lambda ()
+                                   (wait-on-semaphore semaphore)
+                                   (let ((old (symbol-value-in-thread 'this-is-new parent)))
+                                     (setf (symbol-value-in-thread 'this-is-new parent)
+                                           (make-array 24 :initial-element kid-mark))
+                                     old)))))
+        (progv '(this-is-new) (list (make-array 24 :initial-element mom-mark))
+          (signal-semaphore semaphore)
+          (assert (eq mom-mark (aref (join-thread child) 0)))
+          (assert (eq kid-mark (aref (symbol-value 'this-is-new) 0))))))
     (setf running nil)
     (join-thread noise)))
 
@@ -228,7 +241,7 @@
                                          (cell-error-name e)
                                          (sb-thread::symbol-value-in-thread-error-info e))))))))
     (signal-semaphore semaphore)
-    (assert (equal (list *current-thread* 'this-is-new (list :read :unbound))
+    (assert (equal (list *current-thread* 'this-is-new (list :read :unbound-in-thread))
                    (join-thread child)))))
 
 #+sb-thread
@@ -246,7 +259,7 @@
                                          (sb-thread::symbol-value-in-thread-error-info e))))))))
     (signal-semaphore semaphore)
     (let ((res (join-thread child))
-          (want (list *current-thread* name (list :write :unbound))))
+          (want (list *current-thread* name (list :write :no-tls-value))))
       (unless (equal res want)
         (error "wanted ~S, got ~S" want res)))))
 
@@ -258,7 +271,8 @@
       (symbol-value-in-thread-error (e)
         (assert (eq child (thread-error-thread e)))
         (assert (eq 'this-is-new (cell-error-name e)))
-        (assert (equal (list :read :dead) (sb-thread::symbol-value-in-thread-error-info e)))))))
+        (assert (equal (list :read :thread-dead)
+                       (sb-thread::symbol-value-in-thread-error-info e)))))))
 
 #+sb-thread
 (with-test (:name symbol-value-in-thread.8)
@@ -268,4 +282,5 @@
       (symbol-value-in-thread-error (e)
         (assert (eq child (thread-error-thread e)))
         (assert (eq 'this-is-new (cell-error-name e)))
-        (assert (equal (list :write :dead) (sb-thread::symbol-value-in-thread-error-info e)))))))
+        (assert (equal (list :write :thread-dead)
+                       (sb-thread::symbol-value-in-thread-error-info e)))))))
