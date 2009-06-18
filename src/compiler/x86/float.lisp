@@ -507,7 +507,6 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-    (:break x y node)
     (with-fixed-allocation (y
                             complex-single-float-widetag
                             complex-single-float-size
