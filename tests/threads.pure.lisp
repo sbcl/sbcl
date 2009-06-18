@@ -157,3 +157,115 @@
              (sb-ext:timeout ()
                :timeout)))))))
 
+;;;; SYMBOL-VALUE-IN-THREAD
+
+(with-test (:name symbol-value-in-thread.1)
+  (let ((* (cons t t)))
+    (assert (eq * (symbol-value-in-thread '* *current-thread*)))
+    (setf (symbol-value-in-thread '* *current-thread*) 123)
+    (assert (= 123 (symbol-value-in-thread '* *current-thread*)))
+    (assert (= 123 *))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.2)
+  (let* ((parent *current-thread*)
+         (semaphore (make-semaphore))
+         (child (make-thread (lambda ()
+                               (wait-on-semaphore semaphore)
+                               (let ((old (symbol-value-in-thread 'this-is-new parent)))
+                                 (setf (symbol-value-in-thread 'this-is-new parent) :from-child)
+                                 old)))))
+    (progv '(this-is-new) '(42)
+      (signal-semaphore semaphore)
+      (assert (= 42 (join-thread child)))
+      (assert (eq :from-child (symbol-value 'this-is-new))))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.3)
+  (let* ((parent *current-thread*)
+         (semaphore (make-semaphore))
+         (running t)
+         (noise (make-thread (lambda ()
+                               (loop while running
+                                     do (setf * (make-array 1024)))))))
+
+    (loop repeat 10000
+          do (let* ((mom-mark (cons t t))
+                    (kid-mark (cons t t))
+                    (child (make-thread (lambda ()
+                                          (wait-on-semaphore semaphore)
+                                          (let ((old (symbol-value-in-thread 'this-is-new parent)))
+                                            (setf (symbol-value-in-thread 'this-is-new parent)
+                                                  (make-array 24 :initial-element kid-mark))
+                                            old)))))
+               (progv '(this-is-new) (list (make-array 24 :initial-element mom-mark))
+                 (signal-semaphore semaphore)
+                 (assert (eq mom-mark (aref (join-thread child) 0)))
+                 (assert (eq kid-mark (aref (symbol-value 'this-is-new) 0))))))
+    (setf running nil)
+    (join-thread noise)))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.4)
+  (let* ((parent *current-thread*)
+         (semaphore (make-semaphore))
+         (child (make-thread (lambda ()
+                               (wait-on-semaphore semaphore)
+                               (symbol-value-in-thread 'this-is-new parent nil)))))
+    (signal-semaphore semaphore)
+    (assert (equal '(nil nil) (multiple-value-list (join-thread child))))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.5)
+  (let* ((parent *current-thread*)
+         (semaphore (make-semaphore))
+         (child (make-thread (lambda ()
+                               (wait-on-semaphore semaphore)
+                               (handler-case
+                                   (symbol-value-in-thread 'this-is-new parent)
+                                 (symbol-value-in-thread-error (e)
+                                   (list (thread-error-thread e)
+                                         (cell-error-name e)
+                                         (sb-thread::symbol-value-in-thread-error-info e))))))))
+    (signal-semaphore semaphore)
+    (assert (equal (list *current-thread* 'this-is-new (list :read :unbound))
+                   (join-thread child)))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.6)
+  (let* ((parent *current-thread*)
+         (semaphore (make-semaphore))
+         (name (gensym))
+         (child (make-thread (lambda ()
+                               (wait-on-semaphore semaphore)
+                               (handler-case
+                                   (setf (symbol-value-in-thread name parent) t)
+                                 (symbol-value-in-thread-error (e)
+                                   (list (thread-error-thread e)
+                                         (cell-error-name e)
+                                         (sb-thread::symbol-value-in-thread-error-info e))))))))
+    (signal-semaphore semaphore)
+    (let ((res (join-thread child))
+          (want (list *current-thread* name (list :write :unbound))))
+      (unless (equal res want)
+        (error "wanted ~S, got ~S" want res)))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.7)
+  (let ((child (make-thread (lambda ()))))
+    (handler-case
+        (symbol-value-in-thread 'this-is-new child)
+      (symbol-value-in-thread-error (e)
+        (assert (eq child (thread-error-thread e)))
+        (assert (eq 'this-is-new (cell-error-name e)))
+        (assert (equal (list :read :dead) (sb-thread::symbol-value-in-thread-error-info e)))))))
+
+#+sb-thread
+(with-test (:name symbol-value-in-thread.8)
+  (let ((child (make-thread (lambda ()))))
+    (handler-case
+        (setf (symbol-value-in-thread 'this-is-new child) t)
+      (symbol-value-in-thread-error (e)
+        (assert (eq child (thread-error-thread e)))
+        (assert (eq 'this-is-new (cell-error-name e)))
+        (assert (equal (list :write :dead) (sb-thread::symbol-value-in-thread-error-info e)))))))

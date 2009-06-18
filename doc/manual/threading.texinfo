@@ -14,14 +14,14 @@ x86 or x86-64 architecture, or SunOS (Solaris) on the x86.  Support for
 threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 
 @menu
-* Threading basics::
-* Special Variables::
-* Mutex Support::
-* Semaphores::
-* Waitqueue/condition variables::
-* Sessions/Debugging::
-* Foreign threads::
-* Implementation (Linux x86/x86-64)::
+* Threading basics::            
+* Special Variables::           
+* Mutex Support::               
+* Semaphores::                  
+* Waitqueue/condition variables::  
+* Sessions/Debugging::          
+* Foreign threads::             
+* Implementation (Linux x86/x86-64)::  
 @end menu
 
 @node Threading basics
@@ -32,19 +32,37 @@ threading on Darwin (Mac OS X) and FreeBSD on the x86 is experimental.
 (make-thread (lambda () (write-line "Hello, world")))
 @end lisp
 
+@subsection Thread Objects
+
 @include struct-sb-thread-thread.texinfo
 @include var-sb-thread-star-current-thread-star.texinfo
-@include fun-sb-thread-make-thread.texinfo
-@include fun-sb-thread-join-thread.texinfo
-@include condition-sb-thread-join-thread-error.texinfo
-@include fun-sb-thread-join-thread-error-thread.texinfo
-@include fun-sb-thread-thread-alive-p.texinfo
 @include fun-sb-thread-list-all-threads.texinfo
-@include condition-sb-thread-interrupt-thread-error.texinfo
-@include fun-sb-thread-interrupt-thread-error-thread.texinfo
+@include fun-sb-thread-thread-alive-p.texinfo
+@include fun-sb-thread-thread-name.texinfo
+
+@subsection Making, Joining, and Yielding Threads
+
+@include fun-sb-thread-make-thread.texinfo
+@include fun-sb-thread-thread-yield.texinfo
+@include fun-sb-thread-join-thread.texinfo
+
+@subsection Asynchronous Operations
+
 @include fun-sb-thread-interrupt-thread.texinfo
 @include fun-sb-thread-terminate-thread.texinfo
-@include fun-sb-thread-thread-yield.texinfo
+
+@subsection Miscellaneous Operations
+
+@include fun-sb-thread-symbol-value-in-thread.texinfo
+
+@subsection Error Conditions
+
+@include condition-sb-thread-thread-error.texinfo
+@include fun-sb-thread-thread-error-thread.texinfo
+
+@c @include condition-sb-thread-symbol-value-in-thread-error.texinfo
+@include condition-sb-thread-interrupt-thread-error.texinfo
+@include condition-sb-thread-join-thread-error.texinfo
 
 @node Special Variables
 @comment  node-name,  next,  previous,  up

@@ -11,6 +11,85 @@
 
 (in-package "SB!THREAD")
 
+;;; Conditions
+
+(define-condition thread-error (error)
+  ((thread :reader thread-error-thread :initarg :thread))
+  #!+sb-doc
+  (:documentation
+   "Conditions of type THREAD-ERROR are signalled when thread operations fail.
+The offending thread is initialized by the :THREAD initialization argument and
+read by the function THREAD-ERROR-THREAD."))
+
+#!+sb-doc
+(setf
+ (fdocumentation 'thread-error-thread 'function)
+ "Return the offending thread that the THREAD-ERROR pertains to.")
+
+(define-condition symbol-value-in-thread-error (cell-error thread-error)
+  ((info :reader symbol-value-in-thread-error-info :initarg :info))
+  (:report
+   (lambda (condition stream)
+     (destructuring-bind (op problem)
+         (symbol-value-in-thread-error-info condition)
+       (format stream "Cannot ~(~A~) value of ~S in ~S: ~S"
+               op
+               (cell-error-name condition)
+               (thread-error-thread condition)
+               (ecase problem
+                 (:unbound "the symbol is unbound in thread.")
+                 (:dead "the thread has exited."))))))
+  #!+sb-doc
+  (:documentation
+   "Signalled when SYMBOL-VALUE-IN-THREAD or its SETF version fails due to the
+symbol being unbound in target thread, or the target thread having exited. The
+offending symbol can be accessed using CELL-ERROR-NAME, and the offending
+thread using THREAD-ERROR-THREAD."))
+
+(define-condition join-thread-error (thread-error) ()
+  (:report (lambda (c s)
+             (format s "Joining thread failed: thread ~A ~
+                        did not return normally."
+                     (thread-error-thread c))))
+  #!+sb-doc
+  (:documentation
+   "Signalled when joining a thread fails due to abnormal exit of the thread
+to be joined. The offending thread can be accessed using
+THREAD-ERROR-THREAD."))
+
+(defun join-thread-error-thread (condition)
+  (thread-error-thread condition))
+(define-compiler-macro join-thread-error-thread (condition)
+  (deprecation-warning 'join-thread-error-thread 'thread-error-thread)
+  `(thread-error-thread ,condition))
+
+#!+sb-doc
+(setf
+ (fdocumentation 'join-thread-error-thread 'function)
+ "The thread that we failed to join. Deprecated, use THREAD-ERROR-THREAD
+instead.")
+
+(define-condition interrupt-thread-error (thread-error) ()
+  (:report (lambda (c s)
+             (format s "Interrupt thread failed: thread ~A has exited."
+                     (thread-error-thread c))))
+  #!+sb-doc
+  (:documentation
+   "Signalled when interrupting a thread fails because the thread has already
+exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
+
+(defun interrupt-thread-error-thread (condition)
+  (thread-error-thread condition))
+(define-compiler-macro interrupt-thread-error-thread (condition)
+  (deprecation-warning 'join-thread-error-thread 'thread-error-thread)
+  `(thread-error-thread ,condition))
+
+#!+sb-doc
+(setf
+ (fdocumentation 'interrupt-thread-error-thread 'function)
+ "The thread that was not interrupted. Deprecated, use THREAD-ERROR-THREAD
+instead.")
+
 ;;; Of the WITH-PINNED-OBJECTS in this file, not every single one is
 ;;; necessary because threads are only supported with the conservative
 ;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
@@ -35,8 +114,10 @@ in future versions."
   (result-lock (make-mutex :name "thread result lock")))
 
 #!+sb-doc
-(setf (fdocumentation 'thread-name 'function)
-      "The name of the thread. Setfable.")
+(setf
+ (fdocumentation 'thread-name 'function)
+ "Name of the thread. Can be assigned to using SETF. Thread names can be
+arbitrary printable objects, and need not be unique.")
 
 (def!method print-object ((thread thread) stream)
   (print-unreadable-object (thread stream :type t :identity t)
@@ -60,7 +141,9 @@ in future versions."
 
 (defun thread-alive-p (thread)
   #!+sb-doc
-  "Check if THREAD is running."
+  "Return T if THREAD is still alive. Note that the return value is
+potentially stale even before the function returns, as the thread may exit at
+any time."
   (thread-%alive-p thread))
 
 ;; A thread is eligible for gc iff it has finished and there are no
@@ -77,7 +160,9 @@ in future versions."
 
 (defun list-all-threads ()
   #!+sb-doc
-  "Return a list of the live threads."
+  "Return a list of the live threads. Note that the return value is
+potentially stale even before the function returns, as new threads may be
+created and old ones may exit at any time."
   (with-all-threads-lock
     (copy-list *all-threads*)))
 
@@ -897,19 +982,6 @@ around and can be retrieved by JOIN-THREAD."
           (wait-on-semaphore setup-sem)
           thread)))))
 
-(define-condition join-thread-error (error)
-  ((thread :reader join-thread-error-thread :initarg :thread))
-  #!+sb-doc
-  (:documentation "Joining thread failed.")
-  (:report (lambda (c s)
-             (format s "Joining thread failed: thread ~A ~
-                        has not returned normally."
-                     (join-thread-error-thread c)))))
-
-#!+sb-doc
-(setf (fdocumentation 'join-thread-error-thread 'function)
-      "The thread that we failed to join.")
-
 (defun join-thread (thread &key (default nil defaultp))
   #!+sb-doc
   "Suspend current thread until THREAD exits. Returns the result
@@ -927,18 +999,6 @@ return DEFAULT if given or else signal JOIN-THREAD-ERROR."
   #!+sb-doc
   "Deprecated. Same as TERMINATE-THREAD."
   (terminate-thread thread))
-
-(define-condition interrupt-thread-error (error)
-  ((thread :reader interrupt-thread-error-thread :initarg :thread))
-  #!+sb-doc
-  (:documentation "Interrupting thread failed.")
-  (:report (lambda (c s)
-             (format s "Interrupt thread failed: thread ~A has exited."
-                     (interrupt-thread-error-thread c)))))
-
-#!+sb-doc
-(setf (fdocumentation 'interrupt-thread-error-thread 'function)
-      "The thread that was not interrupted.")
 
 (defmacro with-interruptions-lock ((thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))
@@ -1025,43 +1085,91 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
                                            sb!vm::thread-next-slot)))))))
 
   (defun %symbol-value-in-thread (symbol thread)
-    (tagbody
-       ;; Prevent the dead from dying completely while we look for the
-       ;; TLS area...
-       (with-all-threads-lock
-         (if (thread-alive-p thread)
-             (let* ((offset (* sb!vm:n-word-bytes
-                               (sb!vm::symbol-tls-index symbol)))
-                    (tl-val (sap-ref-word (%thread-sap thread) offset)))
-               (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
-                   (go :unbound)
-                   (return-from %symbol-value-in-thread
-                     (values (make-lisp-obj tl-val) t))))
-             (return-from %symbol-value-in-thread (values nil nil))))
-     :unbound
-       (error "Cannot read thread-local symbol value: ~S unbound in ~S"
-              symbol thread)))
+      ;; Prevent the thread from dying completely while we look for the TLS
+      ;; area...
+    (with-all-threads-lock
+      (if (thread-alive-p thread)
+          (let* ((offset (* sb!vm:n-word-bytes
+                            (sb!vm::symbol-tls-index symbol)))
+                 (tl-val (sap-ref-word (%thread-sap thread) offset)))
+            (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
+                (values nil :unbound)
+                (values (make-lisp-obj tl-val) :bound)))
+          (values nil :dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    (tagbody
-       (with-pinned-objects (value)
-         ;; Prevent the dead from dying completely while we look for
-         ;; the TLS area...
-         (with-all-threads-lock
-           (if (thread-alive-p thread)
-               (let* ((offset (* sb!vm:n-word-bytes
-                                 (sb!vm::symbol-tls-index symbol)))
-                      (sap (%thread-sap thread))
-                      (tl-val (sap-ref-word sap offset)))
-                 (if (eql tl-val sb!vm::no-tls-value-marker-widetag)
-                     (go :unbound)
+    (with-pinned-objects (value)
+      ;; Prevent the thread from dying completely while we look for the TLS
+      ;; area...
+      (with-all-threads-lock
+        (if (thread-alive-p thread)
+            (let* ((offset (* sb!vm:n-word-bytes
+                              (sb!vm::symbol-tls-index symbol)))
+                   (sap (%thread-sap thread))
+                   (tl-val (sap-ref-word sap offset)))
+              (cond ((eql tl-val sb!vm::no-tls-value-marker-widetag)
+                     (values nil :unbound))
+                    (t
                      (setf (sap-ref-word sap offset)
-                           (get-lisp-obj-address value)))
-                 (return-from %set-symbol-value-in-thread (values value t)))
-               (return-from %set-symbol-value-in-thread (values nil nil)))))
-     :unbound
-       (error "Cannot set thread-local symbol value: ~S unbound in ~S"
-              symbol thread))))
+                           (get-lisp-obj-address value))
+                     (values value :bound))))
+            (values nil :dead))))))
+
+(defun symbol-value-in-thread (symbol thread &optional (errorp t))
+  "Return the local value of SYMBOL in THREAD, and a secondary value of T
+on success.
+
+If the value cannot be retrieved (because the thread has exited or because it
+has no local binding for NAME) and ERRORP is true signals an error of type
+SYMBOL-VALUE-IN-THREAD-ERROR; if ERRORP is false returns a primary value of
+NIL, and a secondary value of NIL.
+
+Can also be used with SETF to change the thread-local value of SYMBOL.
+
+SYMBOL-VALUE-IN-THREAD is primarily intended as a debugging tool, and not as a
+mechanism form inter-thread communication."
+  (declare (symbol symbol) (thread thread))
+  #!+sb-thread
+  (multiple-value-bind (res status) (%symbol-value-in-thread symbol thread)
+    (if (eq :bound status)
+        (values res t)
+        (if errorp
+            (error 'symbol-value-in-thread-error
+                   :name symbol
+                   :thread thread
+                   :info (list :read status))
+            (values nil nil))))
+  #!-sb-thread
+  (if (boundp symbol)
+      (values (symbol-value symbol) t)
+      (if errorp
+          (error 'symbol-value-in-thread-error
+                 :name symbol
+                 :thread thread
+                 :info (list :read :unbound))
+          (values nil nil))))
+
+(defun (setf symbol-value-in-thread) (value symbol thread &optional (errorp t))
+  (declare (symbol symbol) (thread thread))
+  #!+sb-thread
+  (multiple-value-bind (res status) (%set-symbol-value-in-thread symbol thread value)
+    (if (eq :bound status)
+        (values res t)
+        (if errorp
+            (error 'symbol-value-in-thread-error
+                   :name symbol
+                   :thread thread
+                   :info (list :write status))
+            (values nil nil))))
+  #!-sb-thread
+  (if (boundp symbol)
+      (values (setf (symbol-value symbol) value) t)
+      (if errorp
+          (error 'symbol-value-in-thread-error
+                 :name symbol
+                 :thread thread
+                 :info (list :write :unbound))
+          (values nil nil))))
 
 (defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
   (sb!vm::locked-symbol-global-value-add symbol-name delta))

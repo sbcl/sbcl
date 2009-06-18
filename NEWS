@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+  * minor incompatible change: SB-THREAD:JOIN-THREAD-ERROR-THREAD and
+    SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD have been deprecated in favor
+    of SB-THREAD:THREAD-ERROR-THREAD.
+  * new feature: SB-THREAD:SYMBOL-VALUE-IN-THREAD provides access to symbol
+    values in other threads.
   * new feature: SB-INTROSPECT:ALLOCATION-INFORMATION provides information
     about object allocation.
   * optimization: more efficient type-checks for FIXNUMs when the value
