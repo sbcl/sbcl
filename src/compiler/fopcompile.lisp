@@ -249,25 +249,31 @@
                ;; Symbol macro
                (fopcompile macroexpansion path for-value-p)
                (let ((kind (info :variable :kind form)))
-                 (if (member kind '(:special :constant))
-                     ;; Special variable
-                     (fopcompile `(symbol-value ',form) path for-value-p)
-                     ;; Lexical
-                     (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
-                            (handle (when lambda-var
-                                      (lambda-var-fop-value lambda-var))))
-                       (if handle
-                           (when for-value-p
-                             (sb!fasl::dump-push handle *compile-object*))
-                           (progn
-                             ;; Undefined variable. Signal a warning, and
-                             ;; treat it as a special variable reference, like
-                             ;; the real compiler does -- do not elide even if
-                             ;; the value is unused.
-                             (note-undefined-reference form :variable)
-                             (fopcompile `(symbol-value ',form)
-                                         path
-                                         for-value-p)))))))))
+                 (cond
+                   ((eq :special kind)
+                    ;; Special variable
+                    (fopcompile `(symbol-value ',form) path for-value-p))
+
+                   ((member kind '(:global :constant))
+                    ;; Global variable or constant.
+                    (fopcompile `(symbol-global-value ',form) path for-value-p))
+                   (t
+                    ;; Lexical
+                    (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
+                           (handle (when lambda-var
+                                     (lambda-var-fop-value lambda-var))))
+                      (if handle
+                          (when for-value-p
+                            (sb!fasl::dump-push handle *compile-object*))
+                          (progn
+                            ;; Undefined variable. Signal a warning, and
+                            ;; treat it as a special variable reference, like
+                            ;; the real compiler does -- do not elide even if
+                            ;; the value is unused.
+                            (note-undefined-reference form :variable)
+                            (fopcompile `(symbol-value ',form)
+                                        path
+                                        for-value-p))))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
              (sb!xc:macroexpand form *lexenv*)

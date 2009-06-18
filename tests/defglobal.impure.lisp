@@ -194,3 +194,11 @@
       (ignore-errors (delete-file fasl)))
     (assert (= 1 *counter*))
     (assert (= 1 (symbol-value '.counter-3.)))))
+
+(with-test (:name :defglobal-refers-to-defglobal)
+  (let ((fasl (compile-form `(progn
+                               (defglobal **global-1** :fii)
+                               (defglobal **global-2** **global-1**)))))
+    (load fasl)
+    (assert (eq (symbol-value '**global-1**) (symbol-value '**global-2**)))
+    (assert (eq :fii (symbol-value '**global-1**)))))

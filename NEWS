@@ -21,6 +21,8 @@
     Michael Becker, Gabriel Dos Reis, and Cyrus Harmon)
   * bug fix: :PTY option in RUN-PROGRAM was broken with stream arguments.
     (reported by Elliot Slaughter, thanks to Stas Boukarev)
+  * bug fix: bogus undefined variable warnings from fopcompiled references to
+    global variables. (thanks to Lars Rune Nøstdal)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad
