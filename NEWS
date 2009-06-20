@@ -28,6 +28,8 @@
     (reported by Elliot Slaughter, thanks to Stas Boukarev)
   * bug fix: bogus undefined variable warnings from fopcompiled references to
     global variables. (thanks to Lars Rune Nøstdal)
+  * bug fix: foreign function names should now appear in backtraces on
+    FC6 as well. (reported by Tomasz Skutnik and obias Rautenkranz)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad

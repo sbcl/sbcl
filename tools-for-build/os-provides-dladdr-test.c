@@ -13,8 +13,7 @@ int main ()
    void * handle = dlopen((void*)0, RTLD_GLOBAL | RTLD_NOW);
    void * addr = dlsym(handle, "printf");
    Dl_info * info = (Dl_info*) malloc(sizeof(Dl_info));
-   dladdr(addr, info);
-   if (strcmp(info->dli_sname, "printf")) {
+   if (dladdr(addr, info) == 0) {
        return 1;
    } else {
        return 104;
