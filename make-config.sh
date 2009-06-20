@@ -299,7 +299,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :alien-callbacks :cycle-counter' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
-    printf ' :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
     # Use a little C program to try to guess the endianness.  Ware
@@ -308,8 +308,8 @@ elif [ "$sbcl_arch" = "mips" ]; then
     # FIXME: integrate to grovel-features, mayhaps
     $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
     tools-for-build/determine-endianness >> $ltf
-elif [ "$sbcl_arch" = "ppc"]; then
-    printf ' :gencgc :stack-allocatable-closures :stacka-allocatable-lists' > $ltf
+elif [ "$sbcl_arch" = "ppc" ]; then
+    printf ' :gencgc :stack-allocatable-closures :stacka-allocatable-lists' >> $ltf
     printf ' :linkage-table' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
