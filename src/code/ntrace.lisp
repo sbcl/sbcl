@@ -127,14 +127,17 @@
                 (values (fdefinition x) t))))
         (function x)
         (t (values (fdefinition x) t)))
-    (case (sb-kernel:widetag-of res)
-      (#.sb-vm:closure-header-widetag
+    (typecase res
+      (closure
        (values (sb-kernel:%closure-fun res)
                named-p
                :compiled-closure))
-      (#.sb-vm:funcallable-instance-header-widetag
+      (funcallable-instance
        (values res named-p :funcallable-instance))
-      (t (values res named-p :compiled)))))
+      ;; FIXME: What about SB!EVAL:INTERPRETED-FUNCTION -- it gets picked off
+      ;; by the FIN above, is that right?
+      (t
+       (values res named-p :compiled)))))
 
 ;;; When a function name is redefined, and we were tracing that name,
 ;;; then untrace the old definition and trace the new one.

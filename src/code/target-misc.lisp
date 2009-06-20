@@ -58,72 +58,60 @@
                     (values nil t name))))
            (values nil t name))))))
 
-(defun closurep (object)
-  (= sb!vm:closure-header-widetag (widetag-of object)))
+;;;; Generalizing over SIMPLE-FUN, CLOSURE, and FUNCALLABLE-INSTANCEs
 
+;;; Underlying SIMPLE-FUN
 (defun %fun-fun (function)
   (declare (function function))
-  (case (widetag-of function)
-    (#.sb!vm:simple-fun-header-widetag
+  (typecase function
+    (simple-fun
      function)
-    (#.sb!vm:closure-header-widetag
+    (closure
      (%closure-fun function))
-    (#.sb!vm:funcallable-instance-header-widetag
+    (funcallable-instance
      (%fun-fun (funcallable-instance-fun function)))))
 
-(defun %closure-values (object)
-  (declare (function object))
-  (loop for index from 0
-     below (- (get-closure-length object) (1- sb!vm:closure-info-offset))
-     collect (%closure-index-ref object index)))
+(defun %fun-lambda-list (function)
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (sb!eval:interpreted-function-debug-lambda-list function))
+    (t
+     (%simple-fun-arglist (%fun-fun function)))))
 
-(defun %fun-lambda-list (object)
-  (%simple-fun-arglist (%fun-fun object)))
+(defun (setf %fun-lambda-list) (new-value function)
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (setf (sb!eval:interpreted-function-debug-lambda-list function) new-value))
+    ;; FIXME: Eliding general funcallable-instances for now.
+    ((or simple-fun closure)
+     (setf (%simple-fun-arglist (%fun-fun function)) new-value)))
+  new-value)
+
+(defun %fun-type (function)
+  (%simple-fun-type (%fun-fun function)))
 
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
 ;;; or NIL if there's none
 (defun %fun-name (function)
-  (%simple-fun-name (%fun-fun function)))
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (sb!eval:interpreted-function-debug-name function))
+    (t
+     (%simple-fun-name (%fun-fun function)))))
 
-(defun %fun-type (function)
-  (%simple-fun-type (%fun-fun function)))
-
-(defun (setf %fun-name) (new-name fun)
-  (aver nil) ; since this is unsafe 'til bug 137 is fixed
-  (let ((widetag (widetag-of fun)))
-    (case widetag
-      (#.sb!vm:simple-fun-header-widetag
-       ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
-       ;; functions is left over from CMU CL (modulo various renaming
-       ;; that's gone on since the fork).
-       (setf (%simple-fun-name fun) new-name))
-      (#.sb!vm:closure-header-widetag
-       ;; FIXME: It'd be nice to be able to set %FUN-NAME here on
-       ;; per-closure basis. Instead, we are still using the CMU CL
-       ;; approach of closures being named after their closure
-       ;; function, which doesn't work right e.g. for structure
-       ;; accessors, and might not be quite right for DEFUN
-       ;; in a non-null lexical environment either.
-       ;; When/if weak hash tables become supported
-       ;; again, it'll become easy to fix this, but for now there
-       ;; seems to be no easy way (short of the ugly way of adding a
-       ;; slot to every single closure header), so we don't.
-       ;;
-       ;; Meanwhile, users might encounter this problem by doing DEFUN
-       ;; in a non-null lexical environment, so we try to give a
-       ;; reasonably meaningful user-level "error" message (but only
-       ;; as a warning because this is optional debugging
-       ;; functionality anyway, not some hard ANSI requirement).
-       (warn "can't set name for closure, leaving name unchanged"))
-      (t
-       ;; The other function subtype names are also un-settable
-       ;; but this problem seems less likely to be tickled by
-       ;; user-level code, so we can give a implementor-level
-       ;; "error" (warning) message.
-       (warn "can't set function name ((~S function)=~S), leaving it unchanged"
-             'widetag-of widetag))))
-  new-name)
+(defun (setf %fun-name) (new-value function)
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (setf (sb!eval:interpreted-function-debug-name function) new-value))
+    ;; FIXME: Eliding general funcallable-instances for now.
+    ((or simple-fun closure)
+     (setf (%simple-fun-name (%fun-fun function)) new-value)))
+  new-value)
 
 (defun %fun-doc (x)
   ;; FIXME: This business of going through %FUN-NAME and then globaldb

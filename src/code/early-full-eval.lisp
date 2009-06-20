@@ -21,7 +21,12 @@
 ;; compiler/main and code/deftypes-for-target.
 (sb!kernel::!defstruct-with-alternate-metaclass
  interpreted-function
- :slot-names (name lambda-list env declarations documentation body source-location)
+ ;; DEBUG-NAME and DEBUG-LAMBDA-LIST are initially a copies of the proper
+ ;; ones, but is analogous to SIMPLE-FUN-NAME and ARGLIST in the sense that it
+ ;; is they are there only for debugging, and do not affect behaviour of the
+ ;; function -- so DEFMACRO can set them to more informative values.
+ :slot-names (name debug-name lambda-list debug-lambda-list env
+                   declarations documentation body source-location)
  :boa-constructor %make-interpreted-function
  :superclass-name function
  :metaclass-name static-classoid
@@ -34,8 +39,8 @@
   (defun make-interpreted-function
       (&key name lambda-list env declarations documentation body source-location)
     (let ((function (%make-interpreted-function
-                     name lambda-list env declarations documentation body
-                     source-location)))
+                     name name lambda-list lambda-list env
+                     declarations documentation body source-location)))
       (setf (sb!kernel:funcallable-instance-fun function)
             #'(lambda (&rest args)
                 (interpreted-apply function args)))

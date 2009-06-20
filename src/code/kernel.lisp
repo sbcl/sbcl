@@ -21,8 +21,13 @@
 (defun set-header-data (x val)
   (set-header-data x val))
 
-;;; the length of the closure X, i.e. one more than the
-;;; number of variables closed over
+;;; Return the 24 bits of data in the header of object X, which must
+;;; be a fun-pointer object.
+;;;
+;;; FIXME: Should this not be called GET-FUN-LENGTH instead? Or even better
+;;; yet, if GET-HEADER-DATA masked the lowtag instead of substracting it, we
+;;; could just use it instead -- or at least this could just be a function on
+;;; top of the same VOP.
 (defun get-closure-length (x)
   (get-closure-length x))
 
@@ -73,6 +78,15 @@
 (defun (setf fun-subtype) (type function)
   (setf (fun-subtype function) type))
 
+;;;; SIMPLE-FUN and accessors
+
+(declaim (inline simple-fun-p))
+(defun simple-fun-p (object)
+  (= sb!vm:simple-fun-header-widetag (widetag-of object)))
+
+(deftype simple-fun ()
+  '(satisfies simple-fun-p))
+
 ;;; Extract the arglist from the function header FUNC.
 (defun %simple-fun-arglist (func)
   (%simple-fun-arglist func))
@@ -94,18 +108,42 @@
 (defun %simple-fun-self (simple-fun)
   (%simple-fun-self simple-fun))
 
+;;;; CLOSURE type and accessors
+
+(declaim (inline closurep))
+(defun closurep (object)
+  (= sb!vm:closure-header-widetag (widetag-of object)))
+
+(deftype closure ()
+  '(satisfies closurep))
+
+(defmacro do-closure-values ((value closure) &body body)
+  (with-unique-names (i nclosure)
+    `(let ((,nclosure ,closure))
+       (declare (closure ,nclosure))
+       (dotimes (,i (- (1+ (get-closure-length ,nclosure)) sb!vm:closure-info-offset))
+         (let ((,value (%closure-index-ref ,nclosure ,i)))
+           ,@body)))))
+
+(defun %closure-values (closure)
+  (declare (closure closure))
+  (let (values)
+    (do-closure-values (elt closure)
+      (push elt closure))
+    (nreverse values)))
+
 ;;; Extract the function from CLOSURE.
 (defun %closure-fun (closure)
   (%closure-fun closure))
+
+;;; Extract the INDEXth slot from CLOSURE.
+(defun %closure-index-ref (closure index)
+  (%closure-index-ref closure index))
 
 ;;; Return the length of VECTOR. There is no reason to use this in
 ;;; ordinary code, 'cause length (the vector foo)) is the same.
 (defun sb!c::vector-length (vector)
   (sb!c::vector-length vector))
-
-;;; Extract the INDEXth slot from CLOSURE.
-(defun %closure-index-ref (closure index)
-  (%closure-index-ref closure index))
 
 ;;; Allocate a unboxed, simple vector with type code TYPE, length LENGTH, and
 ;;; WORDS words long. Note: it is your responsibility to ensure that the

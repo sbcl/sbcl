@@ -93,15 +93,8 @@
             (setf (sb!xc:macro-function name) definition
                   (fdocumentation name 'function) doc)
             ,(when set-p
-                   `(case (widetag-of definition)
-                      (#.sb!vm:closure-header-widetag
-                       (setf (%simple-fun-arglist (%closure-fun definition))
-                             lambda-list
-                             (%simple-fun-name (%closure-fun definition))
-                             debug-name))
-                      (#.sb!vm:simple-fun-header-widetag
-                       (setf (%simple-fun-arglist definition) lambda-list
-                             (%simple-fun-name definition) debug-name))))
+                   `(setf (%fun-lambda-list definition) lambda-list
+                          (%fun-name definition) debug-name))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)

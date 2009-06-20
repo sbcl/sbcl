@@ -573,7 +573,7 @@ constant pool."
           ;; from the table if available.
           (let* ((simple-fun (get-simple-fun value))
                  (xrefs (when simple-fun
-                          (sb-vm::%simple-fun-xrefs simple-fun)))
+                          (sb-kernel:%simple-fun-xrefs simple-fun)))
                  (array (when xrefs
                           (aref xrefs kind-index))))
             ;; Loop through the name/path xref entries in the table

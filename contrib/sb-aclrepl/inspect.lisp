@@ -817,12 +817,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object function))
-  (let* ((type (sb-kernel:widetag-of object))
-         (object (if (= type sb-vm:closure-header-widetag)
-                     (sb-kernel:%closure-fun object)
-                     object))
-         (components (list (cons "arglist"
-                               (sb-kernel:%simple-fun-arglist object)))))
+  (let ((components (list (cons "arglist" (sb-kernel:%fun-lambda-list object)))))
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object vector))

@@ -120,18 +120,16 @@
 
 ;;; This is like FIND-IF, except that we do it on a compiled closure's
 ;;; environment.
-(defun find-if-in-closure (test fun)
-  (declare (type function test))
-  (dotimes (index (1- (get-closure-length fun)))
-    (let ((elt (%closure-index-ref fun index)))
-      (when (funcall test elt)
-        (return elt)))))
+(defun find-if-in-closure (test closure)
+  (declare (closure closure))
+  (do-closure-values (value closure)
+    (when (funcall test value)
+      (return value))))
 
 ;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
-  (and (functionp fun)
-       (= (widetag-of fun) sb!vm:closure-header-widetag)
-       (find-if-in-closure #'encapsulation-info-p fun)))
+  (when (closurep fun)
+    (find-if-in-closure #'encapsulation-info-p fun)))
 
 ;;; When removing an encapsulation, we must remember that
 ;;; encapsulating definitions close over a reference to the

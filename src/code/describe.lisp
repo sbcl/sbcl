@@ -217,16 +217,16 @@
     (format s "~@:_~@<Its associated name (as in ~S) is ~2I~_~S.~:>"
             'function-lambda-expression
             (nth-value 2 (function-lambda-expression x)))
-    (case (widetag-of x)
-      (#.sb-vm:closure-header-widetag
+    (typecase x
+      (closure
        (%describe-fun-compiled (%closure-fun x) s kind name)
        (format s "~&Its closure environment is:")
-       (loop for value in (%closure-values x)
-          for i = 0 then (1+ i)
-          do (format s "~&  ~S: ~S" i value)))
-      (#.sb-vm:simple-fun-header-widetag
+       (let ((i -1))
+         (do-closure-values (value x)
+           (format s "~&  ~S: ~S" (incf i) value))))
+      (simple-fun
        (%describe-fun-compiled x s kind name))
-      (#.sb-vm:funcallable-instance-header-widetag
+      (funcallable-instance
        ;; Only STANDARD-GENERIC-FUNCTION would be handled here, but
        ;; since it has its own DESCRIBE-OBJECT method, it should've been
        ;; picked off before getting here. So hopefully we never get here.
@@ -252,27 +252,23 @@
             'function-lambda-expression
             (nth-value 2 (function-lambda-expression x)))
     (format s "~&It is an interpreted function.~%")
-    (let ((args (sb-eval:interpreted-function-lambda-list x)))
-      (cond ((not args)
-             (write-string "There are no arguments." s))
-            (t
-             (format s "~&~@(The ~@[~A's ~]arguments are:~@:_~)" kind)
-             (write-string "  " s)
-             (let ((*print-pretty* t)
-                   (*print-escape* t)
-                   (*print-base* 10)
-                   (*print-radix* nil))
-               (pprint-logical-block (s nil)
-                 (pprint-indent :current 2)
-                 (format s "~A" args)))))
-      (format s "~&It was defined as: ")
+    (let ((args (sb-eval:interpreted-function-debug-lambda-list x)))
+      (format s "Its lambda-list is: ")
       (let ((*print-pretty* t)
             (*print-escape* t)
             (*print-base* 10)
             (*print-radix* nil))
         (pprint-logical-block (s nil)
           (pprint-indent :current 2)
-          (format s "~A" (function-lambda-expression x))))))
+          (format s "~A" args)))
+      (format s "~&It was defined as:~%  ")
+      (let ((*print-pretty* t)
+            (*print-escape* t)
+            (*print-base* 10)
+            (*print-radix* nil))
+        (pprint-logical-block (s nil)
+          (pprint-indent :current 2)
+          (format s "~S" (function-lambda-expression x))))))
   (terpri s))
 
 (defmethod describe-object ((x function) s)

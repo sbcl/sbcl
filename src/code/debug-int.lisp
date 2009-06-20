@@ -1206,35 +1206,30 @@ register."
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)
   (declare (type function fun))
-  (ecase (widetag-of fun)
-    (#.sb!vm:closure-header-widetag
-     (fun-debug-fun (%closure-fun fun)))
-    (#.sb!vm:funcallable-instance-header-widetag
-     (fun-debug-fun (funcallable-instance-fun fun)))
-    (#.sb!vm:simple-fun-header-widetag
-      (let* ((name (%simple-fun-name fun))
-             (component (fun-code-header fun))
-             (res (find-if
-                   (lambda (x)
-                     (and (sb!c::compiled-debug-fun-p x)
-                          (eq (sb!c::compiled-debug-fun-name x) name)
-                          (eq (sb!c::compiled-debug-fun-kind x) nil)))
-                   (sb!c::compiled-debug-info-fun-map
-                    (%code-debug-info component)))))
-        (if res
-            (make-compiled-debug-fun res component)
-            ;; KLUDGE: comment from CMU CL:
-            ;;   This used to be the non-interpreted branch, but
-            ;;   William wrote it to return the debug-fun of fun's XEP
-            ;;   instead of fun's debug-fun. The above code does this
-            ;;   more correctly, but it doesn't get or eliminate all
-            ;;   appropriate cases. It mostly works, and probably
-            ;;   works for all named functions anyway.
-            ;; -- WHN 20000120
-            (debug-fun-from-pc component
-                               (* (- (fun-word-offset fun)
-                                     (get-header-data component))
-                                  sb!vm:n-word-bytes)))))))
+  (let ((simple-fun (%fun-fun fun)))
+    (let* ((name (%simple-fun-name simple-fun))
+           (component (fun-code-header simple-fun))
+           (res (find-if
+                 (lambda (x)
+                   (and (sb!c::compiled-debug-fun-p x)
+                        (eq (sb!c::compiled-debug-fun-name x) name)
+                        (eq (sb!c::compiled-debug-fun-kind x) nil)))
+                 (sb!c::compiled-debug-info-fun-map
+                  (%code-debug-info component)))))
+      (if res
+          (make-compiled-debug-fun res component)
+          ;; KLUDGE: comment from CMU CL:
+          ;;   This used to be the non-interpreted branch, but
+          ;;   William wrote it to return the debug-fun of fun's XEP
+          ;;   instead of fun's debug-fun. The above code does this
+          ;;   more correctly, but it doesn't get or eliminate all
+          ;;   appropriate cases. It mostly works, and probably
+          ;;   works for all named functions anyway.
+          ;; -- WHN 20000120
+          (debug-fun-from-pc component
+                             (* (- (fun-word-offset simple-fun)
+                                   (get-header-data component))
+                                sb!vm:n-word-bytes))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL,
 ;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.

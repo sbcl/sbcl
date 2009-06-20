@@ -231,12 +231,6 @@ evaluated as a PROGN."
 
   (sb!c::note-name-defined name :function)
 
-  ;; FIXME: I want to do this here (and fix bug 137), but until the
-  ;; breathtaking CMU CL function name architecture is converted into
-  ;; something sane, (1) doing so doesn't really fix the bug, and
-  ;; (2) doing probably isn't even really safe.
-  #+nil (setf (%fun-name def) name)
-
   (when doc
     (setf (fdocumentation name 'function) doc)
     #!+sb-eval
