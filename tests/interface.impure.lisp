@@ -168,5 +168,22 @@
 (assert (string= (documentation 'frob 'structure) "FROB"))
 (setf (documentation 'frob 'structure) "NEW5")
 (assert (string= (documentation 'frob 'structure) "NEW5"))
+
+(define-compiler-macro cmacro (x)
+  "compiler macro"
+  x)
+
+(define-compiler-macro (setf cmacro) (y x)
+  "setf compiler macro"
+  y)
+
+(with-test (:name (documentation 'compiler-macro))
+  (unless (equal "compiler macro"
+                 (documentation 'cmacro 'compiler-macro))
+    (error "got ~S for cmacro"
+           (documentation 'cmacro 'compiler-macro)))
+  (unless (equal "setf compiler macro"
+                 (documentation '(setf cmacro) 'compiler-macro))
+    (error "got ~S for setf macro" (documentation '(setf cmacro) 'compiler-macro))))
 
 ;;;; success

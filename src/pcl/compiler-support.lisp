@@ -86,19 +86,6 @@
 (define-internal-pcl-function-name-syntax sb-pcl::ctor (list)
   (valid-function-name-p (cadr list)))
 
-(defun sb-pcl::random-documentation (name type)
-  (cdr (assoc type (info :random-documentation :stuff name))))
-
-(defun sb-pcl::set-random-documentation (name type new-value)
-  (let ((pair (assoc type (info :random-documentation :stuff name))))
-    (if pair
-        (setf (cdr pair) new-value)
-        (push (cons type new-value)
-              (info :random-documentation :stuff name))))
-  new-value)
-
-(defsetf sb-pcl::random-documentation sb-pcl::set-random-documentation)
-
 ;;;; SLOT-VALUE optimizations
 
 (defknown slot-value (t symbol) t (any))

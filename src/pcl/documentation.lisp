@@ -8,9 +8,6 @@
 
 (in-package "SB-PCL")
 
-;;; FIXME: Lots of bare calls to INFO here could be handled
-;;; more cleanly by calling the FDOCUMENTATION function instead.
-
 (defun fun-doc (x)
   (etypecase x
     (generic-function
@@ -37,7 +34,7 @@
   (random-documentation x 'compiler-macro))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (or (values (info :function :documentation x))
+  (or (fdocumentation x 'function)
       ;; Try the pcl function documentation.
       (and (fboundp x) (documentation (fdefinition x) t))))
 
@@ -45,7 +42,7 @@
   (random-documentation x 'compiler-macro))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
-  (values (info :setf :documentation x)))
+  (fdocumentation x 'setf))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
   (random-documentation x 'optimize))
@@ -59,9 +56,7 @@
      (setf (sb-eval:interpreted-function-documentation x)
            new-value))
     (function
-     (let ((name (%fun-name x)))
-       (when (valid-function-name-p name)
-         (setf (info :function :documentation name) new-value)))))
+     (setf (focumentation (%fun-name x) 'function) new-value)))
   new-value)
 
 
@@ -74,7 +69,7 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (setf (info :function :documentation x) new-value))
+  (setf (fdocumentation x 'function) new-value))
 
 (defmethod (setf documentation)
     (new-value (x list) (doc-type (eql 'compiler-macro)))
@@ -83,14 +78,14 @@
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'function)))
-  (setf (info :function :documentation x) new-value))
+  (setf (fdocumentation x 'function) new-value))
 
 (defmethod (setf documentation)
     (new-value (x symbol) (doc-type (eql 'compiler-macro)))
   (setf (random-documentation x 'compiler-macro) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (setf (info :setf :documentation x) new-value))
+  (setf (fdocumentation x 'setf) new-value))
 
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))
@@ -141,10 +136,10 @@
 
 ;;; types, classes, and structure names
 (defmethod documentation ((x structure-class) (doc-type (eql 't)))
-  (values (info :type :documentation (class-name x))))
+  (fdocumentation (class-name x) 'type))
 
 (defmethod documentation ((x structure-class) (doc-type (eql 'type)))
-  (values (info :type :documentation (class-name x))))
+  (fdocumentation (class-name x) 'type))
 
 (defmethod documentation ((x standard-class) (doc-type (eql 't)))
   (slot-value x '%documentation))
@@ -157,34 +152,29 @@
 ;;; condition-class is in fact not implemented as a standard-class or
 ;;; structure-class).
 (defmethod documentation ((x condition-class) (doc-type (eql 't)))
-  (values (info :type :documentation (class-name x))))
+  (fdocumentation (class-name x) 'type))
 
 (defmethod documentation ((x condition-class) (doc-type (eql 'type)))
-  (values (info :type :documentation (class-name x))))
+  (fdocumentation (class-name x) 'type))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'type)))
-  (or (values (info :type :documentation x))
+  (or (fdocumentation x 'type)
       (let ((class (find-class x nil)))
         (when class
           (slot-value class '%documentation)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'structure)))
-  (cond
-    ((structure-type-p x)
-     (values (info :type :documentation x)))
-    ((info :typed-structure :info x)
-     (values (info :typed-structure :documentation x)))
-    (t nil)))
+  (fdocumentation x 'structure))
 
 (defmethod (setf documentation) (new-value
                                  (x structure-class)
                                  (doc-type (eql 't)))
-  (setf (info :type :documentation (class-name x)) new-value))
+  (setf (fdocumentation (class-name x) 'type) new-value))
 
 (defmethod (setf documentation) (new-value
                                  (x structure-class)
                                  (doc-type (eql 'type)))
-  (setf (info :type :documentation (class-name x)) new-value))
+  (setf (fdocumentation (class-name x) 'type) new-value))
 
 (defmethod (setf documentation) (new-value
                                  (x standard-class)
@@ -199,39 +189,34 @@
 (defmethod (setf documentation) (new-value
                                  (x condition-class)
                                  (doc-type (eql 't)))
-  (setf (info :type :documentation (class-name x)) new-value))
+  (setf (fdocumentation (class-name x) 'type) new-value))
 
 (defmethod (setf documentation) (new-value
                                  (x condition-class)
                                  (doc-type (eql 'type)))
-  (setf (info :type :documentation (class-name x)) new-value))
+  (setf (fdocumentation (class-name x) 'type) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
   (if (or (structure-type-p x) (condition-type-p x))
-      (setf (info :type :documentation x) new-value)
+      (setf (fdocumentation x 'type) new-value)
       (let ((class (find-class x nil)))
         (if class
             (setf (slot-value class '%documentation) new-value)
-            (setf (info :type :documentation x) new-value)))))
+            (setf (fdocumentation x 'type) new-value)))))
 
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'structure)))
-  (cond
-    ((structure-type-p x)
-     (setf (info :type :documentation x) new-value))
-    ((info :typed-structure :info x)
-     (setf (info :typed-structure :documentation x) new-value))
-    (t new-value)))
+  (setf (fdocumentation x 'structure) new-value))
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
-  (values (info :variable :documentation x)))
+  (fdocumentation x 'variable))
 
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'variable)))
-  (setf (info :variable :documentation x) new-value))
+  (setf (fdocumentation x 'variable) new-value))
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod documentation (object doc-type)

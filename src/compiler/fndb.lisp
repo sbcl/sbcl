@@ -1320,10 +1320,6 @@
                        (:stream stream) (:use-labels t))
   null)
 
-(defknown fdocumentation (t symbol)
-  (or string null)
-  (flushable))
-
 (defknown describe (t &optional (or stream (member t nil))) (values))
 (defknown inspect (t) (values))
 (defknown room (&optional (member t nil :default)) (values))
@@ -1535,9 +1531,6 @@
 (defknown %set-symbol-value (symbol t) t (unsafe))
 (defknown (setf symbol-function) (function symbol) function (unsafe))
 (defknown %set-symbol-plist (symbol list) list (unsafe))
-(defknown (setf fdocumentation) ((or string null) t symbol)
-  (or string null)
-  ())
 (defknown %setnth (unsigned-byte list t) t (unsafe)
   :destroyed-constant-args (nth-constant-args 2))
 (defknown %set-fill-pointer (vector index) index (unsafe)

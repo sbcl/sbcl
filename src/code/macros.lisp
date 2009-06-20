@@ -152,12 +152,7 @@ invoked. In that case it will store into PLACE and start over."
              ;; FIXME: warn about incompatible lambda list with
              ;; respect to parent function?
              (setf (sb!xc:compiler-macro-function name) definition)
-             ;; FIXME: Add support for (SETF FDOCUMENTATION) when
-             ;; object is a list and type is COMPILER-MACRO. (Until
-             ;; then, we have to discard any compiler macro
-             ;; documentation for (SETF FOO).)
-             (unless (listp name)
-               (setf (fdocumentation name 'compiler-macro) doc))
+             (setf (fdocumentation name 'compiler-macro) doc)
              ,(when set-p
                     `(case (widetag-of definition)
                       (#.sb!vm:closure-header-widetag

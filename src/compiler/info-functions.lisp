@@ -222,70 +222,64 @@ return NIL. Can be set with SETF when ENV is NIL."
 ;;; all the BDOCUMENTATION entries in a *BDOCUMENTATION* hash table
 ;;; and slamming them into PCL once PCL gets going.
 (defun fdocumentation (x doc-type)
-  (flet ((try-cmucl-random-doc (x doc-type)
-           (declare (symbol doc-type))
-           (cdr (assoc doc-type
-                       (values (info :random-documentation :stuff x))))))
-    (case doc-type
-      (variable
-       (typecase x
-         (symbol (values (info :variable :documentation x)))))
-      (function
-       (cond ((functionp x)
-              (%fun-doc x))
-             ((legal-fun-name-p x)
-              ;; FIXME: Is it really right to make
-              ;; (DOCUMENTATION '(SETF FOO) 'FUNCTION) equivalent to
-              ;; (DOCUMENTATION 'FOO 'FUNCTION)? That's what CMU CL
-              ;; did, so we do it, but I'm not sure it's what ANSI wants.
-              (values (info :function :documentation
-                            (fun-name-block-name x))))))
-      (structure
-       (typecase x
-         (symbol (cond
-                   ((eq (info :type :kind x) :instance)
-                    (values (info :type :documentation x)))
-                   ((info :typed-structure :info x)
-                    (values (info :typed-structure :documentation x)))))))
-      (type
-       (typecase x
-         (structure-class (values (info :type :documentation (class-name x))))
-         (t (and (typep x 'symbol) (values (info :type :documentation x))))))
-      (setf (values (info :setf :documentation x)))
-      ((t)
-       (typecase x
-         (function (%fun-doc x))
-         (package (package-doc-string x))
-         (structure-class (values (info :type :documentation (class-name x))))
-         (symbol (try-cmucl-random-doc x doc-type))))
-      (t
-       (typecase x
-         ;; FIXME: This code comes from CMU CL, but
-         ;; TRY-CMUCL-RANDOM-DOC doesn't seem to be defined anywhere
-         ;; in CMU CL. Perhaps it could be defined by analogy with the
-         ;; corresponding SETF FDOCUMENTATION code.
-         (symbol (try-cmucl-random-doc x doc-type)))))))
+  (case doc-type
+    (variable
+     (typecase x
+       (symbol (values (info :variable :documentation x)))))
+    (function
+     (cond ((functionp x)
+            (%fun-doc x))
+           ((legal-fun-name-p x)
+            (values (info :function :documentation x)))))
+    (structure
+     (typecase x
+       (symbol (cond
+                 ((eq (info :type :kind x) :instance)
+                  (values (info :type :documentation x)))
+                 ((info :typed-structure :info x)
+                  (values (info :typed-structure :documentation x)))))))
+    (type
+     (typecase x
+       (structure-class (values (info :type :documentation (class-name x))))
+       (t (and (typep x 'symbol) (values (info :type :documentation x))))))
+    (setf (values (info :setf :documentation x)))
+    ((t)
+     (typecase x
+       (function (%fun-doc x))
+       (package (package-doc-string x))
+       (structure-class (values (info :type :documentation (class-name x))))
+       ((or symbol cons)
+        (random-documentation x doc-type))))
+    (t
+     (when (typep x '(or symbol cons))
+       (random-documentation x doc-type)))))
+
 (defun (setf fdocumentation) (string name doc-type)
-  ;; FIXME: I think it should be possible to set documentation for
-  ;; things (e.g. compiler macros) named (SETF FOO). fndb.lisp
-  ;; declares DOC-TYPE to be a SYMBOL, which contradicts that. What
-  ;; should be done?
+  (declare (type (or null string) string))
   (case doc-type
     (variable (setf (info :variable :documentation name) string))
-    (function (setf (info :function :documentation name) string))
+    (function
+     (when (legal-fun-name-p name)
+       (setf (info :function :documentation name) string)))
     (structure (cond
                  ((eq (info :type :kind name) :instance)
                   (setf (info :type :documentation name) string))
                  ((info :typed-structure :info name)
-                  (setf (info :typed-structure :documentation name) string))
-                 (t
-                  (error "~S is not a structure name." name))))
+                  (setf (info :typed-structure :documentation name) string))))
     (type (setf (info :type :documentation name) string))
     (setf (setf (info :setf :documentation name) string))
     (t
-     (let ((pair (assoc doc-type (info :random-documentation :stuff name))))
-       (if pair
-           (setf (cdr pair) string)
-           (push (cons doc-type string)
-                 (info :random-documentation :stuff name))))))
+     (when (typep name '(or symbol cons))
+       (setf (random-documentation name doc-type) string))))
   string)
+
+(defun random-documentation (name type)
+  (cdr (assoc type (info :random-documentation :stuff name))))
+
+(defun (setf random-documentation) (new-value name type)
+  (let ((pair (assoc type (info :random-documentation :stuff name))))
+    (if pair
+        (setf (cdr pair) new-value)
+        (push (cons type new-value)
+              (info :random-documentation :stuff name))))
+  new-value)

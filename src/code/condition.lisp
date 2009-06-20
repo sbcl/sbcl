@@ -1281,14 +1281,6 @@ holds the source-path to the original form within that file or NIL.
 Associated with this condition are always the restarts STEP-INTO,
 STEP-NEXT, and STEP-CONTINUE."))
 
-#!+sb-doc
-(setf (fdocumentation 'step-condition-source-path 'function)
-      "Source-path of the original form associated with the
-STEP-FORM-CONDITION or NIL."
-      (fdocumentation 'step-condition-pathname 'function)
-      "Pathname of the original source-file associated with the
-STEP-FORM-CONDITION or NIL.")
-
 (define-condition step-result-condition (step-condition)
   ((result :initarg :result :reader step-condition-result)))
 
