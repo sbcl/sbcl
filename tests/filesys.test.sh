@@ -205,9 +205,14 @@ use_test_subdirectory
 mkdir foo
 touch foo/aa.txt
 touch foo/aa.tmp
+mkdir foo/x
 mkdir far
 touch far/ab.txt
 touch far/ab.tmp
+mkdir far/x
+mkdir far/y
+mkdir far/y/x
+mkdir far/x/x
 mkdir qar
 touch qar/ac.txt
 touch qar/ac.tmp
@@ -232,6 +237,9 @@ run_sbcl <<EOF
 (test "f*.[mb]*" "foo.moose/" "foo.bar")
 (test "f*.m*.*")
 (test "f*.b*.*")
+(test "*/x" "foo/x/" "far/x/")
+(test "far/*/x" "far/y/x/" "far/x/x/")
+(test "**/x/" "foo/x/" "far/x/" "far/x/x" "far/y/x/")
 (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?

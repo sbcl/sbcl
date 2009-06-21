@@ -27,7 +27,7 @@
     (reported by Tobias Rittweiler)
   * bug fix: regressions in DIRECTORY from 1.0.28.61: pattern matching of
     directory components now works as it used to. (various prolems reported by
-    Michael Becker, Gabriel Dos Reis, and Cyrus Harmon)
+    Michael Becker, Gabriel Dos Reis, Cyrus Harmon, and Harald Hanche-Olsen)
   * bug fix: :PTY option in RUN-PROGRAM was broken with stream arguments.
     (reported by Elliot Slaughter, thanks to Stas Boukarev)
   * bug fix: bogus undefined variable warnings from fopcompiled references to

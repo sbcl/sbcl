@@ -790,19 +790,15 @@ Experimental: interface subject to change."
                     ;; end of the line
                     (funcall function subdirectory))
                    ((or (eq :wild next) (typep next 'pattern))
-                    (lambda (pathname)
-                      (map-wild function more pathname)))
+                    (map-wild function more subdirectory))
                    ((eq :wild-inferiors next)
-                    (lambda (pathname)
-                      (map-wild-inferiors function more pathname)))
+                    (map-wild-inferiors function more subdirectory))
                    (t
-                    (lambda (pathname)
-                      (let ((this (pathname-directory pathname)))
-                        (when (equal next (car (last this)))
-                          (map-matching-directories
-                           function
-                           (make-pathname :directory (append this more)
-                                          :defaults pathname)))))))))
+                    (let ((this (pathname-directory subdirectory)))
+                      (map-matching-directories
+                       function
+                       (make-pathname :directory (append this more)
+                                      :defaults subdirectory)))))))
       (map-directory
        (if (eq :wild this)
            #'cont
