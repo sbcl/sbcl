@@ -246,6 +246,11 @@ distinct from the global value. Can also be SETF."
 
 ;;;; GENSYM and friends
 
+(defun %make-symbol-name (prefix counter)
+  (with-output-to-string (s)
+    (write-string prefix s)
+    (%output-integer-in-base counter 10 s)))
+
 (defvar *gensym-counter* 0
   #!+sb-doc
   "counter for generating unique GENSYM symbols")
@@ -272,10 +277,7 @@ distinct from the global value. Can also be SETF."
           (fixnum (values "G" thing))
           (string (values (coerce thing 'simple-string) old)))
       (declare (simple-string prefix))
-      (make-symbol
-       (with-output-to-string (s)
-         (write-string prefix s)
-         (%output-integer-in-base int 10 s))))))
+      (make-symbol (%make-symbol-name prefix int)))))
 
 (defvar *gentemp-counter* 0)
 (declaim (type unsigned-byte *gentemp-counter*))
@@ -284,11 +286,6 @@ distinct from the global value. Can also be SETF."
   #!+sb-doc
   "Creates a new symbol interned in package PACKAGE with the given PREFIX."
   (declare (type string prefix))
-  (loop
-    (let ((*print-base* 10)
-          (*print-radix* nil)
-          (*print-pretty* nil)
-          (new-pname (format nil "~A~D" prefix (incf *gentemp-counter*))))
-      (multiple-value-bind (symbol existsp) (find-symbol new-pname package)
-        (declare (ignore symbol))
-        (unless existsp (return (values (intern new-pname package))))))))
+  (loop for name = (%make-symbol-name prefix (incf *gentemp-counter*))
+        while (nth-value 1 (find-symbol name package))
+        finally (return (values (intern name package)))))

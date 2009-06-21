@@ -19,3 +19,9 @@
                                       :adjustable t :initial-contents "X"))))
     (assert (simple-string-p (symbol-name sym)))
     (print sym (make-broadcast-stream))))
+
+(with-test (:name (gentemp pprinter))
+  (let* ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+    (set-pprint-dispatch 'string
+                         (lambda (stream obj) (write-string "BAR-" stream)))
+    (assert (string= "FOO-" (gentemp "FOO-") :end2 4))))

@@ -34,6 +34,8 @@
     FC6 as well. (reported by Tomasz Skutnik and obias Rautenkranz)
   * bug fix: SETF compiler macro documentation strings are not discarded
     anymore.
+  * bug fix: GENTEMP is now unaffected by pretty printer dispatch table.
+    (thanks to Alex Plotnick)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad
