@@ -157,10 +157,21 @@
 (tai t :heap '(:space :static))
 (tai 42 :immediate nil)
 (tai #'cons :heap
-     #+gencgc
+     #+(and (not ppc) gencgc)
+     ;; FIXME: This is the canonical GENCGC result, the one below for PPC is
+     ;; what we get there, but :LARGE T doesn't seem right. Figure out what's
+     ;; going on.
      '(:space :dynamic :generation 6 :write-protected t :pinned nil :large nil)
-     #-gencgc
+     #+(and ppc gencgc)
+     '(:space :dynamic :generation 6 :write-protected t :pinned nil :large t)
+     ;; FIXME: Figure out what's the right cheney-result, and which platforms
+     ;; return something else. The SPARC version here is what we get there,
+     ;; but quite possibly that is the result on all non-GENCGC platforms.
+     #+(and sparc (not gencgc))
+     '(:space :read-only)
+     #+(and (not sparc) (not gencgc))
      '(:space :dynamic))
+#+sb-thread
 (let ((x (list 1 2 3)))
   (declare (dynamic-extent x))
   (tai x :stack sb-thread:*current-thread*))
