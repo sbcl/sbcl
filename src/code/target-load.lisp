@@ -81,7 +81,7 @@
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
-  (flet ((load-stream (stream)
+  (flet ((load-stream (stream faslp)
            (let* (;; Bindings required by ANSI.
                   (*readtable* *readtable*)
                   (*package* (sane-package))
@@ -109,12 +109,14 @@
                   ;; behavior. Hmm. -- WHN 2001-04-06
                   (sb!c::*policy* sb!c::*policy*))
              (return-from load
-               (if (equal (stream-element-type stream) '(unsigned-byte 8))
+               (if faslp
                    (load-as-fasl stream verbose print)
                    (load-as-source stream verbose print))))))
+    ;; Case 1: stream.
     (when (streamp pathspec)
-      (return-from load (load-stream pathspec)))
+      (return-from load (load-stream pathspec (fasl-header-p pathspec))))
     (let ((pathname (pathname pathspec)))
+      ;; Case 2: Open as binary, try to process as a fasl.
       (with-open-stream
           (stream (or (open pathspec :element-type '(unsigned-byte 8)
                             :if-does-not-exist nil)
@@ -135,26 +137,14 @@
                                  :format-arguments (list pathspec)))))
         (unless stream
           (return-from load nil))
-
-        (let* ((header-line (make-array
-                             (length *fasl-header-string-start-string*)
-                             :element-type '(unsigned-byte 8))))
-          (read-sequence header-line stream)
-          (if (mismatch header-line *fasl-header-string-start-string*
-                        :test #'(lambda (code char) (= code (char-code char))))
-              (let ((truename (probe-file stream)))
-                (when (and truename
-                           (string= (pathname-type truename) *fasl-file-type*))
-                  (error 'fasl-header-missing
-                         :stream (namestring truename)
-                         :fhsss header-line
-                         :expected *fasl-header-string-start-string*)))
-              (progn
-                (file-position stream :start)
-                (return-from load
-                  (load-stream stream))))))
+        (let* ((real (probe-file stream))
+               (should-be-fasl-p
+                (and real (string= (pathname-type real) *fasl-file-type*))))
+          (when (fasl-header-p stream :errorp should-be-fasl-p)
+            (return-from load (load-stream stream t)))))
+      ;; Case 3: Open using the gived external format, process as source.
       (with-open-file (stream pathname :external-format external-format)
-        (load-stream stream)))))
+        (load-stream stream nil)))))
 
 ;; This implements the defaulting SBCL seems to have inherited from
 ;; CMU.  This routine does not try to perform any loading; all it does

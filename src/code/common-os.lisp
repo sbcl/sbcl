@@ -13,12 +13,9 @@
 
 (defvar *software-version* nil)
 
-(defvar *core-pathname* nil
-  #!+sb-doc
-  "The absolute pathname of the running SBCL core.")
-
 (sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
 (sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
+(sb!alien:define-alien-routine os-get-runtime-executable-path sb!alien:c-string)
 
 ;;; if something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
@@ -45,4 +42,6 @@
   (/show0 "setting *CORE-PATHNAME*")
   (setf *core-pathname*
         (merge-pathnames (native-pathname *core-string*)))
+  (/show0 "setting *RUNTIME-PATHNAME*")
+  (setf *runtime-pathname* (native-pathname (os-get-runtime-executable-path)))
   (/show0 "leaving OS-COLD-INIT-OR-REINIT"))

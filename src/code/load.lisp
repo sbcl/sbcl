@@ -269,6 +269,48 @@
              (invalid-fasl-features condition)
              (invalid-fasl-expected condition)))))
 
+;;; Skips past the shebang line on stream, if any.
+(defun maybe-skip-shebang-line (stream)
+  (let ((p (file-position stream)))
+    (flet ((next () (read-byte stream nil)))
+      (unwind-protect
+           (when (and (eq (next) (char-code #\#))
+                      (eq (next) (char-code #\!)))
+             (setf p nil)
+             (loop for x = (next)
+                   until (or (not x) (eq x (char-code #\newline)))))
+        (when p
+          (file-position stream p))))
+    t))
+
+;;; Returns T if the stream is a binary input stream with a FASL header.
+(defun fasl-header-p (stream &key errorp)
+  (let ((p (file-position stream)))
+    (unwind-protect
+         (let* ((header *fasl-header-string-start-string*)
+                (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
+                (n 0))
+           (flet ((scan ()
+                    (maybe-skip-shebang-line stream)
+                    (setf n (read-sequence buffer stream))))
+             (if errorp
+                 (scan)
+                 (or (ignore-errors (scan))
+                     ;; no a binary input stream
+                     (return-from fasl-header-p nil))))
+           (if (mismatch buffer header
+                         :test #'(lambda (code char) (= code (char-code char))))
+               ;; Immediate EOF is valid -- we want to match what
+               ;; CHECK-FASL-HEADER does...
+               (or (zerop n)
+                   (when errorp
+                     (error 'fasl-header-missing
+                            :stream stream
+                            :fhsss buffer
+                            :expected header)))
+               t))
+      (file-position stream p))))
+
 ;;;; LOAD-AS-FASL
 ;;;;
 ;;;; Note: LOAD-AS-FASL is used not only by LOAD, but also (with
@@ -278,10 +320,11 @@
 
 ;;; a helper function for LOAD-FASL-GROUP
 ;;;
-;;; Return true if we successfully read a FASL header from the stream,
-;;; or NIL if EOF was hit before anything was read. Signal an error if
-;;; we encounter garbage.
+;;; Return true if we successfully read a FASL header from the stream, or NIL
+;;; if EOF was hit before anything except the optional shebang line was read.
+;;; Signal an error if we encounter garbage.
 (defun check-fasl-header (stream)
+  (maybe-skip-shebang-line stream)
   (let ((byte (read-byte stream nil)))
     (when byte
       ;; Read and validate constant string prefix in fasl header.

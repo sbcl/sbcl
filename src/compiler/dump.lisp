@@ -298,6 +298,13 @@
                          :if-exists :supersede
                          :element-type 'sb!assem:assembly-unit))
            (res (make-fasl-output :stream stream)))
+      ;; Before the actual FASL header, write a shebang line using the current
+      ;; runtime path, so our fasls can be executed directly from the shell.
+      (when *runtime-pathname*
+        (fasl-write-string
+         (format nil "#!~A --script~%"
+                 (native-namestring *runtime-pathname* :as-file t))
+         stream))
       ;; Begin the header with the constant machine-readable (and
       ;; semi-human-readable) string which is used to identify fasl files.
       (fasl-write-string *fasl-header-string-start-string* stream)

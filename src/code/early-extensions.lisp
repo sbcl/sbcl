@@ -13,6 +13,14 @@
 
 (in-package "SB!IMPL")
 
+(defvar *core-pathname* nil
+  #!+sb-doc
+  "The absolute pathname of the running SBCL core.")
+
+(defvar *runtime-pathname* nil
+  #!+sb-doc
+  "The absolute pathname of the running SBCL runtime.")
+
 ;;; something not EQ to anything we might legitimately READ
 (defparameter *eof-object* (make-symbol "EOF-OBJECT"))
 

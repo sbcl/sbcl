@@ -383,25 +383,11 @@ command-line.")
       (dolist (option options)
         (process-1 option)))))
 
-;;; Skips past the shebang line on stream, if any.
-(defun maybe-skip-shebang-line (stream)
-  (let ((p (file-position stream)))
-    (flet ((next () (read-byte stream nil)))
-      (unwind-protect
-           (when (and (eq (next) (char-code #\#))
-                      (eq (next) (char-code #\!)))
-             (setf p nil)
-             (loop for x = (next)
-                   until (or (not x) (eq x (char-code #\newline)))))
-        (when p
-          (file-position stream p))))
-    t))
-
 (defun process-script (script)
   (let ((pathname (native-pathname script)))
     (handling-end-of-the-world
       (with-open-file (f pathname :element-type :default)
-        (maybe-skip-shebang-line f)
+        (sb!fasl::maybe-skip-shebang-line f)
         (load f :verbose nil :print nil)
         (quit)))))
 
