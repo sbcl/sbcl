@@ -87,6 +87,48 @@
 (deftype simple-fun ()
   '(satisfies simple-fun-p))
 
+(defun %simple-fun-doc (simple-fun)
+  (declare (simple-fun simple-fun))
+  (let ((info (%simple-fun-info simple-fun)))
+    (cond ((typep info '(or null string))
+           info)
+          ((simple-vector-p info)
+           nil)
+          ((consp info)
+           (car info))
+          (t
+           (bug "bogus INFO for ~S: ~S" simple-fun info)))))
+
+(defun (setf %simple-fun-doc) (doc simple-fun)
+  (declare (type (or null string) doc)
+           (simple-fun simple-fun))
+  (let ((info (%simple-fun-info simple-fun)))
+    (setf (%simple-fun-info simple-fun)
+          (cond ((typep info '(or null string))
+                 doc)
+                ((simple-vector-p info)
+                 (if doc
+                     (cons doc info)
+                     info))
+                ((consp info)
+                 (if doc
+                     (cons doc (cdr info))
+                     (cdr info)))
+                (t
+                 (bug "bogus INFO for ~S: ~S" simple-fun info))))))
+
+(defun %simple-fun-xrefs (simple-fun)
+  (declare (simple-fun simple-fun))
+  (let ((info (%simple-fun-info simple-fun)))
+    (cond ((typep info '(or null string))
+           nil)
+          ((simple-vector-p info)
+           info)
+          ((consp info)
+           (cdr info))
+          (t
+           (bug "bogus INFO for ~S: ~S" simple-fun info)))))
+
 ;;; Extract the arglist from the function header FUNC.
 (defun %simple-fun-arglist (func)
   (%simple-fun-arglist func))
@@ -97,6 +139,9 @@
 ;;; Extract the name from the function header FUNC.
 (defun %simple-fun-name (func)
   (%simple-fun-name func))
+
+(defun (setf %simple-fun-name) (new-value func)
+  (setf (%simple-fun-name func) new-value))
 
 ;;; Extract the type from the function header FUNC.
 (defun %simple-fun-type (func)

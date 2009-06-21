@@ -2,6 +2,8 @@
   * minor incompatible change: SB-THREAD:JOIN-THREAD-ERROR-THREAD and
     SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD have been deprecated in favor
     of SB-THREAD:THREAD-ERROR-THREAD.
+  * new feature: docstrings for local and anonymous functions are no longer
+    discarded. (thanks to Leslie Polzer)
   * new feature: SB-THREAD:SYMBOL-VALUE-IN-THREAD provides access to symbol
     values in other threads.
   * new feature: SB-INTROSPECT:ALLOCATION-INFORMATION provides information

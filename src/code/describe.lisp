@@ -117,7 +117,7 @@
 (declaim (ftype (function (t stream t t) (values)) %describe-doc))
 (defun %describe-doc (name s kind kind-doc)
   (when (and name (typep name '(or symbol cons)))
-    (let ((doc (fdocumentation name kind)))
+    (let ((doc (documentation name kind)))
       (when doc
         (format s "~&~@(~A documentation:~)~%  ~A"
                 (or kind-doc kind) doc))))

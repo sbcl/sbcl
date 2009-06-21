@@ -113,15 +113,23 @@
      (setf (%simple-fun-name (%fun-fun function)) new-value)))
   new-value)
 
-(defun %fun-doc (x)
-  ;; FIXME: This business of going through %FUN-NAME and then globaldb
-  ;; is the way CMU CL did it, but it doesn't really seem right.
-  ;; When/if weak hash tables become supported again, using a weak
-  ;; hash table to maintain the object/documentation association would
-  ;; probably be better.
-  (let ((name (%fun-name x)))
-    (when (and name (typep name '(or symbol cons)))
-      (values (info :function :documentation name)))))
+(defun %fun-doc (function)
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (sb!eval:interpreted-function-documentation function))
+    (t
+     (%simple-fun-doc (%fun-fun function)))))
+
+(defun (setf %fun-doc) (new-value function)
+  (declare (type (or null string) new-value))
+  (typecase function
+    #!+sb-eval
+    (sb!eval:interpreted-function
+     (setf (sb!eval:interpreted-function-documentation function) new-value))
+    ((or simple-fun closure)
+     (setf (%simple-fun-doc (%fun-fun function)) new-value)))
+  new-value)
 
 ;;; various environment inquiries
 

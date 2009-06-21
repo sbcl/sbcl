@@ -1249,7 +1249,7 @@
     (dump-object name file)
     (dump-object (sb!c::entry-info-arguments entry) file)
     (dump-object (sb!c::entry-info-type entry) file)
-    (dump-object (sb!c::entry-info-xref entry) file)
+    (dump-object (sb!c::entry-info-info entry) file)
     (dump-fop 'fop-fun-entry file)
     (dump-word (label-position (sb!c::entry-info-offset entry)) file)
     (dump-pop file)))

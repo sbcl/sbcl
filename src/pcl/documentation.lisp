@@ -9,14 +9,14 @@
 (in-package "SB-PCL")
 
 (defun fun-doc (x)
-  (etypecase x
-    (generic-function
-     (slot-value x '%documentation))
-    #+sb-eval
-    (sb-eval:interpreted-function
-     (sb-eval:interpreted-function-documentation x))
-    (function
-     (%fun-doc x))))
+  (if (typep x 'generic-function)
+      (slot-value x '%documentation)
+      (%fun-doc x)))
+
+(defun (setf fun-doc) (new-value x)
+  (if (typep x 'generic-function)
+      (setf (slot-value x '%documentation) new-value)
+      (setf (%fun-doc x) new-value)))
 
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
@@ -26,20 +26,20 @@
   (fun-doc x))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
-  (and (legal-fun-name-p x)
-       (fboundp x)
-       (documentation (fdefinition x) t)))
+  (when (and (legal-fun-name-p x) (fboundp x))
+    (documentation (fdefinition x) t)))
 
 (defmethod documentation ((x list) (doc-type (eql 'compiler-macro)))
-  (random-documentation x 'compiler-macro))
+  (awhen (compiler-macro-function x)
+    (documentation it t)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (or (fdocumentation x 'function)
-      ;; Try the pcl function documentation.
-      (and (fboundp x) (documentation (fdefinition x) t))))
+  (when (fboundp x)
+    (documentation (symbol-function x) t)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
-  (random-documentation x 'compiler-macro))
+  (awhen (compiler-macro-function x)
+    (documentation it t)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
   (fdocumentation x 'setf))
@@ -47,42 +47,27 @@
 (defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
   (random-documentation x 'optimize))
 
-(defun (setf fun-doc) (new-value x)
-  (etypecase x
-    (generic-function
-     (setf (slot-value x '%documentation) new-value))
-    #+sb-eval
-    (sb-eval:interpreted-function
-     (setf (sb-eval:interpreted-function-documentation x)
-           new-value))
-    (function
-     (setf (focumentation (%fun-name x) 'function) new-value)))
-  new-value)
-
-
 (defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
   (setf (fun-doc x) new-value))
 
-(defmethod (setf documentation) (new-value
-                                 (x function)
-                                 (doc-type (eql 'function)))
+(defmethod (setf documentation) (new-value (x function) (doc-type (eql 'function)))
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (setf (fdocumentation x 'function) new-value))
+  (when (and (legal-fun-name-p x) (fboundp x))
+    (setf (documentation (fdefinition x) t) new-value)))
 
-(defmethod (setf documentation)
-    (new-value (x list) (doc-type (eql 'compiler-macro)))
-  (setf (random-documentation x 'compiler-macro) new-value))
+(defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
+  (awhen (compiler-macro-function x)
+    (setf (documentation it t) new-value)))
 
-(defmethod (setf documentation) (new-value
-                                 (x symbol)
-                                 (doc-type (eql 'function)))
-  (setf (fdocumentation x 'function) new-value))
+(defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
+  (when (and (legal-fun-name-p x) (fboundp x))
+    (setf (documentation (symbol-function x) t) new-value)))
 
-(defmethod (setf documentation)
-    (new-value (x symbol) (doc-type (eql 'compiler-macro)))
-  (setf (random-documentation x 'compiler-macro) new-value))
+(defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
+  (awhen (compiler-macro-function x)
+    (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
   (setf (fdocumentation x 'setf) new-value))

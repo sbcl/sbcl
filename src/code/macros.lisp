@@ -152,7 +152,8 @@ invoked. In that case it will store into PLACE and start over."
              ;; FIXME: warn about incompatible lambda list with
              ;; respect to parent function?
              (setf (sb!xc:compiler-macro-function name) definition)
-             (setf (fdocumentation name 'compiler-macro) doc)
+             #-sb-xc-host
+             (setf (%fun-doc definition) doc)
              ,(when set-p
                     `(setf (%fun-lambda-list definition) lambda-list
                            (%fun-name definition) debug-name))

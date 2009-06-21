@@ -861,6 +861,8 @@
   ;; the original function or macro lambda list, or :UNSPECIFIED if
   ;; this is a compiler created function
   (arg-documentation nil :type (or list (member :unspecified)))
+  ;; the documentation string for the lambda
+  (documentation nil :type (or null string))
   ;; Node, allocating closure for this lambda. May be NIL when we are
   ;; sure that no closure is needed.
   (allocator nil :type (or null combination))

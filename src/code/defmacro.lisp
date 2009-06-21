@@ -90,8 +90,10 @@
                     ;; will involve finding the old macro lambda-list
                     ;; and comparing it with the new one.
                     (style-warn "redefining ~S in DEFMACRO" name))
-            (setf (sb!xc:macro-function name) definition
-                  (fdocumentation name 'function) doc)
+            (setf (sb!xc:macro-function name) definition)
+            #-sb-xc-host
+            (when doc
+              (setf (%fun-doc definition) doc))
             ,(when set-p
                    `(setf (%fun-lambda-list definition) lambda-list
                           (%fun-name definition) debug-name))

@@ -919,7 +919,7 @@
     (setf debug-name (name-lambdalike form)))
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
       (make-lambda-vars (cadr form))
-    (multiple-value-bind (forms decls) (parse-body (cddr form))
+    (multiple-value-bind (forms decls doc) (parse-body (cddr form))
       (binding* (((*lexenv* result-type post-binding-lexenv)
                   (process-decls decls (append aux-vars vars) nil
                                  :binding-form-p t))
@@ -952,6 +952,7 @@
                                                       :system-lambda system-lambda)))))
         (setf (functional-inline-expansion res) form)
         (setf (functional-arg-documentation res) (cadr form))
+        (setf (functional-documentation res) doc)
         (when (boundp '*lambda-conversions*)
           ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
           ;; keeps things less confusing to users of TIME, where this

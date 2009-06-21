@@ -662,7 +662,7 @@ a bug.~@:>")
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
   (error "FOP-FUN-ENTRY can't be defined without %PRIMITIVE.")
   #-sb-xc-host
-  (let ((xrefs (pop-stack))
+  (let ((info (pop-stack))
         (type (pop-stack))
         (arglist (pop-stack))
         (name (pop-stack))
@@ -678,7 +678,7 @@ a bug.~@:>")
       (setf (%simple-fun-name fun) name)
       (setf (%simple-fun-arglist fun) arglist)
       (setf (%simple-fun-type fun) type)
-      (setf (%simple-fun-xrefs fun) xrefs)
+      (setf (%simple-fun-info fun) info)
       ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
       #+nil (when *load-print*
               (load-fresh-line)

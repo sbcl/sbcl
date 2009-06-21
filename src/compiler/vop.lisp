@@ -324,8 +324,8 @@
   ;; a function type specifier representing the arguments and results
   ;; of this function
   (type 'function :type (or list (member function)))
-  ;; xref information for the XEP
-  (xref nil :type (or null simple-vector)))
+  ;; docstring and/or xref information for the XEP
+  (info nil :type (or null simple-vector string (cons string simple-vector))))
 
 ;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
 ;;; passing locations. It is stored in the PHYSENV-INFO.

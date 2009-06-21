@@ -754,8 +754,9 @@ also processed as top level forms."
           (program-assert-symbol-home-package-unlocked
            :compile name "binding ~A as a local function"))
         (names name)
-        (multiple-value-bind (forms decls) (parse-body (cddr def))
+        (multiple-value-bind (forms decls doc) (parse-body (cddr def))
           (defs `(lambda ,(second def)
+                   ,@(when doc (list doc))
                    ,@decls
                    (block ,(fun-name-block-name name)
                      . ,forms))))))

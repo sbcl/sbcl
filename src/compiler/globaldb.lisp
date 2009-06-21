@@ -1035,12 +1035,6 @@
 
 (define-info-type
   :class :function
-  :type :documentation
-  :type-spec (or string null)
-  :default nil)
-
-(define-info-type
-  :class :function
   :type :definition
   :type-spec (or fdefn null)
   :default nil)

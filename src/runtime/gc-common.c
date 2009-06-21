@@ -382,7 +382,7 @@ scav_code_header(lispobj *where, lispobj object)
         scavenge(&function_ptr->name, 1);
         scavenge(&function_ptr->arglist, 1);
         scavenge(&function_ptr->type, 1);
-        scavenge(&function_ptr->xrefs, 1);
+        scavenge(&function_ptr->info, 1);
     }
 
     return n_words;

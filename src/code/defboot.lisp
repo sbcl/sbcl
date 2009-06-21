@@ -232,11 +232,8 @@ evaluated as a PROGN."
   (sb!c::note-name-defined name :function)
 
   (when doc
-    (setf (fdocumentation name 'function) doc)
-    #!+sb-eval
-    (when (typep def 'sb!eval:interpreted-function)
-      (setf (sb!eval:interpreted-function-documentation def)
-            doc)))
+    (setf (%fun-doc def) doc))
+
   name)
 
 ;;;; DEFVAR and DEFPARAMETER

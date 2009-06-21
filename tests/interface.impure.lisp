@@ -12,7 +12,9 @@
 ;;;; more information.
 
 (load "assertoid.lisp")
+(load "test-util.lisp")
 (use-package "ASSERTOID")
+(use-package "TEST-UTIL")
 
 (defun (setf foo) (x)
   "(setf foo) documentation"
@@ -177,7 +179,7 @@
   "setf compiler macro"
   y)
 
-(with-test (:name (documentation 'compiler-macro))
+(with-test (:name (documentation compiler-macro))
   (unless (equal "compiler macro"
                  (documentation 'cmacro 'compiler-macro))
     (error "got ~S for cmacro"
@@ -185,5 +187,49 @@
   (unless (equal "setf compiler macro"
                  (documentation '(setf cmacro) 'compiler-macro))
     (error "got ~S for setf macro" (documentation '(setf cmacro) 'compiler-macro))))
+
+(with-test (:name (documentation lambda))
+  (let ((f (lambda () "aos the zos" t))
+        (g (sb-int:named-lambda fii () "zoot the fruit" t)))
+    (dolist (doc-type '(t function))
+      (assert (string= (documentation f doc-type) "aos the zos"))
+      (assert (string= (documentation g doc-type) "zoot the fruit")))
+    (setf (documentation f t) "fire")
+    (assert (string= (documentation f t) "fire"))
+    (assert (string= (documentation g t) "zoot the fruit"))))
+
+(with-test (:name (documentation flet))
+  (assert
+   (string= (documentation
+             (flet ((quux (x)
+                      "this is FLET quux"
+                      (/ x 2)))
+               #'quux)
+             t)
+            "this is FLET quux")))
+
+(with-test (:name (documentation labels))
+  (assert
+   (string= (documentation
+             (labels ((rec (x)
+                        "this is LABELS rec"
+                        (if (plusp x)
+                            (* x (rec (1- x)))
+                            1)))
+               #'rec)
+             t)
+            "this is LABELS rec")))
+
+(let ((x 1))
+  (defun docfoo (y)
+    "bar"
+    (incf x y)))
+
+(with-test (:name (documentation closure))
+  (assert (string= (documentation 'docfoo 'function) "bar"))
+  (assert (string= (documentation #'docfoo t) "bar"))
+  (assert (string= (setf (documentation 'docfoo 'function) "baz") "baz"))
+  (assert (string= (documentation 'docfoo 'function) "baz"))
+  (assert (string= (documentation #'docfoo t) "baz")))
 
 ;;;; success

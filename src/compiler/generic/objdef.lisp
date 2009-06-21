@@ -14,9 +14,6 @@
 ;;;; KLUDGE: The primitive objects here may look like self-contained
 ;;;; definitions, but in general they're not. In particular, if you
 ;;;; try to add a slot to them, beware of the following:
-;;;;   * (mysterious crashes which occur after changing the length
-;;;;     of SIMPLE-FUN, just adding a new slot not even doing anything
-;;;;     with it, still dunno why)
 ;;;;   * The GC scavenging code (and for all I know other GC code too)
 ;;;;     is not automatically generated from these layouts, but instead
 ;;;;     was hand-written to correspond to them. The offsets are
@@ -214,11 +211,13 @@
         :ref-trans %simple-fun-type
         :set-known (unsafe)
         :set-trans (setf %simple-fun-type))
-  (xrefs :init :null
-         :ref-trans %simple-fun-xrefs
-         :ref-known (flushable)
-         :set-trans (setf %simple-fun-xrefs)
-         :set-known ())
+  ;; NIL for empty, STRING for a docstring, SIMPLE-VECTOR for XREFS, and (CONS
+  ;; STRING SIMPLE-VECTOR) for both.
+  (info :init :null
+        :ref-trans %simple-fun-info
+        :ref-known (flushable)
+        :set-trans (setf %simple-fun-info)
+        :set-known (unsafe))
   ;; the SB!C::DEBUG-FUN object corresponding to this object, or NIL for none
   #+nil ; FIXME: doesn't work (gotcha, lowly maintenoid!) See notes on bug 137.
   (debug-fun :ref-known (flushable)
