@@ -58,7 +58,6 @@ extern pthread_key_t lisp_thread;
 #endif
 
 extern int kill_safely(os_thread_t os_thread, int signal);
-extern void kill_a_lisp_thread(int signal);
 
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))

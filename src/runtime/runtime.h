@@ -49,7 +49,7 @@
 
 #if QSHOW
 
-#if QSHOW_SIGNAL_SAFE
+#if QSHOW_SIGNAL_SAFE == 1 && !defined(LISP_FEATURE_WIN32)
 
 #include <signal.h>
 extern sigset_t blockable_sigset;
