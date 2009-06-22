@@ -413,6 +413,7 @@ create_thread_struct(lispobj initial_function) {
     th->binding_stack_start=
         (lispobj*)((void*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
+    th->control_stack_guard_page_protected = T;
     th->alien_stack_start=
         (lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;

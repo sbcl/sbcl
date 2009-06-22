@@ -2471,3 +2471,77 @@ maybe_gc(os_context_t *context)
     FSHOW((stderr, "/maybe_gc: returning\n"));
     return (gc_happened != NIL);
 }
+
+#define BYTES_ZERO_BEFORE_END (1<<12)
+
+/* There used to be a similar function called SCRUB-CONTROL-STACK in
+ * Lisp and another called zero_stack() in cheneygc.c, but since it's
+ * shorter to express in, and more often called from C, I keep only
+ * the C one after fixing it. -- MG 2009-03-25 */
+
+/* Zero the unused portion of the control stack so that old objects
+ * are not kept alive because of uninitialized stack variables.
+ *
+ * "To summarize the problem, since not all allocated stack frame
+ * slots are guaranteed to be written by the time you call an another
+ * function or GC, there may be garbage pointers retained in your dead
+ * stack locations. The stack scrubbing only affects the part of the
+ * stack from the SP to the end of the allocated stack." - ram, on
+ * cmucl-imp, Tue, 25 Sep 2001
+ *
+ * So, as an (admittedly lame) workaround, from time to time we call
+ * scrub-control-stack to zero out all the unused portion. This is
+ * supposed to happen when the stack is mostly empty, so that we have
+ * a chance of clearing more of it: callers are currently (2002.07.18)
+ * REPL, SUB-GC and sig_stop_for_gc_handler. */
+
+/* Take care not to tread on the guard page and the hard guard page as
+ * it would be unkind to sig_stop_for_gc_handler. Touching the return
+ * guard page is not dangerous. For this to work the guard page must
+ * be zeroed when protected. */
+
+/* FIXME: I think there is no guarantee that once
+ * BYTES_ZERO_BEFORE_END bytes are zero the rest are also zero. This
+ * may be what the "lame" adjective in the above comment is for. In
+ * this case, exact gc may lose badly. */
+void
+scrub_control_stack(void)
+{
+    struct thread *th = arch_os_get_current_thread();
+    os_vm_address_t guard_page_address = CONTROL_STACK_GUARD_PAGE(th);
+    os_vm_address_t hard_guard_page_address = CONTROL_STACK_HARD_GUARD_PAGE(th);
+    lispobj *sp;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    sp = (lispobj *)&sp - 1;
+#else
+    sp = current_control_stack_pointer;
+#endif
+ scrub:
+    if ((((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size)) &&
+         ((os_vm_address_t)sp >= hard_guard_page_address)) ||
+        (((os_vm_address_t)sp < (guard_page_address + os_vm_page_size)) &&
+         ((os_vm_address_t)sp >= guard_page_address) &&
+         (th->control_stack_guard_page_protected != NIL)))
+        return;
+#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+    do {
+        *sp = 0;
+    } while (((unsigned long)sp--) & (BYTES_ZERO_BEFORE_END - 1));
+    if ((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size))
+        return;
+    do {
+        if (*sp)
+            goto scrub;
+    } while (((unsigned long)sp--) & (BYTES_ZERO_BEFORE_END - 1));
+#else
+    do {
+        *sp = 0;
+    } while (((unsigned long)++sp) & (BYTES_ZERO_BEFORE_END - 1));
+    if ((os_vm_address_t)sp >= hard_guard_page_address)
+        return;
+    do {
+        if (*sp)
+            goto scrub;
+    } while (((unsigned long)++sp) & (BYTES_ZERO_BEFORE_END - 1));
+#endif
+}

@@ -11,10 +11,4 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-(define-alien-routine ("protect_control_stack_guard_page"
-                       %protect-control-stack-guard-page)
-    sb!alien:void
-  (protect-p sb!alien:int)
-  (thread sb!alien:int))
-(defun protect-control-stack-guard-page (n)
-  (%protect-control-stack-guard-page (if n 1 0) 0))
+(define-alien-routine reset-control-stack-guard-page sb!alien:void)

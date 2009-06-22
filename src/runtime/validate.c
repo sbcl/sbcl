@@ -89,12 +89,12 @@ protect_page(void *page, int protect_p, os_vm_prot_t flags) {
                flags : OS_VM_PROT_ALL);
 }
 
-#define DEF_PROTECT_PAGE(name,page_name,flags)                               \
-    void                                                                     \
-    protect_##name(int protect_p, struct thread *thread) {                   \
-        if (!thread)                                                         \
-           thread = arch_os_get_current_thread();                            \
-        protect_page(page_name(thread), protect_p, flags);                   \
+#define DEF_PROTECT_PAGE(name,page_name,flags)                          \
+    void                                                                \
+    protect_##name(int protect_p, struct thread *thread) {              \
+        if (!thread)                                                    \
+            thread = arch_os_get_current_thread();                      \
+        protect_page(page_name(thread), protect_p, flags);              \
     }
 
 DEF_PROTECT_PAGE(control_stack_hard_guard_page,

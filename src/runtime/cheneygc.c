@@ -61,31 +61,6 @@ tv_diff(struct timeval *x, struct timeval *y)
 }
 #endif
 
-#define BYTES_ZERO_BEFORE_END (1<<12)
-
-/* FIXME do we need this?  Doesn't it duplicate lisp code in
- * scrub-control-stack? */
-
-static void
-zero_stack(void)
-{
-    lispobj *ptr = current_control_stack_pointer;
- search:
-    do {
-        if (*ptr)
-            goto fill;
-        ptr++;
-    } while (((unsigned long)ptr) & (BYTES_ZERO_BEFORE_END-1));
-    return;
- fill:
-    do {
-        *ptr++ = 0;
-    } while (((unsigned long)ptr) & (BYTES_ZERO_BEFORE_END-1));
-
-    goto search;
-}
-
-
 void *
 gc_general_alloc(long bytes, int page_type_flag, int quick_p) {
     lispobj *new=new_space_free_pointer;
@@ -258,7 +233,7 @@ collect_garbage(generation_index_t ignore)
 #ifdef PRINTNOISE
     printf("Zeroing empty part of control stack ...\n");
 #endif
-    zero_stack();
+    scrub_control_stack();
     set_auto_gc_trigger(size_retained+bytes_consed_between_gcs);
     thread_sigmask(SIG_SETMASK, &old, 0);
 

@@ -1242,6 +1242,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
     set_thread_state(thread,STATE_SUSPENDED);
     FSHOW_SIGNAL((stderr,"suspended\n"));
 
+    /* While waiting for gc to finish occupy ourselves with zeroing
+     * the unused portion of the control stack to reduce conservatism.
+     * On hypothetic platforms with threads and exact gc it is
+     * actually a must. */
+    scrub_control_stack();
+
     wait_for_thread_state_change(thread, STATE_SUSPENDED);
     FSHOW_SIGNAL((stderr,"resumed\n"));
 
@@ -1479,6 +1485,19 @@ undefined_alien_function(void)
     funcall0(StaticSymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
+/* Called from the REPL, too. */
+void reset_control_stack_guard_page(void)
+{
+    struct thread *th=arch_os_get_current_thread();
+    if (th->control_stack_guard_page_protected == NIL) {
+        memset(CONTROL_STACK_GUARD_PAGE(th), 0, os_vm_page_size);
+        protect_control_stack_guard_page(1, NULL);
+        protect_control_stack_return_guard_page(0, NULL);
+        th->control_stack_guard_page_protected = T;
+        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
+    }
+}
+
 boolean
 handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
@@ -1494,8 +1513,11 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
+        if (th->control_stack_guard_page_protected == NIL)
+            lose("control_stack_guard_page_protected NIL");
         protect_control_stack_guard_page(0, NULL);
         protect_control_stack_return_guard_page(1, NULL);
+        th->control_stack_guard_page_protected = NIL;
         fprintf(stderr, "INFO: Control stack guard page unprotected\n");
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -1513,9 +1535,9 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * unprotect this one. This works even if we somehow missed
          * the return-guard-page, and hit it on our way to new
          * exhaustion instead. */
-        protect_control_stack_guard_page(1, NULL);
-        protect_control_stack_return_guard_page(0, NULL);
-        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
+        if (th->control_stack_guard_page_protected != NIL)
+            lose("control_stack_guard_page_protected not NIL");
+        reset_control_stack_guard_page();
         return 1;
     }
     else if(addr >= BINDING_STACK_HARD_GUARD_PAGE(th) &&

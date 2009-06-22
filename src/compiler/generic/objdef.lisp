@@ -396,6 +396,7 @@
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (control-stack-guard-page-protected)
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)

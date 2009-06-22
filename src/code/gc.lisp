@@ -285,6 +285,8 @@ run in any thread.")
   (when (sub-gc :gen (if full 6 gen))
     (post-gc)))
 
+(define-alien-routine scrub-control-stack sb!alien:void)
+
 (defun unsafe-clear-roots ()
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
   ;; as having these cons more then we have space left leads to huge

@@ -129,6 +129,8 @@ lispobj *search_dynamic_space(void *pointer);
 
 lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
 
+extern void scrub_control_stack();
+
 #include "fixnump.h"
 
 #ifdef LISP_FEATURE_GENCGC
