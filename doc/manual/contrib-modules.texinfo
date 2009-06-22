@@ -13,6 +13,7 @@ modules.
 * sb-grovel::
 * sb-posix::
 * sb-md5::
+* sb-queue::
 * sb-rotate-byte::
 * sb-cover::
 @end menu
@@ -28,6 +29,9 @@ modules.
 
 @page
 @include sb-md5/sb-md5.texinfo
+
+@page
+@include sb-queue/sb-queue.texinfo
 
 @page
 @include sb-rotate-byte/sb-rotate-byte.texinfo
