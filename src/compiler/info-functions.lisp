@@ -226,11 +226,13 @@ return NIL. Can be set with SETF when ENV is NIL."
     (variable
      (typecase x
        (symbol (values (info :variable :documentation x)))))
+    ;; FUNCTION is not used at the momemnt, just here for symmetry.
     (function
      (cond ((functionp x)
             (%fun-doc x))
-           ((legal-fun-name-p x)
-            (%fun-doc (fdefinition x)))))
+           ((and (legal-fun-name-p x) (fboundp x))
+            (%fun-doc (or (and (symbolp x) (macro-function x))
+                          (fdefinition x))))))
     (structure
      (typecase x
        (symbol (cond

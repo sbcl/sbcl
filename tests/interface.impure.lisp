@@ -231,5 +231,13 @@
   (assert (string= (setf (documentation 'docfoo 'function) "baz") "baz"))
   (assert (string= (documentation 'docfoo 'function) "baz"))
   (assert (string= (documentation #'docfoo t) "baz")))
+
+#+sb-doc
+(with-test (:name (documentation built-in-macro))
+  (assert (documentation 'trace 'function)))
+
+#+sb-doc
+(with-test (:name (documentation built-in-function))
+  (assert (documentation 'cons 'function)))
 
 ;;;; success

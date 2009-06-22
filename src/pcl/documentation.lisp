@@ -27,15 +27,15 @@
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
   (when (and (legal-fun-name-p x) (fboundp x))
-    (documentation (fdefinition x) t)))
+    (fun-doc (fdefinition x))))
 
 (defmethod documentation ((x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
     (documentation it t)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (when (fboundp x)
-    (documentation (symbol-function x) t)))
+  (when (and (legal-fun-name-p x) (fboundp x))
+    (fun-doc (or (macro-function x) (fdefinition x)))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
