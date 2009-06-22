@@ -9,33 +9,61 @@
 
 (in-package "SB-PROFILE") ; (SB-, not SB!, since we're built in warm load.)
 
-;;;; reading internal run time with high resolution and low overhead
+
+;;;; COUNTER object
+;;;;
+;;;; Thread safe, and reasonably fast: in common case increment is just an
+;;;; ATOMIC-INCF, in overflow case grab a lock and increment overflow counter.
+
+(defconstant +most-positive-word+ (1- (expt 2 sb-vm:n-word-bits)))
+
+(declaim (inline make-counter))
+(defstruct (counter (:copier nil))
+  (count 0 :type sb-vm:word)
+  (overflow 0 :type unsigned-byte)
+  (overflow-lock (sb-thread::make-spinlock) :type sb-thread::spinlock))
+
+(defun incf-counter (counter delta)
+  ;; When running multi-threaded we can easily get negative numbers for the
+  ;; cons-counter. Don't count them at all.
+  (when (plusp delta)
+    ;; ATOMIC-INCF is restricted to signed-word, but delta can be bigger: first
+    ;; count the number of full overflows...
+    (loop while (>= delta +most-positive-word+)
+          do (sb-thread::with-spinlock ((counter-overflow-lock counter))
+               (incf (counter-overflow counter) 1))
+          (decf delta +most-positive-word+))
+    (flet ((%incf (d)
+             (let ((prev (atomic-incf (counter-count counter) d)))
+               (when (< (logand +most-positive-word+ (+ prev d)) prev)
+                 (sb-thread::with-spinlock ((counter-overflow-lock counter))
+                   (incf (counter-overflow counter)))))))
+      (if (typep delta '(signed-byte 32))
+          (%incf delta)
+          ;; ...and if delta is still too big, split it into four parts: they
+          ;; are guaranteed to fit into a signed word.
+          (let ((quarter (truncate delta 4)))
+            (%incf quarter)
+            (%incf quarter)
+            (%incf quarter)
+            (%incf quarter)))))
+  counter)
+
+(defun counter->integer (counter)
+  (+ (counter-count counter)
+     (* (counter-overflow counter)
+        +most-positive-word+)))
+
+;;;; High resolution timer
+
+;;; FIXME: High resolution this is not. Build a microsecond-accuracy version
+;;; on top of unix-getrusage, maybe.
 
 (defconstant +ticks-per-second+ internal-time-units-per-second)
 
 (declaim (inline get-internal-ticks))
-(defun get-internal-ticks () (get-internal-run-time))
-
-;;;; implementation-dependent interfaces
-
-#|
-;;; To avoid unnecessary consing in the "encapsulation" code, we want
-;;; find out the number of required arguments, and use &REST to
-;;; capture only non-required arguments. This function returns (VALUES
-;;; MIN-ARGS OPTIONALS-P), where MIN-ARGS is the number of required
-;;; arguments and OPTIONALS-P is true iff there are any non-required
-;;; arguments (such as &OPTIONAL, &REST, or &KEY).
-(declaim (ftype (function ((or symbol cons)) (values fixnum t)) fun-signature))
-(defun fun-signature (name)
-  (let ((type (info :function :type name)))
-    (cond ((not (fun-type-p type))
-           (values 0 t))
-          (t
-           (values (length (fun-type-required type))
-                   (or (fun-type-optional type)
-                       (fun-type-keyp type)
-                       (fun-type-rest type)))))))
-|#
+(defun get-internal-ticks ()
+  (get-internal-run-time))
 
 ;;;; global data structures
 
@@ -60,9 +88,9 @@
 ;;; resource consumed for each nested call is added into the
 ;;; appropriate variable. When the outer function returns, these
 ;;; amounts are subtracted from the total.
-(defvar *enclosed-ticks* 0)
-(defvar *enclosed-consing* 0)
-(declaim (type (or pcounter fixnum) *enclosed-ticks* *enclosed-consing*))
+(declaim (counter *enclosed-ticks* *enclosed-consing*))
+(defvar *enclosed-ticks*)
+(defvar *enclosed-consing*)
 
 ;;; This variable is also used to subtract out time for nested
 ;;; profiled calls. The time inside the profile wrapper call --
@@ -72,8 +100,8 @@
 ;;; GET-INTERNAL-TICKS, and after we get to the second call. By
 ;;; keeping track of the count of enclosed profiled calls, we can try
 ;;; to compensate for that.
-(defvar *enclosed-profiles* 0)
-(declaim (type (or pcounter fixnum) *enclosed-profiles*))
+(declaim (counter *enclosed-profiles*))
+(defvar *enclosed-profiles*)
 
 ;;; the encapsulated function we're currently computing profiling data
 ;;; for, recorded so that we can detect the problem of
@@ -98,22 +126,6 @@
 
 ;;;; profile encapsulations
 
-;;; Trade off space for time by handling the usual all-FIXNUM cases inline.
-(defmacro fastbig- (x y)
-  (once-only ((x x) (y y))
-    `(if (and (typep ,x '(and fixnum unsigned-byte))
-              (typep ,y '(and fixnum unsigned-byte)))
-         ;; special case: can use fixnum arithmetic and be guaranteed
-         ;; the result is also a fixnum
-         (- ,x ,y)
-         ;; general case
-         (- ,x ,y))))
-(defmacro fastbig-1+ (x)
-  (once-only ((x x))
-    `(if (typep ,x 'index)
-         (1+ ,x)
-         (1+ ,x))))
-
 ;;; Return a collection of closures over the same lexical context,
 ;;;   (VALUES ENCAPSULATION-FUN READ-STATS-FUN CLEAR-STATS-FUN).
 ;;;
@@ -137,11 +149,11 @@
 ;;; will minimize profiling overhead.)
 (defun profile-encapsulation-lambdas (encapsulated-fun)
   (declare (type function encapsulated-fun))
-  (let* ((count 0)
-         (ticks 0)
-         (consing 0)
-         (profiles 0))
-    (declare (type (or pcounter fixnum) count ticks consing profiles))
+  (let* ((count (make-counter))
+         (ticks (make-counter))
+         (consing (make-counter))
+         (profiles (make-counter)))
+    (declare (counter count ticks consing profiles))
     (values
      ;; ENCAPSULATION-FUN
      (lambda (&more arg-context arg-count)
@@ -149,28 +161,26 @@
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
          (unprofile-all) ; to avoid further recursion
-         (error "~@<When computing profiling data for ~S, the profiled function ~S was called. To get out of this infinite recursion, all functions have been unprofiled. (Since the profiling system evidently uses ~S in its computations, it looks as though it's a bad idea to profile it.)~:@>"
-                *computing-profiling-data-for*
-                encapsulated-fun
+         (error "~@<When computing profiling data for ~S, the profiled ~
+                    function ~S was called. To get out of this infinite recursion, all ~
+                    functions have been unprofiled. (Since the profiling system evidently ~
+                    uses ~S in its computations, it looks as though it's a bad idea to ~
+                    profile it.)~:@>"
+                *computing-profiling-data-for* encapsulated-fun
                 encapsulated-fun))
-       ;; FIXME: Probably when this is stable, we should optimize (SAFETY 0).
-       (fastbig-incf-pcounter-or-fixnum count 1)
+       (incf-counter count 1)
        (let ((dticks 0)
              (dconsing 0)
              (inner-enclosed-profiles 0))
-         (declare (type unsigned-byte dticks dconsing inner-enclosed-profiles)
-                  (dynamic-extent dticks dconsing inner-enclosed-profiles))
-         (aver (typep dticks 'unsigned-byte))
-         (aver (typep dconsing 'unsigned-byte))
-         (aver (typep inner-enclosed-profiles 'unsigned-byte))
+         (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
              (let* ((start-ticks (get-internal-ticks))
-                    (*enclosed-ticks* 0)
-                    (*enclosed-consing* 0)
-                    (*enclosed-profiles* 0)
+                    (*enclosed-ticks* (make-counter))
+                    (*enclosed-consing* (make-counter))
+                    (*enclosed-profiles* (make-counter))
                     (nbf0 *n-bytes-freed-or-purified*)
                     (dynamic-usage-0 (sb-kernel:dynamic-usage)))
-               (declare (inline pcounter-or-fixnum->integer))
+               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing* *enclosed-profiles*))
                (unwind-protect
                    (multiple-value-call encapsulated-fun
                                         (sb-c:%more-arg-values arg-context
@@ -178,41 +188,33 @@
                                                                arg-count))
                  (let ((*computing-profiling-data-for* encapsulated-fun)
                        (dynamic-usage-1 (sb-kernel:dynamic-usage)))
-                   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
-                   (setf dconsing
-                         (if (eql *n-bytes-freed-or-purified* nbf0)
-                             ;; common special case where we can avoid
-                             ;; bignum arithmetic
-                             (- dynamic-usage-1 dynamic-usage-0)
-                             ;; general case
-                             (- (get-bytes-consed) nbf0 dynamic-usage-0)))
-                   (setf inner-enclosed-profiles
-                         (pcounter-or-fixnum->integer *enclosed-profiles*))
-                   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
-                     (fastbig-incf-pcounter-or-fixnum ticks net-dticks))
-                   (let ((net-dconsing (fastbig- dconsing
-                                                 (pcounter-or-fixnum->integer
-                                                  *enclosed-consing*))))
-                     (fastbig-incf-pcounter-or-fixnum consing net-dconsing))
-                   (fastbig-incf-pcounter-or-fixnum profiles
-                                                    inner-enclosed-profiles))))
-           (fastbig-incf-pcounter-or-fixnum *enclosed-ticks* dticks)
-           (fastbig-incf-pcounter-or-fixnum *enclosed-consing* dconsing)
-           (fastbig-incf-pcounter-or-fixnum *enclosed-profiles*
-                                            (fastbig-1+
-                                             inner-enclosed-profiles)))))
+                   (setf dticks (- (get-internal-ticks) start-ticks)
+                         dconsing (if (eql *n-bytes-freed-or-purified* nbf0)
+                                      ;; common special case where we can avoid
+                                      ;; bignum arithmetic
+                                      (- dynamic-usage-1 dynamic-usage-0)
+                                      ;; general case
+                                      (- (get-bytes-consed) nbf0 dynamic-usage-0))
+                         inner-enclosed-profiles (counter->integer *enclosed-profiles*))
+                   (incf-counter ticks (- dticks (counter->integer *enclosed-ticks*)))
+                   (incf-counter consing (- dconsing (counter->integer *enclosed-consing*)))
+                   (incf-counter profiles inner-enclosed-profiles))))
+           (when (boundp '*enclosed-ticks*)
+             (incf-counter *enclosed-ticks* dticks)
+             (incf-counter *enclosed-consing* dconsing)
+             (incf-counter *enclosed-profiles* (1+ inner-enclosed-profiles))))))
      ;; READ-STATS-FUN
      (lambda ()
-       (values (pcounter-or-fixnum->integer count)
-               (pcounter-or-fixnum->integer ticks)
-               (pcounter-or-fixnum->integer consing)
-               (pcounter-or-fixnum->integer profiles)))
+       (values (counter->integer count)
+               (counter->integer ticks)
+               (counter->integer consing)
+               (counter->integer profiles)))
      ;; CLEAR-STATS-FUN
      (lambda ()
-       (setf count 0
-             ticks 0
-             consing 0
-             profiles 0)))))
+       (setf count (make-counter)
+             ticks (make-counter)
+             consing (make-counter)
+             profiles (make-counter))))))
 
 ;;;; interfaces
 

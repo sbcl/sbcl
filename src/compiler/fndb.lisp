@@ -1384,13 +1384,6 @@
 (defknown get-bytes-consed () unsigned-byte (flushable))
 (defknown mask-signed-field ((integer 0 *) integer) integer
           (movable flushable foldable))
-
-;;; PCOUNTERs
-(defknown incf-pcounter (pcounter unsigned-byte) pcounter)
-(defknown pcounter->integer (pcounter) unsigned-byte)
-(defknown %incf-pcounter-or-fixnum ((or pcounter fixnum) unsigned-byte)
-  (or pcounter fixnum))
-(defknown pcounter-or-fixnum->integer ((or pcounter fixnum)) unsigned-byte)
 
 ;;;; magical compiler frobs
 

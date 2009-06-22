@@ -938,15 +938,6 @@ possibly temporariliy, because it might be used internally."
                "SBCL-HOMEDIR-PATHNAME"
                "SIMPLIFY-NAMESTRING"
 
-               ;; PCOUNTERs
-               "FASTBIG-INCF-PCOUNTER-OR-FIXNUM"
-               "INCF-PCOUNTER"
-               "INCF-PCOUNTER-OR-FIXNUM"
-               "MAKE-PCOUNTER"
-               "PCOUNTER"
-               "PCOUNTER->INTEGER"
-               "PCOUNTER-OR-FIXNUM->INTEGER"
-               "PCOUNTER-P"
                "*N-BYTES-FREED-OR-PURIFIED*"
 
                ;; miscellaneous non-standard but handy user-level functions..

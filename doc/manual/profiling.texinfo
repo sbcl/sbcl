@@ -21,6 +21,9 @@ Inlined functions do not appear in the results reported by either.
 The package @code{sb-profile} provides a classic, per-function-call
 profiler.
 
+@strong{NOTE}: When profiling code executed by multiple threads in
+parallel, the consing attributed to each function is inaccurate.
+
 @include macro-sb-profile-profile.texinfo
 @include macro-sb-profile-unprofile.texinfo
 @include fun-sb-profile-report.texinfo
