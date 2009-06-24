@@ -352,8 +352,7 @@ catch_exception_raise(mach_port_t exception_port,
              * protection so the error handler has some headroom, protect the
              * previous page so that we can catch returns from the guard page
              * and restore it. */
-            protect_control_stack_guard_page(0, th);
-            protect_control_stack_return_guard_page(1, th);
+            lower_thread_control_stack_guard_page(th);
 
             backup_thread_state = thread_state;
             open_stack_allocation(&thread_state);
@@ -394,8 +393,7 @@ catch_exception_raise(mach_port_t exception_port,
              * unprotect this one. This works even if we somehow missed
              * the return-guard-page, and hit it on our way to new
              * exhaustion instead. */
-            protect_control_stack_guard_page(1, th);
-            protect_control_stack_return_guard_page(0, th);
+            reset_thread_control_stack_guard_page(th);
         }
         else if (addr >= undefined_alien_address &&
                  addr < undefined_alien_address + os_vm_page_size) {

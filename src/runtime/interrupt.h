@@ -166,4 +166,9 @@ extern void lisp_memory_fault_error(os_context_t *context,
                                     os_vm_address_t addr);
 #endif
 
+#include "thread.h"
+
+extern void lower_thread_control_stack_guard_page(struct thread *th);
+extern void reset_thread_control_stack_guard_page(struct thread *th);
+
 #endif

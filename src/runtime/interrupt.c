@@ -1485,17 +1485,35 @@ undefined_alien_function(void)
     funcall0(StaticSymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
 }
 
+void lower_thread_control_stack_guard_page(struct thread *th)
+{
+    protect_control_stack_guard_page(0, th);
+    protect_control_stack_return_guard_page(1, th);
+    th->control_stack_guard_page_protected = NIL;
+    fprintf(stderr, "INFO: Control stack guard page unprotected\n");
+}
+
+void reset_thread_control_stack_guard_page(struct thread *th)
+{
+    memset(CONTROL_STACK_GUARD_PAGE(th), 0, os_vm_page_size);
+    protect_control_stack_guard_page(1, th);
+    protect_control_stack_return_guard_page(0, th);
+    th->control_stack_guard_page_protected = T;
+    fprintf(stderr, "INFO: Control stack guard page reprotected\n");
+}
+
 /* Called from the REPL, too. */
 void reset_control_stack_guard_page(void)
 {
     struct thread *th=arch_os_get_current_thread();
     if (th->control_stack_guard_page_protected == NIL) {
-        memset(CONTROL_STACK_GUARD_PAGE(th), 0, os_vm_page_size);
-        protect_control_stack_guard_page(1, NULL);
-        protect_control_stack_return_guard_page(0, NULL);
-        th->control_stack_guard_page_protected = T;
-        fprintf(stderr, "INFO: Control stack guard page reprotected\n");
+        reset_thread_control_stack_guard_page(th);
     }
+}
+
+void lower_control_stack_guard_page(void)
+{
+    lower_thread_control_stack_guard_page(arch_os_get_current_thread());
 }
 
 boolean
@@ -1515,11 +1533,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * and restore it. */
         if (th->control_stack_guard_page_protected == NIL)
             lose("control_stack_guard_page_protected NIL");
-        protect_control_stack_guard_page(0, NULL);
-        protect_control_stack_return_guard_page(1, NULL);
-        th->control_stack_guard_page_protected = NIL;
-        fprintf(stderr, "INFO: Control stack guard page unprotected\n");
-
+        lower_control_stack_guard_page();
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* For the unfortunate case, when the control stack is
          * exhausted in a signal handler. */

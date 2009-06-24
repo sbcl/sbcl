@@ -8,7 +8,6 @@
 #include "globals.h"
 #include "runtime.h"
 #include "os.h"
-#include "interrupt.h"
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 #else
@@ -18,6 +17,7 @@ struct alloc_region { };
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 #include "genesis/fdefn.h"
+#include "interrupt.h"
 
 #define STATE_RUNNING (make_fixnum(1))
 #define STATE_SUSPENDED (make_fixnum(2))
