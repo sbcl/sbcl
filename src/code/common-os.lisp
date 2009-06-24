@@ -43,5 +43,6 @@
   (setf *core-pathname*
         (merge-pathnames (native-pathname *core-string*)))
   (/show0 "setting *RUNTIME-PATHNAME*")
-  (setf *runtime-pathname* (native-pathname (os-get-runtime-executable-path)))
+  (let ((exe (os-get-runtime-executable-path)))
+    (setf *runtime-pathname* (when exe (native-pathname exe))))
   (/show0 "leaving OS-COLD-INIT-OR-REINIT"))
