@@ -287,4 +287,21 @@
     (stimulate-sbcl)
     (stimulate-sbcl)))
 
+(defun load-empty-file (type)
+  (let ((pathname (make-pathname :name "load-impure-lisp-empty-temp"
+                                 :type type)))
+      (unwind-protect
+           (progn
+             (with-open-file (f pathname
+                                :if-exists :supersede
+                                :direction :output))
+             (handler-case
+                 (progn (load pathname) t)
+               (error () nil)))
+        (ignore-errors (delete-file pathname)))))
 
+(with-test (:name (load "empty.lisp"))
+  (assert (load-empty-file "lisp")))
+
+(with-test (:name (load "empty.fasl"))
+  (assert (not (load-empty-file "fasl"))))

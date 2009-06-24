@@ -140,7 +140,10 @@
         (let* ((real (probe-file stream))
                (should-be-fasl-p
                 (and real (string= (pathname-type real) *fasl-file-type*))))
-          (when (fasl-header-p stream :errorp should-be-fasl-p)
+          ;; Don't allow empty .fasls, and assume other empty files
+          ;; are source files.
+          (when (and (or should-be-fasl-p (not (eql 0 (file-length stream))))
+                     (fasl-header-p stream :errorp should-be-fasl-p))
             (return-from load (load-stream stream t)))))
       ;; Case 3: Open using the gived external format, process as source.
       (with-open-file (stream pathname :external-format external-format)
