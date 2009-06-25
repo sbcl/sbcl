@@ -576,20 +576,6 @@
                               ',(all-writers)
                               (sb!c:source-location)))))))
 
-;;;; DESCRIBE on CONDITIONs
-
-;;; a function to be used as the guts of DESCRIBE-OBJECT (CONDITION T)
-;;; eventually (once we get CLOS up and running so that we can define
-;;; methods)
-(defun describe-condition (condition stream)
-  (format stream
-          "~&~@<~S ~_is a ~S. ~_Its slot values are ~_~S.~:>~%"
-          condition
-          (type-of condition)
-          (concatenate 'list
-                       (condition-actual-initargs condition)
-                       (condition-assigned-slots condition))))
-
 ;;;; various CONDITIONs specified by ANSI
 
 (define-condition serious-condition (condition) ())

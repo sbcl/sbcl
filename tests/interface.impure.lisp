@@ -113,15 +113,17 @@
   (let ((s (with-output-to-string (s)
              (write-char #\x s)
              (describe i s))))
-    (unless (and (char= #\x (char s 0))
-                 ;; one leading #\NEWLINE from FRESH-LINE or the like, no more
-                 (char= #\newline (char s 1))
-                 (char/= #\newline (char s 2))
-                 ;; one trailing #\NEWLINE from TERPRI or the like, no more
-                 (let ((n (length s)))
-                   (and (char= #\newline (char s (- n 1)))
-                        (char/= #\newline (char s (- n 2))))))
-      (error "misbehavior in DESCRIBE of ~S" i))))
+    (macrolet ((check (form)
+                 `(or ,form
+                      (error "misbehavior in DESCRIBE of ~S:~%   ~S" i ',form))))
+      (check (char= #\x (char s 0)))
+      ;; one leading #\NEWLINE from FRESH-LINE or the like, no more
+      (check (char= #\newline (char s 1)))
+      (check (char/= #\newline (char s 2)))
+      ;; one trailing #\NEWLINE from TERPRI or the like, no more
+      (let ((n (length s)))
+        (check (char= #\newline (char s (- n 1))))
+        (check (char/= #\newline (char s (- n 2))))))))
 
 
 ;;; Tests of documentation on types and classes

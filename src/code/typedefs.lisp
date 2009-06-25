@@ -47,13 +47,15 @@
         (parse-body body :doc-string-allowed nil)
       `(progn
          (!cold-init-forms
-          (setf (info :type :translator ',name)
-                (lambda (,whole)
-                  (block ,name
-                    (destructuring-bind ,wholeless-arglist
-                        (rest ,whole) ; discarding NAME
-                      ,@decls
-                      ,@forms)))))
+          (let ((fun (lambda (,whole)
+                       (block ,name
+                         (destructuring-bind ,wholeless-arglist
+                             (rest ,whole)  ; discarding NAME
+                           ,@decls
+                       ,@forms)))))
+            #-sb-xc-host
+            (setf (%simple-fun-arglist (the simple-fun fun)) ',wholeless-arglist)
+            (setf (info :type :translator ',name) fun)))
          ',name))))
 
 ;;; DEFVARs for these come later, after we have enough stuff defined.

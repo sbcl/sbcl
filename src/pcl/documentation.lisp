@@ -205,7 +205,7 @@
 
 ;;; default if DOC-TYPE doesn't match one of the specified types
 (defmethod documentation (object doc-type)
-  (warn "unsupported DOCUMENTATION: type ~S for object ~S"
+  (warn "unsupported DOCUMENTATION: type ~S for object of type ~S"
         doc-type
         (type-of object))
   nil)

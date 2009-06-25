@@ -778,7 +778,9 @@
                               (print-unreadable-object (s stream :type t))))
              (:copier nil))
   ;; the UT that compilation started at
-  (start-time (get-internal-real-time) :type unsigned-byte)
+  (start-time (get-internal-real) :type unsigned-byte)
+  ;; the IRT that compilation started at
+  (start-real-time (get-internal-real-time) :type unsigned-byte)
   ;; the FILE-INFO structure for this compilation
   (file-info nil :type (or file-info null))
   ;; the stream that we are using to read the FILE-INFO, or NIL if
@@ -1654,7 +1656,7 @@
                    won
                    (elapsed-time-to-string
                     (- (get-internal-real-time)
-                       (source-info-start-time source-info))))
+                       (source-info-start-real-time source-info))))
   (values))
 
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds

@@ -159,13 +159,7 @@
                 "SRC;CODE;PROFILE"
                 "SRC;CODE;NTRACE"
                 "SRC;CODE;STEP"
-                "SRC;CODE;RUN-PROGRAM"
-
-                ;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
-                ;; facility is still used in our ANSI DESCRIBE
-                ;; facility, and should be compiled and loaded after
-                ;; our DESCRIBE facility is compiled and loaded.
-                "SRC;PCL;DESCRIBE"))
+                "SRC;CODE;RUN-PROGRAM"))
 
   (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
     (sb-int:/show "about to compile" fullname)
