@@ -132,14 +132,13 @@
 ;;; optimized constructor function when called.
 (defun install-initial-constructor (ctor &key force-p)
   (when (or force-p (ctor-class ctor))
-    (let ((*installing-ctor* t))
-      (setf (ctor-class ctor) nil)
-      (setf (funcallable-instance-fun ctor)
-            #'(lambda (&rest args)
-                (install-optimized-constructor ctor)
-                (apply ctor args)))
-      (setf (%funcallable-instance-info ctor 1)
-            (ctor-function-name ctor)))))
+    (setf (ctor-class ctor) nil)
+    (setf (funcallable-instance-fun ctor)
+          #'(lambda (&rest args)
+              (install-optimized-constructor ctor)
+              (apply ctor args)))
+    (setf (%funcallable-instance-info ctor 1)
+          (ctor-function-name ctor))))
 
 (defun make-ctor-function-name (class-name initargs safe-code-p)
   (list* 'ctor class-name safe-code-p initargs))
@@ -501,34 +500,39 @@
     ;; MAKE-INSTANCE and/or ALLOCATE-INSTANCE, these will show up
     ;; together with the system-defined ones in what
     ;; COMPUTE-APPLICABLE-METHODS returns.
-    (if (and (not (structure-class-p class))
-             (not (condition-class-p class))
-             (null (cdr make-instance-methods))
-             (null (cdr allocate-instance-methods))
-             (every (lambda (x)
-                      (member (slot-definition-allocation x)
-                              '(:instance :class)))
-                    (class-slots class))
-             (null (check-initargs-1
-                    class
-                    (append
-                     (ctor-default-initkeys
-                      (ctor-initargs ctor) (class-default-initargs class))
-                     (plist-keys (ctor-initargs ctor)))
-                    (append ii-methods si-methods) nil nil))
-             (not (around-or-nonstandard-primary-method-p
-                   ii-methods *the-system-ii-method*))
-             (not (around-or-nonstandard-primary-method-p
-                   si-methods *the-system-si-method*))
-             ;; the instance structure protocol goes through
-             ;; slot-value(-using-class) and friends (actually just
-             ;; (SETF SLOT-VALUE-USING-CLASS) and
-             ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
-             ;; applicable methods we can't shortcircuit them.
-             (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
-             (every (lambda (x) (= (length x) 1)) sbuc-slots-methods))
-        (optimizing-generator ctor ii-methods si-methods)
-        (fallback-generator ctor ii-methods si-methods))))
+    (let ((maybe-invalid-initargs
+           (check-initargs-1
+            class
+            (append
+             (ctor-default-initkeys
+              (ctor-initargs ctor) (class-default-initargs class))
+             (plist-keys (ctor-initargs ctor)))
+            (append ii-methods si-methods) nil nil))
+          (custom-make-instance
+           (not (null (cdr make-instance-methods)))))
+      (if (and (not (structure-class-p class))
+               (not (condition-class-p class))
+               (not custom-make-instance)
+               (null (cdr allocate-instance-methods))
+               (every (lambda (x)
+                        (member (slot-definition-allocation x)
+                                '(:instance :class)))
+                      (class-slots class))
+               (not maybe-invalid-initargs)
+               (not (around-or-nonstandard-primary-method-p
+                     ii-methods *the-system-ii-method*))
+               (not (around-or-nonstandard-primary-method-p
+                     si-methods *the-system-si-method*))
+               ;; the instance structure protocol goes through
+               ;; slot-value(-using-class) and friends (actually just
+               ;; (SETF SLOT-VALUE-USING-CLASS) and
+               ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
+               ;; applicable methods we can't shortcircuit them.
+               (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
+               (every (lambda (x) (= (length x) 1)) sbuc-slots-methods))
+          (optimizing-generator ctor ii-methods si-methods)
+          (fallback-generator ctor ii-methods si-methods
+                              (or maybe-invalid-initargs custom-make-instance))))))
 
 (defun around-or-nonstandard-primary-method-p
     (methods &optional standard-method)
@@ -546,16 +550,30 @@
         when (null qualifiers) do
           (setq primary-checked-p t)))
 
-(defun fallback-generator (ctor ii-methods si-methods)
+(defun fallback-generator (ctor ii-methods si-methods use-make-instance)
   (declare (ignore ii-methods si-methods))
-  `(lambda ,(make-ctor-parameter-list ctor)
-     ;; The CTOR MAKE-INSTANCE optimization only kicks in when the
-     ;; first argument to MAKE-INSTANCE is a constant symbol: by
-     ;; calling it with a class, as here, we inhibit the optimization,
-     ;; so removing the possibility of endless recursion.  -- CSR,
-     ;; 2004-07-12
-     (make-instance ,(ctor-class ctor)
-      ,@(quote-plist-keys (ctor-initargs ctor)))))
+  (let ((class (ctor-class ctor))
+        (lambda-list (make-ctor-parameter-list ctor))
+        (initargs (quote-plist-keys (ctor-initargs ctor))))
+    (if use-make-instance
+        `(lambda ,lambda-list
+           (declare #.*optimize-speed*)
+           ;; The CTOR MAKE-INSTANCE optimization checks for
+           ;; *COMPILING-OPTIMIZED-CONSTRUCTOR* which is bound around compilation of
+           ;; the constructor, hence avoiding the possibility of endless recursion.
+           (make-instance ,class ,@initargs))
+        `(lambda ,lambda-list
+           (declare #.*optimize-speed*)
+           (fast-make-instance ,class ,@initargs)))))
+
+;;; Not as good as the real optimizing generator, but faster than going
+;;; via MAKE-INSTANCE: 1 GF call less, and no need to check initargs.
+(defun fast-make-instance (class &rest initargs)
+  (declare #.*optimize-speed*)
+  (declare (dynamic-extent initargs))
+  (let ((.instance. (apply #'allocate-instance class initargs)))
+    (apply #'initialize-instance .instance. initargs)
+    .instance.))
 
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (locations names body before-method-p)
