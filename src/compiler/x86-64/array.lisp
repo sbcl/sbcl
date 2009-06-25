@@ -394,8 +394,7 @@
    (move dword-index index)
    (inst shr dword-index 1)
    (inst movss (make-ea-for-float-ref object dword-index offset 4) value)
-   (unless (location= result value)
-     (inst movss result value))))
+   (move result value)))
 
 (define-vop (data-vector-set-c-with-offset/simple-array-single-float)
   (:note "inline array store")
@@ -412,8 +411,7 @@
   (:result-types single-float)
   (:generator 4
    (inst movss (make-ea-for-float-ref object index offset 4) value)
-   (unless (location= result value)
-     (inst movss result value))))
+   (move result value)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-double-float)
   (:note "inline array access")
@@ -460,8 +458,7 @@
   (:result-types double-float)
   (:generator 20
    (inst movsd (make-ea-for-float-ref object index offset 8) value)
-   (unless (location= result value)
-     (inst movsd result value))))
+   (move result value)))
 
 (define-vop (data-vector-set-c-with-offset/simple-array-double-float)
   (:note "inline array store")
@@ -478,8 +475,7 @@
   (:result-types double-float)
   (:generator 19
    (inst movsd (make-ea-for-float-ref object index offset 8) value)
-   (unless (location= result value)
-     (inst movsd result value))))
+   (move result value)))
 
 
 ;;; complex float variants
@@ -497,11 +493,7 @@
   (:results (value :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 5
-    (let ((real-tn (complex-single-reg-real-tn value)))
-      (inst movss real-tn (make-ea-for-float-ref object index offset 8)))
-    (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (inst movss imag-tn (make-ea-for-float-ref object index offset 8
-                                                 :complex-offset 4)))))
+    (inst movq value (make-ea-for-float-ref object index offset 8))))
 
 (define-vop (data-vector-ref-c-with-offset/simple-array-complex-single-float)
   (:note "inline array access")
@@ -515,11 +507,7 @@
   (:results (value :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 4
-    (let ((real-tn (complex-single-reg-real-tn value)))
-      (inst movss real-tn (make-ea-for-float-ref object index offset 8)))
-    (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (inst movss imag-tn (make-ea-for-float-ref object index offset 8
-                                                 :complex-offset 4)))))
+    (inst movq value (make-ea-for-float-ref object index offset 8))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
   (:note "inline array store")
@@ -536,18 +524,8 @@
   (:results (result :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 5
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
-      (inst movss (make-ea-for-float-ref object index offset 8) value-real)
-      (unless (location= value-real result-real)
-        (inst movss result-real value-real)))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
-      (inst movss (make-ea-for-float-ref object index offset 8
-                                         :complex-offset 4)
-            value-imag)
-      (unless (location= value-imag result-imag)
-        (inst movss result-imag value-imag)))))
+    (move result value)
+    (inst movq (make-ea-for-float-ref object index offset 8) value)))
 
 (define-vop (data-vector-set-c-with-offset/simple-array-complex-single-float)
   (:note "inline array store")
@@ -563,18 +541,8 @@
   (:results (result :scs (complex-single-reg)))
   (:result-types complex-single-float)
   (:generator 4
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
-      (inst movss (make-ea-for-float-ref object index offset 8) value-real)
-      (unless (location= value-real result-real)
-        (inst movss result-real value-real)))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
-      (inst movss (make-ea-for-float-ref object index offset 8
-                                         :complex-offset 4)
-            value-imag)
-      (unless (location= value-imag result-imag)
-        (inst movss result-imag value-imag)))))
+    (move result value)
+    (inst movq (make-ea-for-float-ref object index offset 8) value)))
 
 (define-vop (data-vector-ref-with-offset/simple-array-complex-double-float)
   (:note "inline array access")
@@ -589,11 +557,7 @@
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 7
-    (let ((real-tn (complex-double-reg-real-tn value)))
-      (inst movsd real-tn (make-ea-for-float-ref object index offset 16 :scale 2)))
-    (let ((imag-tn (complex-double-reg-imag-tn value)))
-      (inst movsd imag-tn (make-ea-for-float-ref object index offset 16 :scale 2
-                                                 :complex-offset 8)))))
+    (inst movapd value (make-ea-for-float-ref object index offset 16 :scale 2))))
 
 (define-vop (data-vector-ref-c-with-offset/simple-array-complex-double-float)
   (:note "inline array access")
@@ -607,11 +571,7 @@
   (:results (value :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 6
-    (let ((real-tn (complex-double-reg-real-tn value)))
-      (inst movsd real-tn (make-ea-for-float-ref object index offset 16 :scale 2)))
-    (let ((imag-tn (complex-double-reg-imag-tn value)))
-      (inst movsd imag-tn (make-ea-for-float-ref object index offset 16 :scale 2
-                                                 :complex-offset 8)))))
+    (inst movapd value (make-ea-for-float-ref object index offset 16 :scale 2))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
   (:note "inline array store")
@@ -628,19 +588,8 @@
   (:results (result :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 20
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
-      (inst movsd (make-ea-for-float-ref object index offset 16 :scale 2)
-            value-real)
-      (unless (location= value-real result-real)
-        (inst movsd result-real value-real)))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
-      (inst movsd (make-ea-for-float-ref object index offset 16 :scale 2
-                                                 :complex-offset 8)
-            value-imag)
-      (unless (location= value-imag result-imag)
-        (inst movsd result-imag value-imag)))))
+    (inst movapd (make-ea-for-float-ref object index offset 16 :scale 2) value)
+    (move result value)))
 
 (define-vop (data-vector-set-c-with-offset/simple-array-complex-double-float)
   (:note "inline array store")
@@ -656,19 +605,8 @@
   (:results (result :scs (complex-double-reg)))
   (:result-types complex-double-float)
   (:generator 19
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
-      (inst movsd (make-ea-for-float-ref object index offset 16 :scale 2)
-            value-real)
-      (unless (location= value-real result-real)
-        (inst movsd result-real value-real)))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
-      (inst movsd (make-ea-for-float-ref object index offset 16 :scale 2
-                                                 :complex-offset 8)
-            value-imag)
-      (unless (location= value-imag result-imag)
-        (inst movsd result-imag value-imag)))))
+    (inst movapd (make-ea-for-float-ref object index offset 16 :scale 2) value)
+    (move result value)))
 
 
 

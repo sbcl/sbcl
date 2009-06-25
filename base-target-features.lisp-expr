@@ -155,6 +155,18 @@
  ;;
  ; :cycle-counter
 
+ ;; Enabled automatically for platforms which implement complex arithmetic
+ ;; VOPs. Such platforms should implement real-complex, complex-real and
+ ;; complex-complex addition and subtractions (for complex-single-float
+ ;; and complex-double-float). They should also also implement complex-real
+ ;; and real-complex multiplication, complex-real division, and
+ ;; sb!vm::swap-complex, which swaps the real and imaginary parts.
+ ;; Finally, they should implement conjugate and complex-real, real-complex
+ ;; and complex-complex CL:= (complex-complex EQL would usually be a good
+ ;; idea).
+ ;;
+ ; :complex-float-vops
+
  ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
  ;; Some of the code which was #+high-security before the fork has now

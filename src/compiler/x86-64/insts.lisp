@@ -1681,6 +1681,8 @@
         :float)
        (#.*double-sc-names*
         :double)
+       (#.*complex-sc-names*
+        :complex)
        (t
         (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))
     (ea
@@ -3150,6 +3152,10 @@
   (define-regular-sse-inst subps    nil  #x5c)
   (define-regular-sse-inst subsd    #xf2 #x5c)
   (define-regular-sse-inst subss    #xf3 #x5c)
+  (define-regular-sse-inst unpckhpd #x66 #x15)
+  (define-regular-sse-inst unpckhps nil  #x15)
+  (define-regular-sse-inst unpcklpd #x66 #x14)
+  (define-regular-sse-inst unpcklps nil  #x14)
   ;; integer arithmetic
   (define-regular-sse-inst paddb    #x66 #xfc)
   (define-regular-sse-inst paddw    #x66 #xfd)

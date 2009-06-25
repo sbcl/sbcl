@@ -342,13 +342,17 @@
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-single-float-widetag)
+  #!+x86-64
+  (data :c-type "struct { float data[2]; } ")
+  #!-x86-64
   (real :c-type "float")
+  #!-x86-64
   (imag :c-type "float"))
 
 (define-primitive-object (complex-double-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-double-float-widetag)
-  #!-x86-64 (filler)
+  (filler)
   (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 

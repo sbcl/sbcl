@@ -584,10 +584,11 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-
+#!-x86-64
 (deftransform eql ((x y) (single-float single-float))
   '(= (single-float-bits x) (single-float-bits y)))
 
+#!-x86-64
 (deftransform eql ((x y) (double-float double-float))
   '(and (= (double-float-low-bits x) (double-float-low-bits y))
         (= (double-float-high-bits x) (double-float-high-bits y))))

@@ -20,10 +20,12 @@
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
        (sc-case ,n-dst
-         (single-reg
-          (inst movss ,n-dst ,n-src))
-         (double-reg
-          (inst movsd ,n-dst ,n-src))
+         ((single-reg complex-single-reg)
+          (aver (xmm-register-p ,n-src))
+          (inst movaps ,n-dst ,n-src))
+         ((double-reg complex-double-reg)
+          (aver (xmm-register-p ,n-src))
+          (inst movapd ,n-dst ,n-src))
          (t
           (inst mov ,n-dst ,n-src))))))
 

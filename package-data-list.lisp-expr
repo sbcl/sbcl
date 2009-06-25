@@ -2460,7 +2460,10 @@ structure representations"
                #!+long-float "COMPLEX-LONG-FLOAT-WIDETAG"
                #!+long-float "COMPLEX-LONG-REG-SC-NUMBER"
                #!+long-float "COMPLEX-LONG-STACK-SC-NUMBER"
+               #!-x86-64 #!-x86-64
                "COMPLEX-SINGLE-FLOAT-IMAG-SLOT" "COMPLEX-SINGLE-FLOAT-REAL-SLOT"
+               #!+x86-64
+               "COMPLEX-SINGLE-FLOAT-DATA-SLOT"
                "COMPLEX-SINGLE-FLOAT-SIZE" "COMPLEX-SINGLE-FLOAT-WIDETAG"
                "COMPLEX-SINGLE-REG-SC-NUMBER" "COMPLEX-SINGLE-STACK-SC-NUMBER"
                "COMPLEX-SIZE" "COMPLEX-BASE-STRING-WIDETAG"

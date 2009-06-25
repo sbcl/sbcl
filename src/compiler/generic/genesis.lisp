@@ -735,10 +735,17 @@ core and return a descriptor to it."
   (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
                                       (1- sb!vm:complex-single-float-size)
                                       sb!vm:complex-single-float-widetag)))
-    (write-wordindexed des sb!vm:complex-single-float-real-slot
-                   (make-random-descriptor (single-float-bits (realpart num))))
-    (write-wordindexed des sb!vm:complex-single-float-imag-slot
-                   (make-random-descriptor (single-float-bits (imagpart num))))
+    #!-x86-64
+    (progn
+      (write-wordindexed des sb!vm:complex-single-float-real-slot
+                         (make-random-descriptor (single-float-bits (realpart num))))
+      (write-wordindexed des sb!vm:complex-single-float-imag-slot
+                         (make-random-descriptor (single-float-bits (imagpart num)))))
+    #!+x86-64
+    (write-wordindexed des sb!vm:complex-single-float-data-slot
+                       (make-random-descriptor
+                        (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
+                                (ash (single-float-bits (imagpart num)) 32))))
     des))
 
 (defun complex-double-float-to-core (num)

@@ -217,6 +217,8 @@
 
   (fp-single-zero immediate-constant)
   (fp-double-zero immediate-constant)
+  (fp-complex-single-zero immediate-constant)
+  (fp-complex-double-zero immediate-constant)
 
   (immediate immediate-constant)
 
@@ -235,7 +237,7 @@
   (sap-stack stack)                     ; System area pointers.
   (single-stack stack)                  ; single-floats
   (double-stack stack)
-  (complex-single-stack stack :element-size 2)  ; complex-single-floats
+  (complex-single-stack stack)  ; complex-single-floats
   (complex-double-stack stack :element-size 2)  ; complex-double-floats
 
 
@@ -325,29 +327,27 @@
 
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
-              :locations #.(loop for i from 0 below 15 collect i)
+              :locations #.*float-regs*
               :constant-scs (fp-single-zero)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
-              :locations #.(loop for i from 0 below 15 collect i)
+              :locations #.*float-regs*
               :constant-scs (fp-double-zero)
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
-                      :locations #.(loop for i from 0 to 14 by 2 collect i)
-                      :element-size 2
-                      :constant-scs ()
+                      :locations #.*float-regs*
+                      :constant-scs (fp-complex-single-zero)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-                      :locations #.(loop for i from 0 to 14 by 2 collect i)
-                      :element-size 2
-                      :constant-scs ()
+                      :locations #.*float-regs*
+                      :constant-scs (fp-complex-double-zero)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -369,6 +369,8 @@
 ;;; These are used to (at least) determine operand size.
 (defparameter *float-sc-names* '(single-reg))
 (defparameter *double-sc-names* '(double-reg double-stack))
+(defparameter *complex-sc-names* '(complex-single-reg complex-single-stack
+                                   complex-double-reg complex-double-stack))
 ) ; EVAL-WHEN
 
 ;;;; miscellaneous TNs for the various registers
@@ -413,16 +415,6 @@
   (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg )
                   :offset r12-offset))
 
-(defparameter fp-single-zero-tn
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'single-reg)
-                  :offset 15))
-
-(defparameter fp-double-zero-tn
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'double-reg)
-                  :offset 15))
-
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
@@ -440,6 +432,14 @@
     (double-float
      (if (eql value 0d0)
          (sc-number-or-lose 'fp-double-zero )
+         nil))
+    ((complex single-float)
+     (if (eql value (complex 0f0 0f0))
+         (sc-number-or-lose 'fp-complex-single-zero)
+         nil))
+    ((complex double-float)
+     (if (eql value (complex 0d0 0d0))
+         (sc-number-or-lose 'fp-complex-double-zero)
          nil))))
 
 

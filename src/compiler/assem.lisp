@@ -107,7 +107,7 @@
   #!+sb-dyncount
   (collect-dynamic-statistics nil))
 (sb!c::defprinter (segment)
-  name)
+  type)
 
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)
