@@ -9,6 +9,8 @@
     values in other threads.
   * new feature: SB-INTROSPECT:ALLOCATION-INFORMATION provides information
     about object allocation.
+  * optimization: MAKE-INSTANCE with non-constant class-argument but constant
+    keywords is an order of magnitude faster.
   * optimization: more efficient type-checks for FIXNUMs when the value
     is known to be a signed word on x86 and x86-64.
   * optimization: compiler now optimizes (EXPT -1 INTEGER), (EXPT -1.0 INTEGER),

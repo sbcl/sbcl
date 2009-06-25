@@ -317,8 +317,6 @@
         ;; Make a smaller one, then
         (make-cache :key-count key-count :value value :size (ceiling size 2)))))
 
-(defconstant n-fixnum-bits #.(integer-length most-positive-fixnum))
-
 ;;;; Copies and expands the cache, dropping any invalidated or
 ;;;; incomplete lines.
 (defun copy-and-expand-cache (cache layouts value)
@@ -357,18 +355,8 @@
                       ;; _Experimentally_ 50% seems to perform the
                       ;; best, but it would be nice to have a proper
                       ;; analysis...
-                      (flet ((random-fixnum ()
-                               (random (1+ most-positive-fixnum))))
-                        (let ((drops (random-fixnum))
-                              (drop-pos n-fixnum-bits))
-                          (declare (fixnum drops)
-                                   (type (integer 0 #.n-fixnum-bits) drop-pos))
-                          (lambda (layouts value)
-                            (when (logbitp (the unsigned-byte (decf drop-pos)) drops)
-                              (try-update-cache copy layouts value))
-                            (when (zerop drop-pos)
-                              (setf drops (random-fixnum)
-                                    drop-pos n-fixnum-bits)))))
+                      (randomly-punting-lambda (layouts value)
+                        (try-update-cache copy layouts value))
                       (lambda (layouts value)
                         (unless (try-update-cache copy layouts value)
                           ;; Didn't fit -- expand the cache, or drop

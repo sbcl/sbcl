@@ -11,8 +11,10 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "test-util.lisp")
+
 (defpackage "CTOR-TEST"
-  (:use "CL"))
+  (:use "CL" "TEST-UTIL"))
 
 (in-package "CTOR-TEST")
 
@@ -83,5 +85,75 @@
 
 (assert (= (slot-value (make-one-slot-subclass 2) 'b) 2))
 (assert (= (slot-value (funcall #'(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) 4) 'b) 4))
+
+;;; Tests for CTOR optimization of non-constant class args and constant class object args
+(defun find-ctor-cache (f)
+  (let ((code (sb-kernel:fun-code-header f)))
+    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+          for c = (sb-kernel:code-header-ref code i)
+          do (when (= sb-vm::value-cell-header-widetag (sb-kernel:widetag-of c))
+               (let ((c (sb-vm::value-cell-ref c)))
+                 (when (and (consp c) (eq 'sb-pcl::ctor-cache (car c)))
+                   (return c)))))))
+
+(let* ((cmacro (compiler-macro-function 'make-instance))
+        (opt 0)
+        (wrapper (lambda (form env)
+                   (let ((res (funcall cmacro form env)))
+                     (unless (eq form res)
+                       (incf opt))
+                     res))))
+   (sb-ext:without-package-locks
+     (unwind-protect
+          (progn
+            (setf (compiler-macro-function 'make-instance) wrapper)
+            (with-test (:name (make-instance :non-constant-class))
+              (assert (= 0 opt))
+              (let ((f (compile nil `(lambda (class)
+                                       (make-instance class :b t)))))
+                (assert (find-ctor-cache f))
+                (assert (= 1 opt))
+                (assert (typep (funcall f 'one-slot-subclass) 'one-slot-subclass))))
+            (with-test (:name (make-instance :constant-class-object))
+              (let ((f (compile nil `(lambda ()
+                                       (make-instance ,(find-class 'one-slot-subclass) :b t)))))
+                (assert (not (find-ctor-cache f)))
+                (assert (= 2 opt))
+                (assert (typep (funcall f) 'one-slot-subclass))))
+            (with-test (:name (make-instance :constant-non-std-class-object))
+              (let ((f (compile nil `(lambda ()
+                                       (make-instance ,(find-class 'structure-object))))))
+                (assert (not (find-ctor-cache f)))
+                (assert (= 3 opt))
+                (assert (typep (funcall f) 'structure-object))))
+            (with-test (:name (make-instance :constant-non-std-class-name))
+              (let ((f (compile nil `(lambda ()
+                                       (make-instance 'structure-object)))))
+                (assert (not (find-ctor-cache f)))
+                (assert (= 4 opt))
+                (assert (typep (funcall f) 'structure-object)))))
+       (setf (compiler-macro-function 'make-instance) cmacro))))
+
+(with-test (:name (make-instance :ctor-inline-cache-resize))
+  (let* ((f (compile nil `(lambda (name) (make-instance name))))
+         (classes (loop repeat (* 2 sb-pcl::+ctor-table-max-size+)
+                        collect (class-name (eval `(defclass ,(gentemp) () ())))))
+         (count 0)
+         (cache (find-ctor-cache f)))
+    (assert cache)
+    (assert (not (cdr cache)))
+    (dolist (class classes)
+      (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
+      (incf count)
+      (cond ((<= count sb-pcl::+ctor-list-max-size+)
+             (unless (consp (cdr cache))
+               (error "oops, wanted list cache, got: ~S" cache))
+             (unless (= count (length (cdr cache)))
+               (error "oops, wanted ~S elts in cache, got: ~S" count cache)))
+            (t
+             (assert (simple-vector-p (cdr cache))))))
+    (dolist (class classes)
+      (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
+      (incf count))))
 
 ;;;; success

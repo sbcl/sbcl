@@ -46,6 +46,27 @@
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
      ,@body))
+
+(declaim (inline random-fixnum))
+(defun random-fixnum ()
+  (random (1+ most-positive-fixnum)))
+
+(defconstant n-fixnum-bits #.(integer-length most-positive-fixnum))
+
+;;; Lambda which executes its body (or not) randomly. Used to drop
+;;; random cache entries.
+(defmacro randomly-punting-lambda (lambda-list &body body)
+  (with-unique-names (drops drop-pos)
+    `(let ((,drops (random-fixnum))
+           (,drop-pos n-fixnum-bits))
+       (declare (fixnum ,drops)
+                (type (integer 0 #.n-fixnum-bits) ,drop-pos))
+       (lambda ,lambda-list
+         (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
+           (locally ,@body))
+         (when (zerop ,drop-pos)
+           (setf ,drops (random-fixnum)
+                 ,drop-pos n-fixnum-bits))))))
 
 ;;;; early definition of WRAPPER
 ;;;;
@@ -102,11 +123,14 @@
   (declare (type function new-value))
   (aver (funcallable-instance-p fin))
   (setf (funcallable-instance-fun fin) new-value))
+
 ;;; FIXME: these macros should just go away.  It's not clear whether
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
 ;;; be; ordinary defstruct accessors are defined as source transforms.
-(defmacro fsc-instance-p (fin)
+(defun fsc-instance-p (fin)
+  (funcallable-instance-p fin))
+(define-compiler-macro fsc-instance-p (fin)
   `(funcallable-instance-p ,fin))
 (defmacro fsc-instance-wrapper (fin)
   `(%funcallable-instance-layout ,fin))
@@ -128,7 +152,9 @@
 ;;; and normal instances, so we can return true on structures also. A
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
 ;;; PCL-INSTANCE-P.
-(defmacro std-instance-p (x)
+(defun std-instance-p (x)
+  (%instancep x))
+(define-compiler-macro std-instance-p (x)
   `(%instancep ,x))
 
 ;; a temporary definition used for debugging the bootstrap

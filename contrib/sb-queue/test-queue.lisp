@@ -19,7 +19,7 @@
 (assert (equal (list nil t) (multiple-value-list (dequeue (make-queue :initial-contents '(nil))))))
 
 (let ((x (make-instance 'structure-object))
-          (y (make-queue)))
+      (y (make-queue)))
   (assert (not (typep x 'queue)))
   (assert (not (queuep x)))
   (assert (typep y 'queue))

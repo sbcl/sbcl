@@ -84,7 +84,13 @@
   (valid-function-name-p (cadr list)))
 
 (define-internal-pcl-function-name-syntax sb-pcl::ctor (list)
-  (valid-function-name-p (cadr list)))
+  (let ((class-or-name (cadr list)))
+    (cond
+      ((symbolp class-or-name)
+       (values (valid-function-name-p class-or-name) nil))
+      ((or (sb-pcl::std-instance-p class-or-name)
+           (sb-pcl::fsc-instance-p class-or-name))
+       (values t nil)))))
 
 ;;;; SLOT-VALUE optimizations
 

@@ -143,3 +143,8 @@
 (defmethod print-object ((dfun-info dfun-info) stream)
   (declare (type stream stream))
   (print-unreadable-object (dfun-info stream :type t :identity t)))
+
+(defmethod print-object ((ctor ctor) stream)
+  (print-unreadable-object (ctor stream :type t)
+    (format stream "~S ~:S" (ctor-class-or-name ctor) (ctor-initargs ctor)))
+  ctor)
