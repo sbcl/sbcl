@@ -156,27 +156,29 @@ command-line.")
 
 ;;;; miscellaneous external functions
 
-(defun sleep (n)
+(defun sleep (seconds)
   #!+sb-doc
-  "This function causes execution to be suspended for N seconds. N may
-  be any non-negative, non-complex number."
-  (when (or (not (realp n))
-            (minusp n))
+  "This function causes execution to be suspended for SECONDS. SECONDS may be
+any non-negative real number."
+  (when (or (not (realp seconds))
+            (minusp seconds))
     (error 'simple-type-error
            :format-control "invalid argument to SLEEP: ~S"
-           :format-arguments (list n)
-           :datum n
+           :format-arguments (list seconds)
+           :datum seconds
            :expected-type '(real 0)))
   #!-win32
   (multiple-value-bind (sec nsec)
-      (if (integerp n)
-          (values n 0)
+      (if (integerp seconds)
+          (values seconds 0)
           (multiple-value-bind (sec frac)
-              (truncate n)
+              (truncate seconds)
             (values sec (truncate frac 1e-9))))
-    (sb!unix:nanosleep sec nsec))
+    ;; nanosleep accepts time_t as the first argument,
+    ;; so truncating is needed. 68 years on 32-bit platform should be enough
+    (sb!unix:nanosleep (min sec (1- (ash 1 (1- sb!vm:n-word-bits)))) nsec))
   #!+win32
-  (sb!win32:millisleep (truncate (* n 1000)))
+  (sb!win32:millisleep (truncate (* seconds 1000)))
   nil)
 
 ;;;; the default toplevel function

@@ -63,6 +63,17 @@
       (sleep 2)
       (sleep 2))))
 
+;;; SLEEP should work with large integers as well -- no timers
+;;; on win32, so don't test there.
+#-win32
+(with-test (:name (sleep pretty-much-forever))
+  (assert (eq :timeout
+              (handler-case
+                  (sb-ext:with-timeout 1
+                    (sleep (ash 1 (* 2 sb-vm:n-word-bits))))
+                (sb-ext:timeout ()
+                  :timeout)))))
+
 ;;; DOCUMENTATION should return nil, not signal slot-unbound
 (documentation 'fixnum 'type)
 (documentation 'class 'type)

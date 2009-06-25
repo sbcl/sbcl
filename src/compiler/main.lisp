@@ -778,7 +778,7 @@
                               (print-unreadable-object (s stream :type t))))
              (:copier nil))
   ;; the UT that compilation started at
-  (start-time (get-internal-real) :type unsigned-byte)
+  (start-time (get-universal-time) :type unsigned-byte)
   ;; the IRT that compilation started at
   (start-real-time (get-internal-real-time) :type unsigned-byte)
   ;; the FILE-INFO structure for this compilation
