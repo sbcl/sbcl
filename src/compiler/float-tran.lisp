@@ -512,8 +512,6 @@
     'single-float))
 (deftransform expt ((x y) ((double-float 0d0) (signed-byte 32)) *)
   `(%pow x (coerce y 'double-float)))
-(deftransform expt ((x y) ((integer -1 -1) integer) *)
-  `(if (evenp y) 1 -1))
 
 ;;; ANSI says log with base zero returns zero.
 (deftransform log ((x y) (float float) float)

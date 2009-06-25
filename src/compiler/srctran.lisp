@@ -3323,6 +3323,15 @@
           ((= val -1/2) '(/ (sqrt x)))
           (t (give-up-ir1-transform)))))
 
+(deftransform expt ((x y) ((constant-arg (member -1 -1.0 -1.0d0)) integer) *)
+  "recode as an ODDP check"
+  (let ((val (lvar-value x)))
+    (if (eql 1 val)
+        '(- 1 (* 2 (logand 1 y)))
+        `(if (oddp y)
+             ,val
+             ,(abs val)))))
+
 ;;; KLUDGE: Shouldn't (/ 0.0 0.0), etc. cause exceptions in these
 ;;; transformations?
 ;;; Perhaps we should have to prove that the denominator is nonzero before

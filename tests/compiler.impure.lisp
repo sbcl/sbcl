@@ -1873,4 +1873,14 @@
                          `(lambda (x y z)
                             (make-array '3 :initial-contents `(,x ,y ,z)))))))
 
+;;; optimizing (EXPT -1 INTEGER)
+(test-util:with-test (:name (expt minus-one integer))
+  (dolist (x '(-1 -1.0 -1.0d0))
+    (let ((fun (compile nil `(lambda (x) (expt ,x (the fixnum x))))))
+      (assert (zerop (count-code-callees fun)))
+      (dotimes (i 12)
+        (if (oddp i)
+            (assert (eql x (funcall fun i)))
+            (assert (eql (- x) (funcall fun i))))))))
+
 ;;; success

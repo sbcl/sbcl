@@ -11,8 +11,9 @@
     about object allocation.
   * optimization: more efficient type-checks for FIXNUMs when the value
     is known to be a signed word on x86 and x86-64.
-  * optimization: (EXPT -1 INTEGER) is compiled into (IF (EVENP INTEGER) 1 -1).
-    (thanks to Stas Boukarev)
+  * optimization: compiler now optimizes (EXPT -1 INTEGER), (EXPT -1.0 INTEGER),
+    and (EXPT -1.0d0 INTEGER) into an ODDP test. (thanks to Stas Boukarev and
+    Paul Khuong)
   * improvement: DESCRIBE output has been reworked to be easier to read and
     contains more pertinent information.
   * improvement: failure to provide requested stack allocation compiler notes
