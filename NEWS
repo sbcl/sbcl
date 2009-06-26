@@ -27,6 +27,9 @@
     note being issued is now considered a bug.)
   * optimization: compiler is smarter about delegating argument type checks to
     callees.
+  * bug fix: SB-POSIX exports the documented types and functions
+    FILE-DESCRIPTOR and FILENAME, and also the corresponding -DESCRIPTOR
+    types. (reported by "abhi")
   * bug fix: on 64 bit platforms FILL worked incorrectly on arrays with
     upgraded element type (COMPLEX SINGLE-FLOAT), regression from 1.0.28.55.
     (thanks to Paul Khuong)

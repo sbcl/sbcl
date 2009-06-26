@@ -2,12 +2,16 @@
   (:shadow close open ftruncate truncate time)
   (:export #:syscall-error #:syscall-errno
 
-           ;; grovel structure accessors
+           ;; types and type conversion
+           #:file-descriptor-designator
+           #:file-descriptor
+           #:filename-designator
+           #:filename
 
+           ;; grovel structure accessors
            #:dirent-name
 
            ;; wrapper class accessors
-
            #:passwd-name #:passwd-passwd #:passwd-uid #:passwd-gid
            #:passwd-gecos #:passwd-dir #:passwd-shell
            #:group-name #:group-gid #:group-passwd
