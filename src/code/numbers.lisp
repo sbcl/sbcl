@@ -358,14 +358,14 @@
        (bignum-cross-fixnum ,op ,big-op)
        (float-contagion ,op x y)
 
-       ((complex complex)
+       ((complex complex) +
         (canonical-complex (,op (realpart x) (realpart y))
                            (,op (imagpart x) (imagpart y))))
        (((foreach bignum fixnum ratio single-float double-float
                   #!+long-float long-float) complex)
-        (complex (,op x (realpart y)) (,op (imagpart y))))
+        (complex (,op x (realpart y)) (,op 0 (imagpart y))))
        ((complex (or rational float))
-        (complex (,op (realpart x) y) (imagpart x)))
+        (complex (,op (realpart x) y) (,op (imagpart x) 0)))
 
        (((foreach fixnum bignum) ratio)
         (let* ((dy (denominator y))

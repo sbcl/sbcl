@@ -3252,41 +3252,32 @@
           (values (type= (numeric-contagion x y)
                          (numeric-contagion y y)))))))
 
+(def!type exact-number ()
+  '(or rational (complex rational)))
+
 ;;; Fold (+ x 0).
 ;;;
-;;; If y is not constant, not zerop, or is contagious, or a positive
-;;; float +0.0 then give up.
-(deftransform + ((x y) (t (constant-arg t)) *)
+;;; Only safely applicable for exact numbers. For floating-point
+;;; x, one would have to first show that neither x or y are signed
+;;; 0s, and that x isn't an SNaN.
+(deftransform + ((x y) (exact-number (constant-arg (eql 0))) *)
   "fold zero arg"
-  (let ((val (lvar-value y)))
-    (unless (and (zerop val)
-                 (not (and (floatp val) (plusp (float-sign val))))
-                 (not-more-contagious y x))
-      (give-up-ir1-transform)))
   'x)
 
 ;;; Fold (- x 0).
-;;;
-;;; If y is not constant, not zerop, or is contagious, or a negative
-;;; float -0.0 then give up.
-(deftransform - ((x y) (t (constant-arg t)) *)
+(deftransform - ((x y) (exact-number (constant-arg (eql 0))) *)
   "fold zero arg"
-  (let ((val (lvar-value y)))
-    (unless (and (zerop val)
-                 (not (and (floatp val) (minusp (float-sign val))))
-                 (not-more-contagious y x))
-      (give-up-ir1-transform)))
   'x)
 
 ;;; Fold (OP x +/-1)
-(macrolet ((def (name result minus-result)
-             `(deftransform ,name ((x y) (t (constant-arg real)) *)
-                "fold identity operations"
-                (let ((val (lvar-value y)))
-                  (unless (and (= (abs val) 1)
-                               (not-more-contagious y x))
-                    (give-up-ir1-transform))
-                  (if (minusp val) ',minus-result ',result)))))
+;;;
+;;; %NEGATE might not always signal correctly.
+(macrolet
+    ((def (name result minus-result)
+         `(deftransform ,name ((x y)
+                               (exact-number (constant-arg (member 1 -1))))
+            "fold identity operations"
+            (if (minusp (lvar-value y)) ',minus-result ',result))))
   (def * x (%negate x))
   (def / x (%negate x))
   (def expt x (/ 1 x)))

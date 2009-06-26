@@ -234,8 +234,7 @@
     (assert (eql 0.0d0 (funcall f 123.0d0 0.0d0)))
     (assert (eql 0.0d0 (funcall f 123.0 0.0d0)))))
 
-
-;; 1.0.29.xFIXMEx introduces a ton of changes for complex floats
+;; 1.0.29.44 introduces a ton of changes for complex floats
 ;; on x86-64. Huge test of doom to help catch weird corner
 ;; cases.
 (with-test (:name :complex-floats)

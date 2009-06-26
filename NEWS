@@ -9,6 +9,10 @@
     values in other threads.
   * new feature: SB-INTROSPECT:ALLOCATION-INFORMATION provides information
     about object allocation.
+  * optimization: more efficient complex float and real float operations
+    on x86-64.
+  * optimization: division of a real float by a complex float is implemented
+    with a specialised code sequence.
   * optimization: MAKE-INSTANCE with non-constant class-argument but constant
     keywords is an order of magnitude faster.
   * optimization: MAKE-INSTANCE with constant keyword arguments is somewhat
@@ -20,6 +24,9 @@
   * optimization: compiler now optimizes (EXPT -1 INTEGER), (EXPT -1.0 INTEGER),
     and (EXPT -1.0d0 INTEGER) into an ODDP test. (thanks to Stas Boukarev and
     Paul Khuong)
+  * improvement: less unsafe constant folding in floating point arithmetic,
+    especially for mixed complex/real -float operations.
+  * improvement: complex float division is slightly more stable.
   * improvement: DESCRIBE output has been reworked to be easier to read and
     contains more pertinent information.
   * improvement: failure to provide requested stack allocation compiler notes
