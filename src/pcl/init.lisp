@@ -32,7 +32,7 @@
   (unless (class-finalized-p class) (finalize-inheritance class))
   (let ((class-default-initargs (class-default-initargs class)))
     (when class-default-initargs
-      (setf initargs (default-initargs class initargs class-default-initargs)))
+      (setf initargs (default-initargs initargs class-default-initargs)))
     (when initargs
       (when (and (eq *boot-state* 'complete)
                  (not (getf initargs :allow-other-keys)))
@@ -49,9 +49,7 @@
       (apply #'initialize-instance instance initargs)
       instance)))
 
-(defmethod default-initargs ((class slot-class)
-                             supplied-initargs
-                             class-default-initargs)
+(defun default-initargs (supplied-initargs class-default-initargs)
   (loop for (key nil fun) in class-default-initargs
         when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
           append (list key (funcall fun)) into default-initargs

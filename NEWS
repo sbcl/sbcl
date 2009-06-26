@@ -15,10 +15,10 @@
     with a specialised code sequence.
   * optimization: MAKE-INSTANCE with non-constant class-argument but constant
     keywords is an order of magnitude faster.
-  * optimization: MAKE-INSTANCE with constant keyword arguments is somewhat
-    faster for non-standard metaclass classes as long as there are no methods
-    additional on MAKE-INSTANCE and initialization arguments can be validated
-    at compile-time.
+  * optimization: MAKE-INSTANCE with constant keyword arguments is x2-4 faster
+    in the presence of :AROUND or non-standard primary INITIALIZE-INSTANCE
+    methods, and similarly for non-standard metaclass classes as long as there
+    are no methods additional on MAKE-INSTANCE.
   * optimization: more efficient type-checks for FIXNUMs when the value
     is known to be a signed word on x86 and x86-64.
   * optimization: compiler now optimizes (EXPT -1 INTEGER), (EXPT -1.0 INTEGER),

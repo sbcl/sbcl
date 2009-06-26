@@ -391,8 +391,6 @@
 
 (defgeneric compute-slot-accessor-info (slotd type gf))
 
-(defgeneric default-initargs (class initargs defaults))
-
 (defgeneric find-method-combination (generic-function type options))
 
 (defgeneric invalid-qualifiers (generic-function combin method))

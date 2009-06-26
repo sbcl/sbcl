@@ -96,6 +96,19 @@
                  (when (and (consp c) (eq 'sb-pcl::ctor-cache (car c)))
                    (return c)))))))
 
+;;; FIXME: Move this to test-utils -- compiler tests have / need stuff like this
+;;; as well.
+(defun find-callee (f &key (type t) (name nil namep))
+  (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun f))))
+    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+          for c = (sb-kernel:code-header-ref code i)
+          do (when (typep c 'sb-impl::fdefn)
+               (let ((fun (sb-impl::fdefn-fun c)))
+                 (when (and (typep fun type)
+                            (or (not namep)
+                                (equal name (sb-impl::fdefn-name c))))
+                   (return fun)))))))
+
 (let* ((cmacro (compiler-macro-function 'make-instance))
         (opt 0)
         (wrapper (lambda (form env)
@@ -155,5 +168,23 @@
     (dolist (class classes)
       (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
       (incf count))))
+
+;;; Make sure we get default initargs right with on the FAST-MAKE-INSTANCE path CTORs
+(defclass some-class ()
+  ((aroundp :initform nil :reader aroundp))
+  (:default-initargs :x :success?))
+(defmethod initialize-instance :around ((some-class some-class) &key (x :fail?))
+  (unless (eq x :success?)
+    (error "Default initarg lossage"))
+  (setf (slot-value some-class 'aroundp) t)
+  (when (next-method-p)
+    (call-next-method)))
+(with-test (:name (make-instance :ctor-default-initargs))
+  (assert (aroundp (eval `(make-instance 'some-class))))
+  (let ((fun (compile nil `(lambda () (make-instance 'some-class)))))
+    (assert (aroundp (funcall fun)))
+    ;; make sure we tested what we think we tested...
+    (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
+      (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
 
 ;;;; success

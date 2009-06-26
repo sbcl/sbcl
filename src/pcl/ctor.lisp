@@ -562,9 +562,12 @@
            ;; *COMPILING-OPTIMIZED-CONSTRUCTOR* which is bound around compilation of
            ;; the constructor, hence avoiding the possibility of endless recursion.
            (make-instance ,class ,@initargs))
-        `(lambda ,lambda-list
-           (declare #.*optimize-speed*)
-           (fast-make-instance ,class ,@initargs)))))
+        (let ((defaults (class-default-initargs class)))
+          (when defaults
+            (setf initargs (default-initargs initargs defaults)))
+          `(lambda ,lambda-list
+             (declare #.*optimize-speed*)
+             (fast-make-instance ,class ,@initargs))))))
 
 ;;; Not as good as the real optimizing generator, but faster than going
 ;;; via MAKE-INSTANCE: 1 GF call less, and no need to check initargs.

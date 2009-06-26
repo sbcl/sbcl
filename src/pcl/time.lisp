@@ -75,8 +75,8 @@
 (push (cons "Time default-initargs."
             '(time-default-initargs (find-class 'plist-mixin) 1000))
       *tests*)
-(defun time-default-initargs (class n)
-  (time (dotimes-fixnum (i n) (default-initargs class nil))))
+(defun time-default-initargs (n)
+  (time (dotimes-fixnum (i n) (default-initargs nil nil))))
 
 (push (cons "Time make-instance."
             '(time-make-instance (find-class 'plist-mixin) 1000))
