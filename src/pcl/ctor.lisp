@@ -446,7 +446,8 @@
                 (constructor-function-form ctor)
               (apply
                (let ((*compiling-optimized-constructor* t))
-                 (compile nil `(lambda ,names ,form)))
+                 (handler-bind ((compiler-note #'muffle-warning))
+                   (compile nil `(lambda ,names ,form))))
                locations))))))
 
 (defun constructor-function-form (ctor)

@@ -61,6 +61,8 @@
   * bug fix: SLEEP accepts large integer arguments, truncating them to
     SIGNED-WORD on the assumption that sleeping for 68 years is sufficient
     for anyone. (reported by Leslie Polzer, thanks to Stas Boukarev)
+  * bug fix: compiler notes for expensive slot type checks could be emitted
+    at runtime MAKE-INSTANCE calls. (reported by Samium Gromoff)
 
 changes in sbcl-1.0.29 relative to 1.0.28:
   * IMPORTANT: bug database has moved from the BUGS file to Launchpad

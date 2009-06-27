@@ -186,5 +186,17 @@
     ;; make sure we tested what we think we tested...
     (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
       (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
+
+;;; No compiler notes, please
+(locally (declare (optimize safety))
+  (defclass type-check-thing ()
+    ((slot :type (integer 0) :initarg :slot))))
+(with-test (:name (make-instance :no-compile-note-at-runtime))
+  (let ((fun (compile nil `(lambda (x)
+                             (declare (optimize safety))
+                             (make-instance 'type-check-thing :slot x)))))
+    (handler-bind ((sb-ext:compiler-note #'error))
+      (funcall fun 41)
+      (funcall fun 13))))
 
 ;;;; success
