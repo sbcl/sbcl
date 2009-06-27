@@ -6,9 +6,9 @@ test::
 	true
 
 up:
-	cvs -d :pserver:anonymous@cclan.cvs.sourceforge.net:/cvsroot/cclan \
-		co -kv -p asdf/asdf.lisp >/tmp/$$$$ &&\
-		mv /tmp/$$$$ asdf.lisp
-	cvs -d :pserver:anonymous@cclan.cvs.sourceforge.net:/cvsroot/cclan \
-		co -kv -p asdf/README  >/tmp/$$$$ &&\
-		mv /tmp/$$$$ README
+	test -d asdf-upstream || git clone http://common-lisp.net/project/asdf/asdf.git asdf-upstream
+	cd asdf-upstream && git pull
+	cp asdf-upstream/asdf.lisp asdf.lisp
+	cp asdf-upstream/asdf.texinfo asdf.texinfo
+	cp asdf-upstream/README README
+	cp asdf-upstream/LICENSE LICENSE 
