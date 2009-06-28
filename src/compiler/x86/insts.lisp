@@ -922,6 +922,11 @@
             (r/m (cond (index #b100)
                        ((null base) #b101)
                        (t (reg-tn-encoding base)))))
+       (when (and (fixup-p disp)
+                  (label-p (fixup-offset disp)))
+         (aver (null base))
+         (aver (null index))
+         (return-from emit-ea (emit-ea segment disp reg allow-constants)))
        (emit-mod-reg-r/m-byte segment mod reg r/m)
        (when (= r/m #b100)
          (let ((ss (1- (integer-length scale)))
@@ -2990,3 +2995,61 @@
   (:emitter
    (emit-byte segment #b00001111)
    (emit-byte segment #b00110001)))
+
+;;;; Late VM definitions
+(defun canonicalize-inline-constant (constant)
+  (let ((first (car constant)))
+    (typecase first
+      (single-float (setf constant (list :single-float first)))
+      (double-float (setf constant (list :double-float first)))))
+  (destructuring-bind (type value) constant
+    (ecase type
+      ((:byte :word :dword)
+         (aver (integerp value))
+         (cons type value))
+      ((:base-char)
+         (aver (base-char-p value))
+         (cons :byte (char-code value)))
+      ((:character)
+         (aver (characterp value))
+         (cons :dword (char-code value)))
+      ((:single-float)
+         (aver (typep value 'single-float))
+         (cons :dword (ldb (byte 32 0) (single-float-bits value))))
+      ((:double-float)
+         (aver (typep value 'double-float))
+         (cons :double-float
+               (ldb (byte 64 0) (logior (ash (double-float-high-bits value) 32)
+                                        (double-float-low-bits value))))))))
+
+(defun inline-constant-value (constant)
+  (let ((label (gen-label))
+        (size  (ecase (car constant)
+                 ((:byte :word :dword) (car constant))
+                 (:double-float :dword))))
+    (values label (make-ea size
+                           :disp (make-fixup nil :code-object label)))))
+
+(defun emit-constant-segment-header (constants optimize)
+  (declare (ignore constants))
+  (loop repeat (if optimize 64 16) do (inst byte #x90)))
+
+(defun size-nbyte (size)
+  (ecase size
+    (:byte  1)
+    (:word  2)
+    (:dword 4)
+    (:double-float 8)))
+
+(defun sort-inline-constants (constants)
+  (stable-sort constants #'> :key (lambda (constant)
+                                    (size-nbyte (caar constant)))))
+
+(defun emit-inline-constant (constant label)
+  (let ((size (size-nbyte (car constant))))
+    (emit-alignment (integer-length (1- size)))
+    (emit-label label)
+    (let ((val (cdr constant)))
+      (loop repeat size
+            do (inst byte (ldb (byte 8 0) val))
+               (setf val (ash val -8))))))

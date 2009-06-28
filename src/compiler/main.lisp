@@ -448,7 +448,13 @@
 
 (defun %compile-component (component)
   (let ((*code-segment* nil)
-        (*elsewhere* nil))
+        (*elsewhere* nil)
+        #!+inline-constants
+        (*constant-segment* nil)
+        #!+inline-constants
+        (*constant-table* nil)
+        #!+inline-constants
+        (*constant-vector* nil))
     (maybe-mumble "GTN ")
     (gtn-analyze component)
     (maybe-mumble "LTN ")

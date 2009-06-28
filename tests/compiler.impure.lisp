@@ -1818,7 +1818,7 @@
 ;;; check that non-trivial constants are EQ across different files: this is
 ;;; not something ANSI either guarantees or requires, but we want to do it
 ;;; anyways.
-(defconstant +share-me-1+ 123.456d0)
+(defconstant +share-me-1+ #-inline-constants 123.456d0 #+inline-constants nil)
 (defconstant +share-me-2+ "a string to share")
 (defconstant +share-me-3+ (vector 1 2 3))
 (defconstant +share-me-4+ (* 2 most-positive-fixnum))
@@ -1826,12 +1826,12 @@
                                                            +share-me-2+
                                                            +share-me-3+
                                                            +share-me-4+
-                                                           pi)))
+                                                           #-inline-constants pi)))
   (multiple-value-bind (f2 c2) (compile2 '(lambda () (values +share-me-1+
                                                              +share-me-2+
                                                              +share-me-3+
                                                              +share-me-4+
-                                                             pi)))
+                                                             #-inline-constants pi)))
     (flet ((test (fa fb)
              (mapc (lambda (a b)
                      (assert (eq a b)))

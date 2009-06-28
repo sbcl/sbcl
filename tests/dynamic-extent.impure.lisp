@@ -538,9 +538,11 @@
     (assert-no-consing (make-array-on-stack-4))
     (assert-no-consing (make-array-on-stack-5))
     (assert-no-consing (vector-on-stack :x :y)))
-  (#+raw-instance-init-vops assert-no-consing
-   #-raw-instance-init-vops progn
-   (make-foo2-on-stack 1.24 1.23d0))
+  (let (a b)
+    (setf a 1.24 b 1.23d0)
+    (#+raw-instance-init-vops assert-no-consing
+     #-raw-instance-init-vops progn
+     (make-foo2-on-stack a b)))
   (#+raw-instance-init-vops assert-no-consing
    #-raw-instance-init-vops progn
    (make-foo3-on-stack))

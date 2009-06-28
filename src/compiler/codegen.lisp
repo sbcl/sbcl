@@ -59,6 +59,12 @@
 (defvar *code-segment* nil)
 (defvar *elsewhere* nil)
 (defvar *elsewhere-label* nil)
+#!+inline-constants
+(progn
+  (defvar *constant-segment* nil)
+  (defvar *constant-table*   nil)
+  (defvar *constant-vector*  nil))
+
 
 ;;;; noise to emit an instruction trace
 
@@ -111,7 +117,16 @@
   (setf *elsewhere*
         (sb!assem:make-segment :type :elsewhere
                                :run-scheduler (default-segment-run-scheduler)
-                               :inst-hook (default-segment-inst-hook)))
+                               :inst-hook (default-segment-inst-hook)
+                               :alignment 0))
+  #!+inline-constants
+  (setf *constant-segment*
+        (sb!assem:make-segment :type :elsewhere
+                               :run-scheduler nil
+                               :inst-hook (default-segment-inst-hook)
+                               :alignment 0)
+        *constant-table*  (make-hash-table :test #'equal)
+        *constant-vector* (make-array 16 :adjustable t :fill-pointer 0))
   (values))
 
 (defun generate-code (component)
@@ -163,6 +178,24 @@
                     (template-name (vop-info vop)))))))
     (sb!assem:append-segment *code-segment* *elsewhere*)
     (setf *elsewhere* nil)
+    #!+inline-constants
+    (progn
+      (unless (zerop (length *constant-vector*))
+        (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
+          (assemble (*constant-segment*)
+            (sb!vm:emit-constant-segment-header
+             constants
+             (do-ir2-blocks (2block component nil)
+               (when (policy (block-last (ir2-block-block 2block))
+                             (> speed space))
+                 (return t))))
+            (map nil (lambda (constant)
+                       (sb!vm:emit-inline-constant (car constant) (cdr constant)))
+                 constants)))
+        (sb!assem:append-segment *code-segment* *constant-segment*))
+      (setf *constant-segment* nil
+            *constant-vector*  nil
+            *constant-table*   nil))
     (values (sb!assem:finalize-segment *code-segment*)
             (nreverse *trace-table-info*)
             *fixup-notes*)))
@@ -178,3 +211,12 @@
          (label-position label-or-posn))
         (index
          label-or-posn))))
+
+#!+inline-constants
+(defun register-inline-constant (&rest constant-descriptor)
+  (declare (dynamic-extent constant-descriptor))
+  (let ((constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
+    (or (gethash constant *constant-table*)
+        (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
+          (vector-push-extend (cons constant label) *constant-vector*)
+          (setf (gethash constant *constant-table*) value)))))

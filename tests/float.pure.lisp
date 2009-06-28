@@ -237,7 +237,9 @@
 ;; 1.0.29.44 introduces a ton of changes for complex floats
 ;; on x86-64. Huge test of doom to help catch weird corner
 ;; cases.
-(with-test (:name :complex-floats)
+;; Abuse the framework to also test some float arithmetic
+;; changes wrt constant arguments in 1.0.29.54.
+(with-test (:name :float-arithmetic)
   (labels ((equal-enough (x y)
              (cond ((eql x y))
                    ((or (complexp x)
@@ -255,7 +257,8 @@
                      (complex (- (realpart x)) (imagpart x))
                      (- x)))
            (compute (x y r)
-             (list (+ x y) (+ r x) (+ x r)
+             (list (1+ x) (* 2 x) (/ x 2) (= 1 x)
+                   (+ x y) (+ r x) (+ x r)
                    (- x y) (- r x) (- x r)
                    (* x y) (* x r) (* r x)
                    (unless (zerop y)
@@ -265,11 +268,16 @@
                    (unless (zerop x)
                      (/ r x))
                    (conjugate x) (conjugate r)
-                   (- x)
+                   (abs r) (- r) (= 1 r)
+                   (- x) (1+ r) (* 2 r) (/ r 2)
                    (complex r) (complex r r) (complex 0 r)
                    (= x y) (= r x) (= y r) (= x (complex 0 r))
+                   (= r (realpart x)) (= (realpart x) r)
+                   (> r (realpart x)) (< r (realpart x))
+                   (> (realpart x) r) (< (realpart x) r)
                    (eql x y) (eql x (complex r)) (eql y (complex r))
-                   (eql x (complex r r)) (eql y (complex 0 r))))
+                   (eql x (complex r r)) (eql y (complex 0 r))
+                   (eql r (realpart x)) (eql (realpart x) r)))
            (compute-all (x y r)
              (multiple-value-bind (x1 x2 x3 x4) (reflections x)
                (multiple-value-bind (y1 y2 y3 y4) (reflections y)
@@ -300,6 +308,7 @@
                                        (coerce y '(complex double-float))
                                        (coerce r 'double-float))))
               (assert (every (lambda (pos ref single double)
+                               (declare (ignorable pos))
                                (every (lambda (ref single double)
                                         (or (and (equal-enough ref single)
                                                  (equal-enough ref double))

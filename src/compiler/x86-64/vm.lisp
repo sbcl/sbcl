@@ -220,6 +220,11 @@
   (fp-complex-single-zero immediate-constant)
   (fp-complex-double-zero immediate-constant)
 
+  (fp-single-immediate immediate-constant)
+  (fp-double-immediate immediate-constant)
+  (fp-complex-single-immediate immediate-constant)
+  (fp-complex-double-immediate immediate-constant)
+
   (immediate immediate-constant)
 
   ;;
@@ -328,26 +333,26 @@
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-single-zero)
+              :constant-scs (fp-single-zero fp-single-immediate)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
               :locations #.*float-regs*
-              :constant-scs (fp-double-zero)
+              :constant-scs (fp-double-zero fp-double-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-single-zero)
+                      :constant-scs (fp-complex-single-zero fp-complex-single-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
                       :locations #.*float-regs*
-                      :constant-scs (fp-complex-double-zero)
+                      :constant-scs (fp-complex-double-zero fp-complex-double-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -426,21 +431,21 @@
      (when (static-symbol-p value)
        (sc-number-or-lose 'immediate)))
     (single-float
-     (if (eql value 0f0)
-         (sc-number-or-lose 'fp-single-zero )
-         nil))
+       (sc-number-or-lose
+        (if (eql value 0f0) 'fp-single-zero 'fp-single-immediate)))
     (double-float
-     (if (eql value 0d0)
-         (sc-number-or-lose 'fp-double-zero )
-         nil))
+       (sc-number-or-lose
+        (if (eql value 0d0) 'fp-double-zero 'fp-double-immediate)))
     ((complex single-float)
-     (if (eql value (complex 0f0 0f0))
-         (sc-number-or-lose 'fp-complex-single-zero)
-         nil))
+       (sc-number-or-lose
+        (if (eql value #c(0f0 0f0))
+            'fp-complex-single-zero
+            'fp-complex-single-immediate)))
     ((complex double-float)
-     (if (eql value (complex 0d0 0d0))
-         (sc-number-or-lose 'fp-complex-double-zero)
-         nil))))
+       (sc-number-or-lose
+        (if (eql value #c(0d0 0d0))
+            'fp-complex-double-zero
+            'fp-complex-double-immediate)))))
 
 
 ;;;; miscellaneous function call parameters

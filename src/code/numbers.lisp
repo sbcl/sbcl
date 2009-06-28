@@ -358,7 +358,7 @@
        (bignum-cross-fixnum ,op ,big-op)
        (float-contagion ,op x y)
 
-       ((complex complex) +
+       ((complex complex)
         (canonical-complex (,op (realpart x) (realpart y))
                            (,op (imagpart x) (imagpart y))))
        (((foreach bignum fixnum ratio single-float double-float

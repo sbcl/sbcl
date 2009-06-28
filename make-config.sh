@@ -281,7 +281,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :inline-constants ' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | netbsd | openbsd | sunos | darwin | win32)
         printf ' :linkage-table' >> $ltf
@@ -297,6 +297,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
+    printf ' :float-eql-vops :inline-constants ' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf

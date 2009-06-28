@@ -187,7 +187,7 @@
         #!+long-float 'long-float #!-long-float 'double-float))
 (define-move-fun (load-fp-constant 2) (vop x y)
   ((fp-constant) (single-reg double-reg #!+long-float long-reg))
-  (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
+  (let ((value (tn-value x)))
     (with-empty-tn@fp-top(y)
       (cond ((or (eql value 0f0) (eql value 0d0) #!+long-float (eql value 0l0))
              (inst fldz))
@@ -209,6 +209,17 @@
             ((= value (log 2e0 2.718281828459045235360287471352662e0))
              (inst fldln2))
             (t (warn "ignoring bogus i387 constant ~A" value))))))
+
+(define-move-fun (load-fp-immediate 2) (vop x y)
+  ((fp-single-immediate) (single-reg)
+   (fp-double-immediate) (double-reg))
+  (let ((value (register-inline-constant (tn-value x))))
+    (with-empty-tn@fp-top(y)
+      (sc-case y
+        (single-reg
+         (inst fld value))
+        (double-reg
+         (inst fldd value))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'single-float))
 

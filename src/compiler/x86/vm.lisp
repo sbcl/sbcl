@@ -170,7 +170,8 @@
 
   ;; some FP constants can be generated in the i387 silicon
   (fp-constant immediate-constant)
-
+  (fp-single-immediate immediate-constant)
+  (fp-double-immediate immediate-constant)
   (immediate immediate-constant)
 
   ;;
@@ -282,14 +283,14 @@
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations (0 1 2 3 4 5 6 7)
-              :constant-scs (fp-constant)
+              :constant-scs (fp-constant fp-single-immediate)
               :save-p t
               :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
               :locations (0 1 2 3 4 5 6 7)
-              :constant-scs (fp-constant)
+              :constant-scs (fp-constant fp-double-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
@@ -390,20 +391,22 @@
      (when (static-symbol-p value)
        (sc-number-or-lose 'immediate)))
     (single-float
-     (when (or (eql value 0f0) (eql value 1f0))
-       (sc-number-or-lose 'fp-constant)))
+       (case value
+         ((0f0 1f0) (sc-number-or-lose 'fp-constant))
+         (t (sc-number-or-lose 'fp-single-immediate))))
     (double-float
-     (when (or (eql value 0d0) (eql value 1d0))
-       (sc-number-or-lose 'fp-constant)))
+       (case value
+         ((0d0 1d0) (sc-number-or-lose 'fp-constant))
+         (t (sc-number-or-lose 'fp-double-immediate))))
     #!+long-float
     (long-float
-     (when (or (eql value 0l0) (eql value 1l0)
-               (eql value pi)
-               (eql value (log 10l0 2l0))
-               (eql value (log 2.718281828459045235360287471352662L0 2l0))
-               (eql value (log 2l0 10l0))
-               (eql value (log 2l0 2.718281828459045235360287471352662L0)))
-       (sc-number-or-lose 'fp-constant)))))
+       (when (or (eql value 0l0) (eql value 1l0)
+                 (eql value pi)
+                 (eql value (log 10l0 2l0))
+                 (eql value (log 2.718281828459045235360287471352662L0 2l0))
+                 (eql value (log 2l0 10l0))
+                 (eql value (log 2l0 2.718281828459045235360287471352662L0)))
+         (sc-number-or-lose 'fp-constant)))))
 
 ;; For an immediate TN, return its value encoded for use as a literal.
 ;; For any other TN, return the TN.  Only works for FIXNUMs,
