@@ -28,6 +28,7 @@
     callees.
   * optimization: several character functions are now compiled somewhat more
     efficiently. (reported by Lynn Quam)
+  * optimization: the compiler now derives simple types for LOAD-VALUE-FORMs.
   * improvement: less unsafe constant folding in floating point arithmetic,
     especially for mixed complex/real -float operations.
   * improvement: complex float division is slightly more stable.

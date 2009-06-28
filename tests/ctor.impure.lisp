@@ -12,9 +12,10 @@
 ;;;; more information.
 
 (load "test-util.lisp")
+(load "compiler-test-util.lisp")
 
 (defpackage "CTOR-TEST"
-  (:use "CL" "TEST-UTIL"))
+  (:use "CL" "TEST-UTIL" "COMPILER-TEST-UTIL"))
 
 (in-package "CTOR-TEST")
 
@@ -87,27 +88,10 @@
 (assert (= (slot-value (funcall #'(sb-pcl::ctor one-slot-subclass nil :b sb-pcl::\.p0.) 4) 'b) 4))
 
 ;;; Tests for CTOR optimization of non-constant class args and constant class object args
-(defun find-ctor-cache (f)
-  (let ((code (sb-kernel:fun-code-header f)))
-    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
-          for c = (sb-kernel:code-header-ref code i)
-          do (when (= sb-vm::value-cell-header-widetag (sb-kernel:widetag-of c))
-               (let ((c (sb-vm::value-cell-ref c)))
-                 (when (and (consp c) (eq 'sb-pcl::ctor-cache (car c)))
-                   (return c)))))))
-
-;;; FIXME: Move this to test-utils -- compiler tests have / need stuff like this
-;;; as well.
-(defun find-callee (f &key (type t) (name nil namep))
-  (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun f))))
-    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
-          for c = (sb-kernel:code-header-ref code i)
-          do (when (typep c 'sb-impl::fdefn)
-               (let ((fun (sb-impl::fdefn-fun c)))
-                 (when (and (typep fun type)
-                            (or (not namep)
-                                (equal name (sb-impl::fdefn-name c))))
-                   (return fun)))))))
+(defun find-ctor-caches (fun)
+  (remove-if-not (lambda (value)
+                   (and (consp value) (eq 'sb-pcl::ctor-cache (car value))))
+                 (find-value-cell-values fun)))
 
 (let* ((cmacro (compiler-macro-function 'make-instance))
         (opt 0)
@@ -124,25 +108,25 @@
               (assert (= 0 opt))
               (let ((f (compile nil `(lambda (class)
                                        (make-instance class :b t)))))
-                (assert (find-ctor-cache f))
+                (assert (= 1 (length (find-ctor-caches f))))
                 (assert (= 1 opt))
                 (assert (typep (funcall f 'one-slot-subclass) 'one-slot-subclass))))
             (with-test (:name (make-instance :constant-class-object))
               (let ((f (compile nil `(lambda ()
                                        (make-instance ,(find-class 'one-slot-subclass) :b t)))))
-                (assert (not (find-ctor-cache f)))
+                (assert (not (find-ctor-caches f)))
                 (assert (= 2 opt))
                 (assert (typep (funcall f) 'one-slot-subclass))))
             (with-test (:name (make-instance :constant-non-std-class-object))
               (let ((f (compile nil `(lambda ()
                                        (make-instance ,(find-class 'structure-object))))))
-                (assert (not (find-ctor-cache f)))
+                (assert (not (find-ctor-caches f)))
                 (assert (= 3 opt))
                 (assert (typep (funcall f) 'structure-object))))
             (with-test (:name (make-instance :constant-non-std-class-name))
               (let ((f (compile nil `(lambda ()
                                        (make-instance 'structure-object)))))
-                (assert (not (find-ctor-cache f)))
+                (assert (not (find-ctor-caches f)))
                 (assert (= 4 opt))
                 (assert (typep (funcall f) 'structure-object)))))
        (setf (compiler-macro-function 'make-instance) cmacro))))
@@ -152,8 +136,10 @@
          (classes (loop repeat (* 2 sb-pcl::+ctor-table-max-size+)
                         collect (class-name (eval `(defclass ,(gentemp) () ())))))
          (count 0)
-         (cache (find-ctor-cache f)))
+         (caches (find-ctor-caches f))
+         (cache (pop caches)))
     (assert cache)
+    (assert (not caches))
     (assert (not (cdr cache)))
     (dolist (class classes)
       (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
@@ -186,8 +172,10 @@
   (let ((fun (compile nil `(lambda () (make-instance 'some-class)))))
     (assert (aroundp (funcall fun)))
     ;; make sure we tested what we think we tested...
-    (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
-      (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
+    (let ((ctors (find-named-callees fun :type 'sb-pcl::ctor)))
+      (assert ctors)
+      (assert (not (cdr ctors)))
+      (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))
 
 ;;; Make sure we get default initargs right with on the FAST-MAKE-INSTANCE path CTORs
 ;;; in more interesting cases as well...
@@ -213,8 +201,10 @@
     (assert (aroundp (funcall fun)))
     (assert (= 2 *some-counter*))
     ;; make sure we tested what we think we tested...
-    (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
-      (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
+    (let ((ctors (find-named-callees fun :type 'sb-pcl::ctor)))
+      (assert ctors)
+      (assert (not (cdr ctors)))
+      (assert (find-named-callees (car ctors) :name 'sb-pcl::fast-make-instance)))))
 
 ;;; No compiler notes, please
 (locally (declare (optimize safety))

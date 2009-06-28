@@ -11,17 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :sb-c)
-
-(defknown compiler-derived-type (t) (values t t) (movable flushable unsafe))
-
-(deftransform compiler-derived-type ((x))
- `(values ',(type-specifier (lvar-type x)) t))
-
-(defun compiler-derived-type (x)
-  (values t nil))
-
 (cl:in-package :cl-user)
+
+(load "compiler-test-util.lisp")
 
 ;; The tests in this file assume that EVAL will use the compiler
 (when (eq sb-ext:*evaluator-mode* :interpret)
@@ -2585,7 +2577,7 @@
  (assert (eq 'character
              (funcall (compile nil
                                '(lambda (s)
-                                 (sb-c::compiler-derived-type (aref (the string s) 0))))
+                                 (ctu:compiler-derived-type (aref (the string s) 0))))
                       "foo"))))
 
 (with-test (:name :base-string-aref-type)
@@ -2593,7 +2585,7 @@
              #-sb-unicode 'character
              (funcall (compile nil
                                '(lambda (s)
-                                 (sb-c::compiler-derived-type (aref (the base-string s) 0))))
+                                 (ctu:compiler-derived-type (aref (the base-string s) 0))))
                       (coerce "foo" 'base-string)))))
 
 (with-test (:name :dolist-constant-type-derivation)
@@ -2602,7 +2594,7 @@
                                    '(lambda (x)
                                      (dolist (y '(1 2 3))
                                        (when x
-                                         (return (sb-c::compiler-derived-type y))))))
+                                         (return (ctu:compiler-derived-type y))))))
                           t))))
 
 (with-test (:name :dolist-simple-list-type-derivation)
@@ -2611,7 +2603,7 @@
                                    '(lambda (x)
                                      (dolist (y (list 1 2 3))
                                        (when x
-                                         (return (sb-c::compiler-derived-type y))))))
+                                         (return (ctu:compiler-derived-type y))))))
                           t))))
 
 (with-test (:name :dolist-dotted-constant-list-type-derivation)
@@ -2621,7 +2613,7 @@
                          '(lambda (x)
                            (dolist (y '(1 2 3 . 4) :foo)
                              (when x
-                               (return (sb-c::compiler-derived-type y)))))))))
+                               (return (ctu:compiler-derived-type y)))))))))
     (assert (equal '(integer 1 3) (funcall fun t)))
     (assert (= 1 (length warned)))
     (multiple-value-bind (res err) (ignore-errors (funcall fun nil))
@@ -2679,7 +2671,7 @@
 (with-test (:name :rest-list-type-derivation)
   (multiple-value-bind (type derivedp)
       (funcall (compile nil `(lambda (&rest args)
-                               (sb-c::compiler-derived-type args)))
+                               (ctu:compiler-derived-type args)))
                nil)
     (assert (eq 'list type))
     (assert derivedp)))
@@ -2941,3 +2933,42 @@
         (compile nil `(lambda (x y)
                         (declare (character x y) (optimize speed))
                         (,name x y)))))))
+
+;;; optimizing make-array
+(with-test (:name (make-array :open-code-initial-contents))
+  (assert (not (ctu:find-named-callees
+                (compile nil
+                         `(lambda (x y z)
+                            (make-array '(3) :initial-contents (list x y z)))))))
+  (assert (not (ctu:find-named-callees
+                (compile nil
+                         `(lambda (x y z)
+                            (make-array '3 :initial-contents (vector x y z)))))))
+  (assert (not (ctu:find-named-callees
+                (compile nil
+                         `(lambda (x y z)
+                            (make-array '3 :initial-contents `(,x ,y ,z))))))))
+
+;;; optimizing (EXPT -1 INTEGER)
+(test-util:with-test (:name (expt minus-one integer))
+  (dolist (x '(-1 -1.0 -1.0d0))
+    (let ((fun (compile nil `(lambda (x) (expt ,x (the fixnum x))))))
+      (assert (not (ctu:find-named-callees fun)))
+      (dotimes (i 12)
+        (if (oddp i)
+            (assert (eql x (funcall fun i)))
+            (assert (eql (- x) (funcall fun i))))))))
+
+(with-test (:name (load-time-value :type-derivation))
+  (flet ((test (type form value-cell-p)
+           (let ((derived (funcall (compile
+                                    nil
+                                    `(lambda ()
+                                       (ctu:compiler-derived-type
+                                        (load-time-value ,form)))))))
+             (unless (equal type derived)
+              (error "wanted ~S, got ~S" type derived)))))
+    (let ((* 10))
+      (test '(integer 11 11) '(+ * 1) nil))
+    (let ((* "fooo"))
+      (test '(integer 4 4) '(length *) t))))

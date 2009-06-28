@@ -16,21 +16,54 @@
 (def-ir1-translator load-time-value
     ((form &optional read-only-p) start next result)
   #!+sb-doc
-  "Arrange for FORM to be evaluated at load-time and use the value produced
-   as if it were a constant. If READ-ONLY-P is non-NIL, then the resultant
-   object is guaranteed to never be modified, so it can be put in read-only
-   storage."
-  (let ((*allow-instrumenting* nil))
+  "Arrange for FORM to be evaluated at load-time and use the value produced as
+if it were a constant. If READ-ONLY-P is non-NIL, then the resultant object is
+guaranteed to never be modified, so it can be put in read-only storage."
+  (let ((*allow-instrumenting* nil)
+        ;; First derive an approximate type from the source form, because it allows
+        ;; us to use READ-ONLY-P implicitly.
+        ;;
+        ;; We also use this type to augment whatever COMPILE-LOAD-TIME-VALUE
+        ;; returns -- in practice it returns *WILD-TYPE* all the time, but
+        ;; theoretically it could return something useful for the READ-ONLY-P case.
+        (source-type (single-value-type
+                      (cond ((consp form)
+                             (let ((op (car form)))
+                               (cond ((member op '(the truly-the))
+                                      (specifier-type (second form)))
+                                     ((eq 'function op)
+                                      (specifier-type 'function))
+                                     ((and (legal-fun-name-p op)
+                                           (eq :declared (info :function :where-from op)))
+                                      (fun-type-returns (info :function :type op)))
+                                     (t
+                                      *wild-type*))))
+                            ((and (symbolp form)
+                                  (eq :declared (info :variable :where-from form)))
+                             (info :variable :type form))
+                            (t
+                             *universal-type*)))))
+    ;; Implictly READ-ONLY-P for immutable objects.
+    (when (and (not read-only-p)
+               (csubtypep source-type (specifier-type '(or character number))))
+      (setf read-only-p t))
     (if (producing-fasl-file)
         (multiple-value-bind (handle type)
+            ;; Value cells are allocated for non-READ-ONLY-P stop the compiler
+            ;; from complaining about constant modification -- it seems that
+            ;; we should be able to elide them all the time if we had a way
+            ;; of telling the compiler that "this object isn't really a constant
+            ;; the way you think". --NS 2009-06-28
             (compile-load-time-value (if read-only-p
                                          form
                                          `(make-value-cell ,form)))
-          (declare (ignore type))
-          (ir1-convert start next result
-                       (if read-only-p
-                           `(%load-time-value ',handle)
-                           `(value-cell-ref (%load-time-value ',handle)))))
+          (when (eq *wild-type* type)
+            (setf type source-type))
+          (let ((value-form
+                 (if read-only-p
+                     `(%load-time-value ',handle)
+                     `(value-cell-ref (%load-time-value ',handle)))))
+            (ir1-convert start next result `(truly-the ,type ,value-form))))
         (let ((value
                (handler-case (eval form)
                  (error (condition)
@@ -39,7 +72,9 @@
           (ir1-convert start next result
                        (if read-only-p
                            `',value
-                           `(value-cell-ref ',(make-value-cell value))))))))
+                           `(truly-the ,(ctype-of value)
+                                       (value-cell-ref
+                                        ',(make-value-cell value)))))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
   (aver (constant-lvar-p handle))

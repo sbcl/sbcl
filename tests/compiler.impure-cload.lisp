@@ -1,5 +1,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (load "assertoid.lisp")
+  (load "compiler-test-util.lisp")
+  (load "test-util.lisp")
   (use-package "ASSERTOID"))
 
 ;;; bug 254: compiler falure
@@ -517,3 +519,18 @@
   (write-line "foo-0"))
 
 (foo)
+
+;;; LOAD-TIME-VALUE smartness
+(defun load-time-value-type-derivation-test-1 ()
+  (ctu:compiler-derived-type (load-time-value (cons 'foo 0))))
+(defun load-time-value-type-derivation-test-2 ()
+  (ctu:compiler-derived-type (load-time-value (+ (or *print-length* 0) 10))))
+(defun load-time-value-auto-read-only-p ()
+  (load-time-value (random most-positive-fixnum)))
+(defun load-time-value-boring ()
+  (load-time-value (cons t t)))
+(test-util:with-test (:name (load-time-value :type-smartness/cload))
+  (assert (eq 'cons (load-time-value-type-derivation-test-1)))
+  (assert (eq 'number (load-time-value-type-derivation-test-2)))
+  (assert (not (ctu:find-value-cell-values #'load-time-value-auto-read-only-p)))
+  (assert (ctu:find-value-cell-values #'load-time-value-boring)))
