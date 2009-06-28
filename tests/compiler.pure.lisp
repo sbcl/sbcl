@@ -2923,3 +2923,21 @@
     (assert (funcall fun (vector 1 2 3)))
     (assert (funcall fun "abc"))
     (assert (not (funcall fun (make-array '(2 2)))))))
+
+(with-test (:name :no-silly-compiler-notes-from-character-function)
+  (let (current)
+    (handler-bind ((compiler-note (lambda (e) (error "~S: ~A" current e))))
+      (dolist (name '(char-code char-int character char-name standard-char-p
+                      graphic-char-p alpha-char-p upper-case-p lower-case-p
+                      both-case-p digit-char-p alphanumericp digit-char-p))
+        (setf current name)
+        (compile nil `(lambda (x)
+                        (declare (character x) (optimize speed))
+                        (,name x))))
+      (dolist (name '(char= char/= char< char> char<= char>= char-equal
+                      char-not-equal char-lessp char-greaterp char-not-greaterp
+                      char-not-lessp))
+        (setf current name)
+        (compile nil `(lambda (x y)
+                        (declare (character x y) (optimize speed))
+                        (,name x y)))))))

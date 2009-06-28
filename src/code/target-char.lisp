@@ -1,15 +1,4 @@
 ;;;; character functions
-;;;;
-;;;; This implementation assumes the use of ASCII codes and the
-;;;; specific character formats used in SBCL (and its ancestor, CMU
-;;;; CL). It is optimized for performance rather than for portability
-;;;; and elegance, and may have to be rewritten if the character
-;;;; representation is changed.
-;;;;
-;;;; KLUDGE: As of sbcl-0.6.11.25, at least, the ASCII-dependence is
-;;;; not confined to this file. E.g. there are DEFTRANSFORMs in
-;;;; srctran.lisp for CHAR-UPCASE, CHAR-EQUAL, and CHAR-DOWNCASE, and
-;;;; they assume ASCII. -- WHN 2001-03-25
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -32,71 +21,72 @@
 (deftype char-code ()
   `(integer 0 (,char-code-limit)))
 
-(defvar *character-database*)
-(declaim (type (simple-array (unsigned-byte 8) (*)) *character-database*))
-
 #!+sb-unicode
 (progn
  (defvar *unicode-character-name-database*)
  (defvar *unicode-character-name-huffman-tree*))
 
-(macrolet ((frob ()
-             (flet ((file (name type)
-                      (merge-pathnames (make-pathname
-                                        :directory
-                                        '(:relative :up :up "output")
-                                        :name name :type type)
-                                       sb!xc:*compile-file-truename*)))
-               `(progn
-                  ,(with-open-file (stream (file "ucd" "dat")
-                                           :direction :input
-                                           :element-type '(unsigned-byte 8))
-                     (let* ((length (file-length stream))
-                            (array (make-array
-                                    length :element-type '(unsigned-byte 8))))
-                       (read-sequence array stream)
-                       `(defun !character-database-cold-init ()
-                          (setq *character-database* ',array))))
-                  ,(with-open-file (stream (file "ucd-names" "lisp-expr")
-                                           :direction :input
-                                           :element-type 'character)
-                     (let ((names (make-hash-table)))
-                       #!+sb-unicode
-                       (loop
-                          for code-point = (read stream nil nil)
-                          for char-name = (string-upcase (read stream nil nil))
-                          while code-point
-                          do (setf (gethash code-point names) char-name))
-                       (let ((tree
-                              #!+sb-unicode
-                               (make-huffman-tree
-                                (let (list)
-                                      (maphash (lambda (code name)
-                                                 (declare (ignore code))
-                                                 (push name list))
-                                               names)
-                                      list)))
-                             (code->name
-                              (make-array (hash-table-count names)
-                                          :fill-pointer 0))
-                             (name->code nil))
-                         (maphash (lambda (code name)
-                                    (vector-push
-                                     (cons code (huffman-encode name tree))
-                                     code->name))
-                                   names)
-                         (setf name->code
-                               (sort (copy-seq code->name) #'< :key #'cdr))
-                         (setf code->name
-                               (sort (copy-seq name->code) #'< :key #'car))
-                         (setf names nil)
-                         `(defun !character-name-database-cold-init ()
-                            #!+sb-unicode
-                            (setq *unicode-character-name-database*
-                                  (cons ',code->name ',name->code)
-                                  *unicode-character-name-huffman-tree* ',tree)))))))))
+(macrolet
+    ((frob ()
+       (flet ((file (name type)
+                (merge-pathnames (make-pathname
+                                  :directory
+                                  '(:relative :up :up "output")
+                                  :name name :type type)
+                                 sb!xc:*compile-file-truename*)))
+         (let ((character-database
+                (with-open-file (stream (file "ucd" "dat")
+                                        :direction :input
+                                        :element-type '(unsigned-byte 8))
+                  (let* ((length (file-length stream))
+                         (array (make-array
+                                 length :element-type '(unsigned-byte 8))))
+                    (read-sequence array stream)
+                    array))))
+           `(progn
+              (declaim (type (simple-array (unsigned-byte 8) (*)) **character-database**))
+              (defglobal **character-database** ,character-database)
+              (defun !character-database-cold-init ()
+                (setf **character-database** ,character-database))
+              ,(with-open-file (stream (file "ucd-names" "lisp-expr")
+                                       :direction :input
+                                       :element-type 'character)
+                               (let ((names (make-hash-table)))
+                                 #!+sb-unicode
+                                 (loop
+                                       for code-point = (read stream nil nil)
+                                       for char-name = (string-upcase (read stream nil nil))
+                                       while code-point
+                                       do (setf (gethash code-point names) char-name))
+                                 (let ((tree
+                                        #!+sb-unicode
+                                         (make-huffman-tree
+                                          (let (list)
+                                            (maphash (lambda (code name)
+                                                       (declare (ignore code))
+                                                       (push name list))
+                                                     names)
+                                            list)))
+                                       (code->name
+                                        (make-array (hash-table-count names)
+                                                    :fill-pointer 0))
+                                       (name->code nil))
+                                   (maphash (lambda (code name)
+                                              (vector-push
+                                               (cons code (huffman-encode name tree))
+                                               code->name))
+                                            names)
+                                   (setf name->code
+                                         (sort (copy-seq code->name) #'< :key #'cdr))
+                                   (setf code->name
+                                         (sort (copy-seq name->code) #'< :key #'car))
+                                   (setf names nil)
+                                   `(defun !character-name-database-cold-init ()
+                                      #!+sb-unicode
+                                      (setq *unicode-character-name-database*
+                                            (cons ',code->name ',name->code)
+                                            *unicode-character-name-huffman-tree* ',tree))))))))))
   (frob))
-#+sb-xc-host (!character-database-cold-init)
 #+sb-xc-host (!character-name-database-cold-init)
 
 (defparameter *base-char-name-alist*
@@ -170,32 +160,38 @@
     (#x9E "Privacy-Message")
     (#x9F "Application-Program-Command"))) ; *** See Note above
 
-;;;; accessor functions
+;;;; UCD accessor functions
+;;;;
+;;;; FIXME: Document the format of the character database.
 
 ;; (* 8 186) => 1488
 ;; (+ 1488 (ash #x110000 -8)) => 5840
 (defun ucd-index (char)
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (page (aref *character-database* (+ 1488 cp-high))))
+         (page (aref **character-database** (+ 1488 cp-high))))
     (+ 5840 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
 
+(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-value-0))
 (defun ucd-value-0 (char)
-  (aref *character-database* (ucd-index char)))
+  (aref **character-database** (ucd-index char)))
 
+(declaim (ftype (sfunction (t) (unsigned-byte 24)) ucd-value-1))
 (defun ucd-value-1 (char)
-  (let ((index (ucd-index char)))
-    (dpb (aref *character-database* (+ index 3))
+  (let ((index (ucd-index char))
+        (character-database **character-database**))
+    (dpb (aref character-database (+ index 3))
          (byte 8 16)
-         (dpb (aref *character-database* (+ index 2))
+         (dpb (aref character-database (+ index 2))
               (byte 8 8)
-              (aref *character-database* (1+ index))))))
+              (aref character-database (1+ index))))))
 
+(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category))
 (defun ucd-general-category (char)
-  (aref *character-database* (* 8 (ucd-value-0 char))))
+  (aref **character-database** (* 8 (ucd-value-0 char))))
 
 (defun ucd-decimal-digit (char)
-  (let ((decimal-digit (aref *character-database*
+  (let ((decimal-digit (aref **character-database**
                              (+ 3 (* 8 (ucd-value-0 char))))))
     (when (< decimal-digit 10)
       decimal-digit)))
@@ -203,14 +199,12 @@
 (defun char-code (char)
   #!+sb-doc
   "Return the integer code of CHAR."
-  ;; FIXME: do we actually need this?
-  (etypecase char
-    (character (char-code (truly-the character char)))))
+  (char-code char))
 
 (defun char-int (char)
   #!+sb-doc
   "Return the integer code of CHAR. (In SBCL this is the same as CHAR-CODE, as
-   there are no character bits or fonts.)"
+there are no character bits or fonts.)"
   (char-code char))
 
 (defun code-char (code)
@@ -220,8 +214,8 @@
 
 (defun character (object)
   #!+sb-doc
-  "Coerce OBJECT into a CHARACTER if possible. Legal inputs are
-  characters, strings and symbols of length 1."
+  "Coerce OBJECT into a CHARACTER if possible. Legal inputs are characters,
+strings and symbols of length 1."
   (flet ((do-error (control args)
            (error 'simple-type-error
                   :datum object
@@ -260,8 +254,8 @@
 
 (defun name-char (name)
   #!+sb-doc
-  "Given an argument acceptable to STRING, NAME-CHAR returns a character
-  whose name is that string, if one exists. Otherwise, NIL is returned."
+  "Given an argument acceptable to STRING, NAME-CHAR returns a character whose
+name is that string, if one exists. Otherwise, NIL is returned."
   (or (let ((char-code (car (rassoc-if (lambda (names)
                                          (member name names :test #'string-equal))
                                        *base-char-name-alist*))))
@@ -294,8 +288,8 @@
 (defun standard-char-p (char)
   #!+sb-doc
   "The argument must be a character object. STANDARD-CHAR-P returns T if the
-   argument is a standard character -- one of the 95 ASCII printing characters
-   or <return>."
+argument is a standard character -- one of the 95 ASCII printing characters or
+<return>."
   (and (typep char 'base-char)
        (let ((n (char-code (the base-char char))))
          (or (< 31 n 127)
@@ -304,14 +298,14 @@
 (defun %standard-char-p (thing)
   #!+sb-doc
   "Return T if and only if THING is a standard-char. Differs from
-  STANDARD-CHAR-P in that THING doesn't have to be a character."
+STANDARD-CHAR-P in that THING doesn't have to be a character."
   (and (characterp thing) (standard-char-p thing)))
 
 (defun graphic-char-p (char)
   #!+sb-doc
   "The argument must be a character object. GRAPHIC-CHAR-P returns T if the
-  argument is a printing character (space through ~ in ASCII), otherwise
-  returns NIL."
+argument is a printing character (space through ~ in ASCII), otherwise returns
+NIL."
   (let ((n (char-code char)))
     (or (< 31 n 127)
         (< 159 n))))
@@ -319,32 +313,32 @@
 (defun alpha-char-p (char)
   #!+sb-doc
   "The argument must be a character object. ALPHA-CHAR-P returns T if the
-   argument is an alphabetic character, A-Z or a-z; otherwise NIL."
+argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
 
 (defun upper-case-p (char)
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
-   argument is an upper-case character, NIL otherwise."
+argument is an upper-case character, NIL otherwise."
   (= (ucd-value-0 char) 0))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
-   argument is a lower-case character, NIL otherwise."
+argument is a lower-case character, NIL otherwise."
   (= (ucd-value-0 char) 1))
 
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
-  argument is an alphabetic character and if the character exists in
-  both upper and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
+argument is an alphabetic character and if the character exists in both upper
+and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
   (< (ucd-value-0 char) 2))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
-  "If char is a digit in the specified radix, returns the fixnum for
-  which that digit stands, else returns NIL."
+  "If char is a digit in the specified radix, returns the fixnum for which
+that digit stands, else returns NIL."
   (let ((m (- (char-code char) 48)))
     (declare (fixnum m))
     (cond ((<= radix 10.)
@@ -363,8 +357,8 @@
 
 (defun alphanumericp (char)
   #!+sb-doc
-  "Given a character-object argument, ALPHANUMERICP returns T if the
-   argument is either numeric or alphabetic."
+  "Given a character-object argument, ALPHANUMERICP returns T if the argument
+is either numeric or alphabetic."
   (let ((gc (ucd-general-category char)))
     (or (< gc 5)
         (= gc 12))))
@@ -449,7 +443,7 @@
 (defun char-equal (character &rest more-characters)
   #!+sb-doc
   "Return T if all of the arguments are the same character.
-  Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do ((clist more-characters (cdr clist)))
       ((null clist) t)
@@ -462,7 +456,7 @@
 (defun char-not-equal (character &rest more-characters)
   #!+sb-doc
   "Return T if no two of the arguments are the same character.
-   Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do* ((head character (car list))
         (list more-characters (cdr list)))
@@ -479,7 +473,7 @@
 (defun char-lessp (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly increasing alphabetic order.
-   Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
@@ -493,7 +487,7 @@
 (defun char-greaterp (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly decreasing alphabetic order.
-   Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
@@ -507,7 +501,7 @@
 (defun char-not-greaterp (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly non-decreasing alphabetic order.
-   Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
@@ -521,7 +515,7 @@
 (defun char-not-lessp (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly non-increasing alphabetic order.
-   Font, bits, and case are ignored."
+Case is ignored."
   (declare (truly-dynamic-extent more-characters))
   (do* ((c character (car list))
         (list more-characters (cdr list)))
@@ -533,8 +527,8 @@
 
 (defun char-upcase (char)
   #!+sb-doc
-  "Return CHAR converted to upper-case if that is possible.  Don't convert
-   lowercase eszet (U+DF)."
+  "Return CHAR converted to upper-case if that is possible. Don't convert
+lowercase eszet (U+DF)."
   (if (= (ucd-value-0 char) 1)
       (code-char (ucd-value-1 char))
       char))
@@ -548,9 +542,9 @@
 
 (defun digit-char (weight &optional (radix 10))
   #!+sb-doc
-  "All arguments must be integers. Returns a character object that
-  represents a digit of the given weight in the specified radix. Returns
-  NIL if no such character exists."
+  "All arguments must be integers. Returns a character object that represents
+a digit of the given weight in the specified radix. Returns NIL if no such
+character exists."
   (and (typep weight 'fixnum)
        (>= weight 0) (< weight radix) (< weight 36)
        (code-char (if (< weight 10) (+ 48 weight) (+ 55 weight)))))
