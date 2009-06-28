@@ -97,12 +97,22 @@
          (and (symbolp constant)
               (not (null (symbol-package constant)))))))
 
-;;; somewhat akin to DEFAULT-INITARGS (SLOT-CLASS T T), but just
-;;; collecting the defaulted initargs for the call.
+;;; Somewhat akin to DEFAULT-INITARGS, but just collecting the defaulted
+;;; initargs for the call.
 (defun ctor-default-initkeys (supplied-initargs class-default-initargs)
   (loop for (key) in class-default-initargs
         when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
         collect key))
+
+;;; Like DEFAULT-INITARGS, but return a list that can be spliced into source,
+;;; instead of a list with values already evaluated.
+(defun ctor-default-initargs (supplied-initargs class-default-initargs)
+  (loop for (key form fun) in class-default-initargs
+        when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
+        append (list key (if (constantp form) form `(funcall ,fun)))
+          into default-initargs
+        finally
+          (return (append supplied-initargs default-initargs))))
 
 ;;; *****************
 ;;; CTORS   *********
@@ -565,7 +575,7 @@
            (make-instance ,class ,@initargs))
         (let ((defaults (class-default-initargs class)))
           (when defaults
-            (setf initargs (default-initargs initargs defaults)))
+            (setf initargs (ctor-default-initargs initargs defaults)))
           `(lambda ,lambda-list
              (declare #.*optimize-speed*)
              (fast-make-instance ,class ,@initargs))))))

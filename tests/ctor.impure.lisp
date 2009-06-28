@@ -172,17 +172,46 @@
 ;;; Make sure we get default initargs right with on the FAST-MAKE-INSTANCE path CTORs
 (defclass some-class ()
   ((aroundp :initform nil :reader aroundp))
-  (:default-initargs :x :success?))
+  (:default-initargs :x :success1))
+
 (defmethod initialize-instance :around ((some-class some-class) &key (x :fail?))
-  (unless (eq x :success?)
+  (unless (eq x :success1)
     (error "Default initarg lossage"))
   (setf (slot-value some-class 'aroundp) t)
   (when (next-method-p)
     (call-next-method)))
-(with-test (:name (make-instance :ctor-default-initargs))
+
+(with-test (:name (make-instance :ctor-default-initargs-1))
   (assert (aroundp (eval `(make-instance 'some-class))))
   (let ((fun (compile nil `(lambda () (make-instance 'some-class)))))
     (assert (aroundp (funcall fun)))
+    ;; make sure we tested what we think we tested...
+    (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
+      (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
+
+;;; Make sure we get default initargs right with on the FAST-MAKE-INSTANCE path CTORs
+;;; in more interesting cases as well...
+(defparameter *some-counter* 0)
+(let* ((x 'success2))
+  (defclass some-class2 ()
+    ((aroundp :initform nil :reader aroundp))
+    (:default-initargs :x (progn (incf *some-counter*) x))))
+
+(defmethod initialize-instance :around ((some-class some-class2) &key (x :fail2?))
+  (unless (eq x 'success2)
+    (error "Default initarg lossage"))
+  (setf (slot-value some-class 'aroundp) t)
+  (when (next-method-p)
+    (call-next-method)))
+
+(with-test (:name (make-instance :ctor-default-initargs-2))
+  (assert (= 0 *some-counter*))
+  (assert (aroundp (eval `(make-instance 'some-class2))))
+  (assert (= 1 *some-counter*))
+  (let ((fun (compile nil `(lambda () (make-instance 'some-class2)))))
+    (assert (= 1 *some-counter*))
+    (assert (aroundp (funcall fun)))
+    (assert (= 2 *some-counter*))
     ;; make sure we tested what we think we tested...
     (let ((ctor (find-callee fun :type 'sb-pcl::ctor)))
       (assert (find-callee ctor :name 'sb-pcl::fast-make-instance)))))
