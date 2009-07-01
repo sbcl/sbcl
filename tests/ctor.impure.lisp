@@ -217,5 +217,25 @@
     (handler-bind ((sb-ext:compiler-note #'error))
       (funcall fun 41)
       (funcall fun 13))))
+
+;;; NO-APPLICABLE-METHOD called
+(defmethod no-applicable-method ((gf (eql #'make-instance)) &rest args)
+  (cons :no-applicable-method args))
+(with-test (:name :constant-invalid-class-arg)
+  (assert (equal
+           '(:no-applicable-method "FOO" :quux 14)
+           (funcall (compile nil `(lambda (x) (make-instance "FOO" :quux x))) 14)))
+  (assert (equal
+           '(:no-applicable-method 'abc zot 1 bar 2)
+           (funcall (compile nil `(lambda (x y) (make-instance ''abc 'zot x 'bar y)))
+                    1 2))))
+(with-test (:name :variable-invalid-class-arg)
+  (assert (equal
+           '(:no-applicable-method "FOO" :quux 14)
+           (funcall (compile nil `(lambda (c x) (make-instance c :quux x))) "FOO" 14)))
+  (assert (equal
+           '(:no-applicable-method 'abc zot 1 bar 2)
+           (funcall (compile nil `(lambda (c x y) (make-instance c 'zot x 'bar y)))
+                    ''abc 1 2))))
 
 ;;;; success

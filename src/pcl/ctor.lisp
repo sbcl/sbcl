@@ -155,17 +155,19 @@
 
 ;;; Keep this a separate function for testing.
 (defun ensure-ctor (function-name class-name initargs safe-code-p)
-  (unless (fboundp function-name)
-    (make-ctor function-name class-name initargs safe-code-p)))
+  (with-world-lock ()
+    (if (fboundp function-name)
+        (the ctor (fdefinition function-name))
+        (make-ctor function-name class-name initargs safe-code-p))))
 
 ;;; Keep this a separate function for testing.
 (defun make-ctor (function-name class-name initargs safe-p)
   (without-package-locks ; for (setf symbol-function)
-   (let ((ctor (%make-ctor function-name class-name nil initargs safe-p)))
-     (push ctor *all-ctors*)
-     (setf (fdefinition function-name) ctor)
-     (install-initial-constructor ctor :force-p t)
-     ctor)))
+    (let ((ctor (%make-ctor function-name class-name nil initargs safe-p)))
+      (install-initial-constructor ctor :force-p t)
+      (push ctor *all-ctors*)
+      (setf (fdefinition function-name) ctor)
+      ctor)))
 
 ;;; *****************
 ;;; Inline CTOR cache
@@ -308,25 +310,35 @@
       (setf table (nth-value 1 (put-ctor ctor table))))
     table))
 
-(defun ctor-for-caching (class-name initargs safe-code-p)
-  (let ((name (make-ctor-function-name class-name initargs safe-code-p)))
-    (or (ensure-ctor name class-name initargs safe-code-p)
-        (fdefinition name))))
-
 (defun ensure-cached-ctor (class-name store initargs safe-code-p)
-  (if (listp store)
-      (multiple-value-bind (ctor list) (find-ctor class-name store)
-        (if ctor
-            (values ctor list)
-            (let ((ctor (ctor-for-caching class-name initargs safe-code-p)))
-              (if (< (length list) +ctor-list-max-size+)
-                  (values ctor (cons ctor list))
-                  (values ctor (ctor-list-to-table list))))))
-      (let ((ctor (get-ctor class-name store)))
-        (if ctor
-            (values ctor store)
-            (put-ctor (ctor-for-caching class-name initargs safe-code-p)
-                      store)))))
+  (flet ((maybe-ctor-for-caching ()
+           (if (typep class-name '(or symbol class))
+               (let ((name (make-ctor-function-name class-name initargs safe-code-p)))
+                 (ensure-ctor name class-name initargs safe-code-p))
+               ;; Invalid first argument: let MAKE-INSTANCE worry about it.
+               (return-from ensure-cached-ctor
+                 (values (lambda (&rest ctor-parameters)
+                           (let (mi-initargs)
+                             (doplist (key value) initargs
+                               (push key mi-initargs)
+                               (push (if (constantp value)
+                                         value
+                                         (pop ctor-parameters))
+                                     mi-initargs))
+                             (apply #'make-instance class-name (nreverse mi-initargs))))
+                         store)))))
+    (if (listp store)
+        (multiple-value-bind (ctor list) (find-ctor class-name store)
+          (if ctor
+              (values ctor list)
+              (let ((ctor (maybe-ctor-for-caching)))
+                (if (< (length list) +ctor-list-max-size+)
+                    (values ctor (cons ctor list))
+                    (values ctor (ctor-list-to-table list))))))
+       (let ((ctor (get-ctor class-name store)))
+         (if ctor
+             (values ctor store)
+             (put-ctor (maybe-ctor-for-caching) store))))))
 
 ;;; ***********************************************
 ;;; Compile-Time Expansion of MAKE-INSTANCE *******
@@ -407,7 +419,7 @@
                                (function (&rest t) t))
                            ,function-name))
                    (funcall (function ,function-name) ,@value-forms))))
-            (when class-arg
+            (when (and class-arg (not (constantp class-arg)))
               ;; Build an inline cache: a CONS, with the actual cache in the CDR.
               `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.
                                                         make-instance))
