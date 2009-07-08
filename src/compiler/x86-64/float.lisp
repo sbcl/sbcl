@@ -394,7 +394,7 @@
                    (inst ,opinst r y))
                   (t
                    (if (sc-is x ,constant-sc)
-                       (inst ,load-inst r (get-constant x))
+                       (inst ,load-inst tmp (get-constant x))
                        (move tmp x))
                    (inst ,opinst tmp y)
                    (move r tmp)))))

@@ -1099,6 +1099,52 @@
                   (compile nil
                            `(lambda ()
                               (make-array 12 :initial-element 'a)))))))
+
+;;; This non-minimal test-case catches a nasty error when loading
+;;; inline constants.
+(deftype matrix ()
+  `(simple-array single-float (16)))
+(declaim (ftype (sb-int:sfunction (single-float single-float single-float single-float
+                                   single-float single-float single-float single-float
+                                   single-float single-float single-float single-float
+                                   single-float single-float single-float single-float)
+                                  matrix)
+                matrix)
+         (inline matrix))
+(defun matrix (m11 m12 m13 m14
+               m21 m22 m23 m24
+               m31 m32 m33 m34
+               m41 m42 m43 m44)
+  (make-array 16
+              :element-type 'single-float
+              :initial-contents (list m11 m21 m31 m41
+                                      m12 m22 m32 m42
+                                      m13 m23 m33 m43
+                                      m14 m24 m34 m44)))
+(declaim (ftype (sb-int:sfunction ((simple-array single-float (3)) single-float) matrix)
+                rotate-around-bad))
+(defun rotate-around (a radians)
+  (let ((c (cos radians))
+	(s (sin radians))
+        ;; The 1.0 here was misloaded on x86-64.
+	(g (- 1.0 (cos radians))))
+    (let* ((x (aref a 0))
+           (y (aref a 1))
+           (z (aref a 2))
+           (gxx (* g x x)) (gxy (* g x y)) (gxz (* g x z))
+           (gyy (* g y y)) (gyz (* g y z)) (gzz (* g z z)))
+      (matrix
+       (+ gxx c)        (- gxy (* s z))  (+ gxz (* s y)) 0.0
+       (+ gxy (* s z))  (+ gyy c)        (- gyz (* s x)) 0.0
+       (- gxz (* s y))  (+ gyz (* s x))  (+ gzz c)       0.0
+       0.0              0.0              0.0             1.0))))
+(with-test (:name :regression-1.0.29.54)
+  (assert (every #'=
+                 '(-1.0 0.0 0.0 0.0 0.0 -1.0 0.0 0.0 0.0 0.0 -1.0 0.0 0.0 0.0 0.0 1.0)
+                 (rotate-around
+                  (make-array 3 :element-type 'single-float) (coerce pi 'single-float))))
+  ;; Same bug manifests in COMPLEX-ATANH as well.
+  (assert (= (atanh #C(-0.7d0 1.1d0)) #C(-0.28715567731069275d0 0.9394245539093365d0))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
