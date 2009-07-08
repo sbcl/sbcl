@@ -534,3 +534,14 @@
   (assert (eq 'number (load-time-value-type-derivation-test-2)))
   (assert (not (ctu:find-value-cell-values #'load-time-value-auto-read-only-p)))
   (assert (ctu:find-value-cell-values #'load-time-value-boring)))
+
+(defun regression-1.0.29.54 ()
+  (logior (1+ most-positive-fixnum)
+          (load-time-value (the fixnum (eval 1)) t)))
+
+(test-util:with-test (:name :regression-1.0.29.54)
+  (assert (= (+ most-positive-fixnum 2) (regression-1.0.29.54)))
+  (assert (eq 42
+              (funcall (compile nil
+                                `(lambda ()
+                                   (load-time-value (values 42))))))))

@@ -35,7 +35,10 @@ guaranteed to never be modified, so it can be put in read-only storage."
                                       (specifier-type 'function))
                                      ((and (legal-fun-name-p op)
                                            (eq :declared (info :function :where-from op)))
-                                      (fun-type-returns (info :function :type op)))
+                                      (let ((ftype (info :function :type op)))
+                                        (if (fun-type-p ftype)
+                                            (fun-type-returns ftype)
+                                            *wild-type*)))
                                      (t
                                       *wild-type*))))
                             ((and (symbolp form)

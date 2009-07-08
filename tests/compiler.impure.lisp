@@ -1122,12 +1122,12 @@
                                       m13 m23 m33 m43
                                       m14 m24 m34 m44)))
 (declaim (ftype (sb-int:sfunction ((simple-array single-float (3)) single-float) matrix)
-                rotate-around-bad))
+                rotate-around))
 (defun rotate-around (a radians)
   (let ((c (cos radians))
-	(s (sin radians))
+        (s (sin radians))
         ;; The 1.0 here was misloaded on x86-64.
-	(g (- 1.0 (cos radians))))
+        (g (- 1.0 (cos radians))))
     (let* ((x (aref a 0))
            (y (aref a 1))
            (z (aref a 2))
