@@ -334,11 +334,17 @@
                  (loop for what in (cleanup-info cleanup)
                        do (etypecase what
                             (cons
-                             (let ((lvar (cdr what)))
-                               (cond ((lvar-good-for-dx-p lvar (car what) component)
-                                      (let ((real (principal-lvar lvar)))
-                                        (setf (lvar-dynamic-extent real) cleanup)
-                                        (real-dx-lvars real)))
+                             (let ((dx (car what))
+                                   (lvar (cdr what)))
+                               (cond ((lvar-good-for-dx-p lvar dx component)
+                                      ;; Since the above check does deep
+                                      ;; checks. we need to deal with the deep
+                                      ;; results in here as well.
+                                      (dolist (cell (handle-nested-dynamic-extent-lvars
+                                                     dx lvar component))
+                                        (let ((real (principal-lvar (cdr cell))))
+                                          (setf (lvar-dynamic-extent real) cleanup)
+                                          (real-dx-lvars real))))
                                      (t
                                       (note-no-stack-allocation lvar)
                                       (setf (lvar-dynamic-extent lvar) nil)))))

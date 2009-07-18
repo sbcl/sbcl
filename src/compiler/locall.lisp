@@ -43,36 +43,6 @@
              (setf (car args) nil)))
   (values))
 
-(defun handle-nested-dynamic-extent-lvars (dx lvar)
-  (let ((uses (lvar-uses lvar)))
-    ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
-    ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
-    ;; to process uses of single-use LVARs.
-    (when (node-p uses)
-      (node-ends-block uses))
-    ;; If this LVAR's USE is good for DX, it is either a CAST, or it
-    ;; must be a regular combination whose arguments are potentially DX as well.
-    (flet ((recurse (use)
-             (etypecase use
-               (cast
-                (handle-nested-dynamic-extent-lvars dx (cast-value use)))
-               (combination
-                (loop for arg in (combination-args use)
-                      ;; deleted args show up as NIL here
-                      when (and arg (lvar-good-for-dx-p arg dx))
-                      append (handle-nested-dynamic-extent-lvars dx arg)))
-               (ref
-                (let* ((other (trivial-lambda-var-ref-lvar use)))
-                  (unless (eq other lvar)
-                    (handle-nested-dynamic-extent-lvars dx other)))))))
-      (cons (cons dx lvar)
-            (if (listp uses)
-                (loop for use in uses
-                      when (use-good-for-dx-p use dx)
-                      nconc (recurse use))
-                (when (use-good-for-dx-p uses dx)
-                  (recurse uses)))))))
-
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
@@ -98,37 +68,6 @@
                     (dolist (cell dx-lvars)
                       (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))
   (values))
-
-;;; Called after a transform has been applied to CALL: if the call has a DX
-;;; result, propagate the DXness to the new functional as well.
-;;;
-;;; This is needed in case an earlier call to LOCALL-ANALYZE-COMPONENT
-;;; collected DX information before the transformation, in which case a later
-;;; call to LOCALL-ANALYZE-COMPONENT would not pick up the DX declaration
-;;; again, since the call has already been converted. (In other words, work
-;;; around the fact that optimization iterates, and locall analysis may have
-;;; already run by the time we are able to transform something.)
-(defun maybe-propagate-dynamic-extent (call fun)
-  (when (lambda-p fun)
-    (let* ((lvar (combination-lvar call))
-           (cleanup (or (and lvar (lvar-dynamic-extent lvar))
-                        (return-from maybe-propagate-dynamic-extent)))
-           (ret (lambda-return fun))
-           (res (if ret
-                    (return-result ret)
-                    (return-from maybe-propagate-dynamic-extent)))
-           (dx (car (rassoc lvar (cleanup-info cleanup) :test #'eq)))
-           (new-dx-lvars (if (and dx res)
-                             (handle-nested-dynamic-extent-lvars dx res)
-                             (return-from maybe-propagate-dynamic-extent))))
-      (when new-dx-lvars
-        ;; This builds on what RECOGNIZE-DYNAMIC-EXTENT-LVARS does above.
-        (aver (eq call (block-last (node-block call))))
-        (dolist (cell new-dx-lvars)
-          (let ((lvar (cdr cell)))
-            (aver (not (lvar-dynamic-extent lvar)))
-            (push cell (cleanup-info cleanup))
-            (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))))
 
 ;;; This function handles merging the tail sets if CALL is potentially
 ;;; tail-recursive, and is a call to a function with a different

@@ -444,6 +444,8 @@
                        (ir1-attributep attr unsafely-flushable)))
           t)))))
 
+;;;; DYNAMIC-EXTENT related
+
 (defun note-no-stack-allocation (lvar &key flush)
   (do-uses (use (principal-lvar lvar))
     (unless (or
@@ -454,7 +456,6 @@
       (let ((*compiler-error-context* use))
         (compiler-notify "could not stack allocate the result of ~S"
                          (find-original-source (node-source-path use)))))))
-
 
 (declaim (ftype (sfunction (node (member nil t :truly) &optional (or null component))
                            boolean) use-good-for-dx-p))
@@ -565,6 +566,43 @@
               for arg in args
               when (eq var this)
               return arg)))))
+
+;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
+(defun handle-nested-dynamic-extent-lvars (dx lvar &optional recheck-component)
+  (let ((uses (lvar-uses lvar)))
+    ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
+    ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
+    ;; to process uses of single-use LVARs.
+    (when (node-p uses)
+      (node-ends-block uses))
+    ;; If this LVAR's USE is good for DX, it is either a CAST, or it
+    ;; must be a regular combination whose arguments are potentially DX as well.
+    (flet ((recurse (use)
+             (etypecase use
+               (cast
+                (handle-nested-dynamic-extent-lvars
+                 dx (cast-value use) recheck-component))
+               (combination
+                (loop for arg in (combination-args use)
+                      ;; deleted args show up as NIL here
+                      when (and arg
+                                (lvar-good-for-dx-p arg dx recheck-component))
+                      append (handle-nested-dynamic-extent-lvars
+                              dx arg recheck-component)))
+               (ref
+                (let* ((other (trivial-lambda-var-ref-lvar use)))
+                  (unless (eq other lvar)
+                    (handle-nested-dynamic-extent-lvars
+                     dx other recheck-component)))))))
+      (cons (cons dx lvar)
+            (if (listp uses)
+                (loop for use in uses
+                      when (use-good-for-dx-p use dx recheck-component)
+                      nconc (recurse use))
+                (when (use-good-for-dx-p uses dx recheck-component)
+                  (recurse uses)))))))
+
+;;;;; BLOCK UTILS
 
 (declaim (inline block-to-be-deleted-p))
 (defun block-to-be-deleted-p (block)

@@ -1277,7 +1277,6 @@
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
-        (maybe-propagate-dynamic-extent call new-fun)
         (locall-analyze-component *current-component*))))
   (values))
 
@@ -1549,13 +1548,19 @@
   (declare (type lvar arg) (type lambda-var var))
   (binding* ((ref (first (leaf-refs var)))
              (lvar (node-lvar ref) :exit-if-null)
-             (dest (lvar-dest lvar)))
+             (dest (lvar-dest lvar))
+             (dest-lvar (when (valued-node-p dest) (node-lvar dest))))
     (when (and
            ;; Think about (LET ((A ...)) (IF ... A ...)): two
            ;; LVAR-USEs should not be met on one path. Another problem
            ;; is with dynamic-extent.
            (eq (lvar-uses lvar) ref)
            (not (block-delete-p (node-block ref)))
+           ;; If the destinatation is dynamic extent, don't substitute unless
+           ;; the source is as well.
+           (or (not dest-lvar)
+               (not (lvar-dynamic-extent dest-lvar))
+               (lvar-dynamic-extent lvar))
            (typecase dest
              ;; we should not change lifetime of unknown values lvars
              (cast

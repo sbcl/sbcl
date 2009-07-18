@@ -513,7 +513,6 @@
     (assert-no-consing (dxlength))
     (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
     (assert-no-consing (test-nip-values))
-    (assert-no-consing (test-let-var-subst1 17))
     (assert-no-consing (test-let-var-subst2 17))
     (assert-no-consing (test-lvar-subst 11))
     (assert-no-consing (nested-dx-lists))
@@ -597,13 +596,26 @@
   (assert-no-consing (bdowning-2005-iv-16))
   (bdowning-2005-iv-16))
 
+(declaim (inline my-nconc))
+(defun-with-dx my-nconc (&rest lists)
+  (declare (dynamic-extent lists))
+  (apply #'nconc lists))
+(defun-with-dx my-nconc-caller (a b c)
+  (let ((l1 (list a b c))
+        (l2 (list a b c)))
+    (my-nconc l1 l2)))
+(with-test (:name :rest-stops-the-buck)
+  (let ((list1 (my-nconc-caller 1 2 3))
+        (list2 (my-nconc-caller 9 8 7)))
+    (assert (equal list1 '(1 2 3 1 2 3)))
+    (assert (equal list2 '(9 8 7 9 8 7)))))
+
 (defun-with-dx let-converted-vars-dx-allocated-bug (x y z)
   (let* ((a (list x y z))
          (b (list x y z))
          (c (list a b)))
     (declare (dynamic-extent c))
     (values (first c) (second c))))
-
 (with-test (:name :let-converted-vars-dx-allocated-bug)
   (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
     (assert (and (equal i j)
@@ -796,4 +808,26 @@
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
 (with-test (:name :handler-case-eating-stack)
   (assert-no-consing (handler-case-eating-stack)))
+
+;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going
+;;; to be stack allocated when it was not, leading to a bogus %NIP-VALUES.
+;;; Fixed by making RECHECK-DYNAMIC-EXTENT-LVARS deal properly with nested DX.
+(deftype vec ()
+  `(simple-array single-float (3)))
+(declaim (ftype (function (t t t) vec) vec))
+(declaim (inline vec))
+(defun vec (a b c)
+  (make-array 3 :element-type 'single-float :initial-contents (list a b c)))
+(defun bad-boy (vec)
+  (declare (type vec vec))
+  (lambda (fun)
+    (let ((vec (vec (aref vec 0) (aref vec 1) (aref vec 2))))
+      (declare (dynamic-extent vec))
+      (funcall fun vec))))
+(with-test (:name :recheck-nested-dx-bug)
+  (assert (funcall (bad-boy (vec 1.0 2.0 3.3))
+                   (lambda (vec) (equalp vec (vec 1.0 2.0 3.3)))))
+  (flet ((foo (x) (declare (ignore x))))
+    (let ((bad-boy (bad-boy (vec 2.0 3.0 4.0))))
+      (assert-no-consing (funcall bad-boy #'foo)))))
 

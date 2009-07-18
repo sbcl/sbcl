@@ -1,4 +1,16 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.30:
+  * improvement: stack allocation is should now be possible in all nested
+    inlining cases: failure to stack allocate when equivalent code is manually
+    open coded is now considered a bug.
+  * bug fix: moderately complex combinations of inline expansions could
+    be miscompiled if the result was declared to be dynamic extent.
+  * bug fix: in some cases no compiler note about failure to stack allocate
+    was emitted, even if the objects were in fact heap allocated.
+  * bug fix: minor violation of "otherwise inaccessible" rule for stack
+    allocation could cause objects users might reasonably expect to
+    be heap allocated to be stack allocated.
+
 changes in sbcl-1.0.30 relative to sbcl-1.0.29:
   * minor incompatible change: SB-THREAD:JOIN-THREAD-ERROR-THREAD and
     SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD have been deprecated in favor
