@@ -233,3 +233,14 @@
     (assert (eql 0.0d0 (funcall f 123.0d0 0.0)))
     (assert (eql 0.0d0 (funcall f 123.0d0 0.0d0)))
     (assert (eql 0.0d0 (funcall f 123.0 0.0d0)))))
+
+;; Bug reported by Eric Marsden on July 15 2009. The compiler
+;; used not to constant fold calls with arguments of type
+;; (EQL foo).
+(with-test (:name :eql-type-constant-fold)
+  (assert (equal '(FUNCTION (T) (VALUES (MEMBER T) &OPTIONAL))
+                 (sb-kernel:%simple-fun-type
+                  (compile nil `(lambda (x)
+                                  (eql #c(1.0 2.0)
+                                       (the (eql #c(1.0 2.0))
+                                         x))))))))

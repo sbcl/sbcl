@@ -830,7 +830,7 @@
                             :load-if (not (sc-is x ,constant-sc)))
                          (y :scs (,sc ,constant-sc)
                             :target mask
-                            :load-if (not (sc-is x ,constant-sc))))
+                            :load-if (not (sc-is y ,constant-sc))))
                   (:arg-types ,type ,type)
                   (:temporary (:sc ,sc :from :eval) mask)
                   (:temporary (:sc any-reg) bits)
