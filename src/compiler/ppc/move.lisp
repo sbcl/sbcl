@@ -141,7 +141,7 @@
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
-    (inst srawi y x 2)))
+    (inst srawi y x n-fixnum-tag-bits)))
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
@@ -151,7 +151,11 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "constant load")
   (:generator 1
-    (inst lr y (tn-value x))))
+    (cond ((sb!c::tn-leaf x)
+           (inst lr y (tn-value x)))
+          (t
+           (loadw y code-tn (tn-offset x) other-pointer-lowtag)
+           (inst srawi y y n-fixnum-tag-bits)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 

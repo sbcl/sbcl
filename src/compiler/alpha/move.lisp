@@ -161,7 +161,11 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "constant load")
   (:generator 1
-    (inst li (tn-value x) y)))
+    (cond ((sc!c::tn-leaf x)
+           (inst li (tn-value x) y))
+          (t
+           (loadw y code-tn (tn-offset x) other-pointer-lowtag)
+           (inst sra y n-fixnum-tag-bits y)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 

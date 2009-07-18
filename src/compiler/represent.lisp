@@ -414,12 +414,7 @@
                    (operand-restriction-ok
                     (first (template-result-types info))
                     (if write-p op-ptype other-ptype)
-                    :t-ok nil)
-                   ;; KLUDGE: Move VOPs with constant SCs can't use
-                   ;; load-time-value TNs. FIXME: if the VOPs were more
-                   ;; clever they could -- this is the release bandaid.
-                   (or (not (eq 'constant (sc-name op-sc)))
-                       (tn-leaf op-tn)))
+                    :t-ok nil))
           (return info))))))
 
 ;;; Emit a coercion VOP for OP BEFORE the specifed VOP or die trying.

@@ -150,7 +150,7 @@
   (:note "fixnum untagging")
   (:generator 1
     (move y x)
-    (inst sar y 2)))
+    (inst sar y n-fixnum-tag-bits)))
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
@@ -160,7 +160,11 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "constant load")
   (:generator 1
-    (inst mov y (tn-value x))))
+    (cond ((sb!c::tn-leaf x)
+           (inst mov y (tn-value x)))
+          (t
+           (inst mov y x)
+           (inst sar y n-fixnum-tag-bits)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
