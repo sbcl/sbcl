@@ -318,14 +318,8 @@
            (format nil
                    "~%  ~
                     compiled from ~S~%  ~
-                    at ~A~%  ~
-                    on ~A~%  ~
                     using ~A version ~A~%"
                    where
-                   #+sb-xc-host "cross-compile time"
-                   #-sb-xc-host (format-universal-time nil (get-universal-time))
-                   #+sb-xc-host "cross-compile host"
-                   #-sb-xc-host (machine-instance)
                    (sb!xc:lisp-implementation-type)
                    (sb!xc:lisp-implementation-version))))
        stream)

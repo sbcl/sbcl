@@ -114,6 +114,9 @@
 
 (defvar *compile-object* nil)
 (declaim (type object *compile-object*))
+(defvar *compile-toplevel-object* nil)
+
+(defvar *emit-cfasl* nil)
 
 (defvar *fopcompile-label-counter*)
 
@@ -1199,6 +1202,15 @@
           (t
            *top-level-form-noted*))))
 
+;;; Handle the evaluation the a :COMPILE-TOPLEVEL body during
+;;; compilation. Normally just evaluate in the appropriate
+;;; environment, but also compile if outputting a CFASL.
+(defun eval-compile-toplevel (body path)
+  (eval-in-lexenv `(progn ,@body) *lexenv*)
+  (when *compile-toplevel-object*
+    (let ((*compile-object* *compile-toplevel-object*))
+      (convert-and-maybe-compile `(progn ,@body) path))))
+
 ;;; Process a top level FORM with the specified source PATH.
 ;;;  * If this is a magic top level form, then do stuff.
 ;;;  * If this is a macro, then expand it.
@@ -1278,7 +1290,7 @@
                  (let ((expanded (preprocessor-macroexpand-1 form)))
                    (cond ((eq expanded form)
                           (when compile-time-too
-                            (eval-in-lexenv form *lexenv*))
+                            (eval-compile-toplevel (list form) path))
                           (convert-and-maybe-compile form path))
                          (t
                           (process-toplevel-form expanded
@@ -1324,9 +1336,8 @@
                                                              e))))
                           (cond (lt (process-toplevel-progn
                                      body path new-compile-time-too))
-                                (new-compile-time-too (eval-in-lexenv
-                                                       `(progn ,@body)
-                                                       *lexenv*))))))
+                                (new-compile-time-too
+                                 (eval-compile-toplevel body path))))))
                      ((macrolet)
                       (funcall-in-macrolet-lexenv
                        magic
@@ -1683,7 +1694,8 @@
 
      ;; extensions
      (trace-file nil)
-     ((:block-compile *block-compile-arg*) nil))
+     ((:block-compile *block-compile-arg*) nil)
+     (emit-cfasl *emit-cfasl*))
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and
 returning its filename.
@@ -1709,7 +1721,11 @@ returning its filename.
   :TRACE-FILE
      If given, internal data structures are dumped to the specified
      file, or if a value of T is given, to a file of *.trace type
-     derived from the input file name. (non-standard)"
+     derived from the input file name. (non-standard)
+
+  :EMIT-CFASL
+     (Experimental). If true, outputs the toplevel compile-time effects
+     of this file into a separate .cfasl file."
 ;;; Block compilation is currently broken.
 #|
   "Also, as a workaround for vaguely-non-ANSI behavior, the
@@ -1726,7 +1742,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
 :BLOCK-COMPILE argument will probably become deprecated."
 |#
   (let* ((fasl-output nil)
+         (cfasl-output nil)
          (output-file-name nil)
+         (coutput-file-name nil)
          (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
@@ -1742,6 +1760,13 @@ SPEED and COMPILATION-SPEED optimization values, and the
                                                :output-file output-file))
             (setq fasl-output
                   (open-fasl-output output-file-name
+                                    (namestring input-pathname))))
+          (when emit-cfasl
+            (setq coutput-file-name
+                  (make-pathname :type "cfasl"
+                                 :defaults output-file-name))
+            (setq cfasl-output
+                  (open-fasl-output coutput-file-name
                                     (namestring input-pathname))))
           (when trace-file
             (let* ((default-trace-file-pathname
@@ -1759,7 +1784,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
           (when sb!xc:*compile-verbose*
             (print-compile-start-note source-info))
 
-          (let ((*compile-object* fasl-output))
+          (let ((*compile-object* fasl-output)
+                (*compile-toplevel-object* cfasl-output))
             (setf (values abort-p warnings-p failure-p)
                   (sub-compile-file source-info))))
 
@@ -1771,6 +1797,11 @@ SPEED and COMPILATION-SPEED optimization values, and the
               (pathname (fasl-output-stream fasl-output)))
         (when (and (not abort-p) sb!xc:*compile-verbose*)
           (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
+
+      (when cfasl-output
+        (close-fasl-output cfasl-output abort-p)
+        (when (and (not abort-p) sb!xc:*compile-verbose*)
+          (compiler-mumble "; ~A written~%" (namestring coutput-file-name))))
 
       (when sb!xc:*compile-verbose*
         (print-compile-end-note source-info (not abort-p)))

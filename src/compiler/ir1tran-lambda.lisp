@@ -1078,24 +1078,25 @@
 ;;; previous references.
 (defun get-defined-fun (name)
   (proclaim-as-fun-name name)
-  (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))
-    (note-name-defined name :function)
-    (cond ((not (defined-fun-p found))
-           (aver (not (info :function :inlinep name)))
-           (let* ((where-from (leaf-where-from found))
-                  (res (make-defined-fun
-                        :%source-name name
-                        :where-from (if (eq where-from :declared)
-                                        :declared :defined)
-                        :type (leaf-type found))))
-             (substitute-leaf res found)
-             (setf (gethash name *free-funs*) res)))
-          ;; If *FREE-FUNS* has a previously converted definition
-          ;; for this name, then blow it away and try again.
-          ((defined-fun-functionals found)
-           (remhash name *free-funs*)
-           (get-defined-fun name))
-          (t found))))
+  (when (boundp '*free-funs*)
+    (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))
+      (note-name-defined name :function)
+      (cond ((not (defined-fun-p found))
+             (aver (not (info :function :inlinep name)))
+             (let* ((where-from (leaf-where-from found))
+                    (res (make-defined-fun
+                          :%source-name name
+                          :where-from (if (eq where-from :declared)
+                                          :declared :defined)
+                          :type (leaf-type found))))
+               (substitute-leaf res found)
+               (setf (gethash name *free-funs*) res)))
+            ;; If *FREE-FUNS* has a previously converted definition
+            ;; for this name, then blow it away and try again.
+            ((defined-fun-functionals found)
+             (remhash name *free-funs*)
+             (get-defined-fun name))
+            (t found)))))
 
 ;;; Check a new global function definition for consistency with
 ;;; previous declaration or definition, and assert argument/result
@@ -1162,14 +1163,13 @@
 (defun %compiler-defun (name lambda-with-lexenv compile-toplevel)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
-      ;; better be in the compiler
-      (aver (boundp '*lexenv*))
-      (remhash name *free-funs*)
       (setf defined-fun (get-defined-fun name))
-      (aver (fasl-output-p *compile-object*))
-      (if (member name *fun-names-in-this-file* :test #'equal)
-          (warn 'duplicate-definition :name name)
-          (push name *fun-names-in-this-file*)))
+      (when (boundp '*lexenv*)
+        (remhash name *free-funs*)
+        (aver (fasl-output-p *compile-object*))
+        (if (member name *fun-names-in-this-file* :test #'equal)
+            (warn 'duplicate-definition :name name)
+            (push name *fun-names-in-this-file*))))
 
     (become-defined-fun-name name)
 

@@ -3,6 +3,9 @@ changes relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested
     inlining cases: failure to stack allocate when equivalent code is manually
     open coded is now considered a bug.
+  * new feature: experimental :EMIT-CFASL parameter to COMPILE-FILE can
+    be used to output toplevel compile-time effects into a separate .CFASL
+    file.
   * bug fix: moderately complex combinations of inline expansions could
     be miscompiled if the result was declared to be dynamic extent.
   * bug fix: in some cases no compiler note about failure to stack allocate
