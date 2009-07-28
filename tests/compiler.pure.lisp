@@ -2972,3 +2972,157 @@
       (test '(integer 11 11) '(+ * 1) nil))
     (let ((* "fooo"))
       (test '(integer 4 4) '(length *) t))))
+
+(with-test (:name :float-division-by-one)
+  (flet ((test (lambda-form arg &optional (result arg))
+           (let* ((fun1 (compile nil lambda-form))
+                  (fun2 (funcall (compile nil `(lambda ()
+                                                 (declare (optimize (sb-c::float-accuracy 0)))
+                                                 ,lambda-form))))
+                  (disassembly1 (with-output-to-string (s)
+                                  (disassemble fun1 :stream s)))
+                  (disassembly2 (with-output-to-string (s)
+                                  (disassemble fun2 :stream s))))
+             ;; Let's make sure there is no division at runtime: for x86 and
+             ;; x86-64 that implies an FDIV, DIVSS, or DIVSD instruction, so
+             ;; look for DIV in the disassembly. It's a terrible KLUDGE, but
+             ;; it works.
+             #+(or x86 x86-64)
+             (assert (and (not (search "DIV" disassembly1))
+                          (not (search "DIV" disassembly2))))
+             (assert (eql result (funcall fun1 arg)))
+             (assert (eql result (funcall fun2 arg))))))
+    (test `(lambda (x) (declare (single-float x)) (/ x 1)) 123.45)
+    (test `(lambda (x) (declare (single-float x)) (/ x -1)) 123.45 -123.45)
+    (test `(lambda (x) (declare (single-float x)) (/ x 1.0)) 543.21)
+    (test `(lambda (x) (declare (single-float x)) (/ x -1.0)) 543.21 -543.21)
+    (test `(lambda (x) (declare (single-float x)) (/ x 1.0d0)) 42.00 42.d0)
+    (test `(lambda (x) (declare (single-float x)) (/ x -1.0d0)) 42.00 -42.d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x 1)) 123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x -1)) 123.45d0 -123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x 1.0)) 543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x -1.0)) 543.21d0 -543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x 1.0d0)) 42.d0)
+    (test `(lambda (x) (declare (double-float x)) (/ x -1.0d0)) 42.d0 -42.0d0)))
+
+(with-test (:name :float-multiplication-by-one)
+  (flet ((test (lambda-form arg &optional (result arg))
+           (let* ((fun1 (compile nil lambda-form))
+                  (fun2 (funcall (compile nil `(lambda ()
+                                                 (declare (optimize (sb-c::float-accuracy 0)))
+                                                 ,lambda-form))))
+                  (disassembly1 (with-output-to-string (s)
+                                  (disassemble fun1 :stream s)))
+                  (disassembly2 (with-output-to-string (s)
+                                  (disassemble fun2 :stream s))))
+             ;; Let's make sure there is no multiplication at runtime: for x86
+             ;; and x86-64 that implies an FMUL, MULSS, or MULSD instruction,
+             ;; so look for MUL in the disassembly. It's a terrible KLUDGE,
+             ;; but it works.
+             #+(or x86 x86-64)
+             (assert (and (not (search "MUL" disassembly1))
+                          (not (search "MUL" disassembly2))))
+             (assert (eql result (funcall fun1 arg)))
+             (assert (eql result (funcall fun2 arg))))))
+    (test `(lambda (x) (declare (single-float x)) (* x 1)) 123.45)
+    (test `(lambda (x) (declare (single-float x)) (* x -1)) 123.45 -123.45)
+    (test `(lambda (x) (declare (single-float x)) (* x 1.0)) 543.21)
+    (test `(lambda (x) (declare (single-float x)) (* x -1.0)) 543.21 -543.21)
+    (test `(lambda (x) (declare (single-float x)) (* x 1.0d0)) 42.00 42.d0)
+    (test `(lambda (x) (declare (single-float x)) (* x -1.0d0)) 42.00 -42.d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 1)) 123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (* x -1)) 123.45d0 -123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 1.0)) 543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (* x -1.0)) 543.21d0 -543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 1.0d0)) 42.d0)
+    (test `(lambda (x) (declare (double-float x)) (* x -1.0d0)) 42.d0 -42.0d0)))
+
+(with-test (:name :float-addition-of-zero)
+  (flet ((test (lambda-form arg &optional (result arg))
+           (let* ((fun1 (compile nil lambda-form))
+                  (fun2 (funcall (compile nil `(lambda ()
+                                                 (declare (optimize (sb-c::float-accuracy 0)))
+                                                 ,lambda-form))))
+                  (disassembly1 (with-output-to-string (s)
+                                  (disassemble fun1 :stream s)))
+                  (disassembly2 (with-output-to-string (s)
+                                  (disassemble fun2 :stream s))))
+             ;; Let's make sure there is no addition at runtime: for x86 and
+             ;; x86-64 that implies an FADD, ADDSS, or ADDSD instruction, so
+             ;; look for the ADDs in the disassembly. It's a terrible KLUDGE,
+             ;; but it works. Unless FLOAT-ACCURACY is zero, we leave the
+             ;; addition in to catch SNaNs.
+             #+x86
+             (assert (and (search "FADD" disassembly1)
+                          (not (search "FADD" disassembly2))))
+             #+x86-64
+             (let ((inst (if (typep result 'double-float)
+                             "ADDSD" "ADDSS")))
+               (assert (and (search inst disassembly1)
+                            (not (search inst disassembly2)))))
+             (assert (eql result (funcall fun1 arg)))
+             (assert (eql result (funcall fun2 arg))))))
+    (test `(lambda (x) (declare (single-float x)) (+ x 0)) 123.45)
+    (test `(lambda (x) (declare (single-float x)) (+ x 0.0)) 543.21)
+    (test `(lambda (x) (declare (single-float x)) (+ x 0.0d0)) 42.00 42.d0)
+    (test `(lambda (x) (declare (double-float x)) (+ x 0)) 123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (+ x 0.0)) 543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (+ x 0.0d0)) 42.d0)))
+
+(with-test (:name :float-substraction-of-zero)
+  (flet ((test (lambda-form arg &optional (result arg))
+           (let* ((fun1 (compile nil lambda-form))
+                  (fun2 (funcall (compile nil `(lambda ()
+                                                 (declare (optimize (sb-c::float-accuracy 0)))
+                                                 ,lambda-form))))
+                  (disassembly1 (with-output-to-string (s)
+                                  (disassemble fun1 :stream s)))
+                  (disassembly2 (with-output-to-string (s)
+                                  (disassemble fun2 :stream s))))
+             ;; Let's make sure there is no substraction at runtime: for x86
+             ;; and x86-64 that implies an FSUB, SUBSS, or SUBSD instruction,
+             ;; so look for SUB in the disassembly. It's a terrible KLUDGE,
+             ;; but it works. Unless FLOAT-ACCURACY is zero, we leave the
+             ;; substraction in in to catch SNaNs.
+             #+x86
+             (assert (and (search "FSUB" disassembly1)
+                          (not (search "FSUB" disassembly2))))
+             #+x86-64
+             (let ((inst (if (typep result 'double-float)
+                             "SUBSD" "SUBSS")))
+               (assert (and (search inst disassembly1)
+                            (not (search inst disassembly2)))))
+             (assert (eql result (funcall fun1 arg)))
+             (assert (eql result (funcall fun2 arg))))))
+    (test `(lambda (x) (declare (single-float x)) (- x 0)) 123.45)
+    (test `(lambda (x) (declare (single-float x)) (- x 0.0)) 543.21)
+    (test `(lambda (x) (declare (single-float x)) (- x 0.0d0)) 42.00 42.d0)
+    (test `(lambda (x) (declare (double-float x)) (- x 0)) 123.45d0)
+    (test `(lambda (x) (declare (double-float x)) (- x 0.0)) 543.21d0)
+    (test `(lambda (x) (declare (double-float x)) (- x 0.0d0)) 42.d0)))
+
+(with-test (:name :float-multiplication-by-two)
+  (flet ((test (lambda-form arg &optional (result arg))
+           (let* ((fun1 (compile nil lambda-form))
+                  (fun2 (funcall (compile nil `(lambda ()
+                                                 (declare (optimize (sb-c::float-accuracy 0)))
+                                                 ,lambda-form))))
+                  (disassembly1 (with-output-to-string (s)
+                                  (disassemble fun1 :stream s)))
+                  (disassembly2 (with-output-to-string (s)
+                                  (disassemble fun2 :stream s))))
+             ;; Let's make sure there is no multiplication at runtime: for x86
+             ;; and x86-64 that implies an FMUL, MULSS, or MULSD instruction,
+             ;; so look for MUL in the disassembly. It's a terrible KLUDGE,
+             ;; but it works.
+             #+(or x86 x86-64)
+             (assert (and (not (search "MUL" disassembly1))
+                          (not (search "MUL" disassembly2))))
+             (assert (eql result (funcall fun1 arg)))
+             (assert (eql result (funcall fun2 arg))))))
+    (test `(lambda (x) (declare (single-float x)) (* x 2)) 123.45 246.9)
+    (test `(lambda (x) (declare (single-float x)) (* x 2.0)) 543.21 1086.42)
+    (test `(lambda (x) (declare (single-float x)) (* x 2.0d0)) 42.00 84.d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 2)) 123.45d0 246.9d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 2.0)) 543.21d0 1086.42d0)
+    (test `(lambda (x) (declare (double-float x)) (* x 2.0d0)) 42.0d0 84.0d0)))

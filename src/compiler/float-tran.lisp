@@ -332,6 +332,36 @@
   (%deftransform x '(function (double-float single-float) *)
                  #'float-contagion-arg2))
 
+;;; Optimize division and multiplication by one and minus one.
+(macrolet ((def (op type &rest args)
+             `(deftransform ,op ((x y) (,type (constant-arg (member ,@args))))
+                (if (minusp (lvar-value y))
+                    '(+ (%negate x) ,(coerce 0 type))
+                    '(+ x ,(coerce 0 type))))))
+  (def / single-float 1 1.0 -1 -1.0)
+  (def * single-float 1 1.0 -1 -1.0)
+  (def / double-float 1 1.0 1.0d0 -1 -1.0 -1.0d0)
+  (def * double-float 1 1.0 1.0d0 -1 -1.0 -1.0d0))
+
+;;; Optimize addition and subsctraction of zero
+(macrolet ((def (op type &rest args)
+             `(deftransform ,op ((x y) (,type (constant-arg (member ,@args))) *
+                                 ;; Beware the SNaN!
+                                 :policy (zerop float-accuracy))
+                'x)))
+  ;; No signed zeros, thanks.
+  (def + single-float 0 0.0)
+  (def - single-float 0 0.0)
+  (def + double-float 0 0.0 0.0d0)
+  (def - double-float 0 0.0 0.0d0))
+
+;;; On most platforms (+ x x) is faster than (* x 2)
+(macrolet ((def (type &rest args)
+             `(deftransform * ((x y) (,type (constant-arg (member ,@args))))
+                '(+ x x))))
+  (def single-float 2 2.0)
+  (def double-float 2 2.0 2.0d0))
+
 ;;; Prevent ZEROP, PLUSP, and MINUSP from losing horribly. We can't in
 ;;; general float rational args to comparison, since Common Lisp
 ;;; semantics says we are supposed to compare as rationals, but we can
