@@ -527,7 +527,8 @@
                                        (ecase (info :function :where-from name)
                                          (:declared "Declared")
                                          ;; This is hopefully clearer to users
-                                         ((:defined-method :defined) "Derived"))))))
+                                         ((:defined-method :defined) "Derived")
+                                         (:assumed))))))
                      (if (typep fun 'generic-function)
                          (values fun
                                  "a generic function"
@@ -553,7 +554,7 @@
             (format stream "~%~A names ~A:" name what)
             (pprint-indent :block 2 stream))
           (describe-lambda-list lambda-list stream)
-          (when ftype
+          (when (and ftype from)
             (format stream "~@:_~A type: ~S" from ftype))
           (describe-documentation name 'function stream)
           (when (car inline)

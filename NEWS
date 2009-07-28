@@ -17,6 +17,8 @@ changes relative to sbcl-1.0.30:
   * bug fix: minor violation of "otherwise inaccessible" rule for stack
     allocation could cause objects users might reasonably expect to
     be heap allocated to be stack allocated.
+  * bug fix: DESCRIBE signalled an error for generic functions under
+    certain circumstances. (reported by Leslie Polzer)
 
 changes in sbcl-1.0.30 relative to sbcl-1.0.29:
   * minor incompatible change: SB-THREAD:JOIN-THREAD-ERROR-THREAD and

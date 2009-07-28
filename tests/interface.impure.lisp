@@ -241,5 +241,11 @@
 #+sb-doc
 (with-test (:name (documentation built-in-function))
   (assert (documentation 'cons 'function)))
+
+(with-test (:name :describe-generic-function-with-assumed-type)
+  ;; Signalled an error at one point
+  (flet ((zoo () (gogo)))
+    (defmethod gogo () nil)
+    (describe 'gogo)))
 
 ;;;; success
