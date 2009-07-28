@@ -926,7 +926,7 @@ corresponds to NAME, or NIL if there is none."
 
   #!-sb-fluid (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
-    "Return the number of seconds and microseconds since the beginning og
+    "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
     #!+darwin
     (with-alien ((tv (struct timeval)))

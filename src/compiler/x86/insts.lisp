@@ -2642,9 +2642,8 @@
 (define-instruction fxch (segment source)
   (:printer floating-point-fp ((op '(#b001 #b001))))
   (:emitter
-    (unless (and (tn-p source)
-                 (eq (sb-name (sc-sb (tn-sc source))) 'float-registers))
-      (cl:break))
+    (aver (and (tn-p source)
+               (eq (sb-name (sc-sb (tn-sc source))) 'float-registers)))
     (emit-byte segment #b11011001)
     (emit-fp-op segment source #b001)))
 
