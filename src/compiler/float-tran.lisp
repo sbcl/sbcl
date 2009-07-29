@@ -332,16 +332,48 @@
   (%deftransform x '(function (double-float single-float) *)
                  #'float-contagion-arg2))
 
-;;; Optimize division and multiplication by one and minus one.
-(macrolet ((def (op type &rest args)
-             `(deftransform ,op ((x y) (,type (constant-arg (member ,@args))))
-                (if (minusp (lvar-value y))
-                    '(+ (%negate x) ,(coerce 0 type))
-                    '(+ x ,(coerce 0 type))))))
-  (def / single-float 1 1.0 -1 -1.0)
-  (def * single-float 1 1.0 -1 -1.0)
-  (def / double-float 1 1.0 1.0d0 -1 -1.0 -1.0d0)
-  (def * double-float 1 1.0 1.0d0 -1 -1.0 -1.0d0))
+(macrolet ((def (type &rest args)
+             `(deftransform * ((x y) (,type (constant-arg (member ,@args))) *
+                               ;; Beware the SNaN!
+                               :policy (zerop float-accuracy))
+                "optimize multiplication by one"
+                (let ((y (lvar-value y)))
+                  (if (minusp y)
+                      '(%negate x)
+                      'x)))))
+  (def * single-float 1.0 -1.0)
+  (def * double-float 1.0d0 -1.0d0))
+
+;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
+(defun maybe-exact-reciprocal (x)
+  (unless (zerop x)
+    (multiple-value-bind (significand exponent sign)
+        ;; Signals an error for NaNs and infinities.
+        (handler-case (integer-decode-float x)
+          (error () (return-from maybe-exact-reciprocal nil)))
+      (let ((expected (/ sign significand (expt 2 exponent))))
+        (let ((reciprocal (/ 1 x)))
+          (multiple-value-bind (significand exponent sign) (integer-decode-float reciprocal)
+            (when (eql expected (* sign significand (expt 2 exponent)))
+              reciprocal)))))))
+
+;;; Replace constant division by multiplication with exact reciprocal,
+;;; if one exists.
+(macrolet ((def (type)
+             `(deftransform / ((x y) (,type (constant-arg ,type)) *
+                               :node node)
+                "convert to multiplication by reciprocal"
+                (let ((n (lvar-value y)))
+                  (if (policy node (zerop float-accuracy))
+                      `(* x ,(/ n))
+                      (let ((r (maybe-exact-reciprocal n)))
+                        (if r
+                            `(* x ,r)
+                            (give-up-ir1-transform
+                             "~S does not have an exact reciprocal"
+                             n))))))))
+  (def single-float)
+  (def double-float))
 
 ;;; Optimize addition and subsctraction of zero
 (macrolet ((def (op type &rest args)

@@ -6,8 +6,8 @@ changes relative to sbcl-1.0.30:
   * new feature: experimental :EMIT-CFASL parameter to COMPILE-FILE can
     be used to output toplevel compile-time effects into a separate .CFASL
     file.
-  * optimization: multiplication and division of single- and double-floats
-    with constant +/-one has been optimized.
+  * optimization: division of floating point numbers by constants uses
+    multiplication by reciprocal when an exact reciprocal exists.
   * optimization: multiplication of single- and double-floats floats by
     constant two has been optimized.
   * bug fix: moderately complex combinations of inline expansions could
