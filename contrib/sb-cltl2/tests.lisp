@@ -182,7 +182,7 @@
           (assert (plusp x)))))
   (:lexical t nil))
 
-(deftest variable-info.lexical.type.2
+(deftest variable-info.lexical.type.3
     (let ((x 42))
       (locally (declare (fixnum x))
         (var-info x)))

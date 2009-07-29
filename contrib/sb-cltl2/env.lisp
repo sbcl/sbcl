@@ -223,6 +223,13 @@ appear with CDR as T if the variable has been declared always bound."
 (declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
                 declaration-information))
 (defun declaration-information (declaration-name &optional env)
+  "Return information about declarations named by DECLARATION-NAME.
+
+If DECLARATION-NAME is optimize return a list who's entries are of the
+form (quality value).
+
+If DECLARATION-NAME is SB-EXT:MUFFLE-CONDITIONS return a type specifier for
+the condition types that have been muffled."
   (let ((env (or env (make-null-lexenv))))
     (case declaration-name
       (optimize
@@ -239,6 +246,11 @@ appear with CDR as T if the variable has been declared always bound."
       (t (error "Unsupported declaration ~S." declaration-name)))))
 
 (defun parse-macro (name lambda-list body &optional env)
+  "Process a macro definition of the kind that might appear in a DEFMACRO form
+into a lambda expression of two variables: a form and an environment. The
+lambda edxpression will parse its form argument, binding the variables in
+LAMBDA-LIST appropriately, and then excute BODY with those bindings in
+effect."
   (declare (ignore env))
   (with-unique-names (whole environment)
     (multiple-value-bind (body decls)
@@ -249,8 +261,13 @@ appear with CDR as T if the variable has been declared always bound."
          ,@decls
          ,body))))
 
-(defun enclose (lambda-expression &optional env)
-  (let ((env (if env
-                 (sb-c::make-restricted-lexenv env)
+(defun enclose (lambda-expression &optional environment)
+  "Return a function consistent with LAMBDA-EXPRESSION in ENVIRONMENT: the
+lambda expression is allowed to reference the declarations and macro
+definitions in ENVIRONMENT, but consequences are undefined if lexical
+variables, functions, tags or any other run-time entity defined in ENVIRONMENT
+is referred to by the expression."
+  (let ((env (if environment
+                 (sb-c::make-restricted-lexenv environment)
                  (make-null-lexenv))))
     (compile-in-lexenv nil lambda-expression env)))
