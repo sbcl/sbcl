@@ -449,13 +449,3 @@ not checked. In short: don't use it.
 The @code{sb-ext:freeze-type} declaration declares that a
 type will never change, which can make type testing
 (@code{typep}, etc.) more efficient for structure types.
-
-The @code{sb-ext:constant-function} declaration specifies
-that a function will always return the same value for the same
-arguments, which may allow the compiler to optimize calls
-to it. This is appropriate for functions like @code{sqrt}, but
-is @emph{not} appropriate for functions like @code{aref},
-which can change their return values when the underlying data are
-changed.
-@c <!-- FIXME: This declaration does not seem to be supported in the
-@c      current compiler. -->
