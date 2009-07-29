@@ -614,17 +614,28 @@
              ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
              ((csubtypep tspec (specifier-type 'float))
               '(%single-float x))
-             ((and (csubtypep tspec (specifier-type 'simple-vector))
-                   ;; Can we avoid checking for dimension issues like
-                   ;; (COERCE FOO '(SIMPLE-VECTOR 5)) returning a
-                   ;; vector of length 6?
-                   (or (policy node (< safety 3)) ; no need in unsafe code
-                       (and (array-type-p tspec) ; no need when no dimensions
-                            (equal (array-type-dimensions tspec) '(*)))))
-              `(if (simple-vector-p x)
+             ;; Special case this one: SIMPLE-STRING is a union-type.
+             ((type= tspec (specifier-type 'simple-string))
+              `(if (typep x 'simple-string)
                    x
-                   (replace (make-array (length x)) x)))
-             ;; FIXME: other VECTOR types?
+                   (replace (make-array (length x) :element-type 'character) x)))
+             ;; Handle specialized element types.
+             ((csubtypep tspec (specifier-type '(simple-array * (*))))
+              (dolist (etype sb!kernel::*specialized-array-element-types*
+                       (give-up-ir1-transform))
+                (when etype
+                  (let ((spec `(simple-array ,etype (*))))
+                    (when (and (csubtypep tspec (specifier-type spec))
+                               ;; Can we avoid checking for dimension issues like (COERCE FOO
+                               ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
+                               (or (policy node (< safety 3)) ; no need in unsafe code
+                                   (and (array-type-p tspec) ; no need when no dimensions
+                                        (equal (array-type-dimensions tspec) '(*)))))
+                      (return
+                        `(if (typep x ',spec)
+                             x
+                             (replace (make-array (length x) :element-type ',etype) x))))
+                    (give-up-ir1-transform)))))
              (t
               (give-up-ir1-transform)))))))
 
