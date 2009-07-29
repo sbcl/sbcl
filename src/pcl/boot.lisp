@@ -2208,6 +2208,21 @@ bootstrapping.
                      method-class)
                     (t (find-class method-class t ,env))))))))
 
+(defun note-gf-signature (fun-name lambda-list-p lambda-list)
+  ;; FIXME: Ideally we would like to not clobber it, but because generic
+  ;; functions assert their FTYPEs callers believing the FTYPE are
+  ;; left with unsafe assumptions. Hence the clobbering.
+  (when (eq :declared (info :function :where-from fun-name))
+    (style-warn "~@<Generic function ~S clobbers an earlier ~S proclamation ~
+                 for the same name.~:@>"
+                fun-name 'ftype))
+  (setf (info :function :type fun-name)
+        (specifier-type
+         (if lambda-list-p
+             (ftype-declaration-from-lambda-list lambda-list fun-name)
+             'function)))
+  (setf (info :function :where-from fun-name) :defined-method))
+
 (defun real-ensure-gf-using-class--generic-function
        (existing
         fun-name
@@ -2222,11 +2237,7 @@ bootstrapping.
     (change-class existing generic-function-class))
   (prog1
       (apply #'reinitialize-instance existing all-keys)
-    (when lambda-list-p
-      (setf (info :function :type fun-name)
-            (specifier-type
-             (ftype-declaration-from-lambda-list lambda-list fun-name))
-            (info :function :where-from fun-name) :defined-method))))
+    (note-gf-signature fun-name lambda-list-p lambda-list)))
 
 (defun real-ensure-gf-using-class--null
        (existing
@@ -2241,11 +2252,7 @@ bootstrapping.
       (setf (gdefinition fun-name)
             (apply #'make-instance generic-function-class
                    :name fun-name all-keys))
-    (when lambda-list-p
-      (setf (info :function :type fun-name)
-            (specifier-type
-             (ftype-declaration-from-lambda-list lambda-list fun-name))
-            (info :function :where-from fun-name) :defined-method))))
+    (note-gf-signature fun-name lambda-list-p lambda-list)))
 
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)

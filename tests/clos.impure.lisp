@@ -1718,5 +1718,30 @@
     (shared-initialize x '(a))
     (assert (slot-boundp x 'a))
     (assert (eq :ok (slot-value x 'a)))))
+
+(declaim (ftype (function (t t t) (values single-float &optional))
+                i-dont-want-to-be-clobbered-1
+                i-dont-want-to-be-clobbered-2))
+(defgeneric i-dont-want-to-be-clobbered-1 (t t t))
+(defmethod i-dont-want-to-be-clobbered-2 ((x cons) y z)
+  y)
+(defun i-cause-an-gf-info-update ()
+  (i-dont-want-to-be-clobbered-2 t t t))
+(with-test (:name :defgeneric-should-clobber-ftype)
+  ;; (because it doesn't check the argument or result types)
+  (assert (equal '(function (t t t) *)
+                 (sb-kernel:type-specifier
+                  (sb-int:info :function
+                               :type 'i-dont-want-to-be-clobbered-1))))
+  (assert (equal '(function (t t t) *)
+                 (sb-kernel:type-specifier
+                  (sb-int:info :function
+                               :type 'i-dont-want-to-be-clobbered-2))))
+  (assert (eq :defined-method
+              (sb-int:info :function
+                           :where-from 'i-dont-want-to-be-clobbered-1)))
+  (assert (eq :defined-method
+              (sb-int:info :function
+                           :where-from 'i-dont-want-to-be-clobbered-2))))
 
 ;;;; success
