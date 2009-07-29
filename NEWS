@@ -19,8 +19,11 @@ changes relative to sbcl-1.0.30:
     but assumed or declared function as well.
   * improvement: recompilation of systems using SB-GROVEL now works
     (thanks to Leslie Polzer)
-  * improvement: SB-CLTL2 functions DECLARATION-INFORMATION, PARSE-MACRO,
-    and ENCLOSE have been documented (thanks to Larry D'Anna)
+  * improvements to SB-CLTL2 (thanks to Larry D'Anna):
+    ** functions DECLARATION-INFORMATION, PARSE-MACRO, and ENCLOSE have been
+       documented.
+    ** DECLARATION-INFORMATION now supports declaration name DECLARATION as
+       well.
   * bug fix: the low-level debugger had 32-bit assumptions and was missing
     information about some array types. (thanks to Luis Oliveira)
   * bug fix: moderately complex combinations of inline expansions could

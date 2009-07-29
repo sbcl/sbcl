@@ -8,7 +8,6 @@
 (in-package :sb-cltl2)
 
 #| TODO:
-declaration-information
 augment-environment
 define-declaration
 (map-environment)
@@ -225,8 +224,11 @@ appear with CDR as T if the variable has been declared always bound."
 (defun declaration-information (declaration-name &optional env)
   "Return information about declarations named by DECLARATION-NAME.
 
-If DECLARATION-NAME is optimize return a list who's entries are of the
-form (quality value).
+If DECLARATION-NAME is OPTIMIZE return a list who's entries are of the
+form \(QUALITY VALUE).
+
+If DECLARATION-NAME is DECLARATION return a list of declaration names that
+have been proclaimed as valid.
 
 If DECLARATION-NAME is SB-EXT:MUFFLE-CONDITIONS return a type specifier for
 the condition types that have been muffled."
@@ -243,6 +245,16 @@ the condition types that have been muffled."
       (sb-ext:muffle-conditions
        (car (rassoc 'muffle-warning
                     (sb-c::lexenv-handled-conditions env))))
+      (declaration
+       ;; FIXME: This is a bit too deep in the guts of INFO for comfort...
+       (let ((type (sb-c::type-info-number
+                    (sb-c::type-info-or-lose :declaration :recognized)))
+             (ret nil))
+         (dolist (env *info-environment*)
+           (do-info (env :name name :type-number num :value value)
+             (when (and (= num type) value)
+               (push name ret))))
+         ret))
       (t (error "Unsupported declaration ~S." declaration-name)))))
 
 (defun parse-macro (name lambda-list body &optional env)

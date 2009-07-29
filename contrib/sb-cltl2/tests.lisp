@@ -109,6 +109,13 @@
                (subtypep '(and warning (not style-warning)) dinfo)))))))
   t)
 
+
+(declaim (declaration fubar))
+
+(deftest declaration-information.declaration
+    (if (member 'fubar (declaration-information 'declaration)) 'yay)
+  yay)
+
 ;;;; VARIABLE-INFORMATION
 
 (defvar *foo*)
