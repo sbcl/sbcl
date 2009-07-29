@@ -97,7 +97,7 @@
                  :type `(array char ,len)
                  :offset offset
                  :size len
-                 :name (gentemp "PADDING")))
+                 :name (intern (format nil "PADDING-~D-~D" len offset))))
 (defun mk-struct (offset &rest children)
   (make-instance 'struct :name (gentemp "STRUCT")
                  :children (remove nil children)
