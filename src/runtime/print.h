@@ -15,8 +15,6 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-extern char *lowtag_Names[], *subtype_Names[];
-
 extern void print(lispobj obj);
 extern void brief_print(lispobj obj);
 extern void reset_printer(void);

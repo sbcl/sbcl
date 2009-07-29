@@ -273,8 +273,7 @@ search_cmd(char **ptr)
         end += 2;
         if (widetag_of(obj) == SIMPLE_FUN_HEADER_WIDETAG) {
             print((long)addr | FUN_POINTER_LOWTAG);
-        } else if (lowtag_of(obj) == OTHER_IMMEDIATE_0_LOWTAG ||
-                   lowtag_of(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
+        } else if (other_immediate_lowtag_p(obj)) {
             print((lispobj)addr | OTHER_POINTER_LOWTAG);
         } else {
             print((lispobj)addr);

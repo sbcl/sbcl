@@ -2867,7 +2867,36 @@ core and return a descriptor to it."
             (c-symbol-name symbol)
             (sb!xc:mask-field (symbol-value symbol) -1))))
 
-
+#!+sb-ldb
+(defun write-tagnames-h (&optional (out *standard-output*))
+  (labels
+      ((pretty-name (symbol strip)
+         (let ((name (string-downcase symbol)))
+           (substitute #\Space #\-
+                       (subseq name 0 (- (length name) (length strip))))))
+       (list-sorted-tags (tail)
+         (loop for symbol being the external-symbols of "SB!VM"
+               when (and (constantp symbol)
+                         (tailwise-equal (string symbol) tail))
+               collect symbol into tags
+               finally (return (sort tags #'< :key #'symbol-value))))
+       (write-tags (kind limit ash-count)
+         (format out "~%static const char *~(~A~)_names[] = {~%"
+                 (subseq kind 1))
+         (let ((tags (list-sorted-tags kind)))
+           (dotimes (i limit)
+             (if (eql i (ash (or (symbol-value (first tags)) -1) ash-count))
+                 (format out "    \"~A\"" (pretty-name (pop tags) kind))
+                 (format out "    \"unknown [~D]\"" i))
+             (unless (eql i (1- limit))
+               (write-string "," out))
+             (terpri out)))
+         (write-line "};" out)))
+    (write-tags "-LOWTAG" sb!vm:lowtag-limit 0)
+    ;; this -2 shift depends on every OTHER-IMMEDIATE-?-LOWTAG
+    ;; ending with the same 2 bits. (#b10)
+    (write-tags "-WIDETAG" (ash (1+ sb!vm:widetag-mask) -2) -2))
+  (values))
 
 (defun write-primitive-object (obj)
   ;; writing primitive object layouts
@@ -3355,6 +3384,8 @@ initially undefined function references:~2%")
             (write-map)))
         (out-to "config" (write-config-h))
         (out-to "constants" (write-constants-h))
+        #!+sb-ldb
+        (out-to "tagnames" (write-tagnames-h))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
                              :key (lambda (obj)
                                     (symbol-name
@@ -3387,5 +3418,3 @@ initially undefined function references:~2%")
 
         (when core-file-name
           (write-initial-core-file core-file-name))))))
-
-
