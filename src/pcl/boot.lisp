@@ -2209,19 +2209,41 @@ bootstrapping.
                     (t (find-class method-class t ,env))))))))
 
 (defun note-gf-signature (fun-name lambda-list-p lambda-list)
-  ;; FIXME: Ideally we would like to not clobber it, but because generic
-  ;; functions assert their FTYPEs callers believing the FTYPE are
-  ;; left with unsafe assumptions. Hence the clobbering.
-  (when (eq :declared (info :function :where-from fun-name))
-    (style-warn "~@<Generic function ~S clobbers an earlier ~S proclamation ~
-                 for the same name.~:@>"
-                fun-name 'ftype))
-  (setf (info :function :type fun-name)
-        (specifier-type
-         (if lambda-list-p
-             (ftype-declaration-from-lambda-list lambda-list fun-name)
-             'function)))
-  (setf (info :function :where-from fun-name) :defined-method))
+  (unless lambda-list-p
+    ;; Use the existing lambda-list, if any. It is reasonable to do eg.
+    ;;
+    ;;   (if (fboundp name)
+    ;;       (ensure-generic-function name)
+    ;;       (ensure-generic-function name :lambda-list '(foo)))
+    ;;
+    ;; in which case we end up here with no lambda-list in the first leg.
+    (setf (values lambda-list lambda-list-p)
+          (handler-case
+              (values (generic-function-lambda-list (fdefinition fun-name))
+                      t)
+            ((or warning error) ()
+              (values nil nil)))))
+  (let ((gf-type
+         (specifier-type
+          (if lambda-list-p
+              (ftype-declaration-from-lambda-list lambda-list fun-name)
+              'function)))
+        (old-type nil))
+    ;; FIXME: Ideally we would like to not clobber it, but because generic
+    ;; functions assert their FTYPEs callers believing the FTYPE are left with
+    ;; unsafe assumptions. Hence the clobbering. Be quiet when the new type
+    ;; is a subtype of the old one, though -- even though the type is not
+    ;; trusted anymore, the warning is still not quite as interesting.
+    (when (and (eq :declared (info :function :where-from fun-name))
+               (not (csubtypep gf-type (setf old-type (info :function :type fun-name)))))
+      (style-warn "~@<Generic function ~S clobbers an earlier ~S proclamation ~S ~
+                   for the same name with ~S.~:@>"
+                  fun-name 'ftype
+                  (type-specifier old-type)
+                  (type-specifier gf-type)))
+    (setf (info :function :type fun-name) gf-type
+          (info :function :where-from fun-name) :defined-method)
+    fun-name))
 
 (defun real-ensure-gf-using-class--generic-function
        (existing

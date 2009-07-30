@@ -167,7 +167,6 @@
     (base-char "base-char")
     (t "character")))
 
-(declaim (ftype (function (t stream)) describe-object))
 (defgeneric describe-object (x stream))
 
 (defvar *in-describe* nil)
