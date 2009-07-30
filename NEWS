@@ -6,9 +6,9 @@ changes relative to sbcl-1.0.30:
   * new feature: experimental :EMIT-CFASL parameter to COMPILE-FILE can
     be used to output toplevel compile-time effects into a separate .CFASL
     file.
-  * optimization: COERCE to SIMPLE-STRING and recognizable one-dimenstional
-    subtypes of SIMPLE-ARRAY is upto 70% faster when the coercion is actually
-    needed.
+  * optimization: COERCE to STRING, SIMPLE-STRING and recognizable
+    one-dimenstional subtypes of ARRAY is upto 70% faster when the coercion is
+    actually needed.
   * optimization: division of floating point numbers by constants uses
     multiplication by reciprocal when an exact reciprocal exists.
   * optimization: multiplication of single- and double-floats floats by

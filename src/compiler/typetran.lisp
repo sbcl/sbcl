@@ -602,7 +602,8 @@
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))
-  (let ((tspec (ir1-transform-specifier-type (lvar-value type))))
+  (let* ((tval (lvar-value type))
+         (tspec (ir1-transform-specifier-type tval)))
     (if (csubtypep (lvar-type x) tspec)
         'x
         ;; Note: The THE here makes sure that specifiers like
@@ -614,29 +615,51 @@
              ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
              ((csubtypep tspec (specifier-type 'float))
               '(%single-float x))
-             ;; Special case this one: SIMPLE-STRING is a union-type.
-             ((type= tspec (specifier-type 'simple-string))
-              `(if (typep x 'simple-string)
+             ;; Special case STRING and SIMPLE-STRING as they are union types
+             ;; in SBCL.
+             ((member tval '(string simple-string))
+              `(if (typep x ',tval)
                    x
                    (replace (make-array (length x) :element-type 'character) x)))
-             ;; Handle specialized element types.
-             ((csubtypep tspec (specifier-type '(simple-array * (*))))
-              (dolist (etype sb!kernel::*specialized-array-element-types*
-                       (give-up-ir1-transform))
-                (when etype
-                  (let ((spec `(simple-array ,etype (*))))
-                    (when (and (csubtypep tspec (specifier-type spec))
-                               ;; Can we avoid checking for dimension issues like (COERCE FOO
-                               ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
-                               (or (policy node (< safety 3)) ; no need in unsafe code
-                                   (and (array-type-p tspec) ; no need when no dimensions
-                                        (equal (array-type-dimensions tspec) '(*)))))
-                      (return
-                        `(if (typep x ',spec)
-                             x
-                             (replace (make-array (length x) :element-type ',etype) x))))
-                    (give-up-ir1-transform)))))
+             ;; Handle specialized element types for 1D arrays.
+             ((csubtypep tspec (specifier-type '(array * (*))))
+              ;; Can we avoid checking for dimension issues like (COERCE FOO
+              ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
+              (if (or (policy node (< safety 3)) ; no need in unsafe code
+                      (and (array-type-p tspec)  ; no need when no dimensions
+                           (equal (array-type-dimensions tspec) '(*))))
+                  ;; We can!
+                  (let ((array-type
+                         (if (csubtypep tspec (specifier-type 'simple-array))
+                             'simple-array
+                             'array)))
+                    (dolist (etype
+                              #+sb-xc-host '(t bit character)
+                              #-sb-xc-host sb!kernel::*specialized-array-element-types*
+                             (give-up-ir1-transform))
+                      (when etype
+                        (let ((spec `(,array-type ,etype (*))))
+                          (when (csubtypep tspec (specifier-type spec))
+                            ;; Is the result required to be non-simple?
+                            (let ((result-simple
+                                   (or (eq 'simple-array array-type)
+                                       (neq *empty-type*
+                                            (type-intersection
+                                             tspec (specifier-type 'simple-array))))))
+                              (return
+                                `(if (typep x ',spec)
+                                     x
+                                     (replace
+                                      (make-array (length x) :element-type ',etype
+                                                  ,@(unless result-simple
+                                                            (list :fill-pointer t
+                                                                  :adjustable t)))
+                                      x)))))))))
+                  ;; No, duh. Dimension checking required.
+                  (give-up-ir1-transform
+                   "~@<~S specifies dimensions other than (*) in safe code.~:@>"
+                   tval)))
              (t
-              (give-up-ir1-transform)))))))
-
-
+              (give-up-ir1-transform
+               "~@<open coding coercion to ~S not implemented.~:@>"
+               tval)))))))
