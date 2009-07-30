@@ -249,7 +249,7 @@ send(2) will be called instead. Returns the number of octets written."))
                   (if eor sockint::MSG-EOR 0)
                   (if dontroute sockint::MSG-DONTROUTE 0)
                   (if dontwait sockint::MSG-DONTWAIT 0)
-                  (if nosignal sockint::MSG-NOSIGNAL 0)
+                  #-darwin (if nosignal sockint::MSG-NOSIGNAL 0)
                   #+linux (if confirm sockint::MSG-CONFIRM 0)
                   #+linux (if more sockint::MSG-MORE 0)))
          (buffer (etypecase buffer

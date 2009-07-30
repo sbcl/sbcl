@@ -91,7 +91,6 @@
  (:integer f-getfl "F_GETFL")
  (:integer f-setfl "F_SETFL")
 
- #+linux (:integer msg-nosignal "MSG_NOSIGNAL")
  (:integer msg-oob "MSG_OOB")
  (:integer msg-peek "MSG_PEEK")
  (:integer msg-trunc "MSG_TRUNC")
