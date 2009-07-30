@@ -621,6 +621,11 @@
               `(if (typep x ',tval)
                    x
                    (replace (make-array (length x) :element-type 'character) x)))
+             ;; Special case VECTOR
+             ((eq tval 'vector)
+              `(if (vectorp x)
+                   x
+                   (replace (make-array (length x)) x)))
              ;; Handle specialized element types for 1D arrays.
              ((csubtypep tspec (specifier-type '(array * (*))))
               ;; Can we avoid checking for dimension issues like (COERCE FOO
