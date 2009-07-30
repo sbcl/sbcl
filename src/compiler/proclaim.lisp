@@ -212,10 +212,10 @@
                    (when (type/= type old-type)
                      ;; FIXME: changing to TYPE-PROCLAMATION-MISMATCH
                      ;; broke late-proclaim.lisp.
-                     (style-warn "The new TYPE proclamation~%  ~S~@
-                                  for ~S does not match the old TYPE~@
-                                  proclamation ~S"
-                                 type name old-type))))
+                     (style-warn
+                      "~@<new TYPE proclamation for ~S~@:_  ~S~@:_~
+                        does not match the old TYPE proclamation:~@:_  ~S~@:>"
+                      name (type-specifier type) (type-specifier old-type)))))
                (setf (info :variable :type name) type)
                (setf (info :variable :where-from name) :declared)))
            (push raw-form *queued-proclaims*)))
