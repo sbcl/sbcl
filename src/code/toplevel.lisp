@@ -174,9 +174,13 @@ any non-negative real number."
           (multiple-value-bind (sec frac)
               (truncate seconds)
             (values sec (truncate frac 1e-9))))
-    ;; nanosleep accepts time_t as the first argument,
-    ;; so truncating is needed. 68 years on 32-bit platform should be enough
-    (sb!unix:nanosleep (min sec (1- (ash 1 (1- sb!vm:n-word-bits)))) nsec))
+    ;; nanosleep() accepts time_t as the first argument, but on some platforms
+    ;; it is restricted to 100 million seconds. Maybe someone can actually
+    ;; have a reason to sleep for over 3 years?
+    (loop while (> sec (expt 10 8))
+          do (decf sec (expt 10 8))
+             (sb!unix:nanosleep (expt 10 8) 0))
+    (sb!unix:nanosleep sec nsec))
   #!+win32
   (sb!win32:millisleep (truncate (* seconds 1000)))
   nil)

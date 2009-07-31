@@ -29,6 +29,8 @@ changes relative to sbcl-1.0.30:
        well.
   * improvement: improved address space layout on OpenBSD (thanks to Josh
     Elsasser)
+  * bug fix: SLEEP supports times over 100 million seconds on long on OpenBSD
+    as well. (reported by Josh Elsasser)
   * bug fix: DELETE-FILE on streams no longer closes the stream with :ABORT T,
     leading to possible attempts to delete the same file twice. See docstring
     on DELETE-FILE for details. (reported by John Fremlin)
