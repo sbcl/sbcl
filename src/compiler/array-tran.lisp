@@ -112,6 +112,63 @@
   (assert-array-rank array (length indices))
   *universal-type*)
 
+(deftransform array-in-bounds-p ((array &rest subscripts))
+  (flet ((give-up ()
+           (give-up-ir1-transform
+            "~@<lower array bounds unknown or negative and upper bounds not ~
+             negative~:@>"))
+         (bound-known-p (x)
+           (integerp x))) ; might be NIL or *
+    (block nil
+      (let ((dimensions (array-type-dimensions-or-give-up
+                         (lvar-conservative-type array))))
+        ;; shortcut for zero dimensions
+        (when (some (lambda (dim)
+                      (and (bound-known-p dim) (zerop dim)))
+                    dimensions)
+          (return nil))
+        ;; we first collect the subscripts LVARs' bounds and see whether
+        ;; we can already decide on the result of the optimization without
+        ;; even taking a look at the dimensions.
+        (flet ((subscript-bounds (subscript)
+                 (let* ((type (lvar-type subscript))
+                        (low (numeric-type-low type))
+                        (high (numeric-type-high type)))
+                   (cond
+                     ((and (or (not (bound-known-p low)) (minusp low))
+                           (or (not (bound-known-p high)) (not (minusp high))))
+                      ;; can't be sure about the lower bound and the upper bound
+                      ;; does not give us a definite clue either.
+                      (give-up))
+                     ((and (bound-known-p high) (minusp high))
+                      (return nil))     ; definitely below lower bound (zero).
+                     (t
+                      (cons low high))))))
+          (let* ((subscripts-bounds (mapcar #'subscript-bounds subscripts))
+                 (subscripts-lower-bound (mapcar #'car subscripts-bounds))
+                 (subscripts-upper-bound (mapcar #'cdr subscripts-bounds))
+                 (in-bounds 0))
+            (mapcar (lambda (low high dim)
+                      (cond
+                        ;; first deal with infinite bounds
+                        ((some (complement #'bound-known-p) (list low high dim))
+                         (when (and (bound-known-p dim) (bound-known-p low) (<= dim low))
+                           (return nil)))
+                        ;; now we know all bounds
+                        ((>= low dim)
+                         (return nil))
+                        ((< high dim)
+                         (aver (not (minusp low)))
+                         (incf in-bounds))
+                        (t
+                         (give-up))))
+                    subscripts-lower-bound
+                    subscripts-upper-bound
+                    dimensions)
+            (if (eql in-bounds (length dimensions))
+                t
+                (give-up))))))))
+
 (defoptimizer (aref derive-type) ((array &rest indices) node)
   (assert-array-rank array (length indices))
   (derive-aref-type array))
@@ -556,9 +613,14 @@
        (let ((result (array-type-dimensions-or-give-up (car types))))
          (dolist (type (cdr types) result)
            (unless (equal (array-type-dimensions-or-give-up type) result)
-             (give-up-ir1-transform))))))
+             (give-up-ir1-transform
+              "~@<dimensions of arrays in union type ~S do not match~:@>"
+              (type-specifier type)))))))
     ;; FIXME: intersection type [e.g. (and (array * (*)) (satisfies foo)) ]
-    (t (give-up-ir1-transform))))
+    (t
+     (give-up-ir1-transform
+      "~@<don't know how to extract array dimensions from type ~S~:@>"
+      (type-specifier type)))))
 
 (defun conservative-array-type-complexp (type)
   (typecase type

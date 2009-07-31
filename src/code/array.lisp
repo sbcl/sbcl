@@ -531,7 +531,7 @@ of specialized arrays is supported."
 
 (defun array-in-bounds-p (array &rest subscripts)
   #!+sb-doc
-  "Return T if the SUBSCIPTS are in bounds for the ARRAY, NIL otherwise."
+  "Return T if the SUBSCRIPTS are in bounds for the ARRAY, NIL otherwise."
   (if (%array-row-major-index array subscripts nil)
       t))
 

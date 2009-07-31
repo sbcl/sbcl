@@ -13,6 +13,8 @@ changes relative to sbcl-1.0.30:
     multiplication by reciprocal when an exact reciprocal exists.
   * optimization: multiplication of single- and double-floats floats by
     constant two has been optimized.
+  * optimization: ARRAY-IN-BOUNDS-P is resolved at compile-time when
+    sufficient type information is available. (thanks to Leslie Polzer)
   * improvement: a STYLE-WARNING is signalled when a generic function
     clobbers an earlier FTYPE proclamation.
   * improvement: the compiler is able to track the effective type of

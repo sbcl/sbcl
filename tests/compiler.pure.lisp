@@ -2949,6 +2949,87 @@
                          `(lambda (x y z)
                             (make-array '3 :initial-contents `(,x ,y ,z))))))))
 
+;;; optimizing array-in-bounds-p
+(with-test (:name :optimize-array-in-bounds-p)
+  (locally
+    (macrolet ((find-callees (&body body)
+                 `(ctu:find-named-callees
+                    (compile nil
+                             '(lambda ()
+                                ,@body))
+                    :name 'array-in-bounds-p))
+               (must-optimize (&body exprs)
+                 `(progn
+                    ,@(loop for expr in exprs
+                            collect `(assert (not (find-callees
+                                                   ,expr))))))
+               (must-not-optimize (&body exprs)
+                 `(progn
+                    ,@(loop for expr in exprs
+                            collect `(assert (find-callees
+                                              ,expr))))))
+      (must-optimize
+        ;; in bounds
+        (let ((a (make-array '(1))))
+          (array-in-bounds-p a 0))
+        ;; exceeds upper bound (constant)
+        (let ((a (make-array '(1))))
+          (array-in-bounds-p a 1))
+        ;; exceeds upper bound (interval)
+        (let ((a (make-array '(1))))
+          (array-in-bounds-p a (+ 1 (random 2))))
+        ;; negative lower bound (constant)
+        (let ((a (make-array '(1))))
+          (array-in-bounds-p a -1))
+        ;; negative lower bound (interval)
+        (let ((a (make-array 3))
+              (i (- (random 1) 20)))
+          (array-in-bounds-p a i))
+        ;; multiple known dimensions
+        (let ((a (make-array '(1 1))))
+          (array-in-bounds-p a 0 0))
+        ;; union types
+        (let ((s (the (simple-string 10) (eval "0123456789"))))
+          (array-in-bounds-p s 9)))
+      (must-not-optimize
+       ;; don't trust non-simple array length in safety=1
+       (let ((a (the (array * (10)) (make-array 10 :adjustable t))))
+         (eval `(adjust-array ,a 0))
+         (array-in-bounds-p a 9))
+       ;; same for a union type
+       (let ((s (the (string 10) (make-array 10
+                                             :element-type 'character
+                                             :adjustable t))))
+         (eval `(adjust-array ,s 0))
+         (array-in-bounds-p s 9))
+       ;; single unknown dimension
+       (let ((a (make-array (random 20))))
+         (array-in-bounds-p a 10))
+       ;; multiple unknown dimensions
+       (let ((a (make-array (list (random 20) (random 5)))))
+         (array-in-bounds-p a 5 2))
+       ;; some other known dimensions
+       (let ((a (make-array (list 1 (random 5)))))
+         (array-in-bounds-p a 0 2))
+       ;; subscript might be negative
+       (let ((a (make-array 5)))
+         (array-in-bounds-p a (- (random 3) 2)))
+       ;; subscript might be too large
+       (let ((a (make-array 5)))
+         (array-in-bounds-p a (random 6)))
+       ;; unknown upper bound
+       (let ((a (make-array 5)))
+         (array-in-bounds-p a (get-universal-time)))
+       ;; unknown lower bound
+       (let ((a (make-array 5)))
+         (array-in-bounds-p a (- (get-universal-time))))
+       ;; in theory we should be able to optimize
+       ;; the following but the current implementation
+       ;; doesn't cut it because the array type's
+       ;; dimensions get reported as (* *).
+       (let ((a (make-array (list (random 20) 1))))
+         (array-in-bounds-p a 5 2))))))
+
 ;;; optimizing (EXPT -1 INTEGER)
 (test-util:with-test (:name (expt minus-one integer))
   (dolist (x '(-1 -1.0 -1.0d0))
