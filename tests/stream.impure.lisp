@@ -577,5 +577,16 @@
     (assert (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
               (read-sequence buffer s))))
   (delete-file pathname))
+
+(with-test (:name :delete-file-on-streams)
+  (with-open-file (f "delete-file-on-stream-test.tmp"
+                     :direction :io)
+    (delete-file f)
+    #-win32
+    (progn
+      (write-line "still open" f)
+      (file-position f :start)
+      (assert (equal "still open" (read-line f)))))
+  (assert (not (probe-file "delete-file-on-stream-test.tmp"))))
 
 ;;; success

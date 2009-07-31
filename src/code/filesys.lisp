@@ -471,17 +471,17 @@ or if PATHSPEC is a wild pathname."
 
 (defun delete-file (file)
   #!+sb-doc
-  "Delete the specified FILE."
-  (let* ((truename (probe-file file))
-         (namestring (when truename
-                       (native-namestring truename :as-file t))))
+  "Delete the specified FILE.
+
+If FILE is a stream, on Windows the stream is closed immediately. On Unix
+plaforms the stream remains open, allowing IO to continue: the OS resources
+associated with the deleted file remain available till the stream is closed as
+per standard Unix unlink() behaviour."
+  (let* ((truename (truename file))
+         (namestring (native-namestring truename :as-file t)))
+    #!+win32
     (when (streamp file)
-      (close file :abort t))
-    (unless namestring
-      (error 'simple-file-error
-             :pathname file
-             :format-control "~S doesn't exist."
-             :format-arguments (list file)))
+      (close file))
     (multiple-value-bind (res err) (sb!unix:unix-unlink namestring)
       (unless res
         (simple-file-perror "couldn't delete ~A" namestring err))))

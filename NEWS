@@ -27,6 +27,9 @@ changes relative to sbcl-1.0.30:
        documented.
     ** DECLARATION-INFORMATION now supports declaration name DECLARATION as
        well.
+  * bug fix: DELETE-FILE on streams no longer closes the stream with :ABORT T,
+    leading to possible attempts to delete the same file twice. See docstring
+    on DELETE-FILE for details. (reported by John Fremlin)
   * bug fix: the low-level debugger had 32-bit assumptions and was missing
     information about some array types. (thanks to Luis Oliveira)
   * bug fix: moderately complex combinations of inline expansions could
