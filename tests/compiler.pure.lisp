@@ -3211,3 +3211,12 @@
     (test `(lambda (x) (declare (double-float x)) (* x 2)) 123.45d0 246.9d0)
     (test `(lambda (x) (declare (double-float x)) (* x 2.0)) 543.21d0 1086.42d0)
     (test `(lambda (x) (declare (double-float x)) (* x 2.0d0)) 42.0d0 84.0d0)))
+
+(with-test (:name :bug-392203)
+  ;; Used to hit an AVER in COMVERT-MV-CALL.
+  (assert (zerop
+           (funcall
+            (compile nil
+                     `(lambda ()
+                        (flet ((k (&rest x) (declare (ignore x)) 0))
+                          (multiple-value-call #'k #'k))))))))
