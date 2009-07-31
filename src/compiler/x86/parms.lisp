@@ -159,12 +159,30 @@
 ;;;     And if KVA_PAGES is extended from 1GB to 1.5GB, we can't use
 ;;;     down to around 0xA0000000.
 ;;;     So we use 0x58000000--0x98000000 for dynamic space.
-;;;   * OpenBSD address space changes for W^X as well as malloc
-;;;     randomization made the old addresses unsafe. The only range
-;;;     that is really safe is between the end of the text segment (it
-;;;     starts at #x3C000000) and #x7C000000. However if the -Z linker
-;;;     option is used then the safe range is (probably) #x00001000 to
-;;;     #x48048000, with the text and data segments at #x08048000.
+;;;   * OpenBSD address space changes for W^X as well as malloc()
+;;;     randomization made the old addresses unsafe.
+;;;     ** By default (linked without -Z option):
+;;;        The executable's text segment starts at #x1c000000 and the
+;;;        data segment MAXDSIZ bytes higher, at #x3c000000. Shared
+;;;        library text segments start randomly between #x00002000 and
+;;;        #x10002000, with the data segment MAXDSIZ bytes after that.
+;;;     ** If the -Z linker option is used:
+;;;        The executable's text and data segments simply start at
+;;;        #x08048000, data immediately following text. Shared library
+;;;        text and data is placed as if allocated by malloc().
+;;;     ** In both cases, the randomized range for malloc() starts
+;;;        MAXDSIZ bytes after the end of the data segment (#x48048000
+;;;        with -Z, #x7c000000 without), and extends 256 MB.
+;;;     ** The read only, static, and linkage table spaces should be
+;;;        safe with and without -Z if they are located just before
+;;;        #x1c000000.
+;;;     ** Ideally the dynamic space should be at #x94000000, 64 MB
+;;;        after the end of the highest random malloc() address.
+;;;        Unfortunately the dynamic space must be in the lower half
+;;;        of the address space, where there are no large areas which
+;;;        are unused both with and without -Z. So we break -Z by
+;;;        starting at #x40000000. By only using 512 - 64 MB we can
+;;;        run under the default 512 MB data size resource limit.
 
 #!+win32
 (progn
@@ -225,18 +243,17 @@
 
 #!+openbsd
 (progn
-  (def!constant read-only-space-start     #x47000000)
-  (def!constant read-only-space-end       #x470ff000)
+  (def!constant read-only-space-start     #x1b000000)
+  (def!constant read-only-space-end       #x1b0ff000)
 
-  (def!constant static-space-start        #x47100000)
-  (def!constant static-space-end          #x471ff000)
+  (def!constant static-space-start        #x1b100000)
+  (def!constant static-space-end          #x1b1ff000)
 
-  (def!constant dynamic-space-start       #x48000000)
-  (def!constant dynamic-space-end         #x78000000)
+  (def!constant dynamic-space-start       #x40000000)
+  (def!constant dynamic-space-end         #x5bfff000)
 
-  ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #x47200000)
-  (def!constant linkage-table-space-end   #x472ff000))
+  (def!constant linkage-table-space-start #x1b200000)
+  (def!constant linkage-table-space-end   #x1b2ff000))
 
 #!+netbsd
 (progn
