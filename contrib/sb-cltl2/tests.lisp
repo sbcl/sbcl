@@ -423,3 +423,246 @@
    :lexical))
 
 
+
+;;;;; DEFINE-DECLARATION
+
+(defmacro third-value (form)
+  (sb-int::with-unique-names (a b c)
+    `(multiple-value-bind (,a ,b ,c) ,form
+       (declare (ignore ,a ,b))
+       ,c)))
+
+(deftest define-declaration.declare
+    (progn
+      (define-declaration zaphod (spec env)
+        (declare (ignore env))
+        (values :declare (cons 'zaphod spec)))
+      (locally (declare (zaphod beblebrox))
+         (locally (declare (zaphod and ford))
+           (ct (declaration-information 'zaphod lexenv)))))
+  (zaphod and ford))
+
+
+(deftest define-declaration.declare2
+    (progn
+      (define-declaration zaphod (spec env)
+        (declare (ignore env))
+        (values :declare (cons 'zaphod spec)))
+      (locally
+           (declare (zaphod beblebrox)
+                    (special x))
+         (ct (declaration-information 'zaphod lexenv))))
+  (zaphod beblebrox))
+
+(deftest define-declaration.variable
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (locally (declare (vogon poetry))
+        (ct
+         (assoc 'vogon-key
+                (third-value
+                 (variable-information
+                  'poetry
+                  lexenv))))))
+  (vogon-key . vogon-value))
+
+
+(deftest define-declaration.variable.special
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (let (x)
+        (declare (vogon x))
+        (declare (special x))
+        (ct
+         (assoc 'vogon-key
+                (third-value
+                 (variable-information 'x lexenv))))))
+  (vogon-key . vogon-value))
+
+(deftest define-declaration.variable.special2
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (let (x)
+        (declare (special x))
+        (declare (vogon x))
+        (ct
+         (assoc 'vogon-key
+                (third-value
+                 (variable-information 'x lexenv))))))
+  (vogon-key . vogon-value))
+
+(deftest define-declaration.variable.mask
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (let (x)
+        (declare (vogon x))
+        (let (x)
+          (ct
+           (assoc
+            'vogon-key
+            (third (multiple-value-list (variable-information 'x lexenv))))))))
+  nil)
+
+(deftest define-declaration.variable.macromask
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (let (x)
+        (declare (vogon x))
+        (symbol-macrolet ((x 42))
+          (ct
+           (assoc
+            'vogon-key
+            (third (multiple-value-list (variable-information 'x lexenv))))))))
+  nil)
+
+(deftest define-declaration.variable.macromask2
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (symbol-macrolet ((x 42))
+        (declare (vogon x))
+        (list
+         (let (x)
+           (ct
+            (assoc
+             'vogon-key
+             (third (multiple-value-list (variable-information 'x lexenv))))))
+         (ct
+          (assoc
+           'vogon-key
+           (third (multiple-value-list (variable-information 'x lexenv))))))))
+  (nil (vogon-key . vogon-value)))
+
+(deftest define-declaration.variable.mask2
+    (progn
+      (define-declaration vogon-a (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key a))))
+      (define-declaration vogon-b (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key b))))
+      (let (x)
+        (declare (vogon-a x))
+        (let (x)
+          (declare (vogon-b x)))
+        (ct
+         (assoc
+          'vogon-key
+          (third (multiple-value-list (variable-information 'x lexenv)))))))
+  (vogon-key . a))
+
+(deftest define-declaration.variable.specialmask
+    (progn
+      (define-declaration vogon (spec env)
+        (declare (ignore env))
+        (values :variable `((,(cadr spec) vogon-key vogon-value))))
+      (locally
+          (declare (vogon *foo*))
+        (let (*foo*)
+          (ct
+           (assoc
+            'vogon-key
+            (third (multiple-value-list (variable-information '*foo* lexenv))))))))
+  (vogon-key . vogon-value))
+
+
+
+(deftest define-declaration.function
+    (progn
+      (define-declaration sad (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state sad))))
+      (locally (declare (zaphod beblebrox))
+        (locally (declare (sad robot))
+          (ct
+           (assoc 'emotional-state
+                  (third-value (function-information
+                                'robot
+                                lexenv)))))))
+  (emotional-state . sad))
+
+(deftest define-declaration.function.lexical
+    (progn
+      (define-declaration sad (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state sad))))
+      (flet ((robot nil))
+        (locally (declare (sad robot))
+          (ct
+           (assoc 'emotional-state
+                  (third-value (function-information
+                                'robot
+                                lexenv)))))))
+  (emotional-state . sad))
+
+
+(deftest define-declaration.function.lexical2
+    (progn
+      (define-declaration sad (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state sad))))
+      (labels ((robot nil))
+        (declare (sad robot))
+        (ct
+         (assoc 'emotional-state
+                (third-value (function-information
+                              'robot
+                              lexenv))))))
+  (emotional-state . sad))
+
+(deftest define-declaration.function.mask
+    (progn
+      (define-declaration sad (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state sad))))
+      (labels ((robot nil))
+        (declare (sad robot))
+        (labels ((robot nil))
+          (ct
+           (assoc 'emotional-state
+                  (third-value (function-information
+                                'robot
+                                lexenv)))))))
+  nil)
+
+
+(deftest define-declaration.function.mask2
+    (progn
+      (define-declaration sad (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state sad))))
+      (locally
+          (declare (sad robot))
+        (labels ((robot nil))
+          (ct
+           (assoc 'emotional-state
+                  (third-value (function-information
+                                'robot
+                                lexenv)))))))
+  nil)
+
+(deftest define-declaration.function2
+    (progn
+      (define-declaration happy (spec env)
+        (declare (ignore env))
+        (values :function `((,(cadr spec) emotional-state happy))))
+      (locally (declare (zaphod beblebrox))
+        (locally (declare (sad robot))
+          (locally (declare (happy robot))
+            (ct
+             (assoc 'emotional-state
+                    (third-value (function-information
+                                  'robot
+                                  lexenv))))))))
+  (emotional-state . happy))

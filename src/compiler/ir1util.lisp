@@ -803,7 +803,8 @@
                          (handled-conditions (lexenv-handled-conditions default))
                          (disabled-package-locks
                           (lexenv-disabled-package-locks default))
-                         (policy (lexenv-policy default)))
+                         (policy (lexenv-policy default))
+                         (user-data (lexenv-user-data default)))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
                   (if ,var
@@ -815,8 +816,10 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup handled-conditions
-     disabled-package-locks policy)))
+     lambda
+     cleanup handled-conditions disabled-package-locks
+     policy
+     user-data)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
@@ -850,7 +853,8 @@
      nil
      (lexenv-handled-conditions lexenv)
      (lexenv-disabled-package-locks lexenv)
-     (lexenv-policy lexenv))))
+     (lexenv-policy lexenv)
+     (lexenv-user-data lexenv))))
 
 ;;;; flow/DFO/component hackery
 

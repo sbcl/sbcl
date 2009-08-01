@@ -8,7 +8,6 @@
 (in-package :sb-cltl2)
 
 #| TODO:
-define-declaration
 (map-environment)
 |#
 
@@ -109,14 +108,52 @@ define-declaration
              (loop for name in variable for lvar in (lvars)
                 collect
                 (cons name
-                      ;; if one of the lvars is declared special then process-decls
-                      ;; will set it's specvar.
+                      ;; If one of the lvars is declared special then
+                      ;; process-decls will set it's specvar.
                       (if (sb-c::lambda-var-specvar lvar)
                           (sb-c::lambda-var-specvar lvar)
                           lvar)))
              (sb-c::lexenv-vars env))))
 
     env))
+
+;;; Retrieve the user-supplied (from define-declaration) pairs for a
+;;; function or a variable from a lexical environment.
+;;;
+;;; KEYWORD should be :function or :variable, VAR should be a
+;;; function or variable name, respectively.
+(defun extra-pairs (keyword var binding env)
+  (when env
+    (let ((ret nil))
+      (dolist (entry (sb-c::lexenv-user-data env))
+        (destructuring-bind
+              (entry-keyword entry-var entry-binding &rest entry-cons)
+            entry
+          (when (and (eq keyword entry-keyword)
+                     (typecase binding
+                       (sb-c::global-var
+                        (and (eq var entry-var)
+                             (typecase entry-binding
+                               (sb-c::global-var t)
+                               (sb-c::lambda-var
+                                (sb-c::lambda-var-specvar entry-binding))
+                               (null t)
+                               (t nil))))
+                       (t
+                        (eq binding entry-binding))))
+            (push entry-cons ret))))
+      (nreverse ret))))
+
+;;; Retrieve the user-supplied (from define-declaration) value for
+;;; the declaration with the given NAME
+(defun extra-decl-info (name env)
+  (when env
+    (dolist (entry (sb-c::lexenv-user-data env))
+      (when (and (eq :declare (car entry))
+                 (eq name (cadr entry)))
+        (return-from extra-decl-info (cddr entry))))
+    nil))
+
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv))
                            (values (member nil :function :macro :special-form)
@@ -162,7 +199,10 @@ CARS of the alist include:
     The CDR is the type specifier associated with NAME, or the symbol
     FUNCTION if there is functional type declaration or proclamation
     associated with NAME. If the CDR is FUNCTION the alist element may
-    be omitted."
+    be omitted.
+
+In addition to these declarations defined using DEFINE-DECLARATION may
+appear."
   (let* ((*lexenv* (or env (make-null-lexenv)))
          (fun (lexenv-find name funs))
          binding localp ftype dx inlinep)
@@ -208,7 +248,9 @@ CARS of the alist include:
                 (:notinline (push (cons 'inline 'notinline) alist))
                 ((nil)))
               (when dx (push (cons 'dynamic-extent t) alist))
-              alist))))
+              (append alist (extra-pairs :function name fun *lexenv*))))))
+
+
 
 (declaim (ftype (sfunction
                  (symbol &optional (or null lexenv))
@@ -265,8 +307,12 @@ CARS of the alist include:
     of the original declaration. If the CDR is T the alist element may
     be omitted.
 
-Additionally, the SBCL specific SB-EXT:ALWAYS-BOUND declaration will
-appear with CDR as T if the variable has been declared always bound."
+  SB-EXT:ALWAYS-BOUND
+    If CDR is T, NAME has been declared as SB-EXT:ALWAYS-BOUND \(SBCL
+    specific.)
+
+In addition to these declarations defined using DEFINE-DECLARATION may
+appear."
   (let* ((*lexenv* (or env (make-null-lexenv)))
          (kind (info :variable :kind name))
          (var (lexenv-find name vars))
@@ -316,7 +362,7 @@ appear with CDR as T if the variable has been declared always bound."
               (when dx (push (cons 'dynamic-extent t) alist))
               (when (info :variable :always-bound name)
                 (push (cons 'sb-ext:always-bound t) alist))
-              alist))))
+              (append alist (extra-pairs :variable name var *lexenv*))))))
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
                 declaration-information))
@@ -328,6 +374,9 @@ form \(QUALITY VALUE).
 
 If DECLARATION-NAME is DECLARATION return a list of declaration names that
 have been proclaimed as valid.
+
+If DECLARATION-NAME is a name that has defined via DEFINE-DECLARATION return a
+user defined value.
 
 If DECLARATION-NAME is SB-EXT:MUFFLE-CONDITIONS return a type specifier for
 the condition types that have been muffled."
@@ -354,7 +403,10 @@ the condition types that have been muffled."
              (when (and (= num type) value)
                (push name ret))))
          ret))
-      (t (error "Unsupported declaration ~S." declaration-name)))))
+      (t (if (info :declaration :handler declaration-name)
+             (extra-decl-info declaration-name env)
+             (error "Unsupported declaration ~S." declaration-name))))))
+
 
 (defun parse-macro (name lambda-list body &optional env)
   "Process a macro definition of the kind that might appear in a DEFMACRO form
@@ -382,3 +434,71 @@ is referred to by the expression."
                  (sb-c::make-restricted-lexenv environment)
                  (make-null-lexenv))))
     (compile-in-lexenv nil lambda-expression env)))
+
+;;; Add a bit of user-data to a lexenv.
+;;;
+;;; If KIND is :declare then DATA should be of the form
+;;;    (declaration-name . value)
+;;; If KIND is :variable then DATA should be of the form
+;;;     (variable-name key value)
+;;; If KIND is :function then DATA should be of the form
+;;;     (function-name key value)
+;;;
+;;; PD-VARS and PD-FVARS are are the vars and fvars arguments
+;;; of the process-decls call that called this function.
+(defun update-lexenv-user-data (env kind data pd-vars pd-fvars)
+  (let ((user-data (sb-c::lexenv-user-data env)))
+    ;; user-data looks like this:
+    ;; ((:declare d . value)
+    ;;  (:variable var binding key . value)
+    ;;  (:function var binding key . value))
+    (let ((*lexenv* env))
+      (ecase kind
+        (:variable
+         (loop
+            for (name key value) in data
+            for binding1 = (sb-c::find-in-bindings pd-vars name)
+            for binding  =  (if binding1 binding1 (lexenv-find name vars))
+            do (push (list* :variable name binding key value) user-data)))
+        (:function
+         (loop
+            for (name key value) in data
+            for binding1 = (find name pd-fvars :key #'sb-c::leaf-source-name :test #'equal)
+            for binding = (if binding1 binding1 (lexenv-find name funs))
+            do (push (list* :function name binding key value) user-data)))
+        (:declare
+         (destructuring-bind (decl-name . value) data
+           (push (list* :declare decl-name value) user-data)))))
+    (sb-c::make-lexenv :default env :user-data user-data)))
+
+(defmacro define-declaration (decl-name lambda-list &body body)
+  "Define a handler for declaration specifiers starting with DECL-NAME.
+
+The function defined by this macro is called with two arguments: a declaration
+specifier and a environment. It must return two values. The first value must
+be :VARIABLE, :FUNCTION, or :DECLARE.
+
+If the first value is :VARIABLE or :FUNCTION then the second value should be a
+list of elements of the form (BINDING-NAME KEY VALUE). conses (KEY . VALUE)
+will be added to the alist returned by:
+
+   (function-information binding-name env)
+
+ or
+
+   (variable-information binding-name env)
+
+If the first value is :DECLARE then the second value should be a
+cons (DECL-NAME . VALUE). VALUE will be returned by:
+
+   (declaration-information decl-name env)
+"
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (proclaim '(declaration ,decl-name))
+     (flet ((func ,lambda-list
+              ,@body))
+       (setf
+        (info :declaration :handler ',decl-name)
+        (lambda (lexenv spec pd-vars pd-fvars)
+          (multiple-value-bind (kind data) (func spec lexenv)
+            (update-lexenv-user-data lexenv kind data pd-vars pd-fvars)))))))

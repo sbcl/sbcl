@@ -1461,7 +1461,10 @@
        (t
         (unless (info :declaration :recognized (first spec))
           (compiler-warn "unrecognized declaration ~S" raw-spec))
-        res))
+        (let ((fn (info :declaration :handler (first spec))))
+          (if fn
+              (funcall fn res spec vars fvars)
+              res))))
      result-type)))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR

@@ -1200,6 +1200,10 @@
                        (when (info :type :kind name)
                          (error 'declaration-type-conflict-error
                                 :format-arguments (list name)))))
+(define-info-type
+  :class :declaration
+  :type :handler
+  :type-spec (or function null))
 
 (define-info-class :alien-type)
 (define-info-type

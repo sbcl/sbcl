@@ -21,7 +21,7 @@
                            (funs vars blocks tags
                                  type-restrictions
                                  lambda cleanup handled-conditions
-                                 disabled-package-locks %policy)))
+                                 disabled-package-locks %policy user-data)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -64,7 +64,11 @@
   ;; and the global policy is stored in *POLICY*. (Because we want to
   ;; be able to affect it from :WITH-COMPILATION-UNIT.) NIL here also
   ;; works as a convenient null-lexenv identifier.
-  (%policy nil :type policy))
+  (%policy nil :type policy)
+  ;; A list associating extra user info to symbols.  The entries
+  ;; are of the form (:declare name . value),
+  ;; (:variable name key . value), or (:function name key . value)
+  (user-data nil :type list))
 
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))

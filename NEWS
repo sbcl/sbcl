@@ -27,9 +27,9 @@ changes relative to sbcl-1.0.30:
   * improvements to SB-CLTL2 (thanks to Larry D'Anna):
     ** functions DECLARATION-INFORMATION, PARSE-MACRO, and ENCLOSE have been
        documented.
+    ** AUGMENT-ENVIRONMENT and DEFINE-DECLARATION have been implemented.
     ** DECLARATION-INFORMATION now supports declaration name DECLARATION as
-       well.
-    ** AUGMENT-ENVIRONMENT has been implemented.
+       well as user defined declaration names.
   * improvement: improved address space layout on OpenBSD (thanks to Josh
     Elsasser)
   * improvement: pretty-printing of various Lisp forms has been improved

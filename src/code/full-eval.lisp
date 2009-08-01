@@ -104,7 +104,8 @@
                    nil nil nil nil nil
                    (sb!c::lexenv-handled-conditions old-lexenv)
                    (sb!c::lexenv-disabled-package-locks old-lexenv)
-                   (sb!c::lexenv-policy old-lexenv))))
+                   (sb!c::lexenv-policy old-lexenv)
+                   (sb!c::lexenv-user-data old-lexenv))))
       (dolist (declaration declarations)
         (unless (consp declaration)
           (ip-error "malformed declaration specifier ~S in ~S"
@@ -175,7 +176,8 @@
              (sb!c::internal-make-lexenv
               nil nil
               nil nil nil nil nil nil nil
-              sb!c::*policy*)))
+              sb!c::*policy*
+              nil)))
 
 ;;; Augment ENV with a special or lexical variable binding
 (declaim (inline push-var))
