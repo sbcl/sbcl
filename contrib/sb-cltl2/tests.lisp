@@ -6,7 +6,7 @@
 ;;;; more information.
 
 (defpackage :sb-cltl2-tests
-  (:use :sb-cltl2 :cl :sb-rt :sb-ext))
+  (:use :sb-cltl2 :cl :sb-rt :sb-ext :sb-kernel :sb-int))
 
 (in-package :sb-cltl2-tests)
 
@@ -286,3 +286,140 @@
       (fun-info identity))
   (:function nil ((inline . inline)
                   (ftype function (t) (values t &optional)))))
+
+(deftest function-information.ftype
+    (flet ((foo (x) x))
+      (declare (ftype (sfunction (integer) integer) foo))
+      (fun-info foo))
+  (:function
+   t
+   ((ftype function (integer) (values integer &optional)))))
+
+;;;;; AUGMENT-ENVIRONMENT
+
+(defmacro ct (form &environment env)
+  (let ((toeval `(let ((lexenv (quote ,env)))
+                   ,form)))
+    `(quote ,(eval toeval))))
+
+
+(deftest augment-environment.variable1
+    (multiple-value-bind (kind local alist)
+        (variable-information
+         'x
+         (augment-environment nil :variable (list 'x) :declare '((type integer x))))
+      (list kind local (cdr (assoc 'type alist))))
+  (:lexical t integer))
+
+(defvar *foo*)
+
+(deftest augment-environment.variable2
+    (identity (variable-information '*foo* (augment-environment nil :variable '(*foo*))))
+  :lexical)
+
+(deftest augment-environment.variable3
+    (identity (variable-information 'foo (augment-environment nil :variable '(foo))))
+  :lexical)
+
+(deftest augment-environment.variable.special1
+    (identity (variable-information 'x (augment-environment nil :variable '(x) :declare '((special x)))))
+  :special)
+
+(deftest augment-environment.variable.special12
+    (locally (declare (special x))
+      (ct
+       (variable-information
+        'x
+        (identity (augment-environment lexenv :variable '(x))))))
+  :lexical)
+
+(deftest augment-environment.variable.special13
+    (let* ((e1 (augment-environment nil :variable '(x) :declare '((special x))))
+           (e2 (augment-environment e1  :variable '(x))))
+      (identity (variable-information 'x e2)))
+  :lexical)
+
+(deftest augment-environment.variable.special.mask
+    (let* ((e1 (augment-environment nil :variable '(x) :declare '((ignore x))))
+           (e2 (augment-environment e1  :variable '(x))))
+      (assoc 'ignore
+             (nth 2 (multiple-value-list
+                     (variable-information 'x e2)))))
+  nil)
+
+(deftest augment-environment.variable.ignore
+    (variable-information
+     'x
+     (augment-environment nil
+                          :variable '(x)
+                          :declare  '((ignore x))))
+  :lexical
+  t
+  ((ignore . t)))
+
+(deftest augment-environment.function
+    (function-information
+     'foo
+     (augment-environment nil
+                          :function '(foo)
+                          :declare  '((ftype (sfunction (integer) integer) foo))))
+  :function
+  t
+  ((ftype function (integer) (values integer &optional))))
+
+
+(deftest augment-environment.macro
+    (macroexpand '(mac feh)
+                 (augment-environment
+                  nil
+                  :macro (list (list 'mac #'(lambda (form benv)
+                                              (declare (ignore env))
+                                              `(quote ,form ,form ,form))))))
+  (quote (mac feh) (mac feh) (mac feh))
+  t)
+
+(deftest augment-environment.symbol-macro
+    (macroexpand 'sym
+                 (augment-environment
+                  nil
+                  :symbol-macro (list (list 'sym '(foo bar baz)))))
+  (foo bar baz)
+  t)
+
+(deftest augment-environment.macro2
+    (eval (macroexpand '(newcond
+                         ((= 1 2) 'foo)
+                         ((= 1 1) 'bar))
+                       (augment-environment nil :macro (list (list 'newcond (macro-function 'cond))))))
+  bar)
+
+
+(deftest augment-environment.nest
+    (let ((x 1))
+      (ct
+       (let* ((e (augment-environment lexenv :variable '(y))))
+         (list
+          (variable-information 'x e)
+          (variable-information 'y e)))))
+  (:lexical :lexical))
+
+(deftest augment-environment.nest2
+    (symbol-macrolet ((x "x"))
+      (ct
+       (let* ((e (augment-environment lexenv :variable '(y))))
+         (list
+          (macroexpand 'x e)
+          (variable-information 'y e)))))
+  ("x" :lexical))
+
+(deftest augment-environment.symbol-macro-var
+    (let ((e (augment-environment
+              nil
+              :symbol-macro (list (list 'sym '(foo bar baz)))
+              :variable '(x))))
+      (list (macroexpand 'sym e)
+            (variable-information 'x e)))
+  ((foo bar baz)
+   :lexical))
+
+

@@ -8,10 +8,115 @@
 (in-package :sb-cltl2)
 
 #| TODO:
-augment-environment
 define-declaration
 (map-environment)
 |#
+
+
+(defvar *null-lexenv* (make-null-lexenv))
+
+(defun augment-environment
+    (env &key variable symbol-macro function macro declare)
+  "Create a new lexical environment by augmenting ENV with new information.
+
+   VARIABLE
+     is a list of symbols to introduce as new variable bindings.
+
+   SYMBOL-MACRO
+     is a list symbol macro bindings of the form (name definition).
+
+   MACRO
+     is a list of macro definitions of the form (name definition), where
+     definition is a function of two arguments (a form and an environment).
+
+   FUNCTION
+     is a list of symbols to introduce as new local function bindings.
+
+   DECLARE
+     is a list of declaration specifiers. Declaration specifiers attach to the
+     new variable or function bindings as if they appeared in let, let*, flet
+     or labels form. For example:
+
+      (augment-environment env :variable '(x) :declare '((special x)))
+
+     is like
+
+      (let (x) (declare (special x)) ....)
+
+     but
+
+      (augment-environment (augment-environment env :variable '(x))
+                           :declare '((special x)))
+
+     is like
+
+       (let (x) (locally (declare (special x))) ...)
+"
+  (collect ((lvars)
+            (clambdas))
+    (unless (or variable symbol-macro function macro declare)
+      (return-from augment-environment env))
+
+    (if (null env)
+        (setq env (make-null-lexenv))
+        (setq env (copy-structure env)))
+
+    ;; a null policy is used to identify a null lexenv
+    (when (sb-c::null-lexenv-p env)
+      (setf (sb-c::lexenv-%policy env) sb-c::*policy*))
+
+    (when macro
+      (setf (sb-c::lexenv-funs env)
+            (nconc
+             (loop for (name def) in macro
+                collect (cons name (cons 'sb-sys::macro def)))
+             (sb-c::lexenv-funs env))))
+
+    (when symbol-macro
+      (setf (sb-c::lexenv-vars env)
+            (nconc
+             (loop for (name def) in symbol-macro
+                collect (cons name (cons 'sb-sys::macro def)))
+             (sb-c::lexenv-vars env))))
+
+    (dolist (name variable)
+      (lvars (sb-c::make-lambda-var :%source-name name)))
+
+    (dolist (name function)
+      (clambdas
+       (sb-c::make-lambda
+        :lexenv *null-lexenv*
+        :%source-name name
+        :allow-instrumenting nil)))
+
+    (when declare
+      ;; process-decls looks in *lexenv* policy to decide what warnings to print
+      (let ((*lexenv* *null-lexenv*))
+        (setq env (sb-c::process-decls
+                   (list `(declare ,@declare))
+                   (lvars) (clambdas) :lexenv env :context nil))))
+
+    (when function
+      (setf (sb-c::lexenv-funs env)
+            (nconc
+             (loop for name in function for lambda in (clambdas)
+                  collect (cons name lambda))
+             (sb-c::lexenv-funs env))))
+
+    (when variable
+      (setf (sb-c::lexenv-vars env)
+            (nconc
+             (loop for name in variable for lvar in (lvars)
+                collect
+                (cons name
+                      ;; if one of the lvars is declared special then process-decls
+                      ;; will set it's specvar.
+                      (if (sb-c::lambda-var-specvar lvar)
+                          (sb-c::lambda-var-specvar lvar)
+                          lvar)))
+             (sb-c::lexenv-vars env))))
+
+    env))
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv))
                            (values (member nil :function :macro :special-form)
@@ -66,10 +171,7 @@ CARS of the alist include:
        (let ((env-type (or (lexenv-find fun type-restrictions)
                            *universal-fun-type*)))
          (setf binding :function
-               ftype (if (eq :declared (sb-c::leaf-where-from fun))
-                         (type-intersection (sb-c::leaf-type fun)
-                                            env-type)
-                         env-type)
+               ftype (type-intersection (sb-c::leaf-type fun) env-type)
                dx (sb-c::leaf-dynamic-extent fun))
          (etypecase fun
            (sb-c::functional
@@ -173,10 +275,7 @@ appear with CDR as T if the variable has been declared always bound."
       (sb-c::leaf
        (let ((env-type (or (lexenv-find var type-restrictions)
                            *universal-type*)))
-         (setf type (if (eq :declared (sb-c::leaf-where-from var))
-                        (type-intersection (sb-c::leaf-type var)
-                                           env-type)
-                        env-type)
+         (setf type (type-intersection (sb-c::leaf-type var) env-type)
                dx (sb-c::leaf-dynamic-extent var)))
        (etypecase var
          (sb-c::lambda-var
