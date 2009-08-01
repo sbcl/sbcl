@@ -226,6 +226,11 @@
     (var-info this-is-global-too)
   (:global nil ((always-bound . t))))
 
+(sb-alien:define-alien-variable "errno" sb-alien:int)
+(deftest alien-variable
+    (var-info errno)
+  (:alien nil nil))
+
 ;;;; FUNCTION-INFORMATION
 
 (defmacro fun-info (var &environment env)

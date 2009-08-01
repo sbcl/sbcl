@@ -254,7 +254,7 @@ appear."
 
 (declaim (ftype (sfunction
                  (symbol &optional (or null lexenv))
-                 (values (member nil :special :lexical :symbol-macro :constant :global)
+                 (values (member nil :special :lexical :symbol-macro :constant :global :alien)
                          boolean
                          list))
                 variable-information))
@@ -283,6 +283,9 @@ binding:
 
   :GLOBAL
     NAME refers to a global variable. (SBCL specific extension.)
+
+  :ALIEN
+    NAME refers to an alien variable. (SBCL specific extension.)
 
 The second value is true if NAME is bound locally. This is currently
 always NIL for special variables, although arguably it should be T

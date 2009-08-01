@@ -30,6 +30,7 @@ changes relative to sbcl-1.0.30:
     ** AUGMENT-ENVIRONMENT and DEFINE-DECLARATION have been implemented.
     ** DECLARATION-INFORMATION now supports declaration name DECLARATION as
        well as user defined declaration names.
+    ** VARIABLE-INFORMATION is now aware of alien variables.
   * improvement: improved address space layout on OpenBSD (thanks to Josh
     Elsasser)
   * improvement: pretty-printing of various Lisp forms has been improved
