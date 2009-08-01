@@ -31,6 +31,8 @@ changes relative to sbcl-1.0.30:
        well.
   * improvement: improved address space layout on OpenBSD (thanks to Josh
     Elsasser)
+  * improvement: pretty-printing of various Lisp forms has been improved
+    (thanks to Tobias Rittweiler)
   * bug fix: a failing AVER in CONVERT-MV-CALL has been fixed. (thanks to
     Larry D'Anna)
   * bug fix: SLEEP supports times over 100 million seconds on long on OpenBSD

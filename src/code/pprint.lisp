@@ -1161,6 +1161,11 @@ line break."
   (funcall (formatter "~:<~^~W~^~3I ~_~W~^ ~_~W~^~1I~@{ ~_~W~}~:>")
            stream list))
 
+(defun pprint-prog2 (stream list &rest noise)
+  (declare (ignore noise))
+  (funcall (formatter "~:<~^~W~^~3I ~:_~W~^ ~_~W~^~1I~@{ ~_~W~}~:>")
+           stream list))
+
 (defun pprint-quote (stream list &rest noise)
   (declare (ignore noise))
   (if (and (consp list)
@@ -1317,25 +1322,51 @@ line break."
     :for :while :until :repeat :always :never :thereis
     ))
 
+(defun pprint-extended-loop-clauses (stream clauses)
+  (pprint-logical-block (stream clauses :prefix "" :suffix "")
+    (output-object (pprint-pop) stream)
+    (pprint-exit-if-list-exhausted)
+    (write-char #\space stream)
+    (loop for thing = (pprint-pop)
+          when (and (symbolp thing)
+                    (member thing  *loop-seperating-clauses* :test #'string=))
+          do (pprint-newline :mandatory stream)
+          do (output-object thing stream)
+          do (pprint-exit-if-list-exhausted)
+          do (write-char #\space stream))))
+
+(defun pprint-simple-loop-clauses (stream clauses)
+  (pprint-logical-block (stream clauses :prefix "" :suffix "")
+    (output-object (pprint-pop) stream)
+    (pprint-exit-if-list-exhausted)
+    (write-char #\space stream)
+    (loop for thing = (pprint-pop) do
+          (when (consp thing)
+            (pprint-newline :mandatory stream))
+          (output-object thing stream)
+          (pprint-exit-if-list-exhausted)
+          (write-char #\space stream))))
+
 (defun pprint-loop (stream list &rest noise)
   (declare (ignore noise))
   (destructuring-bind (loop-symbol . clauses) list
     (write-char #\( stream)
     (output-object loop-symbol stream)
-    (when clauses
-      (write-char #\space stream)
-      (pprint-logical-block (stream clauses :prefix "" :suffix "")
-        (output-object (pprint-pop) stream)
-        (pprint-exit-if-list-exhausted)
-        (write-char #\space stream)
-        (loop for thing = (pprint-pop)
-              when (and (symbolp thing)
-                        (member thing  *loop-seperating-clauses* :test #'string=))
-                do (pprint-newline :mandatory stream)
-              do (output-object thing stream)
-              do (pprint-exit-if-list-exhausted)
-              do (write-char #\space stream))))
+    (cond ((null clauses))
+          ((symbolp (car clauses))
+           (write-char #\space stream)
+           (pprint-extended-loop-clauses stream clauses))
+          (t
+           (write-char #\space stream)
+           (pprint-simple-loop-clauses stream clauses)))
     (write-char #\) stream)))
+
+(defun pprint-if (stream list &rest noise)
+  (declare (ignore noise))
+  ;; Indent after the ``predicate'' form, and the ``then'' form.
+  (funcall (formatter "~:<~^~W~^ ~:_~:I~W~^ ~:@_~:I~@{~W~^ ~:@_~}~:>")
+           stream
+           list))
 
 (defun pprint-fun-call (stream list &rest noise)
   (declare (ignore noise))
@@ -1346,6 +1377,60 @@ line break."
 (defun pprint-data-list (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter "~:<~@{~W~^ ~:_~}~:>") stream list))
+
+;;; Returns an Emacs-style indent spec: an integer N, meaning indent
+;;; the first N arguments specially then indent any further arguments
+;;; like a body.
+(defun macro-indentation (name)
+  (labels ((proper-list-p (list)
+             (not (nth-value 1 (ignore-errors (list-length list)))))
+           (macro-arglist (name)
+             (%simple-fun-arglist (macro-function name)))
+           (clean-arglist (arglist)
+             "Remove &whole, &enviroment, and &aux elements from ARGLIST."
+             (cond ((null arglist) '())
+                   ((member (car arglist) '(&whole &environment))
+                    (clean-arglist (cddr arglist)))
+                   ((eq (car arglist) '&aux)
+                    '())
+                   (t (cons (car arglist) (clean-arglist (cdr arglist)))))))
+    (let ((arglist (macro-arglist name)))
+      (if (proper-list-p arglist)       ; guard against dotted arglists
+          (position '&body (remove '&optional (clean-arglist arglist)))
+          nil))))
+
+;;; Pretty-Print macros by looking where &BODY appears in a macro's
+;;; lambda-list.
+(defun pprint-macro-call (stream list &rest noise)
+  (declare (ignore noise))
+  (let ((indentation (and (car list) (macro-indentation (car list)))))
+    (unless indentation
+      (return-from pprint-macro-call
+        (pprint-fun-call stream list)))
+    (pprint-logical-block (stream list :prefix "(" :suffix ")")
+      (output-object (pprint-pop) stream)
+      (pprint-exit-if-list-exhausted)
+      (write-char #\space stream)
+      (loop for indent from 0 below indentation do
+            (cond
+              ;; Place the very first argument next to the macro name
+              ((zerop indent)
+                   (output-object (pprint-pop) stream)
+                   (pprint-exit-if-list-exhausted))
+              ;; Indent any other non-body argument by the same
+              ;; amount. It's what Emacs seems to do, too.
+              (t
+               (pprint-indent :block 3 stream)
+               (pprint-newline :mandatory stream)
+               (output-object (pprint-pop) stream)
+               (pprint-exit-if-list-exhausted))))
+      ;; Indent back for the body.
+      (pprint-indent :block 1 stream)
+      (pprint-newline :mandatory stream)
+      (loop
+       (output-object (pprint-pop) stream)
+       (pprint-exit-if-list-exhausted)
+       (pprint-newline :mandatory stream)))))
 
 ;;;; the interface seen by regular (ugly) printer and initialization routines
 
@@ -1360,6 +1445,9 @@ line break."
         ;; printing the object after all.
         (output-ugly-object object stream))))
 
+(defun mboundp (name)
+  (and (fboundp name) (macro-function name) t))
+
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
   (setf *initial-pprint-dispatch* (make-pprint-dispatch-table))
@@ -1368,6 +1456,8 @@ line break."
     ;; printers for regular types
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
     (set-pprint-dispatch 'array #'pprint-array)
+    (set-pprint-dispatch '(cons (and symbol (satisfies mboundp)))
+                         #'pprint-macro-call -1)
     (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))
                          #'pprint-fun-call -1)
     (set-pprint-dispatch '(cons symbol)
@@ -1400,6 +1490,7 @@ line break."
                           (tagbody pprint-tagbody)
                           (throw pprint-block)
                           (unwind-protect pprint-block)
+                          (if pprint-if)
 
                           ;; macros
                           (case pprint-case)
@@ -1429,14 +1520,14 @@ line break."
                           #+nil (handler-bind ...)
                           #+nil (handler-case ...)
                           (loop pprint-loop)
-                          (multiple-value-bind pprint-progv)
+                          (multiple-value-bind pprint-prog2)
                           (multiple-value-setq pprint-block)
                           (pprint-logical-block pprint-block)
                           (print-unreadable-object pprint-block)
                           (prog pprint-prog)
                           (prog* pprint-prog)
                           (prog1 pprint-block)
-                          (prog2 pprint-progv)
+                          (prog2 pprint-prog2)
                           (psetf pprint-setq)
                           (psetq pprint-setq)
                           #+nil (restart-bind ...)
