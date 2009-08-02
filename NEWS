@@ -53,6 +53,7 @@ changes relative to sbcl-1.0.30:
     be heap allocated to be stack allocated.
   * bug fix: DESCRIBE signalled an error for generic functions under
     certain circumstances. (thanks to Leslie Polzer)
+  * bug fix: Fixed spelling of an error message.
 
 changes in sbcl-1.0.30 relative to sbcl-1.0.29:
   * minor incompatible change: SB-THREAD:JOIN-THREAD-ERROR-THREAD and

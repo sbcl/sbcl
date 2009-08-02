@@ -1271,7 +1271,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
         || (signal == SIGEMT)
 #endif
         )
-        corruption_warning_and_maybe_lose("Signal %d recieved", signal);
+        corruption_warning_and_maybe_lose("Signal %d received", signal);
 #endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
