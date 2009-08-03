@@ -188,6 +188,9 @@
                                       decimal-digit digit bidi-mirrored
                                       cl-both-case-p)))
           (declare (ignore digit-index))
+          (when (and (not cl-both-case-p)
+                     (< gc-index 2))
+            (format t "~A~%" name))
           (incf *name-size* (length name))
           (when (string/= "" decomposition-type-and-mapping)
             (let ((split (split-string decomposition-type-and-mapping
@@ -362,9 +365,10 @@
                    :direction :output
                    :if-exists :supersede
                    :if-does-not-exist :create)
-    (let ((*print-pretty* t))
-      (prin1 (mapcar #'(lambda (x) (cons (car x) (read-from-string (cdr x))))
-                     *different-numerics*))))
+    (with-standard-io-syntax
+      (let ((*print-pretty* t))
+        (prin1 (mapcar #'(lambda (x) (cons (car x) (read-from-string (cdr x))))
+                       *different-numerics*)))))
   (with-open-file (*standard-output*
                    (make-pathname :name "titlecases"
                                   :type "lisp-expr"
@@ -372,8 +376,9 @@
                    :direction :output
                    :if-exists :supersede
                    :if-does-not-exist :create)
-    (let ((*print-pretty* t))
-      (prin1 *different-titlecases*)))
+    (with-standard-io-syntax
+      (let ((*print-pretty* t))
+        (prin1 *different-titlecases*))))
   (with-open-file (*standard-output*
                    (make-pathname :name "misc"
                                   :type "lisp-expr"
@@ -381,20 +386,21 @@
                    :direction :output
                    :if-exists :supersede
                    :if-does-not-exist :create)
-    (let ((*print-pretty* t))
-      (prin1 `(:length ,(length *misc-table*)
-               :uppercase ,(loop for (gc-index) across *misc-table*
-                                 for i from 0
-                                 when (= gc-index 0)
-                                 collect i)
-               :lowercase ,(loop for (gc-index) across *misc-table*
-                                 for i from 0
-                                 when (= gc-index 1)
-                                 collect i)
-               :titlecase ,(loop for (gc-index) across *misc-table*
-                                 for i from 0
-                                 when (= gc-index 2)
-                                 collect i)))))
+    (with-standard-io-syntax
+      (let ((*print-pretty* t))
+        (prin1 `(:length ,(length *misc-table*)
+                 :uppercase ,(loop for (gc-index) across *misc-table*
+                                for i from 0
+                                when (= gc-index 0)
+                                collect i)
+                 :lowercase ,(loop for (gc-index) across *misc-table*
+                                for i from 0
+                                when (= gc-index 1)
+                                collect i)
+                 :titlecase ,(loop for (gc-index) across *misc-table*
+                                for i from 0
+                                when (= gc-index 2)
+                                collect i))))))
   (values))
 
 ;;; Use of the generated files
@@ -414,9 +420,17 @@
   (values))
 
 ;;; The stuff below is dependent on misc.lisp-expr being
-;;; (:LENGTH 186 :UPPERCASE (0) :LOWERCASE (1) :TITLECASE (2))
+;;; (:LENGTH 206 :UPPERCASE (0 2) :LOWERCASE (1 3) :TITLECASE (4)).
+;;;
+;;; There are two entries for UPPERCASE and LOWERCASE because some
+;;; characters have case (by Unicode standards) but are not
+;;; transformable character-by-character in a locale-independet way
+;;; (as CL requires for its standard operators).
+;;;
+;;; for more details on these debugging functions, see the description
+;;; of the character database format in src/code/target-char.lisp
 
-(defparameter *length* 186)
+(defparameter *length* 206)
 
 (defun cp-index (cp)
   (let* ((cp-high (cp-high cp))

@@ -161,16 +161,55 @@
     (#x9F "Application-Program-Command"))) ; *** See Note above
 
 ;;;; UCD accessor functions
-;;;;
-;;;; FIXME: Document the format of the character database.
 
-;; (* 8 186) => 1488
-;; (+ 1488 (ash #x110000 -8)) => 5840
+;;; The first (* 8 206) => 1648 entries in **CHARACTER-DATABASE**
+;;; contain entries for the distinct character attributes:
+;;; specifically, indexes into the GC kinds, Bidi kinds, CCC kinds,
+;;; the decimal digit property, the digit property and the
+;;; bidi-mirrored boolean property.  (There are two spare bytes for
+;;; other information, should that become necessary)
+;;;
+;;; the next (ash #x110000 -8) entries contain single-byte indexes
+;;; into a table of 256-element 4-byte-sized entries.  These entries
+;;; follow directly on, and are of the form
+;;; {attribute-index[1B],transformed-code-point[3B]}x256, where the
+;;; attribute index is an index into the miscellaneous information
+;;; table, and the transformed code point is the code point of the
+;;; simple mapping of the character to its lowercase or uppercase
+;;; equivalent, as appropriate and if any.
+;;;
+;;; I feel the opacity of the above suggests the need for a diagram:
+;;;
+;;;         C  _______________________________________
+;;;           /                                       \
+;;;          L                                         \
+;;;  [***************|=============================|--------...]
+;;;                 (a)      \                       _
+;;;                         A \______________________/| B
+;;;
+;;; To look up information about a character, take the high 13 bits of
+;;; its code point, and index the character database with that and a
+;;; base of 1648 (going past the miscellaneous information[*], so
+;;; treating (a) as the start of the array).  This, labelled A, gives
+;;; us another index into the detailed pages[-], which we can use to
+;;; look up the details for the character in question: we add the low
+;;; 8 bits of the character, shifted twice (because we have four-byte
+;;; table entries) to 1024 times the `page' index, with a base of 6000
+;;; to skip over everything else.  This gets us to point B.  If we're
+;;; after a transformed code point (i.e. an upcase or downcase
+;;; operation), we can simply read it off now, beginning with an
+;;; offset of 1 byte from point B in some endianness; if we're looking
+;;; for miscellaneous information, we take the value at B, and index
+;;; the character database once more to get to the relevant
+;;; miscellaneous information.
+;;;
+;;; The moral of all this?  Next time, don't just say "FIXME: document
+;;; this"
 (defun ucd-index (char)
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (page (aref **character-database** (+ 1488 cp-high))))
-    (+ 5840 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
+         (page (aref **character-database** (+ 1648 cp-high))))
+    (+ 6000 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-value-0))
 (defun ucd-value-0 (char)
