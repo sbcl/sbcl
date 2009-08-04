@@ -90,7 +90,7 @@
 
 (defknown initialize-vector ((simple-array * (*)) &rest t)
   (simple-array * (*))
-  (always-translatable)
+  (always-translatable flushable)
   :result-arg 0)
 
 (defknown vector-fill* (t t t t) vector

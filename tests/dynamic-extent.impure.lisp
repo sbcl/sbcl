@@ -14,6 +14,9 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:quit :unix-status 104))
 
+(load "compiler-test-util.lisp")
+(use-package :ctu)
+
 (setq sb-c::*check-consistency* t
       sb-ext:*stack-allocate-dynamic-extent* t)
 
@@ -481,26 +484,6 @@
   (setf (gethash 5 *table*) 13)
   (gethash 5 *table*))
 
-(defmacro assert-no-consing (form &optional times)
-  `(%assert-no-consing (lambda () ,form) ,times))
-(defun %assert-no-consing (thunk &optional times)
-  (let ((before (get-bytes-consed))
-        (times (or times 10000)))
-    (declare (type (integer 1 *) times))
-    (dotimes (i times)
-      (funcall thunk))
-    (assert (< (- (get-bytes-consed) before) times))))
-
-(defmacro assert-consing (form &optional times)
-  `(%assert-consing (lambda () ,form) ,times))
-(defun %assert-consing (thunk &optional times)
-  (let ((before (get-bytes-consed))
-        (times (or times 10000)))
-    (declare (type (integer 1 *) times))
-    (dotimes (i times)
-      (funcall thunk))
-    (assert (not (< (- (get-bytes-consed) before) times)))))
-
 (defvar *a-cons* (cons nil nil))
 
 (progn

@@ -14,7 +14,9 @@
 (defpackage :compiler-test-util
   (:nicknames :ctu)
   (:use :cl :sb-c :sb-kernel)
-  (:export #:compiler-derived-type
+  (:export #:assert-consing
+           #:assert-no-consing
+           #:compiler-derived-type
            #:find-value-cell-values
            #:find-named-callees))
 
@@ -46,3 +48,23 @@
                            (or (not namep)
                                (equal name (sb-impl::fdefn-name c))))))
           collect (sb-impl::fdefn-fun c))))
+
+(defmacro assert-no-consing (form &optional times)
+  `(%assert-no-consing (lambda () ,form) ,times))
+(defun %assert-no-consing (thunk &optional times)
+  (let ((before (sb-ext:get-bytes-consed))
+        (times (or times 10000)))
+    (declare (type (integer 1 *) times))
+    (dotimes (i times)
+      (funcall thunk))
+    (assert (< (- (sb-ext:get-bytes-consed) before) times))))
+
+(defmacro assert-consing (form &optional times)
+  `(%assert-consing (lambda () ,form) ,times))
+(defun %assert-consing (thunk &optional times)
+  (let ((before (sb-ext:get-bytes-consed))
+        (times (or times 10000)))
+    (declare (type (integer 1 *) times))
+    (dotimes (i times)
+      (funcall thunk))
+    (assert (not (< (- (sb-ext:get-bytes-consed) before) times)))))

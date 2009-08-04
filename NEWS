@@ -19,6 +19,7 @@ changes relative to sbcl-1.0.30:
     constant two has been optimized.
   * optimization: ARRAY-IN-BOUNDS-P is resolved at compile-time when
     sufficient type information is available. (thanks to Leslie Polzer)
+  * optimization: unused vector creation can now be optimized away.
   * improvement: a STYLE-WARNING is signalled when a generic function
     clobbers an earlier FTYPE proclamation.
   * improvement: the compiler is able to track the effective type of

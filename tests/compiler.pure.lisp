@@ -3225,3 +3225,10 @@
   (let ((f (compile nil `(lambda ()
                            (labels ((k (&optional x) #'k)))))))
     (assert (null (funcall f)))))
+
+(with-test (:name :flush-vector-creation)
+  (let ((f (compile nil `(lambda ()
+                           (dotimes (i 1024)
+                             (vector i i i))
+                           t))))
+    (ctu:assert-no-consing (funcall f))))
