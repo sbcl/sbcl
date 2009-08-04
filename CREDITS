@@ -549,6 +549,10 @@ Douglas Crosher:
   CL:DEFINE-SYMBOL-MACRO, and a generalization of the type system's
   handling of the CONS type to allow ANSI-style (CONS FOO BAR) types.
 
+Larry D'Anna:
+  He provided several parts of SB-CLTL2 environment access, and has
+  also worked on bugs in the IR2 conversion stage of the compiler.
+
 Alexey Dejneka:
   He fixed many, many bugs on various themes, and has done a
   tremendous amount of work on the compiler in particular, fixing
@@ -725,6 +729,10 @@ Scott Parish:
 
 Timothy Ritchey:
   He implemented SB-BSD-SOCKETS support for the win32 port.
+
+Tobias Rittweiler
+  He has made several contributions relating to source locations,
+  pretty printing, SB-INTROSPECT, and the reader.
 
 Kevin M. Rosenberg:
   He provided the ACL-style toplevel (sb-aclrepl contrib module), and

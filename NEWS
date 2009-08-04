@@ -41,6 +41,8 @@ changes relative to sbcl-1.0.30:
     (thanks to Tobias Rittweiler)
   * bug fix: a failing AVER in CONVERT-MV-CALL has been fixed. (thanks to
     Larry D'Anna)
+  * bug fix: a failing AVER in %ALLOCATE-CLOSURES conversion has been fixed
+    (thanks to Larry D'Anna)
   * bug fix: SLEEP supports times over 100 million seconds on long on OpenBSD
     as well. (reported by Josh Elsasser)
   * bug fix: DELETE-FILE on streams no longer closes the stream with :ABORT T,

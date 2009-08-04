@@ -3220,3 +3220,8 @@
                      `(lambda ()
                         (flet ((k (&rest x) (declare (ignore x)) 0))
                           (multiple-value-call #'k #'k))))))))
+
+(with-test (:name :allocate-closures-failing-aver)
+  (let ((f (compile nil `(lambda ()
+                           (labels ((k (&optional x) #'k)))))))
+    (assert (null (funcall f)))))

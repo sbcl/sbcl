@@ -255,7 +255,11 @@
         (vop current-stack-pointer call 2block
              (ir2-lvar-stack-pointer (lvar-info leaves))))
       (dolist (leaf (lvar-value leaves))
-        (binding* ((xep (functional-entry-fun leaf) :exit-if-null)
+        (binding* ((xep (awhen (functional-entry-fun leaf)
+                          ;; if the xep's been deleted then we can skip it
+                          (if (eq (functional-kind it) :deleted)
+                              nil it))
+                        :exit-if-null)
                    (nil (aver (xep-p xep)))
                    (entry-info (lambda-info xep) :exit-if-null)
                    (tn (entry-info-closure-tn entry-info) :exit-if-null)
