@@ -114,7 +114,43 @@
           do (slurp-ucd-line line)))
   (second-pass)
   (build-misc-table)
+  (fixup-hangul-syllables)
   *decompositions*)
+
+(defun fixup-hangul-syllables ()
+  ;; "Hangul Syllable Composition, Unicode 5.1 section 3-12"
+  (let* ((sbase #xac00)
+         (lbase #x1100)
+         (vbase #x1161)
+         (tbase #x11a7)
+         (scount 11172)
+         (lcount 19)
+         (vcount 21)
+         (tcount 28)
+         (ncount (* vcount tcount))
+         (table (make-hash-table)))
+    (with-open-file (*standard-input*
+                     (make-pathname :name "Jamo" :type "txt"
+                                    :defaults *unicode-character-database*))
+      (loop for line = (read-line nil nil)
+            while line
+            if (position #\; line)
+            do (add-jamo-information line table)))
+    (dotimes (sindex scount)
+      (let* ((l (+ lbase (floor sindex ncount)))
+             (v (+ vbase (floor (mod sindex ncount) tcount)))
+             (tee (+ tbase (mod sindex tcount)))
+             (name (format nil "HANGUL_SYLLABLE_~A~A~:[~A~;~]"
+                           (gethash l table) (gethash v table)
+                           (= tee tbase) (gethash tee table))))
+        (setf (gethash (+ sbase sindex) *unicode-names*) name)))))
+
+(defun add-jamo-information (line table)
+  (let* ((split (split-string line #\;))
+         (code (parse-integer (first split) :radix 16))
+         (syllable (string-trim '(#\Space)
+                                (subseq (second split) 0 (position #\# (second split))))))
+    (setf (gethash code table) syllable)))
 
 (defun split-string (line character)
   (loop for prev-position = 0 then (1+ position)

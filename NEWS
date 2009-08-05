@@ -4,9 +4,11 @@ changes relative to sbcl-1.0.30:
     inlining cases: failure to stack allocate when equivalent code is manually
     open coded is now considered a bug.
   * improvement: the Unicode character database has been upgraded to the
-    Unicode 5.0.1 standard, giving names and properties to a number of new
+    Unicode 5.1 standard, giving names and properties to a number of new
     characters, and providing a few extra characters with case
     transformations.
+  * improvement: the system now recognizes and produces names for Unicode
+    Hangul syllable characters.
   * new feature: experimental :EMIT-CFASL parameter to COMPILE-FILE can
     be used to output toplevel compile-time effects into a separate .CFASL
     file.
