@@ -1,13 +1,17 @@
 ;;; introspection library
 
-;;; This is here as a discussion point, not yet a supported interface.  If
-;;; you would like to use the functions here, or you would like other
-;;; functions to be here, join the debate on navel@metacircles.com.
-;;; List info at http://lists.metacircles.com/cgi-bin/mailman/listinfo/navel
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
-;;; For the avoidance of doubt, the exported interface is the proposed
-;;; supported interface.  Anything else is internal, though you're
-;;; welcome to argue a case for exporting it.
+;;; For the avoidance of doubt, the exported interface is the supported
+;;; interface. Anything else is internal, though you're welcome to argue a
+;;; case for exporting it.
 
 ;;; If you steal the code from this file to cut and paste into your
 ;;; own project, there will be much wailing and gnashing of teeth.
@@ -726,4 +730,3 @@ Experimental: interface subject to change."
                      (values :stack sb-thread::*current-thread*))))
                :foreign)))))
 
-(provide 'sb-introspect)
