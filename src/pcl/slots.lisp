@@ -111,6 +111,8 @@
         (slot-unbound (wrapper-class* wrapper) object slot-name)
         value)))
 
+;;; This is used during the PCL build, but gets replaced by a deftransform
+;;; in fixup.lisp.
 (define-compiler-macro slot-value (&whole form object slot-name
                                    &environment env)
   (if (and (constantp slot-name env)
@@ -148,6 +150,8 @@
 (defun safe-set-slot-value (object slot-name new-value)
   (set-slot-value object slot-name new-value))
 
+;;; This is used during the PCL build, but gets replaced by a deftransform
+;;; in fixup.lisp.
 (define-compiler-macro set-slot-value (&whole form object slot-name new-value
                                       &environment env)
   (if (and (constantp slot-name env)

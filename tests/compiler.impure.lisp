@@ -19,6 +19,7 @@
   (sb-ext:quit :unix-status 104))
 
 (load "test-util.lisp")
+(load "compiler-test-util.lisp")
 (load "assertoid.lisp")
 (use-package "TEST-UTIL")
 (use-package "ASSERTOID")
@@ -1145,6 +1146,19 @@
                   (make-array 3 :element-type 'single-float) (coerce pi 'single-float))))
   ;; Same bug manifests in COMPLEX-ATANH as well.
   (assert (= (atanh #C(-0.7d0 1.1d0)) #C(-0.28715567731069275d0 0.9394245539093365d0))))
+
+(with-test (:name :slot-value-on-structure)
+  (let ((f (compile nil `(lambda (x a b)
+                           (declare (something-known-to-be-a-struct x))
+                           (setf (slot-value x 'x) a
+                                 (slot-value x 'y) b)
+                           (list (slot-value x 'x)
+                                 (slot-value x 'y))))))
+    (assert (equal '(#\x #\y)
+                   (funcall f
+                            (make-something-known-to-be-a-struct :x "X" :y "Y")
+                            #\x #\y)))
+    (assert (not (ctu:find-named-callees f)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

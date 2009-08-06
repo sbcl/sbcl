@@ -23,6 +23,8 @@ changes relative to sbcl-1.0.30:
     constant two has been optimized.
   * optimization: ARRAY-IN-BOUNDS-P is resolved at compile-time when
     sufficient type information is available. (thanks to Leslie Polzer)
+  * optimization: SLOT-VALUE and (SETF SLOT-VALUE) with constant slot names on
+    known structure objects are as efficient as defstruct generated accessors.
   * optimization: unused vector creation can now be optimized away.
   * improvement: ASDF systems can now depends on SB-INTROSPECT.
   * improvement: a STYLE-WARNING is signalled when a generic function
