@@ -1732,10 +1732,10 @@
                       (inst mov y stack-temp)))
                    ,@(unless round-p
                       '((inst fldcw scw)))))))))
-  (frob %unary-truncate single-reg single-float nil)
-  (frob %unary-truncate double-reg double-float nil)
+  (frob %unary-truncate/single-float single-reg single-float nil)
+  (frob %unary-truncate/double-float double-reg double-float nil)
   #!+long-float
-  (frob %unary-truncate long-reg long-float nil)
+  (frob %unary-truncate/long-float long-reg long-float nil)
   (frob %unary-round single-reg single-float t)
   (frob %unary-round double-reg double-float t)
   #!+long-float
@@ -1779,10 +1779,10 @@
                 (inst add esp-tn 4)
                 ,@(unless round-p
                    '((inst fldcw scw)))))))
-  (frob %unary-truncate single-reg single-float nil)
-  (frob %unary-truncate double-reg double-float nil)
+  (frob %unary-truncate/single-float single-reg single-float nil)
+  (frob %unary-truncate/double-float double-reg double-float nil)
   #!+long-float
-  (frob %unary-truncate long-reg long-float nil)
+  (frob %unary-truncate/long-float long-reg long-float nil)
   (frob %unary-round single-reg single-float t)
   (frob %unary-round double-reg double-float t)
   #!+long-float

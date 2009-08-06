@@ -547,8 +547,8 @@
                         (* (tn-offset stack-temp) n-word-bytes))
                   (inst lwz y (current-nfp-tn vop)
                         (+ 4 (* (tn-offset stack-temp) n-word-bytes)))))))
-  (frob %unary-truncate single-reg single-float fctiwz)
-  (frob %unary-truncate double-reg double-float fctiwz)
+  (frob %unary-truncate/single-float single-reg single-float fctiwz)
+  (frob %unary-truncate/double-float double-reg double-float fctiwz)
   (frob %unary-round single-reg single-float fctiw)
   (frob %unary-round double-reg double-float fctiw))
 

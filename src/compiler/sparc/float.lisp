@@ -935,10 +935,10 @@
                            (* (tn-offset stack-temp) n-word-bytes))
                      (inst ld y (current-nfp-tn vop)
                            (* (tn-offset stack-temp) n-word-bytes))))))))
-  (frob %unary-truncate single-reg single-float fstoi)
-  (frob %unary-truncate double-reg double-float fdtoi)
+  (frob %unary-truncate/single-float single-reg single-float fstoi)
+  (frob %unary-truncate/double-float double-reg double-float fdtoi)
   #!+long-float
-  (frob %unary-truncate long-reg long-float fqtoi)
+  (frob %unary-truncate/long-float long-reg long-float fqtoi)
   ;; KLUDGE -- these two forms were protected by #-sun4.
   ;; (frob %unary-round single-reg single-float fstoir)
   ;; (frob %unary-round double-reg double-float fdtoir)

@@ -1387,6 +1387,9 @@
 
 ;;;; magical compiler frobs
 
+(defknown %unary-truncate/single-float (single-float) integer (movable foldable flushable))
+(defknown %unary-truncate/double-float (double-float) integer (movable foldable flushable))
+
 ;;; We can't fold this in general because of SATISFIES. There is a
 ;;; special optimizer anyway.
 (defknown %typep (t (or type-specifier ctype)) boolean

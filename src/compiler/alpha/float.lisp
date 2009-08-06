@@ -573,8 +573,8 @@
                   (current-nfp-tn vop))))
           (inst excb)
           ))))
-  (frob %unary-truncate single-reg single-float cvttq/c_sv t)
-  (frob %unary-truncate double-reg double-float cvttq/c_sv)
+  (frob %unary-truncate/single-float single-reg single-float cvttq/c_sv t)
+  (frob %unary-truncate/double-float double-reg double-float cvttq/c_sv)
   (frob %unary-round single-reg single-float cvttq_sv t)
   (frob %unary-round double-reg double-float cvttq_sv))
 

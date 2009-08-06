@@ -695,60 +695,58 @@
             (setq shifted-num (ash shifted-num -1))
             (incf scale)))))))
 
-#|
-These might be useful if we ever have a machine without float/integer
-conversion hardware. For now, we'll use special ops that
-uninterruptibly frob the rounding modes & do ieee round-to-integer.
-
-;;; The compiler compiles a call to this when we are doing %UNARY-TRUNCATE
-;;; and the result is known to be a fixnum. We can avoid some generic
-;;; arithmetic in this case.
-(defun %unary-truncate-single-float/fixnum (x)
-  (declare (single-float x) (values fixnum))
-  (locally (declare (optimize (speed 3) (safety 0)))
-    (let* ((bits (single-float-bits x))
-           (exp (ldb sb!vm:single-float-exponent-byte bits))
-           (frac (logior (ldb sb!vm:single-float-significand-byte bits)
-                         sb!vm:single-float-hidden-bit))
-           (shift (- exp sb!vm:single-float-digits sb!vm:single-float-bias)))
-      (when (> exp sb!vm:single-float-normal-exponent-max)
-        (error 'floating-point-invalid-operation :operator 'truncate
-               :operands (list x)))
-      (if (<= shift (- sb!vm:single-float-digits))
-          0
-          (let ((res (ash frac shift)))
-            (declare (type (unsigned-byte 31) res))
-            (if (minusp bits)
-                (- res)
-                res))))))
-
-;;; Double-float version of this operation (see above single op).
-(defun %unary-truncate-double-float/fixnum (x)
-  (declare (double-float x) (values fixnum))
-  (locally (declare (optimize (speed 3) (safety 0)))
-    (let* ((hi-bits (double-float-high-bits x))
-           (exp (ldb sb!vm:double-float-exponent-byte hi-bits))
-           (frac (logior (ldb sb!vm:double-float-significand-byte hi-bits)
-                         sb!vm:double-float-hidden-bit))
-           (shift (- exp (- sb!vm:double-float-digits sb!vm:n-word-bits)
-                     sb!vm:double-float-bias)))
-      (when (> exp sb!vm:double-float-normal-exponent-max)
-        (error 'floating-point-invalid-operation :operator 'truncate
-               :operands (list x)))
-      (if (<= shift (- sb!vm:n-word-bits sb!vm:double-float-digits))
-          0
-          (let* ((res-hi (ash frac shift))
-                 (res (if (plusp shift)
-                          (logior res-hi
-                                  (the fixnum
-                                       (ash (double-float-low-bits x)
-                                            (- shift sb!vm:n-word-bits))))
-                          res-hi)))
-            (declare (type (unsigned-byte 31) res-hi res))
-            (if (minusp hi-bits)
-                (- res)
-                res))))))
-|#
+;;; These might be useful if we ever have a machine without float/integer
+;;; conversion hardware. For now, we'll use special ops that
+;;; uninterruptibly frob the rounding modes & do ieee round-to-integer.
+#+nil
+(progn
+  ;; The compiler compiles a call to this when we are doing %UNARY-TRUNCATE
+  ;; and the result is known to be a fixnum. We can avoid some generic
+  ;; arithmetic in this case.
+  (defun %unary-truncate-single-float/fixnum (x)
+    (declare (single-float x) (values fixnum))
+    (locally (declare (optimize (speed 3) (safety 0)))
+      (let* ((bits (single-float-bits x))
+             (exp (ldb sb!vm:single-float-exponent-byte bits))
+             (frac (logior (ldb sb!vm:single-float-significand-byte bits)
+                           sb!vm:single-float-hidden-bit))
+             (shift (- exp sb!vm:single-float-digits sb!vm:single-float-bias)))
+        (when (> exp sb!vm:single-float-normal-exponent-max)
+          (error 'floating-point-invalid-operation :operator 'truncate
+                 :operands (list x)))
+        (if (<= shift (- sb!vm:single-float-digits))
+            0
+            (let ((res (ash frac shift)))
+              (declare (type (unsigned-byte 31) res))
+              (if (minusp bits)
+                  (- res)
+                  res))))))
+  ;; Double-float version of this operation (see above single op).
+  (defun %unary-truncate-double-float/fixnum (x)
+    (declare (double-float x) (values fixnum))
+    (locally (declare (optimize (speed 3) (safety 0)))
+      (let* ((hi-bits (double-float-high-bits x))
+             (exp (ldb sb!vm:double-float-exponent-byte hi-bits))
+             (frac (logior (ldb sb!vm:double-float-significand-byte hi-bits)
+                           sb!vm:double-float-hidden-bit))
+             (shift (- exp (- sb!vm:double-float-digits sb!vm:n-word-bits)
+                       sb!vm:double-float-bias)))
+        (when (> exp sb!vm:double-float-normal-exponent-max)
+          (error 'floating-point-invalid-operation :operator 'truncate
+                 :operands (list x)))
+        (if (<= shift (- sb!vm:n-word-bits sb!vm:double-float-digits))
+            0
+            (let* ((res-hi (ash frac shift))
+                   (res (if (plusp shift)
+                            (logior res-hi
+                                    (the fixnum
+                                      (ash (double-float-low-bits x)
+                                           (- shift sb!vm:n-word-bits))))
+                            res-hi)))
+              (declare (type (unsigned-byte 31) res-hi res))
+              (if (minusp hi-bits)
+                  (- res)
+                  res)))))))
 
 ;;; This function is called when we are doing a truncate without any funky
 ;;; divisor, i.e. converting a float or ratio to an integer. Note that we do
@@ -773,6 +771,24 @@ uninterruptibly frob the rounding modes & do ieee round-to-integer.
              (if (minusp number)
                  (- res)
                  res)))))))
+
+;;; Specialized versions for floats.
+(macrolet ((def (type name)
+             `(defun ,name (number)
+                (if (< ,(coerce most-negative-fixnum type)
+                       number
+                       ,(coerce most-positive-fixnum type))
+                    (truly-the fixnum (,name number))
+                    ;; General -- slow -- case.
+                    (multiple-value-bind (bits exp) (integer-decode-float number)
+                      (let ((res (ash bits exp)))
+                        (if (minusp number)
+                            (- res)
+                            res)))))))
+  (def single-float %unary-truncate/single-float)
+  (def double-float %unary-truncate/double-float)
+  #!+long-float
+  (def double-float %unary-truncate/long-float))
 
 ;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
 ;;; can't use the round primitive, then we do our own round-to-nearest on the

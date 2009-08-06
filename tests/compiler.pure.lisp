@@ -3232,3 +3232,18 @@
                              (vector i i i))
                            t))))
     (ctu:assert-no-consing (funcall f))))
+
+(with-test (:name :truncate-float)
+  (let ((s (compile nil `(lambda (x)
+                           (declare (single-float x))
+                           (truncate x))))
+        (d (compile nil `(lambda (x)
+                           (declare (double-float x))
+                           (truncate x)))))
+    ;; Check that there is no generic arithmetic
+    (assert (not (search "GENERIC"
+                         (with-output-to-string (out)
+                           (disassemble s :stream out)))))
+    (assert (not (search "GENERIC"
+                         (with-output-to-string (out)
+                           (disassemble d :stream out)))))))

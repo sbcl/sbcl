@@ -1102,8 +1102,8 @@
                           (signed-reg
                            (inst ,inst y x)
                            ))))))
-  (frob %unary-truncate cvttss2si single-reg single-float nil)
-  (frob %unary-truncate cvttsd2si double-reg double-float nil)
+  (frob %unary-truncate/single-float cvttss2si single-reg single-float nil)
+  (frob %unary-truncate/double-float cvttsd2si double-reg double-float nil)
 
   (frob %unary-round cvtss2si single-reg single-float t)
   (frob %unary-round cvtsd2si double-reg double-float t))

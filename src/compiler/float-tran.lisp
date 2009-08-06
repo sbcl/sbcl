@@ -15,8 +15,10 @@
 
 ;;;; coercions
 
-(defknown %single-float (real) single-float (movable foldable))
-(defknown %double-float (real) double-float (movable foldable))
+(defknown %single-float (real) single-float
+    (movable foldable))
+(defknown %double-float (real) double-float
+    (movable foldable))
 
 (deftransform float ((n f) (* single-float) *)
   '(%single-float n))
@@ -1492,15 +1494,48 @@
   (define-frobs truncate %unary-truncate)
   (define-frobs round %unary-round))
 
-;;; Convert (TRUNCATE x y) to the obvious implementation.  We only want
-;;; this when under certain conditions and let the generic TRUNCATE
-;;; handle the rest.  (Note: if Y = 1, the divide and multiply by Y
-;;; should be removed by other DEFTRANSFORMs.)
-(deftransform truncate ((x &optional y)
-                        (float &optional (or float integer)))
-  (let ((defaulted-y (if y 'y 1)))
-    `(let ((res (%unary-truncate (/ x ,defaulted-y))))
-       (values res (- x (* ,defaulted-y res))))))
+(deftransform %unary-truncate ((x) (single-float))
+  `(%unary-truncate/single-float x))
+(deftransform %unary-truncate ((x) (double-float))
+  `(%unary-truncate/double-float x))
+
+;;; Convert (TRUNCATE x y) to the obvious implementation.
+;;;
+;;; ...plus hair: Insert explicit coercions to appropriate float types: Python
+;;; is reluctant it generate explicit integer->float coercions due to
+;;; precision issues (see SAFE-SINGLE-COERCION-P &co), but this is not an
+;;; issue here as there is no DERIVE-TYPE optimizer on specialized versions of
+;;; %UNARY-TRUNCATE, so the derived type of TRUNCATE remains the best we can
+;;; do here -- which is fine. Also take care not to add unnecassary division
+;;; or multiplication by 1, since we are not able to always eliminate them,
+;;; depending on FLOAT-ACCURACY. Finally, leave out the secondary value when
+;;; we know it is unused: COERCE is not flushable.
+(macrolet ((def (type other-float-arg-types)
+             (let ((unary (symbolicate "%UNARY-TRUNCATE/" type))
+                   (coerce (symbolicate "%" type)))
+               `(deftransform truncate ((x &optional y)
+                                        (,type
+                                         &optional (or ,type ,@other-float-arg-types integer))
+                                        * :result result)
+                  (let ((result-type (lvar-type result)))
+                    (if (or (not y)
+                            (and (constant-lvar-p y) (= 1 (lvar-value y))))
+                        (if (values-type-p result-type)
+                            `(let ((res (,',unary x)))
+                               (values res (- x (,',coerce res))))
+                            `(let ((res (,',unary x)))
+                               ;; Dummy secondary value!
+                               (values res x)))
+                        (if (values-type-p result-type)
+                            `(let* ((f (,',coerce y))
+                                    (res (,',unary (/ x f))))
+                               (values res (- x (* f (,',coerce res)))))
+                            `(let* ((f (,',coerce y))
+                                    (res (,',unary (/ x f))))
+                               ;; Dummy secondary value!
+                               (values res x)))))))))
+  (def single-float ())
+  (def double-float (single-float)))
 
 (deftransform floor ((number &optional divisor)
                      (float &optional (or integer float)))

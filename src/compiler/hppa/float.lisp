@@ -613,9 +613,9 @@
                       (loadw y nfp (tn-offset stack-tn))))))))
   (frob %unary-round single-reg single-float fcnvfx "inline float round")
   (frob %unary-round double-reg double-float fcnvfx "inline float round")
-  (frob %unary-truncate single-reg single-float fcnvfxt
+  (frob %unary-truncate/single-float single-reg single-float fcnvfxt
     "inline float truncate")
-  (frob %unary-truncate double-reg double-float fcnvfxt
+  (frob %unary-truncate/double-float double-reg double-float fcnvfxt
     "inline float truncate"))
 
 (define-vop (make-single-float)
