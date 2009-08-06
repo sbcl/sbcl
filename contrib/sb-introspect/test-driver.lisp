@@ -320,12 +320,12 @@
                         (sb-thread:wait-on-semaphore sem)))
                     :name "child")))
        (loop until obj)
-       (assert (equal (list :stack child)
-                      (multiple-value-list
-                       (sb-introspect:allocation-information obj))))
-       (sb-thread:signal-semaphore sem)
-       (sb-thread:join-thread child)
-       nil))
+       (unwind-protect
+            (equal (list :stack child)
+                   (multiple-value-list
+                    (sb-introspect:allocation-information obj)))
+         (sb-thread:signal-semaphore sem)
+         (sb-thread:join-thread child))))
 
    (deftest allocation-information.thread.3
        (thread-tai2)
