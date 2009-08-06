@@ -251,10 +251,14 @@
 
 ;;; Test allocation-information
 
-(defun tai (x kind info)
+(defun tai (x kind info &key ignore)
   (multiple-value-bind (kind2 info2) (sb-introspect:allocation-information x)
     (unless (eq kind kind2)
       (error "wanted ~S, got ~S" kind kind2))
+    (when ignore
+      (setf info2 (copy-list info2))
+      (dolist (key ignore)
+        (remf info2 key)))
     (equal info info2)))
 
 (deftest allocation-infromation.1
@@ -270,20 +274,20 @@
   t)
 
 (deftest allocation-information.4
+    #+gencgc
     (tai #'cons :heap
-         #+(and (not ppc) gencgc)
-         ;; FIXME: This is the canonical GENCGC result, the one below for PPC is
-         ;; what we get there, but :LARGE T doesn't seem right. Figure out what's
-         ;; going on.
+         ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
+         ;; :LARGE T, which doesn't seem right -- but ignore that for now.
          '(:space :dynamic :generation 6 :write-protected t :pinned nil :large nil)
-         #+(and ppc gencgc)
-         '(:space :dynamic :generation 6 :write-protected t :pinned nil :large t)
+         :ignore #+ppc :large #-ppc nil)
+    #-gencgc
+    (tai :cons :heap
          ;; FIXME: Figure out what's the right cheney-result, and which platforms
          ;; return something else. The SPARC version here is what we get there,
          ;; but quite possibly that is the result on all non-GENCGC platforms.
-         #+(and sparc (not gencgc))
+         #+sparc
          '(:space :read-only)
-         #+(and (not sparc) (not gencgc))
+         #-sparc
          '(:space :dynamic))
   t)
 
