@@ -686,6 +686,7 @@
  ("src/code/debug" :not-host)
 
  ("src/code/octets" :not-host)
+ ("src/code/external-formats/enc-ebcdic" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/enc-cyr" :not-host)
  #!+sb-unicode
