@@ -50,6 +50,8 @@ changes relative to sbcl-1.0.30:
     Elsasser)
   * improvement: pretty-printing of various Lisp forms has been improved
     (thanks to Tobias Rittweiler)
+  * bug fix: some out-of-line array predicates were missing (reported by
+    Stelian Ionescu)
   * bug fix: a failing AVER in CONVERT-MV-CALL has been fixed. (thanks to
     Larry D'Anna)
   * bug fix: a failing AVER in %ALLOCATE-CLOSURES conversion has been fixed

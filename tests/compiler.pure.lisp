@@ -3233,6 +3233,20 @@
                            t))))
     (ctu:assert-no-consing (funcall f))))
 
+(with-test (:name :array-type-predicates)
+  (dolist (et sb-kernel::*specialized-array-element-types*)
+    (when et
+      (let* ((v (make-array 3 :element-type et))
+             (fun (compile nil `(lambda ()
+                                  (list
+                                   (if (typep ,v '(simple-array ,et (*)))
+                                       :good
+                                       :bad)
+                                   (if (typep (elt ,v 0) '(simple-array ,et (*)))
+                                       :bad
+                                       :good))))))
+        (assert (equal '(:good :good) (funcall fun)))))))
+
 (with-test (:name :truncate-float)
   (let ((s (compile nil `(lambda (x)
                            (declare (single-float x))
