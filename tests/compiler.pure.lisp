@@ -3261,3 +3261,9 @@
     (assert (not (search "GENERIC"
                          (with-output-to-string (out)
                            (disassemble d :stream out)))))))
+
+(with-test (:name :make-array-unnamed-dimension-leaf)
+  (let ((fun (compile nil `(lambda (stuff)
+                             (make-array (map 'list 'length stuff))))))
+    (assert (equalp #2A((0 0 0) (0 0 0))
+                    (funcall fun '((1 2) (1 2 3)))))))

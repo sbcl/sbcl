@@ -1961,12 +1961,13 @@ is :ANY, the function name is not checked."
         (name1 uses)
         (mapcar #'name1 uses)))))
 
-;;; Return the source name of a combination. (This is an idiom
-;;; which was used in CMU CL. I gather it always works. -- WHN)
+;;; Return the source name of a combination -- or signals an error
+;;; if the function leaf is anonymous.
 (defun combination-fun-source-name (combination &optional (errorp t))
   (let ((leaf (ref-leaf (lvar-uses (combination-fun combination)))))
-    (when (or errorp (leaf-has-source-name-p leaf))
-      (leaf-source-name leaf))))
+    (if (or errorp (leaf-has-source-name-p leaf))
+        (values (leaf-source-name leaf) t)
+        (values nil nil))))
 
 ;;; Return the COMBINATION node that is the call to the LET FUN.
 (defun let-combination (fun)
@@ -2193,7 +2194,8 @@ is :ANY, the function name is not checked."
   (let ((use (lvar-use lvar)))
     (and (combination-p use)
          (or (not fun-names)
-             (member (combination-fun-source-name use)
-                     fun-names :test #'eq))
+             (multiple-value-bind (name ok)
+                 (combination-fun-source-name use nil)
+               (and ok (member name fun-names :test #'eq))))
          (or (not arg-count)
              (= arg-count (length (combination-args use)))))))
