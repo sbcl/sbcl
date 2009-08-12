@@ -326,18 +326,18 @@
   (movable foldable flushable explicit-check))
 
 (defknown decode-float (float) (values float float-exponent float)
-  (movable foldable flushable explicit-check))
+  (movable foldable unsafely-flushable explicit-check))
 (defknown scale-float (float integer) float
   (movable foldable unsafely-flushable explicit-check))
 (defknown float-radix (float) float-radix
-  (movable foldable flushable))
+  (movable foldable unsafely-flushable))
 (defknown float-sign (float &optional float) float
-  (movable foldable flushable explicit-check))
+  (movable foldable unsafely-flushable explicit-check))
 (defknown (float-digits float-precision) (float) float-digits
-  (movable foldable flushable explicit-check))
+  (movable foldable unsafely-flushable explicit-check))
 (defknown integer-decode-float (float)
-          (values integer float-int-exponent (member -1 1))
-          (movable foldable flushable explicit-check))
+    (values integer float-int-exponent (member -1 1))
+    (movable foldable unsafely-flushable explicit-check))
 
 (defknown complex (real &optional real) number
   (movable foldable flushable explicit-check))

@@ -50,6 +50,8 @@ changes relative to sbcl-1.0.30:
     Elsasser)
   * improvement: pretty-printing of various Lisp forms has been improved
     (thanks to Tobias Rittweiler)
+  * bug fix: calls to DECODE-FLOAT and INTEGER-DECODE-FLOAT whose value was
+    unused were deleted in safe code. (reported by John Fremlin)
   * bug fix: a failing AVER compiling certain MAKE-ARRAY forms. (reported
     by James Wright)
   * bug fix: some out-of-line array predicates were missing (reported by

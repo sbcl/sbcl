@@ -3267,3 +3267,24 @@
                              (make-array (map 'list 'length stuff))))))
     (assert (equalp #2A((0 0 0) (0 0 0))
                     (funcall fun '((1 2) (1 2 3)))))))
+
+(with-test (:name :fp-decoding-funs-not-flushable-in-safe-code)
+  (dolist (name '(float-sign float-radix float-digits float-precision decode-float
+                  integer-decode-float))
+    (let ((fun (compile nil `(lambda (x)
+                               (declare (optimize safety))
+                               (,name x)
+                               nil))))
+      (flet ((test (arg)
+               (unless (eq :error
+                           (handler-case
+                               (funcall fun arg)
+                             (error () :error)))
+                 (error "(~S ~S) did not error"
+                        name arg))))
+        ;; No error
+        (funcall fun 1.0)
+        ;; Error
+        (test 'not-a-float)
+        (when (member name '(decode-float integer-decode-float))
+          (test sb-ext:single-float-positive-infinity))))))
