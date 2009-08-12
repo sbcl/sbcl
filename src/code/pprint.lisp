@@ -1154,7 +1154,7 @@ line break."
 
 (defun pprint-progn (stream list &rest noise)
   (declare (ignore noise))
-  (funcall (formatter "~:<~^~W~@{ ~_~W~}~:>") stream list))
+  (pprint-linear stream list))
 
 (defun pprint-progv (stream list &rest noise)
   (declare (ignore noise))
@@ -1166,11 +1166,14 @@ line break."
   (funcall (formatter "~:<~^~W~^~3I ~:_~W~^ ~_~W~^~1I~@{ ~_~W~}~:>")
            stream list))
 
+(defvar *pprint-quote-with-syntactic-sugar* t)
+
 (defun pprint-quote (stream list &rest noise)
   (declare (ignore noise))
   (if (and (consp list)
            (consp (cdr list))
-           (null (cddr list)))
+           (null (cddr list))
+           *pprint-quote-with-syntactic-sugar*)
       (case (car list)
         (function
          (write-string "#'" stream)
@@ -1182,6 +1185,21 @@ line break."
          (pprint-fill stream list)))
       (pprint-fill stream list)))
 
+(defun pprint-declare (stream list &rest noise)
+  (declare (ignore noise))
+  ;; Make sure to print (DECLARE (FUNCTION F)) not (DECLARE #'A).
+  (let ((*pprint-quote-with-syntactic-sugar* nil))
+    (pprint-spread-fun-call stream list)))
+
+;;; Try to print every variable-value pair on one line; if that doesn't
+;;; work print the value indented by 2 spaces:
+;;;
+;;;      (setq foo bar
+;;;            quux xoo)
+;;;  vs.
+;;;      (setf foo
+;;;              (long form ...)
+;;;            quux xoo)
 (defun pprint-setq (stream list &rest noise)
   (declare (ignore noise))
   (pprint-logical-block (stream list :prefix "(" :suffix ")")
@@ -1190,25 +1208,18 @@ line break."
     (pprint-exit-if-list-exhausted)
     (write-char #\space stream)
     (pprint-newline :miser stream)
-    (if (and (consp (cdr list)) (consp (cddr list)))
-        (loop
-          (pprint-indent :current 2 stream)
-          (output-object (pprint-pop) stream)
-          (pprint-exit-if-list-exhausted)
-          (write-char #\space stream)
-          (pprint-newline :linear stream)
-          (pprint-indent :current -2 stream)
-          (output-object (pprint-pop) stream)
-          (pprint-exit-if-list-exhausted)
-          (write-char #\space stream)
-          (pprint-newline :linear stream))
-        (progn
-          (pprint-indent :current 0 stream)
-          (output-object (pprint-pop) stream)
-          (pprint-exit-if-list-exhausted)
-          (write-char #\space stream)
-          (pprint-newline :linear stream)
-          (output-object (pprint-pop) stream)))))
+    (pprint-logical-block (stream (cdr list) :prefix "" :suffix "")
+      (loop
+       (pprint-indent :block 2 stream)
+       (output-object (pprint-pop) stream)
+       (pprint-exit-if-list-exhausted)
+       (write-char #\space stream)
+       (pprint-newline :fill stream)
+       (pprint-indent :block 0 stream)
+       (output-object (pprint-pop) stream)
+       (pprint-exit-if-list-exhausted)
+       (write-char #\space stream)
+       (pprint-newline :mandatory stream)))))
 
 ;;; FIXME: could become SB!XC:DEFMACRO wrapped in EVAL-WHEN (COMPILE EVAL)
 (defmacro pprint-tagbody-guts (stream)
@@ -1308,7 +1319,7 @@ line break."
 ;;; Each clause in this list will get its own line.
 (defvar *loop-seperating-clauses*
   '(:and
-    :where :for
+    :with :for
     :initially :finally
     :do :doing
     :collect :collecting
@@ -1322,8 +1333,12 @@ line break."
     :for :while :until :repeat :always :never :thereis
     ))
 
-(defun pprint-extended-loop-clauses (stream clauses)
-  (pprint-logical-block (stream clauses :prefix "" :suffix "")
+(defun pprint-extended-loop (stream list)
+  (pprint-logical-block (stream list :prefix "(" :suffix ")")
+    (output-object (pprint-pop) stream)
+    (pprint-exit-if-list-exhausted)
+    (write-char #\space stream)
+    (pprint-indent :current 0 stream)
     (output-object (pprint-pop) stream)
     (pprint-exit-if-list-exhausted)
     (write-char #\space stream)
@@ -1335,36 +1350,18 @@ line break."
           do (pprint-exit-if-list-exhausted)
           do (write-char #\space stream))))
 
-(defun pprint-simple-loop-clauses (stream clauses)
-  (pprint-logical-block (stream clauses :prefix "" :suffix "")
-    (output-object (pprint-pop) stream)
-    (pprint-exit-if-list-exhausted)
-    (write-char #\space stream)
-    (loop for thing = (pprint-pop) do
-          (when (consp thing)
-            (pprint-newline :mandatory stream))
-          (output-object thing stream)
-          (pprint-exit-if-list-exhausted)
-          (write-char #\space stream))))
-
 (defun pprint-loop (stream list &rest noise)
   (declare (ignore noise))
   (destructuring-bind (loop-symbol . clauses) list
-    (write-char #\( stream)
-    (output-object loop-symbol stream)
-    (cond ((null clauses))
-          ((symbolp (car clauses))
-           (write-char #\space stream)
-           (pprint-extended-loop-clauses stream clauses))
-          (t
-           (write-char #\space stream)
-           (pprint-simple-loop-clauses stream clauses)))
-    (write-char #\) stream)))
+    (declare (ignore loop-symbol))
+    (if (or (null clauses) (consp (car clauses)))
+        (pprint-spread-fun-call stream list)
+        (pprint-extended-loop stream list))))
 
 (defun pprint-if (stream list &rest noise)
   (declare (ignore noise))
   ;; Indent after the ``predicate'' form, and the ``then'' form.
-  (funcall (formatter "~:<~^~W~^ ~:_~:I~W~^ ~:@_~:I~@{~W~^ ~:@_~}~:>")
+  (funcall (formatter "~:<~^~W~^ ~:I~W~^ ~:@_~@{~W~^ ~:@_~}~:>")
            stream
            list))
 
@@ -1374,9 +1371,17 @@ line break."
            stream
            list))
 
+(defun pprint-spread-fun-call (stream list &rest noise)
+  (declare (ignore noise))
+  ;; Similiar to PPRINT-FUN-CALL but emit a mandatory newline after
+  ;; each parameter. I.e. spread out each parameter on its own line.
+  (funcall (formatter "~:<~^~W~^ ~:_~:I~@{~W~^ ~:@_~}~:>")
+           stream
+           list))
+
 (defun pprint-data-list (stream list &rest noise)
   (declare (ignore noise))
-  (funcall (formatter "~:<~@{~W~^ ~:_~}~:>") stream list))
+  (pprint-fill stream list))
 
 ;;; Returns an Emacs-style indent spec: an integer N, meaning indent
 ;;; the first N arguments specially then indent any further arguments
@@ -1415,8 +1420,8 @@ line break."
             (cond
               ;; Place the very first argument next to the macro name
               ((zerop indent)
-                   (output-object (pprint-pop) stream)
-                   (pprint-exit-if-list-exhausted))
+               (output-object (pprint-pop) stream)
+               (pprint-exit-if-list-exhausted))
               ;; Indent any other non-body argument by the same
               ;; amount. It's what Emacs seems to do, too.
               (t
@@ -1467,6 +1472,7 @@ line break."
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
 
     (dolist (magic-form '((lambda pprint-lambda)
+                          (declare pprint-declare)
 
                           ;; special forms
                           (block pprint-block)
@@ -1474,6 +1480,7 @@ line break."
                           (eval-when pprint-block)
                           (flet pprint-flet)
                           (function pprint-quote)
+                          (if pprint-if)
                           (labels pprint-flet)
                           (let pprint-let)
                           (let* pprint-let)
@@ -1490,12 +1497,12 @@ line break."
                           (tagbody pprint-tagbody)
                           (throw pprint-block)
                           (unwind-protect pprint-block)
-                          (if pprint-if)
 
                           ;; macros
                           (case pprint-case)
                           (ccase pprint-case)
                           (ctypecase pprint-typecase)
+                          (declaim pprint-declare)
                           (defconstant pprint-block)
                           (define-modify-macro pprint-defun)
                           (define-setf-expander pprint-defun)
@@ -1547,7 +1554,11 @@ line break."
                           (with-output-to-string pprint-block)
                           (with-package-iterator pprint-block)
                           (with-simple-restart pprint-block)
-                          (with-standard-io-syntax pprint-progn)))
+                          (with-standard-io-syntax pprint-progn)
+
+                          ;; sbcl specific
+                          (sb!int:dx-flet pprint-flet)
+                          ))
 
       (set-pprint-dispatch `(cons (eql ,(first magic-form)))
                            (symbol-function (second magic-form))))
