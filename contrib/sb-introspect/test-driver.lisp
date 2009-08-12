@@ -255,10 +255,13 @@
   (multiple-value-bind (kind2 info2) (sb-introspect:allocation-information x)
     (unless (eq kind kind2)
       (error "wanted ~S, got ~S" kind kind2))
-    (when ignore
+    (when (not (null ignore))
       (setf info2 (copy-list info2))
       (dolist (key ignore)
-        (remf info2 key)))
+        (remf info2 key))
+      (setf info (copy-list info))
+      (dolist (key ignore)
+        (remf info key)))
     (equal info info2)))
 
 (deftest allocation-infromation.1
@@ -279,16 +282,13 @@
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
          ;; :LARGE T, which doesn't seem right -- but ignore that for now.
          '(:space :dynamic :generation 6 :write-protected t :pinned nil :large nil)
-         :ignore #+ppc :large #-ppc nil)
+         :ignore #+ppc '(:large) #-ppc nil)
     #-gencgc
     (tai :cons :heap
-         ;; FIXME: Figure out what's the right cheney-result, and which platforms
-         ;; return something else. The SPARC version here is what we get there,
-         ;; but quite possibly that is the result on all non-GENCGC platforms.
-         #+sparc
-         '(:space :read-only)
-         #-sparc
-         '(:space :dynamic))
+         ;; FIXME: Figure out what's the right cheney-result. SPARC at least
+         ;; has exhibited both :READ-ONLY and :DYNAMIC, which seems wrong.
+         '()
+         :ignore '(:space))
   t)
 
 #+sb-thread
