@@ -3288,3 +3288,15 @@
         (test 'not-a-float)
         (when (member name '(decode-float integer-decode-float))
           (test sb-ext:single-float-positive-infinity))))))
+
+(with-test (:name :sap-ref-16)
+  (let* ((fun (compile nil `(lambda (x y)
+                              (declare (type sb-sys:system-area-pointer x)
+                                       (type (integer 0 100) y))
+                              (sb-sys:sap-ref-16 x (+ 4 y)))))
+         (vector (coerce '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+                         '(simple-array (unsigned-byte 8) (*))))
+         (sap (sb-sys:vector-sap vector))
+         (ret (funcall fun sap 0)))
+    ;; test for either endianness
+    (assert (or (= ret (+ (* 5 256) 4)) (= ret (+ (* 4 256) 5))))))

@@ -150,11 +150,7 @@
                                     type
                                     size
                                     &optional signed)
-             (let ((temp-sc (symbolicate size "-REG"))
-                   (element-size (ecase size
-                                   (:byte 1)
-                                   (:word 2)
-                                   (:dword 4))))
+             (let ((temp-sc (symbolicate size "-REG")))
                `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
@@ -163,9 +159,7 @@
                            (offset :scs (signed-reg immediate)))
                     (:info disp)
                     (:arg-types system-area-pointer signed-num
-                                (:constant (constant-displacement 0 ; lowtag
-                                                                  ,element-size
-                                                                  0)))
+                                (:constant (constant-displacement 0 1 0)))
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 5
@@ -177,12 +171,11 @@
                             (immediate
                              (inst ,mov-inst result
                                    (make-ea ,size :base sap
-                                            :disp (+ (tn-value offset)
-                                                     (* ,element-size disp)))))
+                                            :disp (+ (tn-value offset) disp))))
                             (t (inst ,mov-inst result
                                      (make-ea ,size :base sap
                                               :index offset
-                                              :disp (* ,element-size disp))))))))
+                                              :disp disp)))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -194,9 +187,7 @@
                                                'temp)))
                     (:info disp)
                     (:arg-types system-area-pointer signed-num
-                                (:constant (constant-displacement 0 ; lowtag
-                                                                  ,element-size
-                                                                  0))
+                                (:constant (constant-displacement 0 1 0))
                                 ,type)
                     ,@(unless (eq size :dword)
                         `((:temporary (:sc ,temp-sc :offset eax-offset
@@ -212,11 +203,11 @@
                                          (immediate
                                           (make-ea ,size :base sap
                                                    :disp (+ (tn-value offset)
-                                                            (* ,element-size disp))))
+                                                            disp)))
                                          (t (make-ea ,size
                                                      :base sap
                                                      :index offset
-                                                     :disp (* ,element-size disp))))
+                                                     :disp disp)))
                             ,(if (eq size :dword) 'value 'temp))
                       (move result
                             ,(if (eq size :dword) 'value 'eax-tn))))))))
@@ -245,9 +236,7 @@
          (offset :scs (signed-reg immediate)))
   (:info disp)
   (:arg-types system-area-pointer signed-num
-              (:constant (constant-displacement 0 ; lowtag
-                                                8 ; double-float size
-                                                0)))
+              (:constant (constant-displacement 0 1 0)))
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
@@ -259,7 +248,7 @@
        (t
         (with-empty-tn@fp-top(result)
           (inst fldd (make-ea :dword :base sap :index offset
-                              :disp (* 4 disp))))))))
+                              :disp disp)))))))
 
 (define-vop (%set-sap-ref-double-with-offset)
   (:translate sb!c::%set-sap-ref-double-with-offset)
@@ -269,25 +258,21 @@
          (value :scs (double-reg)))
   (:info disp)
   (:arg-types system-area-pointer signed-num
-              (:constant (constant-displacement 0 ; lowtag
-                                                8 ; double-float size
-                                                0))
+              (:constant (constant-displacement 0 1 0))
               double-float)
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fstd (make-ea :dword :base sap :index offset
-                               :disp (* 8 disp)))
+           (inst fstd (make-ea :dword :base sap :index offset :disp disp))
            (unless (zerop (tn-offset result))
              ;; Value is in ST0 but not result.
              (inst fstd result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fstd (make-ea :dword :base sap :index offset
-                               :disp (* 8 disp)))
+           (inst fstd (make-ea :dword :base sap :index offset :disp disp))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fstd value))
@@ -303,9 +288,7 @@
   (:args (sap :scs (sap-reg) :to (:eval 0))
          (value :scs (double-reg)))
   (:arg-types system-area-pointer (:constant (signed-byte 32))
-              (:constant (constant-displacement 0 ; lowtag
-                                                8 ; double-float size
-                                                0))
+              (:constant (constant-displacement 0 1 0))
               double-float)
   (:info offset disp)
   (:results (result :scs (double-reg)))
@@ -340,9 +323,7 @@
          (offset :scs (signed-reg immediate)))
   (:info disp)
   (:arg-types system-area-pointer signed-num
-              (:constant (constant-displacement 0 ; lowtag
-                                                4 ; single-float size
-                                                0)))
+              (:constant (constant-displacement 0 1 0)))
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
@@ -353,8 +334,7 @@
           (inst fld (make-ea :dword :base sap :disp (tn-value offset)))))
        (t
         (with-empty-tn@fp-top(result)
-          (inst fld (make-ea :dword :base sap :index offset
-                             :disp (* 4 disp))))))))
+          (inst fld (make-ea :dword :base sap :index offset :disp disp)))))))
 
 (define-vop (%set-sap-ref-single-with-offset)
   (:translate sb!c::%set-sap-ref-single-with-offset)
@@ -364,25 +344,21 @@
          (value :scs (single-reg)))
   (:info disp)
   (:arg-types system-area-pointer signed-num
-              (:constant (constant-displacement 0 ; lowtag
-                                                4 ; single-float size
-                                                0))
+              (:constant (constant-displacement 0 1 0))
               single-float)
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0
-           (inst fst (make-ea :dword :base sap :index offset
-                              :disp (* 4 disp)))
+           (inst fst (make-ea :dword :base sap :index offset :disp disp))
            (unless (zerop (tn-offset result))
              ;; Value is in ST0 but not result.
              (inst fst result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fst (make-ea :dword :base sap :index offset
-                              :disp (* 4 disp)))
+           (inst fst (make-ea :dword :base sap :index offset :disp disp))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fst value))
@@ -398,9 +374,7 @@
   (:args (sap :scs (sap-reg) :to (:eval 0))
          (value :scs (single-reg)))
   (:arg-types system-area-pointer (:constant (signed-byte 32))
-              (:constant (constant-displacement 0 ; lowtag
-                                                4 ; single-float size
-                                                0))
+              (:constant (constant-displacement 0 1 0))
               single-float)
   (:info offset disp)
   (:results (result :scs (single-reg)))

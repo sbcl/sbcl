@@ -69,6 +69,9 @@ changes relative to sbcl-1.0.30:
     information about some array types. (thanks to Luis Oliveira)
   * bug fix: moderately complex combinations of inline expansions could
     be miscompiled if the result was declared to be dynamic extent.
+  * bug fix: on x86, SAP-REF of sizes greater than 8 bits with offsets of the
+    form (+ <variable> <integer>) were miscompiled under certain
+    circumstances.
   * bug fix: in some cases no compiler note about failure to stack allocate
     was emitted, even if the objects were in fact heap allocated.
   * bug fix: minor violation of "otherwise inaccessible" rule for stack
