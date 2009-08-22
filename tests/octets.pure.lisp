@@ -220,6 +220,13 @@
 
 )
 
-;; regression test: STRING->UTF8 didn't properly handle a non-zero
-;; START argument.
+;;; regression test: STRING->UTF8 didn't properly handle a non-zero
+;;; START argument.
 (assert (equalp #(50) (string-to-octets "42" :start 1 :external-format :utf-8)))
+
+;;; STRING->UTF8 should cope with NIL strings if a null range is required
+(assert (equalp #() (string-to-octets "" :external-format :utf-8)))
+(assert (equalp #() (string-to-octets (make-array 0 :element-type nil)
+                                      :external-format :utf-8)))
+(assert (equalp #() (string-to-octets (make-array 5 :element-type nil)
+                                      :start 3 :end 3 :external-format :utf-8)))

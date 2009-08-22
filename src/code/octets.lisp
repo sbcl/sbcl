@@ -423,13 +423,16 @@ one-past-the-end"
                        finally (return array)))))))
       #!+sb-unicode
       ((simple-array base-char (*))
-       ;; On unicode builds BASE-STRINGs are limited to ASCII range, so we can take
-       ;; a fast path -- and get benefit of the element type information. On non-unicode
-       ;; build BASE-CHAR == CHARACTER.
+       ;; On unicode builds BASE-STRINGs are limited to ASCII range,
+       ;; so we can take a fast path -- and get benefit of the element
+       ;; type information. On non-unicode build BASE-CHAR ==
+       ;; CHARACTER.
        (ascii-bash))
       ((simple-array nil (*))
-       ;; Just get the error...
-       (aref string sstart)))))
+       (if (= send sstart)
+           (make-array 0 :element-type '(unsigned-byte 8))
+           ;; Just get the error...
+           (aref string sstart))))))
 
 ;;;; to-string conversions
 
