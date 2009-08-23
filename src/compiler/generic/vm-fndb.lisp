@@ -63,8 +63,11 @@
            unsigned-byte-64-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            signed-byte-64-p
-           vector-t-p weak-pointer-p code-component-p lra-p
+           weak-pointer-p code-component-p lra-p
            funcallable-instance-p)
+  (t) boolean (movable foldable flushable))
+(defknown #.(loop for (name) in *vector-without-complex-typecode-infos*
+                  collect name)
   (t) boolean (movable foldable flushable))
 
 ;;;; miscellaneous "sub-primitives"

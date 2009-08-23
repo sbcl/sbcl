@@ -17,12 +17,18 @@
 (defun streamp (stream)
   (typep stream 'stream))
 
-;;; Is X a (VECTOR T)?
-(defun vector-t-p (x)
-  (or (simple-vector-p x)
-      (and (complex-vector-p x)
-           (do ((data (%array-data-vector x) (%array-data-vector data)))
-               ((not (array-header-p data)) (simple-vector-p data))))))
+;;; various (VECTOR FOO) type predicates, not implemented as simple
+;;; widetag tests
+(macrolet
+    ((def ()
+       `(progn
+          ,@(loop for (name spec) in *vector-without-complex-typecode-infos*
+                  collect `(defun ,name (x)
+                             (or (typep x '(simple-array ,spec (*)))
+                                 (and (complex-vector-p x)
+                                      (do ((data (%array-data-vector x) (%array-data-vector data)))
+                                          ((not (array-header-p data)) (typep data '(simple-array ,spec (*))))))))))))
+  (def))
 
 ;;; Is X an extended sequence?
 (defun extended-sequence-p (x)

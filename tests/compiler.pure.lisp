@@ -3300,3 +3300,14 @@
          (ret (funcall fun sap 0)))
     ;; test for either endianness
     (assert (or (= ret (+ (* 5 256) 4)) (= ret (+ (* 4 256) 5))))))
+
+(with-test (:name :coerce-type-warning)
+  (dolist (type '(t (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32) 
+                  (signed-byte 8) (signed-byte 16) (signed-byte 32)))
+    (multiple-value-bind (fun warningsp failurep)
+        (compile nil `(lambda (x)
+                        (declare (type simple-vector x))
+                        (coerce x '(vector ,type))))
+      (assert (null warningsp))
+      (assert (null failurep))
+      (assert (typep (funcall fun #(1)) `(simple-array ,type (*)))))))

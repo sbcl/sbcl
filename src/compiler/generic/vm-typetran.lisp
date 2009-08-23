@@ -104,13 +104,16 @@
 (define-type-predicate unsigned-byte-64-p (unsigned-byte 64))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate signed-byte-64-p (signed-byte 64))
-(define-type-predicate vector-t-p (vector t))
 (define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
 (define-type-predicate lra-p lra)
 (define-type-predicate fdefn-p fdefn)
-
+(macrolet
+    ((def ()
+       `(progn ,@(loop for (name spec) in *vector-without-complex-typecode-infos*
+                       collect `(define-type-predicate ,name (vector ,spec))))))
+  (def))
 ;;; Unlike the un-%'ed versions, these are true type predicates,
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)

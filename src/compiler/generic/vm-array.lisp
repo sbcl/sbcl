@@ -198,6 +198,21 @@
   "An alist for mapping simple array element types to their
 corresponding primitive types.")
 
+(defvar *vector-without-complex-typecode-infos*
+  #+sb-xc-host
+  (loop for saetp across *specialized-array-element-type-properties*
+        for specifier = (saetp-specifier saetp)
+        unless (saetp-complex-typecode saetp)
+        collect (list (if (atom specifier)
+                          (intern (format nil "VECTOR-~A-P" specifier))
+                          ;; at the moment, all specialized array
+                          ;; specifiers are either atoms or
+                          ;; two-element lists.
+                          (intern (format nil "VECTOR-~A-~A-P" (car specifier) (cadr specifier))))
+                      specifier))
+  #-sb-xc-host
+  '#.*vector-without-complex-typecode-infos*)
+
 (in-package "SB!C")
 
 (defun find-saetp (element-type)
