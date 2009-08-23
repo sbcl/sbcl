@@ -95,7 +95,7 @@ The save/load process changes the values of some global variables:
     This is reinitialized to reflect the working directory where the
     saved core is loaded.
 
-SAVE-LISP-AND-DIE interacts with SB-ALIEN:LOAD-FOREIGN-OBJECT: see its
+SAVE-LISP-AND-DIE interacts with SB-ALIEN:LOAD-SHARED-OBJECT: see its
 documentation for details.
 
 On threaded platforms only a single thread may remain running after
