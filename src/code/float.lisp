@@ -753,10 +753,13 @@
 ;;; *not* return the second value of truncate, so it must be computed by the
 ;;; caller if needed.
 ;;;
-;;; In the float case, we pick off small arguments so that compiler can use
-;;; special-case operations. We use an exclusive test, since (due to round-off
-;;; error), (float most-positive-fixnum) may be greater than
-;;; most-positive-fixnum.
+;;; In the float case, we pick off small arguments so that compiler
+;;; can use special-case operations. We use an exclusive test, since
+;;; (due to round-off error), (float most-positive-fixnum) is likely
+;;; to be equal to (1+ most-positive-fixnum).  An exclusive test is
+;;; good enough, because most-positive-fixnum will be one less than a
+;;; power of two, and that power of two will be exactly representable
+;;; as a float (at least until we get 128-bit fixnums).
 (defun %unary-truncate (number)
   (number-dispatch ((number real))
     ((integer) number)
@@ -775,9 +778,9 @@
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)
-                (if (< ,(coerce most-negative-fixnum type)
+                (if (< ,(coerce sb!xc:most-negative-fixnum type)
                        number
-                       ,(coerce most-positive-fixnum type))
+                       ,(coerce sb!xc:most-positive-fixnum type))
                     (truly-the fixnum (,name number))
                     ;; General -- slow -- case.
                     (multiple-value-bind (bits exp) (integer-decode-float number)
