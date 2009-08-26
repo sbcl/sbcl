@@ -1517,7 +1517,7 @@
                                         (,type
                                          &optional (or ,type ,@other-float-arg-types integer))
                                         * :result result)
-                  (let ((result-type (lvar-type result)))
+                  (let ((result-type (lvar-derived-type result)))
                     (if (or (not y)
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
                         (if (values-type-p result-type)

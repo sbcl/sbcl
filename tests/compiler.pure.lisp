@@ -3302,7 +3302,7 @@
     (assert (or (= ret (+ (* 5 256) 4)) (= ret (+ (* 4 256) 5))))))
 
 (with-test (:name :coerce-type-warning)
-  (dolist (type '(t (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32) 
+  (dolist (type '(t (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32)
                   (signed-byte 8) (signed-byte 16) (signed-byte 32)))
     (multiple-value-bind (fun warningsp failurep)
         (compile nil `(lambda (x)
@@ -3311,3 +3311,12 @@
       (assert (null warningsp))
       (assert (null failurep))
       (assert (typep (funcall fun #(1)) `(simple-array ,type (*)))))))
+
+(with-test (:name :truncate-double-float)
+  (let ((fun (compile nil `(lambda (x)
+                             (multiple-value-bind (q r)
+                                 (truncate (coerce x 'double-float))
+                               (declare (type unsigned-byte q)
+                                        (type double-float r))
+                               (list q r))))))
+    (assert (equal (funcall fun 1.0d0) '(1 0.0d0)))))
