@@ -633,7 +633,7 @@
                               `(progn
                                  (move dup real)
                                  (inst unpcklps dup dup)))
-                        ,single-inst movss movaps
+                        ,single-inst movss movq
                         single-reg fp-single-immediate single-float
                         complex-single-reg fp-complex-single-immediate complex-single-float
                         ,single-real-complex-name ,single-complex-real-name)
