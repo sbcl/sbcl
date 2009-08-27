@@ -54,6 +54,8 @@ Create the distribution files:
            *** (In sbcl-x.y.z/, run clean.sh and/or distclean.sh to
                clean up.)
            *** Run "sh sbcl-x.y.z/source-distribution.sh sbcl-x.y.z".
+        ** copy the change descriptions in NEWS for this release to
+           sbcl-x.y.z-release.notes.txt
       * Run "md5sum > sbcl-x.y.z-$sfuserid" on the renamed tar files.
         (On *BSD, it's "md5" instead of "md5sum".)
       * Edit the digest file to add
@@ -81,22 +83,33 @@ for sf 'module release' system:
  # no longer possible now that sf doesn't have upload.sourceforge.net
  # * Upload the distribution files via anonymous ftp to
  # upload.sourceforge.net in the /incoming directory.
- * Upload the distribution files via sftp to the uploads/ directory at 
-   $sfuser@frs.sourceforge.net
+ #
+ # no longer possible in the new (as of July 2009) file management system
+ # * Upload the distribution files via sftp to the uploads/ directory at 
+ #   $sfuser@frs.sourceforge.net
+ #   <https://sourceforge.net/project/admin/editpackages.php?group_id=1373>
+ #   <https://sourceforge.net/project/admin/newrelease.php?package_id=1354&group_id=1373>
+ * upload the distribution files via sftp to
+   $sfuser,sbcl@frs.sourceforge.net to the directory
+   /home/frs/project/s/sb/sbcl/sbcl/<version> (creating the directory
+   first)
  * possible shortcuts:
     <https://sourceforge.net/project/admin/?group_id=1373>
-    <https://sourceforge.net/project/admin/editpackages.php?group_id=1373>
-    <https://sourceforge.net/project/admin/newrelease.php?package_id=1354&group_id=1373>
- * Do the misbegotten^Wunscriptable HTTPforms thing on the sourceforge
-  project home to make the distribution files visible.
-  ** (from "Admin", then "File Releases")
-  ** "Add release" for package "sbcl", "release name"="x.y.z". (not
-     "release name"="sbcl-x.y.z")
-  ** boilerplate for "Release Notes":
-      For information about this release, see the NEWS file
-      in the distribution. The information is also available
-      in the "Change Log"/"Changes" section of the SourceForge
-      webbed description of this release.
+    sftp $sfuser,sbcl@frs.sourceforge.net
+ # * Do the misbegotten^Wunscriptable HTTPforms thing on the sourceforge
+ # project home to make the distribution files visible.
+ # ** (from "Admin", then "File Releases")
+ # ** "Add release" for package "sbcl", "release name"="x.y.z". (not
+ #    "release name"="sbcl-x.y.z")
+ # ** boilerplate for "Release Notes":
+ #     For information about this release, see the NEWS file
+ #     in the distribution. The information is also available
+ #     in the "Change Log"/"Changes" section of the SourceForge
+ #     webbed description of this release.
+ * Do the misbegotten^Wunscriptable AJAX thing on the sourceforge File
+   Manager site to make the release notes associated with the file releases
+   ** In the File Manager interface, click on the release notes file,
+      tick the release notes box.
 
 For a new port (e.g. OpenBSD in sbcl-0.6.7) it's particularly good to
 upload the appropriate binary distribution.
