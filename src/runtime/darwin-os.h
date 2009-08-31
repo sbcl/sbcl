@@ -27,7 +27,6 @@ typedef struct ucontext os_context_t;
 
 
 #else
-#include <ucontext.h>
 typedef ucontext_t os_context_t;
 #endif
 

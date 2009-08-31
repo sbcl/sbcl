@@ -18,7 +18,6 @@
 #include "globals.h"
 #include "runtime.h"
 #include <signal.h>
-#include <ucontext.h>
 #include <limits.h>
 #include <mach-o/dyld.h>
 #include "bsd-os.h"
