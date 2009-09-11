@@ -5,6 +5,7 @@ changes relative to sbcl-1.0.31
     options (reported by Faré Rideau, thanks to Zach Beane)
   * bug fix: (SETF SLOT-VALUE) signalled a warning which should have been
     an optimization note instead. (reported by Martin Cracauer)
+  * bug fix: WITH-SLOTS did not work with THE forms. (thanks to David Tolpin)
 
 changes in sbcl-1.0.31 relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested

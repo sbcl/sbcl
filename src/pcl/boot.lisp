@@ -2724,7 +2724,7 @@ bootstrapping.
 
 (defun extract-the (form)
   (cond ((and (consp form) (eq (car form) 'the))
-         (aver (proper-list-of-length-p 3))
+         (aver (proper-list-of-length-p form 3))
          (third form))
         (t
          form)))

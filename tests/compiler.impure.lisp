@@ -1159,6 +1159,13 @@
                             (make-something-known-to-be-a-struct :x "X" :y "Y")
                             #\x #\y)))
     (assert (not (ctu:find-named-callees f)))))
+
+(defclass some-slot-thing ()
+  ((slot :initarg :slot)))
+(with-test (:name :with-slots-the)
+  (let ((x (make-instance 'some-slot-thing :slot "foo")))
+    (with-slots (slot) (the some-slot-thing x)
+      (assert (equal "foo" slot)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
