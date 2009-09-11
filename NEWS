@@ -3,6 +3,8 @@ changes relative to sbcl-1.0.31
   * bug fix: SAVE-LISP-AND-DIE option :SAVE-RUNTIME-OPTIONS did not work
     correctly when starting from an executable core without saved runtime
     options (reported by Faré Rideau, thanks to Zach Beane)
+  * bug fix: (SETF SLOT-VALUE) signalled a warning which should have been
+    an optimization note instead. (reported by Martin Cracauer)
 
 changes in sbcl-1.0.31 relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested

@@ -74,6 +74,6 @@
                   ;; Safe code wants to check the type, and the global
                   ;; accessor won't do that. Also see the comment in the
                   ;; compiler-macro.
-                  (abort-ir1-transform "cannot use optimized accessor in safe code")
+                  (give-up-ir1-transform "cannot use optimized accessor in safe code")
                   `(sb-pcl::accessor-set-slot-value object ',c-slot-name new-value))))
         (give-up-ir1-transform "slot name is not an interned symbol"))))
