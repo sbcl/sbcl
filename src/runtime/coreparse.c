@@ -83,12 +83,16 @@ read_runtime_options(int fd)
 void
 maybe_initialize_runtime_options(int fd)
 {
+    struct runtime_options *new_runtime_options;
     off_t end_offset = sizeof(lispobj) +
         sizeof(os_vm_offset_t) +
         (RUNTIME_OPTIONS_WORDS * sizeof(size_t));
 
     lseek(fd, -end_offset, SEEK_END);
-    runtime_options = read_runtime_options(fd);
+
+    if (new_runtime_options = read_runtime_options(fd)) {
+        runtime_options = new_runtime_options;
+    }
 }
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the

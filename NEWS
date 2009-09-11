@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.31
+  * bug fix: SAVE-LISP-AND-DIE option :SAVE-RUNTIME-OPTIONS did not work
+    correctly when starting from an executable core without saved runtime
+    options (reported by Faré Rideau, thanks to Zach Beane)
+
 changes in sbcl-1.0.31 relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested
     inlining cases: failure to stack allocate when equivalent code is manually

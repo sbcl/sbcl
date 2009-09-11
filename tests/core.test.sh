@@ -85,4 +85,23 @@ else
   exit 1
 fi
 
+# saving runtime options _from_ executable cores
+run_sbcl <<EOF
+  (save-lisp-and-die "$tmpcore" :executable t)
+EOF
+chmod u+x "$tmpcore"
+./"$tmpcore" --no-userinit <<EOF 
+  (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
+EOF
+chmod u+x "$tmpcore"
+./"$tmpcore" --version --eval '(sb-ext:quit)' <<EOF
+  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(sb-ext:quit)"))
+    (sb-ext:quit :unix-status 42))
+EOF
+status=$?
+if [ $status != 42 ]; then
+    echo "saving runtime options from executable failed"
+    exit 1
+fi
+
 exit $EXIT_TEST_WIN
