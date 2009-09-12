@@ -760,9 +760,15 @@ bootstrapping.
              ((symbolp name) `(find-class ',name))
              ((consp name) (ecase (car name)
                              ((eql) `(intern-eql-specializer ,(cadr name)))
-                             ((class-eq) `(class-eq-specializer (find-class ',(cadr name))))
-                             ((prototype) `(fixme))))
-             (t (bug "Foo")))))
+                             ((class-eq) `(class-eq-specializer (find-class ',(cadr name))))))
+             (t
+              ;; FIXME: Document CLASS-EQ specializers.
+              (error 'simple-reference-error
+                     :format-control
+                     "~@<~S is not a valid parameter specializer name.~@:>"
+                     :format-arguments (list name)
+                     :references (list '(:ansi-cl :macro defmethod)
+                                       '(:ansi-cl :glossary "parameter specializer name")))))))
     `(list ,@(mapcar #'parse specializer-names))))
 
 (unless (fboundp 'make-method-specializers-form)

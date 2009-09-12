@@ -1743,5 +1743,15 @@
   (assert (eq :defined-method
               (sb-int:info :function
                            :where-from 'i-dont-want-to-be-clobbered-2))))
+
+(with-test (:name :bogus-parameter-specializer-name-error)
+  (assert (eq :ok
+              (handler-case
+                  (eval `(defmethod #:fii ((x "a string")) 'string))
+                (sb-int:reference-condition (c)
+                  (when (member '(:ansi-cl :macro defmethod)
+                                (sb-int:reference-condition-references c)
+                                :test #'equal)
+                    :ok))))))
 
 ;;;; success
