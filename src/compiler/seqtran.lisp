@@ -1351,6 +1351,30 @@
   '(%find-position-vector-macro item sequence
     from-end start end key test))
 
+(deftransform %find-position ((item sequence from-end start end key test)
+                              (character string t t t function function)
+                              *
+                              :policy (> speed space))
+  (if (eq '* (upgraded-element-type-specifier sequence))
+      (let ((form
+             `(sb!impl::string-dispatch ((simple-array character (*))
+                                         (simple-array base-char (*))
+                                         (simple-array nil (*)))
+                  sequence
+                (%find-position item sequence from-end start end key test))))
+        (if (csubtypep (lvar-type sequence) (specifier-type 'simple-string))
+            form
+            ;; Otherwise we'd get three instances of WITH-ARRAY-DATA from
+            ;; %FIND-POSITION.
+            `(with-array-data ((sequence sequence :offset-var offset)
+                               (start start)
+                               (end end)
+                               :check-fill-pointer t)
+               (multiple-value-bind (elt index) ,form
+                 (values elt (when (fixnump index) (- index offset)))))))
+      ;; The type is known exactly, other transforms will take care of it.
+      (give-up-ir1-transform)))
+
 ;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
 ;;; POSITION-IF, etc.
 (define-source-transform effective-find-position-test (test test-not)

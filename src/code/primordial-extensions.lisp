@@ -145,7 +145,9 @@
        (declare (inline ,fun))
        (etypecase ,var
          ,@(loop for type in types
-                 collect `(,type (,fun (the ,type ,var))))))))
+                 ;; TRULY-THE allows transforms to take advantage of the type
+                 ;; information without need for constraint propagation.
+                 collect `(,type (,fun (truly-the ,type ,var))))))))
 
 ;;; Automate an idiom often found in macros:
 ;;;   (LET ((FOO (GENSYM "FOO"))

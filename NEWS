@@ -1,13 +1,15 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.31
+  * optimization: faster FIND and POSITION on strings of unknown element type
+    in high SPEED policies. (thanks to Karol Swietlicki)
+  * improvement: better error signalling for bogus parameter specializer names
+    in DEFMETHOD forms (reported by Pluijzer)
   * bug fix: SAVE-LISP-AND-DIE option :SAVE-RUNTIME-OPTIONS did not work
     correctly when starting from an executable core without saved runtime
     options (reported by Faré Rideau, thanks to Zach Beane)
   * bug fix: (SETF SLOT-VALUE) signalled a warning which should have been
     an optimization note instead. (reported by Martin Cracauer)
   * bug fix: WITH-SLOTS did not work with THE forms. (thanks to David Tolpin)
-  * improvement: better error signalling for bogus parameter specializer names
-    in DEFMETHOD forms (reported by Pluijzer)
 
 changes in sbcl-1.0.31 relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested

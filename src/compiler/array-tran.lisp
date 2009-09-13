@@ -17,12 +17,14 @@
 ;;; GIVE-UP-IR1-TRANSFORM if the upgraded element type can't be
 ;;; determined.
 (defun upgraded-element-type-specifier-or-give-up (lvar)
-  (let* ((element-ctype (extract-upgraded-element-type lvar))
-         (element-type-specifier (type-specifier element-ctype)))
+  (let ((element-type-specifier (upgraded-element-type-specifier lvar)))
     (if (eq element-type-specifier '*)
         (give-up-ir1-transform
          "upgraded array element type not known at compile time")
         element-type-specifier)))
+
+(defun upgraded-element-type-specifier (lvar)
+  (type-specifier (extract-upgraded-element-type lvar)))
 
 ;;; Array access functions return an object from the array, hence its type is
 ;;; going to be the array upgraded element type. Secondary return value is the
