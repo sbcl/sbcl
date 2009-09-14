@@ -1082,62 +1082,70 @@
 ;;; this transform to non-strings, but I chose to just do the case that
 ;;; should cover 95% of CONCATENATE performance complaints for now.
 ;;;   -- JES, 2007-11-17
+;;;
+;;; Only handle the simple result type cases. If somebody does (CONCATENATE
+;;; '(STRING 6) ...) their code won't be optimized, but nobody does that in
+;;; practice.
 (deftransform concatenate ((result-type &rest lvars)
-                           (symbol &rest sequence)
-                           *
-                           :policy (> speed space))
-  (unless (constant-lvar-p result-type)
-    (give-up-ir1-transform))
-  (let* ((element-type (let ((type (lvar-value result-type)))
-                         ;; Only handle the simple result type cases. If
-                         ;; somebody does (CONCATENATE '(STRING 6) ...)
-                         ;; their code won't be optimized, but nobody does
-                         ;; that in practice.
-                         (case type
-                           ((string simple-string) 'character)
-                           ((base-string simple-base-string) 'base-char)
-                           (t (give-up-ir1-transform)))))
-         (vars (loop for x in lvars collect (gensym)))
-         (lvar-values (loop for lvar in lvars
-                            collect (when (constant-lvar-p lvar)
-                                      (lvar-value lvar))))
-         (lengths
-          (loop for value in lvar-values
-                for var in vars
-                collect (if value
-                            (length value)
-                            `(sb!impl::string-dispatch ((simple-array * (*))
-                                                        sequence)
-                                 ,var
-                               (declare (muffle-conditions compiler-note))
-                               (length ,var))))))
-    `(apply
-      (lambda ,vars
-        (declare (ignorable ,@vars))
-        (let* ((.length. (+ ,@lengths))
-               (.pos. 0)
-               (.string. (make-string .length. :element-type ',element-type)))
-          (declare (type index .length. .pos.)
-                   (muffle-conditions compiler-note))
-          ,@(loop for value in lvar-values
-                  for var in vars
-                  collect (if (stringp value)
-                              ;; Fold the array reads for constant arguments
-                              `(progn
-                                 ,@(loop for c across value
-                                         collect `(setf (aref .string.
-                                                              .pos.) ,c)
-                                         collect `(incf .pos.)))
-                              `(sb!impl::string-dispatch
-                                   (#!+sb-unicode
-                                    (simple-array character (*))
-                                    (simple-array base-char (*))
-                                    t)
-                                   ,var
-                                 (replace .string. ,var :start1 .pos.)
-                                 (incf .pos. (length ,var)))))
-          .string.))
-      lvars)))
+                           ((constant-arg
+                             (member string simple-string base-string simple-base-string))
+                            &rest sequence)
+                           * :node node)
+  (let ((vars (loop for x in lvars collect (gensym)))
+        (type (lvar-value result-type)))
+    (if (policy node (<= speed space))
+        ;; Out-of-line
+        `(lambda (.dummy. ,@vars)
+           (declare (ignore .dummy.))
+           ,(ecase type
+                   ((string simple-string)
+                    `(%concatenate-to-string ,@vars))
+                   ((base-string simple-base-string)
+                    `(%concatenate-to-base-string ,@vars))))
+        ;; Inline
+        (let* ((element-type (ecase type
+                               ((string simple-string) 'character)
+                               ((base-string simple-base-string) 'base-char)))
+               (lvar-values (loop for lvar in lvars
+                                  collect (when (constant-lvar-p lvar)
+                                            (lvar-value lvar))))
+               (lengths
+                (loop for value in lvar-values
+                      for var in vars
+                      collect (if value
+                                  (length value)
+                                  `(sb!impl::string-dispatch ((simple-array * (*))
+                                                              sequence)
+                                       ,var
+                                     (declare (muffle-conditions compiler-note))
+                                     (length ,var))))))
+          `(apply
+            (lambda ,vars
+              (declare (ignorable ,@vars))
+              (let* ((.length. (+ ,@lengths))
+                     (.pos. 0)
+                     (.string. (make-string .length. :element-type ',element-type)))
+                (declare (type index .length. .pos.)
+                         (muffle-conditions compiler-note))
+                ,@(loop for value in lvar-values
+                        for var in vars
+                        collect (if (stringp value)
+                                    ;; Fold the array reads for constant arguments
+                                    `(progn
+                                       ,@(loop for c across value
+                                               collect `(setf (aref .string.
+                                                                    .pos.) ,c)
+                                               collect `(incf .pos.)))
+                                    `(sb!impl::string-dispatch
+                                         (#!+sb-unicode
+                                          (simple-array character (*))
+                                          (simple-array base-char (*))
+                                          t)
+                                         ,var
+                                       (replace .string. ,var :start1 .pos.)
+                                       (incf .pos. (length ,var)))))
+                .string.))
+            lvars)))))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 

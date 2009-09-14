@@ -866,6 +866,29 @@
     (t
      (bad-sequence-type-error output-type-spec)))))
 
+;;; Efficient out-of-line concatenate for strings. Compiler transforms
+;;; CONCATENATE 'STRING &co into these.
+(macrolet ((def (name element-type)
+             `(defun ,name (&rest sequences)
+                (declare (dynamic-extent sequences)
+                         (optimize speed))
+                (let* ((lengths (mapcar #'length sequences))
+                       (result (make-array (the integer (apply #'+ lengths))
+                                           :element-type ',element-type))
+                       (start 0))
+                  (declare (index start))
+                  (dolist (seq sequences)
+                    (string-dispatch
+                        ((simple-array character (*))
+                         (simple-array base-char (*))
+                         t)
+                        seq
+                      (replace result seq :start1 start))
+                    (incf start (the index (pop lengths))))
+                  result))))
+  (def %concatenate-to-string character)
+  (def %concatenate-to-base-string base-char))
+
 ;;; internal frobs
 ;;; FIXME: These are weird. They're never called anywhere except in
 ;;; CONCATENATE. It seems to me that the macros ought to just
