@@ -916,23 +916,32 @@ code to be loaded.
 ;;;; loop types
 
 (defun loop-typed-init (data-type &optional step-var-p)
-  (when (and data-type (sb!xc:subtypep data-type 'number))
-    (let ((init (if step-var-p 1 0)))
-      (flet ((like (&rest types)
-               (coerce init (find-if (lambda (type)
-                                       (sb!xc:subtypep data-type type))
-                                     types))))
-        (cond ((sb!xc:subtypep data-type 'float)
-               (like 'single-float 'double-float
-                     'short-float 'long-float 'float))
-              ((sb!xc:subtypep data-type '(complex float))
-               (like '(complex single-float)
-                     '(complex double-float)
-                     '(complex short-float)
-                     '(complex long-float)
-                     '(complex float)))
-              (t
-               init))))))
+  (cond ((null data-type)
+         nil)
+        ((sb!xc:subtypep data-type 'number)
+         (let ((init (if step-var-p 1 0)))
+           (flet ((like (&rest types)
+                    (coerce init (find-if (lambda (type)
+                                            (sb!xc:subtypep data-type type))
+                                          types))))
+             (cond ((sb!xc:subtypep data-type 'float)
+                    (like 'single-float 'double-float
+                          'short-float 'long-float 'float))
+                   ((sb!xc:subtypep data-type '(complex float))
+                    (like '(complex single-float)
+                          '(complex double-float)
+                          '(complex short-float)
+                          '(complex long-float)
+                          '(complex float)))
+                   (t
+                    init)))))
+        ((sb!xc:subtypep data-type 'vector)
+         (let ((ctype (sb!kernel:specifier-type data-type)))
+           (when (sb!kernel:array-type-p ctype)
+             (let ((etype (sb!kernel:array-type-element-type ctype)))
+               (make-array 0 :element-type (sb!kernel:type-specifier etype))))))
+        (t
+         nil)))
 
 (defun loop-optional-type (&optional variable)
   ;; No variable specified implies that no destructuring is permissible.
@@ -1036,7 +1045,7 @@ code to be loaded.
            (loop-error "duplicated variable ~S in a LOOP binding" name))
          (unless (symbolp name)
            (loop-error "bad variable ~S somewhere in LOOP" name))
-         (loop-declare-var name dtype step-var-p)
+         (loop-declare-var name dtype step-var-p initialization)
          ;; We use ASSOC on this list to check for duplications (above),
          ;; so don't optimize out this list:
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))
@@ -1055,16 +1064,18 @@ code to be loaded.
              (loop-make-var (cdr name) nil tcdr))))
   name)
 
-(defun loop-declare-var (name dtype &optional step-var-p)
+(defun loop-declare-var (name dtype &optional step-var-p initialization)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
          (unless (or (sb!xc:subtypep t dtype)
                      (and (eq (find-package :cl) (symbol-package name))
                           (eq :special (sb!int:info :variable :kind name))))
-           (let ((dtype (let ((init (loop-typed-init dtype step-var-p)))
-                          (if (sb!xc:typep init dtype)
-                              dtype
-                              `(or (member ,init) ,dtype)))))
+           (let ((dtype (if initialization
+                            dtype
+                            (let ((init (loop-typed-init dtype step-var-p)))
+                              (if (sb!xc:typep init dtype)
+                                  dtype
+                                  `(or ,(type-of init) ,dtype))))))
              (push `(type ,dtype ,name) *loop-declarations*))))
         ((consp name)
          (cond ((consp dtype)
