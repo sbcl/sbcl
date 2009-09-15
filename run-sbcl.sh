@@ -13,22 +13,35 @@
 
 set -e
 
-if [ "$1" = "--help" ]; then
-    echo "usage: run-sbcl.sh sbcl-options*"
-    echo
-    echo "Runs SBCL from the build directory or binary tarball without need for"
-    echo "installation. Except for --help and --core, accepts all the same"
-    echo "command-line options as SBCL does."
-    echo
-    exit 1
+BASE=`dirname "$0"`
+CORE_DEFINED=no
+
+for arg in $*; do
+    case $arg in
+        (--core)
+          CORE_DEFINED=yes
+          ;;
+        (--help)
+          echo "usage: run-sbcl.sh sbcl-options*"
+          echo
+          echo "Runs SBCL from the build directory or binary tarball without need for"
+          echo "installation. Except for --help, accepts all the same command-line options"
+          echo "as SBCL does."
+          echo
+          exit 1
+          ;;
+    esac
+done
+
+ARGUMENTS=""
+
+if [ "$CORE_DEFINED" = "no" ]; then
+    ARGUMENTS="--core "$BASE"/output/sbcl.core"
 fi
 
-BASE=`dirname "$0"`
-
 if [ -x "$BASE"/src/runtime/sbcl -a -f "$BASE"/output/sbcl.core ]; then
-    echo "(running SBCL from: $BASE)"
-    SBCL_HOME="$BASE"/contrib \
-        "$BASE"/src/runtime/sbcl --core "$BASE"/output/sbcl.core "$@"
+    echo "(running SBCL from: `pwd`)"
+    SBCL_HOME="$BASE"/contrib "$BASE"/src/runtime/sbcl $ARGUMENTS "$@"
 else
     echo "No built SBCL here ($BASE): run 'sh make.sh' first!"
     exit 1
