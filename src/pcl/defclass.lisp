@@ -53,7 +53,7 @@
           ;; DEFSTRUCT-P should be true if the class is defined
           ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
           ;; is compiled for the class.
-          (defstruct-p (and (eq *boot-state* 'complete)
+          (defstruct-p (and (eq **boot-state** 'complete)
                             (let ((mclass (find-class metaclass nil)))
                               (and mclass
                                    (*subtypep

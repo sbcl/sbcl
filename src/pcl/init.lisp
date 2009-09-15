@@ -34,7 +34,7 @@
     (when class-default-initargs
       (setf initargs (default-initargs initargs class-default-initargs)))
     (when initargs
-      (when (and (eq *boot-state* 'complete)
+      (when (and (eq **boot-state** 'complete)
                  (not (getf initargs :allow-other-keys)))
         (let ((class-proto (class-prototype class)))
           (check-initargs-1

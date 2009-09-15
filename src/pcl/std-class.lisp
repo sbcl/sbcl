@@ -103,7 +103,7 @@
                       (find-slot-definition class name)))
          (old-std-p (and old-slotd (slot-accessor-std-p old-slotd 'all))))
     (multiple-value-bind (function std-p)
-        (if (eq *boot-state* 'complete)
+        (if (eq **boot-state** 'complete)
             (get-accessor-method-function gf type class slotd)
             (get-optimized-std-accessor-method-function class slotd type))
       (setf (slot-accessor-std-p slotd type) std-p)
@@ -353,7 +353,7 @@
       (without-package-locks
         (setf (find-class name) class))))
   ;; After boot (SETF FIND-CLASS) does this.
-  (unless (eq *boot-state* 'complete)
+  (unless (eq **boot-state** 'complete)
     (%set-class-type-translation class name))
   class)
 
@@ -367,7 +367,7 @@
       (without-package-locks
         (setf (find-class name) class))))
   ;; After boot (SETF FIND-CLASS) does this.
-  (unless (eq *boot-state* 'complete)
+  (unless (eq **boot-state** 'complete)
     (%set-class-type-translation class name))
   class)
 

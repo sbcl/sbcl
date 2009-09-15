@@ -29,7 +29,7 @@
 (dolist (s '(condition function structure-object))
   (dohash ((k v) (classoid-subclasses (find-classoid s)))
     (find-class (classoid-name k))))
-(setq *boot-state* 'complete)
+(setq **boot-state** 'complete)
 
 (defun print-std-instance (instance stream depth)
   (declare (ignore depth))

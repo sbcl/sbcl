@@ -110,10 +110,8 @@
 ;;; This DEFVAR was originally in defs.lisp, now moved here.
 ;;;
 ;;; Possible values are NIL, EARLY, BRAID, or COMPLETE.
-;;;
-;;; KLUDGE: This should probably become
-;;;   (DECLAIM (TYPE (MEMBER NIL :EARLY :BRAID :COMPLETE) *BOOT-STATE*))
-(defvar *boot-state* nil)
+(declaim (type (member nil early braid complete) **boot-state**))
+(defglobal **boot-state** nil)
 
 (/show "pcl/macros.lisp 187")
 
@@ -123,7 +121,7 @@
   (if (and (constantp symbol)
            (legal-class-name-p (setf symbol (constant-form-value symbol)))
            (constantp errorp)
-           (member *boot-state* '(braid complete)))
+           (member **boot-state** '(braid complete)))
       (let ((errorp (not (null (constant-form-value errorp))))
             (cell (make-symbol "CLASSOID-CELL")))
         `(let ((,cell (load-time-value (find-classoid-cell ',symbol :create t))))
@@ -148,14 +146,14 @@
            (let ((cell (find-classoid-cell name :create new-value)))
              (cond (new-value
                     (setf (classoid-cell-pcl-class cell) new-value)
-                    (when (eq *boot-state* 'complete)
+                    (when (eq **boot-state** 'complete)
                       (let ((classoid (class-classoid new-value)))
                         (setf (find-classoid name) classoid)
                         (%set-class-type-translation new-value classoid))))
                    (cell
                     (%clear-classoid name cell)))
-             (when (or (eq *boot-state* 'complete)
-                       (eq *boot-state* 'braid))
+             (when (or (eq **boot-state** 'complete)
+                       (eq **boot-state** 'braid))
                (update-ctors 'setf-find-class :class new-value :name name))
              new-value)))
         (t

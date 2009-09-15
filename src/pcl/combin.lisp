@@ -105,7 +105,7 @@
   ;; or aren't to prevent the leaky next methods bug.
   (let* ((cm-args (cdr form))
          (fmf-p (and (null no-fmf-p)
-                     (or (not (eq *boot-state* 'complete))
+                     (or (not (eq **boot-state** 'complete))
                          (gf-fast-method-function-p generic-function))
                      (null (cddr cm-args))))
          (method (car cm-args))
@@ -225,7 +225,7 @@
           (error-p (or (eq (first effective-method) '%no-primary-method)
                        (eq (first effective-method) '%invalid-qualifiers)))
           (mc-args-p
-           (when (eq *boot-state* 'complete)
+           (when (eq **boot-state** 'complete)
              ;; Otherwise the METHOD-COMBINATION slot is not bound.
              (let ((combin (generic-function-method-combination gf)))
                (and (long-method-combination-p combin)

@@ -235,6 +235,11 @@
                   class name class-eq-specializer-wrapper source
                   direct-supers direct-subclasses cpl wrapper))))))))
 
+    (setq **standard-method-classes**
+          (mapcar (lambda (name)
+                    (symbol-value (make-class-symbol name)))
+                  *standard-method-class-names*))
+
     (let* ((smc-class (find-class 'standard-method-combination))
            (smc-wrapper (!bootstrap-get-slot 'standard-class
                                              smc-class
@@ -576,7 +581,7 @@
   (let ((class (classoid-pcl-class classoid)))
     (cond (class
            (ensure-non-standard-class (class-name class) classoid class))
-          ((eq 'complete *boot-state*)
+          ((eq 'complete **boot-state**)
            (ensure-non-standard-class (classoid-name classoid) classoid)))))
 
 (pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
@@ -585,7 +590,7 @@
 ;;; FIXME: only needed during bootstrap
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name :lambda-list '(object)))
-         (mlist (if (eq *boot-state* 'complete)
+         (mlist (if (eq **boot-state** 'complete)
                     (early-gf-methods gf)
                     (generic-function-methods gf))))
     (unless mlist
@@ -682,7 +687,7 @@
 
       (%set-class-type-translation class name))))
 
-(setq *boot-state* 'braid)
+(setq **boot-state** 'braid)
 
 (defmethod no-applicable-method (generic-function &rest args)
   (error "~@<There is no applicable method for the generic function ~2I~_~S~

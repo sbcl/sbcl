@@ -28,11 +28,11 @@
 ;;; build, of course, but they might happen if someone is experimenting
 ;;; and debugging, and it's probably worth complaining if they do,
 ;;; so we've left 'em in.)
-(when (eq *boot-state* 'complete)
+(when (eq **boot-state** 'complete)
   (error "Trying to load (or compile) PCL in an environment in which it~%~
           has already been loaded. This doesn't work, you will have to~%~
           get a fresh lisp (reboot) and then load PCL."))
-(when *boot-state*
+(when **boot-state**
   (cerror "Try loading (or compiling) PCL anyways."
           "Trying to load (or compile) PCL in an environment in which it~%~
            has already been partially loaded. This may not work, you may~%~
@@ -91,7 +91,7 @@
            (when (symbolp specl)
              ;;maybe (or (find-class specl nil) (ensure-class specl)) instead?
              (setq specl (find-class specl)))
-           (or (not (eq *boot-state* 'complete))
+           (or (not (eq **boot-state** 'complete))
                (specializerp specl)))
          (specializer-type specl))
         (t
@@ -130,7 +130,7 @@
                (let ((type (specializer-type class)))
                  (if (listp type) type `(,type)))
                `(,type))))
-        ((or (not (eq *boot-state* 'complete))
+        ((or (not (eq **boot-state** 'complete))
              (specializerp type))
          (specializer-type type))
         (t
@@ -158,7 +158,7 @@
 (defun *subtypep (type1 type2)
   (if (equal type1 type2)
       (values t t)
-      (if (eq *boot-state* 'early)
+      (if (eq **boot-state** 'early)
           (values (eq type1 type2) t)
           (let ((*in-precompute-effective-methods-p* t))
             (declare (special *in-precompute-effective-methods-p*))

@@ -370,7 +370,7 @@
 
 (defmethod generic-function-argument-precedence-order
     ((gf standard-generic-function))
-  (aver (eq *boot-state* 'complete))
+  (aver (eq **boot-state** 'complete))
   (loop with arg-info = (gf-arg-info gf)
         with lambda-list = (arg-info-lambda-list arg-info)
         for argument-position in (arg-info-precedence arg-info)
@@ -795,7 +795,7 @@
 (defvar *std-cam-methods* nil)
 
 (defun compute-applicable-methods-emf (generic-function)
-  (if (eq *boot-state* 'complete)
+  (if (eq **boot-state** 'complete)
       (let* ((cam (gdefinition 'compute-applicable-methods))
              (cam-methods (compute-applicable-methods-using-types
                            cam (list `(eql ,generic-function) t))))

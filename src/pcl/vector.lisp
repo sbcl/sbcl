@@ -81,7 +81,7 @@
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
 (defun optimize-slot-value-by-class-p (class slot-name type)
-  (or (not (eq *boot-state* 'complete))
+  (or (not (eq **boot-state** 'complete))
       (let ((slotd (find-slot-definition class slot-name)))
         (and slotd
              (slot-accessor-std-p slotd type)))))
@@ -155,7 +155,7 @@
                                                          parameter-or-nil
                                                          env)))
                      (class (find-class class-name nil)))
-                (when (or (not (eq *boot-state* 'complete))
+                (when (or (not (eq **boot-state** 'complete))
                           (and class (not (class-finalized-p class))))
                   (setq class nil))
                 (when (and class-name (not (eq class-name t)))
@@ -255,7 +255,7 @@
                                  new-value &optional safep)
   (let ((class (if (consp sparameter) (cdr sparameter) *the-class-t*))
         (parameter (if (consp sparameter) (car sparameter) sparameter)))
-    (if (and (eq *boot-state* 'complete)
+    (if (and (eq **boot-state** 'complete)
              (classp class)
              (memq *the-class-structure-object* (class-precedence-list class)))
         (let ((slotd (find-slot-definition class slot-name)))
@@ -301,7 +301,7 @@
   (let ((class (and (constantp class-form) (constant-form-value class-form)))
         (slot-name (and (constantp slot-name-form)
                         (constant-form-value slot-name-form))))
-    (and (eq *boot-state* 'complete)
+    (and (eq **boot-state** 'complete)
          (standard-class-p class)
          (not (eq class *the-class-t*)) ; shouldn't happen, though.
          (let ((slotd (find-slot-definition class slot-name)))
@@ -311,7 +311,7 @@
   (let ((class (and (constantp class-form) (constant-form-value class-form)))
         (slot-name (and (constantp slot-name-form)
                         (constant-form-value slot-name-form))))
-    (and (eq *boot-state* 'complete)
+    (and (eq **boot-state** 'complete)
          (standard-class-p class)
          (not (eq class *the-class-t*)) ; shouldn't happen, though.
          ;; FIXME: Is this really right? "Don't skip if there is

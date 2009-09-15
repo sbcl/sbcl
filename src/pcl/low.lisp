@@ -202,7 +202,6 @@
 (defun set-fun-name (fun new-name)
   #+sb-doc
   "Set the name of a compiled function object. Return the function."
-  (declare (special *boot-state* *the-class-standard-generic-function*))
   (when (valid-function-name-p fun)
     (setq fun (fdefinition fun)))
   (typecase fun
@@ -211,7 +210,7 @@
     (sb-eval:interpreted-function
      (setf (sb-eval:interpreted-function-name fun) new-name))
     (funcallable-instance ;; KLUDGE: probably a generic function...
-     (cond ((if (eq *boot-state* 'complete)
+     (cond ((if (eq **boot-state** 'complete)
                 (typep fun 'generic-function)
                 (eq (class-of fun) *the-class-standard-generic-function*))
             (setf (%funcallable-instance-info fun 2) new-name))

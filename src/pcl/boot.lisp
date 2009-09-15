@@ -353,7 +353,7 @@ bootstrapping.
 
 
 (defun prototypes-for-make-method-lambda (name)
-  (if (not (eq *boot-state* 'complete))
+  (if (not (eq **boot-state** 'complete))
       (values nil nil)
       (let ((gf? (and (fboundp name)
                       (gdefinition name))))
@@ -379,7 +379,7 @@ bootstrapping.
 (defun method-prototype-for-gf (name)
   (let ((gf? (and (fboundp name)
                   (gdefinition name))))
-    (cond ((neq *boot-state* 'complete) nil)
+    (cond ((neq **boot-state** 'complete) nil)
           ((or (null gf?)
                (not (generic-function-p gf?)))          ; Someone else MIGHT
                                                         ; error at load time.
@@ -754,7 +754,7 @@ bootstrapping.
   (declare (ignore env proto-gf proto-method))
   (flet ((parse (name)
            (cond
-             ((and (eq *boot-state* 'complete)
+             ((and (eq **boot-state** 'complete)
                    (specializerp name))
               name)
              ((symbolp name) `(find-class ',name))
@@ -863,7 +863,7 @@ bootstrapping.
                  ;; cases by blacklisting them here. -- WHN 2001-01-19
                  (list 'slot-object #+nil (find-class 'slot-object)))
          '(ignorable))
-        ((not (eq *boot-state* 'complete))
+        ((not (eq **boot-state** 'complete))
          ;; KLUDGE: PCL, in its wisdom, sometimes calls methods with
          ;; types which don't match their specializers. (Specifically,
          ;; it calls ENSURE-CLASS-USING-CLASS (T NULL) with a non-NULL
@@ -1549,7 +1549,7 @@ bootstrapping.
 (defun generic-function-name-p (name)
   (and (legal-fun-name-p name)
        (fboundp name)
-       (if (eq *boot-state* 'complete)
+       (if (eq **boot-state** 'complete)
            (standard-generic-function-p (gdefinition name))
            (funcallable-instance-p (gdefinition name)))))
 
@@ -1579,7 +1579,7 @@ bootstrapping.
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
                   initargs source-location)
-  (when (and (eq *boot-state* 'complete)
+  (when (and (eq **boot-state** 'complete)
              (fboundp gf-spec))
     (let* ((gf (fdefinition gf-spec))
            (method (and (generic-function-p gf)
@@ -1727,7 +1727,7 @@ bootstrapping.
   (let ((existing (and (fboundp fun-name)
                        (gdefinition fun-name))))
     (cond ((and existing
-                (eq *boot-state* 'complete)
+                (eq **boot-state** 'complete)
                 (null (generic-function-p existing)))
            (generic-clobbers-function fun-name)
            (fmakunbound fun-name)
@@ -1756,32 +1756,32 @@ bootstrapping.
                       +slot-unbound+))))
           (early-collect-inheritance 'standard-generic-function)))
 
-(defvar *sgf-method-class-index*
+(defconstant +sgf-method-class-index+
   (!bootstrap-slot-index 'standard-generic-function 'method-class))
 
 (defun early-gf-p (x)
   (and (fsc-instance-p x)
-       (eq (clos-slots-ref (get-slots x) *sgf-method-class-index*)
+       (eq (clos-slots-ref (get-slots x) +sgf-method-class-index+)
            +slot-unbound+)))
 
-(defvar *sgf-methods-index*
+(defconstant +sgf-methods-index+
   (!bootstrap-slot-index 'standard-generic-function 'methods))
 
 (defmacro early-gf-methods (gf)
-  `(clos-slots-ref (get-slots ,gf) *sgf-methods-index*))
+  `(clos-slots-ref (get-slots ,gf) +sgf-methods-index+))
 
 (defun safe-generic-function-methods (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
-      (clos-slots-ref (get-slots generic-function) *sgf-methods-index*)
+      (clos-slots-ref (get-slots generic-function) +sgf-methods-index+)
       (generic-function-methods generic-function)))
 
-(defvar *sgf-arg-info-index*
+(defconstant +sgf-arg-info-index+
   (!bootstrap-slot-index 'standard-generic-function 'arg-info))
 
 (defmacro early-gf-arg-info (gf)
-  `(clos-slots-ref (get-slots ,gf) *sgf-arg-info-index*))
+  `(clos-slots-ref (get-slots ,gf) +sgf-arg-info-index+))
 
-(defvar *sgf-dfun-state-index*
+(defconstant +sgf-dfun-state-index+
   (!bootstrap-slot-index 'standard-generic-function 'dfun-state))
 
 (defstruct (arg-info
@@ -1827,10 +1827,10 @@ bootstrapping.
 
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
                         argument-precedence-order)
-  (let* ((arg-info (if (eq *boot-state* 'complete)
+  (let* ((arg-info (if (eq **boot-state** 'complete)
                        (gf-arg-info gf)
                        (early-gf-arg-info gf)))
-         (methods (if (eq *boot-state* 'complete)
+         (methods (if (eq **boot-state** 'complete)
                       (generic-function-methods gf)
                       (early-gf-methods gf)))
          (was-valid-p (integerp (arg-info-number-optional arg-info)))
@@ -1909,21 +1909,19 @@ bootstrapping.
                    ~S."
                   gf-keywords)))))))
 
-(defvar *sm-specializers-index*
+(defconstant +sm-specializers-index+
   (!bootstrap-slot-index 'standard-method 'specializers))
-(defvar *sm-%function-index*
+(defconstant +sm-%function-index+
   (!bootstrap-slot-index 'standard-method '%function))
-(defvar *sm-qualifiers-index*
+(defconstant +sm-qualifiers-index+
   (!bootstrap-slot-index 'standard-method 'qualifiers))
-(defvar *sm-plist-index*
-  (!bootstrap-slot-index 'standard-method 'plist))
 
 ;;; FIXME: we don't actually need this; we could test for the exact
 ;;; class and deal with it as appropriate.  In fact we probably don't
 ;;; need it anyway because we only use this for METHOD-SPECIALIZERS on
 ;;; the standard reader method for METHOD-SPECIALIZERS.  Probably.
-(dolist (s '(specializers %function plist))
-  (aver (= (symbol-value (intern (format nil "*SM-~A-INDEX*" s)))
+(dolist (s '(specializers %function))
+  (aver (= (symbol-value (intern (format nil "+SM-~A-INDEX+" s)))
            (!bootstrap-slot-index 'standard-reader-method s)
            (!bootstrap-slot-index 'standard-writer-method s)
            (!bootstrap-slot-index 'standard-boundp-method s)
@@ -1931,34 +1929,31 @@ bootstrapping.
            (!bootstrap-slot-index 'global-writer-method s)
            (!bootstrap-slot-index 'global-boundp-method s))))
 
-(define-symbol-macro *standard-method-classes*
-  (list *the-class-standard-method* *the-class-standard-reader-method*
-        *the-class-standard-writer-method* *the-class-standard-boundp-method*
-        *the-class-global-reader-method* *the-class-global-writer-method*
-        *the-class-global-boundp-method*))
+(defvar *standard-method-class-names*
+  '(standard-method standard-reader-method
+    standard-writer-method standard-boundp-method
+    global-reader-method global-writer-method
+    global-boundp-method))
+
+(declaim (list **standard-method-classes**))
+(defglobal **standard-method-classes** nil)
 
 (defun safe-method-specializers (method)
-  (let ((standard-method-classes *standard-method-classes*)
-        (class (class-of method)))
-    (if (member class standard-method-classes)
-        (clos-slots-ref (get-slots method) *sm-specializers-index*)
-        (method-specializers method))))
+  (if (member (class-of method) **standard-method-classes** :test #'eq)
+      (clos-slots-ref (std-instance-slots method) +sm-specializers-index+)
+      (method-specializers method)))
 (defun safe-method-fast-function (method)
   (let ((mf (safe-method-function method)))
     (and (typep mf '%method-function)
          (%method-function-fast-function mf))))
 (defun safe-method-function (method)
-  (let ((standard-method-classes *standard-method-classes*)
-        (class (class-of method)))
-    (if (member class standard-method-classes)
-        (clos-slots-ref (get-slots method) *sm-%function-index*)
-        (method-function method))))
+  (if (member (class-of method) **standard-method-classes** :test #'eq)
+      (clos-slots-ref (std-instance-slots method) +sm-%function-index+)
+      (method-function method)))
 (defun safe-method-qualifiers (method)
-  (let ((standard-method-classes *standard-method-classes*)
-        (class (class-of method)))
-    (if (member class standard-method-classes)
-        (clos-slots-ref (get-slots method) *sm-qualifiers-index*)
-        (method-qualifiers method))))
+  (if (member (class-of method) **standard-method-classes** :test #'eq)
+      (clos-slots-ref (std-instance-slots method) +sm-qualifiers-index+)
+      (method-qualifiers method)))
 
 (defun set-arg-info1 (gf arg-info new-method methods was-valid-p first-p)
   (let* ((existing-p (and methods (cdr methods) new-method))
@@ -1971,16 +1966,16 @@ bootstrapping.
                    nil)))
     (when (arg-info-valid-p arg-info)
       (dolist (method (if new-method (list new-method) methods))
-        (let* ((specializers (if (or (eq *boot-state* 'complete)
+        (let* ((specializers (if (or (eq **boot-state** 'complete)
                                      (not (consp method)))
                                  (safe-method-specializers method)
                                  (early-method-specializers method t)))
-               (class (if (or (eq *boot-state* 'complete) (not (consp method)))
+               (class (if (or (eq **boot-state** 'complete) (not (consp method)))
                           (class-of method)
                           (early-method-class method)))
                (new-type
                 (when (and class
-                           (or (not (eq *boot-state* 'complete))
+                           (or (not (eq **boot-state** 'complete))
                                (eq (generic-function-method-combination gf)
                                    *standard-method-combination*)))
                   (cond ((or (eq class *the-class-standard-reader-method*)
@@ -2008,7 +2003,7 @@ bootstrapping.
       (unless (gf-info-c-a-m-emf-std-p arg-info)
         (setf (gf-info-simple-accessor-type arg-info) t))))
   (unless was-valid-p
-    (let ((name (if (eq *boot-state* 'complete)
+    (let ((name (if (eq **boot-state** 'complete)
                     (generic-function-name gf)
                     (!early-gf-name gf))))
       (setf (gf-precompute-dfun-and-emf-p arg-info)
@@ -2029,7 +2024,7 @@ bootstrapping.
                         ;; remain.
                         (not (find #\Space (symbol-name symbol))))))))))
   (setf (gf-info-fast-mf-p arg-info)
-        (or (not (eq *boot-state* 'complete))
+        (or (not (eq **boot-state** 'complete))
             (let* ((method-class (generic-function-method-class gf))
                    (methods (compute-applicable-methods
                              #'make-method-lambda
@@ -2119,12 +2114,12 @@ bootstrapping.
 
 (defun safe-gf-dfun-state (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
-      (clos-slots-ref (get-slots generic-function) *sgf-dfun-state-index*)
+      (clos-slots-ref (fsc-instance-slots generic-function) +sgf-dfun-state-index+)
       (gf-dfun-state generic-function)))
 (defun (setf safe-gf-dfun-state) (new-value generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
-      (setf (clos-slots-ref (get-slots generic-function)
-                            *sgf-dfun-state-index*)
+      (setf (clos-slots-ref (fsc-instance-slots generic-function)
+                            +sgf-dfun-state-index+)
             new-value)
       (setf (gf-dfun-state generic-function) new-value)))
 
@@ -2133,44 +2128,44 @@ bootstrapping.
                        (list* dfun cache info)
                        dfun)))
     (cond
-      ((eq *boot-state* 'complete)
+      ((eq **boot-state** 'complete)
        ;; Check that we are under the lock.
        #+sb-thread
        (aver (eq sb-thread:*current-thread* (sb-thread::spinlock-value (gf-lock gf))))
        (setf (safe-gf-dfun-state gf) new-state))
       (t
-       (setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
+       (setf (clos-slots-ref (get-slots gf) +sgf-dfun-state-index+)
              new-state))))
   dfun)
 
 (defun gf-dfun-cache (gf)
-  (let ((state (if (eq *boot-state* 'complete)
+  (let ((state (if (eq **boot-state** 'complete)
                    (safe-gf-dfun-state gf)
-                   (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
+                   (clos-slots-ref (get-slots gf) +sgf-dfun-state-index+))))
     (typecase state
       (function nil)
       (cons (cadr state)))))
 
 (defun gf-dfun-info (gf)
-  (let ((state (if (eq *boot-state* 'complete)
+  (let ((state (if (eq **boot-state** 'complete)
                    (safe-gf-dfun-state gf)
-                   (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
+                   (clos-slots-ref (get-slots gf) +sgf-dfun-state-index+))))
     (typecase state
       (function nil)
       (cons (cddr state)))))
 
-(defvar *sgf-name-index*
+(defconstant +sgf-name-index+
   (!bootstrap-slot-index 'standard-generic-function 'name))
 
 (defun !early-gf-name (gf)
-  (clos-slots-ref (get-slots gf) *sgf-name-index*))
+  (clos-slots-ref (get-slots gf) +sgf-name-index+))
 
 (defun gf-lambda-list (gf)
-  (let ((arg-info (if (eq *boot-state* 'complete)
+  (let ((arg-info (if (eq **boot-state** 'complete)
                       (gf-arg-info gf)
                       (early-gf-arg-info gf))))
     (if (eq :no-lambda-list (arg-info-lambda-list arg-info))
-        (let ((methods (if (eq *boot-state* 'complete)
+        (let ((methods (if (eq **boot-state** 'complete)
                            (generic-function-methods gf)
                            (early-gf-methods gf))))
           (if (null methods)
@@ -2285,7 +2280,7 @@ bootstrapping.
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
       (clos-slots-ref (fsc-instance-slots generic-function)
-                      *sgf-arg-info-index*)
+                      +sgf-arg-info-index+)
       (gf-arg-info generic-function)))
 
 ;;; FIXME: this function took on a slightly greater role than it
@@ -2721,7 +2716,7 @@ bootstrapping.
                      (cons (if (listp arg) (cadr arg) t) specializers)
                      (cons (if (listp arg) (car arg) arg) required)))))))
 
-(setq *boot-state* 'early)
+(setq **boot-state** 'early)
 
 ;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET
 ;;; which used %WALKER stuff. That suggests to me that maybe the code

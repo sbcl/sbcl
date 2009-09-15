@@ -471,7 +471,7 @@
     initargs))
 
 (defun make-std-writer-method-function (class-or-name slot-name)
-  (let* ((class (when (eq *boot-state* 'complete)
+  (let* ((class (when (eq **boot-state** 'complete)
                   (if (typep class-or-name 'class)
                       class-or-name
                       (find-class class-or-name nil))))
@@ -585,13 +585,13 @@
          (vector (make-array n :initial-element nil))
          (save-slot-location-p
           (or bootstrap
-              (when (eq 'complete *boot-state*)
+              (when (eq 'complete **boot-state**)
                 (let ((metaclass (class-of class)))
                   (or (eq metaclass *the-class-standard-class*)
                       (eq metaclass *the-class-funcallable-standard-class*))))))
          (save-type-check-function-p
           (unless bootstrap
-            (and (eq 'complete *boot-state*) (safe-p class)))))
+            (and (eq 'complete **boot-state**) (safe-p class)))))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
@@ -605,7 +605,7 @@
                                           (slot-definition-type-check-function slot))
                                         slot)
                             (svref vector index))))))
-      (if (eq 'complete *boot-state*)
+      (if (eq 'complete **boot-state**)
          (dolist (slot slots)
            (add-to-vector (slot-definition-name slot) slot))
          (dolist (slot slots)

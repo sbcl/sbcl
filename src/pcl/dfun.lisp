@@ -196,7 +196,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (setf *standard-slot-locations* new)))
 
 (defun maybe-update-standard-slot-locations (class)
-  (when (and (eq *boot-state* 'complete)
+  (when (and (eq **boot-state** 'complete)
              (memq (class-name class) *standard-classes*))
     (compute-standard-slot-locations)))
 
@@ -529,7 +529,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                         (generic-function-methods gf)))
            (default '(unknown)))
       (and (null applyp)
-           (or (not (eq *boot-state* 'complete))
+           (or (not (eq **boot-state** 'complete))
                ;; If COMPUTE-APPLICABLE-METHODS is specialized, we
                ;; can't use this, of course, because we can't tell
                ;; which methods will be considered applicable.
@@ -550,7 +550,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            ;; method has qualifiers, to make sure that emfs are really
            ;; method functions; see above.
            (dolist (method methods t)
-             (when (eq *boot-state* 'complete)
+             (when (eq **boot-state** 'complete)
                (when (or (some #'eql-specializer-p
                                (safe-method-specializers method))
                          (safe-method-qualifiers method))
@@ -589,7 +589,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (return t)))))
 
 (defun use-dispatch-dfun-p (gf &optional (caching-p (use-caching-dfun-p gf)))
-  (when (eq *boot-state* 'complete)
+  (when (eq **boot-state** 'complete)
     (unless (or caching-p
                 (gf-requires-emf-keyword-checks gf)
                 ;; DISPATCH-DFUN-COST will error if it encounters a
@@ -762,10 +762,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
              (initial-dfun gf args))))
     (multiple-value-bind (dfun cache info)
         (cond
-          ((and (eq *boot-state* 'complete)
+          ((and (eq **boot-state** 'complete)
                 (not (finalize-specializers gf)))
            (values initial-dfun nil (initial-dfun-info)))
-          ((and (eq *boot-state* 'complete)
+          ((and (eq **boot-state** 'complete)
                 (compute-applicable-methods-emf-std-p gf))
            (let* ((caching-p (use-caching-dfun-p gf))
                   ;; KLUDGE: the only effect of this (when
@@ -1223,7 +1223,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
               (safe-method-qualifiers meth))
       (return-from accessor-values-internal (values nil nil))))
   (let* ((meth (car methods))
-         (early-p (not (eq *boot-state* 'complete)))
+         (early-p (not (eq **boot-state** 'complete)))
          (slot-name (when accessor-class
                       (if (consp meth)
                           (and (early-method-standard-accessor-p meth)
@@ -1261,7 +1261,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                      (generic-function-methods gf)))
         (all-index nil)
         (no-class-slots-p t)
-        (early-p (not (eq *boot-state* 'complete)))
+        (early-p (not (eq **boot-state** 'complete)))
         first second (size 0))
     (declare (fixnum size))
     ;; class -> {(specl slotd)}
@@ -1359,7 +1359,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                 precedence
                 (lambda (class1 class2 index)
                   (let* ((class (type-class (nth index types)))
-                         (cpl (if (eq *boot-state* 'complete)
+                         (cpl (if (eq **boot-state** 'complete)
                                   (class-precedence-list class)
                                   (early-class-precedence-list class))))
                     (if (memq class2 (memq class1 cpl))
@@ -1383,10 +1383,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (stable-sort methods #'sorter)))
 
 (defun order-specializers (specl1 specl2 index compare-classes-function)
-  (let ((type1 (if (eq *boot-state* 'complete)
+  (let ((type1 (if (eq **boot-state** 'complete)
                    (specializer-type specl1)
                    (!bootstrap-get-slot 'specializer specl1 '%type)))
-        (type2 (if (eq *boot-state* 'complete)
+        (type2 (if (eq **boot-state** 'complete)
                    (specializer-type specl2)
                    (!bootstrap-get-slot 'specializer specl2 '%type))))
     (cond ((eq specl1 specl2)
@@ -1476,7 +1476,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
               argument-precedence-order)))
 
 (defun cpl-or-nil (class)
-  (if (eq *boot-state* 'complete)
+  (if (eq **boot-state** 'complete)
       (progn
         ;; KLUDGE: why not use (slot-boundp class
         ;; 'class-precedence-list)?  Well, unfortunately, CPL-OR-NIL is
@@ -1619,8 +1619,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun map-all-classes (fun &optional (root t))
   (let ((all-classes (make-hash-table :test 'eq))
-        (braid-p (or (eq *boot-state* 'braid)
-                     (eq *boot-state* 'complete))))
+        (braid-p (or (eq **boot-state** 'braid)
+                     (eq **boot-state** 'complete))))
     (labels ((do-class (class)
                (unless (gethash class all-classes)
                  (setf (gethash class all-classes) t)
@@ -1700,7 +1700,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                             wrappers-p all-applicable-p
                                             all-sorted-p function-p)
   (if (and all-applicable-p all-sorted-p (not function-p))
-      (if (eq *boot-state* 'complete)
+      (if (eq **boot-state** 'complete)
           (let* ((combin (generic-function-method-combination gf))
                  (effective (compute-effective-method gf combin methods)))
             (make-effective-method-function1 gf effective method-alist-p
@@ -1723,7 +1723,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (get-secondary-dispatch-function1 gf methods nil nil nil t sorted-p))
 
 (defun methods-contain-eql-specializer-p (methods)
-  (and (eq *boot-state* 'complete)
+  (and (eq **boot-state** 'complete)
        (dolist (method methods nil)
          (when (dolist (spec (method-specializers method) nil)
                  (when (eql-specializer-p spec) (return t)))

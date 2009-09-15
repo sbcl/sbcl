@@ -244,7 +244,7 @@
         (built-in  (find-class 'built-in-class))
         (frc       (find-class 'forward-referenced-class)))
     (flet ((specializer->metatype (x)
-             (let* ((specializer-class (if (eq *boot-state* 'complete)
+             (let* ((specializer-class (if (eq **boot-state** 'complete)
                                            (specializer-class-or-nil x)
                                            x))
                    (meta-specializer (class-of specializer-class)))
