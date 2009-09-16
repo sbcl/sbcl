@@ -20,7 +20,7 @@
 ;;;; here: certainly enough that I (dan, 2003.1.22) don't want to mess
 ;;;; around deciding how to thread-safetify it.  So we use a Big Lock.
 ;;;; Because this code is mutually recursive with the compiler, we use
-;;;; the *world-lock*.
+;;;; the **WORLD-LOCK**.
 
 ;;;; miscellaneous load utilities
 

@@ -127,13 +127,13 @@ the stack without triggering overflow protection.")
 (!begin-collecting-cold-init-forms)
 ;;; This lock is seized in the compiler, and related areas -- like the
 ;;; classoid/layout/class system.
-(defvar *world-lock*)
+(defglobal **world-lock** nil)
 (!cold-init-forms
- (setf *world-lock* (sb!thread:make-mutex :name "World Lock")))
+ (setf **world-lock** (sb!thread:make-mutex :name "World Lock")))
 (!defun-from-collected-cold-init-forms !world-lock-cold-init)
 
 (defmacro with-world-lock (() &body body)
-  `(sb!thread:with-recursive-lock (*world-lock*)
+  `(sb!thread:with-recursive-lock (**world-lock**)
      ,@body))
 
 (declaim (type fixnum *compiler-sset-counter*))

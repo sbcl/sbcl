@@ -11,13 +11,13 @@
 
 (in-package "SB!IMPL")
 
-(defvar *finalizer-store* nil)
+(defglobal **finalizer-store** nil)
 
-(defvar *finalizer-store-lock*
+(defglobal **finalizer-store-lock**
   (sb!thread:make-mutex :name "Finalizer store lock."))
 
 (defmacro with-finalizer-store-lock (&body body)
-  `(sb!thread::with-system-mutex (*finalizer-store-lock* :without-gcing t)
+  `(sb!thread::with-system-mutex (**finalizer-store-lock** :without-gcing t)
      ,@body))
 
 (defun finalize (object function &key dont-save)
@@ -70,13 +70,13 @@ Examples:
     (error "Cannot finalize NIL."))
   (with-finalizer-store-lock
     (push (list (make-weak-pointer object) function dont-save)
-          *finalizer-store*))
+          **finalizer-store**))
   object)
 
 (defun deinit-finalizers ()
   ;; remove :dont-save finalizers
   (with-finalizer-store-lock
-    (setf *finalizer-store* (delete-if #'third *finalizer-store*)))
+    (setf **finalizer-store** (delete-if #'third **finalizer-store**)))
   nil)
 
 (defun cancel-finalization (object)
@@ -86,8 +86,8 @@ Examples:
   ;; run.
   (when object
     (with-finalizer-store-lock
-        (setf *finalizer-store*
-              (delete object *finalizer-store*
+        (setf **finalizer-store**
+              (delete object **finalizer-store**
                       :key (lambda (list)
                              (weak-pointer-value (car list))))))
     object))
@@ -95,12 +95,12 @@ Examples:
 (defun run-pending-finalizers ()
   (let (pending)
     (with-finalizer-store-lock
-        (setf *finalizer-store*
+        (setf **finalizer-store**
               (delete-if (lambda (list)
                            (when (null (weak-pointer-value (car list)))
                              (push (second list) pending)
                              t))
-                          *finalizer-store*)))
+                         **finalizer-store**)))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.
     (dolist (fun pending)

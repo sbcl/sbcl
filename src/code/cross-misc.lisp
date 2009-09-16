@@ -39,6 +39,14 @@
   (declare (ignore table))
   `(progn ,@body))
 
+(defmacro defglobal (name value &rest doc)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (defparameter ,name
+       (if (boundp ',name)
+           (symbol-value ',name)
+           ,value)
+       ,@doc)))
+
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
 ;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a
