@@ -175,4 +175,23 @@
                  (macro/1)))
       (inner-m))))
 
+;;; Inlining functions with non-trivial lambda-lists.
+(declaim (inline inline/3))
+(defun inline/3 (a &optional b &key c d)
+  (list a b c d))
+(defun inline/3-user/1 (a)
+  (inline/3 a))
+(defun inline/3-user/2 (a b)
+  (inline/3 a b))
+(defun inline/3-user/3 (a b c)
+  (inline/3 a b :c c))
+(defun inline/3-user/4 (a b c d)
+  (inline/3 a b :d d :c c))
+
+(declaim (inline inline/4))
+(defun inline/4 (a &rest more)
+  (cons a more))
+(defun inline/4-user ()
+  (inline/4 :a :b :c))
+
 ;;; Test references to / from compiler-macros

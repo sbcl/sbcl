@@ -101,20 +101,10 @@
                (record-xref :calls name context node nil)))))
          ;; Inlined global function
          (clambda
-          (when (functional-inlinep leaf)
-            (let ((name (leaf-debug-name leaf)))
-              ;; FIXME: we should store the original var into the
-              ;; functional when creating inlined-functionals, so that
-              ;; we could just check whether it was a global-var,
-              ;; rather then needing to guess based on the debug-name.
-              (when (or (symbolp name)
-                        ;; Any non-SETF non-symbol names will
-                        ;; currently be either non-functions or
-                        ;; internals.
-                        (and (consp name)
-                             (equal (car name) 'setf)))
-                ;; TODO: a WHO-INLINES xref-kind could be useful
-                (record-xref :calls name context node nil)))))
+          (let ((inline-var (functional-inline-expanded leaf)))
+            (when (global-var-p inline-var)
+              ;; TODO: a WHO-INLINES xref-kind could be useful
+              (record-xref :calls (leaf-debug-name inline-var) context node nil))))
          ;; Reading a constant
          (constant
           (record-xref :references (ref-%source-name node) context node nil)))))

@@ -871,8 +871,9 @@
   ;; xref information for this functional (only used for functions with an
   ;; XEP)
   (xref () :type list)
-  ;; True if this functional was created from an inline expansion
-  (inline-expanded nil :type boolean))
+  ;; True if this functional was created from an inline expansion. This
+  ;; is either T, or the GLOBAL-VAR for which it is an expansion.
+  (inline-expanded nil))
 (defprinter (functional :identity t)
   %source-name
   %debug-name
