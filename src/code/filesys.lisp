@@ -477,7 +477,7 @@ If FILE is a stream, on Windows the stream is closed immediately. On Unix
 plaforms the stream remains open, allowing IO to continue: the OS resources
 associated with the deleted file remain available till the stream is closed as
 per standard Unix unlink() behaviour."
-  (let* ((pathname (pathname file))
+  (let* ((pathname (translate-logical-pathname file))
          (namestring (native-namestring pathname :as-file t)))
     (truename file) ; for error-checking side-effect
     #!+win32

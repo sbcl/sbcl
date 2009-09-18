@@ -457,4 +457,17 @@
 #|:UNSPECIFIC|#     "C:\\tmp\\"   "C:\\tmp\\"   NIL           NIL
 #|""         |#     "C:\\tmp\\"   "C:\\tmp\\"   "C:\\tmp\\."  "C:\\tmp\\.a"
 #|"a"        |#     "C:\\tmp\\a"  "C:\\tmp\\a"  "C:\\tmp\\a." "C:\\tmp\\a.a")))
+
+(with-test (:name :delete-file-logical-pathname)
+  (setf (logical-pathname-translations "SB-TEST")
+        (list (list "**;*.*.*" (make-pathname :name :wild
+                                              :type :wild
+                                              :defaults (truename ".")))))
+  (let ((test (pathname "SB-TEST:delete-logical-pathname.tmp")))
+    (assert (typep test 'logical-pathname))
+    (with-open-file (f test :direction :output)
+      (write-line "delete me!" f))
+    (assert (probe-file test))
+    (assert (delete-file test))
+    (assert (not (probe-file test)))))
 ;;;; success

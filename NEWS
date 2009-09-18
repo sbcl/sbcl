@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.31
     by David Vázquez)
   * improvement: better error signalling for bogus parameter specializer names
     in DEFMETHOD forms (reported by Pluijzer)
+  * bug fix: DELETE-FILE once again works on logical pathnames (regression
+    since 1.0.30.49)
   * bug fix: redefinition of a class via DEFCLASS without :DEFAULT-INITARGS
     removes previous default initargs (reported by Lars Rune Nøstdal and
     Samium Gromoff)
