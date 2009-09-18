@@ -470,4 +470,12 @@
     (assert (probe-file test))
     (assert (delete-file test))
     (assert (not (probe-file test)))))
+
+(with-test (:name :logical-pathname-type-error)
+  (assert (eq :type-error-ok
+              (handler-case (logical-pathname "FOO.txt")
+                (type-error () :type-error-ok))))
+  (assert (eq :type-error-ok
+              (handler-case (logical-pathname "SYS:%")
+                (type-error () :type-error-ok)))))
 ;;;; success

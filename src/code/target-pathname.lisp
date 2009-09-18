@@ -1510,6 +1510,14 @@ system's syntax for files."
 ;;; loaded yet.
 (defvar *logical-pathname-defaults*)
 
+(defun logical-namestring-p (x)
+  (and (stringp x)
+       (ignore-errors
+         (typep (pathname x) 'logical-pathname))))
+
+(deftype logical-namestring ()
+  `(satisfies logical-namestring-p))
+
 (defun logical-pathname (pathspec)
   #!+sb-doc
   "Converts the pathspec argument to a logical-pathname and returns it."
@@ -1517,12 +1525,19 @@ system's syntax for files."
            (values logical-pathname))
   (if (typep pathspec 'logical-pathname)
       pathspec
-      (let ((res (parse-namestring pathspec nil *logical-pathname-defaults*)))
-        (when (eq (%pathname-host res)
-                  (%pathname-host *logical-pathname-defaults*))
-          (error "This logical namestring does not specify a host:~%  ~S"
-                 pathspec))
-        res)))
+      (flet ((oops (problem)
+               (error 'simple-type-error
+                      :datum pathspec
+                      :expected-type 'logical-namestring
+                      :format-control "~S is not a valid logical namestring:~%  ~A"
+                      :format-arguments (list pathspec problem))))
+        (let ((res (handler-case
+                       (parse-namestring pathspec nil *logical-pathname-defaults*)
+                     (error (e) (oops e)))))
+          (when (eq (%pathname-host res)
+                    (%pathname-host *logical-pathname-defaults*))
+            (oops "no host specified"))
+          res))))
 
 ;;;; logical pathname unparsing
 

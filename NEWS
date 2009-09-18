@@ -8,6 +8,8 @@ changes relative to sbcl-1.0.31
     in DEFMETHOD forms (reported by Pluijzer)
   * bug fix: DELETE-FILE once again works on logical pathnames (regression
     since 1.0.30.49)
+  * bug fix: LOGICAL-PATHNAME signals a TYPE-ERROR if pathspec is specified
+    incorrectly.
   * bug fix: redefinition of a class via DEFCLASS without :DEFAULT-INITARGS
     removes previous default initargs (reported by Lars Rune Nøstdal and
     Samium Gromoff)
