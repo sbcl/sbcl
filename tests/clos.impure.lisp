@@ -1753,5 +1753,16 @@
                                 (sb-int:reference-condition-references c)
                                 :test #'equal)
                     :ok))))))
+
+(defclass remove-default-initargs-test ()
+  ((x :initarg :x :initform 42)))
+(defclass remove-default-initatgs-test ()
+  ((x :initarg :x :initform 42))
+  (:default-initargs :x 0))
+(defclass remove-default-initargs-test ()
+  ((x :initarg :x :initform 42)))
+(with-test (:name :remove-default-initargs)
+  (assert (= 42 (slot-value (make-instance 'remove-default-initargs-test)
+                            'x))))
 
 ;;;; success

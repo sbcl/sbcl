@@ -163,6 +163,8 @@
            (push `(:documentation ,(second option)) canonized-options))
           (otherwise
            (push `(',(car option) ',(cdr option)) canonized-options))))
+      (unless default-initargs
+        (push '(:direct-default-initargs nil) canonized-options))
       (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
 (defun canonize-defclass-slots (class-name slots env)

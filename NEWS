@@ -6,6 +6,9 @@ changes relative to sbcl-1.0.31
     by David Vázquez)
   * improvement: better error signalling for bogus parameter specializer names
     in DEFMETHOD forms (reported by Pluijzer)
+  * bug fix: redefinition of a class via DEFCLASS without :DEFAULT-INITARGS
+    removes previous default initargs (reported by Lars Rune Nøstdal and
+    Samium Gromoff)
   * bug fix: correct WHO-CALLS information for inlined lambdas with complex
     lambda-lists. (reported by Peter Seibel)
   * bug fix: SAVE-LISP-AND-DIE option :SAVE-RUNTIME-OPTIONS did not work
