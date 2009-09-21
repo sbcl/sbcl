@@ -29,3 +29,9 @@
   ;; cache.
   (setf (gethash 'y hash) t)
   (assert (gethash a hash)))
+
+;;; Minimum quality checks
+(assert (/= (sxhash "foo") (sxhash "bar")))
+(assert (/= (sxhash (pathname "foo.txt")) (sxhash (pathname "bar.txt"))))
+(assert (/= (sxhash (list 1 2 3)) (sxhash (list 3 2 1))))
+(assert (/= (sxhash #*1010) (sxhash #*0101)))

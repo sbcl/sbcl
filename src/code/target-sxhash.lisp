@@ -183,12 +183,27 @@
                              (sxhash-recurse (cdr x) (1- depthoid)))
                         261835505)))
                (instance
-                (if (or (typep x 'structure-object) (typep x 'condition))
-                    (logxor 422371266
-                            (sxhash ; through DEFTRANSFORM
-                             (classoid-name
-                              (layout-classoid (%instance-layout x)))))
-                    (sxhash-instance x)))
+                (if (pathnamep x)
+                    ;; Pathnames are EQUAL if all the components are EQUAL, so
+                    ;; we hash all of the components of a pathname together.
+                    (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
+                      (mixf hash (sxhash-recurse (pathname-device x) depthoid))
+                      (mixf hash (sxhash-recurse (pathname-directory x) depthoid))
+                      (mixf hash (sxhash-recurse (pathname-name x) depthoid))
+                      (mixf hash (sxhash-recurse (pathname-type x) depthoid))
+                      ;; Hash :NEWEST the same as NIL because EQUAL for
+                      ;; pathnames assumes that :newest and nil are equal.
+                      (let ((version (%pathname-version x)))
+                        (mixf hash (sxhash-recurse (if (eq version :newest)
+                                                       nil
+                                                       version)
+                                                   depthoid))))
+                    (if (or (typep x 'structure-object) (typep x 'condition))
+                        (logxor 422371266
+                                (sxhash ; through DEFTRANSFORM
+                                 (classoid-name
+                                  (layout-classoid (%instance-layout x)))))
+                        (sxhash-instance x))))
                (symbol (sxhash x)) ; through DEFTRANSFORM
                (array
                 (typecase x

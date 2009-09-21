@@ -20,12 +20,11 @@
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))
 
-;;; In case of a parse error we want to get a condition of type
-;;; CL:PARSE-ERROR (or more specifically, of type
-;;; SB-KERNEL:NAMESTRING-PARSE-ERROR).
+;;; In case of a parse error we want to get a condition of type TYPE-ERROR,
+;;; because ANSI says so. (This used to be PARSE-ERROR.)
 (assert
   (typep (grab-condition (logical-pathname "demo0::bla;file.lisp"))
-         'parse-error))
+         'type-error))
 
 ;;; some things SBCL-0.6.9 used not to parse correctly:
 ;;;
