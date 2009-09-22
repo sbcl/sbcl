@@ -128,6 +128,11 @@ if [ "$sbcl_os" = "sunos" ] && [ `isainfo -k` = "amd64" ]; then
     guessed_sbcl_arch=x86-64
 fi
 
+# Under Darwin, uname -m returns "i386" even if CPU is x86_64.
+if [ "$sbcl_os" = "darwin" ] && [ "`sysctl -n hw.optional.x86_64`" = "1" ]; then
+    guessed_sbcl_arch=x86-64
+fi
+
 echo //setting up CPU-architecture-dependent information
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
 echo sbcl_arch=\"$sbcl_arch\"
