@@ -316,44 +316,3 @@
   (:generator 2
     (inst addu sap vector
           (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
-
-;;; Transforms for 64-bit SAP accessors.
-#!+little-endian
-(progn
-  (deftransform sap-ref-64 ((sap offset) (* *))
-    '(logior (sap-ref-32 sap offset)
-             (ash (sap-ref-32 sap (+ offset 4)) 32)))
-
-  (deftransform signed-sap-ref-64 ((sap offset) (* *))
-    '(logior (sap-ref-32 sap offset)
-             (ash (signed-sap-ref-32 sap (+ offset 4)) 32)))
-
-  (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
-    '(progn
-       (%set-sap-ref-32 sap offset (logand value #xffffffff))
-       (%set-sap-ref-32 sap (+ offset 4) (ash value -32))))
-
-  (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
-    '(progn
-       (%set-sap-ref-32 sap offset (logand value #xffffffff))
-       (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
-
-#!-little-endian
-(progn
-  (deftransform sap-ref-64 ((sap offset) (* *))
-    '(logior (ash (sap-ref-32 sap offset) 32)
-             (sap-ref-32 sap (+ offset 4))))
-
-  (deftransform signed-sap-ref-64 ((sap offset) (* *))
-    '(logior (ash (signed-sap-ref-32 sap offset) 32)
-             (sap-ref-32 sap (+ 4 offset))))
-
-  (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
-    '(progn
-       (%set-sap-ref-32 sap offset (ash value -32))
-       (%set-sap-ref-32 sap (+ offset 4) (logand value #xffffffff))))
-
-  (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
-    '(progn
-       (%set-signed-sap-ref-32 sap offset (ash value -32))
-       (%set-sap-ref-32 sap (+ 4 offset) (logand value #xffffffff)))))

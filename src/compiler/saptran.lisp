@@ -176,3 +176,48 @@
     %set-sap-ref-32 %set-sap-ref-64)
   (def %set-signed-sap-ref-word (sap offset value)
     %set-signed-sap-ref-32 %set-signed-sap-ref-64))
+
+;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
+
+#!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
+(progn
+#!+#.(cl:if (cl:eq :little-endian sb!c:*backend-byte-order*) '(and) '(or))
+(progn
+  (deftransform sap-ref-64 ((sap offset) (* *))
+    '(logior (sap-ref-32 sap offset)
+             (ash (sap-ref-32 sap (+ offset 4)) 32)))
+
+  (deftransform signed-sap-ref-64 ((sap offset) (* *))
+    '(logior (sap-ref-32 sap offset)
+             (ash (signed-sap-ref-32 sap (+ offset 4)) 32)))
+
+  (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
+    '(progn
+       (%set-sap-ref-32 sap offset (logand value #xffffffff))
+       (%set-sap-ref-32 sap (+ offset 4) (ash value -32))))
+
+  (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
+    '(progn
+       (%set-sap-ref-32 sap offset (logand value #xffffffff))
+       (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
+
+#!+#.(cl:if (cl:eq :big-endian sb!c:*backend-byte-order*) '(and) '(or))
+(progn
+  (deftransform sap-ref-64 ((sap offset) (* *))
+    '(logior (ash (sap-ref-32 sap offset) 32)
+             (sap-ref-32 sap (+ offset 4))))
+
+  (deftransform signed-sap-ref-64 ((sap offset) (* *))
+    '(logior (ash (signed-sap-ref-32 sap offset) 32)
+             (sap-ref-32 sap (+ 4 offset))))
+
+  (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
+    '(progn
+       (%set-sap-ref-32 sap offset (ash value -32))
+       (%set-sap-ref-32 sap (+ offset 4) (logand value #xffffffff))))
+
+  (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
+    '(progn
+       (%set-signed-sap-ref-32 sap offset (ash value -32))
+       (%set-sap-ref-32 sap (+ 4 offset) (logand value #xffffffff)))))
+) ; (= 32 SB!VM:N-MACHINE-WORD-BITS)
