@@ -176,6 +176,15 @@ with that condition (or with no condition) will be returned."
         :interactive read-evaluated-form
         value))))
 
+(defun case-failure (name value keys)
+  (error 'case-failure
+         :name name
+         :datum value
+         :expected-type (if (eq name 'ecase)
+                            `(member ,@keys)
+                            `(or ,@keys))
+         :possibilities keys))
+
 (defun case-body-error (name keyform keyform-value expected-type keys)
   (restart-case
       (error 'case-failure

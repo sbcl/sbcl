@@ -303,11 +303,7 @@ invoked. In that case it will store into PLACE and start over."
          (cond
           ,@(nreverse clauses)
           ,@(if errorp
-                `((t (error 'case-failure
-                            :name ',name
-                            :datum ,keyform-value
-                            :expected-type ',expected-type
-                            :possibilities ',keys))))))))
+                `((t (case-failure ',name ,keyform-value ',keys))))))))
 ) ; EVAL-WHEN
 
 (defmacro-mundanely case (keyform &body cases)
