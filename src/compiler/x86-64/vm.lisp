@@ -19,8 +19,8 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *byte-register-names* (make-array 32 :initial-element nil))
-  (defvar *word-register-names* (make-array 16 :initial-element nil))
-  (defvar *dword-register-names* (make-array 16 :initial-element nil))
+  (defvar *word-register-names* (make-array 32 :initial-element nil))
+  (defvar *dword-register-names* (make-array 32 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
   (defvar *float-register-names* (make-array 16 :initial-element nil)))
 
@@ -82,7 +82,16 @@
   (defreg bp 10 :word)
   (defreg si 12 :word)
   (defreg di 14 :word)
-  (defregset *word-regs* ax cx dx bx si di)
+  (defreg r8w  16 :word)
+  (defreg r9w  18 :word)
+  (defreg r10w 20 :word)
+  (defreg r11w 22 :word)
+  (defreg r12w 24 :word)
+  (defreg r13w 26 :word)
+  (defreg r14w 28 :word)
+  (defreg r15w 30 :word)
+  (defregset *word-regs* ax cx dx bx si di r8w r9w r10w
+             #+nil r11w #+nil r12w r13w r14w r15w)
 
   ;; double word registers
   (defreg eax 0 :dword)
@@ -93,7 +102,16 @@
   (defreg ebp 10 :dword)
   (defreg esi 12 :dword)
   (defreg edi 14 :dword)
-  (defregset *dword-regs* eax ecx edx ebx esi edi)
+  (defreg r8d  16 :dword)
+  (defreg r9d  18 :dword)
+  (defreg r10d 20 :dword)
+  (defreg r11d 22 :dword)
+  (defreg r12d 24 :dword)
+  (defreg r13d 26 :dword)
+  (defreg r14d 28 :dword)
+  (defreg r15d 30 :dword)
+  (defregset *dword-regs* eax ecx edx ebx esi edi r8d r9d r10d
+             #+nil r11d #+nil r12w r13d r14d r15d)
 
   ;; quadword registers
   (defreg rax 0 :qword)
@@ -397,13 +415,25 @@
 
   (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
                     r8 r9 r10 r11 r12 r13 r14 r15)
-  (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
-  (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
+  (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi
+                    r8d r9d r10d r11d r12d r13d r14d r15d)
+  (def-misc-reg-tns word-reg ax bx cx dx bp sp di si
+                    r8w r9w r10w r11w r12w r13w r14w r15w)
   (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
                     r11b r12b r13b r14b r15b)
   (def-misc-reg-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))
+
+(defun reg-in-size (tn size)
+  (make-random-tn :kind :normal
+                  :sc (sc-or-lose
+                       (ecase size
+                         (:byte 'byte-reg)
+                         (:word 'word-reg)
+                         (:dword 'dword-reg)
+                         (:qword 'unsigned-reg)))
+                  :offset (tn-offset tn)))
 
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
