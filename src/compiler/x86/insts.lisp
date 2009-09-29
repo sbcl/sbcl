@@ -608,6 +608,13 @@
   ;; optional fields
   (imm))
 
+;;; reg-no-width with #x0f prefix
+(sb!disassem:define-instruction-format (ext-reg-no-width 16
+                                        :default-printer '(:name :tab reg))
+  (prefix  :field (byte 8 0)    :value #b00001111)
+  (op    :field (byte 5 11))
+  (reg   :field (byte 3 8) :type 'reg))
+
 ;;; Same as reg/mem, but with a prefix of #b00001111
 (sb!disassem:define-instruction-format (ext-reg/mem 24
                                         :default-printer '(:name :tab reg/mem))
@@ -1592,6 +1599,12 @@
   (:emitter
    (emit-byte segment #b11010100)
    (emit-byte segment #b00001010)))
+
+(define-instruction bswap (segment dst)
+  (:printer ext-reg-no-width ((op #b11001)))
+  (:emitter
+   (emit-byte segment #x0f)
+   (emit-byte-with-reg segment #b11001 (reg-tn-encoding dst))))
 
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)
