@@ -1129,7 +1129,7 @@
     ;; not work either.
     (when (echo-stream-unread-stuff stream)
       (let* ((char (read-char stream))
-             (octets (octets-to-string
+             (octets (string-to-octets
                       (string char)
                       :external-format
                       (stream-external-format
