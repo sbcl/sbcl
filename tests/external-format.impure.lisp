@@ -17,9 +17,9 @@
 
 (defmacro do-external-formats ((xf &optional result) &body body)
   (let ((nxf (gensym)))
-    `(dolist (,nxf sb-impl::*external-formats* ,result)
-       (let ((,xf (first (first ,nxf))))
-         ,@body))))
+    `(loop for ,nxf being the hash-values of sb-impl::*external-formats*
+        do (let ((,xf (first (sb-impl::ef-names ,nxf))))
+             ,@body))))
 
 (defvar *test-path* "external-format-test.tmp")
 

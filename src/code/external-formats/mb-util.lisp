@@ -183,38 +183,6 @@
         (define-mb->string
          (make-od-name-list 'define format '>string)))
     `(progn
-       ;; for fd-stream.lisp
-       (define-external-format/variable-width ,aliases t
-         (mb-char-len (or (,ucs-to-mb (char-code byte)) -1))
-         (let ((mb (,ucs-to-mb bits)))
-           (if (null mb)
-               (external-format-encoding-error stream byte)
-               (ecase size
-                 (1 (setf (sap-ref-8 sap tail) mb))
-                 (2 (setf (sap-ref-8 sap tail) (ldb (byte 8 8) mb)
-                          (sap-ref-8 sap (1+ tail)) (ldb (byte 8 0) mb)))
-                 (3 (setf (sap-ref-8 sap tail) (ldb (byte 8 16) mb)
-                          (sap-ref-8 sap (1+ tail)) (ldb (byte 8 8) mb)
-                          (sap-ref-8 sap (+ 2 tail)) (ldb (byte 8 0) mb))))))
-         (,mb-len byte)
-         (let* ((mb (ecase size
-                      (1 byte)
-                      (2 (let ((byte2 (sap-ref-8 sap (1+ head))))
-                           (unless (,mb-continuation-byte-p byte2)
-                             (return-from decode-break-reason 2))
-                           (dpb byte (byte 8 8) byte2)))
-                      (3 (let ((byte2 (sap-ref-8 sap (1+ head)))
-                               (byte3 (sap-ref-8 sap (+ 2 head))))
-                           (unless (,mb-continuation-byte-p byte2)
-                             (return-from decode-break-reason 2))
-                           (unless (,mb-continuation-byte-p byte3)
-                             (return-from decode-break-reason 3))
-                           (dpb byte (byte 8 16) (dpb byte2 (byte 8 8) byte3))))))
-                (ucs (,mb-to-ucs mb)))
-           (if (null ucs)
-               (return-from decode-break-reason 1)
-               (code-char ucs))))
-
        ;; for octets.lisp
        (define-condition ,(make-od-name 'malformed format)
            (octet-decoding-error) ())
@@ -276,7 +244,36 @@
 
        (instantiate-octets-definition ,define-mb->string)
 
-       (add-external-format-funs ',aliases
-                                 '(,(make-od-name format '>string-aref)
-                                   ,string->mb))
-       )))
+       ;; for fd-stream.lisp
+       (define-external-format/variable-width ,aliases t
+         (mb-char-len (or (,ucs-to-mb (char-code byte)) -1))
+         (let ((mb (,ucs-to-mb bits)))
+           (if (null mb)
+               (external-format-encoding-error stream byte)
+               (ecase size
+                 (1 (setf (sap-ref-8 sap tail) mb))
+                 (2 (setf (sap-ref-8 sap tail) (ldb (byte 8 8) mb)
+                          (sap-ref-8 sap (1+ tail)) (ldb (byte 8 0) mb)))
+                 (3 (setf (sap-ref-8 sap tail) (ldb (byte 8 16) mb)
+                          (sap-ref-8 sap (1+ tail)) (ldb (byte 8 8) mb)
+                          (sap-ref-8 sap (+ 2 tail)) (ldb (byte 8 0) mb))))))
+         (,mb-len byte)
+         (let* ((mb (ecase size
+                      (1 byte)
+                      (2 (let ((byte2 (sap-ref-8 sap (1+ head))))
+                           (unless (,mb-continuation-byte-p byte2)
+                             (return-from decode-break-reason 2))
+                           (dpb byte (byte 8 8) byte2)))
+                      (3 (let ((byte2 (sap-ref-8 sap (1+ head)))
+                               (byte3 (sap-ref-8 sap (+ 2 head))))
+                           (unless (,mb-continuation-byte-p byte2)
+                             (return-from decode-break-reason 2))
+                           (unless (,mb-continuation-byte-p byte3)
+                             (return-from decode-break-reason 3))
+                           (dpb byte (byte 8 16) (dpb byte2 (byte 8 8) byte3))))))
+                (ucs (,mb-to-ucs mb)))
+           (if (null ucs)
+               (return-from decode-break-reason 1)
+               (code-char ucs)))
+         ,(make-od-name format '>string-aref)
+         ,string->mb))))

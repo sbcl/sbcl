@@ -72,17 +72,13 @@
   (declare (type simple-string string))
   (locally
       (declare (optimize (speed 3) (safety 0)))
-    (let ((func (sb!impl::get-external-format-function external-format 10)))
-      (unless func
-        (error "Undefined external-format ~A.~%" external-format))
-      (funcall (symbol-function func) string))))
+    (let ((external-format (sb!impl::get-external-format-or-lose external-format)))
+      (funcall (sb!impl::ef-write-c-string-fun external-format) string))))
 
 (defun c-string-to-string (sap external-format element-type)
   (declare (type system-area-pointer sap))
   (locally
       (declare (optimize (speed 3) (safety 0)))
-    (let ((func (sb!impl::get-external-format-function external-format 9)))
-      (unless func
-        (error "Undefined external-format ~A.~%" external-format))
-      (funcall (symbol-function func) sap element-type))))
+    (let ((external-format (sb!impl::get-external-format-or-lose external-format)))
+      (funcall (sb!impl::ef-read-c-string-fun external-format) sap element-type))))
 

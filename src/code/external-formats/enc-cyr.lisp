@@ -160,9 +160,6 @@
 
 (instantiate-octets-definition define-koi8-r->string)
 
-(add-external-format-funs '(:koi8-r :|koi8-r|)
-                          '(koi8-r->string-aref string->koi8-r))
-
 (define-external-format (:koi8-r :|koi8-r|)
     1 t
     (let ((koi8-r-byte (code->koi8-r-mapper bits)))
@@ -172,7 +169,9 @@
     (let ((code (koi8-r->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    koi8-r->string-aref
+    string->koi8-r) ;; TODO -- error check
 
 (define-unibyte-mapper koi8-u->code-mapper code->koi8-u-mapper
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL
@@ -334,9 +333,6 @@
 
 (instantiate-octets-definition define-koi8-u->string)
 
-(add-external-format-funs '(:koi8-u :|koi8-u|)
-                          '(koi8-u->string-aref string->koi8-u))
-
 (define-external-format (:koi8-u :|koi8-u|)
     1 t
     (let ((koi8-u-byte (code->koi8-u-mapper bits)))
@@ -346,7 +342,9 @@
     (let ((code (koi8-u->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    koi8-u->string-aref
+    string->koi8-u) ;; TODO -- error check
 
 (define-unibyte-mapper x-mac-cyrillic->code-mapper code->x-mac-cyrillic-mapper
   (#x80 #x0410) ; CYRILLIC CAPITAL LETTER A
@@ -503,9 +501,6 @@
 
 (instantiate-octets-definition define-x-mac-cyrillic->string)
 
-(add-external-format-funs '(:x-mac-cyrillic :|x-mac-cyrillic|)
-                          '(x-mac-cyrillic->string-aref string->x-mac-cyrillic))
-
 (define-external-format (:x-mac-cyrillic :|x-mac-cyrillic|)
     1 t
     (let ((x-mac-cyrillic-byte (code->x-mac-cyrillic-mapper bits)))
@@ -515,4 +510,6 @@
     (let ((code (x-mac-cyrillic->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    x-mac-cyrillic->string-aref
+    string->x-mac-cyrillic) ;; TODO -- error check

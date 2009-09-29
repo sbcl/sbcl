@@ -111,9 +111,6 @@
 
 (instantiate-octets-definition define-cp1250->string)
 
-(add-external-format-funs '(:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
-                          '(cp1250->string-aref string->cp1250))
-
 (define-external-format (:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
     1 t
     (let ((cp1250-byte (code->cp1250-mapper bits)))
@@ -123,7 +120,9 @@
     (let ((code (cp1250->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1250->string-aref
+    string->cp1250) ;; TODO -- error check
 
 (define-unibyte-mapper cp1251->code-mapper code->cp1251-mapper
   (#x80 #x0402) ; CYRILLIC CAPITAL LETTER DJE
@@ -270,9 +269,6 @@
 
 (instantiate-octets-definition define-cp1251->string)
 
-(add-external-format-funs '(:cp1251 :|cp1251|  :windows-1251 :|windows-1251|)
-                          '(cp1251->string-aref string->cp1251))
-
 (define-external-format (:cp1251 :|cp1251| :windows-1251 :|windows-1251|)
     1 t
     (let ((cp1251-byte (code->cp1251-mapper bits)))
@@ -282,7 +278,9 @@
     (let ((code (cp1251->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1251->string-aref
+    string->cp1251) ;; TODO -- error check
 
 (define-unibyte-mapper cp1252->code-mapper code->cp1252-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -348,9 +346,6 @@
 
 (instantiate-octets-definition define-cp1252->string)
 
-(add-external-format-funs '(:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
-                          '(cp1252->string-aref string->cp1252))
-
 (define-external-format (:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
     1 t
     (let ((cp1252-byte (code->cp1252-mapper bits)))
@@ -360,7 +355,9 @@
     (let ((code (cp1252->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1252->string-aref
+    string->cp1252) ;; TODO -- error check
 
 (define-unibyte-mapper cp1253->code-mapper code->cp1253-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -501,9 +498,6 @@
 
 (instantiate-octets-definition define-cp1253->string)
 
-(add-external-format-funs '(:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
-                          '(cp1253->string-aref string->cp1253))
-
 (define-external-format (:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
     1 t
     (let ((cp1253-byte (code->cp1253-mapper bits)))
@@ -513,7 +507,9 @@
     (let ((code (cp1253->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1253->string-aref
+    string->cp1253) ;; TODO -- error check
 
 (define-unibyte-mapper cp1254->code-mapper code->cp1254-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -585,9 +581,6 @@
 
 (instantiate-octets-definition define-cp1254->string)
 
-(add-external-format-funs '(:cp1254 :|cp1254| :windows-1254 :|windows-1254|)
-                          '(cp1254->string-aref string->cp1254))
-
 (define-external-format (:cp1254 :|cp1254|)
     1 t
     (let ((cp1254-byte (code->cp1254-mapper bits)))
@@ -597,7 +590,9 @@
     (let ((code (cp1254->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1254->string-aref
+    string->cp1254) ;; TODO -- error check
 
 (define-unibyte-mapper cp1255->code-mapper code->cp1255-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -730,9 +725,6 @@
 
 (instantiate-octets-definition define-cp1255->string)
 
-(add-external-format-funs '(:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
-                          '(cp1255->string-aref string->cp1255))
-
 (define-external-format (:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
     1 t
     (let ((cp1255-byte (code->cp1255-mapper bits)))
@@ -742,7 +734,9 @@
     (let ((code (cp1255->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1255->string-aref
+    string->cp1255) ;; TODO -- error check
 
 (define-unibyte-mapper cp1256->code-mapper code->cp1256-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -861,10 +855,7 @@
 
 (instantiate-octets-definition define-cp1256->string)
 
-(add-external-format-funs '(:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
-                          '(cp1256->string-aref string->cp1256))
-
-(define-external-format (:cp1256 :|cp1256|)
+(define-external-format (:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
     1 t
     (let ((cp1256-byte (code->cp1256-mapper bits)))
       (if cp1256-byte
@@ -873,7 +864,9 @@
     (let ((code (cp1256->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1256->string-aref
+    string->cp1256) ;; TODO -- error check
 
 (define-unibyte-mapper cp1257->code-mapper code->cp1257-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -994,9 +987,6 @@
 
 (instantiate-octets-definition define-cp1257->string)
 
-(add-external-format-funs '(:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
-                          '(cp1257->string-aref string->cp1257))
-
 (define-external-format (:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
     1 t
     (let ((cp1257-byte (code->cp1257-mapper bits)))
@@ -1006,7 +996,9 @@
     (let ((code (cp1257->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1257->string-aref
+    string->cp1257) ;; TODO -- error check
 
 (define-unibyte-mapper cp1258->code-mapper code->cp1258-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -1086,9 +1078,6 @@
 
 (instantiate-octets-definition define-cp1258->string)
 
-(add-external-format-funs '(:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
-                          '(cp1258->string-aref string->cp1258))
-
 (define-external-format (:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
     1 t
     (let ((cp1258-byte (code->cp1258-mapper bits)))
@@ -1098,4 +1087,7 @@
     (let ((code (cp1258->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp1258->string-aref
+    string->cp1258) ;; TODO -- error check
+

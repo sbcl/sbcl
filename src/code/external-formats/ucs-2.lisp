@@ -34,26 +34,6 @@
         (sap-ref-8 sap offset) (ldb (byte 8 8) value)))
 
 ;;;
-;;;   Define external format: fd-stream
-;;;
-(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) nil
-  2
-  (if (< bits #x10000)
-      (setf (sap-ref-16le sap tail) bits)
-      (external-format-encoding-error stream bits))
-  2
-  (code-char (sap-ref-16le sap head)))
-
-(define-external-format/variable-width (:ucs-2be :ucs2be) nil
-  2
-  (if (< bits #x10000)
-      (setf (sap-ref-16be sap tail) bits)
-      (external-format-encoding-error stream bits))
-  2
-  (code-char (sap-ref-16be sap head)))
-
-
-;;;
 ;;;   octets
 ;;;
 
@@ -209,8 +189,22 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(add-external-format-funs '(:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2)
-                          '(ucs-2le->string-aref string->ucs-2le))
+(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) nil
+  2
+  (if (< bits #x10000)
+      (setf (sap-ref-16le sap tail) bits)
+      (external-format-encoding-error stream bits))
+  2
+  (code-char (sap-ref-16le sap head))
+  ucs-2le->string-aref
+  string->ucs-2le)
 
-(add-external-format-funs '(:ucs-2be :ucs2be)
-                          '(ucs-2be->string-aref string->ucs-2be))
+(define-external-format/variable-width (:ucs-2be :ucs2be) nil
+  2
+  (if (< bits #x10000)
+      (setf (sap-ref-16be sap tail) bits)
+      (external-format-encoding-error stream bits))
+  2
+  (code-char (sap-ref-16be sap head))
+  ucs-2be->string-aref
+  string->ucs-2be)

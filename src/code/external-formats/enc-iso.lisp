@@ -89,9 +89,6 @@
 
 (instantiate-octets-definition define-iso-8859-2->string)
 
-(add-external-format-funs '(:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
-                          '(iso-8859-2->string-aref string->iso-8859-2))
-
 (define-external-format (:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
     1 t
     (let ((iso-8859-2-byte (code->iso-8859-2-mapper bits)))
@@ -101,7 +98,9 @@
     (let ((code (iso-8859-2->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-2->string-aref
+    string->iso8859-2) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-3->code-mapper code->iso-8859-3-mapper
   (#xA1 #x0126) ; LATIN CAPITAL LETTER H WITH STROKE
@@ -170,9 +169,6 @@
 
 (instantiate-octets-definition define-iso-8859-3->string)
 
-(add-external-format-funs '(:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
-                          '(iso-8859-3->string-aref string->iso-8859-3))
-
 (define-external-format (:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
     1 t
     (let ((iso-8859-3-byte (code->iso-8859-3-mapper bits)))
@@ -182,7 +178,9 @@
     (let ((code (iso-8859-3->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-3->string-aref
+    string->iso-8859-3) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-4->code-mapper code->iso-8859-4-mapper
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
@@ -266,9 +264,6 @@
 
 (instantiate-octets-definition define-iso-8859-4->string)
 
-(add-external-format-funs '(:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
-                          '(iso-8859-4->string-aref string->iso-8859-4))
-
 (define-external-format (:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
     1 t
     (let ((iso-8859-4-byte (code->iso-8859-4-mapper bits)))
@@ -278,7 +273,9 @@
     (let ((code (iso-8859-4->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-4->string-aref
+    string->iso-8859-4) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-5->code-mapper code->iso-8859-5-mapper
   (#xA1 #x0401) ; CYRILLIC CAPITAL LETTER IO
@@ -406,9 +403,6 @@
 
 (instantiate-octets-definition define-iso-8859-5->string)
 
-(add-external-format-funs '(:iso-8859-5 :|iso-8859-5|)
-                          '(iso-8859-5->string-aref string->iso-8859-5))
-
 (define-external-format (:iso-8859-5 :|iso-8859-5|)
     1 t
     (let ((iso-8859-5-byte (code->iso-8859-5-mapper bits)))
@@ -418,7 +412,9 @@
     (let ((code (iso-8859-5->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-5->string-aref
+    string->iso-8859-5) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-6->code-mapper code->iso-8859-6-mapper
   (#xA1 nil)
@@ -545,9 +541,6 @@
 
 (instantiate-octets-definition define-iso-8859-6->string)
 
-(add-external-format-funs '(:iso-8859-6 :|iso-8859-6|)
-                          '(iso-8859-6->string-aref string->iso-8859-6))
-
 (define-external-format (:iso-8859-6 :|iso-8859-6|)
     1 t
     (let ((iso-8859-6-byte (code->iso-8859-6-mapper bits)))
@@ -557,7 +550,9 @@
     (let ((code (iso-8859-6->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-6->string-aref
+    string->iso-8859-6) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-7->code-mapper code->iso-8859-7-mapper
   (#xA1 #x02BD) ; MODIFIER LETTER REVERSED COMMA
@@ -671,9 +666,6 @@
 
 (instantiate-octets-definition define-iso-8859-7->string)
 
-(add-external-format-funs '(:iso-8859-7 :|iso-8859-7|)
-                          '(iso-8859-7->string-aref string->iso-8859-7))
-
 (define-external-format (:iso-8859-7 :|iso-8859-7|)
     1 t
     (let ((iso-8859-7-byte (code->iso-8859-7-mapper bits)))
@@ -683,7 +675,9 @@
     (let ((code (iso-8859-7->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-7->string-aref
+    string->iso-8859-7) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-8->code-mapper code->iso-8859-8-mapper
   (#xA1 nil)
@@ -786,9 +780,6 @@
 
 (instantiate-octets-definition define-iso-8859-8->string)
 
-(add-external-format-funs '(:iso-8859-8 :|iso-8859-8|)
-                          '(iso-8859-8->string-aref string->iso-8859-8))
-
 (define-external-format (:iso-8859-8 :|iso-8859-8|)
     1 t
     (let ((iso-8859-8-byte (code->iso-8859-8-mapper bits)))
@@ -798,7 +789,9 @@
     (let ((code (iso-8859-8->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-8->string-aref
+    string->iso-8859-8) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-9->code-mapper code->iso-8859-9-mapper
   (#xD0 #x011E) ; LATIN CAPITAL LETTER G WITH BREVE
@@ -838,9 +831,6 @@
 
 (instantiate-octets-definition define-iso-8859-9->string)
 
-(add-external-format-funs '(:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
-                          '(iso-8859-9->string-aref string->iso-8859-9))
-
 (define-external-format (:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
     1 t
     (let ((iso-8859-9-byte (code->iso-8859-9-mapper bits)))
@@ -850,7 +840,9 @@
     (let ((code (iso-8859-9->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-9->string-aref
+    string->iso-8859-9) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-10->code-mapper code->iso-8859-10-mapper
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
@@ -930,9 +922,6 @@
 
 (instantiate-octets-definition define-iso-8859-10->string)
 
-(add-external-format-funs '(:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
-                          '(iso-8859-10->string-aref string->iso-8859-10))
-
 (define-external-format (:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
     1 t
     (let ((iso-8859-10-byte (code->iso-8859-10-mapper bits)))
@@ -942,7 +931,9 @@
     (let ((code (iso-8859-10->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-10->string-aref
+    string->iso-8859-10) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-11->code-mapper code->iso-8859-11-mapper
   (#xA1 #x0E01) ; THAI CHARACTER KO KAI
@@ -1071,9 +1062,6 @@
 
 (instantiate-octets-definition define-iso-8859-11->string)
 
-(add-external-format-funs '(:iso-8859-11 :|iso-8859-11|)
-                          '(iso-8859-11->string-aref string->iso-8859-11))
-
 (define-external-format (:iso-8859-11 :|iso-8859-11|)
     1 t
     (let ((iso-8859-11-byte (code->iso-8859-11-mapper bits)))
@@ -1083,7 +1071,9 @@
     (let ((code (iso-8859-11->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-11->string-aref
+    string->iso-8859-11) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-13->code-mapper code->iso-8859-13-mapper
   (#xA1 #x201D) ; RIGHT DOUBLE QUOTATION MARK
@@ -1173,9 +1163,6 @@
 
 (instantiate-octets-definition define-iso-8859-13->string)
 
-(add-external-format-funs '(:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
-                          '(iso-8859-13->string-aref string->iso-8859-13))
-
 (define-external-format (:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
     1 t
     (let ((iso-8859-13-byte (code->iso-8859-13-mapper bits)))
@@ -1185,7 +1172,9 @@
     (let ((code (iso-8859-13->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-13->string-aref
+    string->iso-8859-13) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-14->code-mapper code->iso-8859-14-mapper
   (#xA1 #x1E02) ; LATIN CAPITAL LETTER B WITH DOT ABOVE
@@ -1250,9 +1239,6 @@
 
 (instantiate-octets-definition define-iso-8859-14->string)
 
-(add-external-format-funs '(:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
-                          '(iso-8859-14->string-aref string->iso-8859-14))
-
 (define-external-format (:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
     1 t
     (let ((iso-8859-14-byte (code->iso-8859-14-mapper bits)))
@@ -1262,4 +1248,59 @@
     (let ((code (iso-8859-14->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    iso-8859-14->string-aref
+    string->iso-8859-14) ;; TODO -- error check
+
+(define-unibyte-mapper
+    latin9->code-mapper
+    code->latin9-mapper
+  (#xA4 #x20AC)
+  (#xA6 #x0160)
+  (#xA8 #x0161)
+  (#xB4 #x017D)
+  (#xB8 #x017E)
+  (#xBC #x0152)
+  (#xBD #x0153)
+  (#xBE #x0178))
+
+(declaim (inline get-latin9-bytes))
+(defun get-latin9-bytes (string pos)
+  (declare (optimize speed (safety 0))
+           (type simple-string string)
+           (type array-range pos))
+  (get-latin-bytes #'code->latin9-mapper :latin-9 string pos))
+
+(defun string->latin9 (string sstart send null-padding)
+  (declare (optimize speed (safety 0))
+           (type simple-string string)
+           (type array-range sstart send))
+  (values (string->latin% string sstart send #'get-latin9-bytes null-padding)))
+
+(defmacro define-latin9->string* (accessor type)
+    (declare (ignore type))
+    (let ((name (make-od-name 'latin9->string* accessor)))
+      `(progn
+        (defun ,name (string sstart send array astart aend)
+          (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'latin9->code-mapper)))))
+(instantiate-octets-definition define-latin9->string*)
+
+(defmacro define-latin9->string (accessor type)
+    (declare (ignore type))
+    `(defun ,(make-od-name 'latin9->string accessor) (array astart aend)
+      (,(make-od-name 'latin->string accessor) array astart aend #'latin9->code-mapper)))
+  (instantiate-octets-definition define-latin9->string)
+
+;;; The names for latin9 are different due to a historical accident.
+(define-external-format (:latin-9 :latin9 :iso-8859-15 :iso8859-15)
+    1 t
+    (let ((latin-9-byte (code->latin9-mapper bits)))
+      (if latin-9-byte
+          (setf (sap-ref-8 sap tail) latin-9-byte)
+          (external-format-encoding-error stream bits)))
+    (let ((code (latin9->code-mapper byte)))
+      (if code
+          (code-char code)
+          (external-format-decoding-error stream byte)))
+    latin9->string-aref
+    string->latin9)

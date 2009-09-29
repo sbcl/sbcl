@@ -160,9 +160,6 @@
 
 (instantiate-octets-definition define-cp437->string)
 
-(add-external-format-funs '(:cp437 :|cp437|)
-                          '(cp437->string-aref string->cp437))
-
 (define-external-format (:cp437 :|cp437|)
     1 t
     (let ((cp437-byte (code->cp437-mapper bits)))
@@ -172,7 +169,9 @@
     (let ((code (cp437->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp437->string-aref
+    string->cp437) ;; TODO -- error check
 
 (define-unibyte-mapper cp850->code-mapper code->cp850-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -334,9 +333,6 @@
 
 (instantiate-octets-definition define-cp850->string)
 
-(add-external-format-funs '(:cp850 :|cp850|)
-                          '(cp850->string-aref string->cp850))
-
 (define-external-format (:cp850 :|cp850|)
     1 t
     (let ((cp850-byte (code->cp850-mapper bits)))
@@ -346,7 +342,9 @@
     (let ((code (cp850->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp850->string-aref
+    string->cp850) ;; TODO -- error check
 
 (define-unibyte-mapper cp852->code-mapper code->cp852-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -508,9 +506,6 @@
 
 (instantiate-octets-definition define-cp852->string)
 
-(add-external-format-funs '(:cp852 :|cp852|)
-                          '(cp852->string-aref string->cp852))
-
 (define-external-format (:cp852 :|cp852|)
     1 t
     (let ((cp852-byte (code->cp852-mapper bits)))
@@ -520,7 +515,9 @@
     (let ((code (cp852->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp852->string-aref
+    string->cp852) ;; TODO -- error check
 
 (define-unibyte-mapper cp855->code-mapper code->cp855-mapper
   (#x80 #x0452) ; CYRILLIC SMALL LETTER DJE
@@ -682,9 +679,6 @@
 
 (instantiate-octets-definition define-cp855->string)
 
-(add-external-format-funs '(:cp855 :|cp855|)
-                          '(cp855->string-aref string->cp855))
-
 (define-external-format (:cp855 :|cp855|)
     1 t
     (let ((cp855-byte (code->cp855-mapper bits)))
@@ -694,7 +688,9 @@
     (let ((code (cp855->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp855->string-aref
+    string->cp855) ;; TODO -- error check
 
 (define-unibyte-mapper cp857->code-mapper code->cp857-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -855,9 +851,6 @@
 
 (instantiate-octets-definition define-cp857->string)
 
-(add-external-format-funs '(:cp857 :|cp857|)
-                          '(cp857->string-aref string->cp857))
-
 (define-external-format (:cp857 :|cp857|)
     1 t
     (let ((cp857-byte (code->cp857-mapper bits)))
@@ -867,7 +860,9 @@
     (let ((code (cp857->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp857->string-aref
+    string->cp857) ;; TODO -- error check
 
 (define-unibyte-mapper cp860->code-mapper code->cp860-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1029,9 +1024,6 @@
 
 (instantiate-octets-definition define-cp860->string)
 
-(add-external-format-funs '(:cp860 :|cp860|)
-                          '(cp860->string-aref string->cp860))
-
 (define-external-format (:cp860 :|cp860|)
     1 t
     (let ((cp860-byte (code->cp860-mapper bits)))
@@ -1041,7 +1033,9 @@
     (let ((code (cp860->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp860->string-aref
+    string->cp860) ;; TODO -- error check
 
 (define-unibyte-mapper cp861->code-mapper code->cp861-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1203,9 +1197,6 @@
 
 (instantiate-octets-definition define-cp861->string)
 
-(add-external-format-funs '(:cp861 :|cp861|)
-                          '(cp861->string-aref string->cp861))
-
 (define-external-format (:cp861 :|cp861|)
     1 t
     (let ((cp861-byte (code->cp861-mapper bits)))
@@ -1215,7 +1206,9 @@
     (let ((code (cp861->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp861->string-aref
+    string->cp861) ;; TODO -- error check
 
 (define-unibyte-mapper cp862->code-mapper code->cp862-mapper
   (#x80 #x05D0) ; HEBREW LETTER ALEF
@@ -1377,9 +1370,6 @@
 
 (instantiate-octets-definition define-cp862->string)
 
-(add-external-format-funs '(:cp862 :|cp862|)
-                          '(cp862->string-aref string->cp862))
-
 (define-external-format (:cp862 :|cp862|)
     1 t
     (let ((cp862-byte (code->cp862-mapper bits)))
@@ -1389,7 +1379,9 @@
     (let ((code (cp862->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp862->string-aref
+    string->cp862) ;; TODO -- error check
 
 (define-unibyte-mapper cp863->code-mapper code->cp863-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1551,9 +1543,6 @@
 
 (instantiate-octets-definition define-cp863->string)
 
-(add-external-format-funs '(:cp863 :|cp863|)
-                          '(cp863->string-aref string->cp863))
-
 (define-external-format (:cp863 :|cp863|)
     1 t
     (let ((cp863-byte (code->cp863-mapper bits)))
@@ -1563,7 +1552,9 @@
     (let ((code (cp863->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp863->string-aref
+    string->cp863) ;; TODO -- error check
 
 (define-unibyte-mapper cp864->code-mapper code->cp864-mapper
   (#x80 #x00B0) ; DEGREE SIGN
@@ -1722,9 +1713,6 @@
 
 (instantiate-octets-definition define-cp864->string)
 
-(add-external-format-funs '(:cp864 :|cp864|)
-                          '(cp864->string-aref string->cp864))
-
 (define-external-format (:cp864 :|cp864|)
     1 t
     (let ((cp864-byte (code->cp864-mapper bits)))
@@ -1734,7 +1722,9 @@
     (let ((code (cp864->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp864->string-aref
+    string->cp864) ;; TODO -- error check
 
 (define-unibyte-mapper cp865->code-mapper code->cp865-mapper
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA
@@ -1896,9 +1886,6 @@
 
 (instantiate-octets-definition define-cp865->string)
 
-(add-external-format-funs '(:cp865 :|cp865|)
-                          '(cp865->string-aref string->cp865))
-
 (define-external-format (:cp865 :|cp865|)
     1 t
     (let ((cp865-byte (code->cp865-mapper bits)))
@@ -1908,7 +1895,9 @@
     (let ((code (cp865->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp865->string-aref
+    string->cp865) ;; TODO -- error check
 
 (define-unibyte-mapper cp866->code-mapper code->cp866-mapper
   (#x80 #x0410) ; CYRILLIC CAPITAL LETTER A
@@ -2070,9 +2059,6 @@
 
 (instantiate-octets-definition define-cp866->string)
 
-(add-external-format-funs '(:cp866 :|cp866|)
-                          '(cp866->string-aref string->cp866))
-
 (define-external-format (:cp866 :|cp866|)
     1 t
     (let ((cp866-byte (code->cp866-mapper bits)))
@@ -2082,7 +2068,9 @@
     (let ((code (cp866->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp866->string-aref
+    string->cp866) ;; TODO -- error check
 
 (define-unibyte-mapper cp869->code-mapper code->cp869-mapper
   (#x80 nil)
@@ -2244,9 +2232,6 @@
 
 (instantiate-octets-definition define-cp869->string)
 
-(add-external-format-funs '(:cp869 :|cp869|)
-                          '(cp869->string-aref string->cp869))
-
 (define-external-format (:cp869 :|cp869|)
     1 t
     (let ((cp869-byte (code->cp869-mapper bits)))
@@ -2256,7 +2241,9 @@
     (let ((code (cp869->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp869->string-aref
+    string->cp869) ;; TODO -- error check
 
 (define-unibyte-mapper cp874->code-mapper code->cp874-mapper
   (#x80 #x20AC) ; EURO SIGN
@@ -2417,9 +2404,6 @@
 
 (instantiate-octets-definition define-cp874->string)
 
-(add-external-format-funs '(:cp874 :|cp874|)
-                          '(cp874->string-aref string->cp874))
-
 (define-external-format (:cp874 :|cp874|)
     1 t
     (let ((cp874-byte (code->cp874-mapper bits)))
@@ -2429,4 +2413,6 @@
     (let ((code (cp874->code-mapper byte)))
       (if code
           (code-char code)
-          (external-format-decoding-error stream byte)))) ;; TODO -- error check
+          (external-format-decoding-error stream byte)))
+    cp874->string-aref
+    string->cp874) ;; TODO -- error check

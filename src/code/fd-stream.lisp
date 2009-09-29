@@ -723,20 +723,44 @@
           (setf (fd-stream-char-pos stream) (- end last-newline 1))
           (incf (fd-stream-char-pos stream) (- end start))))))
 
-(defvar *external-formats* ()
+(defstruct (external-format
+             (:constructor %make-external-format)
+             (:conc-name ef-)
+             (:predicate external-format-p)
+             (:copier nil))
+  ;; All the names that can refer to this external format.  The first
+  ;; one is the canonical name.
+  (names (missing-arg) :type list :read-only t)
+  (read-n-chars-fun (missing-arg) :type function :read-only t)
+  (read-char-fun (missing-arg) :type function :read-only t)
+  (write-n-bytes-fun (missing-arg) :type function :read-only t)
+  (write-char-none-buffered-fun (missing-arg) :type function :read-only t)
+  (write-char-line-buffered-fun (missing-arg) :type function :read-only t)
+  (write-char-full-buffered-fun (missing-arg) :type function :read-only t)
+  ;; Can be nil for fixed-width formats.
+  (resync-fun nil :type (or function null) :read-only t)
+  (bytes-for-char-fun (missing-arg) :type function :read-only t)
+  (read-c-string-fun (missing-arg) :type function :read-only t)
+  (write-c-string-fun (missing-arg) :type function :read-only t)
+  ;; We make these symbols so that a developer working on the octets
+  ;; code can easily redefine things and use the new function definition
+  ;; without redefining the external format as well.  The slots above
+  ;; are functions because a developer working with those slots would be
+  ;; redefining the external format anyway.
+  (octets-to-string-sym (missing-arg) :type symbol :read-only t)
+  (string-to-octets-sym (missing-arg) :type symbol :read-only t))
+
+(defvar *external-formats* (make-hash-table)
   #!+sb-doc
-  "List of all available external formats. Each element is a list of the
-  element-type, string input function name, character input function name,
-  and string output function name.")
+  "Hashtable of all available external formats. The table maps from
+  external-format names to EXTERNAL-FORMAT structures.")
 
 (defun get-external-format (external-format)
-  (dolist (entry *external-formats*)
-    (when (member external-format (first entry))
-      (return entry))))
+  (gethash external-format *external-formats*))
 
-(defun get-external-format-function (external-format index)
-  (let ((entry (get-external-format external-format)))
-    (when entry (nth index entry))))
+(defun get-external-format-or-lose (external-format)
+  (or (get-external-format external-format)
+      (error "Undefined external-format ~A" external-format)))
 
 ;;; Find an output routine to use given the type and buffering. Return
 ;;; as multiple values the routine, the real type transfered, and the
@@ -746,15 +770,14 @@
     (let ((entry (get-external-format external-format)))
       (when entry
         (return-from pick-output-routine
-          (values (symbol-function (nth (ecase buffering
-                                          (:none 4)
-                                          (:line 5)
-                                          (:full 6))
-                                        entry))
+          (values (ecase buffering
+                    (:none (ef-write-char-none-buffered-fun entry))
+                    (:line (ef-write-char-line-buffered-fun entry))
+                    (:full (ef-write-char-full-buffered-fun entry)))
                   'character
                   1
-                  (symbol-function (fourth entry))
-                  (first (first entry)))))))
+                  (ef-write-n-bytes-fun entry)
+                  (first (ef-names entry)))))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
                (eq buffering (second entry))
@@ -1092,14 +1115,14 @@
 ;;; bytes per element (and for character types string input routine).
 (defun pick-input-routine (type &optional external-format)
   (when (subtypep type 'character)
-    (dolist (entry *external-formats*)
-      (when (member external-format (first entry))
+    (let ((entry (get-external-format external-format)))
+      (when entry
         (return-from pick-input-routine
-          (values (symbol-function (third entry))
+          (values (ef-read-char-fun entry)
                   'character
                   1
-                  (symbol-function (second entry))
-                  (first (first entry)))))))
+                  (ef-read-n-chars-fun entry)
+                  (first (ef-names entry)))))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
                (or (not (fourth entry))
@@ -1202,15 +1225,14 @@
             ))))
 
 (defun fd-stream-resync (stream)
-  (dolist (entry *external-formats*)
-    (when (member (fd-stream-external-format stream) (first entry))
-      (return-from fd-stream-resync
-        (funcall (symbol-function (eighth entry)) stream)))))
+  (let ((entry (get-external-format (fd-stream-external-format stream))))
+    (when entry
+      (funcall (ef-resync-fun entry) stream))))
 
 (defun get-fd-stream-character-sizer (stream)
-  (dolist (entry *external-formats*)
-    (when (member (fd-stream-external-format stream) (first entry))
-      (return-from get-fd-stream-character-sizer (ninth entry)))))
+  (let ((entry (get-external-format (fd-stream-external-format stream))))
+    (when entry
+      (ef-bytes-for-char-fun entry))))
 
 (defun fd-stream-character-size (stream char)
   (let ((sizer (get-fd-stream-character-sizer stream)))
@@ -1223,17 +1245,18 @@
 
 (defun find-external-format (external-format)
   (when external-format
-    (find external-format *external-formats* :test #'member :key #'car)))
+    (get-external-format external-format)))
 
 (defun variable-width-external-format-p (ef-entry)
-  (when (eighth ef-entry) t))
+  (and ef-entry (not (null (ef-resync-fun ef-entry)))))
 
 (defun bytes-for-char-fun (ef-entry)
-  (if ef-entry (symbol-function (ninth ef-entry)) (constantly 1)))
+  (if ef-entry (ef-bytes-for-char-fun ef-entry) (constantly 1)))
 
-;;; FIXME: OAOOM here vrt. *EXTERNAL-FORMAT-FUNCTIONS* in fd-stream.lisp
 (defmacro define-external-format (external-format size output-restart
-                                  out-expr in-expr)
+                                  out-expr in-expr
+                                  octets-to-string-sym
+                                  string-to-octets-sym)
   (let* ((name (first external-format))
          (out-function (symbolicate "OUTPUT-BYTES/" name))
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
@@ -1398,18 +1421,28 @@
                     (declare (ignorable bits byte))
                     ,out-expr)))
               ,n-buffer)))
-      (setf *external-formats*
-       (cons '(,external-format ,in-function ,in-char-function ,out-function
-               ,@(mapcar #'(lambda (buffering)
-                             (intern (format nil format (string buffering))))
-                         '(:none :line :full))
-               nil ; no resync-function
-               ,size-function ,read-c-string-function ,output-c-string-function)
-        *external-formats*)))))
+        (let ((entry (%make-external-format
+                      :names ',external-format
+                      :read-n-chars-fun #',in-function
+                      :read-char-fun #',in-char-function
+                      :write-n-bytes-fun #',out-function
+                      ,@(mapcan #'(lambda (buffering)
+                                    (list (intern (format nil "WRITE-CHAR-~A-BUFFERED-FUN" buffering) :keyword)
+                                          `#',(intern (format nil format (string buffering)))))
+                                '(:none :line :full))
+                      :resync-fun nil
+                      :bytes-for-char-fun #',size-function
+                      :read-c-string-fun #',read-c-string-function
+                      :write-c-string-fun #',output-c-string-function
+                      :octets-to-string-sym ',octets-to-string-sym
+                      :string-to-octets-sym ',string-to-octets-sym)))
+          (dolist (ef ',external-format)
+            (setf (gethash ef *external-formats*) entry))))))
 
 (defmacro define-external-format/variable-width
     (external-format output-restart out-size-expr
-     out-expr in-size-expr in-expr)
+     out-expr in-size-expr in-expr
+     octets-to-string-sym string-to-octets-sym)
   (let* ((name (first external-format))
          (out-function (symbolicate "OUTPUT-BYTES/" name))
          (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
@@ -1651,109 +1684,23 @@
                   ,out-expr)))
             ,n-buffer)))
 
-      (setf *external-formats*
-       (cons '(,external-format ,in-function ,in-char-function ,out-function
-               ,@(mapcar #'(lambda (buffering)
-                             (intern (format nil format (string buffering))))
-                         '(:none :line :full))
-               ,resync-function
-               ,size-function ,read-c-string-function ,output-c-string-function)
-        *external-formats*)))))
-
-;;; Multiple names for the :ISO{,-}8859-* families are needed because on
-;;; FreeBSD (and maybe other BSD systems), nl_langinfo("LATIN-1") will
-;;; return "ISO8859-1" instead of "ISO-8859-1".
-(define-external-format (:latin-1 :latin1 :iso-8859-1 :iso8859-1)
-    1 t
-  (if (>= bits 256)
-      (external-format-encoding-error stream bits)
-      (setf (sap-ref-8 sap tail) bits))
-  (code-char byte))
-
-(define-external-format (:ascii :us-ascii :ansi_x3.4-1968
-                         :iso-646 :iso-646-us :|646|)
-    1 t
-  (if (>= bits 128)
-      (external-format-encoding-error stream bits)
-      (setf (sap-ref-8 sap tail) bits))
-  (code-char byte))
-
-#!+sb-unicode
-(let ((latin-9-table (let ((table (make-string 256)))
-                       (do ((i 0 (1+ i)))
-                           ((= i 256))
-                         (setf (aref table i) (code-char i)))
-                       (setf (aref table #xa4) (code-char #x20ac))
-                       (setf (aref table #xa6) (code-char #x0160))
-                       (setf (aref table #xa8) (code-char #x0161))
-                       (setf (aref table #xb4) (code-char #x017d))
-                       (setf (aref table #xb8) (code-char #x017e))
-                       (setf (aref table #xbc) (code-char #x0152))
-                       (setf (aref table #xbd) (code-char #x0153))
-                       (setf (aref table #xbe) (code-char #x0178))
-                       table))
-      (latin-9-reverse-1 (make-array 16
-                                     :element-type '(unsigned-byte 21)
-                                     :initial-contents '(#x0160 #x0161 #x0152 #x0153 0 0 0 0 #x0178 0 0 0 #x20ac #x017d #x017e 0)))
-      (latin-9-reverse-2 (make-array 16
-                                     :element-type '(unsigned-byte 8)
-                                     :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0))))
-  (define-external-format (:latin-9 :latin9 :iso-8859-15 :iso8859-15)
-      1 t
-    (setf (sap-ref-8 sap tail)
-          (if (< bits 256)
-              (if (= bits (char-code (aref latin-9-table bits)))
-                  bits
-                  (external-format-encoding-error stream byte))
-              (if (= (aref latin-9-reverse-1 (logand bits 15)) bits)
-                  (aref latin-9-reverse-2 (logand bits 15))
-                  (external-format-encoding-error stream byte))))
-    (aref latin-9-table byte)))
-
-(define-external-format/variable-width (:utf-8 :utf8) nil
-  (let ((bits (char-code byte)))
-    (cond ((< bits #x80) 1)
-          ((< bits #x800) 2)
-          ((< bits #x10000) 3)
-          (t 4)))
-  (ecase size
-    (1 (setf (sap-ref-8 sap tail) bits))
-    (2 (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (3 (setf (sap-ref-8 sap tail)       (logior #xe0 (ldb (byte 4 12) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 6) bits))
-             (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (4 (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
-             (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
-             (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
-  (cond ((< byte #x80) 1)
-        ((< byte #xc2) (return-from decode-break-reason 1))
-        ((< byte #xe0) 2)
-        ((< byte #xf0) 3)
-        (t 4))
-  (code-char (ecase size
-               (1 byte)
-               (2 (let ((byte2 (sap-ref-8 sap (1+ head))))
-                    (unless (<= #x80 byte2 #xbf)
-                      (return-from decode-break-reason 2))
-                    (dpb byte (byte 5 6) byte2)))
-               (3 (let ((byte2 (sap-ref-8 sap (1+ head)))
-                        (byte3 (sap-ref-8 sap (+ 2 head))))
-                    (unless (and (<= #x80 byte2 #xbf)
-                                 (<= #x80 byte3 #xbf))
-                      (return-from decode-break-reason 3))
-                    (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
-               (4 (let ((byte2 (sap-ref-8 sap (1+ head)))
-                        (byte3 (sap-ref-8 sap (+ 2 head)))
-                        (byte4 (sap-ref-8 sap (+ 3 head))))
-                    (unless (and (<= #x80 byte2 #xbf)
-                                 (<= #x80 byte3 #xbf)
-                                 (<= #x80 byte4 #xbf))
-                      (return-from decode-break-reason 4))
-                    (dpb byte (byte 3 18)
-                         (dpb byte2 (byte 6 12)
-                              (dpb byte3 (byte 6 6) byte4))))))))
+      (let ((entry (%make-external-format
+                    :names ',external-format
+                    :read-n-chars-fun #',in-function
+                    :read-char-fun #',in-char-function
+                    :write-n-bytes-fun #',out-function
+                    ,@(mapcan #'(lambda (buffering)
+                                  (list (intern (format nil "WRITE-CHAR-~A-BUFFERED-FUN" buffering) :keyword)
+                                        `#',(intern (format nil format (string buffering)))))
+                              '(:none :line :full))
+                    :resync-fun #',resync-function
+                    :bytes-for-char-fun #',size-function
+                    :read-c-string-fun #',read-c-string-function
+                    :write-c-string-fun #',output-c-string-function
+                    :octets-to-string-sym ',octets-to-string-sym
+                    :string-to-octets-sym ',string-to-octets-sym)))
+        (dolist (ef ',external-format)
+          (setf (gethash ef *external-formats*) entry))))))
 
 ;;;; utility functions (misc routines, etc)
 

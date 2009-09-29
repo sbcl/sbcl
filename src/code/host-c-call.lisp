@@ -55,11 +55,11 @@
                           ;; changes.
                           (alien-c-string-type-external-format type))))
     (not (and external-format
-              (or (eq (caar external-format) :ascii)
+              (or (eq (first (sb!impl::ef-names external-format)) :ascii)
                   ;; On non-SB-UNICODE all latin-1 codepoints will fit
                   ;; into a base-char, on SB-UNICODE they won't.
                   #!-sb-unicode
-                  (eq (caar external-format) :latin-1))))))
+                  (eq (first (sb!impl::ef-names external-format)) :latin-1))))))
 
 (define-alien-type-method (c-string :naturalize-gen) (type alien)
   `(if (zerop (sap-int ,alien))
