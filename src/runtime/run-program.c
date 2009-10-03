@@ -65,16 +65,22 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     if (pid != 0)
         return pid;
 
-    /* Put us in our own process group. */
+    /* Put us in our own process group, but only if we need not
+     * share stdin with our parent. In the latter case we claim
+     * control of the terminal. */
+    if (sin >= 0) {
 #if defined(LISP_FEATURE_HPUX)
-    setsid();
+      setsid();
 #elif defined(LISP_FEATURE_DARWIN)
-    setpgid(0, getpid());
+      setpgid(0, getpid());
 #elif defined(SVR4) || defined(__linux__) || defined(__osf__)
-    setpgrp();
+      setpgrp();
 #else
-    setpgrp(0, getpid());
+      setpgrp(0, getpid());
 #endif
+    } else {
+      tcsetpgrp(0, getpgrp());
+    }
 
     /* unblock signals */
     sigemptyset(&sset);

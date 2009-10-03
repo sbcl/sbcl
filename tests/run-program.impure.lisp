@@ -146,3 +146,27 @@
                     s)
                   0
                   2))))
+
+;; Check whether RUN-PROGRAM puts its child process into the foreground
+;; when stdin is inherited. If it fails to do so we will receive a SIGTTIN.
+;;
+;; We can't check for the signal itself since run-program.c resets the
+;; forked process' signal mask to defaults. But the default is `stop'
+;; of which we can be notified asynchronously by providing a status hook.
+(with-test (:name (:run-program :inherit-stdin))
+  (let (stopped)
+    (flet ((status-hook (proc)
+             (ecase (sb-ext:process-status proc)
+               (:stopped (setf stopped t)))))
+      (let ((proc (sb-ext:run-program "/bin/ed" nil :search nil :wait nil
+                                      :input t :output t
+                                      :status-hook #'status-hook)))
+        ;; Give the program a generous time to generate the SIGTTIN.
+        ;; If it hasn't done so after that time we can consider it
+        ;; to be working (i.e. waiting for input without generating SIGTTIN).
+        (sleep 0.5)
+        ;; either way we have to signal it to terminate
+        (process-kill proc sb-posix:sigterm)
+        (process-close proc)
+        (assert (not stopped))))))
+
