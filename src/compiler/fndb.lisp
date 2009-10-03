@@ -1311,7 +1311,8 @@
 
    ;; extensions
    (:trace-file t)
-   (:block-compile t))
+   (:block-compile t)
+   (:emit-cfasl t))
   (values (or pathname null) boolean boolean))
 
 ;; FIXME: consider making (OR CALLABLE CONS) something like
