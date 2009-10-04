@@ -198,19 +198,9 @@ is_valid_lisp_addr(os_vm_address_t addr)
  */
 
 void
-memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context
-#if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
-/* FreeBSD/amd64 stores fault address only in undocumented 4th arg. */
-                     ,void *fault_addr
-#endif
-    )
+memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-#if defined(LISP_FEATURE_FREEBSD) && defined(LISP_FEATURE_X86_64)
-    /* KLUDGE: Store fault address into si_addr for compatibilities. */
-    siginfo->si_addr = fault_addr;
-#else
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
-#endif
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
     FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
@@ -393,7 +383,8 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX) \
+    && !defined(LISP_FEATURE_SB_LUTEX)
 int
 futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 {
