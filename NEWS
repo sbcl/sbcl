@@ -24,6 +24,8 @@ changes relative to sbcl-1.0.31
   * bug fix: Have RUN-PROGRAM with :INPUT T only run the subprocess in a
     new process group if it doesn't need to share stdin with the sbcl
     process. (thanks to Leslie Polzer)
+  * bug fix: SATISFIES could be misoptimized to refer to a local function.
+    (reported by Stanislaw Halik)
 
 changes in sbcl-1.0.31 relative to sbcl-1.0.30:
   * improvement: stack allocation is should now be possible in all nested

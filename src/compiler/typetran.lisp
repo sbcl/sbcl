@@ -238,7 +238,8 @@
            `(%typep ,object ',spec))
           (t
            (ecase (first spec)
-             (satisfies `(if (funcall #',(second spec) ,object) t nil))
+             (satisfies
+              `(if (funcall (global-function ,(second spec)) ,object) t nil))
              ((not and)
               (once-only ((n-obj object))
                 `(,(first spec) ,@(mapcar (lambda (x)

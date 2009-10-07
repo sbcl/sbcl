@@ -3347,3 +3347,16 @@
     (test 'simple-string "%CONCATENATE-TO-STRING")
     (test 'base-string "%CONCATENATE-TO-BASE-STRING")
     (test 'simple-base-string "%CONCATENATE-TO-BASE-STRING")))
+
+(with-test (:name :satisfies-no-local-fun)
+  (let ((fun (compile nil `(lambda (arg)
+                             (labels ((local-not-global-bug (x)
+                                        t)
+                                      (bar (x)
+                                        (typep x '(satisfies local-not-global-bug))))
+                               (bar arg))))))
+    (assert (eq 'local-not-global-bug
+                (handler-case
+                    (funcall fun 42)
+                  (undefined-function (c)
+                    (cell-error-name c)))))))
