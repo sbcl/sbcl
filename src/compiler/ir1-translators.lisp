@@ -26,7 +26,7 @@ forms, returns NIL."
   #!+sb-doc
   "IF predicate then [else]
 
-If PREDICATE evaluates to false, evaluate THEN and return its values,
+If PREDICATE evaluates to true, evaluate THEN and return its values,
 otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
   (let* ((pred-ctran (make-ctran))
          (pred-lvar (make-lvar))
