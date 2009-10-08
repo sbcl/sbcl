@@ -94,9 +94,9 @@ chmod u+x "$tmpcore"
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --version --eval '(sb-ext:quit)' <<EOF
-  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(sb-ext:quit)"))
-    (sb-ext:quit :unix-status 42))
+./"$tmpcore" --no-userinit --version --eval '(quit)' <<EOF
+  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(quit)"))
+    (quit :unix-status 42))
 EOF
 status=$?
 if [ $status != 42 ]; then
