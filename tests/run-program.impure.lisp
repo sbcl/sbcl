@@ -156,7 +156,7 @@
 (with-test (:name (:run-program :inherit-stdin))
   (let (stopped)
     (flet ((status-hook (proc)
-             (ecase (sb-ext:process-status proc)
+             (case (sb-ext:process-status proc)
                (:stopped (setf stopped t)))))
       (let ((proc (sb-ext:run-program "/bin/ed" nil :search nil :wait nil
                                       :input t :output t

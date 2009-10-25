@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.31
+changes in sbcl-1.0.32 relative to sbcl-1.0.31
   * optimization: faster FIND and POSITION on strings of unknown element type
     in high SPEED policies. (thanks to Karol Swietlicki)
   * optimization: faster CONCATENATE 'STRING in low SPEED policies (reported
