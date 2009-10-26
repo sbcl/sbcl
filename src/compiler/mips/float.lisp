@@ -608,7 +608,7 @@
                             pa-flag)
                 (:arg-types ,from-type)
                 (:result-types signed-num)
-                (:translate %unary-truncate)
+                (:translate ,name)
                 (:policy :fast-safe)
                 (:note "inline float truncate")
                 (:vop-var vop)

@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes in sbcl-1.0.32 relative to sbcl-1.0.31
+changes relative to sbcl-1.0.31:
+  * bug fix: restore buildability on the MIPS platform.  (regression from
+    1.0.30.38, reported by Samium Gromoff)
+
+changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type
     in high SPEED policies. (thanks to Karol Swietlicki)
   * optimization: faster CONCATENATE 'STRING in low SPEED policies (reported
