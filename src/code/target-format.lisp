@@ -78,8 +78,7 @@
                       (function
                        (typecase character
                          (base-char
-                          (svref *format-directive-interpreters* (char-code character)))
-                         (character nil)))
+                          (svref *format-directive-interpreters* (char-code character)))))
                       (*default-format-error-offset*
                        (1- (format-directive-end directive))))
                  (unless function

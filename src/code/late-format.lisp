@@ -279,8 +279,7 @@
             (let ((char (format-directive-character directive)))
               (typecase char
                 (base-char
-                 (aref *format-directive-expanders* (char-code char)))
-                (character nil))))
+                 (aref *format-directive-expanders* (sb!xc:char-code char))))))
            (*default-format-error-offset*
             (1- (format-directive-end directive))))
        (declare (type (or null function) expander))
@@ -389,13 +388,13 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defun %set-format-directive-expander (char fn)
-  (setf (aref *format-directive-expanders* (char-code (char-upcase char))) fn)
+  (let ((code (sb!xc:char-code (char-upcase char))))
+    (setf (aref *format-directive-expanders* code) fn))
   char)
 
 (defun %set-format-directive-interpreter (char fn)
-  (setf (aref *format-directive-interpreters*
-              (char-code (char-upcase char)))
-        fn)
+  (let ((code (sb!xc:char-code (char-upcase char))))
+    (setf (aref *format-directive-interpreters* code) fn))
   char)
 
 (defun find-directive (directives kind stop-at-semi)

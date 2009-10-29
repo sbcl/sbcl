@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.31:
+changes relative to sbcl-1.0.32:
   * bug fix: restore buildability on the MIPS platform.  (regression from
     1.0.30.38, reported by Samium Gromoff)
 
