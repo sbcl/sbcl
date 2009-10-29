@@ -174,7 +174,7 @@
   (declare (closure closure))
   (let (values)
     (do-closure-values (elt closure)
-      (push elt closure))
+      (push elt values))
     (nreverse values)))
 
 ;;; Extract the function from CLOSURE.
