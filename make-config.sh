@@ -160,7 +160,7 @@ case "$sbcl_os" in
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
         case "$sbcl_arch" in
-        x86 | mips)
+        x86 | x86-64 | mips)
             printf ' :largefile' >> $ltf
             ;;
         esac

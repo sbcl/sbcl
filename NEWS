@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.32:
+  * improvement: support O_LARGEFILE access to files larger than 2GB on
+    x86-64/linux.  (thanks to Daniel Janus)
   * bug fix: restore buildability on the MIPS platform.  (regression from
     1.0.30.38, reported by Samium Gromoff)
 
