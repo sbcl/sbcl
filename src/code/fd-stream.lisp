@@ -1463,7 +1463,7 @@
           (declare (type index start end))
           (synchronize-stream-output stream)
           (unless (<= 0 start end (length string))
-            (sequence-bounding-indices-bad string start end))
+            (sequence-bounding-indices-bad-error string start end))
           (do ()
               ((= end start))
             (let ((obuf (fd-stream-obuf stream)))
