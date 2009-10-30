@@ -614,16 +614,14 @@
                          1)
                       (ash (meta-sc-number-or-lose sc) 1))))
           (incf index))
-        ;; KLUDGE: As in the other COERCEs wrapped around with
-        ;; MAKE-SPECIALIZABLE-ARRAY results in COMPUTE-REF-ORDERING,
-        ;; this coercion could be removed by a sufficiently smart
-        ;; compiler, but I dunno whether Python is that smart. It
-        ;; would be good to check this and help it if it's not smart
-        ;; enough to remove it for itself. However, it's probably not
-        ;; urgent, since the overhead of an extra no-op conversion is
-        ;; unlikely to be large compared to consing and corresponding
-        ;; GC. -- WHN ca. 19990701
-        `(coerce ,results '(specializable-vector ,element-type))))))
+        ;; KLUDGE: The load-time MAKE-ARRAY here is an artifact of our
+        ;; cross-compilation strategy, and the conservative
+        ;; assumptions we are forced to make on which specialized
+        ;; arrays exist on the host lisp that the cross-compiler is
+        ;; running on.  (We used to use COERCE here, but that caused
+        ;; SUBTYPEP calls too early in cold-init for comfort).  --
+        ;; CSR, 2009-10-30
+        `(make-array ,(length results) :element-type '(specializable ,element-type) :initial-contents ',results)))))
 
 (defun compute-ref-ordering (parse)
   (let* ((num-args (+ (length (vop-parse-args parse))
@@ -700,30 +698,15 @@
             (incf index)))
         `(:num-args ,num-args
           :num-results ,num-results
-          ;; KLUDGE: The (COERCE .. (SPECIALIZABLE-VECTOR ..)) wrapper
-          ;; here around the result returned by
-          ;; MAKE-SPECIALIZABLE-ARRAY above was of course added to
-          ;; help with cross-compilation. "A sufficiently smart
-          ;; compiler" should be able to optimize all this away in the
-          ;; final target Lisp, leaving a single MAKE-ARRAY with no
-          ;; subsequent coercion. However, I don't know whether Python
-          ;; is that smart. (Can it figure out the return type of
-          ;; MAKE-ARRAY? Does it know that COERCE can be optimized
-          ;; away if the input type is known to be the same as the
-          ;; COERCEd-to type?) At some point it would be good to test
-          ;; to see whether this construct is in fact causing run-time
-          ;; overhead, and fix it if so. (Some declarations of the
-          ;; types returned by MAKE-ARRAY might be enough to fix it.)
-          ;; However, it's probably not urgent to fix this, since it's
-          ;; hard to imagine that any overhead caused by calling
-          ;; COERCE and letting it decide to bail out could be large
-          ;; compared to the cost of consing and GCing the vectors in
-          ;; the first place. -- WHN ca. 19990701
-          :ref-ordering (coerce ',ordering
-                                '(specializable-vector ,oe-type))
+          ;; KLUDGE: see the comment regarding MAKE-ARRAY in
+          ;; COMPUTE-TEMPORARIES-DESCRIPTION.  -- CSR, 2009-10-30
+          :ref-ordering (make-array ,(length ordering)
+                                    :initial-contents ',ordering
+                                    :element-type '(specializable ,oe-type))
           ,@(when (targets)
-              `(:targets (coerce ',(targets)
-                                 '(specializable-vector ,te-type)))))))))
+              `(:targets (make-array ,(length (targets))
+                                     :initial-contents ',(targets)
+                                     :element-type '(specializable ,te-type)))))))))
 
 (defun make-emit-function-and-friends (parse)
   `(:emit-function #'emit-generic-vop

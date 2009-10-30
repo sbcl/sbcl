@@ -1,15 +1,12 @@
 (in-package "SB!IMPL")
 
-(defun make-multibyte-mapper (list)
+(defmacro define-multibyte-mapper (name list)
   (let ((list (sort (copy-list list) #'< :key #'car))
         (hi (loop for x in list maximize (max (car x) (cadr x)))))
-    (make-array (list (length list) 2)
-                :element-type (list 'integer 0 hi)
-                :initial-contents list)))
-
-(defmacro define-multibyte-mapper (name list)
-  `(defparameter ,name
-     (make-multibyte-mapper ,list)))
+    `(defparameter ,name
+       (make-array '(,(length list) 2)
+                   :element-type '(integer 0 ,hi)
+                   :initial-contents ',list))))
 
 (defun get-multibyte-mapper (table code)
   (declare (optimize speed (safety 0))

@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 (define-multibyte-mapper *gbk-to-ucs-table*
-    '( ;; begin, insert GBK2UCS.TXT here (emacs: C-x i GBK2UCS.TXT)
+    ( ;; begin, insert GBK2UCS.TXT here (emacs: C-x i GBK2UCS.TXT)
       (#x8140 #x4E02)
       (#x8141 #x4E04)
       (#x8142 #x4E05)
@@ -21807,7 +21807,7 @@
       )) ;; end of *gbk-to-ucs-table*
 
 (define-multibyte-mapper *ucs-to-gbk-table*
-    '( ;; begin, insert UCS2GBK.TXT here (emacs: C-x i UCS2GBK.TXT)
+    ( ;; begin, insert UCS2GBK.TXT here (emacs: C-x i UCS2GBK.TXT)
       (#x00A4 #xA1E8)
       (#x00A7 #xA1EC)
       (#x00A8 #xA1A7)

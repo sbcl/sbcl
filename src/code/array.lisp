@@ -96,6 +96,8 @@
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
+     (unless *type-system-initialized*
+       (bug "SUBTYPEP dispatch for MAKE-ARRAY before the type system is ready"))
      #.`(pick-vector-type type
          ,@(map 'list
                 (lambda (saetp)
