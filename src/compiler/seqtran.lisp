@@ -291,7 +291,7 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(deftype eq-comparable-type ()
+(def!type eq-comparable-type ()
   '(or fixnum (not number)))
 
 ;;; True if EQL comparisons involving type can be simplified to EQ.
