@@ -195,3 +195,27 @@
   (inline/4 :a :b :c))
 
 ;;; Test references to / from compiler-macros
+
+
+;;; Test specialization
+
+(defclass a-class () ())
+(defclass a-subclass (a-class) ())
+
+(defstruct a-structure)
+(defstruct (a-substructure (:include a-structure)))
+
+(defvar *an-instance-of-a-class* (make-instance 'a-class))
+(defvar *an-instance-of-a-subclass* (make-instance 'a-subclass))
+
+(defvar *an-instance-of-a-structure* (make-a-structure))
+(defvar *an-instance-of-a-substructure* (make-a-substructure))
+
+(defmethod a-gf-1 ((x a-class)))
+(defmethod a-gf-1 ((x a-structure)))
+
+(defmethod a-gf-2 ((x (eql *an-instance-of-a-class*))))
+(defmethod a-gf-2 ((x (eql *an-instance-of-a-structure*))))
+
+(defmethod a-gf-3 ((x (eql *an-instance-of-a-subclass*))))
+(defmethod a-gf-3 ((x (eql *an-instance-of-a-substructure*))))

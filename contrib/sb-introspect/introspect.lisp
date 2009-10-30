@@ -48,7 +48,9 @@
            "WHO-CALLS"
            "WHO-REFERENCES"
            "WHO-SETS"
-           "WHO-MACROEXPANDS"))
+           "WHO-MACROEXPANDS"
+           "WHO-SPECIALIZES-DIRECTLY"
+           "WHO-SPECIALIZES-GENERALLY"))
 
 (in-package :sb-introspect)
 
@@ -623,6 +625,86 @@ definition-source pairs."
 macro MACRO-NAME is expanded. Returns a list of function name,
 definition-source pairs."
   (collect-xref #.(position :macroexpands sb-c::*xref-kinds*) macro-name))
+
+(defun who-specializes-directly (class-designator)
+  "Search for source locations of methods directly specializing on
+CLASS-DESIGNATOR. Returns an alist of method name, definition-source
+pairs.
+
+A method matches the criterion either if it specializes on the same
+class as CLASS-DESIGNATOR designates (this includes CLASS-EQ
+specializers), or if it eql-specializes on an instance of the
+designated class.
+
+Experimental.
+"
+  (let ((class (canonicalize-class-designator class-designator)))
+    (let ((result (collect-specializing-methods
+                   #'(lambda (specl)
+                       ;; Does SPECL specialize on CLASS directly?
+                       (typecase specl
+                         (sb-pcl::class-eq-specializer
+                          (eq (sb-pcl::specializer-object specl) class))
+                         (sb-pcl::eql-specializer
+                          (let ((obj (sb-mop:eql-specializer-object specl)))
+                            (eq (class-of obj) class)))
+                         ((not sb-pcl::standard-specializer)
+                          nil)
+                         (t
+                          (eq specl class)))))))
+      (map-into result #'(lambda (m)
+                           (cons `(method ,(method-generic-function-name m))
+                                 (find-definition-source m)))
+                result))))
+
+(defun who-specializes-generally (class-designator)
+  "Search for source locations of methods specializing on
+CLASS-DESIGNATOR, or a subclass of it. Returns an alist of method
+name, definition-source pairs.
+
+A method matches the criterion either if it specializes on the
+designated class itself or a subclass of it (this includes CLASS-EQ
+specializers), or if it eql-specializes on an instance of the
+designated class or a subclass of it.
+
+Experimental.
+"
+  (let ((class (canonicalize-class-designator class-designator)))
+    (let ((result (collect-specializing-methods
+                   #'(lambda (specl)
+                       ;; Does SPECL specialize on CLASS or a subclass
+                       ;; of it?
+                       (typecase specl
+                         (sb-pcl::class-eq-specializer
+                          (subtypep (sb-pcl::specializer-object specl) class))
+                         (sb-pcl::eql-specializer
+                          (typep (sb-mop:eql-specializer-object specl) class))
+                         ((not sb-pcl::standard-specializer)
+                          nil)
+                         (t
+                          (subtypep specl class)))))))
+      (map-into result #'(lambda (m)
+                           (cons `(method ,(method-generic-function-name m))
+                                 (find-definition-source m)))
+                result))))
+
+(defun canonicalize-class-designator (class-designator)
+  (etypecase class-designator
+    (symbol (find-class class-designator))
+    (class  class-designator)))
+
+(defun method-generic-function-name (method)
+  (sb-mop:generic-function-name (sb-mop:method-generic-function method)))
+
+(defun collect-specializing-methods (predicate)
+  (let ((result '()))
+    (sb-pcl::map-specializers
+     #'(lambda (specl)
+         (when (funcall predicate specl)
+           (let ((methods (sb-mop:specializer-direct-methods specl)))
+             (setf result (append methods result))))))
+    (delete-duplicates result)))
+
 
 ;;;; ALLOCATION INTROSPECTION
 

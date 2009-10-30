@@ -46,5 +46,13 @@
                (:file "test-driver" :depends-on ("test"))))
 
 (defmethod perform ((op test-op) (com (eql (find-system :sb-introspect-tests))))
-  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
-      (error "~S failed" 'test-op)))
+  ;; N.b. At least DEFINITION-SOURCE-PLIST.1 assumes that CWD is the
+  ;; contrib/sb-introspect directory which is true for when this is
+  ;; implicitly run via make-target-contribs.sh -- but not when this
+  ;; is executed manually.
+  (let ((*default-pathname-defaults*
+         (make-pathname :directory (pathname-directory
+                                    '#.(or *compile-file-pathname*
+                                           *load-pathname*)))))
+    (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+        (error "~S failed" 'test-op))))
