@@ -2,14 +2,15 @@
 changes relative to sbcl-1.0.32:
   * improvement: support O_LARGEFILE access to files larger than 2GB on
     x86-64/linux.  (thanks to Daniel Janus)
-  * bug fix: restore buildability on the MIPS platform.  (regression from
-    1.0.30.38, reported by Samium Gromoff)
-  * bug fix: inspecting closures is less likely to fail with a type error.
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-DIRECTLY to get a list of
     definitions for methods specializing on the passed class itself. 
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-GENERALLY to get a list of
     definitions for methods specializing on the passed class itself, or on
     subclasses of it.
+  * bug fix: restore buildability on the MIPS platform.  (regression from
+    1.0.30.38, reported by Samium Gromoff)
+  * bug fix: inspecting closures is less likely to fail with a type error.
+  * bug fix: no timer starvation when setting the system clock back
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

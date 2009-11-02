@@ -363,6 +363,11 @@ triggers."
       (when (or (null timer)
                 (< (get-internal-real-time)
                    (%timer-expire-time timer)))
+        ;; Seemingly this is a spurious SIGALRM, but play it safe and
+        ;; reset the system timer because if the system clock was set
+        ;; back after the SIGALRM had been delivered then we won't get
+        ;; another chance.
+        (set-system-timer)
         (return-from run-expired-timers nil))
       (assert (eq timer (priority-queue-extract-maximum *schedule*)))
       (set-system-timer))
