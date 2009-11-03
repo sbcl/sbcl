@@ -7,6 +7,9 @@ changes relative to sbcl-1.0.32:
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-GENERALLY to get a list of
     definitions for methods specializing on the passed class itself, or on
     subclasses of it.
+  * fixes and improvements related to external formats:
+    ** fix a typo preventing conversion of strings into octet vectors
+       in the latin-2 encoding.  (reported by Attila Lendvai)
   * bug fix: restore buildability on the MIPS platform.  (regression from
     1.0.30.38, reported by Samium Gromoff)
   * bug fix: inspecting closures is less likely to fail with a type error.

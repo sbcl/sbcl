@@ -230,3 +230,8 @@
                                       :external-format :utf-8)))
 (assert (equalp #() (string-to-octets (make-array 5 :element-type nil)
                                       :start 3 :end 3 :external-format :utf-8)))
+
+;;; whoops: the iso-8859-2 format referred to an undefined symbol.
+#+sb-unicode
+(assert (equalp #(251) (string-to-octets (string (code-char 369))
+                                         :external-format :latin-2)))

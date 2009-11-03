@@ -100,7 +100,7 @@
           (code-char code)
           (external-format-decoding-error stream byte)))
     iso-8859-2->string-aref
-    string->iso8859-2) ;; TODO -- error check
+    string->iso-8859-2) ;; TODO -- error check
 
 (define-unibyte-mapper iso-8859-3->code-mapper code->iso-8859-3-mapper
   (#xA1 #x0126) ; LATIN CAPITAL LETTER H WITH STROKE
