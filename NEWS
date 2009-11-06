@@ -21,6 +21,8 @@ changes relative to sbcl-1.0.32:
   * bug fix: inspecting closures is less likely to fail with a type error.
   * bug fix: no timer starvation when setting the system clock back.
     (launchpad bug #460283)
+  * bug fix: WITH-STANDARD-IO-SYNTAX now binds *PRINT-PPRINT-DISPATCH* to the
+    standard pprint dispatch table as specified by CLHS.
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

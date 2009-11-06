@@ -1203,6 +1203,17 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (:default-initargs :references `((:ansi-cl :section (2 1 1 2))
                                    (:ansi-cl :glossary "standard readtable"))))
 
+(define-condition standard-pprint-dispatch-table-modified-error
+    (reference-condition error)
+  ((operation :initarg :operation
+              :reader standard-pprint-dispatch-table-modified-operation))
+  (:report (lambda (condition stream)
+             (format stream "~S would modify the standard pprint dispatch table."
+                     (standard-pprint-dispatch-table-modified-operation
+                      condition))))
+  (:default-initargs
+      :references `((:ansi-cl :glossary "standard pprint dispatch table"))))
+
 (define-condition timeout (serious-condition)
   ((seconds :initarg :seconds :initform nil :reader timeout-seconds))
   (:report (lambda (condition stream)

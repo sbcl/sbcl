@@ -447,4 +447,13 @@
                 (princ (make-condition 'sb-kernel::heap-exhausted-error)))))
   (assert (string/= result "#<" :end1 2)))
 
+(with-test (:name (:with-standard-io-syntax :bind-print-pprint-dispatch))
+  (let ((*print-pprint-dispatch* (copy-pprint-dispatch nil)))
+    (set-pprint-dispatch 'symbol #'(lambda (stream obj)
+                                     (declare (ignore obj))
+                                     (write-string "FOO" stream)))
+    (with-standard-io-syntax
+      (let ((*print-pretty* t))
+        (assert (string= (princ-to-string 'bar) "BAR"))))))
+
 ;;; success

@@ -813,7 +813,8 @@ line break."
 
 ;;;; pprint-dispatch tables
 
-(defvar *initial-pprint-dispatch*)
+(defvar *standard-pprint-dispatch-table*)
+(defvar *initial-pprint-dispatch-table*)
 (defvar *building-initial-table* nil)
 
 (defstruct (pprint-dispatch-entry (:copier nil))
@@ -868,7 +869,7 @@ line break."
                             ,x))))
   (defvar *precompiled-pprint-dispatch-funs*
     (list (frob array (typep object 'array))
-          (frob sharp-function (and (consp object)
+          (frob function-call (and (consp object)
                                     (symbolp (car object))
                                     (fboundp (car object))))
           (frob cons (typep object 'cons)))))
@@ -920,7 +921,7 @@ line break."
 
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
-  (let* ((orig (or table *initial-pprint-dispatch*))
+  (let* ((orig (or table *initial-pprint-dispatch-table*))
          (new (make-pprint-dispatch-table
                :entries (copy-list (pprint-dispatch-table-entries orig))))
          (new-cons-entries (pprint-dispatch-table-cons-entries new)))
@@ -931,7 +932,7 @@ line break."
 
 (defun pprint-dispatch (object &optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
-  (let* ((table (or table *initial-pprint-dispatch*))
+  (let* ((table (or table *initial-pprint-dispatch-table*))
          (cons-entry
           (and (consp object)
                (gethash (car object)
@@ -949,6 +950,11 @@ line break."
                   (output-ugly-object object stream))
                 nil))))
 
+(defun assert-not-standard-pprint-dispatch-table (pprint-dispatch operation)
+  (when (eq pprint-dispatch *standard-pprint-dispatch-table*)
+    (cerror "Frob it anyway!" 'standard-pprint-dispatch-table-modified-error
+            :operation operation)))
+
 (defun set-pprint-dispatch (type function &optional
                             (priority 0) (table *print-pprint-dispatch*))
   (declare (type (or null callable) function)
@@ -956,6 +962,7 @@ line break."
            (type pprint-dispatch-table table))
   (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
   (/hexstr type)
+  (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)
   (if function
       (if (cons-type-specifier-p type)
           (setf (gethash (second (second type))
@@ -1455,10 +1462,14 @@ line break."
 
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
-  (setf *initial-pprint-dispatch* (make-pprint-dispatch-table))
-  (let ((*print-pprint-dispatch* *initial-pprint-dispatch*)
+  ;; Kludge: We set *STANDARD-PP-D-TABLE* to a new table even though
+  ;; it's going to be set to a copy of *INITIAL-PP-D-T* below because
+  ;; it's used in WITH-STANDARD-IO-SYNTAX, and condition reportery
+  ;; possibly performed in the following extent may use W-S-IO-SYNTAX.
+  (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table))
+  (setf *initial-pprint-dispatch-table*  (make-pprint-dispatch-table))
+  (let ((*print-pprint-dispatch* *initial-pprint-dispatch-table*)
         (*building-initial-table* t))
-    ;; printers for regular types
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
     (set-pprint-dispatch 'array #'pprint-array)
     (set-pprint-dispatch '(cons (and symbol (satisfies mboundp)))
@@ -1568,5 +1579,7 @@ line break."
     (sb!impl::!backq-pp-cold-init)
     (/show0 "leaving !PPRINT-COLD-INIT"))
 
-  (setf *print-pprint-dispatch* (copy-pprint-dispatch nil))
+  (setf *standard-pprint-dispatch-table*
+        (copy-pprint-dispatch *initial-pprint-dispatch-table*))
+  (setf *print-pprint-dispatch* *initial-pprint-dispatch-table*)
   (setf *print-pretty* t))

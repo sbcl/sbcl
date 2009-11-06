@@ -86,6 +86,7 @@
        *PRINT-LEVEL*                    NIL
        *PRINT-LINES*                    NIL
        *PRINT-MISER-WIDTH*              NIL
+       *PRINT-PPRINT-DISPATCH*          the standard pprint dispatch table
        *PRINT-PRETTY*                   NIL
        *PRINT-RADIX*                    NIL
        *PRINT-READABLY*                 T
@@ -110,6 +111,7 @@
         (*print-level* nil)
         (*print-lines* nil)
         (*print-miser-width* nil)
+        (*print-pprint-dispatch* sb!pretty::*standard-pprint-dispatch-table*)
         (*print-pretty* nil)
         (*print-radix* nil)
         (*print-readably* t)
@@ -118,12 +120,6 @@
         (*read-default-float-format* 'single-float)
         (*read-eval* t)
         (*read-suppress* nil)
-        ;; FIXME: It doesn't seem like a good idea to expose our
-        ;; disaster-recovery *STANDARD-READTABLE* here. What if some
-        ;; enterprising user corrupts the disaster-recovery readtable
-        ;; by doing destructive readtable operations within
-        ;; WITH-STANDARD-IO-SYNTAX? Perhaps we should do a
-        ;; COPY-READTABLE? The consing would be unfortunate, though.
         (*readtable* *standard-readtable*))
     (funcall function)))
 

@@ -206,5 +206,14 @@
   (with-open-stream (null (make-broadcast-stream))
     (pprint '(defpackage :foo nil))
     (pprint '(defpackage :foo 42))))
+
+(with-test (:name :standard-pprint-dispatch-modified)
+  (assert
+   (eq :error
+       (handler-case (with-standard-io-syntax
+                       (set-pprint-dispatch 'symbol (constantly nil))
+                       :no-error)
+         (sb-int:standard-pprint-dispatch-table-modified-error ()
+           :error)))))
 
 ;;; success
