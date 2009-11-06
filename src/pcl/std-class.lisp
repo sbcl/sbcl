@@ -69,10 +69,37 @@
               (the fixnum (logand (the fixnum (lognot mask)) flags)))))
   value)
 
-(defmethod initialize-internal-slot-functions ((slotd
-                                                effective-slot-definition))
+(defmethod initialize-internal-slot-functions
+    ((slotd effective-slot-definition))
   (let* ((name (slot-value slotd 'name))
          (class (slot-value slotd '%class)))
+    (dolist (type '(reader writer boundp))
+      (let* ((gf-name (ecase type
+                              (reader 'slot-value-using-class)
+                              (writer '(setf slot-value-using-class))
+                              (boundp 'slot-boundp-using-class)))
+             (gf (gdefinition gf-name)))
+        ;; KLUDGE: this logic is cut'n'pasted from
+        ;; GET-ACCESSOR-METHOD-FUNCTION, which (for STD-CLASSes) is
+        ;; only called later, because it does things that can't be
+        ;; computed this early in class finalization; however, we need
+        ;; this bit as early as possible.  -- CSR, 2009-11-05
+        (setf (slot-accessor-std-p slotd type)
+              (let* ((std-method (standard-svuc-method type))
+                     (str-method (structure-svuc-method type))
+                     (types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
+                     (types (if (eq type 'writer) `(t ,@types1) types1))
+                     (methods (compute-applicable-methods-using-types gf types)))
+                (null (cdr methods))))
+        (setf (slot-accessor-function slotd type)
+              (lambda (&rest args)
+                ;; FIXME: a tiny amount of wasted SLOT-ACCESSOR-STD-P
+                ;; work here (see KLUDGE comment above).
+                (let ((fun (compute-slot-accessor-info slotd type gf)))
+                  (apply fun args))))))))
+
+(defmethod finalize-internal-slot-functions ((slotd effective-slot-definition))
+  (let* ((name (slot-value slotd 'name)))
     (dolist (type '(reader writer boundp))
       (let* ((gf-name (ecase type
                               (reader 'slot-value-using-class)
@@ -98,10 +125,7 @@
 (defmethod compute-slot-accessor-info ((slotd effective-slot-definition)
                                        type gf)
   (let* ((name (slot-value slotd 'name))
-         (class (slot-value slotd '%class))
-         (old-slotd (when (class-finalized-p class)
-                      (find-slot-definition class name)))
-         (old-std-p (and old-slotd (slot-accessor-std-p old-slotd 'all))))
+         (class (slot-value slotd '%class)))
     (multiple-value-bind (function std-p)
         (if (eq **boot-state** 'complete)
             (get-accessor-method-function gf type class slotd)
@@ -615,7 +639,7 @@
 
 (defmethod compute-slots :around ((class condition-class))
   (let ((eslotds (call-next-method)))
-    (mapc #'initialize-internal-slot-functions eslotds)
+    (mapc #'finalize-internal-slot-functions eslotds)
     eslotds))
 
 (defmethod shared-initialize :after
@@ -1095,7 +1119,7 @@
 
 (defmethod compute-slots :around ((class structure-class))
   (let ((eslotds (call-next-method)))
-    (mapc #'initialize-internal-slot-functions eslotds)
+    (mapc #'finalize-internal-slot-functions eslotds)
     eslotds))
 
 (defmethod compute-effective-slot-definition ((class slot-class) name dslotds)
