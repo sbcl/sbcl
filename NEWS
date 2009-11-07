@@ -23,6 +23,9 @@ changes relative to sbcl-1.0.32:
     (launchpad bug #460283)
   * bug fix: WITH-STANDARD-IO-SYNTAX now binds *PRINT-PPRINT-DISPATCH* to the
     standard pprint dispatch table as specified by CLHS.
+  * bug fix: give CLISP a hint about a type declaration to enable it to build
+    the cross-compiler without warnings.  (thanks to Josh Elasser; launchpad
+    bug #396597)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

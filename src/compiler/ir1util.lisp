@@ -429,7 +429,7 @@
     (lvar-dynamic-extent it)))
 
 (defun flushable-combination-p (call)
-  (declare (combination call))
+  (declare (type combination call))
   (let ((kind (combination-kind call))
         (info (combination-fun-info call)))
     (when (and (eq kind :known) (fun-info-p info))
