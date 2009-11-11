@@ -754,6 +754,7 @@
   ;; All the names that can refer to this external format.  The first
   ;; one is the canonical name.
   (names (missing-arg) :type list :read-only t)
+  (default-replacement-character (missing-arg) :type character)
   (read-n-chars-fun (missing-arg) :type function)
   (read-char-fun (missing-arg) :type function)
   (write-n-bytes-fun (missing-arg) :type function)
@@ -1388,7 +1389,7 @@
     (canonical-name (&rest other-names)
      out-form in-form octets-to-string-symbol string-to-octets-symbol)
   `(define-external-format/variable-width (,canonical-name ,@other-names)
-     t 1
+     t #\? 1
      ,out-form
      1
      ,in-form
@@ -1396,8 +1397,8 @@
      ,string-to-octets-symbol))
 
 (defmacro define-external-format/variable-width
-    (external-format output-restart out-size-expr
-     out-expr in-size-expr in-expr
+    (external-format output-restart replacement-character
+     out-size-expr out-expr in-size-expr in-expr
      octets-to-string-sym string-to-octets-sym)
   (let* ((name (first external-format))
          (out-function (symbolicate "OUTPUT-BYTES/" name))
@@ -1646,6 +1647,7 @@
 
       (let ((entry (%make-external-format
                     :names ',external-format
+                    :default-replacement-character ,replacement-character
                     :read-n-chars-fun #',in-function
                     :read-char-fun #',in-char-function
                     :write-n-bytes-fun #',out-function
@@ -2455,6 +2457,14 @@
     (without-package-locks
         (makunbound '*available-buffers*))))
 
+(defun stdstream-external-format (outputp)
+  (declare (ignorable outputp))
+  (let* ((keyword #!+win32 (if outputp (sb!win32::console-output-codepage) (sb!win32::console-input-codepage))
+                  #!-win32 (default-external-format))
+         (ef (get-external-format keyword))
+         (replacement (ef-default-replacement-character ef)))
+    `(,keyword :replacement ,replacement)))
+
 ;;; This is called whenever a saved core is restarted.
 (defun stream-reinit (&optional init-buffers-p)
   (when init-buffers-p
@@ -2464,22 +2474,20 @@
   (with-output-to-string (*error-output*)
     (setf *stdin*
           (make-fd-stream 0 :name "standard input" :input t :buffering :line
-                            #!+win32 :external-format #!+win32 (sb!win32::console-input-codepage)))
+                            :external-format (stdstream-external-format nil)))
     (setf *stdout*
           (make-fd-stream 1 :name "standard output" :output t :buffering :line
-                            #!+win32 :external-format #!+win32 (sb!win32::console-output-codepage)))
+                            :external-format (stdstream-external-format t)))
     (setf *stderr*
           (make-fd-stream 2 :name "standard error" :output t :buffering :line
-                            #!+win32 :external-format #!+win32 (sb!win32::console-output-codepage)))
+                            :external-format (stdstream-external-format t)))
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (if tty
           (setf *tty*
-                (make-fd-stream tty
-                                :name "the terminal"
-                                :input t
-                                :output t
-                                :buffering :line
+                (make-fd-stream tty :name "the terminal"
+                                :input t :output t :buffering :line
+                                :external-format (stdstream-external-format t)
                                 :auto-close t))
           (setf *tty* (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))

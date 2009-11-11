@@ -19,6 +19,11 @@ changes relative to sbcl-1.0.32:
        (:<encoding> :replacement <character>) as an external format which will
        automatically substitute <character> on encoding or decoding errors for
        streams and for STRING-TO-OCTETS and its inverse.
+    ** improvement: the file streams underlying the standard streams (such as
+       *STANDARD-INPUT*, *TERMINAL-IO*) are opened with an external format 
+       which uses the replacement mechanism to handle encoding errors,
+       preventing various infinite error chains and unrecoverable I/O
+       confusion.
     ** minor incompatible change: the utf-8 external format now correctly
        refuses to encode Lisp characters in the surrogate range (char-codes
        between #xd800 and #xdfff).

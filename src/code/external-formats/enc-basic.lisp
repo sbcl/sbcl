@@ -383,6 +383,7 @@
 (instantiate-octets-definition define-utf8->string)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
+  #!+sb-unicode (code-char #xfffd) #!-sb-unicode #\?
   (let ((bits (char-code byte)))
     (cond ((< bits #x80) 1)
           ((< bits #x800) 2)

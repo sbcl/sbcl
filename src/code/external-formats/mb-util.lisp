@@ -248,6 +248,12 @@
 
        ;; for fd-stream.lisp
        (define-external-format/variable-width ,aliases t
+         ;; KLUDGE: it so happens that at present (2009-10-22) none of
+         ;; the external formats defined with
+         ;; define-multibyte-encoding can encode the unicode
+         ;; replacement character, so we hardcode the preferred
+         ;; replacement here.
+         #\?
          (mb-char-len (or (,ucs-to-mb (char-code byte)) -1))
          (let ((mb (,ucs-to-mb bits)))
            (if (null mb)
