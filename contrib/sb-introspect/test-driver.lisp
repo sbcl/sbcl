@@ -281,7 +281,7 @@
     (tai #'cons :heap
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
          ;; :LARGE T, which doesn't seem right -- but ignore that for now.
-         '(:space :dynamic :generation 6 :write-protected t :pinned nil :large nil)
+         '(:space :dynamic :generation 6 :write-protected t :boxed t :pinned nil :large nil)
          :ignore #+ppc '(:large) #-ppc nil)
     #-gencgc
     (tai :cons :heap

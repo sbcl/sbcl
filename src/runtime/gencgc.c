@@ -429,10 +429,10 @@ gen_av_mem_age(generation_index_t gen)
 
 /* The verbose argument controls how much to print: 0 for normal
  * level of detail; 1 for debugging. */
-static void
-print_generation_stats(int verbose) /* FIXME: should take FILE argument */
+extern void
+print_generation_stats() /* FIXME: should take FILE argument, or construct a string */
 {
-    generation_index_t i, gens;
+    generation_index_t i;
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 #define FPU_STATE_SIZE 27
@@ -446,17 +446,11 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
      * so they need to be saved and reset for C. */
     fpu_save(fpu_state);
 
-    /* highest generation to print */
-    if (verbose)
-        gens = SCRATCH_GENERATION;
-    else
-        gens = PSEUDO_STATIC_GENERATION;
-
     /* Print the heap stats. */
     fprintf(stderr,
             " Gen StaPg UbSta LaSta LUbSt Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
 
-    for (i = 0; i < gens; i++) {
+    for (i = 0; i < SCRATCH_GENERATION; i++) {
         page_index_t j;
         long boxed_cnt = 0;
         long unboxed_cnt = 0;
@@ -1168,7 +1162,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
         /* If we are in GC, or totally out of memory there is no way
          * to sanely transfer control to the lisp-side of things.
          */
-        print_generation_stats(1);
+        print_generation_stats();
         fprintf(stderr, "GC control variables:\n");
         fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",
                 SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
@@ -4352,7 +4346,7 @@ collect_garbage(generation_index_t last_gen)
     }
 
     if (gencgc_verbose > 1)
-        print_generation_stats(0);
+        print_generation_stats();
 
     do {
         /* Collect the generation. */
@@ -4390,7 +4384,7 @@ collect_garbage(generation_index_t last_gen)
 
         if (gencgc_verbose > 1) {
             FSHOW((stderr, "GC of generation %d finished:\n", gen));
-            print_generation_stats(0);
+            print_generation_stats();
         }
 
         gen++;
@@ -4536,7 +4530,7 @@ gc_free_heap(void)
     }
 
     if (gencgc_verbose > 1)
-        print_generation_stats(0);
+        print_generation_stats();
 
     /* Initialize gc_alloc(). */
     gc_alloc_generation = 0;

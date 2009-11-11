@@ -730,6 +730,11 @@ For :HEAP objects the secondary value is a plist:
     Indicates a \"large\" object subject to non-copying
     promotion. (GENCGC and :SPACE :DYNAMIC only.)
 
+  :BOXED
+    Indicates that the object is allocated in a boxed region. Unboxed
+    allocation is used for eg. specialized arrays after they have survived one
+    collection. (GENCGC and :SPACE :DYNAMIC only.)
+
   :PINNED
     Indicates that the page(s) on which the object resides are kept live due
     to conservative references. Note that object may reside on a pinned page
@@ -781,6 +786,7 @@ Experimental: interface subject to change."
                              (list :space space
                                    :generation (sb-alien:slot page 'sb-vm::gen)
                                    :write-protected (logbitp 0 flags)
+                                   :boxed (logbitp 2 flags)
                                    :pinned (logbitp 5 flags)
                                    :large (logbitp 6 flags)))))
                        (list :space space))
