@@ -189,7 +189,7 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) nil
+(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) t
   2
   (if (< bits #x10000)
       (setf (sap-ref-16le sap tail) bits)
@@ -199,7 +199,7 @@
   ucs-2le->string-aref
   string->ucs-2le)
 
-(define-external-format/variable-width (:ucs-2be :ucs2be) nil
+(define-external-format/variable-width (:ucs-2be :ucs2be) t
   2
   (if (< bits #x10000)
       (setf (sap-ref-16be sap tail) bits)
