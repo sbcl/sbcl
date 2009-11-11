@@ -456,17 +456,17 @@
   (values))
 
 ;;; The stuff below is dependent on misc.lisp-expr being
-;;; (:LENGTH 206 :UPPERCASE (0 2) :LOWERCASE (1 3) :TITLECASE (4)).
+;;; (:LENGTH 215 :UPPERCASE (0 2) :LOWERCASE (1 3) :TITLECASE (4)).
 ;;;
 ;;; There are two entries for UPPERCASE and LOWERCASE because some
 ;;; characters have case (by Unicode standards) but are not
-;;; transformable character-by-character in a locale-independet way
+;;; transformable character-by-character in a locale-independent way
 ;;; (as CL requires for its standard operators).
 ;;;
 ;;; for more details on these debugging functions, see the description
 ;;; of the character database format in src/code/target-char.lisp
 
-(defparameter *length* 206)
+(defparameter *length* 215)
 
 (defun cp-index (cp)
   (let* ((cp-high (cp-high cp))

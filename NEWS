@@ -7,7 +7,11 @@ changes relative to sbcl-1.0.32:
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-GENERALLY to get a list of
     definitions for methods specializing on the passed class itself, or on
     subclasses of it.
-  * fixes and improvements related to external formats:
+  * fixes and improvements related to Unicode and external formats:
+    ** the Unicode character database has been upgraded to the
+       Unicode 5.2 standard, giving names and properties to a number of new
+       characters, and providing a few extra characters with case
+       transformations.
     ** fix a typo preventing conversion of strings into octet vectors
        in the latin-2 encoding.  (reported by Attila Lendvai; launchpad bug
        #471689)
