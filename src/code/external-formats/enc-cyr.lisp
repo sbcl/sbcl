@@ -1,6 +1,6 @@
 (in-package "SB!IMPL")
 
-(define-unibyte-mapper koi8-r->code-mapper code->koi8-r-mapper
+(define-unibyte-mapping-external-format :koi8-r (:|koi8-r|)
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL
   (#x81 #x2502) ; BOX DRAWINGS LIGHT VERTICAL
   (#x82 #x250C) ; BOX DRAWINGS LIGHT DOWN AND RIGHT
@@ -131,49 +131,7 @@
   (#xFF #x042A) ; CYRILLIC CAPITAL LETTER HARD SIGN
 )
 
-(declaim (inline get-koi8-r-bytes))
-(defun get-koi8-r-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->koi8-r-mapper :koi8-r string pos))
-
-(defun string->koi8-r (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-koi8-r-bytes null-padding)))
-
-(defmacro define-koi8-r->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'koi8-r->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'koi8-r->code-mapper)))))
-
-(instantiate-octets-definition define-koi8-r->string*)
-
-(defmacro define-koi8-r->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'koi8-r->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'koi8-r->code-mapper)))
-
-(instantiate-octets-definition define-koi8-r->string)
-
-(define-external-format (:koi8-r :|koi8-r|)
-    1 t
-    (let ((koi8-r-byte (code->koi8-r-mapper bits)))
-      (if koi8-r-byte
-          (setf (sap-ref-8 sap tail) koi8-r-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (koi8-r->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    koi8-r->string-aref
-    string->koi8-r) ;; TODO -- error check
-
-(define-unibyte-mapper koi8-u->code-mapper code->koi8-u-mapper
+(define-unibyte-mapping-external-format :koi8-u (:|koi8-u|)
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL
   (#x81 #x2502) ; BOX DRAWINGS LIGHT VERTICAL
   (#x82 #x250C) ; BOX DRAWINGS LIGHT DOWN AND RIGHT
@@ -304,49 +262,7 @@
   (#xFF #x042A) ; CYRILLIC CAPITAL LETTER HARD SIGN
 )
 
-(declaim (inline get-koi8-u-bytes))
-(defun get-koi8-u-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->koi8-u-mapper :koi8-u string pos))
-
-(defun string->koi8-u (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-koi8-u-bytes null-padding)))
-
-(defmacro define-koi8-u->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'koi8-u->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'koi8-u->code-mapper)))))
-
-(instantiate-octets-definition define-koi8-u->string*)
-
-(defmacro define-koi8-u->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'koi8-u->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'koi8-u->code-mapper)))
-
-(instantiate-octets-definition define-koi8-u->string)
-
-(define-external-format (:koi8-u :|koi8-u|)
-    1 t
-    (let ((koi8-u-byte (code->koi8-u-mapper bits)))
-      (if koi8-u-byte
-          (setf (sap-ref-8 sap tail) koi8-u-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (koi8-u->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    koi8-u->string-aref
-    string->koi8-u) ;; TODO -- error check
-
-(define-unibyte-mapper x-mac-cyrillic->code-mapper code->x-mac-cyrillic-mapper
+(define-unibyte-mapping-external-format :x-mac-cyrillic (:|x-mac-cyrillic|)
   (#x80 #x0410) ; CYRILLIC CAPITAL LETTER A
   (#x81 #x0411) ; CYRILLIC CAPITAL LETTER BE
   (#x82 #x0412) ; CYRILLIC CAPITAL LETTER VE
@@ -471,45 +387,3 @@
   (#xFE #x044E) ; CYRILLIC SMALL LETTER YU
   (#xFF #x00A4) ; CURRENCY SIGN
 )
-
-(declaim (inline get-x-mac-cyrillic-bytes))
-(defun get-x-mac-cyrillic-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->x-mac-cyrillic-mapper :x-mac-cyrillic string pos))
-
-(defun string->x-mac-cyrillic (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-x-mac-cyrillic-bytes null-padding)))
-
-(defmacro define-x-mac-cyrillic->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'x-mac-cyrillic->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'x-mac-cyrillic->code-mapper)))))
-
-(instantiate-octets-definition define-x-mac-cyrillic->string*)
-
-(defmacro define-x-mac-cyrillic->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'x-mac-cyrillic->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'x-mac-cyrillic->code-mapper)))
-
-(instantiate-octets-definition define-x-mac-cyrillic->string)
-
-(define-external-format (:x-mac-cyrillic :|x-mac-cyrillic|)
-    1 t
-    (let ((x-mac-cyrillic-byte (code->x-mac-cyrillic-mapper bits)))
-      (if x-mac-cyrillic-byte
-          (setf (sap-ref-8 sap tail) x-mac-cyrillic-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (x-mac-cyrillic->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    x-mac-cyrillic->string-aref
-    string->x-mac-cyrillic) ;; TODO -- error check

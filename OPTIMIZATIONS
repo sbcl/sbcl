@@ -405,3 +405,23 @@ can be transformed into
 which allows compiler-macro-expansion for FOO. (Only constant
 arguments can be moved inside the new lambda -- otherwise evaluation
 order is altered.)
+
+--------------------------------------------------------------------------------
+#41
+
+The unibyte external formats are written in a very generic way.  Three
+optimizations immediately applicable that could be automatically
+generated:
+
+(a) if the external format merely permutes the first 256 characters, a
+    constant-time lookup (rather than a binary search) could be
+    performed on output.  This applies at least to EBCDIC, which
+    currently has a hand-rolled mapper instead.
+
+(b) if there are no undefined characters corresponding to the 256
+    codes, then no error checking need be done on input.
+
+(c) if there is a way to use particular bits of the exceptional
+    characters, constant-time output (rather than binary search) can
+    still be achieved as used to be done by the latin-9 external
+    format before 1.0.31.

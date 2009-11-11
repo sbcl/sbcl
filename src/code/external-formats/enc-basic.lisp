@@ -59,13 +59,14 @@
                 finally (return (coerce string 'simple-string))))))))
 (instantiate-octets-definition define-ascii->string)
 
-(define-external-format (:ascii :us-ascii :ansi_x3.4-1968
-                         :iso-646 :iso-646-us :|646|)
-    1 t
+(define-unibyte-external-format :ascii
+    (:us-ascii :ansi_x3.4-1968 :iso-646 :iso-646-us :|646|)
   (if (>= bits 128)
       (external-format-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))
-  (code-char byte)
+  (if (>= byte 128)
+      (return-from decode-break-reason 1)
+      (code-char byte))
   ascii->string-aref
   string->ascii)
 
@@ -101,8 +102,7 @@
 ;;; Multiple names for the :ISO{,-}8859-* families are needed because on
 ;;; FreeBSD (and maybe other BSD systems), nl_langinfo("LATIN-1") will
 ;;; return "ISO8859-1" instead of "ISO-8859-1".
-(define-external-format (:latin-1 :latin1 :iso-8859-1 :iso8859-1)
-    1 t
+(define-unibyte-external-format :latin-1 (:latin1 :iso-8859-1 :iso8859-1)
   (if (>= bits 256)
       (external-format-encoding-error stream bits)
       (setf (sap-ref-8 sap tail) bits))

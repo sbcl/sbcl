@@ -1,6 +1,7 @@
 (in-package "SB!IMPL")
 
-(define-unibyte-mapper cp1250->code-mapper code->cp1250-mapper
+(define-unibyte-mapping-external-format :cp1250
+    (:|cp1250| :windows-1250 :|windows-1250|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -82,49 +83,8 @@
   (#xFF #x02D9) ; DOT ABOVE
 )
 
-(declaim (inline get-cp1250-bytes))
-(defun get-cp1250-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1250-mapper :cp1250 string pos))
-
-(defun string->cp1250 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1250-bytes null-padding)))
-
-(defmacro define-cp1250->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1250->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1250->code-mapper)))))
-
-(instantiate-octets-definition define-cp1250->string*)
-
-(defmacro define-cp1250->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1250->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1250->code-mapper)))
-
-(instantiate-octets-definition define-cp1250->string)
-
-(define-external-format (:cp1250 :|cp1250| :windows-1250 :|windows-1250|)
-    1 t
-    (let ((cp1250-byte (code->cp1250-mapper bits)))
-      (if cp1250-byte
-          (setf (sap-ref-8 sap tail) cp1250-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1250->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1250->string-aref
-    string->cp1250) ;; TODO -- error check
-
-(define-unibyte-mapper cp1251->code-mapper code->cp1251-mapper
+(define-unibyte-mapping-external-format :cp1251
+    (:|cp1251| :windows-1251 :|windows-1251|)
   (#x80 #x0402) ; CYRILLIC CAPITAL LETTER DJE
   (#x81 #x0403) ; CYRILLIC CAPITAL LETTER GJE
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -240,49 +200,8 @@
   (#xFF #x044F) ; CYRILLIC SMALL LETTER YA
 )
 
-(declaim (inline get-cp1251-bytes))
-(defun get-cp1251-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1251-mapper :cp1251 string pos))
-
-(defun string->cp1251 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1251-bytes null-padding)))
-
-(defmacro define-cp1251->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1251->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1251->code-mapper)))))
-
-(instantiate-octets-definition define-cp1251->string*)
-
-(defmacro define-cp1251->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1251->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1251->code-mapper)))
-
-(instantiate-octets-definition define-cp1251->string)
-
-(define-external-format (:cp1251 :|cp1251| :windows-1251 :|windows-1251|)
-    1 t
-    (let ((cp1251-byte (code->cp1251-mapper bits)))
-      (if cp1251-byte
-          (setf (sap-ref-8 sap tail) cp1251-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1251->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1251->string-aref
-    string->cp1251) ;; TODO -- error check
-
-(define-unibyte-mapper cp1252->code-mapper code->cp1252-mapper
+(define-unibyte-mapping-external-format :cp1252
+    (:|cp1252| :windows-1252 :|windows-1252|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -317,49 +236,8 @@
   (#x9F #x0178) ; LATIN CAPITAL LETTER Y WITH DIAERESIS
 )
 
-(declaim (inline get-cp1252-bytes))
-(defun get-cp1252-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1252-mapper :cp1252 string pos))
-
-(defun string->cp1252 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1252-bytes null-padding)))
-
-(defmacro define-cp1252->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1252->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1252->code-mapper)))))
-
-(instantiate-octets-definition define-cp1252->string*)
-
-(defmacro define-cp1252->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1252->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1252->code-mapper)))
-
-(instantiate-octets-definition define-cp1252->string)
-
-(define-external-format (:cp1252 :|cp1252| :windows-1252 :|windows-1252|)
-    1 t
-    (let ((cp1252-byte (code->cp1252-mapper bits)))
-      (if cp1252-byte
-          (setf (sap-ref-8 sap tail) cp1252-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1252->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1252->string-aref
-    string->cp1252) ;; TODO -- error check
-
-(define-unibyte-mapper cp1253->code-mapper code->cp1253-mapper
+(define-unibyte-mapping-external-format :cp1253
+    (:|cp1253| :windows-1253 :|windows-1253|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -469,49 +347,7 @@
   (#xFF nil)
 )
 
-(declaim (inline get-cp1253-bytes))
-(defun get-cp1253-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1253-mapper :cp1253 string pos))
-
-(defun string->cp1253 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1253-bytes null-padding)))
-
-(defmacro define-cp1253->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1253->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1253->code-mapper)))))
-
-(instantiate-octets-definition define-cp1253->string*)
-
-(defmacro define-cp1253->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1253->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1253->code-mapper)))
-
-(instantiate-octets-definition define-cp1253->string)
-
-(define-external-format (:cp1253 :|cp1253| :windows-1253 :|windows-1253|)
-    1 t
-    (let ((cp1253-byte (code->cp1253-mapper bits)))
-      (if cp1253-byte
-          (setf (sap-ref-8 sap tail) cp1253-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1253->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1253->string-aref
-    string->cp1253) ;; TODO -- error check
-
-(define-unibyte-mapper cp1254->code-mapper code->cp1254-mapper
+(define-unibyte-mapping-external-format :cp1254 (:|cp1254|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -552,49 +388,8 @@
   (#xFE #x015F) ; LATIN SMALL LETTER S WITH CEDILLA
 )
 
-(declaim (inline get-cp1254-bytes))
-(defun get-cp1254-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1254-mapper :cp1254 string pos))
-
-(defun string->cp1254 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1254-bytes null-padding)))
-
-(defmacro define-cp1254->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1254->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1254->code-mapper)))))
-
-(instantiate-octets-definition define-cp1254->string*)
-
-(defmacro define-cp1254->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1254->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1254->code-mapper)))
-
-(instantiate-octets-definition define-cp1254->string)
-
-(define-external-format (:cp1254 :|cp1254|)
-    1 t
-    (let ((cp1254-byte (code->cp1254-mapper bits)))
-      (if cp1254-byte
-          (setf (sap-ref-8 sap tail) cp1254-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1254->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1254->string-aref
-    string->cp1254) ;; TODO -- error check
-
-(define-unibyte-mapper cp1255->code-mapper code->cp1255-mapper
+(define-unibyte-mapping-external-format :cp1255
+    (:|cp1255| :windows-1255 :|windows-1255|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -696,49 +491,8 @@
   (#xFF nil)
 )
 
-(declaim (inline get-cp1255-bytes))
-(defun get-cp1255-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1255-mapper :cp1255 string pos))
-
-(defun string->cp1255 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1255-bytes null-padding)))
-
-(defmacro define-cp1255->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1255->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1255->code-mapper)))))
-
-(instantiate-octets-definition define-cp1255->string*)
-
-(defmacro define-cp1255->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1255->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1255->code-mapper)))
-
-(instantiate-octets-definition define-cp1255->string)
-
-(define-external-format (:cp1255 :|cp1255| :windows-1255 :|windows-1255|)
-    1 t
-    (let ((cp1255-byte (code->cp1255-mapper bits)))
-      (if cp1255-byte
-          (setf (sap-ref-8 sap tail) cp1255-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1255->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1255->string-aref
-    string->cp1255) ;; TODO -- error check
-
-(define-unibyte-mapper cp1256->code-mapper code->cp1256-mapper
+(define-unibyte-mapping-external-format :cp1256
+    (:|cp1256| :windows-1256 :|windows-1256|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 #x067E) ; ARABIC LETTER PEH
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -826,49 +580,8 @@
   (#xFF nil)
 )
 
-(declaim (inline get-cp1256-bytes))
-(defun get-cp1256-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1256-mapper :cp1256 string pos))
-
-(defun string->cp1256 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1256-bytes null-padding)))
-
-(defmacro define-cp1256->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1256->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1256->code-mapper)))))
-
-(instantiate-octets-definition define-cp1256->string*)
-
-(defmacro define-cp1256->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1256->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1256->code-mapper)))
-
-(instantiate-octets-definition define-cp1256->string)
-
-(define-external-format (:cp1256 :|cp1256| :windows-1256 :|windows-1256|)
-    1 t
-    (let ((cp1256-byte (code->cp1256-mapper bits)))
-      (if cp1256-byte
-          (setf (sap-ref-8 sap tail) cp1256-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1256->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1256->string-aref
-    string->cp1256) ;; TODO -- error check
-
-(define-unibyte-mapper cp1257->code-mapper code->cp1257-mapper
+(define-unibyte-mapping-external-format :cp1257
+    (:|cp1257| :windows-1257 :|windows-1257|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -958,49 +671,8 @@
   (#xFF #x02D9) ; DOT ABOVE
 )
 
-(declaim (inline get-cp1257-bytes))
-(defun get-cp1257-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1257-mapper :cp1257 string pos))
-
-(defun string->cp1257 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1257-bytes null-padding)))
-
-(defmacro define-cp1257->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1257->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1257->code-mapper)))))
-
-(instantiate-octets-definition define-cp1257->string*)
-
-(defmacro define-cp1257->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1257->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1257->code-mapper)))
-
-(instantiate-octets-definition define-cp1257->string)
-
-(define-external-format (:cp1257 :|cp1257| :windows-1257 :|windows-1257|)
-    1 t
-    (let ((cp1257-byte (code->cp1257-mapper bits)))
-      (if cp1257-byte
-          (setf (sap-ref-8 sap tail) cp1257-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1257->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1257->string-aref
-    string->cp1257) ;; TODO -- error check
-
-(define-unibyte-mapper cp1258->code-mapper code->cp1258-mapper
+(define-unibyte-mapping-external-format :cp1258
+    (:|cp1258| :windows-1258 :|windows-1258|)
   (#x80 #x20AC) ; EURO SIGN
   (#x81 nil)
   (#x82 #x201A) ; SINGLE LOW-9 QUOTATION MARK
@@ -1048,46 +720,3 @@
   (#xFD #x01B0) ; LATIN SMALL LETTER U WITH HORN
   (#xFE #x20AB) ; DONG SIGN
 )
-
-(declaim (inline get-cp1258-bytes))
-(defun get-cp1258-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->cp1258-mapper :cp1258 string pos))
-
-(defun string->cp1258 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-cp1258-bytes null-padding)))
-
-(defmacro define-cp1258->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'cp1258->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'cp1258->code-mapper)))))
-
-(instantiate-octets-definition define-cp1258->string*)
-
-(defmacro define-cp1258->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'cp1258->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'cp1258->code-mapper)))
-
-(instantiate-octets-definition define-cp1258->string)
-
-(define-external-format (:cp1258 :|cp1258| :windows-1258 :|windows-1258|)
-    1 t
-    (let ((cp1258-byte (code->cp1258-mapper bits)))
-      (if cp1258-byte
-          (setf (sap-ref-8 sap tail) cp1258-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (cp1258->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    cp1258->string-aref
-    string->cp1258) ;; TODO -- error check
-

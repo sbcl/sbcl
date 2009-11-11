@@ -1,6 +1,7 @@
 (in-package "SB!IMPL")
 
-(define-unibyte-mapper iso-8859-2->code-mapper code->iso-8859-2-mapper
+(define-unibyte-mapping-external-format :iso-8859-2
+    (:|iso-8859-2| :latin-2 :|latin-2|)
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
   (#xA2 #x02D8) ; BREVE
   (#xA3 #x0141) ; LATIN CAPITAL LETTER L WITH STROKE
@@ -60,49 +61,8 @@
   (#xFF #x02D9) ; DOT ABOVE
 )
 
-(declaim (inline get-iso-8859-2-bytes))
-(defun get-iso-8859-2-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-2-mapper :iso-8859-2 string pos))
-
-(defun string->iso-8859-2 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-2-bytes null-padding)))
-
-(defmacro define-iso-8859-2->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-2->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-2->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-2->string*)
-
-(defmacro define-iso-8859-2->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-2->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-2->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-2->string)
-
-(define-external-format (:iso-8859-2 :|iso-8859-2| :latin-2 :|latin-2|)
-    1 t
-    (let ((iso-8859-2-byte (code->iso-8859-2-mapper bits)))
-      (if iso-8859-2-byte
-          (setf (sap-ref-8 sap tail) iso-8859-2-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-2->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-2->string-aref
-    string->iso-8859-2) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-3->code-mapper code->iso-8859-3-mapper
+(define-unibyte-mapping-external-format :iso-8859-3
+    (:|iso-8859-3| :latin-3 :|latin-3|)
   (#xA1 #x0126) ; LATIN CAPITAL LETTER H WITH STROKE
   (#xA2 #x02D8) ; BREVE
   (#xA5 nil)
@@ -140,49 +100,8 @@
   (#xFF #x02D9) ; DOT ABOVE
 )
 
-(declaim (inline get-iso-8859-3-bytes))
-(defun get-iso-8859-3-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-3-mapper :iso-8859-3 string pos))
-
-(defun string->iso-8859-3 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-3-bytes null-padding)))
-
-(defmacro define-iso-8859-3->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-3->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-3->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-3->string*)
-
-(defmacro define-iso-8859-3->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-3->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-3->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-3->string)
-
-(define-external-format (:iso-8859-3 :|iso-8859-3| :latin-3 :|latin-3|)
-    1 t
-    (let ((iso-8859-3-byte (code->iso-8859-3-mapper bits)))
-      (if iso-8859-3-byte
-          (setf (sap-ref-8 sap tail) iso-8859-3-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-3->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-3->string-aref
-    string->iso-8859-3) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-4->code-mapper code->iso-8859-4-mapper
+(define-unibyte-mapping-external-format :iso-8859-4
+    (:|iso-8859-4| :latin-4 :|latin-4|)
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
   (#xA2 #x0138) ; LATIN SMALL LETTER KRA
   (#xA3 #x0156) ; LATIN CAPITAL LETTER R WITH CEDILLA
@@ -235,49 +154,7 @@
   (#xFF #x02D9) ; DOT ABOVE
 )
 
-(declaim (inline get-iso-8859-4-bytes))
-(defun get-iso-8859-4-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-4-mapper :iso-8859-4 string pos))
-
-(defun string->iso-8859-4 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-4-bytes null-padding)))
-
-(defmacro define-iso-8859-4->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-4->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-4->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-4->string*)
-
-(defmacro define-iso-8859-4->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-4->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-4->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-4->string)
-
-(define-external-format (:iso-8859-4 :|iso-8859-4| :latin-4 :|latin-4|)
-    1 t
-    (let ((iso-8859-4-byte (code->iso-8859-4-mapper bits)))
-      (if iso-8859-4-byte
-          (setf (sap-ref-8 sap tail) iso-8859-4-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-4->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-4->string-aref
-    string->iso-8859-4) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-5->code-mapper code->iso-8859-5-mapper
+(define-unibyte-mapping-external-format :iso-8859-5 (:|iso-8859-5|)
   (#xA1 #x0401) ; CYRILLIC CAPITAL LETTER IO
   (#xA2 #x0402) ; CYRILLIC CAPITAL LETTER DJE
   (#xA3 #x0403) ; CYRILLIC CAPITAL LETTER GJE
@@ -374,49 +251,7 @@
   (#xFF #x045F) ; CYRILLIC SMALL LETTER DZHE
 )
 
-(declaim (inline get-iso-8859-5-bytes))
-(defun get-iso-8859-5-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-5-mapper :iso-8859-5 string pos))
-
-(defun string->iso-8859-5 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-5-bytes null-padding)))
-
-(defmacro define-iso-8859-5->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-5->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-5->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-5->string*)
-
-(defmacro define-iso-8859-5->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-5->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-5->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-5->string)
-
-(define-external-format (:iso-8859-5 :|iso-8859-5|)
-    1 t
-    (let ((iso-8859-5-byte (code->iso-8859-5-mapper bits)))
-      (if iso-8859-5-byte
-          (setf (sap-ref-8 sap tail) iso-8859-5-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-5->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-5->string-aref
-    string->iso-8859-5) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-6->code-mapper code->iso-8859-6-mapper
+(define-unibyte-mapping-external-format :iso-8859-6 (:|iso-8859-6|)
   (#xA1 nil)
   (#xA2 nil)
   (#xA3 nil)
@@ -512,49 +347,7 @@
   (#xFF nil)
 )
 
-(declaim (inline get-iso-8859-6-bytes))
-(defun get-iso-8859-6-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-6-mapper :iso-8859-6 string pos))
-
-(defun string->iso-8859-6 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-6-bytes null-padding)))
-
-(defmacro define-iso-8859-6->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-6->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-6->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-6->string*)
-
-(defmacro define-iso-8859-6->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-6->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-6->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-6->string)
-
-(define-external-format (:iso-8859-6 :|iso-8859-6|)
-    1 t
-    (let ((iso-8859-6-byte (code->iso-8859-6-mapper bits)))
-      (if iso-8859-6-byte
-          (setf (sap-ref-8 sap tail) iso-8859-6-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-6->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-6->string-aref
-    string->iso-8859-6) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-7->code-mapper code->iso-8859-7-mapper
+(define-unibyte-mapping-external-format :iso-8859-7 (:|iso-8859-7|)
   (#xA1 #x02BD) ; MODIFIER LETTER REVERSED COMMA
   (#xA2 #x02BC) ; MODIFIER LETTER APOSTROPHE
   (#xA4 nil)
@@ -637,49 +430,7 @@
   (#xFF nil)
 )
 
-(declaim (inline get-iso-8859-7-bytes))
-(defun get-iso-8859-7-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-7-mapper :iso-8859-7 string pos))
-
-(defun string->iso-8859-7 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-7-bytes null-padding)))
-
-(defmacro define-iso-8859-7->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-7->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-7->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-7->string*)
-
-(defmacro define-iso-8859-7->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-7->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-7->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-7->string)
-
-(define-external-format (:iso-8859-7 :|iso-8859-7|)
-    1 t
-    (let ((iso-8859-7-byte (code->iso-8859-7-mapper bits)))
-      (if iso-8859-7-byte
-          (setf (sap-ref-8 sap tail) iso-8859-7-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-7->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-7->string-aref
-    string->iso-8859-7) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-8->code-mapper code->iso-8859-8-mapper
+(define-unibyte-mapping-external-format :iso-8859-8 (:|iso-8859-8|)
   (#xA1 nil)
   (#xAA #x00D7) ; MULTIPLICATION SIGN
   (#xAF #x203E) ; OVERLINE
@@ -751,49 +502,8 @@
   (#xFF nil)
 )
 
-(declaim (inline get-iso-8859-8-bytes))
-(defun get-iso-8859-8-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-8-mapper :iso-8859-8 string pos))
-
-(defun string->iso-8859-8 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-8-bytes null-padding)))
-
-(defmacro define-iso-8859-8->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-8->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-8->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-8->string*)
-
-(defmacro define-iso-8859-8->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-8->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-8->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-8->string)
-
-(define-external-format (:iso-8859-8 :|iso-8859-8|)
-    1 t
-    (let ((iso-8859-8-byte (code->iso-8859-8-mapper bits)))
-      (if iso-8859-8-byte
-          (setf (sap-ref-8 sap tail) iso-8859-8-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-8->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-8->string-aref
-    string->iso-8859-8) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-9->code-mapper code->iso-8859-9-mapper
+(define-unibyte-mapping-external-format :iso-8859-9
+    (:|iso-8859-9| :latin-5 :|latin-5|)
   (#xD0 #x011E) ; LATIN CAPITAL LETTER G WITH BREVE
   (#xDD #x0130) ; LATIN CAPITAL LETTER I WITH DOT ABOVE
   (#xDE #x015E) ; LATIN CAPITAL LETTER S WITH CEDILLA
@@ -802,49 +512,8 @@
   (#xFE #x015F) ; LATIN SMALL LETTER S WITH CEDILLA
 )
 
-(declaim (inline get-iso-8859-9-bytes))
-(defun get-iso-8859-9-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-9-mapper :iso-8859-9 string pos))
-
-(defun string->iso-8859-9 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-9-bytes null-padding)))
-
-(defmacro define-iso-8859-9->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-9->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-9->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-9->string*)
-
-(defmacro define-iso-8859-9->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-9->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-9->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-9->string)
-
-(define-external-format (:iso-8859-9 :|iso-8859-9| :latin-5 :|latin-5|)
-    1 t
-    (let ((iso-8859-9-byte (code->iso-8859-9-mapper bits)))
-      (if iso-8859-9-byte
-          (setf (sap-ref-8 sap tail) iso-8859-9-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-9->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-9->string-aref
-    string->iso-8859-9) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-10->code-mapper code->iso-8859-10-mapper
+(define-unibyte-mapping-external-format :iso-8859-10
+    (:|iso-8859-10| :latin-6 :|latin-6|)
   (#xA1 #x0104) ; LATIN CAPITAL LETTER A WITH OGONEK
   (#xA2 #x0112) ; LATIN CAPITAL LETTER E WITH MACRON
   (#xA3 #x0122) ; LATIN CAPITAL LETTER G WITH CEDILLA
@@ -893,49 +562,7 @@
   (#xFF #x0138) ; LATIN SMALL LETTER KRA
 )
 
-(declaim (inline get-iso-8859-10-bytes))
-(defun get-iso-8859-10-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-10-mapper :iso-8859-10 string pos))
-
-(defun string->iso-8859-10 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-10-bytes null-padding)))
-
-(defmacro define-iso-8859-10->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-10->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-10->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-10->string*)
-
-(defmacro define-iso-8859-10->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-10->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-10->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-10->string)
-
-(define-external-format (:iso-8859-10 :|iso-8859-10| :latin-6 :|latin-6|)
-    1 t
-    (let ((iso-8859-10-byte (code->iso-8859-10-mapper bits)))
-      (if iso-8859-10-byte
-          (setf (sap-ref-8 sap tail) iso-8859-10-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-10->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-10->string-aref
-    string->iso-8859-10) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-11->code-mapper code->iso-8859-11-mapper
+(define-unibyte-mapping-external-format :iso-8859-11 (:|iso-8859-11|)
   (#xA1 #x0E01) ; THAI CHARACTER KO KAI
   (#xA2 #x0E02) ; THAI CHARACTER KHO KHAI
   (#xA3 #x0E03) ; THAI CHARACTER KHO KHUAT
@@ -1033,49 +660,8 @@
   (#xFF nil)
 )
 
-(declaim (inline get-iso-8859-11-bytes))
-(defun get-iso-8859-11-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-11-mapper :iso-8859-11 string pos))
-
-(defun string->iso-8859-11 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-11-bytes null-padding)))
-
-(defmacro define-iso-8859-11->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-11->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-11->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-11->string*)
-
-(defmacro define-iso-8859-11->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-11->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-11->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-11->string)
-
-(define-external-format (:iso-8859-11 :|iso-8859-11|)
-    1 t
-    (let ((iso-8859-11-byte (code->iso-8859-11-mapper bits)))
-      (if iso-8859-11-byte
-          (setf (sap-ref-8 sap tail) iso-8859-11-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-11->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-11->string-aref
-    string->iso-8859-11) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-13->code-mapper code->iso-8859-13-mapper
+(define-unibyte-mapping-external-format :iso-8859-13
+    (:|iso-8859-13| :latin-7 :|latin-7|)
   (#xA1 #x201D) ; RIGHT DOUBLE QUOTATION MARK
   (#xA5 #x201E) ; DOUBLE LOW-9 QUOTATION MARK
   (#xA8 #x00D8) ; LATIN CAPITAL LETTER O WITH STROKE
@@ -1134,49 +720,8 @@
   (#xFF #x2019) ; RIGHT SINGLE QUOTATION MARK
 )
 
-(declaim (inline get-iso-8859-13-bytes))
-(defun get-iso-8859-13-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-13-mapper :iso-8859-13 string pos))
-
-(defun string->iso-8859-13 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-13-bytes null-padding)))
-
-(defmacro define-iso-8859-13->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-13->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-13->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-13->string*)
-
-(defmacro define-iso-8859-13->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-13->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-13->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-13->string)
-
-(define-external-format (:iso-8859-13 :|iso-8859-13| :latin-7 :|latin-7|)
-    1 t
-    (let ((iso-8859-13-byte (code->iso-8859-13-mapper bits)))
-      (if iso-8859-13-byte
-          (setf (sap-ref-8 sap tail) iso-8859-13-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-13->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-13->string-aref
-    string->iso-8859-13) ;; TODO -- error check
-
-(define-unibyte-mapper iso-8859-14->code-mapper code->iso-8859-14-mapper
+(define-unibyte-mapping-external-format :iso-8859-14
+    (:|iso-8859-14| :latin-8 :|latin-8|)
   (#xA1 #x1E02) ; LATIN CAPITAL LETTER B WITH DOT ABOVE
   (#xA2 #x1E03) ; LATIN SMALL LETTER B WITH DOT ABOVE
   (#xA4 #x010A) ; LATIN CAPITAL LETTER C WITH DOT ABOVE
@@ -1210,51 +755,9 @@
   (#xFE #x0177) ; LATIN SMALL LETTER Y WITH CIRCUMFLEX
 )
 
-(declaim (inline get-iso-8859-14-bytes))
-(defun get-iso-8859-14-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->iso-8859-14-mapper :iso-8859-14 string pos))
-
-(defun string->iso-8859-14 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-iso-8859-14-bytes null-padding)))
-
-(defmacro define-iso-8859-14->string* (accessor type)
-  (declare (ignore type))
-  (let ((name (make-od-name 'iso-8859-14->string* accessor)))
-    `(progn
-      (defun ,name (string sstart send array astart aend)
-        (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'iso-8859-14->code-mapper)))))
-
-(instantiate-octets-definition define-iso-8859-14->string*)
-
-(defmacro define-iso-8859-14->string (accessor type)
-  (declare (ignore type))
-  `(defun ,(make-od-name 'iso-8859-14->string accessor) (array astart aend)
-    (,(make-od-name 'latin->string accessor) array astart aend #'iso-8859-14->code-mapper)))
-
-(instantiate-octets-definition define-iso-8859-14->string)
-
-(define-external-format (:iso-8859-14 :|iso-8859-14| :latin-8 :|latin-8|)
-    1 t
-    (let ((iso-8859-14-byte (code->iso-8859-14-mapper bits)))
-      (if iso-8859-14-byte
-          (setf (sap-ref-8 sap tail) iso-8859-14-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (iso-8859-14->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    iso-8859-14->string-aref
-    string->iso-8859-14) ;; TODO -- error check
-
-(define-unibyte-mapper
-    latin9->code-mapper
-    code->latin9-mapper
+;;; The names for latin9 are different due to a historical accident.
+(define-unibyte-mapping-external-format :latin-9
+    (:latin9 :iso-8859-15 :iso8859-15)
   (#xA4 #x20AC)
   (#xA6 #x0160)
   (#xA8 #x0161)
@@ -1262,45 +765,5 @@
   (#xB8 #x017E)
   (#xBC #x0152)
   (#xBD #x0153)
-  (#xBE #x0178))
-
-(declaim (inline get-latin9-bytes))
-(defun get-latin9-bytes (string pos)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range pos))
-  (get-latin-bytes #'code->latin9-mapper :latin-9 string pos))
-
-(defun string->latin9 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
-           (type simple-string string)
-           (type array-range sstart send))
-  (values (string->latin% string sstart send #'get-latin9-bytes null-padding)))
-
-(defmacro define-latin9->string* (accessor type)
-    (declare (ignore type))
-    (let ((name (make-od-name 'latin9->string* accessor)))
-      `(progn
-        (defun ,name (string sstart send array astart aend)
-          (,(make-od-name 'latin->string* accessor) string sstart send array astart aend #'latin9->code-mapper)))))
-(instantiate-octets-definition define-latin9->string*)
-
-(defmacro define-latin9->string (accessor type)
-    (declare (ignore type))
-    `(defun ,(make-od-name 'latin9->string accessor) (array astart aend)
-      (,(make-od-name 'latin->string accessor) array astart aend #'latin9->code-mapper)))
-  (instantiate-octets-definition define-latin9->string)
-
-;;; The names for latin9 are different due to a historical accident.
-(define-external-format (:latin-9 :latin9 :iso-8859-15 :iso8859-15)
-    1 t
-    (let ((latin-9-byte (code->latin9-mapper bits)))
-      (if latin-9-byte
-          (setf (sap-ref-8 sap tail) latin-9-byte)
-          (external-format-encoding-error stream bits)))
-    (let ((code (latin9->code-mapper byte)))
-      (if code
-          (code-char code)
-          (external-format-decoding-error stream byte)))
-    latin9->string-aref
-    string->latin9)
+  (#xBE #x0178)
+)

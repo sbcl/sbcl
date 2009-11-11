@@ -505,11 +505,6 @@
       (stream-encoding-error-and-handle stream code)
       (c-string-encoding-error stream code)))
 
-(defun external-format-decoding-error (stream octet-count)
-  (if (streamp stream)
-      (stream-decoding-error stream octet-count)
-      (c-string-decoding-error stream octet-count)))
-
 (defun synchronize-stream-output (stream)
   ;; If we're reading and writing on the same file, flush buffered
   ;; input and rewind file position accordingly.
@@ -1336,198 +1331,69 @@
 (defun bytes-for-char-fun (ef-entry)
   (if ef-entry (ef-bytes-for-char-fun ef-entry) (constantly 1)))
 
-(defmacro define-external-format (external-format size output-restart
-                                  out-expr in-expr
-                                  octets-to-string-sym
-                                  string-to-octets-sym)
-  (let* ((name (first external-format))
-         (out-function (symbolicate "OUTPUT-BYTES/" name))
-         (format (format nil "OUTPUT-CHAR-~A-~~A-BUFFERED" (string name)))
-         (in-function (symbolicate "FD-STREAM-READ-N-CHARACTERS/" name))
-         (in-char-function (symbolicate "INPUT-CHAR/" name))
-         (size-function (symbolicate "BYTES-FOR-CHAR/" name))
-         (read-c-string-function (symbolicate "READ-FROM-C-STRING/" name))
-         (output-c-string-function (symbolicate "OUTPUT-TO-C-STRING/" name))
-         (n-buffer (gensym "BUFFER")))
+(defmacro define-unibyte-mapping-external-format
+    (canonical-name (&rest other-names) &body exceptions)
+  (let ((->code-name (symbolicate canonical-name '->code-mapper))
+        (code->-name (symbolicate 'code-> canonical-name '-mapper))
+        (get-bytes-name (symbolicate 'get- canonical-name '-bytes))
+        (string->-name (symbolicate 'string-> canonical-name))
+        (define-string*-name (symbolicate 'define- canonical-name '->string*))
+        (string*-name (symbolicate canonical-name '->string*))
+        (define-string-name (symbolicate 'define- canonical-name '->string))
+        (string-name (symbolicate canonical-name '->string))
+        (->string-aref-name (symbolicate canonical-name '->string-aref)))
     `(progn
-      (defun ,size-function (byte)
-        (declare (ignore byte))
-        ,size)
-      (defun ,out-function (stream string flush-p start end)
-        (let ((start (or start 0))
-              (end (or end (length string))))
-          (declare (type index start end))
-          (synchronize-stream-output stream)
-          (unless (<= 0 start end (length string))
-            (sequence-bounding-indices-bad-error string start end))
-          (do ()
-              ((= end start))
-            (let ((obuf (fd-stream-obuf stream)))
-              (string-dispatch (simple-base-string
-                                #!+sb-unicode
-                                (simple-array character (*))
-                                string)
-                  string
-                (let ((sap (buffer-sap obuf))
-                      (len (buffer-length obuf))
-                      ;; FIXME: rename
-                      (tail (buffer-tail obuf)))
-                  (declare (type index tail)
-                           ;; STRING bounds have already been checked.
-                           (optimize (safety 0)))
-                  (,@(if output-restart
-                         `(catch 'output-nothing)
-                         `(progn))
-                     (do* ()
-                          ((or (= start end) (< (- len tail) 4)))
-                       (let* ((byte (aref string start))
-                              (bits (char-code byte)))
-                         ,out-expr
-                         (incf tail ,size)
-                         (setf (buffer-tail obuf) tail)
-                         (incf start)))
-                     ;; Exited from the loop normally
-                     (go flush))
-                  ;; Exited via CATCH. Skip the current character.
-                  (incf start))))
-           flush
-            (when (< start end)
-              (flush-output-buffer stream)))
-          (when flush-p
-            (flush-output-buffer stream))))
-      (def-output-routines (,format
-                            ,size
-                            ,output-restart
-                            (:none character)
-                            (:line character)
-                            (:full character))
-          (if (eql byte #\Newline)
-              (setf (fd-stream-char-pos stream) 0)
-              (incf (fd-stream-char-pos stream)))
-          (let* ((obuf (fd-stream-obuf stream))
-                 (bits (char-code byte))
-                 (sap (buffer-sap obuf))
-                 (tail (buffer-tail obuf)))
-            ,out-expr))
-      (defun ,in-function (stream buffer start requested eof-error-p
-                           &aux (index start) (end (+ start requested)))
-        (declare (type fd-stream stream)
-                 (type index start requested index end)
-                 (type
-                  (simple-array character (#.+ansi-stream-in-buffer-length+))
-                  buffer))
-        (when (fd-stream-eof-forced-p stream)
-          (setf (fd-stream-eof-forced-p stream) nil)
-          (return-from ,in-function 0))
-        (do ((instead (fd-stream-instead stream)))
-            ((= (fill-pointer instead) 0)
-             (setf (fd-stream-listen stream) nil))
-          (setf (aref buffer index) (vector-pop instead))
-          (incf index)
-          (when (= index end)
-            (return-from ,in-function (- index start))))
-        (do ()
-            (nil)
-          (let* ((ibuf (fd-stream-ibuf stream))
-                 (head (buffer-head ibuf))
-                 (tail (buffer-tail ibuf))
-                 (sap (buffer-sap ibuf)))
-            (declare (type index head tail)
-                     (type system-area-pointer sap))
-            ;; Copy data from stream buffer into user's buffer.
-            (dotimes (i (min (truncate (- tail head) ,size)
-                             (- end index)))
-              (declare (optimize speed))
-              (let* ((byte (sap-ref-8 sap head)))
-                (setf (aref buffer index) ,in-expr)
-                (incf index)
-                (incf head ,size)))
-            (setf (buffer-head ibuf) head)
-            ;; Maybe we need to refill the stream buffer.
-            (cond ( ;; If there was enough data in the stream buffer, we're done.
-                   (= index end)
-                   (return (- index start)))
-                  ( ;; If EOF, we're done in another way.
-                   (null (catch 'eof-input-catcher (refill-input-buffer stream)))
-                   (if eof-error-p
-                       (error 'end-of-file :stream stream)
-                       (return (- index start))))
-                  ;; Otherwise we refilled the stream buffer, so fall
-                  ;; through into another pass of the loop.
-                  ))))
-      (def-input-routine ,in-char-function (character ,size sap head)
-        (let ((byte (sap-ref-8 sap head)))
-          ,in-expr))
-      (defun ,read-c-string-function (sap element-type)
-        (declare (type system-area-pointer sap)
-                 (type (member character base-char) element-type))
-        (locally
-            (declare (optimize (speed 3) (safety 0)))
-          (let* ((stream ,name)
-                 (length
-                  (loop for head of-type index upfrom 0 by ,size
-                        for count of-type index upto (1- array-dimension-limit)
-                        for byte = (sap-ref-8 sap head)
-                        for char of-type character = ,in-expr
-                        until (zerop (char-code char))
-                        finally (return count)))
-                 ;; Inline the common cases
-                 (string (make-string length :element-type element-type)))
-            (declare (ignorable stream)
-                     (type index length)
-                     (type simple-string string))
-            (/show0 before-copy-loop)
-            (loop for head of-type index upfrom 0 by ,size
-               for index of-type index below length
-               for byte = (sap-ref-8 sap head)
-               for char of-type character = ,in-expr
-               do (setf (aref string index) char))
-            string))) ;; last loop rewrite to dotimes?
-        (defun ,output-c-string-function (string)
-          (declare (type simple-string string))
-          (locally
-              (declare (optimize (speed 3) (safety 0)))
-            (let* ((length (length string))
-                   (,n-buffer (make-array (* (1+ length) ,size)
-                                          :element-type '(unsigned-byte 8)))
-                   (tail 0)
-                   (stream ,name))
-              (declare (type index length tail))
-              (with-pinned-objects (,n-buffer)
-                (let ((sap (vector-sap ,n-buffer)))
-                  (declare (system-area-pointer sap))
-                  (dotimes (i length)
-                    (let* ((byte (aref string i))
-                           (bits (char-code byte)))
-                      (declare (ignorable byte bits))
-                      ,out-expr)
-                    (incf tail ,size))
-                  (let* ((bits 0)
-                         (byte (code-char bits)))
-                    (declare (ignorable bits byte))
-                    ,out-expr)))
-              ,n-buffer)))
-        (let ((entry (%make-external-format
-                      :names ',external-format
-                      :read-n-chars-fun #',in-function
-                      :read-char-fun #',in-char-function
-                      :write-n-bytes-fun #',out-function
-                      ,@(mapcan #'(lambda (buffering)
-                                    (list (intern (format nil "WRITE-CHAR-~A-BUFFERED-FUN" buffering) :keyword)
-                                          `#',(intern (format nil format (string buffering)))))
-                                '(:none :line :full))
-                      :resync-fun nil
-                      :bytes-for-char-fun #',size-function
-                      :read-c-string-fun #',read-c-string-function
-                      :write-c-string-fun #',output-c-string-function
-                      :octets-to-string-fun (lambda (&rest rest)
-                                              (declare (dynamic-extent rest))
-                                              (apply ',octets-to-string-sym rest))
-                      :string-to-octets-fun (lambda (&rest rest)
-                                              (declare (dynamic-extent rest))
-                                              (apply ',string-to-octets-sym rest)))))
-          (dolist (ef ',external-format)
-            (setf (gethash ef *external-formats*) entry))))))
+       (define-unibyte-mapper ,->code-name ,code->-name
+         ,@exceptions)
+       (declaim (inline ,get-bytes-name))
+       (defun ,get-bytes-name (string pos)
+         (declare (optimize speed (safety 0))
+                  (type simple-string string)
+                  (type array-range pos))
+         (get-latin-bytes #',code->-name ,canonical-name string pos))
+       (defun ,string->-name (string sstart send null-padding)
+         (declare (optimize speed (safety 0))
+                  (type simple-string string)
+                  (type array-range sstart send))
+         (values (string->latin% string sstart send #',get-bytes-name null-padding)))
+       (defmacro ,define-string*-name (accessor type)
+         (declare (ignore type))
+         (let ((name (make-od-name ',string*-name accessor)))
+           `(progn
+              (defun ,name (string sstart send array astart aend)
+                (,(make-od-name 'latin->string* accessor)
+                  string sstart send array astart aend #',',->code-name)))))
+       (instantiate-octets-definition ,define-string*-name)
+       (defmacro ,define-string-name (accessor type)
+         (declare (ignore type))
+         (let ((name (make-od-name ',string-name accessor)))
+           `(progn
+              (defun ,name (array astart aend)
+                (,(make-od-name 'latin->string accessor)
+                  array astart aend #',',->code-name)))))
+       (instantiate-octets-definition ,define-string-name)
+       (define-unibyte-external-format ,canonical-name ,other-names
+         (let ((octet (,code->-name bits)))
+           (if octet
+               (setf (sap-ref-8 sap tail) octet)
+               (external-format-encoding-error stream bits)))
+         (let ((code (,->code-name byte)))
+           (if code
+               (code-char code)
+               (return-from decode-break-reason 1)))
+         ,->string-aref-name
+         ,string->-name))))
+
+(defmacro define-unibyte-external-format
+    (canonical-name (&rest other-names)
+     out-form in-form octets-to-string-symbol string-to-octets-symbol)
+  `(define-external-format/variable-width (,canonical-name ,@other-names)
+     t 1
+     ,out-form
+     1
+     ,in-form
+     ,octets-to-string-symbol
+     ,string-to-octets-symbol))
 
 (defmacro define-external-format/variable-width
     (external-format output-restart out-size-expr
