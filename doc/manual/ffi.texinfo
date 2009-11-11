@@ -283,6 +283,7 @@ types to declare that no useful value is returned.  Using
 return zero values.
 
 @item
+@cindex External formats
 The foreign type specifier @code{(sb-alien:c-string &key external-format
 element-type)} is similar to @code{(* char)}, but is interpreted as a
 null-terminated string, and is automatically converted into a Lisp

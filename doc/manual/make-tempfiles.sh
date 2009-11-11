@@ -72,3 +72,16 @@ then
 else
     cp package-locks-basic.texinfo package-locks.texi-temp
 fi
+
+echo /creating encodings.texi-temp
+$SBCL <<EOF
+(with-open-file (s "encodings.texi-temp" :direction :output :if-exists :supersede)
+  (let (result)
+    (sb-int:dohash ((key val) sb-impl::*external-formats*)
+      (pushnew (sb-impl::ef-names val) result :test #'equal))
+    (setq result (sort result #'string< :key #'car))
+    (format s "@table @code~%~%")
+    (loop for (cname . names) in result
+          do (format s "@item ~S~%~{@code{~S}~^, ~}~%~%" cname names))
+    (format s "@end table~%")))
+EOF

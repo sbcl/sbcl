@@ -81,7 +81,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Beyond the ANSI Standard::    
 * Foreign Function Interface::  
 * Pathnames::
-* Extensible Streams::          
+* Streams::          
 * Package Locks::               
 * Threading::
 * Timers::
