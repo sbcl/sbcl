@@ -51,7 +51,8 @@
          (ensure-roundtrip-utf8 ()
            (let ((string (make-string char-code-limit)))
              (dotimes (i char-code-limit)
-               (setf (char string i) (code-char i)))
+               (unless (<= #xd800 i #xdfff)
+                 (setf (char string i) (code-char i))))
              (let ((string2
                     (octets-to-string (string-to-octets string :external-format :utf8)
                                       :external-format :utf8)))
@@ -131,12 +132,21 @@
     (utf8-decode-tests #(#xe0 #xa0 #x80) "?") ; #x800
     (utf8-decode-tests #(#xef #xbf #xbf) "?") ; #xffff
     (utf8-decode-tests #(#xf0 #x90 #x80 #x80) "?")) ; #x10000
-  (utf8-decode-tests #(#xf4 #x90 #x80 #x80) "?") ; #x110000
-  (utf8-decode-tests #(#xf7 #xbf #xbf #xbf) "?") ; #x1fffff
-  (utf8-decode-tests #(#xf8 #x88 #x80 #x80 #x80) "?") ; #x200000
-  (utf8-decode-tests #(#xfb #xbf #xbf #xbf #xbf) "?") ; #x3ffffff
-  (utf8-decode-tests #(#xfc #x84 #x80 #x80 #x80 #x80) "?") ; #x4000000
-  (utf8-decode-tests #(#xfd #xbf #xbf #xbf #xbf #xbf) "?") ; #x7fffffff
+  #+nil ; old, 6-byte UTF-8 definition
+  (progn
+    (utf8-decode-tests #(#xf4 #x90 #x80 #x80) "?") ; #x110000
+    (utf8-decode-tests #(#xf7 #xbf #xbf #xbf) "?") ; #x1fffff
+    (utf8-decode-tests #(#xf8 #x88 #x80 #x80 #x80) "?") ; #x200000
+    (utf8-decode-tests #(#xfb #xbf #xbf #xbf #xbf) "?") ; #x3ffffff
+    (utf8-decode-tests #(#xfc #x84 #x80 #x80 #x80 #x80) "?") ; #x4000000
+    (utf8-decode-tests #(#xfd #xbf #xbf #xbf #xbf #xbf) "?")) ; #x7fffffff
+  (progn ; new, 4-byte (maximum #x10ffff) UTF-8 definition
+    (utf8-decode-tests #(#xf4 #x90) "??") ; #x110000
+    (utf8-decode-tests #(#xf7 #xbf #xbf #xbf) "????") ; #x1fffff
+    (utf8-decode-tests #(#xf8 #x88 #x80 #x80 #x80) "?????") ; #x200000
+    (utf8-decode-tests #(#xfb #xbf #xbf #xbf #xbf) "?????") ; #x3ffffff
+    (utf8-decode-tests #(#xfc #x84 #x80 #x80 #x80 #x80) "??????") ; #x4000000
+    (utf8-decode-tests #(#xfd #xbf #xbf #xbf #xbf #xbf) "??????")) ; #x7fffffff
 
   ;; Unexpected continuation bytes
   (utf8-decode-tests #(#x80) "?")
@@ -178,19 +188,24 @@
 
   ;; Otherwise incomplete sequences (last continuation byte missing)
   (utf8-decode-tests #0=#(#xc0) "?")
-  (utf8-decode-tests #1=#(#xe0 #x80) "?")
-  (utf8-decode-tests #2=#(#xf0 #x80 #x80) "?")
+  (utf8-decode-tests #1=#(#xe0 #xa0) "?")
+  (utf8-decode-tests #2=#(#xf0 #x90 #x80) "?")
+  #+nil
   (utf8-decode-tests #3=#(#xf8 #x80 #x80 #x80) "?")
+  #+nil
   (utf8-decode-tests #4=#(#xfc #x80 #x80 #x80 #x80) "?")
   (utf8-decode-tests #5=#(#xdf) "?")
   (utf8-decode-tests #6=#(#xef #xbf) "?")
+  #+nil
   (utf8-decode-tests #7=#(#xf7 #xbf #xbf) "?")
+  #+nil
   (utf8-decode-tests #8=#(#xfb #xbf #xbf #xbf) "?")
+  #+nil
   (utf8-decode-tests #9=#(#xfd #xbf #xbf #xbf #xbf) "?")
 
   ;; All ten previous tests concatenated
-  (utf8-decode-tests (concatenate 'vector #0# #1# #2# #3# #4# #5# #6# #7# #8# #9#)
-                     "??????????")
+  (utf8-decode-tests (concatenate 'vector #0# #1# #2# #5# #6#)
+                     "?????")
 
   ;; Random impossible bytes
   (utf8-decode-tests #(#xfe) "?")
@@ -198,25 +213,25 @@
   (utf8-decode-tests #(#xfe #xfe #xff #xff) "????")
 
   ;; Overlong sequences - /
-  (utf8-decode-tests #(#xc0 #xaf) "?")
-  (utf8-decode-tests #(#xe0 #x80 #xaf) "?")
-  (utf8-decode-tests #(#xf0 #x80 #x80 #xaf) "?")
-  (utf8-decode-tests #(#xf8 #x80 #x80 #x80 #xaf) "?")
-  (utf8-decode-tests #(#xfc #x80 #x80 #x80 #x80 #xaf) "?")
+  (utf8-decode-tests #(#xc0 #xaf) "??")
+  (utf8-decode-tests #(#xe0 #x80 #xaf) "???")
+  (utf8-decode-tests #(#xf0 #x80 #x80 #xaf) "????")
+  (utf8-decode-tests #(#xf8 #x80 #x80 #x80 #xaf) "?????")
+  (utf8-decode-tests #(#xfc #x80 #x80 #x80 #x80 #xaf) "??????")
 
   ;; Overlong sequences - #\Rubout
-  (utf8-decode-tests #(#xc1 #xbf) "?")
-  (utf8-decode-tests #(#xe0 #x9f #xbf) "?")
-  (utf8-decode-tests #(#xf0 #x8f #xbf #xbf) "?")
-  (utf8-decode-tests #(#xf8 #x87 #xbf #xbf #xbf) "?")
-  (utf8-decode-tests #(#xfc #x83 #xbf #xbf #xbf #xbf) "?")
+  (utf8-decode-tests #(#xc1 #xbf) "??")
+  (utf8-decode-tests #(#xe0 #x9f #xbf) "???")
+  (utf8-decode-tests #(#xf0 #x8f #xbf #xbf) "????")
+  (utf8-decode-tests #(#xf8 #x87 #xbf #xbf #xbf) "?????")
+  (utf8-decode-tests #(#xfc #x83 #xbf #xbf #xbf #xbf) "??????")
 
   ;; Overlong sequences - #\Null
-  (utf8-decode-tests #(#xc0 #x80) "?")
-  (utf8-decode-tests #(#xe0 #x80 #x80) "?")
-  (utf8-decode-tests #(#xf0 #x80 #x80 #x80) "?")
-  (utf8-decode-tests #(#xf8 #x80 #x80 #x80 #x80) "?")
-  (utf8-decode-tests #(#xfc #x80 #x80 #x80 #x80 #x80) "?")
+  (utf8-decode-tests #(#xc0 #x80) "??")
+  (utf8-decode-tests #(#xe0 #x80 #x80) "???")
+  (utf8-decode-tests #(#xf0 #x80 #x80 #x80) "????")
+  (utf8-decode-tests #(#xf8 #x80 #x80 #x80 #x80) "?????")
+  (utf8-decode-tests #(#xfc #x80 #x80 #x80 #x80 #x80) "??????")
 
   ;; Not testing surrogates & characters #xFFFE, #xFFFF; they're
   ;; perfectly good sbcl chars even if they're not actually ISO 10646
@@ -236,6 +251,9 @@
                                       :external-format :utf-8)))
 (assert (equalp #() (string-to-octets (make-array 5 :element-type nil)
                                       :start 3 :end 3 :external-format :utf-8)))
+(assert (equalp #(0) (string-to-octets (make-array 5 :element-type nil)
+                                       :start 3 :end 3 :null-terminate t
+                                       :external-format :utf-8)))
 
 ;;; whoops: the iso-8859-2 format referred to an undefined symbol.
 #+sb-unicode
@@ -251,3 +269,17 @@
                       (coerce #(182 123 253 238) '(vector (unsigned-byte 8)))
                       :external-format :euc-jp)))))
 
+#+sb-unicode
+(with-test (:name (:utf-8 :surrogates :encoding-errors))
+  (handler-bind ((sb-int:character-encoding-error
+                  (lambda (c) (use-value #\? c))))
+    (assert (equalp (string-to-octets (string (code-char #xd800))
+                                      :external-format :utf-8)
+                    (vector (char-code #\?))))))
+#+sb-unicode
+(with-test (:name (:utf-8 :surrogates :decoding-errors))
+  (handler-bind ((sb-int:character-decoding-error
+                  (lambda (c) (use-value #\? c))))
+    (assert (find #\? (octets-to-string
+                       (coerce #(237 160 128) '(vector (unsigned-byte 8)))
+                       :external-format :utf-8)))))

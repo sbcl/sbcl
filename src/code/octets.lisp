@@ -74,20 +74,13 @@ one-past-the-end"
 ;;;   character-out-of-range
 ;;;   invalid-utf8-starter-byte
 ;;;   invalid-utf8-continuation-byte
-;;;   overlong-utf8-sequence
 ;;;
 ;;; Of these, the only one truly likely to be of interest to calling
 ;;; code is end-of-input-in-character (in which case it's likely to
 ;;; want to make a note of octet-decoding-error-start, supply "" as a
 ;;; replacement string, and then move that last chunk of bytes to the
 ;;; beginning of its buffer for the next go round) but they're all
-;;; provided on the off chance they're of interest.  The next most
-;;; likely interesting option is overlong-utf8-sequence -- the
-;;; application, if it cares to, can decode this itself (taking care
-;;; to ensure that the result isn't out of range of CHAR-CODE-LIMIT)
-;;; and return that result.  This library doesn't provide support for
-;;; that as a conforming UTF-8-using program is supposed to treat it
-;;; as an error.
+;;; provided on the off chance they're of interest.
 
 (define-condition octet-decoding-error (character-decoding-error)
   ((array :initarg :array :accessor octet-decoding-error-array)

@@ -14,6 +14,9 @@ changes relative to sbcl-1.0.32:
        transformations.
     ** improvement: restarts for providing replacement input/output on coding
        errors for fd-stream external formats.
+    ** minor incompatible change: the utf-8 external format now correctly
+       refuses to encode Lisp characters in the surrogate range (char-codes
+       between #xd800 and #xdfff).
     ** fix a typo preventing conversion of strings into octet vectors
        in the latin-2 encoding.  (reported by Attila Lendvai; launchpad bug
        #471689)
