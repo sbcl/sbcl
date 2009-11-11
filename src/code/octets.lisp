@@ -183,9 +183,8 @@ one-past-the-end"
                    finally (return elements)))
          ;; Find the smallest character code such that the corresponding
          ;; byte is != to the code.
-         (lowest-non-equivalent-code (position-if-not #'(lambda (pair)
-                                                          (apply #'= pair))
-                                                      pairs))
+         (lowest-non-equivalent-code
+          (caar (sort (copy-seq exceptions) #'< :key #'car)))
          ;; Sort them for our lookup table.
          (sorted-pairs (sort (subseq pairs lowest-non-equivalent-code)
                              #'< :key #'car))
@@ -199,9 +198,9 @@ one-past-the-end"
               ,(make-array 256 :element-type t #+nil 'char-code
                            :initial-contents (loop for byte below 256
                                                 collect
-                                                (let ((exception (cadr (assoc byte exceptions))))
+                                                (let ((exception (cdr (assoc byte exceptions))))
                                                   (if exception
-                                                      exception
+                                                      (car exception)
                                                       byte)))))
              (code-to-byte-table
               ,(make-array (length sorted-lookup-table)

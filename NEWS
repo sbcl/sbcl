@@ -30,9 +30,10 @@ changes relative to sbcl-1.0.32:
     ** fix the bug underlying the expected failure in the FORCE-END-OF-FILE
        restart on fd-stream decoding errors.
     ** fix a bug in the ATTEMPT-RESYNC fd-stream decoding restart when the
-       error is near the end of file
+       error is near the end of file.
     ** fix a double-error case in unibyte octet conversions, when the first
        use of USE-VALUE is ignored.
+    ** fix bugs in handling of undefined code points in unibyte encodings.
   * enhancement: SB-INTROSPECT:ALLOCATION-INFORMATION also reports if the
     object is allocated in a boxed region of dynamic space.
   * bug fix: uses of slot accessors on specialized method parameters within

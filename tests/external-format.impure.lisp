@@ -366,4 +366,13 @@
            (assert (or (= i (char-code #\?)) (> i 127))))
           (t (assert (and (not (= i (char-code #\?))) (< i 128)))))))))
 
+(with-test (:name (:unibyte-invalid-codepoints :cp857))
+  (dotimes (i 256)
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
+      (write-byte i s))
+    (with-open-file (s *test-path* :external-format :cp857)
+      (handler-case (read-char s)
+        (error () (assert (member i '(#xd5 #xe7 #xf2))))
+        (:no-error (char) (assert (not (member i '(#xd5 #xe7 #xf2)))))))))
+
 ;;;; success
