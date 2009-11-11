@@ -730,7 +730,7 @@
              (position #\newline thing :from-end t
                        :start start :end end))))
       (if (and (typep thing 'base-string)
-               (eq (fd-stream-external-format stream) :latin-1))
+               (eq (fd-stream-external-format-keyword stream) :latin-1))
           (ecase (fd-stream-buffering stream)
             (:full
              (buffer-output stream thing start end))
@@ -755,28 +755,47 @@
              (:constructor %make-external-format)
              (:conc-name ef-)
              (:predicate external-format-p)
-             (:copier nil))
+             (:copier %copy-external-format))
   ;; All the names that can refer to this external format.  The first
   ;; one is the canonical name.
   (names (missing-arg) :type list :read-only t)
-  (read-n-chars-fun (missing-arg) :type function :read-only t)
-  (read-char-fun (missing-arg) :type function :read-only t)
-  (write-n-bytes-fun (missing-arg) :type function :read-only t)
-  (write-char-none-buffered-fun (missing-arg) :type function :read-only t)
-  (write-char-line-buffered-fun (missing-arg) :type function :read-only t)
-  (write-char-full-buffered-fun (missing-arg) :type function :read-only t)
+  (read-n-chars-fun (missing-arg) :type function)
+  (read-char-fun (missing-arg) :type function)
+  (write-n-bytes-fun (missing-arg) :type function)
+  (write-char-none-buffered-fun (missing-arg) :type function)
+  (write-char-line-buffered-fun (missing-arg) :type function)
+  (write-char-full-buffered-fun (missing-arg) :type function)
   ;; Can be nil for fixed-width formats.
-  (resync-fun nil :type (or function null) :read-only t)
-  (bytes-for-char-fun (missing-arg) :type function :read-only t)
-  (read-c-string-fun (missing-arg) :type function :read-only t)
-  (write-c-string-fun (missing-arg) :type function :read-only t)
-  ;; We make these symbols so that a developer working on the octets
-  ;; code can easily redefine things and use the new function definition
-  ;; without redefining the external format as well.  The slots above
-  ;; are functions because a developer working with those slots would be
+  (resync-fun nil :type (or function null))
+  (bytes-for-char-fun (missing-arg) :type function)
+  (read-c-string-fun (missing-arg) :type function)
+  (write-c-string-fun (missing-arg) :type function)
+  ;; We indirect through symbols in these functions so that a
+  ;; developer working on the octets code can easily redefine things
+  ;; and use the new function definition without redefining the
+  ;; external format as well.  The slots above don't do any
+  ;; indirection because a developer working with those slots would be
   ;; redefining the external format anyway.
-  (octets-to-string-sym (missing-arg) :type symbol :read-only t)
-  (string-to-octets-sym (missing-arg) :type symbol :read-only t))
+  (octets-to-string-fun (missing-arg) :type function)
+  (string-to-octets-fun (missing-arg) :type function))
+
+(defun wrap-external-format-functions (external-format fun)
+  (let ((result (%copy-external-format external-format)))
+    (macrolet ((frob (accessor)
+                 `(setf (,accessor result) (funcall fun (,accessor result)))))
+      (frob ef-read-n-chars-fun)
+      (frob ef-read-char-fun)
+      (frob ef-write-n-bytes-fun)
+      (frob ef-write-char-none-buffered-fun)
+      (frob ef-write-char-line-buffered-fun)
+      (frob ef-write-char-full-buffered-fun)
+      (frob ef-resync-fun)
+      (frob ef-bytes-for-char-fun)
+      (frob ef-read-c-string-fun)
+      (frob ef-write-c-string-fun)
+      (frob ef-octets-to-string-fun)
+      (frob ef-string-to-octets-fun))
+    result))
 
 (defvar *external-formats* (make-hash-table)
   #!+sb-doc
@@ -784,11 +803,56 @@
   external-format names to EXTERNAL-FORMAT structures.")
 
 (defun get-external-format (external-format)
-  (gethash external-format *external-formats*))
+  (flet ((keyword-external-format (keyword)
+           (declare (type keyword keyword))
+           (gethash keyword *external-formats*))
+         (replacement-handlerify (entry replacement)
+           (when entry
+             (wrap-external-format-functions
+              entry
+              (lambda (fun)
+                (and fun
+                     (lambda (&rest rest)
+                       (declare (dynamic-extent rest))
+                       (handler-bind
+                           ((stream-decoding-error
+                             (lambda (c)
+                               (declare (ignore c))
+                               (invoke-restart 'input-replacement replacement)))
+                            (stream-encoding-error
+                             (lambda (c)
+                               (declare (ignore c))
+                               (invoke-restart 'output-replacement replacement)))
+                            (octets-encoding-error
+                             (lambda (c) (use-value replacement c)))
+                            (octet-decoding-error
+                             (lambda (c) (use-value replacement c))))
+                         (apply fun rest)))))))))
+    (typecase external-format
+      (keyword (keyword-external-format external-format))
+      ((cons keyword)
+       (let ((entry (keyword-external-format (car external-format)))
+             (replacement (getf (cdr external-format) :replacement)))
+         (if replacement
+             (replacement-handlerify entry replacement)
+             entry))))))
 
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
       (error "Undefined external-format ~A" external-format)))
+
+(defun external-format-keyword (external-format)
+  (typecase external-format
+    (keyword external-format)
+    ((cons keyword) (car external-format))))
+
+(defun fd-stream-external-format-keyword (stream)
+  (external-format-keyword (fd-stream-external-format stream)))
+
+(defun canonize-external-format (external-format entry)
+  (typecase external-format
+    (keyword (first (ef-names entry)))
+    ((cons keyword) (cons (first (ef-names entry)) (rest external-format)))))
 
 ;;; Find an output routine to use given the type and buffering. Return
 ;;; as multiple values the routine, the real type transfered, and the
@@ -805,7 +869,7 @@
                   'character
                   1
                   (ef-write-n-bytes-fun entry)
-                  (first (ef-names entry)))))))
+                  (canonize-external-format external-format entry))))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
                (eq buffering (second entry))
@@ -1156,7 +1220,7 @@
                   'character
                   1
                   (ef-read-n-chars-fun entry)
-                  (first (ef-names entry)))))))
+                  (canonize-external-format external-format entry))))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
                (or (not (fourth entry))
@@ -1456,8 +1520,12 @@
                       :bytes-for-char-fun #',size-function
                       :read-c-string-fun #',read-c-string-function
                       :write-c-string-fun #',output-c-string-function
-                      :octets-to-string-sym ',octets-to-string-sym
-                      :string-to-octets-sym ',string-to-octets-sym)))
+                      :octets-to-string-fun (lambda (&rest rest)
+                                              (declare (dynamic-extent rest))
+                                              (apply ',octets-to-string-sym rest))
+                      :string-to-octets-fun (lambda (&rest rest)
+                                              (declare (dynamic-extent rest))
+                                              (apply ',string-to-octets-sym rest)))))
           (dolist (ef ',external-format)
             (setf (gethash ef *external-formats*) entry))))))
 
@@ -1723,8 +1791,12 @@
                     :bytes-for-char-fun #',size-function
                     :read-c-string-fun #',read-c-string-function
                     :write-c-string-fun #',output-c-string-function
-                    :octets-to-string-sym ',octets-to-string-sym
-                    :string-to-octets-sym ',string-to-octets-sym)))
+                    :octets-to-string-fun (lambda (&rest rest)
+                                            (declare (dynamic-extent rest))
+                                            (apply ',octets-to-string-sym rest))
+                    :string-to-octets-fun (lambda (&rest rest)
+                                            (declare (dynamic-extent rest))
+                                            (apply ',string-to-octets-sym rest)))))
         (dolist (ef ',external-format)
           (setf (gethash ef *external-formats*) entry))))))
 

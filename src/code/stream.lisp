@@ -135,7 +135,7 @@
 
 ;;;; file position and file length
 (defun external-format-char-size (external-format)
-  (let ((ef-entry (find-external-format external-format)))
+  (let ((ef-entry (get-external-format external-format)))
     (if (variable-width-external-format-p ef-entry)
         (bytes-for-char-fun ef-entry)
         (funcall (bytes-for-char-fun ef-entry) #\x))))

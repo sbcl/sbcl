@@ -81,4 +81,3 @@
       (declare (optimize (speed 3) (safety 0)))
     (let ((external-format (sb!impl::get-external-format-or-lose external-format)))
       (funcall (sb!impl::ef-read-c-string-fun external-format) sap element-type))))
-

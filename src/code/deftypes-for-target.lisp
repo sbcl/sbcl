@@ -167,6 +167,11 @@
 ;;; a valid argument to a stream function
 (sb!xc:deftype stream-designator () '(or stream (member nil t)))
 
+;;; something valid as the :EXTERNAL-FORMAT argument to OPEN, LOAD,
+;;; COMPILE-FILE and friends.
+(sb!xc:deftype external-format-designator ()
+  '(or keyword (cons keyword)))
+
 ;;; an object suitable for input to standard functions that accept
 ;;; "environment objects" (of the ANSI glossary)
 (sb!xc:deftype lexenv-designator () '(or lexenv null))

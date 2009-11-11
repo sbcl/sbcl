@@ -1232,7 +1232,7 @@
                                            :rename-and-delete :overwrite
                                            :append :supersede nil))
                        (:if-does-not-exist (member :error :create nil))
-                       (:external-format keyword))
+                       (:external-format external-format-designator))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
@@ -1255,7 +1255,7 @@
    (:verbose t)
    (:print t)
    (:if-does-not-exist t)
-   (:external-format keyword))
+   (:external-format external-format-designator))
   t)
 
 (defknown directory (pathname-designator &key (:resolve-symlinks t))
@@ -1307,7 +1307,7 @@
                      (member t)))
    (:verbose t)
    (:print t)
-   (:external-format keyword)
+   (:external-format external-format-designator)
 
    ;; extensions
    (:trace-file t)

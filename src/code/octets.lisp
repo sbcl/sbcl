@@ -392,8 +392,7 @@ one-past-the-end"
                     :check-fill-pointer t)
     (declare (type (simple-array (unsigned-byte 8) (*)) vector))
     (let ((ef (maybe-defaulted-external-format external-format)))
-      (funcall (symbol-function (sb!impl::ef-octets-to-string-sym ef))
-               vector start end))))
+      (funcall (sb!impl::ef-octets-to-string-fun ef) vector start end))))
 
 (defun string-to-octets (string &key (external-format :default)
                          (start 0) end null-terminate)
@@ -404,8 +403,8 @@ one-past-the-end"
                     :check-fill-pointer t)
     (declare (type simple-string string))
     (let ((ef (maybe-defaulted-external-format external-format)))
-      (funcall (symbol-function (sb!impl::ef-string-to-octets-sym ef))
-               string start end (if null-terminate 1 0)))))
+      (funcall (sb!impl::ef-string-to-octets-fun ef) string start end
+               (if null-terminate 1 0)))))
 
 #!+sb-unicode
 (defvar +unicode-replacement-character+ (string (code-char #xfffd)))

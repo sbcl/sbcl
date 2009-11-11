@@ -14,6 +14,11 @@ changes relative to sbcl-1.0.32:
        transformations.
     ** improvement: restarts for providing replacement input/output on coding
        errors for fd-stream external formats.
+    ** improvement: where :<encoding> is a keyword corresponding to an
+       external format the system supports, it is now possible to specify
+       (:<encoding> :replacement <character>) as an external format which will
+       automatically substitute <character> on encoding or decoding errors for
+       streams and for STRING-TO-OCTETS and its inverse.
     ** minor incompatible change: the utf-8 external format now correctly
        refuses to encode Lisp characters in the surrogate range (char-codes
        between #xd800 and #xdfff).
