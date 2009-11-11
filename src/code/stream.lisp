@@ -146,7 +146,7 @@
   (declare (type stream stream))
   (declare (type (or index (alien sb!unix:off-t) (member nil :start :end))
                  position))
-  ;; FIXME: It woud be good to comment on the stuff that is done here...
+  ;; FIXME: It would be good to comment on the stuff that is done here...
   ;; FIXME: This doesn't look interrupt safe.
   (cond
     (position
@@ -548,22 +548,27 @@
            ;; An empty count does not necessarily mean that we reached
            ;; the EOF, it's also possible that it's e.g. due to a
            ;; invalid octet sequence in a multibyte stream. To handle
-           ;; the resyncing case correctly we need to call the
-           ;; single-character reading function and check whether an
-           ;; EOF was really reached. If not, we can just fill the
-           ;; buffer by one character, and hope that the next refill
-           ;; will not need to resync.
-           (let* ((value (funcall (ansi-stream-in stream) stream nil :eof))
-                  (index (1- +ansi-stream-in-buffer-length+)))
-             (case value
-               ((:eof)
-                ;; Mark buffer as empty.
+           ;; the resyncing case correctly we need to call the reading
+           ;; function and check whether an EOF was really reached. If
+           ;; not, we can just fill the buffer by one character, and
+           ;; hope that the next refill will not need to resync.
+           ;;
+           ;; KLUDGE: we can't use FD-STREAM functions (which are the
+           ;; only ones which will give us decoding errors) here,
+           ;; because this code is generic.  We can't call the N-BIN
+           ;; function, because near the end of a real file that can
+           ;; legitimately bounce us to the IN function.  So we have
+           ;; to call ANSI-STREAM-IN.
+           (let* ((index (1- +ansi-stream-in-buffer-length+))
+                  (value (funcall (ansi-stream-in stream) stream nil :eof)))
+             (cond
+               ((eql value :eof)
+                ;; definitely EOF now
                 (setf (ansi-stream-in-index stream)
                       +ansi-stream-in-buffer-length+)
-                ;; EOF. Redo the read, this time with the real eof parameters.
-                (values t (funcall (ansi-stream-in stream)
-                                   stream eof-error-p eof-value)))
-               (otherwise
+                (values t (eof-or-lose stream eof-error-p eof-value)))
+               ;; we resynced or were given something instead
+               (t
                 (setf (aref ibuf index) value)
                 (values nil (setf (ansi-stream-in-index stream) index))))))
           (t

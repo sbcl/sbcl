@@ -171,8 +171,9 @@
   (listen nil :type (member nil t :eof))
 
   ;; the input buffer
-  (unread nil)
+  (instead (make-array 0 :element-type 'character :adjustable t :fill-pointer t) :type (array character (*)))
   (ibuf nil :type (or buffer null))
+  (eof-forced-p nil :type (member t nil))
 
   ;; the output buffer
   (obuf nil :type (or buffer null))
@@ -462,7 +463,24 @@
     (force-end-of-file ()
       :report (lambda (stream)
                 (format stream "~@<Force an end of file.~@:>"))
-      t)))
+      (setf (fd-stream-eof-forced-p stream) t))
+    (input-replacement (string)
+      :report (lambda (stream)
+                (format stream "~@<Use string as replacement input, ~
+                               attempt to resync at a character ~
+                               boundary and continue.~@:>"))
+      :interactive (lambda ()
+                     (format *query-io* "~@<Enter a string: ~@:>")
+                     (finish-output *query-io*)
+                     (list (read *query-io*)))
+      (let ((string (reverse (string string)))
+            (instead (fd-stream-instead stream)))
+        (dotimes (i (length string))
+          (vector-push-extend (char string i) instead))
+        (fd-stream-resync stream)
+        (when (> (length string) 0)
+          (setf (fd-stream-listen stream) t)))
+      nil)))
 
 (defun stream-encoding-error-and-handle (stream code)
   (restart-case
@@ -470,6 +488,16 @@
     (output-nothing ()
       :report (lambda (stream)
                 (format stream "~@<Skip output of this character.~@:>"))
+      (throw 'output-nothing nil))
+    (output-replacement (string)
+      :report (lambda (stream)
+                (format stream "~@<Output replacement string.~@:>"))
+      :interactive (lambda ()
+                     (format *query-io* "~@<Enter a string: ~@:>")
+                     (finish-output *query-io*)
+                     (list (read *query-io*)))
+      (let ((string (string string)))
+        (fd-sout stream (string string) 0 (length string)))
       (throw 'output-nothing nil))))
 
 (defun external-format-encoding-error (stream code)
@@ -979,45 +1007,54 @@
     `(let* ((,stream-var ,stream)
             (ibuf (fd-stream-ibuf ,stream-var))
             (size nil))
-       (if (fd-stream-unread ,stream-var)
-           (prog1
-               (fd-stream-unread ,stream-var)
-             (setf (fd-stream-unread ,stream-var) nil)
-             (setf (fd-stream-listen ,stream-var) nil))
-           (let ((,element-var nil)
-                 (decode-break-reason nil))
-             (do ((,retry-var t))
-                 ((not ,retry-var))
-               (unless
-                   (catch 'eof-input-catcher
-                     (setf decode-break-reason
-                           (block decode-break-reason
-                             (input-at-least ,stream-var 1)
-                             (let* ((byte (sap-ref-8 (buffer-sap ibuf)
-                                                     (buffer-head ibuf))))
-                               (declare (ignorable byte))
-                               (setq size ,bytes)
-                               (input-at-least ,stream-var size)
-                               (setq ,element-var (locally ,@read-forms))
-                               (setq ,retry-var nil))
-                             nil))
-                     (when decode-break-reason
-                       (stream-decoding-error-and-handle stream
-                                                         decode-break-reason))
-                     t)
-                 (let ((octet-count (- (buffer-tail ibuf)
-                                       (buffer-head ibuf))))
-                   (when (or (zerop octet-count)
-                             (and (not ,element-var)
-                                  (not decode-break-reason)
-                                  (stream-decoding-error-and-handle
-                                   stream octet-count)))
-                     (setq ,retry-var nil)))))
-             (cond (,element-var
-                    (incf (buffer-head ibuf) size)
-                    ,element-var)
-                   (t
-                    (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
+       (block use-instead
+         (when (fd-stream-eof-forced-p ,stream-var)
+           (setf (fd-stream-eof-forced-p ,stream-var) nil)
+           (return-from use-instead
+             (eof-or-lose ,stream-var ,eof-error ,eof-value)))
+         (let ((,element-var nil)
+               (decode-break-reason nil))
+           (do ((,retry-var t))
+               ((not ,retry-var))
+             (if (> (length (fd-stream-instead ,stream-var)) 0)
+                 (let* ((instead (fd-stream-instead ,stream-var))
+                        (result (vector-pop instead))
+                        (pointer (fill-pointer instead)))
+                   (when (= pointer 0)
+                     (setf (fd-stream-listen ,stream-var) nil))
+                   (return-from use-instead result))
+                 (unless
+                     (catch 'eof-input-catcher
+                       (setf decode-break-reason
+                             (block decode-break-reason
+                               (input-at-least ,stream-var 1)
+                               (let* ((byte (sap-ref-8 (buffer-sap ibuf)
+                                                       (buffer-head ibuf))))
+                                 (declare (ignorable byte))
+                                 (setq size ,bytes)
+                                 (input-at-least ,stream-var size)
+                                 (setq ,element-var (locally ,@read-forms))
+                                 (setq ,retry-var nil))
+                               nil))
+                       (when decode-break-reason
+                         (when (stream-decoding-error-and-handle
+                                stream decode-break-reason)
+                           (setq ,retry-var nil)
+                           (throw 'eof-input-catcher nil)))
+                       t)
+                   (let ((octet-count (- (buffer-tail ibuf)
+                                         (buffer-head ibuf))))
+                     (when (or (zerop octet-count)
+                               (and (not ,element-var)
+                                    (not decode-break-reason)
+                                    (stream-decoding-error-and-handle
+                                     stream octet-count)))
+                       (setq ,retry-var nil))))))
+           (cond (,element-var
+                  (incf (buffer-head ibuf) size)
+                  ,element-var)
+                 (t
+                  (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
 
 ;;; a macro to wrap around all input routines to handle EOF-ERROR noise
 (defmacro input-wrapper ((stream bytes eof-error eof-value) &body read-forms)
@@ -1025,11 +1062,8 @@
         (element-var (gensym "ELT")))
     `(let* ((,stream-var ,stream)
             (ibuf (fd-stream-ibuf ,stream-var)))
-       (if (fd-stream-unread ,stream-var)
-           (prog1
-               (fd-stream-unread ,stream-var)
-             (setf (fd-stream-unread ,stream-var) nil)
-             (setf (fd-stream-listen ,stream-var) nil))
+       (if (> (length (fd-stream-instead ,stream-var)) 0)
+           (bug "INSTEAD not empty in INPUT-WRAPPER for ~S" ,stream-var)
            (let ((,element-var
                   (catch 'eof-input-catcher
                     (input-at-least ,stream-var ,bytes)
@@ -1178,22 +1212,7 @@
                                &aux (total-copied 0))
   (declare (type fd-stream stream))
   (declare (type index start requested total-copied))
-  (let ((unread (fd-stream-unread stream)))
-    (when unread
-      ;; AVERs designed to fail when we have more complicated
-      ;; character representations.
-      (aver (typep unread 'base-char))
-      (aver (= (fd-stream-element-size stream) 1))
-      ;; KLUDGE: this is a slightly-unrolled-and-inlined version of
-      ;; %BYTE-BLT
-      (etypecase buffer
-        (system-area-pointer
-         (setf (sap-ref-8 buffer start) (char-code unread)))
-        ((simple-unboxed-array (*))
-         (setf (aref buffer start) unread)))
-      (setf (fd-stream-unread stream) nil)
-      (setf (fd-stream-listen stream) nil)
-      (incf total-copied)))
+  (aver (= (length (fd-stream-instead stream)) 0))
   (do ()
       (nil)
     (let* ((remaining-request (- requested total-copied))
@@ -1280,35 +1299,34 @@
           (do ()
               ((= end start))
             (let ((obuf (fd-stream-obuf stream)))
-              (setf (buffer-tail obuf)
-                    (string-dispatch (simple-base-string
-                                      #!+sb-unicode
-                                      (simple-array character (*))
-                                      string)
-                        string
-                      (let ((sap (buffer-sap obuf))
-                            (len (buffer-length obuf))
-                            ;; FIXME: rename
-                            (tail (buffer-tail obuf)))
-                       (declare (type index tail)
-                                ;; STRING bounds have already been checked.
-                                (optimize (safety 0)))
-                       (loop
-                         (,@(if output-restart
-                                `(catch 'output-nothing)
-                                `(progn))
-                            (do* ()
-                                 ((or (= start end) (< (- len tail) 4)))
-                              (let* ((byte (aref string start))
-                                     (bits (char-code byte)))
-                                ,out-expr
-                                (incf tail ,size)
-                                (incf start)))
-                            ;; Exited from the loop normally
-                            (return tail))
-                         ;; Exited via CATCH. Skip the current character
-                         ;; and try the inner loop again.
-                         (incf start))))))
+              (string-dispatch (simple-base-string
+                                #!+sb-unicode
+                                (simple-array character (*))
+                                string)
+                  string
+                (let ((sap (buffer-sap obuf))
+                      (len (buffer-length obuf))
+                      ;; FIXME: rename
+                      (tail (buffer-tail obuf)))
+                  (declare (type index tail)
+                           ;; STRING bounds have already been checked.
+                           (optimize (safety 0)))
+                  (,@(if output-restart
+                         `(catch 'output-nothing)
+                         `(progn))
+                     (do* ()
+                          ((or (= start end) (< (- len tail) 4)))
+                       (let* ((byte (aref string start))
+                              (bits (char-code byte)))
+                         ,out-expr
+                         (incf tail ,size)
+                         (setf (buffer-tail obuf) tail)
+                         (incf start)))
+                     ;; Exited from the loop normally
+                     (go flush))
+                  ;; Exited via CATCH. Skip the current character.
+                  (incf start))))
+           flush
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1334,12 +1352,16 @@
                  (type
                   (simple-array character (#.+ansi-stream-in-buffer-length+))
                   buffer))
-        (let ((unread (fd-stream-unread stream)))
-          (when unread
-            (setf (aref buffer index) unread)
-            (setf (fd-stream-unread stream) nil)
-            (setf (fd-stream-listen stream) nil)
-            (incf index)))
+        (when (fd-stream-eof-forced-p stream)
+          (setf (fd-stream-eof-forced-p stream) nil)
+          (return-from ,in-function 0))
+        (do ((instead (fd-stream-instead stream)))
+            ((= (fill-pointer instead) 0)
+             (setf (fd-stream-listen stream) nil))
+          (setf (aref buffer index) (vector-pop instead))
+          (incf index)
+          (when (= index end)
+            (return-from ,in-function (- index start))))
         (do ()
             (nil)
           (let* ((ibuf (fd-stream-ibuf stream))
@@ -1467,36 +1489,33 @@
           (do ()
               ((= end start))
             (let ((obuf (fd-stream-obuf stream)))
-              (setf (buffer-tail obuf)
-                    (string-dispatch (simple-base-string
-                                      #!+sb-unicode
-                                      (simple-array character (*))
-                                      string)
-                        string
-                      (let ((len (buffer-length obuf))
-                            (sap (buffer-sap obuf))
-                            ;; FIXME: Rename
-                            (tail (buffer-tail obuf)))
-                        (declare (type index tail)
-                                 ;; STRING bounds have already been checked.
-                                 (optimize (safety 0)))
-                        (loop
-                          (,@(if output-restart
-                                 `(catch 'output-nothing)
-                                 `(progn))
-                             (do* ()
-                                  ((or (= start end) (< (- len tail) 4)))
-                               (let* ((byte (aref string start))
-                                      (bits (char-code byte))
-                                      (size ,out-size-expr))
-                                 ,out-expr
-                                 (incf tail size)
-                                 (incf start)))
-                             ;; Exited from the loop normally
-                             (return tail))
-                          ;; Exited via CATCH. Skip the current character
-                          ;; and try the inner loop again.
-                          (incf start))))))
+              (string-dispatch (simple-base-string
+                                #!+sb-unicode (simple-array character (*))
+                                string)
+                  string
+                (let ((len (buffer-length obuf))
+                      (sap (buffer-sap obuf))
+                      ;; FIXME: Rename
+                      (tail (buffer-tail obuf)))
+                  (declare (type index tail)
+                           ;; STRING bounds have already been checked.
+                           (optimize (safety 0)))
+                  (,@(if output-restart
+                         `(catch 'output-nothing)
+                         `(progn))
+                     (do* ()
+                          ((or (= start end) (< (- len tail) 4)))
+                       (let* ((byte (aref string start))
+                              (bits (char-code byte))
+                              (size ,out-size-expr))
+                         ,out-expr
+                         (incf tail size)
+                         (setf (buffer-tail obuf) tail)
+                         (incf start)))
+                     (go flush))
+                  ;; Exited via CATCH: skip the current character.
+                  (incf start))))
+           flush
             (when (< start end)
               (flush-output-buffer stream)))
           (when flush-p
@@ -1522,12 +1541,16 @@
                  (type
                   (simple-array character (#.+ansi-stream-in-buffer-length+))
                   buffer))
-        (let ((unread (fd-stream-unread stream)))
-          (when unread
-            (setf (aref buffer start) unread)
-            (setf (fd-stream-unread stream) nil)
-            (setf (fd-stream-listen stream) nil)
-            (incf total-copied)))
+        (when (fd-stream-eof-forced-p stream)
+          (setf (fd-stream-eof-forced-p stream) nil)
+          (return-from ,in-function 0))
+        (do ((instead (fd-stream-instead stream)))
+            ((= (fill-pointer instead) 0)
+             (setf (fd-stream-listen stream) nil))
+          (setf (aref buffer (+ start total-copied)) (vector-pop instead))
+          (incf total-copied)
+          (when (= requested total-copied)
+            (return-from ,in-function total-copied)))
         (do ()
             (nil)
           (let* ((ibuf (fd-stream-ibuf stream))
@@ -1565,8 +1588,10 @@
                   (if eof-error-p
                       (error 'end-of-file :stream stream)
                       (return-from ,in-function total-copied)))
-                (setf head (buffer-head ibuf))
-                (setf tail (buffer-tail ibuf))))
+                ;; we might have been given stuff to use instead, so
+                ;; we have to return (and trust our caller to know
+                ;; what to do about TOTAL-COPIED being 0).
+                (return-from ,in-function total-copied)))
             (setf (buffer-head ibuf) head)
             ;; Maybe we need to refill the stream buffer.
             (cond ( ;; If there were enough data in the stream buffer, we're done.
@@ -1591,20 +1616,21 @@
           ,in-expr))
       (defun ,resync-function (stream)
         (let ((ibuf (fd-stream-ibuf stream)))
-          (loop
-            (input-at-least stream 2)
-            (incf (buffer-head ibuf))
-            (unless (block decode-break-reason
-                      (let* ((sap (buffer-sap ibuf))
-                             (head (buffer-head ibuf))
-                             (byte (sap-ref-8 sap head))
-                             (size ,in-size-expr))
-                        (declare (ignorable byte))
-                        (input-at-least stream size)
-                        (setf head (buffer-head ibuf))
-                        ,in-expr)
-                     nil)
-             (return)))))
+          (catch 'eof-input-catcher
+            (loop
+               (incf (buffer-head ibuf))
+               (input-at-least stream 1)
+               (unless (block decode-break-reason
+                         (let* ((sap (buffer-sap ibuf))
+                                (head (buffer-head ibuf))
+                                (byte (sap-ref-8 sap head))
+                                (size ,in-size-expr))
+                           (declare (ignorable byte))
+                           (input-at-least stream size)
+                           (setf head (buffer-head ibuf))
+                           ,in-expr)
+                         nil)
+                 (return))))))
       (defun ,read-c-string-function (sap element-type)
         (declare (type system-area-pointer sap))
         (locally
@@ -1895,13 +1921,12 @@
   ;; we're still safe: buffers have finalizers of their own.
   (release-fd-stream-buffers fd-stream))
 
-;;; Flushes the current input buffer and unread chatacter, and returns
-;;; the input buffer, and the amount of of flushed input in bytes.
+;;; Flushes the current input buffer and any supplied replacements,
+;;; and returns the input buffer, and the amount of of flushed input
+;;; in bytes.
 (defun flush-input-buffer (stream)
-  (let ((unread (if (fd-stream-unread stream)
-                    1
-                    0)))
-    (setf (fd-stream-unread stream) nil)
+  (let ((unread (length (fd-stream-instead stream))))
+    (setf (fill-pointer (fd-stream-instead stream)) 0)
     (let ((ibuf (fd-stream-ibuf stream)))
       (if ibuf
           (let ((head (buffer-head ibuf))
@@ -1959,16 +1984,8 @@
                                  (do-listen)))))))
        (do-listen)))
     (:unread
-     ;; If the stream is bivalent, the user might follow an
-     ;; unread-char with a read-byte.  In this case, the bookkeeping
-     ;; is simpler if we adjust the buffer head by the number of code
-     ;; units in the character.
-     ;; FIXME: there has to be a proper way to check for bivalence,
-     ;; right?
-     (if (fd-stream-bivalent-p fd-stream)
-         (decf (buffer-head (fd-stream-ibuf fd-stream))
-               (fd-stream-character-size fd-stream arg1))
-         (setf (fd-stream-unread fd-stream) arg1))
+     (decf (buffer-head (fd-stream-ibuf fd-stream))
+           (fd-stream-character-size fd-stream arg1))
      (setf (fd-stream-listen fd-stream) t))
     (:close
      ;; Drop input buffers
@@ -2135,8 +2152,6 @@
         (let ((ibuf (fd-stream-ibuf stream)))
           (when ibuf
             (decf posn (- (buffer-tail ibuf) (buffer-head ibuf)))))
-        (when (fd-stream-unread stream)
-          (decf posn))
         ;; Divide bytes by element size.
         (truncate posn (fd-stream-element-size stream))))))
 

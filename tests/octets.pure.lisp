@@ -95,24 +95,30 @@
                 l9c))))
   (ensure-roundtrip-utf8)
 
-  (let ((non-ascii-bytes (make-array 128
-                                     :element-type '(unsigned-byte 8)
-                                     :initial-contents (loop for i from 128 below 256
-                                                             collect i))))
-    (handler-bind ((sb-int:character-decoding-error
-                    (lambda (c)
-                      (use-value "??" c))))
-      (assert (string= (octets-to-string non-ascii-bytes :external-format :ascii)
-                       (make-string 256 :initial-element #\?)))))
-  (let ((non-ascii-chars (make-array 128
-                                     :element-type 'character
-                                     :initial-contents (loop for i from 128 below 256
-                                                             collect (code-char i)))))
-    (handler-bind ((sb-int:character-encoding-error
-                    (lambda (c)
-                      (use-value "??" c))))
-      (assert (equalp (string-to-octets non-ascii-chars :external-format :ascii)
-                      (make-array 256 :initial-element (char-code #\?))))))
+  (with-test (:name (:ascii :decoding-error use-value))
+    (let ((non-ascii-bytes (make-array 128
+                                       :element-type '(unsigned-byte 8)
+                                       :initial-contents (loop for i from 128 below 256 collect i)))
+        (error-count 0))
+      (handler-bind ((sb-int:character-decoding-error
+                      (lambda (c)
+                        (incf error-count)
+                        (use-value "??" c))))
+        (assert (string= (octets-to-string non-ascii-bytes :external-format :ascii)
+                         (make-string 256 :initial-element #\?)))
+        (assert (= error-count 128)))))
+  (with-test (:name (:ascii :encoding-error use-value))
+    (let ((non-ascii-chars (make-array 128
+                                       :element-type 'character
+                                       :initial-contents (loop for i from 128 below 256 collect (code-char i))))
+          (error-count 0))
+      (handler-bind ((sb-int:character-encoding-error
+                      (lambda (c)
+                        (incf error-count)
+                        (use-value "??" c))))
+        (assert (equalp (string-to-octets non-ascii-chars :external-format :ascii)
+                        (make-array 256 :initial-element (char-code #\?))))
+        (assert (= error-count 128)))))
 
   ;; From Markus Kuhn's UTF-8 test file:
   ;; http://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt
@@ -235,3 +241,13 @@
 #+sb-unicode
 (assert (equalp #(251) (string-to-octets (string (code-char 369))
                                          :external-format :latin-2)))
+
+#+sb-unicode
+(with-test (:name (:euc-jp :decoding-errors))
+  (handler-bind ((sb-int:character-decoding-error
+                  (lambda (c) (use-value #\? c))))
+    (assert (string= "?{?"
+                     (octets-to-string
+                      (coerce #(182 123 253 238) '(vector (unsigned-byte 8)))
+                      :external-format :euc-jp)))))
+

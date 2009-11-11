@@ -260,7 +260,8 @@ one-past-the-end"
                             :initial-element 0
                             :element-type '(unsigned-byte 8)))
         (index 0)
-        (error-position 0))
+        (error-position 0)
+        (error-replacement))
     (tagbody
      :no-error
        (loop for pos of-type index from sstart below send
@@ -273,30 +274,32 @@ one-past-the-end"
                   ;; KLUDGE: We ran into encoding errors.  Bail and do
                   ;; things the slow way (does anybody actually use this
                   ;; functionality besides our own test suite?).
-                  (setf error-position pos)
+                  (setf error-position pos error-replacement byte)
                   (go :error)))
                (incf index))
           finally (return-from string->latin% octets))
      :error
-       ;; We have encoded INDEX octets so far and we ran into an encoding
-       ;; error at ERROR-POSITION.
+       ;; We have encoded INDEX octets so far and we ran into an
+       ;; encoding error at ERROR-POSITION; the user has asked us to
+       ;; replace the expected output with ERROR-REPLACEMENT.
        (let ((new-octets (make-array (* index 2)
                                      :element-type '(unsigned-byte 8)
                                      :adjustable t :fill-pointer index)))
          (replace new-octets octets)
-         (loop for pos of-type index from error-position below send
-            do (let ((thing (funcall get-bytes string pos)))
+         (flet ((extend (thing)
                  (typecase thing
-                   ((unsigned-byte 8)
-                    (vector-push-extend thing new-octets))
+                   ((unsigned-byte 8) (vector-push-extend thing new-octets))
                    ((simple-array (unsigned-byte 8) (*))
                     (dotimes (i (length thing))
-                      (vector-push-extend (aref thing i) new-octets)))))
-            finally (return-from string->latin%
-                      (progn
-                        (unless (zerop null-padding)
-                          (vector-push-extend 0 new-octets))
-                        (copy-seq new-octets))))))))
+                      (vector-push-extend (aref thing i) new-octets))))))
+           (extend error-replacement)
+           (loop for pos of-type index from (1+ error-position) below send
+                 do (extend (funcall get-bytes string pos))
+                 finally (return-from string->latin%
+                           (progn
+                             (unless (zerop null-padding)
+                               (vector-push-extend 0 new-octets))
+                             (copy-seq new-octets)))))))))
 
 ;;;; to-string conversions
 

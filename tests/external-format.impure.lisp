@@ -78,22 +78,29 @@
   (write-byte 67 s))
 (with-open-file (s *test-path* :direction :input
                  :external-format :utf-8)
-  (handler-bind
-      ((sb-int:character-decoding-error #'(lambda (decoding-error)
-                                            (declare (ignore decoding-error))
-                                            (invoke-restart
-                                             'sb-int:attempt-resync))))
-    (assert (equal (read-line s nil s) "ABC"))
-    (assert (equal (read-line s nil s) s))))
+  (let ((count 0))
+    (handler-bind
+        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+                                              (declare (ignore decoding-error))
+                                              (when (> (incf count) 1)
+                                                (error "too many errors"))
+                                              (invoke-restart
+                                               'sb-int:attempt-resync))))
+      (assert (equal (read-line s nil s) "ABC"))
+      (assert (equal (read-line s nil s) s)))))
 (with-open-file (s *test-path* :direction :input
                  :external-format :utf-8)
-  (handler-bind
-      ((sb-int:character-decoding-error #'(lambda (decoding-error)
-                                            (declare (ignore decoding-error))
-                                            (invoke-restart
-                                             'sb-int:force-end-of-file))))
-    (assert (equal (read-line s nil s) "AB"))
-    (assert (equal (read-line s nil s) s))))
+  (let ((count 0))
+    (handler-bind
+        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+                                              (declare (ignore decoding-error))
+                                              (when (> (incf count) 1)
+                                                (error "too many errors"))
+                                              (invoke-restart
+                                               'sb-int:force-end-of-file))))
+      (assert (equal (read-line s nil s) "AB"))
+      (setf count 0)
+      (assert (equal (read-line s nil s) s)))))
 
 ;;; And again with more data to account for buffering (this was briefly)
 ;;; broken in early 0.9.6.
@@ -112,40 +119,41 @@
 (with-test (:name (:character-decode-large :attempt-resync))
   (with-open-file (s *test-path* :direction :input
                      :external-format :utf-8)
-    (handler-bind
-        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+    (let ((count 0))
+      (handler-bind
+          ((sb-int:character-decoding-error (lambda (decoding-error)
                                               (declare (ignore decoding-error))
+                                              (when (> (incf count) 1)
+                                                (error "too many errors"))
                                               (invoke-restart
                                                'sb-int:attempt-resync)))
-         ;; The failure mode is an infinite loop, add a timeout to detetct it.
-         (sb-ext:timeout (lambda () (error "Timeout"))))
-      (sb-ext:with-timeout 5
-        (dotimes (i 80)
-          (assert (equal (read-line s nil s)
-                         "1234567890123456789012345678901234567890123456789")))))))
+           ;; The failure mode is an infinite loop, add a timeout to
+           ;; detetct it.
+           (sb-ext:timeout (lambda () (error "Timeout"))))
+        (sb-ext:with-timeout 5
+          (dotimes (i 80)
+            (assert (equal (read-line s nil s)
+                           "1234567890123456789012345678901234567890123456789"))))))))
 
-(with-test (:name (:character-decode-large :force-end-of-file)
-            :fails-on :sbcl)
-  (error "We can't reliably test this due to WITH-TIMEOUT race condition")
-  ;; This test will currently fail. But sometimes it will fail in
-  ;; ungracefully due to the WITH-TIMEOUT race mentioned above. This
-  ;; rightfully confuses some people, so we'll skip running the code
-  ;; for now. -- JES, 2006-01-27
-  #+nil
+(with-test (:name (:character-decode-large :force-end-of-file))
   (with-open-file (s *test-path* :direction :input
                      :external-format :utf-8)
-    (handler-bind
-        ((sb-int:character-decoding-error #'(lambda (decoding-error)
+    (let ((count 0))
+      (handler-bind
+          ((sb-int:character-decoding-error (lambda (decoding-error)
                                               (declare (ignore decoding-error))
+                                              (when (> (incf count) 1)
+                                                (error "too many errors"))
                                               (invoke-restart
                                                'sb-int:force-end-of-file)))
-         ;; The failure mode is an infinite loop, add a timeout to detetct it.
-         (sb-ext:timeout (lambda () (error "Timeout"))))
-      (sb-ext:with-timeout 5
-        (dotimes (i 80)
-          (assert (equal (read-line s nil s)
-                         "1234567890123456789012345678901234567890123456789")))
-        (assert (equal (read-line s nil s) s))))))
+           ;; The failure mode is an infinite loop, add a timeout to detetct it.
+           (sb-ext:timeout (lambda () (error "Timeout"))))
+        (sb-ext:with-timeout 5
+          (dotimes (i 40)
+            (assert (equal (read-line s nil s)
+                           "1234567890123456789012345678901234567890123456789")))
+          (setf count 0)
+          (assert (equal (read-line s nil s) s)))))))
 
 ;;; Test character encode restarts.
 (with-open-file (s *test-path* :direction :output
@@ -344,5 +352,18 @@
                                          :element-type base-char)
     (str (c-string :external-format :ebcdic-us)))
   (assert (typep (strdup "foo") 'simple-base-string)))
+
+(with-test (:name (:input-replacement :at-end-of-file))
+  (dotimes (i 256)
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
+      (write-byte i s))
+    (handler-bind ((sb-int:character-decoding-error
+                    (lambda (c)
+                      (invoke-restart 'sb-impl::input-replacement #\?))))
+      (with-open-file (s *test-path* :external-format :utf-8)
+        (cond
+          ((char= (read-char s) #\?)
+           (assert (or (= i (char-code #\?)) (> i 127))))
+          (t (assert (and (not (= i (char-code #\?))) (< i 128)))))))))
 
 ;;;; success

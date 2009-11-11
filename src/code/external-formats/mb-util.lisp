@@ -150,7 +150,12 @@
                      (declare (type (or null string) invalid))
                      (cond
                        ((null invalid)
-                        (vector-push-extend (,simple-get-mb-char array pos bytes) string))
+                        (let ((thing (,simple-get-mb-char array pos bytes)))
+                          (typecase thing
+                            (character (vector-push-extend thing string))
+                            (string
+                               (dotimes (i (length thing))
+                                 (vector-push-extend (char thing i) string))))))
                        (t
                         (dotimes (i (length invalid))
                           (vector-push-extend (char invalid i) string))))
