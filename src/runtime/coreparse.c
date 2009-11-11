@@ -423,6 +423,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             size_t offset = 0;
             long bytes_read;
             unsigned long data[4096];
+            unsigned long word;
             lseek(fd, fdoffset + file_offset, SEEK_SET);
             while ((bytes_read = read(fd, data, (size < 4096 ? size : 4096 )))
                     > 0)
@@ -435,9 +436,12 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                      * core entry was rounded up to os_vm_page_size
                      * during the save, and might now have more
                      * elements than the page table.
+                     *
+                     * The low bits of each word are allocation flags.
                      */
-                    if (data[i]) {
-                        page_table[offset].region_start_offset = data[i];
+                    if (word=data[i]) {
+                        page_table[offset].region_start_offset = word & ~0x03;
+                        page_table[offset].allocated = word & 0x03;
                     }
                     i++;
                     offset++;

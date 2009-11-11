@@ -312,15 +312,22 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
             &~(os_vm_page_size-1);
         unsigned long *data = calloc(size, 1);
         if (data) {
+            unsigned long word;
             long offset;
             int i;
             for (i = 0; i < last_free_page; i++) {
-                data[i] = page_table[i].region_start_offset;
+                /* Thanks to alignment requirements, the two low bits
+                 * are always zero, so we can use them to store the
+                 * allocation type -- region is always closed, so only
+                 * the two low bits of allocation flags matter. */
+                word = page_table[i].region_start_offset;
+                gc_assert((word & 0x03) == 0);
+                data[i] = word | (0x03 & page_table[i].allocated);
             }
             write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
             write_lispobj(4, file);
             write_lispobj(size, file);
-            offset = write_bytes(file, (char *) data, size, core_start_pos);
+            offset = write_bytes(file, (char *)data, size, core_start_pos);
             write_lispobj(offset, file);
         }
     }

@@ -4626,7 +4626,6 @@ gencgc_pickup_dynamic(void)
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
     do {
         lispobj *first,*ptr= (lispobj *)page_address(page);
-        page_table[page].allocated = BOXED_PAGE_FLAG;
         page_table[page].gen = gen;
         page_table[page].bytes_used = PAGE_BYTES;
         page_table[page].large_object = 0;
@@ -4636,8 +4635,10 @@ gencgc_pickup_dynamic(void)
         page_table[page].need_to_zero = 1;
 
         if (!gencgc_partial_pickup) {
+            page_table[page].allocated = BOXED_PAGE_FLAG;
             first=gc_search_space(prev,(ptr+2)-prev,ptr);
-            if(ptr == first)  prev=ptr;
+            if(ptr == first)
+                prev=ptr;
             page_table[page].region_start_offset =
                 page_address(page) - (void *)prev;
         }
