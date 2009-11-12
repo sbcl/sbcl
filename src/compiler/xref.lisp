@@ -130,26 +130,29 @@
                         nil)))))))
 
 (defun internal-name-p (what)
-  ;; Don't store XREF information for internals. We define as internal
-  ;; anything named only by symbols from either implementation
-  ;; packages, COMMON-LISP or KEYWORD. The last one is useful for
-  ;; example when dealing with ctors.
+  ;; Unless we're building with SB-XREF-FOR-INTERNALS, don't store
+  ;; XREF information for internals. We define anything with a symbol
+  ;; from either an implementation package or from COMMON-LISP as
+  ;; internal
   (typecase what
     (list
      (every #'internal-name-p what))
     (symbol
+     #!+sb-xref-for-internals
+     (eq '.anonymous. what)
+     #!-sb-xref-for-internals
      (or (eq '.anonymous. what)
          (member (symbol-package what)
-                 (load-time-value (list* (find-package "COMMON-LISP")
-                                         (find-package "KEYWORD")
-                                         #+sb-xc-host (find-package "SB-XC")
-                                         (remove-if-not
-                                          (lambda (package)
-                                            (= (mismatch "SB!"
-                                                         (package-name package))
-                                               3))
-                                          (list-all-packages)))))
-         #+sb-xc-host ; again, special case like in genesis and dump
+                 (load-time-value
+                  (list* (find-package "COMMON-LISP")
+                         #+sb-xc-host (find-package "SB-XC")
+                         (remove-if-not
+                          (lambda (package)
+                            (= (mismatch "SB!"
+                                         (package-name package))
+                               3))
+                          (list-all-packages)))))
+         #+sb-xc-host   ; again, special case like in genesis and dump
          (multiple-value-bind (cl-symbol cl-status)
              (find-symbol (symbol-name what) sb!int:*cl-package*)
            (and (eq what cl-symbol) (eq cl-status :external)))))

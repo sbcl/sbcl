@@ -261,6 +261,12 @@
  ;; increases core size by about 100kB.
  :sb-source-locations
 
+ ;; Record xref data for SBCL internals. This can be rather useful for
+ ;; people who want to develop on SBCL itself because it'll make M-?
+ ;; (slime-edit-uses) work which lists call/expansion/etc. sites.
+ ;; It'll increase the core size by major 5-6mB, though.
+ ; :sb-xref-for-internals
+
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
  ;; to. It doesn't seem to be needed for X86 systems anyway.

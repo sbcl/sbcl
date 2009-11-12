@@ -7,6 +7,11 @@ changes relative to sbcl-1.0.32:
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-GENERALLY to get a list of
     definitions for methods specializing on the passed class itself, or on
     subclasses of it.
+  * new build flag: :sb-xref-for-internals; SBCL will collect xref information
+    about itself during the build (e.g. for M-? in Slime), if this flag is
+    enabled in customize-target-features.lisp. This will increase the core
+    size by about 5-6mb, though, so it's mostly interesting to SBCL
+    developers.
   * fixes and improvements related to Unicode and external formats:
     ** the Unicode character database has been upgraded to the
        Unicode 5.2 standard, giving names and properties to a number of new
