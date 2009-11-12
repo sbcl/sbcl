@@ -589,4 +589,22 @@
       (assert (equal "still open" (read-line f)))))
   (assert (not (probe-file "delete-file-on-stream-test.tmp"))))
 
+;;; READ-CHAR-NO-HANG on bivalent streams (as returned by RUN-PROGRAM)
+;;; was wrong.  CSR managed to promote the wrongness to all streams in
+;;; the 1.0.32.x series, breaking slime instantly.
+(with-test (:name :read-char-no-hang-after-unread-char)
+  (let* ((process (run-program "/bin/sh" '("-c" "echo a && sleep 10")
+                               :output :stream :wait nil))
+         (stream (process-output process))
+         (char (read-char stream)))
+    (assert (char= char #\a))
+    (unread-char char stream)
+    (assert (char= (read-char stream) #\a))
+    (assert (char= (read-char stream) #\Newline))
+    (let ((time (get-universal-time)))
+      ;; no input, not yet known to be at EOF: should return
+      ;; immediately
+      (read-char-no-hang stream)
+      (assert (< (- (get-universal-time) time) 2)))))
+
 ;;; success

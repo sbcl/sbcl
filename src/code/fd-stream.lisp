@@ -1485,6 +1485,8 @@
           (setf (aref buffer (+ start total-copied)) (vector-pop instead))
           (incf total-copied)
           (when (= requested total-copied)
+            (when (= (fill-pointer instead) 0)
+              (setf (fd-stream-listen stream) nil))
             (return-from ,in-function total-copied)))
         (do ()
             (nil)
@@ -1925,8 +1927,7 @@
        (do-listen)))
     (:unread
      (decf (buffer-head (fd-stream-ibuf fd-stream))
-           (fd-stream-character-size fd-stream arg1))
-     (setf (fd-stream-listen fd-stream) t))
+           (fd-stream-character-size fd-stream arg1)))
     (:close
      ;; Drop input buffers
      (setf (ansi-stream-in-index fd-stream) +ansi-stream-in-buffer-length+

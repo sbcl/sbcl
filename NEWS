@@ -18,7 +18,8 @@ changes relative to sbcl-1.0.32:
        external format the system supports, it is now possible to specify
        (:<encoding> :replacement <character>) as an external format which will
        automatically substitute <character> on encoding or decoding errors for
-       streams and for STRING-TO-OCTETS and its inverse.
+       streams and for STRING-TO-OCTETS and its inverse.  (launchpad bug
+       #317072)
     ** improvement: the file streams underlying the standard streams (such as
        *STANDARD-INPUT*, *TERMINAL-IO*) are opened with an external format 
        which uses the replacement mechanism to handle encoding errors,
@@ -39,6 +40,8 @@ changes relative to sbcl-1.0.32:
     ** fix a double-error case in unibyte octet conversions, when the first
        use of USE-VALUE is ignored.
     ** fix bugs in handling of undefined code points in unibyte encodings.
+    ** fix LISTEN (and consequent hangs in READ-CHAR-NO-HANG) on bivalent
+       streams after an UNREAD-CHAR.
   * enhancement: SB-INTROSPECT:ALLOCATION-INFORMATION also reports if the
     object is allocated in a boxed region of dynamic space.
   * bug fix: uses of slot accessors on specialized method parameters within
@@ -57,6 +60,7 @@ changes relative to sbcl-1.0.32:
     the cross-compiler without warnings.  (thanks to Josh Elasser; launchpad
     bug #396597)
   * bug fix: correctly dump literal objects in defaulting forms of arglists.
+    (reported by Attila Lendvai; launchpad bug #310132)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type
