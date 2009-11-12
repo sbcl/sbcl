@@ -3360,3 +3360,10 @@
                     (funcall fun 42)
                   (undefined-function (c)
                     (cell-error-name c)))))))
+
+;;; Prior to 1.0.32.x, dumping a fasl with a function with a default
+;;; argument that is a complex structure (needing make-load-form
+;;; processing) failed an AVER.  The first attempt at a fix caused
+;;; doing the same in-core to break.
+(with-test (:name :bug-310132)
+  (compile nil '(lambda (&optional (foo #p"foo/bar")))))
