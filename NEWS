@@ -56,6 +56,7 @@ changes relative to sbcl-1.0.32:
   * bug fix: give CLISP a hint about a type declaration to enable it to build
     the cross-compiler without warnings.  (thanks to Josh Elasser; launchpad
     bug #396597)
+  * bug fix: correctly dump literal objects in defaulting forms of arglists.
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

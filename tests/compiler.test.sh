@@ -405,5 +405,41 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+# Test correct fasl-dumping of literals in arglist defaulting.
+# (LP Bug #310132)
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+;; These are CLHS examples from the dictionary entry for MAKE-LOAD-FORM.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defstruct my-struct a b c)
+  (defmethod make-load-form ((s my-struct) &optional environment)
+    (make-load-form-saving-slots s :environment environment))
+  (defclass my-class ()
+    ((x :initarg :x :reader obj-x)
+     (y :initarg :y :reader obj-y)
+     (dist :accessor obj-dist)))
+  (defmethod make-load-form ((self my-class) &optional environment)
+    (make-load-form-saving-slots self
+                                 :slot-names '(x y)
+                                 :environment environment)))
+
+(defun bar1 (&optional (x #.(make-my-struct)))
+  x)
+
+(defun bar2 (&optional (x #.(make-instance 'my-class)))
+  x)
+
+;; Packages are externalizable.
+(defun bar3 (&optional (x #.*package*))
+  x)
+
+(assert (typep (bar1) 'my-struct))
+(assert (typep (bar2) 'my-class))
+(assert (eq (bar3) *package*))
+
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN
