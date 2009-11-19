@@ -406,14 +406,24 @@
              ;; not safe to assume here that it will eventually
              ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
              (not (unknown-type-p (array-type-element-type type)))
-             (eq (array-type-complexp stype) (array-type-complexp type)))
-          (once-only ((n-obj obj))
-            (multiple-value-bind (tests headerp)
-                (test-array-dimensions n-obj type stype)
-              `(and (,pred ,n-obj)
-                    ,@tests
-                    ,@(test-array-element-type n-obj type stype headerp))))
-          `(%typep ,obj ',(type-specifier type)))))
+             (or (eq (array-type-complexp stype) (array-type-complexp type))
+                 (and (eql (array-type-complexp stype) :maybe)
+                      (eql (array-type-complexp type) t))))
+        (once-only ((n-obj obj))
+          (multiple-value-bind (tests headerp)
+              (test-array-dimensions n-obj type stype)
+            `(and (,pred ,n-obj)
+                  ,@(when (and (eql (array-type-complexp stype) :maybe)
+                               (eql (array-type-complexp type) t))
+                      ;; KLUDGE: this is a bit lame; if we get here,
+                      ;; we already know that N-OBJ is an array, but
+                      ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
+                      ;; other hand, this should get compiled down to
+                      ;; two widetag tests, so it's only a bit lame.
+                      `((typep ,n-obj '(not simple-array))))
+                  ,@tests
+                  ,@(test-array-element-type n-obj type stype headerp))))
+        `(%typep ,obj ',(type-specifier type)))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly

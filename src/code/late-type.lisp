@@ -1531,11 +1531,26 @@
        (aver (not (eq (type-union not1 not2) *universal-type*)))
        nil))))
 
+(defun maybe-complex-array-refinement (type1 type2)
+  (let* ((ntype (negation-type-type type2))
+         (ndims (array-type-dimensions ntype))
+         (ncomplexp (array-type-complexp ntype))
+         (nseltype (array-type-specialized-element-type ntype))
+         (neltype (array-type-element-type ntype)))
+    (if (and (eql ndims '*) (null ncomplexp)
+             (eql neltype *wild-type*) (eql nseltype *wild-type*))
+        (make-array-type :dimensions (array-type-dimensions type1)
+                         :complexp t
+                         :element-type (array-type-element-type type1)
+                         :specialized-element-type (array-type-specialized-element-type type1)))))
+
 (!define-type-method (negation :complex-intersection2) (type1 type2)
   (cond
     ((csubtypep type1 (negation-type-type type2)) *empty-type*)
     ((eq (type-intersection type1 (negation-type-type type2)) *empty-type*)
      type1)
+    ((and (array-type-p type1) (array-type-p (negation-type-type type2)))
+     (maybe-complex-array-refinement type1 type2))
     (t nil)))
 
 (!define-type-method (negation :simple-union2) (type1 type2)
@@ -2343,21 +2358,31 @@ used for a COMPLEX component.~:@>"
         (complexp (array-type-complexp type)))
     (cond ((eq dims '*)
            (if (eq eltype '*)
-               (if complexp 'array 'simple-array)
-               (if complexp `(array ,eltype) `(simple-array ,eltype))))
+               (ecase complexp
+                 ((t) '(and array (not simple-array)))
+                 ((:maybe) 'array)
+                 ((nil) 'simple-array))
+               (ecase complexp
+                 ((t) `(and (array ,eltype) (not simple-array)))
+                 ((:maybe) `(array ,eltype))
+                 ((nil) `(simple-array ,eltype)))))
           ((= (length dims) 1)
            (if complexp
-               (if (eq (car dims) '*)
-                   (case eltype
-                     (bit 'bit-vector)
-                     ((base-char #!-sb-unicode character) 'base-string)
-                     (* 'vector)
-                     (t `(vector ,eltype)))
-                   (case eltype
-                     (bit `(bit-vector ,(car dims)))
-                     ((base-char #!-sb-unicode character)
-                      `(base-string ,(car dims)))
-                     (t `(vector ,eltype ,(car dims)))))
+               (let ((answer
+                      (if (eq (car dims) '*)
+                          (case eltype
+                            (bit 'bit-vector)
+                            ((base-char #!-sb-unicode character) 'base-string)
+                            (* 'vector)
+                            (t `(vector ,eltype)))
+                          (case eltype
+                            (bit `(bit-vector ,(car dims)))
+                            ((base-char #!-sb-unicode character)
+                             `(base-string ,(car dims)))
+                            (t `(vector ,eltype ,(car dims)))))))
+                 (if (eql complexp :maybe)
+                     answer
+                     `(and ,answer (not simple-array))))
                (if (eq (car dims) '*)
                    (case eltype
                      (bit 'simple-bit-vector)
@@ -2371,9 +2396,10 @@ used for a COMPLEX component.~:@>"
                      ((t) `(simple-vector ,(car dims)))
                      (t `(simple-array ,eltype ,dims))))))
           (t
-           (if complexp
-               `(array ,eltype ,dims)
-               `(simple-array ,eltype ,dims))))))
+           (ecase complexp
+             ((t) `(and (array ,eltype ,dims) (not simple-array)))
+             ((:maybe) `(array ,eltype ,dims))
+             ((nil) `(simple-array ,eltype ,dims)))))))
 
 (!define-type-method (array :simple-subtypep) (type1 type2)
   (let ((dims1 (array-type-dimensions type1))

@@ -66,6 +66,8 @@ changes relative to sbcl-1.0.32:
     bug #396597)
   * bug fix: correctly dump literal objects in defaulting forms of arglists.
     (reported by Attila Lendvai; launchpad bug #310132)
+  * bug fix: distinguish in type specifiers between arrays that might be
+    complex and arrays that are definitely complex.  (launchpad bug #309129)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

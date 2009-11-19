@@ -3367,3 +3367,19 @@
 ;;; doing the same in-core to break.
 (with-test (:name :bug-310132)
   (compile nil '(lambda (&optional (foo #p"foo/bar")))))
+
+(with-test (:name :bug-309129)
+  (let* ((src '(lambda (v) (values (svref v 0) (vector-pop v))))
+         (warningp nil)
+         (fun (handler-bind ((warning (lambda (c)
+                                        (setf warningp t) (muffle-warning c))))
+                (compile nil src))))
+    (assert warningp)
+    (handler-case (funcall fun #(1))
+      (type-error (c)
+        ;; we used to put simply VECTOR into EXPECTED-TYPE, rather
+        ;; than explicitly (AND VECTOR (NOT SIMPLE-ARRAY))
+        (assert (not (typep (type-error-datum c) (type-error-expected-type c)))))
+      (:no-error (&rest values)
+        (declare (ignore values))
+        (error "no error")))))
