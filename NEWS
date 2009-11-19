@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.32:
+  * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)
   * improvement: support O_LARGEFILE access to files larger than 2GB on
     x86-64/linux.  (thanks to Daniel Janus; launchpad bug #453080)
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-DIRECTLY to get a list of

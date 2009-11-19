@@ -67,6 +67,8 @@ context_eflags_addr(os_context_t *context)
     return CONTEXT_ADDR_FROM_STEM(rflags);
 #elif defined __OpenBSD__
     return &context->sc_rflags;
+#elif defined __NetBSD__
+    return CONTEXT_ADDR_FROM_STEM(RFLAGS);
 #else
 #error unsupported OS
 #endif

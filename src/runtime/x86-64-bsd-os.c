@@ -79,6 +79,60 @@ os_context_pc_addr(os_context_t *context)
     return CONTEXT_ADDR_FROM_STEM(rip);
 }
 
+#elif defined(LISP_FEATURE_NETBSD)
+os_context_register_t *
+os_context_register_addr(os_context_t *context, int offset)
+{
+    switch(offset) {
+    case reg_RAX:
+        return CONTEXT_ADDR_FROM_STEM(RAX);
+    case reg_RCX:
+        return CONTEXT_ADDR_FROM_STEM(RCX);
+    case reg_RDX:
+        return CONTEXT_ADDR_FROM_STEM(RDX);
+    case reg_RBX:
+        return CONTEXT_ADDR_FROM_STEM(RBX);
+    case reg_RSP:
+        return CONTEXT_ADDR_FROM_STEM(RSP);
+    case reg_RBP:
+        return CONTEXT_ADDR_FROM_STEM(RBP);
+    case reg_RSI:
+        return CONTEXT_ADDR_FROM_STEM(RSI);
+    case reg_RDI:
+        return CONTEXT_ADDR_FROM_STEM(RDI);
+    case reg_R8:
+        return CONTEXT_ADDR_FROM_STEM(R8);
+    case reg_R9:
+        return CONTEXT_ADDR_FROM_STEM(R9);
+    case reg_R10:
+        return CONTEXT_ADDR_FROM_STEM(R10);
+    case reg_R11:
+        return CONTEXT_ADDR_FROM_STEM(R11);
+    case reg_R12:
+        return CONTEXT_ADDR_FROM_STEM(R12);
+    case reg_R13:
+        return CONTEXT_ADDR_FROM_STEM(R13);
+    case reg_R14:
+        return CONTEXT_ADDR_FROM_STEM(R14);
+    case reg_R15:
+        return CONTEXT_ADDR_FROM_STEM(R15);
+    default:
+        return 0;
+    }
+}
+
+os_context_register_t *
+os_context_sp_addr(os_context_t *context)
+{
+    return CONTEXT_ADDR_FROM_STEM(RSP);
+}
+
+os_context_register_t *
+os_context_pc_addr(os_context_t *context)
+{
+    return CONTEXT_ADDR_FROM_STEM(RIP);
+}
+
 #endif
 
 void
