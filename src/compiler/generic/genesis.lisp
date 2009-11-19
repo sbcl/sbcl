@@ -2778,7 +2778,8 @@ core and return a descriptor to it."
               (maybe-record-with-translated-name '("-SIZE") 6)
               (maybe-record-with-translated-name '("-START" "-END" "-PAGE-BYTES") 7 :large t)
               (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 8)
-              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 9))))))
+              (maybe-record-with-translated-name '("-CORE-SPACE-ID") 9)
+              (maybe-record-with-translated-name '("-GENERATION+") 10))))))
     ;; KLUDGE: these constants are sort of important, but there's no
     ;; pleasing way to inform the code above about them.  So we fake
     ;; it for now.  nikodemus on #lisp (2004-08-09) suggested simply

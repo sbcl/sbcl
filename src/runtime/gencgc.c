@@ -69,9 +69,7 @@ page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
  * scratch space by the collector, and should never get collected.
  */
 enum {
-    HIGHEST_NORMAL_GENERATION = 5,
-    PSEUDO_STATIC_GENERATION,
-    SCRATCH_GENERATION,
+    SCRATCH_GENERATION = PSEUDO_STATIC_GENERATION+1,
     NUM_GENERATIONS
 };
 
@@ -257,7 +255,12 @@ size_t void_diff(void *x, void *y)
     return (pointer_sized_uint_t)x - (pointer_sized_uint_t)y;
 }
 
-/* a structure to hold the state of a generation */
+/* a structure to hold the state of a generation
+ *
+ * CAUTION: If you modify this, make sure to touch up the alien
+ * definition in src/code/gc.lisp accordingly. ...or better yes,
+ * deal with the FIXME there...
+ */
 struct generation {
 
     /* the first page that gc_alloc() checks on its next call */
@@ -287,9 +290,9 @@ struct generation {
     /* the number of GCs since the last raise */
     int num_gc;
 
-    /* the average age after which a GC will raise objects to the
+    /* the number of GCs to run on the generations before raising objects to the
      * next generation */
-    int trigger_age;
+    int number_of_gcs_before_promotion;
 
     /* the cumulative sum of the bytes allocated to this generation. It is
      * cleared after a GC on this generations, and update before new
@@ -301,7 +304,7 @@ struct generation {
     /* a minimum average memory age before a GC will occur helps
      * prevent a GC when a large number of new live objects have been
      * added, in which case a GC could be a waste of time */
-    double min_av_mem_age;
+    double minimum_age_before_gc;
 
     /* A linked list of lutex structures in this generation, used for
      * implementing lutex finalization. */
@@ -416,8 +419,8 @@ count_generation_bytes_allocated (generation_index_t gen)
 }
 
 /* Return the average age of the memory in a generation. */
-static double
-gen_av_mem_age(generation_index_t gen)
+extern double
+generation_average_age(generation_index_t gen)
 {
     if (generations[gen].bytes_allocated == 0)
         return 0.0;
@@ -500,7 +503,7 @@ print_generation_stats() /* FIXME: should take FILE argument, or construct a str
                 generations[i].gc_trigger,
                 count_write_protect_generation_pages(i),
                 generations[i].num_gc,
-                gen_av_mem_age(i));
+                generation_average_age(i));
     }
     fprintf(stderr,"   Total bytes allocated    = %lu\n", bytes_allocated);
     fprintf(stderr,"   Dynamic-space-size bytes = %u\n", dynamic_space_size);
@@ -4357,7 +4360,7 @@ collect_garbage(generation_index_t last_gen)
         } else {
             raise =
                 (gen < last_gen)
-                || (generations[gen].num_gc >= generations[gen].trigger_age);
+                || (generations[gen].num_gc >= generations[gen].number_of_gcs_before_promotion);
         }
 
         if (gencgc_verbose > 1) {
@@ -4394,8 +4397,8 @@ collect_garbage(generation_index_t last_gen)
                      && raise
                      && (generations[gen].bytes_allocated
                          > generations[gen].gc_trigger)
-                     && (gen_av_mem_age(gen)
-                         > generations[gen].min_av_mem_age))));
+                     && (generation_average_age(gen)
+                         > generations[gen].minimum_age_before_gc))));
 
     /* Now if gen-1 was raised all generations before gen are empty.
      * If it wasn't raised then all generations before gen-1 are empty.
@@ -4599,8 +4602,8 @@ gc_init(void)
         generations[i].cum_sum_bytes_allocated = 0;
         /* the tune-able parameters */
         generations[i].bytes_consed_between_gc = 2000000;
-        generations[i].trigger_age = 1;
-        generations[i].min_av_mem_age = 0.75;
+        generations[i].number_of_gcs_before_promotion = 1;
+        generations[i].minimum_age_before_gc = 0.75;
         generations[i].lutexes = NULL;
     }
 

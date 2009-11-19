@@ -508,9 +508,15 @@
                       (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
                  (t
                   (let ((ptype (gethash name *backend-predicate-types*)))
-                    (when ptype
-                      (add 'typep (ok-lvar-lambda-var (first args) constraints)
-                           ptype nil))))))))))
+                    (if ptype
+                        (add 'typep (ok-lvar-lambda-var (first args) constraints)
+                             ptype nil)
+                        (with-open-file (f "/tmp/unknown.txt"
+                                           :if-exists :append
+                                           :if-does-not-exist :create
+                                           :direction :output)
+                          (let ((*package* (find-package :keyword)))
+                            (format f "~S~%" name))))))))))))
       (values consequent-constraints alternative-constraints))))
 
 ;;;; Applying constraints

@@ -121,7 +121,7 @@ user-defined structures when the structure constructor defined using
 call to the constructor is bound to a variable declared
 @code{dynamic-extent}.
 
-@strong{Note:} structures with ``raw'' slots can currently be
+@strong{Note}: structures with ``raw'' slots can currently be
 stack-allocated only on x86 and x86-64.
 
 @item

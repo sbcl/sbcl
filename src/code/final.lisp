@@ -41,19 +41,21 @@ signalled in whichever thread the FUNCTION was called in.
 
 Examples:
 
-  ;;; good (assumes RELEASE-HANDLE is re-entrant)
+  ;;; GOOD, assuming RELEASE-HANDLE is re-entrant.
   (let* ((handle (get-handle))
          (object (make-object handle)))
    (finalize object (lambda () (release-handle handle)))
    object)
 
-  ;;; bad, finalizer refers to object being finalized, causing
-  ;;; it to be retained indefinitely
+  ;;; BAD, finalizer refers to object being finalized, causing
+  ;;; it to be retained indefinitely!
   (let* ((handle (get-handle))
          (object (make-object handle)))
-    (finalize object (lambda () (release-handle (object-handle object)))))
+    (finalize object
+              (lambda ()
+                (release-handle (object-handle object)))))
 
-  ;;; bad, not re-entrant
+  ;;; BAD, not re-entrant!
   (defvar *rec* nil)
 
   (defun oops ()
@@ -64,7 +66,7 @@ Examples:
 
   (progn
     (finalize \"oops\" #'oops)
-    (oops)) ; causes GC and re-entry to #'oops due to the finalizer
+    (oops)) ; GC causes re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
   (unless object
     (error "Cannot finalize NIL."))

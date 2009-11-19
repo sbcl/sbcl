@@ -52,6 +52,9 @@ provided with absolutely no warranty. See the @file{COPYING} and
 
 @c We use @&key, etc to escape & from TeX in lambda lists --
 @c so we need to define them for info as well.
+@macro &allow-other-keys
+&allow-other-keys
+@end macro
 @macro &optional
 &optional
 @end macro

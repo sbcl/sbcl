@@ -304,8 +304,8 @@ run in any thread.")
 
 (defun bytes-consed-between-gcs ()
   #!+sb-doc
-  "Return the amount of memory that will be allocated before the next garbage
-   collection is initiated. This can be set with SETF."
+  "The amount of memory that will be allocated before the next garbage
+collection is initiated. This can be set with SETF."
   (sb!alien:extern-alien "bytes_consed_between_gcs"
                          (sb!alien:unsigned 32)))
 
@@ -321,3 +321,106 @@ run in any thread.")
              (or #!+sb-thread *stop-for-gc-pending*
                  *gc-pending*))
     (sb!unix::receive-pending-interrupt)))
+
+;;;; GENCGC specifics
+;;;;
+;;;; For documentation convenience, these have stubs on non-GENCGC platforms
+;;;; as well.
+#!+gencgc
+(deftype generation-index ()
+  '(integer 0 #.sb!vm:+pseudo-static-generation+))
+
+;;; FIXME: GENERATION (and PAGE, as seen in room.lisp) should probably be
+;;; defined in Lisp, and written to header files by genesis, instead of this
+;;; OAOOMiness -- this duplicates the struct definition in gencgc.c.
+#!+gencgc
+(define-alien-type generation
+    (struct generation
+            (alloc-start-page page-index-t)
+            (alloc-unboxed-start-page page-index-t)
+            (alloc-large-start-page page-index-t)
+            (alloc-large-unboxed-start-page page-index-t)
+            (bytes-allocated unsigned-long)
+            (gc-trigger unsigned-long)
+            (bytes-consed-between-gcs unsigned-long)
+            (number-of-gcs int)
+            (number-of-gcs-before-promotion int)
+            (cum-sum-bytes-allocated unsigned-long)
+            (minimum-age-before-gc double)))
+
+#!+gencgc
+(define-alien-variable generations
+    (array generation #.(1+ sb!vm:+pseudo-static-generation+)))
+
+(macrolet ((def (slot doc &optional setfp)
+             (declare (ignorable doc))
+             `(progn
+                (defun ,(symbolicate "GENERATION-" slot) (generation)
+                  #!+sb-doc
+                  ,doc
+                  (declare (generation-index generation))
+                  #!-gencgc
+                  (declare (ignore generation))
+                  #!-gencgc
+                  (error "~S is a GENCGC only function and unavailable in this build"
+                         ',name)
+                  #!+gencgc
+                  (slot (deref generations generation) ',slot))
+                ,@(when setfp
+                        `((defun (setf ,(symbolicate "GENERATION-" slot)) (value generation)
+                            (declare (generation-index generation))
+                            #!-gencgc
+                            (declare (ignore value generation))
+                            #!-gencgc
+                            (error "(SETF ~S) is a GENCGC only function and unavailable in this build"
+                                   ',name)
+                            #!+gencgc
+                            (setf (slot (deref generations generation) ',slot) value)))))))
+  (def bytes-consed-between-gcs
+      "Number of bytes that can be allocated to GENERATION before that
+generation is considered for garbage collection. This value is meaningless for
+generation 0 (the nursery): see BYTES-CONSED-BETWEEN-GCS instead. Default is
+20Mb. Can be assigned to using SETF. Available on GENCGC platforms only.
+
+Experimental: interface subject to change."
+    t)
+  (def minimum-age-before-gc
+      "Minimum average age of objects allocated to GENERATION before that
+generation is may be garbage collected. Default is 0.75. See also
+GENERATION-AVERAGE-AGE. Can be assigned to using SETF. Available on GENCGC
+platforms only.
+
+Experimental: interface subject to change."
+    t)
+  (def number-of-gcs-before-promotion
+      "Number of times garbage collection is done on GENERATION before
+automatic promotion to the next generation is triggered. Can be assigned to
+using SETF. Available on GENCGC platforms only.
+
+Experimental: interface subject to change."
+    t)
+  (def bytes-allocated
+      "Number of bytes allocated to GENERATION currently. Available on GENCGC
+platforms only.
+
+Experimental: interface subject to change.")
+  (def number-of-gcs
+      "Number of times garbage collection has been done on GENERATION without
+promotion. Available on GENCGC platforms only.
+
+Experimental: interface subject to change."))
+  (defun generation-average-age (generation)
+    "Average age of memory allocated to GENERATION: average number of times
+objects allocated to the generation have seen younger objects promoted to it.
+Available on GENCGC platforms only.
+
+Experimental: interface subject to change."
+    (declare (generation-index generation))
+    #!-gencgc (declare (ignore generation))
+    #!-gencgc
+    (error "~S is a GENCGC only function and unavailable in this build."
+           'generation-average-age)
+    #!+gencgc
+    (alien-funcall (extern-alien "generation_average_age"
+                                 (function double generation-index-t))
+                   generation))

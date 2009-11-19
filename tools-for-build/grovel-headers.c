@@ -57,6 +57,7 @@
 #endif
 
 #include "wrap.h"
+#include "gc.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
@@ -437,10 +438,11 @@ main(int argc, char *argv[])
     defconstant("fpe-fltsub", -1);
 #endif
 #endif // !WIN32
+    printf("\n");
 
 #ifdef LISP_FEATURE_BSD
     printf(";;; sysctl(3) names\n");
-    printf("(in-package \"SB!IMPL\")\n\n");
+    printf("(in-package \"SB!IMPL\")\n");
     defconstant("ctl-kern", CTL_KERN);
     defconstant("ctl-hw", CTL_HW);
     defconstant("ctl-maxname", CTL_MAXNAME);
@@ -450,5 +452,14 @@ main(int argc, char *argv[])
     defconstant("hw-pagesize", HW_PAGESIZE);
     printf("\n");
 #endif
+
+#ifdef LISP_FEATURE_GENCGC
+    printf(";;; GENCGC related\n");
+    printf("(in-package \"SB!KERNEL\")\n");
+    DEFTYPE("page-index-t", page_index_t);
+    DEFTYPE("generation-index-t", generation_index_t);
+    printf("\n");
+#endif
+
     return 0;
 }

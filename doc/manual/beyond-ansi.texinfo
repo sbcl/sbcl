@@ -22,20 +22,48 @@ it still has quite a few.  @xref{Contributed Modules}.
 @node  Garbage Collection
 @comment  node-name,  next,  previous,  up
 @section Garbage Collection
+@cindex Garbage collection
 
 SBCL provides additional garbage collection functionality not
-specified by ANSI. Weak pointers allow references to objects to be
-maintained without keeping them from being garbage collected, and
-``finalization'' hooks are available to cause code to be executed when
-an object has been garbage collected. Additionally users can specify
-their own cleanup actions to be executed with garbage collection. See
-also @code{make-hash-table} for information on weak hash tables.
+specified by ANSI.
+
+@include var-sb-ext-star-after-gc-hooks-star.texinfo
+@include fun-sb-ext-gc.texinfo
+
+@subsection Finalization
+@cindex Finalization
+
+Finalization allows code to be executed after an object has been
+garbage collected. This is useful for example for releasing foreign
+memory associated with a Lisp object.
 
 @include fun-sb-ext-finalize.texinfo
 @include fun-sb-ext-cancel-finalization.texinfo
+
+@subsection Weak Pointers
+@cindex Weak pointers
+
+Weak pointers allow references to objects to be maintained without
+keeping them from being garbage collected: useful for building caches
+among other things.
+
+Hash tables can also have weak keys and values: @pxref{Hash Table
+Extensions}.
+
 @include fun-sb-ext-make-weak-pointer.texinfo
 @include fun-sb-ext-weak-pointer-value.texinfo
-@include var-sb-ext-star-after-gc-hooks-star.texinfo
+
+@subsection Introspection and Tuning
+
+@include var-sb-ext-star-gc-run-time-star.texinfo
+@include fun-sb-ext-bytes-consed-between-gcs.texinfo
+@include fun-sb-ext-generation-average-age.texinfo
+@include fun-sb-ext-generation-bytes-allocated.texinfo
+@include fun-sb-ext-generation-bytes-consed-between-gcs.texinfo
+@include fun-sb-ext-generation-minimum-age-before-gc.texinfo
+@include fun-sb-ext-generation-number-of-gcs-before-promotion.texinfo
+@include fun-sb-ext-generation-number-of-gcs.texinfo
+@include fun-sb-ext-get-bytes-consed.texinfo
 
 @node Metaobject Protocol
 @comment  node-name,  next,  previous,  up
@@ -381,6 +409,7 @@ accessor @code{sb-ext:name-conflict-symbols}.
 @node    Hash Table Extensions
 @comment  node-name,  next,  previous,  up
 @section Hash Table Extensions
+@cindex Hash tables
 
 Hash table extensions supported by SBCL are all controlled by keyword
 arguments to @code{make-hash-table}.
