@@ -281,10 +281,16 @@
     (define-call "setup_mach_exceptions" void never-fails)
     (define-call ("posix_fork" :c-name "fork") pid-t minusp)
     (defun fork ()
-      (let ((pid (posix-fork)))
-        (when (= pid 0)
-          (setup-mach-exceptions))
-        pid))
+      (tagbody
+         (sb-thread::with-all-threads-lock
+           (when (cdr sb-thread::*all-threads*)
+             (go :error))
+           (let ((pid (posix-fork)))
+             (when (= pid 0)
+               (setup-mach-exceptions))
+             (return-from fork pid)))
+       :error
+         (error "Cannot fork with multiple threads running.")))
     (export 'fork :sb-posix))
 
   #-mach-exception-handler

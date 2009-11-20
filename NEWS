@@ -52,6 +52,9 @@ changes relative to sbcl-1.0.32:
        streams after an UNREAD-CHAR.
   * enhancement: SB-INTROSPECT:ALLOCATION-INFORMATION also reports if the
     object is allocated in a boxed region of dynamic space.
+  * enhancement: SB-POSIX:FORK now signals an error if an attempt to
+    fork with multiple Lisp threads running is made, instead of going
+    ahead with unpredictable consequences. (reported by Leslie Polzer)
   * bug fix: uses of slot accessors on specialized method parameters within
     the bodies of SLOT-VALUE-USING-CLASS methods no longer triggers a type
     error while finalizing the class.  This fix may cause classes with slot

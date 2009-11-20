@@ -344,7 +344,6 @@
 
 ;;;; generic interfaces
 
-;;; FIXME: used only in this file, needn't be in runtime
 (defmacro do-info ((env &key (name (gensym)) (class (gensym)) (type (gensym))
                         (type-number (gensym)) (value (gensym)) known-volatile)
                    &body body)
