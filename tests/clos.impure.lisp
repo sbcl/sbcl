@@ -1765,4 +1765,16 @@
   (assert (= 42 (slot-value (make-instance 'remove-default-initargs-test)
                             'x))))
 
+(with-test (:name :bug-485019)
+  ;; there was a bug in WALK-SETQ, used in method body walking, in the
+  ;; presence of declarations on symbol macros.
+  (defclass bug-485019 ()
+    ((array :initarg :array)))
+  (defmethod bug-485019 ((bug-485019 bug-485019))
+    (with-slots (array) bug-485019
+      (declare (type (or null simple-array) array))
+      (setf array (make-array 4)))
+    bug-485019)
+  (bug-485019 (make-instance 'bug-485019)))
+
 ;;;; success

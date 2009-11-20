@@ -866,7 +866,7 @@
             (let* ((type (env-var-type var env))
                    (expanded (if (eq t type)
                                  `(setf ,(cddr symmac) ,val)
-                                 `(setf ,(cddr symmac) `(the ,type ,val))))
+                                 `(setf ,(cddr symmac) (the ,type ,val))))
                    (walked (walk-form-internal expanded context env)))
               (if (eq expanded walked)
                   form

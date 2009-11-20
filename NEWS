@@ -76,6 +76,9 @@ changes relative to sbcl-1.0.32:
     complex and arrays that are definitely complex.  (launchpad bug #309129)
   * bug fix: SUBTYPEP knows that the SYMBOL type is not SUBTYPEP the KEYWORD
     type.  (reported by Levente Mészáros; launchpad bug #485972)
+  * bug fix: setting the value of a symbol-macro within a method in the
+    presence of type declarations works properly again.  (reported by Iban
+    Hatchondo; launchpad bug #485019)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type
