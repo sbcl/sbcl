@@ -74,6 +74,8 @@ changes relative to sbcl-1.0.32:
     (reported by Attila Lendvai; launchpad bug #310132)
   * bug fix: distinguish in type specifiers between arrays that might be
     complex and arrays that are definitely complex.  (launchpad bug #309129)
+  * bug fix: SUBTYPEP knows that the SYMBOL type is not SUBTYPEP the KEYWORD
+    type.  (reported by Levente Mészáros; launchpad bug #485972)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type

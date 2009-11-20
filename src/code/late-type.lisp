@@ -1349,7 +1349,15 @@
            (values nil nil)))))
 
 (!define-type-method (hairy :complex-subtypep-arg2) (type1 type2)
-  (invoke-complex-subtypep-arg1-method type1 type2))
+  (let ((specifier (hairy-type-specifier type2)))
+    (cond
+      ((and (consp specifier) (eql (car specifier) 'satisfies))
+       (case (cadr specifier)
+         ((keywordp) (if (type= type1 (specifier-type 'symbol))
+                         (values nil t)
+                         (invoke-complex-subtypep-arg1-method type1 type2)))
+         (t (invoke-complex-subtypep-arg1-method type1 type2))))
+      (t (invoke-complex-subtypep-arg1-method type1 type2)))))
 
 (!define-type-method (hairy :complex-subtypep-arg1) (type1 type2)
   (declare (ignore type1 type2))

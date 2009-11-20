@@ -420,3 +420,7 @@ ACTUAL ~D DERIVED ~D~%"
         (let ((i (sb-c::values-type-intersection x y)))
           (assert (sb-c::type= i (sb-c::values-type-intersection i x)))
           (assert (sb-c::type= i (sb-c::values-type-intersection i y))))))))
+
+(with-test (:name :bug-485972)
+  (assert (equal (multiple-value-list (subtypep 'symbol 'keyword)) '(nil t)))
+  (assert (equal (multiple-value-list (subtypep 'keyword 'symbol)) '(t t))))
