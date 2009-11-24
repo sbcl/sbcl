@@ -639,6 +639,8 @@ designated class.
 Experimental.
 "
   (let ((class (canonicalize-class-designator class-designator)))
+    (unless class
+      (return-from who-specializes-directly nil))
     (let ((result (collect-specializing-methods
                    #'(lambda (specl)
                        ;; Does SPECL specialize on CLASS directly?
@@ -670,6 +672,8 @@ designated class or a subclass of it.
 Experimental.
 "
   (let ((class (canonicalize-class-designator class-designator)))
+    (unless class
+      (return-from who-specializes-generally nil))
     (let ((result (collect-specializing-methods
                    #'(lambda (specl)
                        ;; Does SPECL specialize on CLASS or a subclass
@@ -689,9 +693,10 @@ Experimental.
                 result))))
 
 (defun canonicalize-class-designator (class-designator)
-  (etypecase class-designator
-    (symbol (find-class class-designator))
-    (class  class-designator)))
+  (typecase class-designator
+    (symbol (find-class class-designator nil))
+    (class  class-designator)
+    (t nil)))
 
 (defun method-generic-function-name (method)
   (sb-mop:generic-function-name (sb-mop:method-generic-function method)))
