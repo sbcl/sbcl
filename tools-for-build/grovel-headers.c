@@ -22,9 +22,13 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #ifdef _WIN32
+  /* KLUDGE: From src/runtime/runtime.h, avoid double definition of
+     boolean.  We really should clean up our act on this one. */
+  #define boolean rpcndr_boolean
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
   #include <shlobj.h>
+  #undef boolean
 #else
   #include <sys/times.h>
   #include <sys/wait.h>
