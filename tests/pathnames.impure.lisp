@@ -477,4 +477,13 @@
   (assert (eq :type-error-ok
               (handler-case (logical-pathname "SYS:%")
                 (type-error () :type-error-ok)))))
+
+;;; Reported by Willem Broekema: Reading #p"\\\\" caused an error due
+;;; to insufficient sanity in input testing in EXTRACT-DEVICE (in
+;;; src;code;win32-pathname).
+#+win32
+(with-test (:name :bug-489698)
+  (assert (equal (make-pathname :directory '(:absolute))
+                 (read-from-string "#p\"\\\\\\\\\""))))
+
 ;;;; success

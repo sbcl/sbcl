@@ -3,6 +3,8 @@
 changes relative to sbcl-1.0.33:
   * enhancement: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST now also works on most
     builtin types.
+  * bug fix: #p"\\\\" can now be read without error on Win32 (reported by
+Willem Broekema; launchpad bug #489698).
 
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)

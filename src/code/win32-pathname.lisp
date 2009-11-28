@@ -20,7 +20,7 @@
         (cond ((and (eql c1 #\:) (alpha-char-p c0))
                ;; "X:" style, saved as X
                (values (string (char namestr start)) (+ start 2)))
-              ((and (member c0 '(#\/ #\\)) (eql c0 c1))
+              ((and (member c0 '(#\/ #\\)) (eql c0 c1) (>= end (+ start 3)))
                ;; "//UNC" style, saved as UNC
                ;; FIXME: at unparsing time we tell these apart by length,
                ;; which seems a bit lossy -- presumably one-letter UNC
