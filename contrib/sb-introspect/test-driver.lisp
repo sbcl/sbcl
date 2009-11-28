@@ -238,15 +238,25 @@
   nil)
 
 (deftest deftype-lambda-list.1
-    (multiple-value-bind (arglist found?) (deftype-lambda-list 'foobar-type)
-          (and found?
-               (equal arglist '(&whole w &environment e
-                                r1 r2 &optional o &rest rest &key k1 k2 k3))))
+    (deftype-lambda-list 'foobar-type)
+  (&whole w &environment e r1 r2 &optional o &rest rest &key k1 k2 k3)
   t)
 
 (deftest deftype-lambda-list.2
-    (equal (multiple-value-list (deftype-lambda-list (gensym)))
-           '(nil nil))
+    (deftype-lambda-list (gensym))
+  nil
+  nil)
+
+;; ARRAY is a primitive type with associated translator function.
+(deftest deftype-lambda-list.3
+    (deftype-lambda-list 'array)
+  (&optional (sb-kernel::element-type '*) (sb-kernel::dimensions '*))
+  t)
+
+;; VECTOR is a primitive type that is defined by means of DEFTYPE.
+(deftest deftype-lambda-list.4
+    (deftype-lambda-list 'vector)
+  (&optional sb-kernel::element-type sb-kernel::size)
   t)
 
 ;;; Test allocation-information

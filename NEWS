@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
+changes relative to sbcl-1.0.33:
+  * enhancement: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST now also works on most
+    builtin types.
+
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)
   * improvement: support O_LARGEFILE access to files larger than 2GB on

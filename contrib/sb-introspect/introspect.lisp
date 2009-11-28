@@ -451,7 +451,19 @@ function designator."
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
 value, and a flag whether the arglist could be found as second
 value."
-  (sb-int:info :type :lambda-list typespec-operator))
+  (check-type typespec-operator symbol)
+  (case (sb-int:info :type :kind typespec-operator)
+    (:defined
+     (sb-int:info :type :lambda-list typespec-operator))
+    (:primitive
+     (let ((translator-fun (sb-int:info :type :translator typespec-operator)))
+       (if translator-fun
+           (values (sb-kernel:%fun-lambda-list translator-fun) t)
+           ;; Some builtin types (e.g. STRING) do not have a
+           ;; translator, but they were actually defined via DEFTYPE
+           ;; in src/code/deftypes-for-target.lisp.
+           (sb-int:info :type :lambda-list typespec-operator))))
+    (t (values nil nil))))
 
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))
