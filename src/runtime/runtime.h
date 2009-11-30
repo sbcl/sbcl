@@ -168,7 +168,11 @@ FDEFN(lispobj obj)
 static inline int
 is_lisp_pointer(lispobj obj)
 {
+#if N_WORD_BITS == 64
+    return (obj & 3) == 3;
+#else
     return obj & 1;
+#endif
 }
 
 #include "fixnump.h"
