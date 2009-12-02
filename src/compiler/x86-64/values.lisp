@@ -97,7 +97,9 @@
 
     DONE
     (inst mov count start)              ; start is high address
-    (inst sub count rsp-tn)))           ; stackp is low address
+    (inst sub count rsp-tn)             ; stackp is low address
+    #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+    (inst shr count (- word-shift n-fixnum-tag-bits))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -132,16 +134,25 @@
 
       (any-reg
        (move src context)
+       #!+#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
        (inst sub src skip)
+       #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+       (progn
+         ;; FIXME: This can't be efficient, but LEA (my first choice)
+         ;; doesn't do subtraction.
+         (inst shl skip (- word-shift n-fixnum-tag-bits))
+         (inst sub src skip)
+         (inst shr skip (- word-shift n-fixnum-tag-bits)))
        (move count num)
        (inst sub count skip)))
 
-    (move loop-index count)
+    (inst lea loop-index (make-ea :byte :index count
+                                  :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst mov start rsp-tn)
     (inst jrcxz DONE)  ; check for 0 count?
 
-    (inst sub rsp-tn count)
-    (inst sub src count)
+    (inst sub rsp-tn loop-index)
+    (inst sub src loop-index)
 
     LOOP
     (inst mov temp (make-ea :qword :base src :index loop-index))

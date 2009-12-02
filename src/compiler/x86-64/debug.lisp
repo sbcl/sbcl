@@ -43,7 +43,8 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp))))
+          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
+                   :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -71,7 +72,8 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp)
+          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
+                   :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
           value)
     (move result value)))
 

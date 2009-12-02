@@ -79,9 +79,10 @@
               positive-fixnum)
   (:policy :fast-safe)
   (:generator 100
-    (inst lea result (make-ea :byte :base words :disp
-                              (+ (1- (ash 1 n-lowtag-bits))
-                                 (* vector-data-offset n-word-bytes))))
+    (inst lea result (make-ea :byte :index words
+                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                              :disp (+ lowtag-mask
+                                       (* vector-data-offset n-word-bytes))))
     (inst and result (lognot lowtag-mask))
     (pseudo-atomic
       (allocation result result)
@@ -104,9 +105,10 @@
   (:policy :fast-safe)
   (:node-var node)
   (:generator 100
-    (inst lea result (make-ea :byte :base words :disp
-                              (+ (1- (ash 1 n-lowtag-bits))
-                                 (* vector-data-offset n-word-bytes))))
+    (inst lea result (make-ea :byte :index words
+                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                              :disp (+ lowtag-mask
+                                       (* vector-data-offset n-word-bytes))))
     (inst and result (lognot lowtag-mask))
     ;; FIXME: It would be good to check for stack overflow here.
     (move ecx words)
@@ -203,11 +205,13 @@
   (:node-var node)
   (:generator 50
     (inst lea bytes
-          (make-ea :qword :base extra :disp (* (1+ words) n-word-bytes)))
+          (make-ea :qword :disp (* (1+ words) n-word-bytes) :index extra
+                   :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst mov header bytes)
-    (inst shl header (- n-widetag-bits 3)) ; w+1 to length field
+    (inst shl header (- n-widetag-bits word-shift)) ; w+1 to length field
     (inst lea header                    ; (w-1 << 8) | type
-          (make-ea :qword :base header :disp (+ (ash -2 n-widetag-bits) type)))
+          (make-ea :qword :base header
+                   :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic
      (allocation result bytes node)

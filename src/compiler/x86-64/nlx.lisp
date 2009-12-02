@@ -212,7 +212,7 @@
     (inst sub rdi n-word-bytes)
     (move rcx count)                    ; fixnum words == bytes
     (move num rcx)
-    (inst shr rcx word-shift)           ; word count for <rep movs>
+    (inst shr rcx n-fixnum-tag-bits)    ; word count for <rep movs>
     ;; If we got zero, we be done.
     (inst jrcxz DONE)
     ;; Copy them down.

@@ -79,7 +79,7 @@
          ;; effect of the ENTER with discrete instructions. Takes
          ;; 3+4+4=11 bytes as opposed to 1+4=5 bytes.
          (cond ((policy ,node (>= speed space))
-                (inst sub rsp-tn (fixnumize 3))
+                (inst sub rsp-tn (* 3 n-word-bytes))
                 (inst mov (make-ea :qword :base rsp-tn
                                    :disp (frame-byte-offset
                                           (+ sp->fp-offset
@@ -94,7 +94,7 @@
                (t
                 ;; Dummy for return address.
                 (inst push rbp-tn)
-                (inst enter (fixnumize 1))))
+                (inst enter n-word-bytes)))
 
          ,(if (zerop num-args)
               '(inst xor ecx ecx)

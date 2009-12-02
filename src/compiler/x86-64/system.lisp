@@ -39,13 +39,13 @@
     (inst cmp al-tn fun-pointer-lowtag)
     (inst jmp :e FUNCTION-PTR)
 
-    ;; Pick off structures and list pointers.
-    (inst test al-tn 1)
-    (inst jmp :ne DONE)
-
     ;; Pick off fixnums.
-    (inst and al-tn fixnum-tag-mask)
+    (inst test al-tn fixnum-tag-mask)
     (inst jmp :e DONE)
+
+    ;; Pick off structures and list pointers.
+    (inst test al-tn 2)
+    (inst jmp :ne DONE)
 
     ;; must be an other immediate
     (inst mov rax object)

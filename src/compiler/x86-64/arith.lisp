@@ -391,7 +391,7 @@
   (:note "inline fixnum arithmetic")
   (:generator 4
     (move r x)
-    (inst sar r 3)
+    (inst sar r n-fixnum-tag-bits)
     (inst imul r y)))
 
 (define-vop (fast-*-c/fixnum=>fixnum fast-safe-arith-op)
@@ -686,6 +686,7 @@
                       (progn
                         (inst sar result (- amount))
                         (inst and result (lognot fixnum-tag-mask)))))
+                 ;; shifting left (zero fill)
                  ((plusp amount)
                   (unless modularp
                     (aver (not "Impossible: fixnum ASH should not be called with
@@ -693,6 +694,7 @@ constant shift greater than word length")))
                   (if (sc-is result any-reg)
                       (zeroize result)
                       (inst mov result 0)))
+                 ;; shifting right (sign fill)
                  (t (inst sar result 63)
                     (inst and result (lognot fixnum-tag-mask))))))))
 
@@ -1664,7 +1666,7 @@ constant shift greater than word length")))
   (:result-types unsigned-num)
   (:generator 1
     (move digit fixnum)
-    (inst sar digit 3)))
+    (inst sar digit n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
   (:translate sb!bignum:%bigfloor)
@@ -1700,7 +1702,7 @@ constant shift greater than word length")))
   (:generator 1
     (move res digit)
     (when (sc-is res any-reg control-stack)
-      (inst shl res 3))))
+      (inst shl res n-fixnum-tag-bits))))
 
 (define-vop (digit-ashr)
   (:translate sb!bignum:%ashr)

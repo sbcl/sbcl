@@ -40,10 +40,10 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                ;; Same as: (inst enter (fixnumize 1))
+                ;; Same as: (inst enter (* n-word-bytes 1))
                 (inst push rbp-tn)
                 (inst mov rbp-tn rsp-tn)
-                (inst sub rsp-tn (fixnumize 1))
+                (inst sub rsp-tn (* n-word-bytes 1))
                 (inst push (make-ea :qword :base rbp-tn
                             :disp (frame-byte-offset return-pc-save-offset)))
                 (inst mov rcx (fixnumize 2)) ; arg count
@@ -53,12 +53,16 @@
                                         (static-fun-offset
                                          ',(symbolicate "TWO-ARG-" fun))))))))
 
+  #.`
   (define-generic-arith-routine (+ 10)
     (move res x)
     (inst add res y)
     (inst jmp :no OKAY)
-    (inst rcr res 1)                  ; carry has correct sign
-    (inst sar res 2)                  ; remove type bits
+    ;; Unbox the overflowed result, recovering the correct sign from
+    ;; the carry flag, then re-box as a bignum.
+    (inst rcr res 1)
+    ,@(when (> n-fixnum-tag-bits 1)   ; don't shift by 0
+            '((inst sar res (1- n-fixnum-tag-bits))))
 
     (move rcx res)
 
@@ -67,13 +71,17 @@
 
     OKAY)
 
+  #.`
   (define-generic-arith-routine (- 10)
     (move res x)
     (inst sub res y)
     (inst jmp :no OKAY)
+    ;; Unbox the overflowed result, recovering the correct sign from
+    ;; the carry flag, then re-box as a bignum.
     (inst cmc)                        ; carry has correct sign now
     (inst rcr res 1)
-    (inst sar res 2)                  ; remove type bits
+    ,@(when (> n-fixnum-tag-bits 1)   ; don't shift by 0
+            '((inst sar res (1- n-fixnum-tag-bits))))
 
     (move rcx res)
 
@@ -128,7 +136,7 @@
 
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn (fixnumize 1))
+  (inst sub rsp-tn (* n-word-bytes 1))
   (inst push (make-ea :qword :base rbp-tn
                       :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov rcx (fixnumize 1))    ; arg count
@@ -168,7 +176,7 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst sub rsp-tn (fixnumize 3))
+                (inst sub rsp-tn (* n-word-bytes 3))
                 (inst mov (make-ea :qword :base rsp-tn
                                    :disp (frame-byte-offset
                                           (+ sp->fp-offset
@@ -238,7 +246,7 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (inst sub rsp-tn (fixnumize 3))
+  (inst sub rsp-tn (* n-word-bytes 3))
   (inst mov (make-ea :qword :base rsp-tn
                      :disp (frame-byte-offset
                             (+ sp->fp-offset
@@ -300,7 +308,7 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (inst sub rsp-tn (fixnumize 3))
+  (inst sub rsp-tn (* n-word-bytes 3))
   (inst mov (make-ea :qword :base rsp-tn
                      :disp (frame-byte-offset
                             (+ sp->fp-offset

@@ -347,7 +347,8 @@
   (:generator 20
     (aver (not (location= x y)))
     (let ((done (gen-label)))
-      (inst mov y #.(ash lowtag-mask n-positive-fixnum-bits))
+      (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
+                         n-positive-fixnum-bits))
       ;; The assembly routines test the sign flag from this one, so if
       ;; you change stuff here, make sure the sign flag doesn't get
       ;; overwritten before the CALL!

@@ -194,7 +194,7 @@ Lstack:
 	xor	%rdx,%rdx	# clear any descriptor registers 
 	xor	%rdi,%rdi	# that we can't be sure we'll 
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
-	shl	$3,%rcx		# (fixnumize num-args)
+	shl	$N_FIXNUM_TAG_BITS,%rcx	# (fixnumize num-args)
 	cmp	$0,%rcx
 	je	Ldone
 	mov	0(%rbx),%rdx	# arg0
