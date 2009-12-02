@@ -103,18 +103,6 @@ instead.")
 (setf (fdocumentation '*current-thread* 'variable)
       "Bound in each thread to the thread itself.")
 
-(defstruct (thread (:constructor %make-thread))
-  #!+sb-doc
-  "Thread type. Do not rely on threads being structs as it may change
-in future versions."
-  name
-  %alive-p
-  os-thread
-  interruptions
-  (interruptions-lock (make-mutex :name "thread interruptions lock"))
-  result
-  (result-lock (make-mutex :name "thread result lock")))
-
 #!+sb-doc
 (setf
  (fdocumentation 'thread-name 'function)

@@ -200,11 +200,11 @@
 (declaim (ftype (function (list list attributes &key
                                 (:derive-type (or function null))
                                 (:optimizer (or function null))
-                                (:destroyed-constant-args (or function null)))
+                                (:destroyed-constant-args (or function null))
+                                (:result-arg (or index null)))
                           *)
                 %defknown))
-(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args
-                  result-arg)
+(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args result-arg)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type

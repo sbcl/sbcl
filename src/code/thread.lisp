@@ -11,6 +11,18 @@
 
 (in-package "SB!THREAD")
 
+(def!struct (thread (:constructor %make-thread))
+  #!+sb-doc
+  "Thread type. Do not rely on threads being structs as it may change
+in future versions."
+  name
+  %alive-p
+  os-thread
+  interruptions
+  (interruptions-lock (make-mutex :name "thread interruptions lock"))
+  result
+  (result-lock (make-mutex :name "thread result lock")))
+
 (def!struct mutex
   #!+sb-doc
   "Mutex type."

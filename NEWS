@@ -1,10 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-
 changes relative to sbcl-1.0.33:
   * enhancement: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST now also works on most
     builtin types.
-  * bug fix: #p"\\\\" can now be read without error on Win32 (reported by
-Willem Broekema; launchpad bug #489698).
+  * bug fix: #p"\\\\" can now be read without error on Win32.  (reported by
+    Willem Broekema; launchpad bug #489698).
+  * bug fix: some minor code rearrangements to reenable warning-free building
+    from CMUCL (reported by xme@gmx.net; launchpad bug #491104)
 
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)
