@@ -3,14 +3,14 @@ changes relative to sbcl-1.0.33:
   * enhancement: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST now also works on most
     builtin types.
   * bug fix: #p"\\\\" can now be read without error on Win32.  (reported by
-    Willem Broekema; launchpad bug #489698).
+    Willem Broekema; launchpad bug lp#489698).
   * bug fix: some minor code rearrangements to reenable warning-free building
-    from CMUCL (reported by xme@gmx.net; launchpad bug #491104)
+    from CMUCL (reported by xme@gmx.net; launchpad bug lp#491104)
 
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)
   * improvement: support O_LARGEFILE access to files larger than 2GB on
-    x86-64/linux.  (thanks to Daniel Janus; launchpad bug #453080)
+    x86-64/linux.  (thanks to Daniel Janus; launchpad bug lp#453080)
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-DIRECTLY to get a list of
     definitions for methods specializing on the passed class itself. 
   * new feature: SB-INTROSPECT:WHO-SPECIALIZES-GENERALLY to get a list of
@@ -35,7 +35,7 @@ changes in sbcl-1.0.33 relative to sbcl-1.0.32:
        (:<encoding> :replacement <character>) as an external format which will
        automatically substitute <character> on encoding or decoding errors for
        streams and for STRING-TO-OCTETS and its inverse.  (launchpad bug
-       #317072)
+       lp#317072)
     ** improvement: the file streams underlying the standard streams (such as
        *STANDARD-INPUT*, *TERMINAL-IO*) are opened with an external format 
        which uses the replacement mechanism to handle encoding errors,
@@ -46,9 +46,9 @@ changes in sbcl-1.0.33 relative to sbcl-1.0.32:
        between #xd800 and #xdfff).
     ** fix a typo preventing conversion of strings into octet vectors
        in the latin-2 encoding.  (reported by Attila Lendvai; launchpad bug
-       #471689)
+       lp#471689)
     ** fix a bug in the octet multibyte handling of decoding errors and the
-       USE-VALUE restart.  (launchpad bug #314939)
+       USE-VALUE restart.  (launchpad bug lp#314939)
     ** fix the bug underlying the expected failure in the FORCE-END-OF-FILE
        restart on fd-stream decoding errors.
     ** fix a bug in the ATTEMPT-RESYNC fd-stream decoding restart when the
@@ -67,26 +67,26 @@ changes in sbcl-1.0.33 relative to sbcl-1.0.32:
     the bodies of SLOT-VALUE-USING-CLASS methods no longer triggers a type
     error while finalizing the class.  This fix may cause classes with slot
     accessors to be finalized later than previously.  (reported by Lars Rune
-    Nøstdal; launchpad bug #473699)
+    Nøstdal; launchpad bug lp#473699)
   * bug fix: restore buildability on the MIPS platform.  (regression from
     1.0.30.38, reported by Samium Gromoff)
   * bug fix: inspecting closures is less likely to fail with a type error.
   * bug fix: no timer starvation when setting the system clock back.
-    (launchpad bug #460283)
+    (launchpad bug lp#460283)
   * bug fix: WITH-STANDARD-IO-SYNTAX now binds *PRINT-PPRINT-DISPATCH* to the
     standard pprint dispatch table as specified by CLHS.
   * bug fix: give CLISP a hint about a type declaration to enable it to build
     the cross-compiler without warnings.  (thanks to Josh Elasser; launchpad
-    bug #396597)
+    bug lp#396597)
   * bug fix: correctly dump literal objects in defaulting forms of arglists.
-    (reported by Attila Lendvai; launchpad bug #310132)
+    (reported by Attila Lendvai; launchpad bug lp#310132)
   * bug fix: distinguish in type specifiers between arrays that might be
-    complex and arrays that are definitely complex.  (launchpad bug #309129)
+    complex and arrays that are definitely complex.  (launchpad bug lp#309129)
   * bug fix: SUBTYPEP knows that the SYMBOL type is not SUBTYPEP the KEYWORD
-    type.  (reported by Levente Mészáros; launchpad bug #485972)
+    type.  (reported by Levente Mészáros; launchpad bug lp#485972)
   * bug fix: setting the value of a symbol-macro within a method in the
     presence of type declarations works properly again.  (reported by Iban
-    Hatchondo; launchpad bug #485019)
+    Hatchondo; launchpad bug lp#485019)
 
 changes in sbcl-1.0.32 relative to sbcl-1.0.31:
   * optimization: faster FIND and POSITION on strings of unknown element type
