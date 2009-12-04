@@ -169,40 +169,37 @@
 
 (defgeneric describe-object (x stream))
 
-(defvar *in-describe* nil)
-
-(defmethod describe-object :around (x s)
-  (cond (*in-describe*
-         (call-next-method))
-        (t
-         (format s "~&~A~%  [~A]~%"
-                 (object-self-string x)
-                 (object-type-string x))
-         (pprint-logical-block (s nil)
-           (call-next-method x s)))))
-
 ;;; Catch-all.
 (defmethod describe-object ((x t) s)
+  (format s "~&~A~%  [~A]~%"
+          (object-self-string x)
+          (object-type-string x))
   (values))
 
 (defmethod describe-object ((x cons) s)
+  (call-next-method)
   (describe-function x nil s))
 
 (defmethod describe-object ((x function) s)
+  (call-next-method)
   (describe-function nil x s))
 
 (defmethod describe-object ((x class) s)
+  (call-next-method)
   (describe-class nil x s)
   (describe-instance x s))
 
 (defmethod describe-object ((x sb-pcl::slot-object) s)
+  (call-next-method)
   (describe-instance x s))
 
 (defmethod describe-object ((x character) s)
+  (call-next-method)
   (format s "~%:_Char-code: ~S" (char-code x))
   (format s "~%:_Char-name: ~A~%_" (char-name x)))
 
 (defmethod describe-object ((x array) s)
+  (call-next-method)
   (format s "~%Element-type: ~S" (array-element-type x))
   (if (vectorp x)
       (if (array-has-fill-pointer-p x)
@@ -225,9 +222,11 @@
     (terpri s)))
 
 (defmethod describe-object ((x hash-table) s)
-  ;; Don't print things which are already apparent from the printed representation
-  ;; -- COUNT, TEST, and WEAKNESS
-  (format s "~%Occupancy: ~,1F" (float (/ (hash-table-count x) (hash-table-size x))))
+  (call-next-method)
+  ;; Don't print things which are already apparent from the printed
+  ;; representation -- COUNT, TEST, and WEAKNESS
+  (format s "~%Occupancy: ~,1F" (float (/ (hash-table-count x)
+                                          (hash-table-size x))))
   (format s "~%Rehash-threshold: ~S" (hash-table-rehash-threshold x))
   (format s "~%Rehash-size: ~S" (hash-table-rehash-size x))
   (format s "~%Size: ~S" (hash-table-size x))
@@ -235,6 +234,7 @@
   (terpri s))
 
 (defmethod describe-object ((symbol symbol) stream)
+  (call-next-method)
   ;; Describe the value cell.
   (let* ((kind (info :variable :kind symbol))
          (wot (ecase kind
@@ -318,6 +318,7 @@
       (terpri stream))))
 
 (defmethod describe-object ((package package) stream)
+  (call-next-method)
   (describe-documentation package t stream)
   (flet ((humanize (list)
            (sort (mapcar (lambda (x)
