@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.33:
     Willem Broekema; launchpad bug lp#489698).
   * bug fix: some minor code rearrangements to reenable warning-free building
     from CMUCL (reported by xme@gmx.net; launchpad bug lp#491104)
+  * bug fix: PRINT-OBJECT for clos instances respects the right margin when
+    pretty printing
 
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)

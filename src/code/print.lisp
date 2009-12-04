@@ -316,10 +316,12 @@
                     :level nil :length nil)
              (write-char #\space stream))
            (when body
+             (pprint-newline :fill stream)
              (funcall body))
            (when identity
              (when (or body (not type))
                (write-char #\space stream))
+             (pprint-newline :fill stream)
              (write-char #\{ stream)
              (write (get-lisp-obj-address object) :stream stream
                     :radix nil :base 16)
@@ -332,9 +334,9 @@
            (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
              (print-description)))
           (t
-            (write-string "#<" stream)
-            (print-description)
-            (write-char #\> stream))))
+           (write-string "#<" stream)
+           (print-description)
+           (write-char #\> stream))))
   nil)
 
 ;;;; OUTPUT-OBJECT -- the main entry point

@@ -46,7 +46,10 @@
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
   (defmethod print-object ((x t) stream)
-    (print-unreadable-object (x stream :type t :identity t))))
+    (if *print-pretty*
+        (pprint-logical-block (stream nil)
+          (print-unreadable-object (x stream :type t :identity t)))
+        (print-unreadable-object (x stream :type t :identity t)))))
 (/show0 "done replacing placeholder PRINT-OBJECT with DEFGENERIC")
 
 ;;;; a hook called by the printer to take care of dispatching to PRINT-OBJECT

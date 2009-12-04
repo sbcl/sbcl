@@ -456,4 +456,20 @@
       (let ((*print-pretty* t))
         (assert (string= (princ-to-string 'bar) "BAR"))))))
 
+;;; bug-lp#488979
+
+(defclass a-class-name () ())
+
+(assert (find #\Newline
+              (let ((*print-pretty* t)
+                    (*print-right-margin* 10))
+                (format nil "~A" (make-instance 'a-class-name)))
+              :test #'char=))
+
+(assert (not (find #\Newline
+                   (let ((*print-pretty* nil)
+                         (*print-right-margin* 10))
+                     (format nil "~A" (make-instance 'a-class-name)))
+                   :test #'char=)))
+
 ;;; success
