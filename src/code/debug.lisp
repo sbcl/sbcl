@@ -482,20 +482,24 @@ is how many frames to show."
                 (nreverse (mapcar #'cdr *debug-print-variable-alist*))
               (apply fun rest)))))))
 
+;;; This function is not inlined so it shows up in the backtrace; that
+;;; can be rather handy when one has to debug the interplay between
+;;; *INVOKE-DEBUGGER-HOOK* and *DEBUGGER-HOOK*.
+(declaim (notinline run-hook))
+(defun run-hook (variable condition)
+  (let ((old-hook (symbol-value variable)))
+    (when old-hook
+      (progv (list variable) (list nil)
+        (funcall old-hook condition old-hook)))))
+
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
 
   ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
   ;; called when the debugger is disabled
-  (let ((old-hook *invoke-debugger-hook*))
-    (when old-hook
-      (let ((*invoke-debugger-hook* nil))
-        (funcall old-hook condition old-hook))))
-  (let ((old-hook *debugger-hook*))
-    (when old-hook
-      (let ((*debugger-hook* nil))
-        (funcall old-hook condition old-hook))))
+  (run-hook '*invoke-debugger-hook* condition)
+  (run-hook '*debugger-hook* condition)
 
   ;; We definitely want *PACKAGE* to be of valid type.
   ;;
