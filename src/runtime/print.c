@@ -244,8 +244,13 @@ static void print_list(lispobj obj)
 
 static void brief_struct(lispobj obj)
 {
-    printf("#<ptr to 0x%08lx instance>",
-           (unsigned long) ((struct instance *)native_pointer(obj))->slots[0]);
+    struct instance *instance = (struct instance *)native_pointer(obj);
+    if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
+        printf("(invalid address)");
+    } else {
+        printf("#<ptr to 0x%08lx instance>",
+               (unsigned long) instance->slots[0]);
+    }
 }
 
 static void print_struct(lispobj obj)
@@ -253,10 +258,14 @@ static void print_struct(lispobj obj)
     struct instance *instance = (struct instance *)native_pointer(obj);
     unsigned int i;
     char buffer[16];
-    print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
-    for (i = 1; i < HeaderValue(instance->header); i++) {
-        sprintf(buffer, "slot %d: ", i);
-        print_obj(buffer, instance->slots[i]);
+    if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
+        printf("(invalid address)");
+    } else {
+        print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
+        for (i = 1; i < HeaderValue(instance->header); i++) {
+            sprintf(buffer, "slot %d: ", i);
+            print_obj(buffer, instance->slots[i]);
+        }
     }
 }
 
@@ -630,11 +639,7 @@ static void print_obj(char *prefix, lispobj obj)
     if (var != NULL && var_clock(var) == cur_clock)
         dont_descend = 1;
 
-    if (var == NULL &&
-        ((obj & LOWTAG_MASK) == FUN_POINTER_LOWTAG ||
-         (obj & LOWTAG_MASK) == LIST_POINTER_LOWTAG ||
-         (obj & LOWTAG_MASK) == INSTANCE_POINTER_LOWTAG ||
-         (obj & LOWTAG_MASK) == OTHER_POINTER_LOWTAG))
+    if (var == NULL && is_lisp_pointer(obj))
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)
