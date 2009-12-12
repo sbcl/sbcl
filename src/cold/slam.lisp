@@ -31,9 +31,23 @@
        (> (file-write-date output)
           (file-write-date input))))
 
+;;; One possible use-case for slam.sh is to generate a trace-file for
+;;; a file that is suddenly of interest, but was not of interest
+;;; before.  In order for this to work, we need to reload the stems
+;;; and flags from build-order.lisp-expr, the user needs to have added
+;;; :trace-file as a flag.
+(setf *stems-and-flags* (read-from-file "build-order.lisp-expr"))
+
 (do-stems-and-flags (stem flags)
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
           (objname (stem-object-path stem flags :target-compile)))
-      (unless (output-up-to-date-wrt-input-p objname srcname)
+      (unless (and (output-up-to-date-wrt-input-p objname srcname)
+                   ;; Back to our "new-trace-file" case, also build if
+                   ;; a trace file is desired but is out-of-date.
+                   (or (not (position :trace-file flags))
+                       (output-up-to-date-wrt-input-p
+                        (concatenate 'string (stem-remap-target stem)
+                                     ".trace")
+                        srcname)))
         (target-compile-stem stem flags)))))
