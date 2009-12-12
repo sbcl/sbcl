@@ -43,7 +43,8 @@
 #define reg_R14 REG(28)
 #define reg_R15 REG(30)
 
-#define REGNAMES "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI"
+#define REGNAMES "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI", \
+        "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15"
 
 /* classification of registers
  *
