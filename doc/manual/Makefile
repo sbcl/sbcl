@@ -7,6 +7,7 @@ PSFILES=sbcl.ps asdf.ps
 PDFFILES=sbcl.pdf asdf.pdf
 INFOFILES=sbcl.info asdf.info
 HTMLDIRS=$(basename $(SBCLTEXI)) $(basename $(ASDFTEXI))
+HTMLFILES=sbcl.html asdf.html
 # Place where generated documentation ends up. The value of
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
 # Lisp's `pathname' function).
@@ -53,8 +54,11 @@ html: html-stamp
 
 html-stamp: $(DOCFILES) docstrings
 	@rm -rf $(HTMLDIRS)
-	$(MAKEINFO) $(I_FLAGS) --html $(SBCLTEXI)
-	$(MAKEINFO) --html $(ASDFTEXI)
+	@rm -f $(HTMLFILES)
+	$(MAKEINFO) $(I_FLAGS) --html --css-include=style-multi.css $(SBCLTEXI)
+	$(MAKEINFO) --html --css-include=style-multi.css $(ASDFTEXI)
+	$(MAKEINFO) $(I_FLAGS) --html --no-split --css-include=style-single.css $(SBCLTEXI)
+	$(MAKEINFO) --html --no-split --css-include=style-single.css $(ASDFTEXI)
 	touch html-stamp
 
 # Postscript documentation
@@ -98,6 +102,7 @@ tempfiles-stamp:
 clean: 
 	rm -f *~ *.bak *.orig \#*\# .\#* texput.log *.fasl
 	rm -rf $(HTMLDIRS) $(DOCSTRINGDIR)
+	rm -f  $(HTMLFILES)
 	rm -f contrib-docs.texi-temp
 	rm -f package-locks.texi-temp
 	rm -f variables.texinfo

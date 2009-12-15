@@ -1,0 +1,10 @@
+  .node { visibility:hidden; height: 0px; }
+  .menu { visibility:hidden; height: 0px; }
+  .chapter { background-color:#d0e4fe; }
+  .section { background-color:#d0e4fe; }
+  .subsection { background-color:#d0e4fe; }
+  .settitle { background-color:#d0e4fe; }
+  .contents { border: 2px solid black;
+              margin: 1cm 1cm 1cm 1cm; 
+              padding-left: 3mm; }
+  body { padding-left: 3mm; }

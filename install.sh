@@ -138,6 +138,12 @@ do
       && echo " html $BUILD_ROOT$DOC_DIR/html/`basename $html`/index.html"
 done
 
+for html in doc/manual/sbcl.html doc/manual/asdf.html
+do
+  cp $html "$BUILD_ROOT$DOC_DIR"/ \
+      && echo " html $BUILD_ROOT$DOC_DIR/`basename $html`"
+done
+
 for f in BUGS CREDITS COPYING NEWS
 do
   cp $f "$BUILD_ROOT$DOC_DIR"/
