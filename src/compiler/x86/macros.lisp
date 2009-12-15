@@ -350,6 +350,12 @@
        (progn ,@forms)
        (pseudo-atomic ,@forms)))
 
+;;; Unsafely clear pa flags so that the image can properly lose in a
+;;; pa section.
+#!+sb-thread
+(defmacro %clear-pseudo-atomic ()
+  '(inst mov (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot)) 0 :fs))
+
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
