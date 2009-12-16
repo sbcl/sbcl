@@ -1087,12 +1087,15 @@
                      (catch 'eof-input-catcher
                        (setf decode-break-reason
                              (block decode-break-reason
-                               (input-at-least ,stream-var 1)
-                               (let* ((byte (sap-ref-8 (buffer-sap ibuf)
-                                                       (buffer-head ibuf))))
+                               (input-at-least ,stream-var ,(if (consp bytes) (car bytes) `(setq size ,bytes)))
+                               (let* ((byte (sap-ref-8 (buffer-sap ibuf) (buffer-head ibuf))))
                                  (declare (ignorable byte))
-                                 (setq size ,bytes)
-                                 (input-at-least ,stream-var size)
+                                 ,@(when (consp bytes)
+                                     `((let ((sap (buffer-sap ibuf))
+                                             (head (buffer-head ibuf)))
+                                         (declare (ignorable sap head))
+                                         (setq size ,(cadr bytes))
+                                         (input-at-least ,stream-var size))))
                                  (setq ,element-var (locally ,@read-forms))
                                  (setq ,retry-var nil))
                                nil))
@@ -1501,9 +1504,12 @@
                 ((or (= tail head) (= requested total-copied)))
               (setf decode-break-reason
                     (block decode-break-reason
+                      ,@(when (consp in-size-expr)
+                          `((when (> ,(car in-size-expr) (- tail head))
+                              (return))))
                       (let ((byte (sap-ref-8 sap head)))
                         (declare (ignorable byte))
-                        (setq size ,in-size-expr)
+                        (setq size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr))
                         (when (> size (- tail head))
                           (return))
                         (setf (aref buffer (+ start total-copied)) ,in-expr)
@@ -1552,18 +1558,20 @@
           (declare (ignorable byte))
           ,in-expr))
       (defun ,resync-function (stream)
-        (let ((ibuf (fd-stream-ibuf stream)))
+        (let ((ibuf (fd-stream-ibuf stream))
+              size)
           (catch 'eof-input-catcher
             (loop
                (incf (buffer-head ibuf))
-               (input-at-least stream 1)
+               (input-at-least stream ,(if (consp in-size-expr) (car in-size-expr) `(setq size ,in-size-expr)))
                (unless (block decode-break-reason
                          (let* ((sap (buffer-sap ibuf))
                                 (head (buffer-head ibuf))
-                                (byte (sap-ref-8 sap head))
-                                (size ,in-size-expr))
+                                (byte (sap-ref-8 sap head)))
                            (declare (ignorable byte))
-                           (input-at-least stream size)
+                           ,@(when (consp in-size-expr)
+                               `((setq size ,(cadr in-size-expr))
+                                 (input-at-least stream size)))
                            (setf head (buffer-head ibuf))
                            ,in-expr)
                          nil)
@@ -1579,7 +1587,7 @@
                            (setf decode-break-reason
                                  (block decode-break-reason
                                    (setf byte (sap-ref-8 sap head)
-                                         size ,in-size-expr
+                                         size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr)
                                          char ,in-expr)
                                    (incf head size)
                                    nil))
@@ -1598,7 +1606,7 @@
               (setf decode-break-reason
                     (block decode-break-reason
                       (setf byte (sap-ref-8 sap head)
-                            size ,in-size-expr
+                            size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr)
                             char ,in-expr)
                       (incf head size)
                       nil))
