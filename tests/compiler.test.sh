@@ -156,7 +156,7 @@ cat > $tmpfilename <<EOF
     (defun foo (x)
       (error x))
 EOF
-fail_on_compiler_note $tmpfilename
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 # test case from Rudi for some CLOS WARNINGness that shouldn't have
 # been there
@@ -213,7 +213,7 @@ cat > $tmpfilename <<EOF
       (declare (muffle-conditions code-deletion-note))
       (if t (foo) (foo)))
 EOF
-fail_on_compiler_note $tmpfilename
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 cat > $tmpfilename <<EOF
     (defun foo (x y)
@@ -221,7 +221,7 @@ cat > $tmpfilename <<EOF
       (declare (optimize speed))
       (+ x y))
 EOF
-fail_on_compiler_note $tmpfilename
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 cat > $tmpfilename <<EOF
     (declaim (muffle-conditions compiler-note))
@@ -229,7 +229,7 @@ cat > $tmpfilename <<EOF
       (declare (optimize speed))
       (+ x y))
 EOF
-fail_on_compiler_note $tmpfilename
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 cat > $tmpfilename <<EOF
     (declaim (muffle-conditions compiler-note))
@@ -238,7 +238,7 @@ cat > $tmpfilename <<EOF
       (declare (optimize speed))
       (+ x y))
 EOF
-expect_compiler_note $tmpfilename
+expect_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 # undefined variable causes a WARNING
 cat > $tmpfilename <<EOF
@@ -441,5 +441,17 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+(defmacro foo () (error "ERROR at macroexpansion time."))
+(defun bar () (foo))
+EOF
+expect_condition_during_compile sb-c:compiler-error $tmpfilename
+
+cat > $tmpfilename <<EOF
+(eval-when (:compile-toplevel)
+  (error "ERROR within EVAL-WHEN."))
+EOF
+expect_condition_during_compile sb-c:compiler-error $tmpfilename
 # success
 exit $EXIT_TEST_WIN

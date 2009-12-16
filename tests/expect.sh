@@ -99,24 +99,24 @@ EOF
     check_status_maybe_lose abort-compile $?
 }
 
-fail_on_compiler_note ()
+fail_on_condition_during_compile ()
 {
     run_sbcl <<EOF
-        (handler-bind ((sb-ext:compiler-note #'error))
-          (compile-file "$1")
+        (handler-bind (($1 #'error))
+          (compile-file "$2")
           (sb-ext:quit :unix-status $EXIT_LISP_WIN))
 EOF
-    check_status_maybe_lose fail-on-compiler-note $?
+    check_status_maybe_lose "fail-on-condition_$1" $?
 }
 
-expect_compiler_note ()
+expect_condition_during_compile ()
 {
     run_sbcl <<EOF
-        (handler-bind ((sb-ext:compiler-note (lambda (c)
-                                               (declare (ignore c))
-                                               (sb-ext:quit :unix-status
-                                                            $EXIT_LISP_WIN))))
-          (compile-file "$1"))
+        (handler-bind (($1 (lambda (c)
+                             (declare (ignore c))
+                             (sb-ext:quit :unix-status $EXIT_LISP_WIN))))
+          (compile-file "$2"))
 EOF
-    check_status_maybe_lose expect-compiler-note $?
+    check_status_maybe_lose "expect-condition_$1" $?
 }
+

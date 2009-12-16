@@ -1206,7 +1206,10 @@
 ;;; compilation. Normally just evaluate in the appropriate
 ;;; environment, but also compile if outputting a CFASL.
 (defun eval-compile-toplevel (body path)
-  (eval-in-lexenv `(progn ,@body) *lexenv*)
+  (handler-case (eval-in-lexenv `(progn ,@body) *lexenv*)
+    (error (condition)
+      (compiler-error "(during compile-time-too processing)~%~A"
+                      condition)))
   (when *compile-toplevel-object*
     (let ((*compile-object* *compile-toplevel-object*))
       (convert-and-maybe-compile `(progn ,@body) path))))
