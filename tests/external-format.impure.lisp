@@ -906,5 +906,23 @@
         (assert (char= (char new 0) #\replacement_character))
         (assert (char= (char new (1- size)) #\replacement_character))
         (assert (string= string new :start1 1 :start2 1 :end1 (1- size) :end2 (1- size)))))))
+
+(with-test (:name (:multibyte :input-replacement :ucs4le))
+  (let ((octets (coerce '(0 1 1 0 1 0 0 1) '(vector (unsigned-byte 8)))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
+      (write-sequence octets s))
+    (with-open-file (s *test-path* :external-format '(:ucs4le :replacement #\replacement_character))
+      (let ((string (read-line s)))
+        (assert (char= (char string 0) (code-char #x10100)))
+        (assert (char= (char string 1) #\replacement_character))))))
+
+(with-test (:name (:multibyte :input-replacement :ucs4le))
+  (let ((octets (coerce '(0 1 1 0 1 0 0 1) '(vector (unsigned-byte 8)))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede :element-type '(unsigned-byte 8))
+      (write-sequence octets s))
+    (with-open-file (s *test-path* :external-format '(:ucs4be :replacement #\replacement_character))
+      (let ((string (read-line s)))
+        (assert (char= (char string 0) (code-char #x10100)))
+        (assert (char= (char string 1) #\replacement_character))))))
 
 ;;;; success

@@ -283,3 +283,35 @@
     (assert (find #\? (octets-to-string
                        (coerce #(237 160 128) '(vector (unsigned-byte 8)))
                        :external-format :utf-8)))))
+
+#+sb-unicode
+(with-test (:name (:ucs-2 :out-of-range :encoding-errors))
+  (handler-bind ((sb-int:character-encoding-error
+                  (lambda (c) (use-value "???" c))))
+    (assert (equalp (string-to-octets (string (code-char #x10001))
+                                      :external-format :ucs-2le)
+                    #(63 0 63 0 63 0))))
+  (handler-bind ((sb-int:character-encoding-error
+                  (lambda (c) (use-value "???" c))))
+    (assert (equalp (string-to-octets (string (code-char #x10001))
+                                      :external-format :ucs-2be)
+                    #(0 63 0 63 0 63)))))
+
+#+sb-unicode
+(with-test (:name (:ucs-4 :out-of-range :decoding-errors))
+  (handler-bind ((sb-int:character-decoding-error
+                  (lambda (c) (use-value "???" c))))
+    (assert (equalp (octets-to-string (coerce '(1 2 3 4) '(vector (unsigned-byte 8)))
+                                      :external-format :ucs-4le)
+                    "???")))
+  (assert (equalp (octets-to-string (coerce '(#xff #xff #x10 #x00) '(vector (unsigned-byte 8)))
+                                    :external-format :ucs-4le)
+                  (string (code-char #x10ffff))))
+  (handler-bind ((sb-int:character-decoding-error
+                  (lambda (c) (use-value "???" c))))
+    (assert (equalp (octets-to-string (coerce '(1 2 3 4) '(vector (unsigned-byte 8)))
+                                      :external-format :ucs-4be)
+                    "???"))
+    (assert (equalp (octets-to-string (coerce '(#x00 #x10 #xff #xff) '(vector (unsigned-byte 8)))
+                                      :external-format :ucs-4be)
+                    (string (code-char #x10ffff))))))

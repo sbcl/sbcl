@@ -4,6 +4,10 @@ changes relative to sbcl-1.0.33:
     builtin types.
   * enhancement: Errors during compile-time-too processing (i.e. EVAL-WHEN)
     are now caught and reported just like errors during macroexpansion.
+  * fixes and improvements related to Unicode and external formats:
+    ** bug fix: error handling and restart usage in the ucs-2 external format 
+       has been improved.
+    ** there is now an implementation of the ucs-4 external format.
   * bug fix: #p"\\\\" can now be read without error on Win32.  (reported by
     Willem Broekema; launchpad bug lp#489698).
   * bug fix: some minor code rearrangements to reenable warning-free building
