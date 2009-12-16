@@ -428,7 +428,7 @@
   ucs-4le->string-aref
   string->ucs-4le)
 
-(define-external-format/variable-width (:ucs-4be :ucs4be) t
+(define-external-format/variable-width (:ucs-4be :ucs4be) nil
   (code-char #xfffd)
   4
   (setf (sap-ref-32be sap tail) bits)

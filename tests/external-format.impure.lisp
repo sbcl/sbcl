@@ -925,4 +925,63 @@
         (assert (char= (char string 0) (code-char #x10100)))
         (assert (char= (char string 1) #\replacement_character))))))
 
+;;; utf tests
+(with-test (:name (:utf-16le :roundtrip))
+  (let ((string (map 'string 'code-char '(#x20 #x200 #x2000 #xfffd #x10fffd))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format :utf-16le)
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-16le)
+      (assert (string= string (read-line s))))))
+(with-test (:name (:utf-16be :roundtrip))
+  (let ((string (map 'string 'code-char '(#x20 #x200 #x2000 #xfffd #x10fffd))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format :utf-16be)
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-16be)
+      (assert (string= string (read-line s))))))
+(with-test (:name (:utf-16le :encoding-error))
+  (let ((string (map 'string 'code-char '(#x20 #xfffe #xdc00 #xd800 #x1fffe #x20))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format '(:utf-16le :replacement #\?))
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-16le)
+      (assert (string= " ???? " (read-line s))))))
+(with-test (:name (:utf-16be :encoding-error))
+  (let ((string (map 'string 'code-char '(#x20 #xfffe #xdc00 #xd800 #x1fffe #x20))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format '(:utf-16be :replacement #\?))
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-16be)
+      (assert (string= " ???? " (read-line s))))))
+
+(with-test (:name (:utf-32le :roundtrip))
+  (let ((string (map 'string 'code-char '(#x20 #x200 #x2000 #xfffd #x10fffd))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format :utf-32le)
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-32le)
+      (assert (string= string (read-line s))))))
+(with-test (:name (:utf-32be :roundtrip))
+  (let ((string (map 'string 'code-char '(#x20 #x200 #x2000 #xfffd #x10fffd))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format :utf-32be)
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-32be)
+      (assert (string= string (read-line s))))))
+(with-test (:name (:utf-32le :encoding-error))
+  (let ((string (map 'string 'code-char '(#x20 #xfffe #xdc00 #xd800 #x1fffe #x20))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format '(:utf-32le :replacement #\?))
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-32le)
+      (assert (string= " ???? " (read-line s))))))
+(with-test (:name (:utf-32be :encoding-error))
+  (let ((string (map 'string 'code-char '(#x20 #xfffe #xdc00 #xd800 #x1fffe #x20))))
+    (with-open-file (s *test-path* :direction :output :if-exists :supersede
+                       :external-format '(:utf-32be :replacement #\?))
+      (write-string string s))
+    (with-open-file (s *test-path* :external-format :utf-32be)
+      (assert (string= " ???? " (read-line s))))))
+
 ;;;; success

@@ -708,6 +708,8 @@
  ("src/code/external-formats/enc-jpn" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/enc-ucs" :not-host)
+ #!+sb-unicode
+ ("src/code/external-formats/enc-utf" :not-host)
 
  ;; The code here can't be compiled until CONDITION and
  ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is
