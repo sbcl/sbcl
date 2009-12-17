@@ -169,7 +169,7 @@
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 3
-    (inst sra x 2 y)
+    (inst sra x n-fixnum-tag-bits y)
     (inst extru x 31 2 zero-tn :=)
     (loadw y x bignum-digits-offset other-pointer-lowtag)))
 
@@ -184,7 +184,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst sll x 2 y)))
+    (inst sll x n-fixnum-tag-bits y)))
 
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
@@ -206,7 +206,7 @@
       ;; If we are left with zero, it will fit in a fixnum.  So branch around
       ;; the bignum-construction, doing the shift in the delay slot.
       (inst comb := temp zero-tn done)
-      (inst sll x 2 y)
+      (inst sll x n-fixnum-tag-bits y)
       ;; Make a single-digit bignum.
       (with-fixed-allocation
           (y nil temp bignum-widetag (1+ bignum-digits-offset) nil)
@@ -226,9 +226,9 @@
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
   (:generator 20
     (move arg x)
-    (inst srl x 29 temp)
+    (inst srl x n-positive-fixnum-bits temp)
     (inst comb := temp zero-tn done)
-    (inst sll x 2 y)
+    (inst sll x n-fixnum-tag-bits y)
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 2)))
       (set-lowtag other-pointer-lowtag alloc-tn y)
       (inst xor temp temp temp)

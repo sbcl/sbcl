@@ -169,9 +169,9 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 3
     (let ((done (gen-label)))
-      (inst and temp x 3)
+      (inst and temp x fixnum-tag-mask)
       (inst beq temp done)
-      (inst sra y x 2)
+      (inst sra y x n-fixnum-tag-bits)
 
       (loadw y x bignum-digits-offset other-pointer-lowtag)
       (emit-label done))))
@@ -189,7 +189,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst sll y x 2)))
+    (inst sll y x n-fixnum-tag-bits)))
 ;;;
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
@@ -207,11 +207,11 @@
     (move x arg)
     (let ((fixnum (gen-label))
           (done (gen-label)))
-      (inst sra temp x 29)
+      (inst sra temp x n-positive-fixnum-bits)
       (inst beq temp fixnum)
       (inst nor temp zero-tn)
       (inst beq temp done)
-      (inst sll y x 2)
+      (inst sll y x n-fixnum-tag-bits)
 
       (with-fixed-allocation
           (y pa-flag temp bignum-widetag (1+ bignum-digits-offset) nil)
@@ -220,7 +220,7 @@
       (inst nop)
 
       (emit-label fixnum)
-      (inst sll y x 2)
+      (inst sll y x n-fixnum-tag-bits)
       (emit-label done))))
 ;;;
 (define-move-vop move-from-signed :move
@@ -238,9 +238,9 @@
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
-    (inst srl temp x 29)
+    (inst srl temp x n-positive-fixnum-bits)
     (inst beq temp done)
-    (inst sll y x 2)
+    (inst sll y x n-fixnum-tag-bits)
 
     (pseudo-atomic
       (pa-flag :extra (pad-data-block (+ bignum-digits-offset 2)))

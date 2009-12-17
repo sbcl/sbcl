@@ -530,7 +530,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst mov value (make-ea-for-raw-slot object index tmp))))
 
@@ -563,7 +563,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst mov (make-ea-for-raw-slot object index tmp) value)
     (move result value)))
@@ -626,7 +626,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movss value (make-ea-for-raw-slot object index tmp))))
 
@@ -659,7 +659,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movss (make-ea-for-raw-slot object index tmp) value)
     (move result value)))
@@ -703,7 +703,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movsd value (make-ea-for-raw-slot object index tmp))))
 
@@ -736,7 +736,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movsd (make-ea-for-raw-slot object index tmp) value)
     (move result value)))
@@ -780,7 +780,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movq value (make-ea-for-raw-slot object index tmp))))
 
@@ -813,7 +813,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (move result value)
     (inst movq (make-ea-for-raw-slot object index tmp) value)))
@@ -857,7 +857,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (inst movdqu value (make-ea-for-raw-slot object index tmp -8))))
 
@@ -890,7 +890,7 @@
   (:generator 5
     (loadw tmp object 0 instance-pointer-lowtag)
     (inst shr tmp n-widetag-bits)
-    (inst shl tmp 3)
+    (inst shl tmp n-fixnum-tag-bits)
     (inst sub tmp index)
     (move result value)
     (inst movdqu (make-ea-for-raw-slot object index tmp -8) value)))

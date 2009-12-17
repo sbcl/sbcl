@@ -42,7 +42,7 @@
     (inst b :eq done)
     ;; Okay, it is an immediate.  If fixnum, we want zero.  Otherwise,
     ;; we want the low 8 bits.
-    (inst andcc zero-tn object #b11)
+    (inst andcc zero-tn object fixnum-tag-mask)
     (inst b :eq done)
     (inst li result 0)
     ;; It wasn't a fixnum, so get the low 8 bits.
@@ -117,7 +117,7 @@
     (inst and t1 widetag-mask)
     (sc-case data
       (any-reg
-       (inst sll t2 data (- n-widetag-bits 2))
+       (inst sll t2 data (- n-widetag-bits n-fixnum-tag-bits))
        (inst or t1 t2))
       (immediate
        (inst or t1 (ash (tn-value data) n-widetag-bits)))
@@ -149,8 +149,8 @@
        (inst sll temp val n-widetag-bits)
        (inst or res temp (tn-value type)))
       (t
-       (inst sra temp type 2)
-       (inst sll res val (- n-widetag-bits 2))
+       (inst sra temp type n-fixnum-tag-bits)
+       (inst sll res val (- n-widetag-bits n-fixnum-tag-bits))
        (inst or res res temp)))))
 
 

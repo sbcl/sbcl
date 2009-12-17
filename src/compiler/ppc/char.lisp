@@ -81,7 +81,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst slwi res ch 2)))
+    (inst slwi res ch n-fixnum-tag-bits)))
 
 (define-vop (code-char)
   (:translate code-char)
@@ -91,7 +91,7 @@
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (inst srwi res code 2)))
+    (inst srwi res code n-fixnum-tag-bits)))
 
 ;;; Comparison of characters.
 (define-vop (character-compare)

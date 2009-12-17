@@ -359,7 +359,7 @@
   (:note "inline fixnum arithmetic")
   (:generator 4
     (move r x)
-    (inst sar r 2)
+    (inst sar r n-fixnum-tag-bits)
     (inst imul r y)))
 
 (define-vop (fast-*-c/fixnum=>fixnum fast-safe-arith-op)
@@ -445,8 +445,9 @@
     (inst cdq)
     (inst idiv eax y)
     (if (location= quo eax)
-        (inst shl eax 2)
-        (inst lea quo (make-ea :dword :index eax :scale 4)))
+        (inst shl eax n-fixnum-tag-bits)
+        (inst lea quo (make-ea :dword :index eax
+                               :scale (ash 1 n-fixnum-tag-bits))))
     (move rem edx)))
 
 (define-vop (fast-truncate-c/fixnum=>fixnum fast-safe-arith-op)
@@ -471,8 +472,9 @@
     (inst mov y-arg (fixnumize y))
     (inst idiv eax y-arg)
     (if (location= quo eax)
-        (inst shl eax 2)
-        (inst lea quo (make-ea :dword :index eax :scale 4)))
+        (inst shl eax n-fixnum-tag-bits)
+        (inst lea quo (make-ea :dword :index eax
+                               :scale (ash 1 n-fixnum-tag-bits))))
     (move rem edx)))
 
 (define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)
@@ -1581,7 +1583,7 @@
   (:result-types unsigned-num)
   (:generator 1
     (move digit fixnum)
-    (inst sar digit 2)))
+    (inst sar digit n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
   (:translate sb!bignum:%floor)
@@ -1617,7 +1619,7 @@
   (:generator 1
     (move res digit)
     (when (sc-is res any-reg control-stack)
-      (inst shl res 2))))
+      (inst shl res n-fixnum-tag-bits))))
 
 (define-vop (digit-ashr)
   (:translate sb!bignum:%ashr)

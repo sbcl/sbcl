@@ -44,7 +44,7 @@
     (inst jmp :ne DONE)
 
     ;; Pick off fixnums.
-    (inst and al-tn 7)
+    (inst and al-tn fixnum-tag-mask)
     (inst jmp :e DONE)
 
     ;; must be an other immediate

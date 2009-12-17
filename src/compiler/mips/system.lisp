@@ -39,7 +39,7 @@
     (inst beq ndescr function-ptr)
 
     ;; Pick off fixnums.
-    (inst and result object 3)
+    (inst and result object fixnum-tag-mask)
     (inst beq result done)
 
     ;; Pick off structure and list pointers.
@@ -122,7 +122,7 @@
     (inst and t1 widetag-mask)
     (sc-case data
       (any-reg
-       (inst sll t2 data (- n-widetag-bits 2))
+       (inst sll t2 data (- n-widetag-bits n-fixnum-tag-bits))
        (inst or t1 t2))
       (immediate
        (inst or t1 (ash (tn-value data) n-widetag-bits)))
@@ -153,8 +153,8 @@
        (inst sll temp val n-widetag-bits)
        (inst or res temp (tn-value type)))
       (t
-       (inst sra temp type 2)
-       (inst sll res val (- n-widetag-bits 2))
+       (inst sra temp type n-fixnum-tag-bits)
+       (inst sll res val (- n-widetag-bits n-fixnum-tag-bits))
        (inst or res res temp)))))
 
 

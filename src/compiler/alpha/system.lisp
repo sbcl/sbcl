@@ -116,7 +116,7 @@
     (inst and t1 widetag-mask t1)
     (sc-case data
       (any-reg
-       (inst sll data (- n-widetag-bits 2) t2)
+       (inst sll data (- n-widetag-bits n-fixnum-tag-bits) t2)
        (inst bis t1 t2 t1))
       (immediate
        (let ((c (ash (tn-value data) n-widetag-bits)))

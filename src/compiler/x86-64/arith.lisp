@@ -509,8 +509,9 @@
     (inst cqo)
     (inst idiv eax y)
     (if (location= quo eax)
-        (inst shl eax 3)
-        (inst lea quo (make-ea :qword :index eax :scale 8)))
+        (inst shl eax n-fixnum-tag-bits)
+        (inst lea quo (make-ea :qword :index eax
+                               :scale (ash 1 n-fixnum-tag-bits))))
     (move rem edx)))
 
 (define-vop (fast-truncate-c/fixnum=>fixnum fast-safe-arith-op)
@@ -537,8 +538,9 @@
         (setf y-arg (register-inline-constant :qword (fixnumize y))))
     (inst idiv eax y-arg)
     (if (location= quo eax)
-        (inst shl eax 3)
-        (inst lea quo (make-ea :qword :index eax :scale 8)))
+        (inst shl eax n-fixnum-tag-bits)
+        (inst lea quo (make-ea :qword :index eax
+                               :scale (ash 1 n-fixnum-tag-bits))))
     (move rem edx)))
 
 (define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)

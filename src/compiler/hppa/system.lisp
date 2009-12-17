@@ -29,7 +29,7 @@
     (inst li (logxor other-pointer-lowtag fun-pointer-lowtag) temp2)
     (inst xor temp1 temp2 temp1)
     (inst comb := temp1 zero-tn FUNCTION-PTR)
-    (inst li 3 temp1)  ; pick off fixnums
+    (inst li fixnum-tag-mask temp1)  ; pick off fixnums
     (inst li 1 temp2)
     (inst and temp1 object result)
     (inst comb := result zero-tn DONE)
@@ -129,7 +129,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst zdep ptr 29 29 res)))
+    (inst zdep ptr n-positive-fixnum-bits n-positive-fixnum-bits res)))
 
 (define-vop (make-other-immediate-type)
   (:args (val :scs (any-reg descriptor-reg))

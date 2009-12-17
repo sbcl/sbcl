@@ -459,7 +459,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)
   (:generator 2
-    (inst srawi temp y 2)
+    (inst srawi temp y n-fixnum-tag-bits)
     (inst mullw r x temp)))
 
 (define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
@@ -1165,7 +1165,7 @@
   (:results (digit :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (inst srawi digit fixnum 2)))
+    (inst srawi digit fixnum n-fixnum-tag-bits)))
 
 
 (define-vop (bignum-floor)
@@ -1232,7 +1232,7 @@
   (:generator 1
     (sc-case res
       (any-reg
-       (inst slwi res digit 2))
+       (inst slwi res digit n-fixnum-tag-bits))
       (signed-reg
        (move res digit)))))
 

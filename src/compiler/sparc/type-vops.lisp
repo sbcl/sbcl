@@ -183,7 +183,7 @@
                     (if not-p
                         (values not-target target)
                         (values target not-target))
-                  (inst andcc zero-tn value #x3)
+                  (inst andcc zero-tn value fixnum-tag-mask)
                   (inst b :eq yep)
                   (test-type value nope t (other-pointer-lowtag) :temp temp)
                   (loadw temp value 0 other-pointer-lowtag)
@@ -197,7 +197,7 @@
   (:generator 45
               (let ((nope (generate-error-code vop object-not-signed-byte-32-error value))
                     (yep (gen-label)))
-                (inst andcc temp value #x3)
+                (inst andcc temp value fixnum-tag-mask)
                 (inst b :eq yep)
                 (test-type value nope t (other-pointer-lowtag) :temp temp)
                 (loadw temp value 0 other-pointer-lowtag)
@@ -225,7 +225,7 @@
                         (values not-target target)
                         (values target not-target))
                   ;; Is it a fixnum?
-                  (inst andcc temp value #x3)
+                  (inst andcc temp value fixnum-tag-mask)
                   (inst b :eq fixnum)
                   (inst cmp value)
 
@@ -270,7 +270,7 @@
                     (fixnum (gen-label))
                     (single-word (gen-label)))
                 ;; Is it a fixnum?
-                (inst andcc temp value #x3)
+                (inst andcc temp value fixnum-tag-mask)
                 (inst b :eq fixnum)
                 (inst cmp value)
 

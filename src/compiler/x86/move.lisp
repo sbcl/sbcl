@@ -178,12 +178,12 @@
                    :from (:argument 0) :to (:result 0) :target y) eax)
   (:generator 4
     (move eax x)
-    (inst test al-tn 3)
+    (inst test al-tn fixnum-tag-mask)
     (inst jmp :z fixnum)
     (loadw y eax bignum-digits-offset other-pointer-lowtag)
     (inst jmp done)
     FIXNUM
-    (inst sar eax 2)
+    (inst sar eax n-fixnum-tag-bits)
     (move y eax)
     DONE))
 (define-move-vop move-to-word/integer :move
@@ -203,11 +203,12 @@
     (cond ((and (sc-is x signed-reg unsigned-reg)
                 (not (location= x y)))
            ;; Uses 7 bytes, but faster on the Pentium
-           (inst lea y (make-ea :dword :index x :scale 4)))
+           (inst lea y (make-ea :dword :index x
+                                :scale (ash 1 n-fixnum-tag-bits))))
           (t
            ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
            (move y x)
-           (inst shl y 2)))))
+           (inst shl y n-fixnum-tag-bits)))))
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
@@ -251,10 +252,10 @@
       ;; The assembly routines test the sign flag from this one, so if
       ;; you change stuff here, make sure the sign flag doesn't get
       ;; overwritten before the CALL!
-      (inst test x #.(ash lowtag-mask (- n-word-bits n-fixnum-tag-bits 1)))
+      (inst test x #.(ash lowtag-mask n-positive-fixnum-bits))
       ;; Faster but bigger then SHL Y 2. The cost of doing this speculatively
       ;; is noise compared to bignum consing if that is needed.
-      (inst lea y (make-ea :dword :index x :scale 4))
+      (inst lea y (make-ea :dword :index x :scale (ash 1 n-fixnum-tag-bits)))
       (inst jmp :z done)
       (inst mov y x)
       (inst call (make-fixup (ecase (tn-offset y)

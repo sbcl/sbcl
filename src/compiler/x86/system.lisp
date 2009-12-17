@@ -44,7 +44,7 @@
     (inst jmp :ne done)
 
     ;; Pick off fixnums.
-    (inst and al-tn 3)
+    (inst and al-tn fixnum-tag-mask)
     (inst jmp :e done)
 
     ;; must be an other immediate
@@ -142,7 +142,7 @@
   (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
   (:generator 2
     (move res val)
-    (inst shl res (- n-widetag-bits 2))
+    (inst shl res (- n-widetag-bits n-fixnum-tag-bits))
     (inst or res (sc-case type
                    (unsigned-reg type)
                    (immediate (tn-value type))))))
