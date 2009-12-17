@@ -426,6 +426,7 @@
  (:integer vstop "VSTOP" nil t)
  (:integer vsusp "VSUSP" nil t)
  (:integer vtime "VTIME" nil t)
+ (:integer vdisable "_POSIX_VDISABLE" nil t)
 
  (:integer brkint "BRKINT" nil t)
  (:integer icrnl "ICRNL" nil t)
@@ -445,7 +446,9 @@
  #+xsi
  (:integer onlcr "ONLCR" nil t)
  (:integer ocrnl "OCRNL" nil t)
+ (:integer onocr "ONOCR" nil t)
  (:integer onlret "ONLRET" nil t)
+ (:integer ofdel "OFDEL" nil t)
  (:integer ofill "OFILL" nil t)
  (:integer nldly "NLDLY" nil t)
  (:integer nl0 "NL0" nil t)

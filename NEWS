@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.33:
     builtin types.
   * enhancement: Errors during compile-time-too processing (i.e. EVAL-WHEN)
     are now caught and reported just like errors during macroexpansion.
+  * enhancement: SB-POSIX now provides access to tcdrain(), tcflow(),
+    tcflush(), tcgetsid(), and tcsendbreak(). (thanks to Jerry James)
   * fixes and improvements related to Unicode and external formats:
     ** bug fix: error handling and restart usage in the ucs-2 external format 
        has been improved.
