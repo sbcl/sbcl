@@ -823,3 +823,31 @@
                (values (integerp fd) (pathname-name pathname))
             (delete-file temp)))))
   t "mkstemp-1")
+
+(deftest envstuff
+    (let ((name1 "ASLIFJLSDKFJKAHGSDKLJH")
+          (name2 "KJHFKLJDSHIUYHBSDNFCBH"))
+      (values (sb-posix:getenv name1)
+              (sb-posix:getenv name1)
+              (progn
+                (sb-posix:putenv (concatenate 'string name1 "=name1,test1"))
+                (sb-ext:gc :full t)
+                (sb-posix:getenv name1))
+              (progn
+                (sb-posix:setenv name1 "name1,test2" 0)
+                (sb-ext:gc :full t)
+                (sb-posix:getenv name1))
+              (progn
+                (sb-posix:setenv name2 "name2,test1" 0)
+                (sb-ext:gc :full t)
+                (sb-posix:getenv name2))
+              (progn
+                (sb-posix:setenv name2 "name2,test2" 1)
+                (sb-ext:gc :full t)
+                (sb-posix:getenv name2))))
+  nil
+  nil
+  "name1,test1"
+  "name1,test1"
+  "name2,test1"
+  "name2,test2")

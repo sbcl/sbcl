@@ -11,6 +11,9 @@ changes relative to sbcl-1.0.33:
        has been improved.
     ** there is now an implementation of the ucs-4 external format.
     ** the utf-16 and utf-32 external formats are supported.
+  * bug fix: SB-POSIX wrapper for putenv no longer tries to put lisp strings
+    in the environment. setenv() and unsetenv() are also provided. (reported by
+    Fare Rideau; launchpad bug lp#460455)
   * bug fix: #p"\\\\" can now be read without error on Win32.  (reported by
     Willem Broekema; launchpad bug lp#489698).
   * bug fix: some minor code rearrangements to reenable warning-free building

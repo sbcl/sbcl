@@ -736,7 +736,38 @@
     (declare (type (alien (* char)) r))
     (unless (null-alien r)
       (cast r c-string))))
-(define-call "putenv" int minusp (string c-string))
+#-win32
+(progn
+  (define-call "setenv" int minusp (name c-string) (value c-string) (overwrite int))
+  (define-call "unsetenv" int minusp (name c-string))
+  (export 'putenv :sb-posix)
+  (defun putenv (string)
+    (declare (string string))
+    ;; We don't want to call actual putenv: the string passed to putenv ends
+    ;; up in environ, and we any string we allocate GC might move.
+    ;;
+    ;; This makes our wrapper nonconformant if you squit hard enough, but
+    ;; users who care about that should really be calling putenv() directly in
+    ;; order to be able to manage memory sanely.
+    (let ((p (position #\= string))
+          (n (length string)))
+      (if p
+          (if (= p n)
+              (unsetenv (subseq string 0 p))
+              (setenv (subseq string 0 p) (subseq string (1+ p)) 1))
+          (error "Invalid argument to putenv: ~S" string)))))
+#+win32
+(progn
+  ;; Windows doesn't define a POSIX setenv, but happily their _putenv is sane.
+  (define-call* "putenv" int minusp (string c-string))
+  (defun setenv (name value overwrite)
+    (declare (string name value))
+    (if (and (zerop overwrite) (sb-posix:getenv name))
+        0
+        (putenv (concatenate 'string name "=" value))))
+  (defun unsetenv (name)
+    (declare (string name))
+    (putenv (concatenate 'string name "="))))
 
 ;;; syslog
 #-win32
