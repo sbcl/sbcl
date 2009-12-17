@@ -369,3 +369,8 @@ of :INHERITED :EXTERNAL :INTERNAL."
                                                         (t (,',init-macro :inherited)
                                                            (setf ,',counter nil)))))))))))))
                 ,@body))))))))
+
+(defmacro-mundanely with-packages ((&key) &body forms)
+  `(flet ((thunk () ,@forms))
+     (declare (dynamic-extent #'thunk))
+     (call-with-packages #'thunk)))

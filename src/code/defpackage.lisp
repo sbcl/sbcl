@@ -212,7 +212,7 @@
                        implement lock doc-string)
   (declare #!-sb-package-locks
            (ignore implement lock))
-  (enter-new-nicknames package nicknames)
+  (%enter-new-nicknames package nicknames)
   ;; 1. :shadow and :shadowing-import-from
   ;;
   ;; shadows is a list of strings, shadowing-imports is a list of symbols.
@@ -299,25 +299,26 @@
            (type (or simple-string null) doc-string)
            #!-sb-package-locks
            (ignore implement lock))
-  (let* ((existing-package (find-package name))
-         (use (use-list-packages existing-package use))
-         (shadowing-imports (import-list-symbols shadowing-imports))
-         (imports (import-list-symbols imports)))
-    (if existing-package
-        (update-package-with-variance existing-package name
-                                      nicknames source-location
-                                      shadows shadowing-imports
-                                      use imports interns exports
-                                      implement lock doc-string)
-        (let ((package (make-package name
-                                     :use nil
-                                     :internal-symbols (or size 10)
-                                     :external-symbols (length exports))))
-          (update-package package
-                          nicknames source-location
-                          shadows shadowing-imports
-                          use imports interns exports
-                          implement lock doc-string)))))
+  (with-packages ()
+    (let* ((existing-package (find-package name))
+           (use (use-list-packages existing-package use))
+           (shadowing-imports (import-list-symbols shadowing-imports))
+           (imports (import-list-symbols imports)))
+      (if existing-package
+          (update-package-with-variance existing-package name
+                                        nicknames source-location
+                                        shadows shadowing-imports
+                                        use imports interns exports
+                                        implement lock doc-string)
+          (let ((package (make-package name
+                                       :use nil
+                                       :internal-symbols (or size 10)
+                                       :external-symbols (length exports))))
+            (update-package package
+                            nicknames source-location
+                            shadows shadowing-imports
+                            use imports interns exports
+                            implement lock doc-string))))))
 
 (defun find-or-make-symbol (name package)
   (multiple-value-bind (symbol how) (find-symbol name package)

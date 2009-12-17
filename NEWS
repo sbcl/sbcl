@@ -15,6 +15,8 @@ changes relative to sbcl-1.0.33:
     from CMUCL (reported by xme@gmx.net; launchpad bug lp#491104)
   * bug fix: PRINT-OBJECT for clos instances respects the right margin when
     pretty printing
+  * bug fix: FIND-PACKAGE & DEFPACKAGE were not thread safe. (reported by
+    Attila Lendvai)
 
 changes in sbcl-1.0.33 relative to sbcl-1.0.32:
   * new port: support added for x86-64 NetBSD.  (thanks to Aymeric Vincent)

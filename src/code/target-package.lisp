@@ -53,14 +53,15 @@
 (!cold-init-forms
  (setf *package-lock* (sb!thread:make-mutex :name "Package Lock")))
 
-(defmacro with-packages ((&key) &body forms)
+(defun call-with-packages (function)
+  (declare (function function))
   ;; FIXME: Since name conflicts can be signalled while holding the
   ;; mutex, user code can be run leading to lock ordering problems.
   ;;
   ;; This used to be a spinlock, but there it can be held for a long
   ;; time while the debugger waits for user input.
-  `(sb!thread:with-recursive-lock (*package-lock*)
-     ,@forms))
+  (sb!thread:with-recursive-lock (*package-lock*)
+    (funcall function)))
 
 ;;; Make a package hashtable having a prime number of entries at least
 ;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+). If RES is supplied,
@@ -332,7 +333,8 @@ error if any of PACKAGES is not a valid package designator."
 (defvar *package-names*)
 (declaim (type hash-table *package-names*))
 (!cold-init-forms
-  (setf *package-names* (make-hash-table :test 'equal)))
+ ;; No lock, accesses are synchonized on WITH-PACKAGES.
+ (setf *package-names* (make-hash-table :test 'equal)))
 
 ;;; This magical variable is T during initialization so that
 ;;; USE-PACKAGE's of packages that don't yet exist quietly win. Such
@@ -357,30 +359,31 @@ error if any of PACKAGES is not a valid package designator."
    (find-restart-or-control-error 'debootstrap-package condition)))
 
 (defun find-package (package-designator)
-  (flet ((find-package-from-string (string)
-           (declare (type string string))
-           (let ((packageoid (gethash string *package-names*)))
-             (when (and (null packageoid)
-                        (not *in-package-init*) ; KLUDGE
-                        (let ((mismatch (mismatch "SB!" string)))
-                          (and mismatch (= mismatch 3))))
-               (restart-case
-                   (signal 'bootstrap-package-not-found :name string)
-                 (debootstrap-package ()
-                   (return-from find-package
-                     (if (string= string "SB!XC")
-                         (find-package "COMMON-LISP")
-                         (find-package
-                          (substitute #\- #\! string :count 1)))))))
-             packageoid)))
-    (typecase package-designator
-      (package package-designator)
-      (symbol (find-package-from-string (symbol-name package-designator)))
-      (string (find-package-from-string package-designator))
-      (character (find-package-from-string (string package-designator)))
-      (t (error 'type-error
-                :datum package-designator
-                :expected-type '(or character package string symbol))))))
+  (with-packages ()
+    (flet ((find-package-from-string (string)
+             (declare (type string string))
+             (let ((packageoid (gethash string *package-names*)))
+              (when (and (null packageoid)
+                         (not *in-package-init*) ; KLUDGE
+                         (let ((mismatch (mismatch "SB!" string)))
+                           (and mismatch (= mismatch 3))))
+                (restart-case
+                    (signal 'bootstrap-package-not-found :name string)
+                  (debootstrap-package ()
+                    (return-from find-package
+                      (if (string= string "SB!XC")
+                          (find-package "COMMON-LISP")
+                          (find-package
+                           (substitute #\- #\! string :count 1)))))))
+              packageoid)))
+     (typecase package-designator
+       (package package-designator)
+       (symbol (find-package-from-string (symbol-name package-designator)))
+       (string (find-package-from-string package-designator))
+       (character (find-package-from-string (string package-designator)))
+       (t (error 'type-error
+                 :datum package-designator
+                 :expected-type '(or character package string symbol)))))))
 
 ;;; Return a list of packages given a package designator or list of
 ;;; package designators, or die trying.
@@ -525,10 +528,10 @@ error if any of PACKAGES is not a valid package designator."
     (when (< used (truncate size 4))
       (resize-package-hashtable table (* used 2)))))
 
-;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*.
-;;; If there is a conflict then give the user a chance to do
-;;; something about it.
-(defun enter-new-nicknames (package nicknames)
+;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
+;;; conflict then give the user a chance to do something about it. Caller is
+;;; responsible for having acquired the mutex via WITH-PACKAGES.
+(defun %enter-new-nicknames (package nicknames)
   (declare (type list nicknames))
   (dolist (n nicknames)
     (let* ((n (package-namify n))
@@ -590,7 +593,7 @@ implementation it is ~S." *default-package-use-list*)
       ;; Perhaps this can be solved by just moving ENTER-NEW-NICKNAMES before
       ;; USE-PACKAGE, but I need to check what kinds of errors can be caused by
       ;; USE-PACKAGE, too.
-      (enter-new-nicknames package nicknames)
+      (%enter-new-nicknames package nicknames)
       (setf (gethash name *package-names*) package))))
 
 ;;; Change the name if we can, blast any old nicknames and then
@@ -629,7 +632,7 @@ implementation it is ~S." *default-package-use-list*)
         (setf (package-%name package) name
               (gethash name *package-names*) package
               (package-%nicknames package) ())
-        (enter-new-nicknames package nicknames))
+        (%enter-new-nicknames package nicknames))
       package)))
 
 (defun delete-package (package-designator)
