@@ -66,9 +66,9 @@ stale value, use MUTEX-OWNER instead."
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
                             &body body)
   #!+sb-doc
-  "Acquire MUTEX for the dynamic scope of BODY, setting it to
-NEW-VALUE or some suitable default value if NIL.  If WAIT-P is non-NIL
-and the mutex is in use, sleep until it is available"
+  "Acquire MUTEX for the dynamic scope of BODY, setting it to VALUE or
+some suitable default value if NIL.  If WAIT-P is non-NIL and the mutex
+is in use, sleep until it is available"
   `(dx-flet ((with-mutex-thunk () ,@body))
      (call-with-mutex
       #'with-mutex-thunk
