@@ -358,7 +358,7 @@ If an unsupported TYPE is requested, the function will return NIL.
     ((or condition standard-object structure-object)
      (find-definition-source (class-of object)))
     (t
-     (error "Don't know how to retrieve source location for a ~S~%"
+     (error "Don't know how to retrieve source location for a ~S"
             (type-of object)))))
 
 (defun find-function-definition-source (function)
