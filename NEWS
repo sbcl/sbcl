@@ -6,6 +6,7 @@ changes relative to sbcl-1.0.33:
     are now caught and reported just like errors during macroexpansion.
   * enhancement: SB-POSIX now provides access to tcdrain(), tcflow(),
     tcflush(), tcgetsid(), and tcsendbreak(). (thanks to Jerry James)
+  * enhancement: ASDF systems can now depends on SB-QUEUE.
   * fixes and improvements related to Unicode and external formats:
     ** bug fix: error handling and restart usage in the ucs-2 external format 
        has been improved.
