@@ -25,7 +25,7 @@ INSTALLING SBCL
     $ sh run-sbcl.sh
 
   The following command installs SBCL and related documentation under
-  the "/usr/local" directory:
+  the "/usr/local" directory (typically run as root):
 
     # INSTALL_ROOT=/usr/local sh install.sh
 
@@ -159,12 +159,26 @@ INSTALLING SBCL
                (pushnew x features))
              (disable (x)
                (setf features (remove x features))))
-        ;; Threading support, available only on x86/x86-64 Linux, x86 Solaris
-        ;; and x86 Mac OS X (experimental).
+        ;; Threading support.
         (enable :sb-thread)))
 
   This is the preferred way because it lets local changes interact
   cleanly with CVS changes to the main, global source tree.
+
+  Some features of interest:
+
+    :SB-THREAD
+      Native threads. Enabled by default on x86[-64] Linux only, also
+      available on x86[-64] Max OS X, x86[-64] FreeBSD, and x86
+      Solaris.
+
+    :SB-UNICODE
+      Unicode support. Enabled by default. Disabling this feature
+      limits characters to the 8-bit ISO-8859-1 set.
+
+    :SB-XREF-FOR-INTERNALS
+      XREF data for SBCL internals. Not enabled by default, increases
+      core size by 5-6mb.
 
   A catalog of available features and their meaning can be found in
   "base-target-features.lisp-expr".
@@ -243,7 +257,7 @@ INSTALLING SBCL
   Supported operating systems and architectures:
 
                            x86 x86-64 PPC Sparc Alpha MIPS MIPSel
-    Linux 2.2, 2.4, 2.6     X     X    X    X     X     X     X
+    Linux 2.6               X     X    X    X     X     X     X
     Darwin (Mac OS X)       X     X    X
     Solaris                 X               X
     FreeBSD                 X     X

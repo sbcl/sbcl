@@ -216,12 +216,9 @@
 
  ;; low-level thread primitives support
  ;;
- ;; As of SBCL 0.8, this is only supposed to work in x86 Linux with
- ;; NPTL support (usually kernel 2.6, though sme Red Hat distributions
- ;; with older kernels also have it) and is implemented using clone(2)
- ;; and the %fs segment register.  Note that no consistent effort to
- ;; audit the SBCL library code for thread safety has been performed,
- ;; so caveat executor.
+ ;; As of SBCL 1.0.33.26, threads are part of the default build on
+ ;; x86oid Linux. Other platforms that support them include
+ ;; x86oid Darwin, FreeBSD, and Solaris.
  ; :sb-thread
 
  ;; lutex support

@@ -160,9 +160,12 @@ case "$sbcl_os" in
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
         case "$sbcl_arch" in
-        x86 | x86-64 | mips)
-            printf ' :largefile' >> $ltf
-            ;;
+	    mips)
+		printf ' :largefile' >> $ltf
+		;;
+            x86 | x86-64)
+		printf ' :sb-thread :largefile' >> $ltf
+		;;
         esac
 
         if [ $sbcl_arch = "x86-64" ]; then
