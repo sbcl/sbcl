@@ -14,6 +14,10 @@ changes relative to sbcl-1.0.33:
   * bug fix: SB-POSIX wrapper for putenv no longer tries to put lisp strings
     in the environment. setenv() and unsetenv() are also provided. (reported by
     Fare Rideau; launchpad bug lp#460455)
+  * bug fix: LOAD of both .fasl and .FASL type files now forces fasl-style
+    loading. This ensures sensible errors for .FASL files from other
+    implementations on case-insensitive filesystems. (reported by Willem
+    Broekema; launchpad bug lp#489417)
   * bug fix: #p"\\\\" can now be read without error on Win32.  (reported by
     Willem Broekema; launchpad bug lp#489698).
   * bug fix: some minor code rearrangements to reenable warning-free building
