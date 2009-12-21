@@ -2832,7 +2832,9 @@ core and return a descriptor to it."
         (unless (eq nil (car current-error))
           (format t "#define ~A ~D~%"
                   (c-symbol-name (car current-error))
-                  i)))))
+                  i))))
+    (format t "#define INTERNAL_ERROR_NAMES \\~%~{~S~#[~:;, \\~%~]~}~%"
+            (map 'list #'cdr internal-errors)))
   (terpri)
 
   ;; I'm not really sure why this is in SB!C, since it seems

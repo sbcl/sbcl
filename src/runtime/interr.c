@@ -117,6 +117,7 @@ corruption_warning_and_maybe_lose(char *fmt, ...)
 #endif
 }
 
+char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
 /* internal error handler for when the Lisp error system doesn't exist
  *
  * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
@@ -129,7 +130,9 @@ describe_internal_error(os_context_t *context)
     int len, scoffset, sc, offset, ch;
 
     len = *ptr++;
-    printf("internal error #%d\n", *ptr++);
+    printf("internal error #%d (%s)\n", *ptr,
+           internal_error_descriptions[*ptr]);
+    ptr++;
     len--;
     while (len > 0) {
         scoffset = *ptr++;
