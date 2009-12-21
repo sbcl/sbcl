@@ -167,39 +167,42 @@
     (base-char "base-char")
     (t "character")))
 
+(defun print-standard-describe-header (x stream)
+  (format stream "~&~A~%  [~A]~%"
+          (object-self-string x)
+          (object-type-string x)))
+
 (defgeneric describe-object (x stream))
 
 ;;; Catch-all.
+
 (defmethod describe-object ((x t) s)
-  (format s "~&~A~%  [~A]~%"
-          (object-self-string x)
-          (object-type-string x))
-  (values))
+  (print-standard-describe-header x s))
 
 (defmethod describe-object ((x cons) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (describe-function x nil s))
 
 (defmethod describe-object ((x function) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (describe-function nil x s))
 
 (defmethod describe-object ((x class) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (describe-class nil x s)
   (describe-instance x s))
 
 (defmethod describe-object ((x sb-pcl::slot-object) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (describe-instance x s))
 
 (defmethod describe-object ((x character) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (format s "~%:_Char-code: ~S" (char-code x))
   (format s "~%:_Char-name: ~A~%_" (char-name x)))
 
 (defmethod describe-object ((x array) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   (format s "~%Element-type: ~S" (array-element-type x))
   (if (vectorp x)
       (if (array-has-fill-pointer-p x)
@@ -222,7 +225,7 @@
     (terpri s)))
 
 (defmethod describe-object ((x hash-table) s)
-  (call-next-method)
+  (print-standard-describe-header x s)
   ;; Don't print things which are already apparent from the printed
   ;; representation -- COUNT, TEST, and WEAKNESS
   (format s "~%Occupancy: ~,1F" (float (/ (hash-table-count x)
@@ -234,7 +237,7 @@
   (terpri s))
 
 (defmethod describe-object ((symbol symbol) stream)
-  (call-next-method)
+  (print-standard-describe-header symbol stream)
   ;; Describe the value cell.
   (let* ((kind (info :variable :kind symbol))
          (wot (ecase kind
@@ -318,42 +321,43 @@
       (terpri stream))))
 
 (defmethod describe-object ((package package) stream)
-  (call-next-method)
-  (describe-documentation package t stream)
-  (flet ((humanize (list)
-           (sort (mapcar (lambda (x)
-                           (if (packagep x)
-                               (package-name x)
-                               x))
-                         list)
-                 #'string<))
-         (out (label list)
-           (describe-stuff label list stream :escape nil)))
-    (let ((implemented (humanize (package-implemented-by-list package)))
-          (implements (humanize (package-implements-list package)))
-          (nicks (humanize (package-nicknames package)))
-          (uses (humanize (package-use-list package)))
-          (used (humanize (package-used-by-list package)))
-          (shadows (humanize (package-shadowing-symbols package)))
-          (this (list (package-name package)))
-          (exports nil))
-      (do-external-symbols (ext package)
-        (push ext exports))
-      (setf exports (humanize exports))
-      (when (package-locked-p package)
-        (format stream "~@:_Locked."))
-      (when (set-difference implemented this :test #'string=)
-        (out "Implemented-by-list" implemented))
-      (when (set-difference implements this :test #'string=)
-        (out "Implements-list" implements))
-      (out "Nicknames" nicks)
-      (out "Use-list" uses)
-      (out "Used-by-list" used)
-      (out "Shadows" shadows)
-      (out "Exports" exports)
-      (format stream "~@:_~S internal symbols."
-              (package-internal-symbol-count package))))
-  (terpri stream))
+  (print-standard-describe-header package stream)
+  (pprint-logical-block (stream nil)
+    (describe-documentation package t stream)
+    (flet ((humanize (list)
+             (sort (mapcar (lambda (x)
+                             (if (packagep x)
+                                 (package-name x)
+                                 x))
+                           list)
+                   #'string<))
+           (out (label list)
+             (describe-stuff label list stream :escape nil)))
+      (let ((implemented (humanize (package-implemented-by-list package)))
+            (implements (humanize (package-implements-list package)))
+            (nicks (humanize (package-nicknames package)))
+            (uses (humanize (package-use-list package)))
+            (used (humanize (package-used-by-list package)))
+            (shadows (humanize (package-shadowing-symbols package)))
+            (this (list (package-name package)))
+            (exports nil))
+        (do-external-symbols (ext package)
+          (push ext exports))
+        (setf exports (humanize exports))
+        (when (package-locked-p package)
+          (format stream "~@:_Locked."))
+        (when (set-difference implemented this :test #'string=)
+          (out "Implemented-by-list" implemented))
+        (when (set-difference implements this :test #'string=)
+          (out "Implements-list" implements))
+        (out "Nicknames" nicks)
+        (out "Use-list" uses)
+        (out "Used-by-list" used)
+        (out "Shadows" shadows)
+        (out "Exports" exports)
+        (format stream "~@:_~S internal symbols."
+                (package-internal-symbol-count package))))
+    (terpri stream)))
 
 ;;;; Helpers to deal with shared functionality
 
