@@ -25,21 +25,20 @@
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS
   (or
    (without-gcing
-     (let* ((pointer *static-space-free-pointer*) ; in words
-            (free (* pointer n-word-bytes))
-            (vector (logior free other-pointer-lowtag)) ; in bytes, yay
+     (let* ((pointer (ash *static-space-free-pointer* n-fixnum-tag-bits))
+            (vector (logior pointer other-pointer-lowtag))
             ;; rounded to dual word boundary
             (nwords (logandc2 (+ lowtag-mask (+ words vector-data-offset 1))
                               lowtag-mask))
-            (new-pointer (+ *static-space-free-pointer* nwords))
-            (new-free (* new-pointer n-word-bytes)))
-       (when (> static-space-end new-free)
+            (new-pointer (+ pointer (ash nwords word-shift))))
+       (when (> static-space-end new-pointer)
          (store-word widetag
                      vector 0 other-pointer-lowtag)
-         (store-word (ash length word-shift)
+         (store-word (fixnumize length)
                      vector vector-length-slot other-pointer-lowtag)
-         (store-word 0 new-free)
-         (setf *static-space-free-pointer* new-pointer)
+         (store-word 0 new-pointer)
+         (setf *static-space-free-pointer*
+               (ash new-pointer (- n-fixnum-tag-bits)))
          (%make-lisp-obj vector))))
    (error 'simple-storage-condition
           :format-control "Not enough memory left in static space to ~

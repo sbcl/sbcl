@@ -171,10 +171,10 @@
   (ecase space
     (:static
      (values (int-sap static-space-start)
-             (int-sap (* *static-space-free-pointer* n-word-bytes))))
+             (int-sap (ash *static-space-free-pointer* n-fixnum-tag-bits))))
     (:read-only
      (values (int-sap read-only-space-start)
-             (int-sap (* *read-only-space-free-pointer* n-word-bytes))))
+             (int-sap (ash *read-only-space-free-pointer* n-fixnum-tag-bits))))
     (:dynamic
      (values (int-sap (current-dynamic-space-start))
              (dynamic-space-free-pointer)))))

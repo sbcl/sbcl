@@ -1993,11 +1993,11 @@ register."
        #!-gencgc
        (and (logbitp 0 val)
             (or (< sb!vm:read-only-space-start val
-                   (* sb!vm:*read-only-space-free-pointer*
-                      sb!vm:n-word-bytes))
+                   (ash sb!vm:*read-only-space-free-pointer*
+                        sb!vm:n-fixnum-tag-bits))
                 (< sb!vm:static-space-start val
-                   (* sb!vm:*static-space-free-pointer*
-                      sb!vm:n-word-bytes))
+                   (ash sb!vm:*static-space-free-pointer*
+                        sb!vm:n-fixnum-tag-bits))
                 (< (current-dynamic-space-start) val
                    (sap-int (dynamic-space-free-pointer))))))
       (values (%make-lisp-obj val) t)
