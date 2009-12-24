@@ -728,7 +728,10 @@
 
 ;;; environment
 
-(export 'getenv :sb-posix)
+(eval-when (:compile-toplevel :load-toplevel)
+  ;; Do this at compile-time as Win32 code below refers to it as
+  ;; sb-posix:getenv.
+  (export 'getenv :sb-posix))
 (defun getenv (name)
   (let ((r (alien-funcall
             (extern-alien "getenv" (function (* char) c-string))
@@ -760,11 +763,13 @@
 (progn
   ;; Windows doesn't define a POSIX setenv, but happily their _putenv is sane.
   (define-call* "putenv" int minusp (string c-string))
+  (export 'setenv :sb-posix)
   (defun setenv (name value overwrite)
     (declare (string name value))
     (if (and (zerop overwrite) (sb-posix:getenv name))
         0
         (putenv (concatenate 'string name "=" value))))
+  (export 'unsetenv :sb-posix)
   (defun unsetenv (name)
     (declare (string name))
     (putenv (concatenate 'string name "="))))
