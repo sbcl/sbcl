@@ -679,7 +679,7 @@
           (t
            (move result number)
            (cond ((< -64 amount 64)
-                  ;; this code is used both in ASH and ASH-SMOD61, so
+                  ;; this code is used both in ASH and ASH-MODFX, so
                   ;; be careful
                   (if (plusp amount)
                       (inst shl result amount)
@@ -1343,18 +1343,19 @@ constant shift greater than word length")))
                    (vop64f (intern (format nil "FAST-~S-MOD64/FIXNUM=>FIXNUM" name)))
                    (vop64cu (intern (format nil "FAST-~S-MOD64-C/WORD=>UNSIGNED" name)))
                    (vop64cf (intern (format nil "FAST-~S-MOD64-C/FIXNUM=>FIXNUM" name)))
-                   (sfun61 (intern (format nil "~S-SMOD61" name)))
-                   (svop61f (intern (format nil "FAST-~S-SMOD61/FIXNUM=>FIXNUM" name)))
-                   (svop61cf (intern (format nil "FAST-~S-SMOD61-C/FIXNUM=>FIXNUM" name))))
+                   (funfx (intern (format nil "~S-MODFX" name)))
+                   (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
+                   (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
                `(progn
                   (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
-                  (define-modular-fun ,sfun61 (x y) ,name :tagged t 61)
+                  (define-modular-fun ,funfx (x y) ,name :tagged t
+                                      #.(- n-word-bits n-fixnum-tag-bits))
                   (define-mod-binop (,vop64u ,vopu) ,fun64)
                   (define-vop (,vop64f ,vopf) (:translate ,fun64))
-                  (define-vop (,svop61f ,vopf) (:translate ,sfun61))
+                  (define-vop (,vopfxf ,vopf) (:translate ,funfx))
                   ,@(when -c-p
                       `((define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
-                        (define-vop (,svop61cf ,vopcf) (:translate ,sfun61))))))))
+                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
   (def + t)
   (def - t)
   (def * t))
@@ -1370,25 +1371,25 @@ constant shift greater than word length")))
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count))
 
-(define-vop (fast-ash-left-smod61-c/fixnum=>fixnum
+(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-c/fixnum=>fixnum)
   (:variant :modular)
-  (:translate ash-left-smod61))
-(define-vop (fast-ash-left-smod61/fixnum=>fixnum
+  (:translate ash-left-modfx))
+(define-vop (fast-ash-left-modfx/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum))
-(deftransform ash-left-smod61 ((integer count)
-                               ((signed-byte 61) (unsigned-byte 6)))
+(deftransform ash-left-modfx ((integer count)
+                              (fixnum (unsigned-byte 6)))
   (when (sb!c::constant-lvar-p count)
     (sb!c::give-up-ir1-transform))
-  '(%primitive fast-ash-left-smod61/fixnum=>fixnum integer count))
+  '(%primitive fast-ash-left-modfx/fixnum=>fixnum integer count))
 
 (in-package "SB!C")
 
 (defknown sb!vm::%lea-mod64 (integer integer (member 1 2 4 8) (signed-byte 64))
   (unsigned-byte 64)
   (foldable flushable movable))
-(defknown sb!vm::%lea-smod61 (integer integer (member 1 2 4 8) (signed-byte 64))
-  (signed-byte 61)
+(defknown sb!vm::%lea-modfx (integer integer (member 1 2 4 8) (signed-byte 64))
+  fixnum
   (foldable flushable movable))
 
 (define-modular-fun-optimizer %lea ((base index scale disp) :untagged nil :width width)
@@ -1399,19 +1400,20 @@ constant shift greater than word length")))
     (cut-to-width index :untagged width nil)
     'sb!vm::%lea-mod64))
 (define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
-  (when (and (<= width 61)
+  (when (and (<= width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
              (constant-lvar-p scale)
              (constant-lvar-p disp))
     (cut-to-width base :tagged width t)
     (cut-to-width index :tagged width t)
-    'sb!vm::%lea-smod61))
+    'sb!vm::%lea-modfx))
 
 #+sb-xc-host
 (progn
   (defun sb!vm::%lea-mod64 (base index scale disp)
     (ldb (byte 64 0) (%lea base index scale disp)))
-  (defun sb!vm::%lea-smod61 (base index scale disp)
-    (mask-signed-field 61 (%lea base index scale disp))))
+  (defun sb!vm::%lea-modfx (base index scale disp)
+    (mask-signed-field (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+                       (%lea base index scale disp))))
 #-sb-xc-host
 (progn
   (defun sb!vm::%lea-mod64 (base index scale disp)
@@ -1420,21 +1422,22 @@ constant shift greater than word length")))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
       (ldb (byte 64 0) (+ base (* index scale) disp))))
-  (defun sb!vm::%lea-smod61 (base index scale disp)
-    (let ((base (mask-signed-field 61 base))
-          (index (mask-signed-field 61 index)))
+  (defun sb!vm::%lea-modfx (base index scale disp)
+    (let* ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
+           (base (mask-signed-field fixnum-width base))
+           (index (mask-signed-field fixnum-width index)))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
-      (mask-signed-field 61 (+ base (* index scale) disp)))))
+      (mask-signed-field fixnum-width (+ base (* index scale) disp)))))
 
 (in-package "SB!VM")
 
 (define-vop (%lea-mod64/unsigned=>unsigned
              %lea/unsigned=>unsigned)
   (:translate %lea-mod64))
-(define-vop (%lea-smod61/fixnum=>fixnum
+(define-vop (%lea-modfx/fixnum=>fixnum
              %lea/fixnum=>fixnum)
-  (:translate %lea-smod61))
+  (:translate %lea-modfx))
 
 ;;; logical operations
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
@@ -1786,14 +1789,14 @@ constant shift greater than word length")))
     (*-transformer y)))
 
 (deftransform * ((x y)
-                 ((signed-byte 61) (constant-arg (unsigned-byte 64)))
-                 (signed-byte 61))
+                 (fixnum (constant-arg (unsigned-byte 64)))
+                 fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))
-(deftransform sb!vm::*-smod61
-    ((x y) ((signed-byte 61) (constant-arg (unsigned-byte 64)))
-     (signed-byte 61))
+(deftransform sb!vm::*-modfx
+    ((x y) (fixnum (constant-arg (unsigned-byte 64)))
+     fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))

@@ -624,14 +624,13 @@
   ;; This should really be dependent on SB!VM:N-WORD-BITS, but since we
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
-  #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
-  (progn
-    #!+x86 (def sb!vm::ash-left-smod30 :tagged 30 t)
-    (def sb!vm::ash-left-mod32 :untagged 32 nil))
-  #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))
-  (progn
-    #!+x86-64 (def sb!vm::ash-left-smod61 :tagged 61 t)
-    (def sb!vm::ash-left-mod64 :untagged 64 nil)))
+  #.`(progn
+       #!+(or x86 x86-64)
+       (def sb!vm::ash-left-modfx
+           :tagged ,(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) t)
+       (def ,(intern (format nil "ASH-LEFT-MOD~D" sb!vm:n-machine-word-bits)
+                     "SB!VM")
+           :untagged ,sb!vm:n-machine-word-bits nil)))
 
 ;;;; word-wise logical operations
 

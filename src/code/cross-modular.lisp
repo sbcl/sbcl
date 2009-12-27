@@ -45,16 +45,13 @@
       (do-mfuns *tagged-modular-class*)))
   `(progn ,@(forms)))
 
-#!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 32) '(and) '(or))
-(defun sb!vm::ash-left-mod32 (integer amount)
-  (ldb (byte 32 0) (ash integer amount)))
-#!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
-(defun sb!vm::ash-left-mod64 (integer amount)
-  (ldb (byte 64 0) (ash integer amount)))
-#!+x86
-(defun sb!vm::ash-left-smod30 (integer amount)
-  (mask-signed-field 30 (ash integer amount)))
-#!+x86-64
-(defun sb!vm::ash-left-smod61 (integer amount)
-  (mask-signed-field 61 (ash integer amount)))
+#.`
+(defun ,(intern (format nil "ASH-LEFT-MOD~D" sb!vm:n-machine-word-bits)
+                "SB!VM")
+    (integer amount)
+  (ldb (byte ,sb!vm:n-machine-word-bits 0) (ash integer amount)))
 
+#!+(or x86 x86-64)
+(defun sb!vm::ash-left-modfx (integer amount)
+  (mask-signed-field (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+                     (ash integer amount)))

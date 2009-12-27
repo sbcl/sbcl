@@ -1496,14 +1496,9 @@ the first."
     (bignum (ldb (byte 64 0)
                  (ash (logand integer #xffffffffffffffff) amount)))))
 
-#!+x86
-(defun sb!vm::ash-left-smod30 (integer amount)
-  (etypecase integer
-    ((signed-byte 30) (sb!c::mask-signed-field 30 (ash integer amount)))
-    (integer (sb!c::mask-signed-field 30 (ash (sb!c::mask-signed-field 30 integer) amount)))))
-
-#!+x86-64
-(defun sb!vm::ash-left-smod61 (integer amount)
-  (etypecase integer
-    ((signed-byte 61) (sb!c::mask-signed-field 61 (ash integer amount)))
-    (integer (sb!c::mask-signed-field 61 (ash (sb!c::mask-signed-field 61 integer) amount)))))
+#!+(or x86 x86-64)
+(defun sb!vm::ash-left-modfx (integer amount)
+  (let ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)))
+    (etypecase integer
+      (fixnum (sb!c::mask-signed-field fixnum-width (ash integer amount)))
+      (integer (sb!c::mask-signed-field fixnum-width (ash (sb!c::mask-signed-field fixnum-width integer) amount))))))

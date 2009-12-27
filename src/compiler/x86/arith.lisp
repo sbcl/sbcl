@@ -609,7 +609,7 @@
           (t
            (move result number)
            (cond ((< -32 amount 32)
-                  ;; this code is used both in ASH and ASH-SMOD30, so
+                  ;; this code is used both in ASH and ASH-MODFX, so
                   ;; be careful
                   (if (plusp amount)
                       (inst shl result amount)
@@ -1298,18 +1298,19 @@ constant shift greater than word length")))
                    (vop32f (intern (format nil "FAST-~S-MOD32/FIXNUM=>FIXNUM" name)))
                    (vop32cu (intern (format nil "FAST-~S-MOD32-C/WORD=>UNSIGNED" name)))
                    (vop32cf (intern (format nil "FAST-~S-MOD32-C/FIXNUM=>FIXNUM" name)))
-                   (sfun30 (intern (format nil "~S-SMOD30" name)))
-                   (svop30f (intern (format nil "FAST-~S-SMOD30/FIXNUM=>FIXNUM" name)))
-                   (svop30cf (intern (format nil "FAST-~S-SMOD30-C/FIXNUM=>FIXNUM" name))))
+                   (funfx (intern (format nil "~S-MODFX" name)))
+                   (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
+                   (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
                `(progn
                   (define-modular-fun ,fun32 (x y) ,name :untagged nil 32)
-                  (define-modular-fun ,sfun30 (x y) ,name :tagged t 30)
+                  (define-modular-fun ,funfx (x y) ,name :tagged t
+                                      #.(- n-word-bits n-fixnum-tag-bits))
                   (define-mod-binop (,vop32u ,vopu) ,fun32)
                   (define-vop (,vop32f ,vopf) (:translate ,fun32))
-                  (define-vop (,svop30f ,vopf) (:translate ,sfun30))
+                  (define-vop (,vopfxf ,vopf) (:translate ,funfx))
                   ,@(when -c-p
                       `((define-mod-binop-c (,vop32cu ,vopcu) ,fun32)
-                        (define-vop (,svop30cf ,vopcf) (:translate ,sfun30))))))))
+                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
   (def + t)
   (def - t)
   ;; (no -C variant as x86 MUL instruction doesn't take an immediate)
@@ -1328,26 +1329,26 @@ constant shift greater than word length")))
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
-(define-vop (fast-ash-left-smod30-c/fixnum=>fixnum
+(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-c/fixnum=>fixnum)
   (:variant :modular)
-  (:translate ash-left-smod30))
+  (:translate ash-left-modfx))
 
-(define-vop (fast-ash-left-smod30/fixnum=>fixnum
+(define-vop (fast-ash-left-modfx/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum))
-(deftransform ash-left-smod30 ((integer count)
-                               ((signed-byte 30) (unsigned-byte 5)))
+(deftransform ash-left-modfx ((integer count)
+                              (fixnum (unsigned-byte 5)))
   (when (sb!c::constant-lvar-p count)
     (sb!c::give-up-ir1-transform))
-  '(%primitive fast-ash-left-smod30/fixnum=>fixnum integer count))
+  '(%primitive fast-ash-left-modfx/fixnum=>fixnum integer count))
 
 (in-package "SB!C")
 
 (defknown sb!vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
   (unsigned-byte 32)
   (foldable flushable movable))
-(defknown sb!vm::%lea-smod30 (integer integer (member 1 2 4 8) (signed-byte 32))
-  (signed-byte 30)
+(defknown sb!vm::%lea-modfx (integer integer (member 1 2 4 8) (signed-byte 32))
+  fixnum
   (foldable flushable movable))
 
 (define-modular-fun-optimizer %lea ((base index scale disp) :untagged nil :width width)
@@ -1358,19 +1359,20 @@ constant shift greater than word length")))
     (cut-to-width index :untagged width nil)
     'sb!vm::%lea-mod32))
 (define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
-  (when (and (<= width 30)
+  (when (and (<= width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
              (constant-lvar-p scale)
              (constant-lvar-p disp))
     (cut-to-width base :tagged width t)
     (cut-to-width index :tagged width t)
-    'sb!vm::%lea-smod30))
+    'sb!vm::%lea-modfx))
 
 #+sb-xc-host
 (progn
   (defun sb!vm::%lea-mod32 (base index scale disp)
     (ldb (byte 32 0) (%lea base index scale disp)))
-  (defun sb!vm::%lea-smod30 (base index scale disp)
-    (mask-signed-field 30 (%lea base index scale disp))))
+  (defun sb!vm::%lea-modfx (base index scale disp)
+    (mask-signed-field (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+                       (%lea base index scale disp))))
 #-sb-xc-host
 (progn
   (defun sb!vm::%lea-mod32 (base index scale disp)
@@ -1379,21 +1381,22 @@ constant shift greater than word length")))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
       (ldb (byte 32 0) (+ base (* index scale) disp))))
-  (defun sb!vm::%lea-smod30 (base index scale disp)
-    (let ((base (mask-signed-field 30 base))
-          (index (mask-signed-field 30 index)))
+  (defun sb!vm::%lea-modfx (base index scale disp)
+    (let* ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
+           (base (mask-signed-field fixnum-width base))
+           (index (mask-signed-field fixnum-width index)))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
-      (mask-signed-field 30 (+ base (* index scale) disp)))))
+      (mask-signed-field fixnum-width (+ base (* index scale) disp)))))
 
 (in-package "SB!VM")
 
 (define-vop (%lea-mod32/unsigned=>unsigned
              %lea/unsigned=>unsigned)
   (:translate %lea-mod32))
-(define-vop (%lea-smod30/fixnum=>fixnum
+(define-vop (%lea-modfx/fixnum=>fixnum
              %lea/fixnum=>fixnum)
-  (:translate %lea-smod30))
+  (:translate %lea-modfx))
 
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
@@ -1886,17 +1889,17 @@ constant shift greater than word length")))
     (*-transformer :unsigned 32 y)))
 
 (deftransform * ((x y)
-                 ((signed-byte 30) (constant-arg (unsigned-byte 32)))
-                 (signed-byte 30))
+                 (fixnum (constant-arg (unsigned-byte 32)))
+                 fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed 30 y)))
-(deftransform sb!vm::*-smod30
-    ((x y) ((signed-byte 30) (constant-arg (unsigned-byte 32)))
-     (signed-byte 30))
+    (*-transformer :signed (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) y)))
+(deftransform sb!vm::*-modfx
+    ((x y) (fixnum (constant-arg (unsigned-byte 32)))
+     fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed 30 y)))
+    (*-transformer :signed (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) y)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.
