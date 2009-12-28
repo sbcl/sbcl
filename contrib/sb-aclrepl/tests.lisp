@@ -52,7 +52,7 @@
 (defparameter *complex* #c(1 2))
 (defparameter *ratio* 22/7)
 (defparameter *double* 5.5d0)
-(defparameter *bignum* 1234567890123456789)
+(defparameter *bignum* 4938271560493827156)
 (defparameter *array* (make-array '(3 3 2) :initial-element nil))
 (defparameter *vector* (make-array '(20):initial-contents
                              '(0 1 2 3 4 5 6 7 8 9
@@ -190,11 +190,11 @@
 (case sb-vm::n-word-bits
   (32
    (def-elements-tests *bignum* 2
-     #(2112454933 287445236)
+     #(4154852436 1149780945)
      #((0 . :HEX32) (1 . :HEX32))))
   (64
    (def-elements-tests *bignum* 1
-     #(1234567890123456789)
+     #(4938271560493827156)
      #((0 . :HEX64)))))
 
 (def-elements-tests *vector* 20
@@ -325,13 +325,13 @@
 (case sb-vm::n-word-bits
   (32
    (def-display-test *bignum*
-       "bignum 1234567890123456789 with 2 32-bit words
-   0-> #x7DE98115
-   1-> #x112210F4"))
+       "bignum 4938271560493827156 with 2 32-bit words
+   0-> #xF7A60454
+   1-> #x448843D1"))
   (64
    (def-display-test *bignum*
-       "bignum 1234567890123456789 with 1 64-bit word
-   0-> #x112210F47DE98115"
+       "bignum 4938271560493827156 with 1 64-bit word
+   0-> #x448843D1F7A60454"
      )))
 
 (def-display-test *vector*

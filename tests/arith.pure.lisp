@@ -151,11 +151,11 @@
              ((1+ most-positive-fixnum) (1+ most-positive-fixnum) nil)
              ((1+ most-positive-fixnum) (1- most-negative-fixnum) t)
              (1 (ash most-negative-fixnum 1) nil)
-             (#.(- sb-vm:n-word-bits sb-vm:n-lowtag-bits) most-negative-fixnum t)
-             (#.(1+ (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
-             (#.(+ 2 (- sb-vm:n-word-bits sb-vm:n-lowtag-bits)) (ash most-negative-fixnum 1) t)
-             (#.(+ sb-vm:n-word-bits 32) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) nil)
-             (#.(+ sb-vm:n-word-bits 33) (ash most-negative-fixnum #.(+ 32 sb-vm:n-lowtag-bits 1)) t)))
+             (#.(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits 1) most-negative-fixnum t)
+             (#.(1+ (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits 1)) (ash most-negative-fixnum 1) t)
+             (#.(+ 2 (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits 1)) (ash most-negative-fixnum 1) t)
+             (#.(+ sb-vm:n-word-bits 32) (ash most-negative-fixnum #.(+ 32 sb-vm:n-fixnum-tag-bits 2)) nil)
+             (#.(+ sb-vm:n-word-bits 33) (ash most-negative-fixnum #.(+ 32 sb-vm:n-fixnum-tag-bits 2)) t)))
   (destructuring-bind (index int result) x
     (assert (eq (eval `(logbitp ,index ,int)) result))))
 
