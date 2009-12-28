@@ -95,7 +95,7 @@ SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
         lispobj *r = &(((union per_thread_data *)thread)
-                       ->dynamic_values[fixnum_value(sym->tls_index)]);
+                       ->dynamic_values[(sym->tls_index) >> WORD_SHIFT]);
         if((*r)!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
     }
 #endif
@@ -111,7 +111,7 @@ SymbolValue(u64 tagged_symbol_pointer, void *thread)
     if(thread && sym->tls_index) {
         lispobj r=
             ((union per_thread_data *)thread)
-            ->dynamic_values[fixnum_value(sym->tls_index)];
+            ->dynamic_values[(sym->tls_index) >> WORD_SHIFT];
         if(r!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
     }
 #endif
@@ -125,7 +125,7 @@ SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
     return ((union per_thread_data *)thread)
-        ->dynamic_values[fixnum_value(sym->tls_index)];
+        ->dynamic_values[(sym->tls_index) >> WORD_SHIFT];
 #else
     return sym->value;
 #endif
@@ -139,7 +139,7 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
         lispobj *pr= &(((union per_thread_data *)thread)
-                       ->dynamic_values[fixnum_value(sym->tls_index)]);
+                       ->dynamic_values[(sym->tls_index) >> WORD_SHIFT]);
         if(*pr!=NO_TLS_VALUE_MARKER_WIDETAG) {
             *pr=val;
             return;
@@ -156,7 +156,7 @@ SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
     struct symbol *sym= (struct symbol *)
         (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     ((union per_thread_data *)thread)
-        ->dynamic_values[fixnum_value(sym->tls_index)]
+        ->dynamic_values[(sym->tls_index) >> WORD_SHIFT]
         =val;
 #else
     SetSymbolValue(tagged_symbol_pointer,val,thread) ;

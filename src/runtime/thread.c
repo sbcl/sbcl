@@ -393,12 +393,12 @@ create_thread_struct(lispobj initial_function) {
         per_thread->dynamic_values[i] = NO_TLS_VALUE_MARKER_WIDETAG;
     if (all_threads == 0) {
         if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) {
-            SetSymbolValue(FREE_TLS_INDEX,make_fixnum(tls_index_start),0);
+            SetSymbolValue(FREE_TLS_INDEX,tls_index_start << WORD_SHIFT,0);
             SetSymbolValue(TLS_INDEX_LOCK,make_fixnum(0),0);
         }
 #define STATIC_TLS_INIT(sym,field) \
   ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
-  make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
+  (THREAD_SLOT_OFFSET_WORDS(field) << WORD_SHIFT)
 
         STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
 #ifdef BINDING_STACK_POINTER

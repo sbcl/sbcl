@@ -1296,8 +1296,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
       (loop
         (if (thread-alive-p thread)
             (let* ((epoch sb!kernel::*gc-epoch*)
-                   (offset (* sb!vm:n-word-bytes
-                              (sb!vm::symbol-tls-index symbol)))
+                   (offset (sb!kernel:get-lisp-obj-address
+                            (sb!vm::symbol-tls-index symbol)))
                    (tl-val (sap-ref-word (%thread-sap thread) offset)))
               (cond ((zerop offset)
                      (return (values nil :no-tls-value)))
@@ -1331,8 +1331,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
       ;; area...
       (with-all-threads-lock
         (if (thread-alive-p thread)
-            (let ((offset (* sb!vm:n-word-bytes
-                             (sb!vm::symbol-tls-index symbol))))
+            (let ((offset (sb!kernel:get-lisp-obj-address
+                           (sb!vm::symbol-tls-index symbol))))
               (cond ((zerop offset)
                      (values nil :no-tls-value))
                     (t

@@ -4138,7 +4138,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
             scavenge((lispobj *) th->binding_stack_start,len);
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
-            len=fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+            len=(SymbolValue(FREE_TLS_INDEX,0) >> WORD_SHIFT) -
                 (sizeof (struct thread))/(sizeof (lispobj));
             scavenge((lispobj *) (th+1),len);
 #endif
