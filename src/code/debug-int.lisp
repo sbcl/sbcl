@@ -1604,22 +1604,13 @@ register."
       (without-package-locks
         (setf (compiled-debug-var-symbol (svref vars i))
               (intern (format nil "ARG-~V,'0D" width i)
-                      ;; KLUDGE: It's somewhat nasty to have a bare
-                      ;; package name string here. It would be
-                      ;; nicer to have #.(FIND-PACKAGE "SB!DEBUG")
-                      ;; instead, since then at least it would transform
-                      ;; correctly under package renaming and stuff.
-                      ;; However, genesis can't handle dumped packages..
-                      ;; -- WHN 20000129
-                      ;;
-                      ;; FIXME: Maybe this could be fixed by moving the
-                      ;; whole debug-int.lisp file to warm init? (after
-                      ;; which dumping a #.(FIND-PACKAGE ..) expression
-                      ;; would work fine) If this is possible, it would
-                      ;; probably be a good thing, since minimizing the
-                      ;; amount of stuff in cold init is basically good.
-                      (or (find-package "SB-DEBUG")
-                          (find-package "SB!DEBUG"))))))))
+                      ;; The cross-compiler won't dump literal package
+                      ;; references because the target package objects
+                      ;; aren't created until partway through
+                      ;; cold-init. In lieu of adding smarts to the
+                      ;; build framework to handle this, we use an
+                      ;; explicit load-time-value form.
+                      (load-time-value (find-package "SB!DEBUG"))))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB!C::COMPILED-DEBUG-FUN, returning a vector
