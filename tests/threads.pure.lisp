@@ -265,22 +265,30 @@
 
 #+sb-thread
 (with-test (:name symbol-value-in-thread.7)
-  (let ((child (make-thread (lambda ()))))
+  (let ((child (make-thread (lambda ())))
+        (error-occurred nil))
+    (join-thread child)
     (handler-case
         (symbol-value-in-thread 'this-is-new child)
       (symbol-value-in-thread-error (e)
+        (setf error-occurred t)
         (assert (eq child (thread-error-thread e)))
         (assert (eq 'this-is-new (cell-error-name e)))
         (assert (equal (list :read :thread-dead)
-                       (sb-thread::symbol-value-in-thread-error-info e)))))))
+                       (sb-thread::symbol-value-in-thread-error-info e)))))
+    (assert error-occurred)))
 
 #+sb-thread
 (with-test (:name symbol-value-in-thread.8)
-  (let ((child (make-thread (lambda ()))))
+  (let ((child (make-thread (lambda ())))
+        (error-occurred nil))
+    (join-thread child)
     (handler-case
         (setf (symbol-value-in-thread 'this-is-new child) t)
       (symbol-value-in-thread-error (e)
+        (setf error-occurred t)
         (assert (eq child (thread-error-thread e)))
         (assert (eq 'this-is-new (cell-error-name e)))
         (assert (equal (list :write :thread-dead)
-                       (sb-thread::symbol-value-in-thread-error-info e)))))))
+                       (sb-thread::symbol-value-in-thread-error-info e)))))
+    (assert error-occurred)))
