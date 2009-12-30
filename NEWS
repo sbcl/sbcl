@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.33:
+changes in sbcl-1.0.34 relative to sbcl-1.0.33:
   * minor incompatible change: threading support is now enabled by default
     on x86[-64] Linux.
   * enhancement: SB-INTROSPECT:DEFTYPE-LAMBDA-LIST now also works on most
