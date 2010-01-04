@@ -245,3 +245,13 @@
       (read-from-string "CL-USER:DOES-NOT-EXIST")
     (reader-error (c)
       (princ c))))
+
+;;; The GET-MACRO-CHARACTER in SBCL <= "1.0.34.2" bogusly computed its
+;;; second return value relative to *READTABLE* rather than the passed
+;;; readtable.
+(let* ((*readtable* (copy-readtable nil)))
+  (set-syntax-from-char #\" #\A)
+  (multiple-value-bind (reader-fn non-terminating-p)
+      (get-macro-character #\" (copy-readtable nil))
+    (declare (ignore reader-fn))
+    (assert (not non-terminating-p))))

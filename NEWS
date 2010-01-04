@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.34:
+  * bug fix: GET-MACRO-CHARACTER bogusly computed its second return value
+    always relative to *READTABLE* rather than the passed argument.
+
 changes in sbcl-1.0.34 relative to sbcl-1.0.33:
   * minor incompatible change: threading support is now enabled by default
     on x86[-64] Linux.

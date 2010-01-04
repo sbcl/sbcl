@@ -292,8 +292,8 @@ standard Lisp readtable when NIL."
     (values fun-value
             ;; NON-TERMINATING-P return value:
             (if fun-value
-                (or (constituentp char)
-                    (not (terminating-macrop char)))
+                (or (constituentp char designated-readtable)
+                    (not (terminating-macrop char designated-readtable)))
                 ;; ANSI's definition of GET-MACRO-CHARACTER says this
                 ;; value is NIL when CHAR is not a macro character.
                 ;; I.e. this value means not just "non-terminating
