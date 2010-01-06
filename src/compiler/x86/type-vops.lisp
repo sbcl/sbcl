@@ -127,18 +127,28 @@
                      ;; was true.
                      (return))
                     (t
-                     (unless (= start bignum-widetag)
-                       (inst cmp al-tn start)
-                       (if (= end complex-array-widetag)
-                           (progn
-                             (aver last)
-                             (inst jmp greater-or-equal target))
-                           (inst jmp :b when-false))) ; was :l
-                     (unless (= end complex-array-widetag)
-                       (inst cmp al-tn end)
-                       (if last
-                           (inst jmp less-or-equal target)
-                           (inst jmp :be when-true)))))))))))) ; was :le
+                     (cond
+                       ((= start bignum-widetag)
+                        (inst cmp al-tn end)
+                        (if last
+                            (inst jmp less-or-equal target)
+                            (inst jmp :be when-true)))
+                       ((= end complex-array-widetag)
+                        (inst cmp al-tn start)
+                        (if last
+                            (inst jmp greater-or-equal target)
+                            (inst jmp :b when-false)))
+                       ((not last)
+                        (inst cmp al-tn start)
+                        (inst jmp :b when-false)
+                        (inst cmp al-tn end)
+                        (if last
+                            (inst jmp less-or-equal target)
+                            (inst jmp :be when-true)))
+                       (t
+                        (inst sub al-tn start)
+                        (inst cmp al-tn (- end start))
+                        (inst jmp less-or-equal target))))))))))))
       (emit-label drop-through))))
 
 ;;;; type checking and testing

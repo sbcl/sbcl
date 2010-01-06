@@ -83,13 +83,14 @@
 (defun %test-headers (value target not-p function-p headers
                             &optional (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
-    (multiple-value-bind (equal less-or-equal when-true when-false)
-        ;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
-        ;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
-        ;; it's true and when we know it's false respectively.
+    (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
+        ;; EQUAL, LESS-OR-EQUAL, and GREATER-OR-EQUAL are the conditions
+        ;; for branching to TARGET.  WHEN-TRUE and WHEN-FALSE are the
+        ;; labels to branch to when we know it's true and when we know
+        ;; it's false respectively.
         (if not-p
-            (values :ne :a drop-through target)
-            (values :e :na target drop-through))
+            (values :ne :a :b drop-through target)
+            (values :e :na :nb target drop-through))
       (%test-lowtag value when-false t lowtag)
       (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
       (do ((remaining headers (cdr remaining)))
@@ -105,13 +106,28 @@
            (t
              (let ((start (car header))
                    (end (cdr header)))
-               (unless (= start bignum-widetag)
-                 (inst cmp al-tn start)
-                 (inst jmp :b when-false)) ; was :l
-               (inst cmp al-tn end)
-               (if last
-                   (inst jmp less-or-equal target)
-                   (inst jmp :be when-true))))))) ; was :le
+               (cond
+                 ((= start bignum-widetag)
+                  (inst cmp al-tn end)
+                  (if last
+                      (inst jmp less-or-equal target)
+                      (inst jmp :be when-true)))
+                 ((= end complex-array-widetag)
+                  (inst cmp al-tn start)
+                  (if last
+                      (inst jmp greater-or-equal target)
+                      (inst jmp :b when-false)))
+                 ((not last)
+                  (inst cmp al-tn start)
+                  (inst jmp :b when-false)
+                  (inst cmp al-tn end)
+                  (if last
+                      (inst jmp less-or-equal target)
+                      (inst jmp :be when-true)))
+                 (t
+                  (inst sub al-tn start)
+                  (inst cmp al-tn (- end start))
+                  (inst jmp less-or-equal target))))))))
       (emit-label drop-through))))
 
 
