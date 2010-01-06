@@ -295,41 +295,6 @@
   '(if (array-header-p %array)
        (values (%array-data-vector %array) %index)
        (values %array %index)))
-
-;;; transforms for getting at simple arrays of (UNSIGNED-BYTE N) when (< N 8)
-;;;
-;;; FIXME: In CMU CL, these were commented out with #+NIL. Why? Should
-;;; we fix them or should we delete them? (Perhaps these definitions
-;;; predate the various DATA-VECTOR-REF-FOO VOPs which have
-;;; (:TRANSLATE DATA-VECTOR-REF), and are redundant now?)
-#+nil
-(macrolet
-    ((frob (type bits)
-       (let ((elements-per-word (truncate sb!vm:n-word-bits bits)))
-         `(progn
-            (deftransform data-vector-ref ((vector index)
-                                           (,type *))
-              `(multiple-value-bind (word bit)
-                   (floor index ,',elements-per-word)
-                 (ldb ,(ecase sb!vm:target-byte-order
-                         (:little-endian '(byte ,bits (* bit ,bits)))
-                         (:big-endian '(byte ,bits (- sb!vm:n-word-bits
-                                                      (* (1+ bit) ,bits)))))
-                      (%vector-raw-bits vector word))))
-            (deftransform data-vector-set ((vector index new-value)
-                                           (,type * *))
-              `(multiple-value-bind (word bit)
-                   (floor index ,',elements-per-word)
-                 (setf (ldb ,(ecase sb!vm:target-byte-order
-                               (:little-endian '(byte ,bits (* bit ,bits)))
-                               (:big-endian
-                                '(byte ,bits (- sb!vm:n-word-bits
-                                                (* (1+ bit) ,bits)))))
-                            (%vector-raw-bits vector word))
-                       new-value)))))))
-  (frob simple-bit-vector 1)
-  (frob (simple-array (unsigned-byte 2) (*)) 2)
-  (frob (simple-array (unsigned-byte 4) (*)) 4))
 
 ;;;; BIT-VECTOR hackery
 
