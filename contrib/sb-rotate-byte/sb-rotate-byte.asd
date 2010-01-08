@@ -16,6 +16,8 @@
             :components
             ((:file "x86-vm"
                     :in-order-to ((compile-op (feature :x86))))
+             (:file "x86-64-vm"
+                    :in-order-to ((compile-op (feature :x86-64))))
              (:file "ppc-vm"
                     :in-order-to ((compile-op (feature :ppc)))))
             :pathname

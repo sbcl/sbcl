@@ -7,6 +7,10 @@
 (defknown %unsigned-32-rotate-byte ((integer -31 31) (unsigned-byte 32))
     (unsigned-byte 32)
   (foldable flushable))
+#+x86-64
+(defknown %unsigned-64-rotate-byte ((integer -63 63) (unsigned-byte 64))
+    (unsigned-byte 64)
+  (foldable flushable))
 
 (macrolet (;; see src/compiler/srctran.lisp
            (with-byte-specifier ((size-var pos-var spec) &body body)
@@ -43,23 +47,16 @@
         *universal-type*)))
 
 (deftransform %rotate-byte ((count size pos integer)
-                            ((constant-arg (member 0)) * * *) *)
-  "fold identity operation"
-  'integer)
-
-(deftransform %rotate-byte ((count size pos integer)
                             ((integer -31 31)
                              (constant-arg (member 32))
                              (constant-arg (member 0))
                              (unsigned-byte 32)) *)
   "inline 32-bit rotation"
-  ;; FIXME: What happens when, as here, the two type specifiers for
-  ;; COUNT overlap?  Which gets to run first?
   '(%unsigned-32-rotate-byte count integer))
 
 ;; Generic implementation for platforms that don't supply VOPs for 32-bit
 ;; rotate.
-#-(or x86 ppc)
+#-(or x86 x86-64 ppc)
 (deftransform %unsigned-32-rotate-byte ((.count. .integer.)
                                         ((integer -31 31)
                                          (unsigned-byte 32)) *)
@@ -68,3 +65,20 @@
                (ash .integer. .count.))
        (logior (ldb (byte 32 0) (ash .integer. .count.))
                (ash .integer. (- .count. 32)))))
+
+#+x86-64
+(deftransform %rotate-byte ((count size pos integer)
+                            ((integer -63 63)
+                             (constant-arg (member 64))
+                             (constant-arg (member 0))
+                             (unsigned-byte 64)) *)
+  "inline 64-bit rotation"
+  '(%unsigned-64-rotate-byte count integer))
+
+;;; This transform needs to come after the others to ensure it gets
+;;; first crack at a zero COUNT, since transforms are currently run
+;;; latest-defined first.
+(deftransform %rotate-byte ((count size pos integer)
+                            ((constant-arg (member 0)) * * *) *)
+  "fold identity operation"
+  'integer)

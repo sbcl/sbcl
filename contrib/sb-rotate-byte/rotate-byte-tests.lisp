@@ -1,5 +1,8 @@
 (in-package "SB-ROTATE-BYTE")
 
+;;; Ensure we don't bug out with an identity rotation.
+(assert (= (rotate-byte 0 (byte 32 0) 3) 3))
+
 (assert (= (rotate-byte 3 (byte 32 0) 3) 24))
 (assert (= (rotate-byte 3 (byte 16 0) 3) 24))
 (assert (= (rotate-byte 3 (byte 2 0) 3) 3))
@@ -65,3 +68,22 @@
 (assert (= (ub32-reg-pressure 5 5) 10880))
 (assert (= (ub32-reg-pressure 5 (ash 1 26)) 2147494368))
 (assert (= (ub32-reg-pressure 5 (ash 1 27)) 10721))
+
+(defun ub64/c (integer)
+  (declare (type (unsigned-byte 64) integer))
+  (rotate-byte 6 (byte 64 0) integer))
+
+(assert (= (ub64/c 5) 320))
+(assert (= (ub64/c 1) 64))
+(assert (= (ub64/c (ash 1 57)) (ash 1 63)))
+(assert (= (ub64/c (ash 1 58)) 1))
+
+(defun ub64 (count integer)
+  (declare (type (unsigned-byte 64) integer)
+           (type (integer -63 63) count))
+  (rotate-byte count (byte 64 0) integer))
+
+(assert (= (ub64 6 5) 320))
+(assert (= (ub64 6 1) 64))
+(assert (= (ub64 6 (ash 1 57)) (ash 1 63)))
+(assert (= (ub64 6 (ash 1 58)) 1))

@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.34:
+  * optimization: SB-ROTATE-BYTE:ROTATE-BYTE now generates more efficient
+    code for 32-bit and 64-bit rotations on x86-64.
+  * bug fix: Passing a rotation count of zero to SB-ROTATE-BYTE:ROTATE-BYTE
+    no longer causes a compiler error on x86 and ppc.
   * bug fix: GET-MACRO-CHARACTER bogusly computed its second return value
     always relative to *READTABLE* rather than the passed argument.
 
