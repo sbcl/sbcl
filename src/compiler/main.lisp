@@ -1624,10 +1624,11 @@
       ;; the input file.
       (fatal-compiler-error (condition)
        (signal condition)
+       (fresh-line *error-output*)
        (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
          (format *error-output*
-                 "~@<compilation aborted because of fatal error: ~2I~_~A~:>"
-                 condition))
+                 "~@<~@:_compilation aborted because of fatal error: ~2I~_~A~@:_~:>"
+                 (encapsulated-condition condition)))
        (finish-output *error-output*)
        (values t t t)))))
 
