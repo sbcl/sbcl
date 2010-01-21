@@ -514,7 +514,9 @@
 
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
-  (let ((lisp-name (lisp-for-c-symbol name)))
+  (let ((lisp-name (lisp-for-c-symbol name))
+        (real-name #+inode64 (format nil "~A$INODE64" name)
+                   #-inode64 name))
     `(progn
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))
@@ -522,7 +524,7 @@
         (declare (type (or null stat) stat))
         (with-alien-stat a-stat ()
           (let ((r (alien-funcall
-                    (extern-alien ,(real-c-name (list name :options :largefile)) ,type)
+                    (extern-alien ,(real-c-name (list real-name :options :largefile)) ,type)
                     (,designator-fun ,arg)
                     a-stat)))
             (when (minusp r)

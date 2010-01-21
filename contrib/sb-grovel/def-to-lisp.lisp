@@ -205,10 +205,16 @@ code:
                       '("-D_LARGEFILE_SOURCE"
                         "-D_LARGEFILE64_SOURCE"
                         "-D_FILE_OFFSET_BITS=64")
-                      #+(and x86-64 darwin)
-                      '("-arch" "x86_64")
+                      #+(and x86-64 darwin inode64)
+                      '("-arch" "x86_64"
+                        "-mmacosx-version-min=10.5"
+                        "-D_DARWIN_USE_64_BIT_INODE")
+                      #+(and x86-64 darwin (not inode64))
+                      '("-arch" "x86_64"
+                        "-mmacosx-version-min=10.4")
                       #+(and x86 darwin)
-                      '("-arch" "i386")
+                      '("-arch" "i386"
+                        "-mmacosx-version-min=10.4")
                       #+(and x86-64 sunos) '("-m64")
                       (list "-o"
                             (namestring tmp-a-dot-out)
