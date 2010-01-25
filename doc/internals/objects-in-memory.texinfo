@@ -1,0 +1,270 @@
+@node Objects In Memory
+@comment  node-name,  next,  previous,  up
+@chapter Objects In Memory
+
+@menu
+* Type tags::                   
+* Heap Object Layout::          
+@end menu
+
+@node Type tags
+@section Type tags
+
+The in-memory representation of Lisp data includes type information
+about each object.  This type information takes the form of a lowtag
+in the low bits of each pointer to heap space, a widetag for each
+boxed immediate value and a header (also with a widetag) at the start
+of the allocated space for each object.  These tags are used to inform
+both the GC and Lisp code about the type and allocated size of Lisp
+objects.
+
+@c FIXME: Add diagrams showing tag allocation to next two sections.
+
+@subsection Lowtags
+
+Objects allocated on the Lisp heap are aligned to a double-word
+boundary, leaving the low-order bits (which would normally identify a
+particular octet within the first two words) available for use to hold
+type information.  This turns out to be three bits on 32-bit systems
+and four bits on 64-bit systems.
+
+Of these 8 or 16 tags, we have some constraints for allocation:
+
+@itemize
+@item
+We need 6 of the low 8 bits of the word for widetags, meaning that one
+out of every four lowtags must be an @code{other-immediate} lowtag.
+@item
+We have four pointer types.  Instance (struct and CLOS) pointers,
+function pointers, list pointers, and other pointers.
+@item
+@code{fixnum}s are required to have their lowtags be comprised
+entirely of zeros.
+@item
+There are additional constraints around the ordering of the pointer
+types, particularly with respect to list pointers (the NIL-cons hack).
+@end itemize
+
+Complicating this issue is that while the lowtag @emph{space} is three
+or four bits wide, some of the lowtags are effectively narrower.  The
+@code{other-immediate} tags effectively have a two-bit lowtag, and
+@code{fixnum}s have historically been one bit narrower than the other
+lowtags (thus @code{even-fixnum-lowtag} and @code{odd-fixnum-lowtag})
+though with the recent work on wider fixnums on 64-bit systems this is
+no longer necessarily so.
+
+The lowtags are specified in
+@file{src/compiler/generic/early-objdef.lisp}.
+
+@c 32-bit lowtag assignment
+@c x00 -- Fixnum
+@c x10 -- Other-immediate
+@c xx1 -- Pointer
+@c 001 --   Instance-pointer
+@c 011 --   List-pointer
+@c 101 --   Function-pointer
+@c 111 --   Other-pointer
+
+@c 32-bit lowtag assignment (proposed wider-fixnum branch)
+@c xxx0 -- Fixnum
+@c xx01 -- Other-immediate
+@c xx11 -- Pointer
+@c x011 --   List-pointer
+@c 0111 --   (Either instance or function pointer)
+@c 1111 --   Other-pointer
+
+@c 64-bit lowtag assignment (pre-wider-fixnums)
+@c x000 -- Fixnum
+@c xx10 -- Other-immediate
+@c xyyy -- Unused (where 011 <= yyy <= 110)
+@c xyy1 -- Pointer (where yy is either 00 or 11)
+@c 0001 --   Instance-pointer
+@c 0111 --   List-pointer
+@c 1001 --   Function-pointer
+@c 1111 --   Other-pointer
+
+@c 64-bit lowtag assignment (wider-fixnums)
+@c xyz0 -- Fixnum (where z or yz may also be 0 depending on n-fixnum-tag-bits)
+@c xx01 -- Other-immediate
+@c xx11 -- Pointer
+@c 0011 --   Instance-pointer
+@c 0111 --   List-pointer
+@c 1011 --   Function-pointer
+@c 1111 --   Other-pointer
+
+@subsubsection Fixnums
+
+@code{Fixnum}s are signed integers represented as immediate values.
+In SBCL, these integers are @code{(- n-word-bits n-fixnum-tag-bits)}
+bits wide, stored in the most-significant section of a machine word.
+
+The reason that @code{fixnum} tags are required to have the low
+@code{n-fixnum-tag-bits} as zeros is that it allows for addition and
+subtraction to be performed using native machine instructions
+directly, and multiplication and division can be performed likewise
+using a simple shift instruction to compensate for the effect of the
+tag.
+
+@subsubsection Other-immediates
+
+@code{Other-immediate}s are the lowtag part of widetag values.  Due to
+the constraints of widetag allocation, one out of every four lowtags
+must be a widetag (alternately, the width of the
+@code{other-immediate} lowtag is two bits).
+
+@subsubsection Pointers
+
+There are four different pointer lowtags, largely for optimization
+purposes.
+
+@itemize
+@item
+We have a distinct list pointer tag so that we can do a listp test by
+simply checking the pointer tag instead of needing to retrieve a
+header word for each @code{cons} cell.  This effectively halves the
+memory cost of @code{cons} cells.
+@item
+We have a distinct instance pointer tag so that we do not need to
+check a header word for each instance when doing a type check.  This
+saves a memory access for retrieving the class of an instance.
+@item
+We have a distinct function pointer tag so that we do not need to
+check a header word to determine if a given pointer is directly
+funcallable (that is, if the pointer is to a closure, a simple-fun, or
+a funcallable-instance).  This saves a memory access in the type test
+prior to @code{funcall} or @code{apply} of a function object.
+@item
+We have one last pointer tag for everything else.  Obtaining further
+type information from these pointers requires fetching the header word
+and dispatching on the widetag.
+@end itemize
+
+@subsection Widetags
+
+Widetags are used for three purposes.  First, to provide type
+information for immediate (non-pointer) data such as characters.
+Second, to provide ``marker'' values for things such as unbound slots.
+Third, to provide type information for objects stored on the heap.
+
+Because widetags are used for immediate data they must have a lowtag
+component.  This ends up being the @code{other-immediate} lowtags.
+For various reasons it was deemed convenient for widetags to be no
+more than eight bits wide, and with 27 or more distinct array types
+(depending on build-time configuration), seven numeric types, markers,
+and non-numeric heap object headers there ends up being more than 32
+widetags required (though less than 64).  This combination of factors
+leads to the requirement that one out of every four lowtags be an
+@code{other-immediate} lowtag.
+
+As widetags are involved in type tests for non-CLOS objects, their
+allocation is carefully arranged to allow for certain type tests to be
+cheaper than they might otherwise be.
+
+@itemize
+@item
+The numeric types are arranged to make @code{rational}, @code{float},
+@code{real}, @code{complex} and @code{number} type tests become range
+tests on the widetag.
+@item
+The array types are arranged to make various type tests become range
+tests on the widetag.
+@item
+The string types have disjoint ranges, but have been arranged so that
+their ranges differ only by one bit, allowing the @code{stringp} type
+test to become a masking operation followed by a range test or a
+masking operation followed by a simple comparison.
+@item
+There may be other clevernesses, these are just what can be found
+through reading the comments above the widetag definition.
+@end itemize
+
+The widetags are specified in
+@file{src/compiler/generic/early-objdef.lisp}.
+
+@node Heap Object Layout
+@section Heap Object Layout
+
+Objects stored in the heap are of two kinds: those with headers, and
+cons cells.  If the first word of an object has a header widetag then
+the object has the type and layout associated with that widetag.
+Otherwise, the object is assumed to be a @code{cons} cell.
+
+Some objects have ``unboxed'' words without any associated type
+information as well as the more usual ``boxed'' words with lowtags.
+Obvious cases include the specialized array types, some of the numeric
+types, @code{system-area-pointer}s, and so on.
+
+The primitive object layouts are specified in
+@file{src/compiler/generic/objdef.lisp}.
+
+@subsection Header Values
+
+As a widetag is only eight bits wide but a heap object header takes a
+full machine word, there is an extra 24 or 56 bits of space available
+for unboxed data storage in each heap object.  This space is called
+the ``header value'', and is used for various purposes depending on
+the type of heap object in question.
+
+@subsection Symbols
+
+In contrast to the simple model of symbols provided in the Common Lisp
+standard, symbol objects in SBCL do not have a function cell.
+Instead, the mapping from symbols to functions is done via the
+compiler globaldb.
+
+There are two additional slots associated with symbols.  One is a hash
+value for the symbol (based on the symbol name), which avoids having
+to recompute the hash from the name every time it is required.
+
+The other additional slot, on threaded systems only, is the TLS index,
+which is either @code{no-tls-value-marker-widetag} or an unboxed byte
+offset within the TLS area to the TLS slot associated with the symbol.
+Because the unboxed offset is aligned to a word boundary it appears as
+a @code{fixnum} when viewed as boxed data.  It is not, in general,
+safe to increment this value as a @code{fixnum}, however, in case
+@code{n-fixnum-tag-bits} changes@footnote{This is not as unlikely as
+it might seem at first; while historically @code{n-fixnum-tag-bits}
+has always been the same as @code{word-shift} there is a branch where
+it is permitted to vary at build time from @code{word-shift} to as low
+as 1 on 64-bit ports, and a proposed scheme to allow the same on
+32-bit ports}.
+
+@subsection The NIL-cons Hack
+
+As an ``optimization'', the symbol @code{nil} has
+@code{list-pointer-lowtag} rather than @code{other-pointer-lowtag},
+and is aligned in memory so that the value and hash slots are the
+@code{car} and @code{cdr} of the @code{cons}, with both slots
+containing @code{nil}.  This allows for @code{car} and @code{cdr} to
+simply do a lowtag test and slot access instead of having to
+explicitly test for @code{nil}, at the cost of requiring all symbol
+type tests and slot accesses to test for @code{nil}.
+
+@subsection Functions and Code Components
+
+@c This could do with a diagram showing a code-component with a couple
+@c of simple-fun entry points.
+
+All compiled code resides in @code{code-component} objects.  These
+objects consist of a header, some number of boxed literal values, a
+``data block'' containing machine code and @code{simple-fun} headers,
+and a ``trace table'' which is currently unused@footnote{Trace tables
+were originally used to support garbage collection using gengc in
+CMUCL.  As there is still vestigial support for carrying them around
+at the end of @code{code-component}s, they may end up being used for
+something else in the future.}.
+
+The @code{simple-fun} headers represent simple function objects (not
+@code{funcallable-instance}s or closures), and each
+@code{code-component} will typically have one for the main entry point
+and one per closure entry point (as the function underlying the
+closure, not the closure object proper).  In a compiler trace-file,
+the @code{simple-fun} headers are all listed as entries in the IR2
+component.
+
+The @code{simple-fun} headers are held in a linked list per
+@code{code-component} in order to allow the garbage collector to find
+them during relocation.  In order to be able to find the start of a
+@code{code-component} from a @code{simple-fun}, the header value is
+the offset in words from the start of the @code{code-component} to the
+start of the @code{simple-fun}.
