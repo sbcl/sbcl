@@ -3253,14 +3253,27 @@
                            (truncate x))))
         (d (compile nil `(lambda (x)
                            (declare (double-float x))
-                           (truncate x)))))
+                           (truncate x))))
+        (s-inlined (compile nil '(lambda (x)
+                                  (declare (type (single-float 0.0s0 1.0s0) x))
+                                  (truncate x))))
+        (d-inlined (compile nil '(lambda (x)
+                                  (declare (type (double-float 0.0d0 1.0d0) x))
+                                  (truncate x)))))
     ;; Check that there is no generic arithmetic
     (assert (not (search "GENERIC"
                          (with-output-to-string (out)
                            (disassemble s :stream out)))))
     (assert (not (search "GENERIC"
                          (with-output-to-string (out)
-                           (disassemble d :stream out)))))))
+                           (disassemble d :stream out)))))
+    ;; Check that we actually inlined the call when we were supposed to.
+    (assert (not (search "UNARY-TRUNCATE"
+                         (with-output-to-string (out)
+                           (disassemble s-inlined :stream out)))))
+    (assert (not (search "UNARY-TRUNCATE"
+                         (with-output-to-string (out)
+                           (disassemble d-inlined :stream out)))))))
 
 (with-test (:name :make-array-unnamed-dimension-leaf)
   (let ((fun (compile nil `(lambda (stuff)

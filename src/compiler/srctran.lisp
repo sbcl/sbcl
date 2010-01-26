@@ -1789,6 +1789,16 @@
                        #'%unary-truncate-derive-type-aux
                        #'%unary-truncate))
 
+(defoptimizer (%unary-truncate/single-float derive-type) ((number))
+  (one-arg-derive-type number
+                       #'%unary-truncate-derive-type-aux
+                       #'%unary-truncate))
+
+(defoptimizer (%unary-truncate/double-float derive-type) ((number))
+  (one-arg-derive-type number
+                       #'%unary-truncate-derive-type-aux
+                       #'%unary-truncate))
+
 (defoptimizer (%unary-ftruncate derive-type) ((number))
   (let ((divisor (specifier-type '(integer 1 1))))
     (one-arg-derive-type number
