@@ -1806,6 +1806,24 @@
                              (ftruncate-derive-type-quot-aux n divisor nil))
                          #'%unary-ftruncate)))
 
+(defoptimizer (%unary-round derive-type) ((number))
+  (one-arg-derive-type number
+                       (lambda (n)
+                         (block nil
+                           (unless (numeric-type-real-p n)
+                             (return *empty-type*))
+                           (let* ((interval (numeric-type->interval n))
+                                  (low      (interval-low interval))
+                                  (high     (interval-high interval)))
+                             (specifier-type
+                              `(integer ,(if low
+                                             (round low)
+                                             '*)
+                                        ,(if high
+                                             (round high)
+                                             '*))))))
+                       #'%unary-round))
+
 ;;; Define optimizers for FLOOR and CEILING.
 (macrolet
     ((def (name q-name r-name)
