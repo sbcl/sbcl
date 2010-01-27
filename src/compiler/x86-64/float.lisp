@@ -1039,8 +1039,7 @@
 
 (macrolet ((frob (name translate inst to-sc to-type)
              `(define-vop (,name)
-                (:args (x :scs (signed-stack signed-reg) :target temp))
-                (:temporary (:sc signed-stack) temp)
+                (:args (x :scs (signed-stack signed-reg)))
                 (:results (y :scs (,to-sc)))
                 (:arg-types signed-num)
                 (:result-types ,to-type)
@@ -1050,20 +1049,14 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 5
-                  (sc-case x
-                    (signed-reg
-                     (inst mov temp x)
-                     (note-this-location vop :internal-error)
-                     (inst ,inst y temp))
-                    (signed-stack
-                     (note-this-location vop :internal-error)
-                     (inst ,inst y x)))))))
+                  (note-this-location vop :internal-error)
+                  (inst ,inst y x)))))
   (frob %single-float/signed %single-float cvtsi2ss single-reg single-float)
   (frob %double-float/signed %double-float cvtsi2sd double-reg double-float))
 
-(macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
+(macrolet ((frob (name translate inst from-scs from-type ea-func to-sc to-type)
              `(define-vop (,name)
-               (:args (x :scs (,from-sc) :target y))
+               (:args (x :scs ,from-scs :target y))
                (:results (y :scs (,to-sc)))
                (:arg-types ,from-type)
                (:result-types ,to-type)
@@ -1074,18 +1067,20 @@
                (:save-p :compute-only)
                (:generator 2
                 (note-this-location vop :internal-error)
-                (inst ,inst y x)))))
-  (frob %single-float/double-float %single-float cvtsd2ss double-reg
-        double-float single-reg single-float)
+                (inst ,inst y (sc-case x
+                                (,(first from-scs) x)
+                                (,(second from-scs) (,ea-func x))))))))
+  (frob %single-float/double-float %single-float cvtsd2ss
+        (double-reg double-stack) double-float ea-for-df-stack
+        single-reg single-float)
 
   (frob %double-float/single-float %double-float cvtss2sd
-        single-reg single-float double-reg double-float))
+        (single-reg single-stack) single-float ea-for-sf-stack
+        double-reg double-float))
 
-(macrolet ((frob (trans inst from-sc from-type round-p)
-             (declare (ignore round-p))
+(macrolet ((frob (trans inst from-scs from-type ea-func)
              `(define-vop (,(symbolicate trans "/" from-type))
-               (:args (x :scs (,from-sc)))
-               (:temporary (:sc any-reg) temp-reg)
+               (:args (x :scs ,from-scs))
                (:results (y :scs (signed-reg)))
                (:arg-types ,from-type)
                (:result-types signed-num)
@@ -1095,18 +1090,18 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 5
-                 (sc-case y
-                          (signed-stack
-                           (inst ,inst temp-reg x)
-                           (move y temp-reg))
-                          (signed-reg
-                           (inst ,inst y x)
-                           ))))))
-  (frob %unary-truncate/single-float cvttss2si single-reg single-float nil)
-  (frob %unary-truncate/double-float cvttsd2si double-reg double-float nil)
+                 (inst ,inst y (sc-case x
+                                 (,(first from-scs) x)
+                                 (,(second from-scs) (,ea-func x))))))))
+  (frob %unary-truncate/single-float cvttss2si
+        (single-reg single-stack) single-float ea-for-sf-stack)
+  (frob %unary-truncate/double-float cvttsd2si
+        (double-reg double-stack) double-float ea-for-df-stack)
 
-  (frob %unary-round cvtss2si single-reg single-float t)
-  (frob %unary-round cvtsd2si double-reg double-float t))
+  (frob %unary-round cvtss2si
+        (single-reg single-stack) single-float ea-for-sf-stack)
+  (frob %unary-round cvtsd2si
+        (double-reg double-stack) double-float ea-for-df-stack))
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res

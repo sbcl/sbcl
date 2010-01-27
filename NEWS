@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.34:
+  * optimization: Slightly better code is generated for integer<->float
+    conversions and for single-float<->double-float conversions on x86-64.
   * optimization: SB-ROTATE-BYTE:ROTATE-BYTE now generates more efficient
     code for 32-bit and 64-bit rotations on x86-64.
   * bug fix: TRUNCATE with a single single-float or double-float argument is
