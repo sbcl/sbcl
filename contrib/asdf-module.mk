@@ -35,4 +35,4 @@ test: all
 # preserve owner, so chown after installing for the current user.
 install: $(EXTRA_INSTALL_TARGETS)
 	tar cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar xpvf - )
-	find "$(BUILD_ROOT)$(INSTALL_DIR)" -type f -exec chown `id -u`:`id -g` {} \;
+	find "$(BUILD_ROOT)$(INSTALL_DIR)" -exec chown `id -u`:`id -g` {} \;

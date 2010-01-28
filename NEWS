@@ -6,6 +6,9 @@ changes relative to sbcl-1.0.34:
     conversions and for single-float<->double-float conversions on x86-64.
   * optimization: SB-ROTATE-BYTE:ROTATE-BYTE now generates more efficient
     code for 32-bit and 64-bit rotations on x86-64.
+  * bug fix: The install script changes the ownership of directories as well
+    as files for contrib modules using asdf.  (thanks to Eugene Ossintsev;
+    launchpad bug lp#508485)
   * bug fix: TRUNCATE with a single single-float or double-float argument is
     properly inlined when possible.  (launchpad bug lp#489388)
   * bug fix: Passing a rotation count of zero to SB-ROTATE-BYTE:ROTATE-BYTE
