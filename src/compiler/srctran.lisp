@@ -1815,6 +1815,10 @@
                            (let* ((interval (numeric-type->interval n))
                                   (low      (interval-low interval))
                                   (high     (interval-high interval)))
+                             (when (consp low)
+                               (setf low (car low)))
+                             (when (consp high)
+                               (setf high (car high)))
                              (specifier-type
                               `(integer ,(if low
                                              (round low)
