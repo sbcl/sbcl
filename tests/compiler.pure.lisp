@@ -3396,3 +3396,10 @@
       (:no-error (&rest values)
         (declare (ignore values))
         (error "no error")))))
+
+(with-test (:name :unary-round-type-derivation)
+  (let* ((src '(lambda (zone)
+                (multiple-value-bind (h m) (truncate (abs zone) 1.0)
+                  (round (* 60.0 m)))))
+         (fun (compile nil src)))
+    (assert (= (funcall fun 0.5) 30))))
