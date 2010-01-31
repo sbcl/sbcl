@@ -574,7 +574,7 @@ time we reacquire MUTEX and return to the caller."
                         (allow-with-interrupts
                           (futex-wait (waitqueue-data-address queue)
                                       (get-lisp-obj-address me)
-                                      ;; our way if saying "no
+                                      ;; our way of saying "no
                                       ;; timeout":
                                       (or to-sec -1)
                                       (or to-usec 0))))
@@ -584,8 +584,10 @@ time we reacquire MUTEX and return to the caller."
                    ;; them before entering the debugger, but this is
                    ;; better than nothing.
                    (allow-with-interrupts (get-mutex mutex)))
-             ;; ETIMEDOUT
-             ((1) (signal-deadline))
+             ;; ETIMEDOUT; we know it was a timeout, yet we cannot
+             ;; signal a deadline unconditionally here because the
+             ;; call to GET-MUTEX may already have signaled it.
+             ((1))
              ;; EINTR
              ((2))
              ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup

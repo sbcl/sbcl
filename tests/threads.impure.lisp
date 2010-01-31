@@ -936,6 +936,37 @@
 
 (format t "waitqueue wakeup tests done~%")
 
+;;; Make sure that a deadline handler is not invoked twice in a row in
+;;; CONDITION-WAIT. See LP #512914 for a detailed explanation.
+;;;
+#-sb-lutex    ; See KLUDGE above: no deadlines for condition-wait+lutexes.
+(with-test (:name (:condition-wait :deadlines :LP-512914))
+  (let ((n 2) ; was empirically enough to trigger the bug
+        (mutex (sb-thread:make-mutex))
+        (waitq (sb-thread:make-waitqueue))
+        (threads nil)
+        (deadline-handler-run-twice? nil))
+    (dotimes (i n)
+      (let ((child
+             (sb-thread:make-thread
+              #'(lambda ()
+                  (handler-bind
+                      ((sb-sys:deadline-timeout
+                        (let ((already? nil))
+                          #'(lambda (c)
+                              (when already?
+                                (setq deadline-handler-run-twice? t))
+                              (setq already? t)
+                              (sleep 0.2)
+                              (sb-thread:condition-broadcast waitq)
+                              (sb-sys:defer-deadline 10.0 c)))))
+                    (sb-sys:with-deadline (:seconds 0.1)
+                      (sb-thread:with-mutex (mutex)
+                        (sb-thread:condition-wait waitq mutex))))))))
+        (push child threads)))
+    (mapc #'sb-thread:join-thread threads)
+    (assert (not deadline-handler-run-twice?))))
+
 (with-test (:name (:mutex :finalization))
   (let ((a nil))
     (dotimes (i 500000)

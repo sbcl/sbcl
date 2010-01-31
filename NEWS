@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.35:
+  * bug fix: SB-THREAD:CONDITION-WAIT sometimes signaled a deadline twice
+    in a row even though a handler defered it long into the future.
+
 changes in sbcl-1.0.35 relative to sbcl-1.0.34:
   * optimization: ROUND with a single single-float or double-float argument
     is properly inlined when possible.
