@@ -556,7 +556,8 @@ time we reacquire MUTEX and return to the caller."
         ;; continuing after a deadline or EINTR.
         (setf (waitqueue-data queue) me)
         (loop
-         (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+         (multiple-value-bind (to-sec to-usec)
+             (allow-with-interrupts (decode-timeout nil))
            (case (unwind-protect
                       (with-pinned-objects (queue me)
                         ;; RELEASE-MUTEX is purposefully as close to
