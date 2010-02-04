@@ -880,7 +880,7 @@ around and can be retrieved by JOIN-THREAD."
          (setup-sem (make-semaphore :name "Thread setup semaphore"))
          (real-function (coerce function 'function))
          (initial-function
-          (lambda ()
+          (named-lambda initial-thread-function ()
             ;; In time we'll move some of the binding presently done in C
             ;; here too.
             ;;
