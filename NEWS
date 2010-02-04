@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.35:
+  * bug fix: fix compilation on chenygc platforms. Thanks to Larry Valkama and
+    Bruce O'Neel.
   * bug fix: SB-THREAD:CONDITION-WAIT sometimes signaled a deadline twice 
     in a row even though a handler defered the deadline long into the
     future. (lp#512914)
