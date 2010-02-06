@@ -119,8 +119,18 @@ void align_context_stack(x86_thread_state64_t *context)
  * the old ESP value and other register state when activated.  The
  * first part of this is the recovery trampoline, which loads ESP from
  * EBP, pops EBP, and returns. */
-asm(".globl _stack_allocation_recover; .align 4; _stack_allocation_recover: mov %rbp, %rsp; pop %rsi; pop %rdi; pop \
-%rdx; pop %rcx; pop %r8; pop %r9; pop %rbp; ret;");
+asm(".globl _stack_allocation_recover; \
+    .align 4; \
+ _stack_allocation_recover: \
+    lea -48(%rbp), %rsp; \
+    pop %rsi; \
+    pop %rdi; \
+    pop %rdx; \
+    pop %rcx; \
+    pop %r8; \
+    pop %r9; \
+    pop %rbp; \
+    ret;");
 
 void open_stack_allocation(x86_thread_state64_t *context)
 {
@@ -128,6 +138,7 @@ void open_stack_allocation(x86_thread_state64_t *context)
 
     push_context(context->rip, context);
     push_context(context->rbp, context);
+    context->rbp = context->rsp;
 
     push_context(context->r9, context);
     push_context(context->r8, context);
@@ -136,7 +147,6 @@ void open_stack_allocation(x86_thread_state64_t *context)
     push_context(context->rsi, context);
     push_context(context->rdi, context);
 
-    context->rbp = context->rsp;
     context->rip = (u64) stack_allocation_recover;
 
     align_context_stack(context);

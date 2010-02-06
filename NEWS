@@ -8,6 +8,8 @@ changes relative to sbcl-1.0.35:
   * bug fix: a deadline handler was run without interrupts enabled for a
     deadline signaled within SB-THREAD:CONDITION-WAIT. That could result
     in infinitely spinning, non-killable threads.
+  * bug fix: backtrace from internal-errors on x86-64 os x was truncated
+    before reaching the erring stack frame.
 
 changes in sbcl-1.0.35 relative to sbcl-1.0.34:
   * optimization: ROUND with a single single-float or double-float argument
