@@ -329,7 +329,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
     $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
-    printf ' :gencgc :stack-allocatable-closures :stacka-allocatable-lists' >> $ltf
+    printf ' :gencgc :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :linkage-table' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
