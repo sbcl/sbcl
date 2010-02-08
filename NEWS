@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.35:
+  * bug fix: Fix grammer and style issues for the docstrings of
+    printer-related variables and functions.  (Thanks to mon_key; launchpad
+    bug lp#518696)
   * bug fix: fix compilation on chenygc platforms. Thanks to Larry Valkama and
     Bruce O'Neel.
   * bug fix: SB-THREAD:CONDITION-WAIT sometimes signaled a deadline twice 

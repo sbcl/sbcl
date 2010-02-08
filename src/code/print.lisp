@@ -18,8 +18,8 @@
 
 (defvar *print-readably* nil
   #!+sb-doc
-  "If true, all objects will printed readably. If readable printing is
-  impossible, an error will be signalled. This overrides the value of
+  "If true, all objects will be printed readably. If readable printing
+  is impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
 (defvar *print-escape* t
   #!+sb-doc
@@ -30,7 +30,7 @@
   "Should pretty printing be used?")
 (defvar *print-base* 10.
   #!+sb-doc
-  "the output base for RATIONALs (including integers)")
+  "The output base for RATIONALs (including integers).")
 (defvar *print-radix* nil
   #!+sb-doc
   "Should base be verified when printing RATIONALs?")
@@ -56,10 +56,10 @@
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
 (defvar *print-lines* nil
   #!+sb-doc
-  "the maximum number of lines to print per object")
+  "The maximum number of lines to print per object.")
 (defvar *print-right-margin* nil
   #!+sb-doc
-  "the position of the right margin in ems (for pretty-printing)")
+  "The position of the right margin in ems (for pretty-printing).")
 (defvar *print-miser-width* nil
   #!+sb-doc
   "If the remaining space between the current column and the right margin
@@ -69,7 +69,7 @@
 (defvar *print-pprint-dispatch*)
 #!+sb-doc
 (setf (fdocumentation '*print-pprint-dispatch* 'variable)
-      "the pprint-dispatch-table that controls how to pretty-print objects")
+      "The pprint-dispatch-table that controls how to pretty-print objects.")
 
 (defmacro with-standard-io-syntax (&body body)
   #!+sb-doc
@@ -167,7 +167,7 @@
                      ((:pprint-dispatch *print-pprint-dispatch*)
                       *print-pprint-dispatch*))
   #!+sb-doc
-  "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*"
+  "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
   (output-object object (out-synonym-of stream))
   object)
 
