@@ -584,10 +584,12 @@
                     (index (or start 0) (1+ index))
                     (end (or end (* (length vector) (vector-elt-width vector))))
                     (endian-swap (endian-swap-value vector endian-swap))
-                    (byte (read-byte-internal encap nil nil t)
-                          (read-byte-internal encap nil nil nil)))
-                   ((or (null byte) (>= index end)) index)
-                (setf (bref vector (logxor index endian-swap)) byte))))))
+                    (flag t nil))
+                   ((>= index end) index)
+                (let ((byte (read-byte-internal encap nil nil flag)))
+                  (unless byte
+                    (return index))
+                  (setf (bref vector (logxor index endian-swap)) byte)))))))
     ((or ansi-stream fundamental-stream)
      (unless (typep vector '(or string
                              (simple-array (signed-byte 8) (*))

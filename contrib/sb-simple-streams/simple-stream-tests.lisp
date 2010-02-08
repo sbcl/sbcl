@@ -930,3 +930,22 @@ Nothing to see here, move along.")
                        :external-format :utf-8)
         (char-code (read-char s))))
   196)
+
+;; launchpad bug #491087
+
+(deftest lp491087
+    (labels ((read-big-int (stream)
+               (let ((b (make-array 1 :element-type '(signed-byte 32)
+                                    :initial-element 0)))
+                 (declare (dynamic-extent b))
+                 (sb-simple-streams::read-vector b stream
+                                                 :endian-swap :network-order)
+                 (aref b 0))))
+      (with-open-file (stream "lp491087.txt" :class 'file-simple-stream)
+        (let* ((start (file-position stream))
+               (integer (read-big-int stream))
+               (end (file-position stream)))
+          (and (= start 0)
+               (= integer #x30313233)
+               (= end 4)))))
+  T)

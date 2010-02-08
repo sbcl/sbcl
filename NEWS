@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.35:
+  * bug fix: Fix SB-SIMPLE-STREAMS:READ-VECTOR to correctly set the
+    FILE-POSITION of the stream being read from.  (launchpad bug lp#491087)
   * bug fix: Fix grammer and style issues for the docstrings of
     printer-related variables and functions.  (Thanks to mon_key; launchpad
     bug lp#518696)
