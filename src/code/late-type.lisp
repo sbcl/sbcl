@@ -358,11 +358,44 @@
     (result)))
 
 (!def-type-translator function (&optional (args '*) (result '*))
-  (make-fun-type :args args
-                 :returns (coerce-to-values (values-specifier-type result))))
+  (let ((result (coerce-to-values (values-specifier-type result))))
+    (if (eq args '*)
+        (if (eq result *wild-type*)
+            (specifier-type 'function)
+            (make-fun-type :wild-args t :returns result))
+        (multiple-value-bind (required optional rest keyp keywords allowp)
+            (parse-args-types args)
+          (if (and (null required)
+                   (null optional)
+                   (eq rest *universal-type*)
+                   (not keyp))
+              (if (eq result *wild-type*)
+                  (specifier-type 'function)
+                  (make-fun-type :wild-args t :returns result))
+              (make-fun-type :required required
+                             :optional optional
+                             :rest rest
+                             :keyp keyp
+                             :keywords keywords
+                             :allowp allowp
+                             :returns result))))))
 
 (!def-type-translator values (&rest values)
-  (make-values-type :args values))
+  (if (eq values '*)
+      *wild-type*
+      (multiple-value-bind (required optional rest keyp keywords allowp llk-p)
+          (parse-args-types values)
+        (declare (ignore keywords))
+        (cond (keyp
+               (error "&KEY appeared in a VALUES type specifier ~S."
+                      `(values ,@values)))
+              (llk-p
+               (make-values-type :required required
+                                 :optional optional
+                                 :rest rest
+                                 :allowp allowp))
+              (t
+               (make-short-values-type required))))))
 
 ;;;; VALUES types interfaces
 ;;;;

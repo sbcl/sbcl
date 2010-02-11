@@ -81,7 +81,7 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
-(defun args-types (lambda-list-like-thing)
+(defun parse-args-types (lambda-list-like-thing)
   (multiple-value-bind
         (required optional restp rest keyp keys allowp auxp aux
                   morep more-context more-count llk-p)
@@ -136,34 +136,17 @@
                      :rest rest
                      :allowp allowp))
 
-(defun make-values-type (&key (args nil argsp)
-                         required optional rest allowp)
-  (if argsp
-      (if (eq args '*)
-          *wild-type*
-          (multiple-value-bind (required optional rest keyp keywords allowp
-                                llk-p)
-              (args-types args)
-            (declare (ignore keywords))
-            (when keyp
-              (error "&KEY appeared in a VALUES type specifier ~S."
-                     `(values ,@args)))
-            (if llk-p
-                (make-values-type :required required
-                                  :optional optional
-                                  :rest rest
-                                  :allowp allowp)
-                (make-short-values-type required))))
-      (multiple-value-bind (required optional rest)
-          (canonicalize-args-type-args required optional rest)
-        (cond ((and (null required)
-                    (null optional)
-                    (eq rest *universal-type*))
-               *wild-type*)
-              ((memq *empty-type* required)
-               *empty-type*)
-              (t (make-values-type-cached required optional
-                                          rest allowp))))))
+(defun make-values-type (&key required optional rest allowp)
+  (multiple-value-bind (required optional rest)
+      (canonicalize-args-type-args required optional rest)
+    (cond ((and (null required)
+                (null optional)
+                (eq rest *universal-type*))
+           *wild-type*)
+          ((memq *empty-type* required)
+           *empty-type*)
+          (t (make-values-type-cached required optional
+                                      rest allowp)))))
 
 (!define-type-class values)
 
@@ -171,44 +154,18 @@
 (defstruct (fun-type (:include args-type
                                (class-info (type-class-or-lose 'function)))
                      (:constructor
-                      %make-fun-type (&key required optional rest
-                                           keyp keywords allowp
-                                           wild-args
-                                           returns
-                                      &aux (rest (if (eq rest *empty-type*)
-                                                     nil
-                                                     rest)))))
+                      make-fun-type (&key required optional rest
+                                          keyp keywords allowp
+                                          wild-args
+                                          returns
+                                     &aux (rest (if (eq rest *empty-type*)
+                                                    nil
+                                                    rest)))))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype))
-(defun make-fun-type (&rest initargs
-                      &key (args nil argsp) returns &allow-other-keys)
-  (if argsp
-      (if (eq args '*)
-          (if (eq returns *wild-type*)
-              (specifier-type 'function)
-              (%make-fun-type :wild-args t :returns returns))
-          (multiple-value-bind (required optional rest keyp keywords allowp)
-              (args-types args)
-            (if (and (null required)
-                     (null optional)
-                     (eq rest *universal-type*)
-                     (not keyp))
-                (if (eq returns *wild-type*)
-                    (specifier-type 'function)
-                    (%make-fun-type :wild-args t :returns returns))
-                (%make-fun-type :required required
-                                :optional optional
-                                :rest rest
-                                :keyp keyp
-                                :keywords keywords
-                                :allowp allowp
-                                :returns returns))))
-      ;; FIXME: are we really sure that we won't make something that
-      ;; looks like a completely wild function here?
-      (apply #'%make-fun-type initargs)))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument
