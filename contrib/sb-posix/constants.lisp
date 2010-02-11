@@ -270,6 +270,7 @@
  (:structure dirent
              (#+(and linux largefile) "struct dirent64"
               #-(and linux largefile) "struct dirent"
+              (:ino-t ino "ino_t" "d_ino")
               (:c-string name "char *" "d_name"
                          :distrust-length #+sunos t #-sunos nil)) t)
 
