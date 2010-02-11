@@ -1061,3 +1061,7 @@ redefinition."
     (type-error (e)
       (assert (eq 'string (type-error-expected-type e)))
       (assert (zerop (type-error-datum e))))))
+
+(with-test (:name defstruct-copier-typechecks-argument)
+  (assert (not (raises-error? (copy-person (make-astronaut :name "Neil")))))
+  (assert (raises-error? (copy-astronaut (make-person :name "Fred")))))
