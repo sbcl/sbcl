@@ -31,6 +31,7 @@
   (:export "ALLOCATION-INFORMATION"
            "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
+           "FUNCTION-TYPE"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
@@ -464,6 +465,33 @@ value."
            ;; in src/code/deftypes-for-target.lisp.
            (sb-int:info :type :lambda-list typespec-operator))))
     (t (values nil nil))))
+
+(defun function-type (function-designator)
+  "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
+  (flet ((ftype-of (function-designator)
+           (sb-kernel:type-specifier
+            (sb-int:info :function :type function-designator))))
+    (etypecase function-designator
+      (symbol
+       (when (and (fboundp function-designator)
+                  (not (macro-function function-designator))
+                  (not (special-operator-p function-designator)))
+         (ftype-of function-designator)))
+      (cons
+       (when (and (sb-int:legal-fun-name-p function-designator)
+                  (fboundp function-designator))
+         (ftype-of function-designator)))
+      (generic-function
+       (function-type (sb-pcl:generic-function-name function-designator)))
+      (function
+       ;; Give declared type in globaldb priority over derived type
+       ;; because it contains more accurate information e.g. for
+       ;; struct-accessors.
+       (let ((type (function-type (sb-kernel:%fun-name
+                                   (sb-impl::%fun-fun function-designator)))))
+         (if type
+             type
+             (sb-impl::%fun-type function-designator)))))))
 
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))

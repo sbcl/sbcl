@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.35:
+  * new feature: SB-INTROSPECT:FUNCTION-TYPE takes a function-designator and
+    returns the function's declared, or derived FTYPE.
   * new feature: SB-POSIX now supports accessing the d_ino member of
     dirent structures.  (Thanks to Philipp Marek and Pierre THEIRRY)
   * new feature: MAKE-RANDOM-STATE has been extended to accept octet vectors,
