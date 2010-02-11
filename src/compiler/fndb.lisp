@@ -381,7 +381,10 @@
   (movable foldable flushable))
 (defknown random ((or (float (0.0)) (integer 1)) &optional random-state)
   (or (float 0.0) (integer 0)) ())
-(defknown make-random-state (&optional (or (member nil t) random-state))
+(defknown make-random-state (&optional
+                             (or (member nil t) random-state unsigned-byte
+                                 (simple-array (unsigned-byte 8) (*))
+                                 (simple-array (unsigned-byte 32) (*))))
   random-state (flushable))
 (defknown random-state-p (t) boolean (movable foldable flushable))
 

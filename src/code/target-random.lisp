@@ -3,7 +3,8 @@
 ;;;;   Makoto Matsumoto and T. Nishimura, "Mersenne twister: A
 ;;;;   623-dimensionally equidistributed uniform pseudorandom number
 ;;;;   generator.", ACM Transactions on Modeling and Computer Simulation,
-;;;;   1997, to appear.
+;;;;   Vol. 8, No. 1, January pp.3-30 (1998) DOI:10.1145/272991.272995
+;;;; http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -16,7 +17,25 @@
 
 (in-package "SB!KERNEL")
 
+;;;; Constants
+(defconstant mt19937-n 624)
+(defconstant mt19937-m 397)
+(defconstant mt19937-upper-mask #x80000000)
+(defconstant mt19937-lower-mask #x7FFFFFFF)
+(defconstant mt19937-a #x9908B0DF)
+(defconstant mt19937-b #x9D2C5680)
+(defconstant mt19937-c #xEFC60000)
+
 ;;;; RANDOM-STATEs
+
+;;; The state is stored in a (simple-array (unsigned-byte 32) (627))
+;;; wrapped in a random-state structure:
+;;;
+;;;  0-1:   Constant matrix A. [0, #x9908b0df]
+;;;  2:     Index k.
+;;;  3-626: State.
+
+(deftype random-state-state () `(simple-array (unsigned-byte 32) (,(+ 3 mt19937-n))))
 
 (def!method make-load-form ((random-state random-state) &optional environment)
   (make-load-form-saving-slots random-state :environment environment))
@@ -27,38 +46,34 @@
       (format stream "#S(~S ~S #.~S)"
               'random-state
               ':state
-              `(make-array 627
+              `(make-array (,(+ 3 mt19937-n))
                 :element-type
                 '(unsigned-byte 32)
                 :initial-contents
                 ',(coerce (random-state-state state) 'list)))))
 
-;;; The state is stored in a (simple-array (unsigned-byte 32) (627))
-;;; wrapped in a random-state structure:
-;;;
-;;;  0-1:   Constant matrix A. [0, #x9908b0df]
-;;;  2:     Index k.
-;;;  3-626: State.
-
 ;;; Generate and initialize a new random-state array. Index is
 ;;; initialized to 1 and the states to 32bit integers excluding zero.
 ;;;
-;;; Seed - A 32bit number, not zero.
+;;; Seed - A 32bit number.
 ;;;
-;;; Apparently uses the generator Line 25 of Table 1 in
-;;; [KNUTH 1981, The Art of Computer Programming, Vol. 2 (2nd Ed.), pp102]
-(defun init-random-state (&optional (seed 4357) state)
-  (declare (type (integer 1 #xffffffff) seed))
+;;; See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier.
+;;; In the previous versions, MSBs of the seed affect only MSBs of the array.
+(defun init-random-state (&optional (seed 5489) state)
+  (declare (type (unsigned-byte 32) seed))
   (let ((state (or state (make-array 627 :element-type '(unsigned-byte 32)))))
-    (declare (type (simple-array (unsigned-byte 32) (627)) state))
-    (setf (aref state 1) #x9908b0df)
-    (setf (aref state 2) 1)
-    (setf (aref state 3) seed)
-    (do ((k 1 (1+ k)))
-        ((>= k 624))
-      (declare (type (mod 625) k))
-      (setf (aref state (+ 3 k))
-            (logand (* 69069 (aref state (+ 3 (1- k)))) #xffffffff)))
+    (check-type state random-state-state)
+    (setf (aref state 0) 0)
+    (setf (aref state 1) mt19937-a)
+    (setf (aref state 2) mt19937-n)
+    (loop for i below mt19937-n
+      for p from 3
+      for s = seed then
+      (logand #xFFFFFFFF
+              (+ (* 1812433253
+                    (logxor s (ash s -30)))
+                 i))
+      do (setf (aref state p) s))
     state))
 
 (defvar *random-state*)
@@ -69,34 +84,132 @@
 
 (defun make-random-state (&optional state)
   #!+sb-doc
-  "Make a random state object. If STATE is not supplied, return a copy
-  of the default random state. If STATE is a random state, then return a
-  copy of it. If STATE is T then return a random state generated from
-  the universal time."
+  "Make a random state object. The optional STATE argument specifies a seed
+  for deterministic pseudo-random number generation.
+
+  As per the Common Lisp standard,
+  - If STATE is NIL or not supplied or is NIL, return a copy of the default
+  *RANDOM-STATE*.
+  - If STATE is a random state, return a copy of it.
+  - If STATE is T, return a randomly initialized state (using operating-system
+  provided randomness source where available, otherwise a poor substitute
+  based on internal time and pid)
+
+  As an SBCL extension (starting with SBCL 1.0.33), we also support receiving
+  as a seed an object of the following types:
+  - (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*))
+  - UNSIGNED-BYTE
+  While we support arguments of any size and will mix the provided bits into
+  the random state, it is probably overkill to provide more than 256 bits worth
+  of actual information.
+
+  This particular SBCL version also accepts an argument of the following type:
+  - (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*))
+
+  This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
+  internal state only effectively contains about 19937 bits of information.
+  http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
+"
   (/show0 "entering MAKE-RANDOM-STATE")
-  (flet ((copy-random-state (state)
-           (/show0 "entering COPY-RANDOM-STATE")
-           (let ((state (random-state-state state))
-                 (new-state
-                  (make-array 627 :element-type '(unsigned-byte 32))))
-             (/show0 "made NEW-STATE, about to DOTIMES")
-             (dotimes (i 627)
-               (setf (aref new-state i) (aref state i)))
-             (/show0 "falling through to %MAKE-RANDOM-STATE")
-             (%make-random-state :state new-state))))
-    (/show0 "at head of ETYPECASE in MAKE-RANDOM-STATE")
-    (etypecase state
-      (null
-       (/show0 "NULL case")
-       (copy-random-state *random-state*))
-      (random-state
-       (/show0 "RANDOM-STATE-P clause")
-       (copy-random-state state))
-      ((member t)
-       (/show0 "T clause")
-       (%make-random-state :state (init-random-state
-                                   (logand (get-universal-time)
-                                           #xffffffff)))))))
+  (etypecase state
+    ;; Easy standard cases
+    (null
+     (/show0 "copying *RANDOM-STATE*")
+     (%make-random-state :state (copy-seq (random-state-state *random-state*))))
+    (random-state
+     (/show0 "copying the provided RANDOM-STATE")
+     (%make-random-state :state (copy-seq (random-state-state state))))
+    ;; Standard case, less easy: try to randomly initialize a state.
+    ((eql t)
+     (/show0 "getting randomness from the operating system")
+     (make-random-state
+      (or
+       ;; On unices, we try to read from /dev/urandom and pass the results
+       ;; to our (simple-array (unsigned-byte 32) (*)) processor below.
+       ;; More than 256 bits would provide a false sense of security.
+       ;; If you need more bits than that, you probably also need
+       ;; a better algorithm too.
+       #!-win32
+       (ignore-errors
+         (with-open-file (r "/dev/urandom" :element-type '(unsigned-byte 32)
+                            :direction :input :if-does-not-exist :error)
+           (let ((a (make-array '(8) :element-type '(unsigned-byte 32))))
+             (assert (= 8 (read-sequence a r)))
+             a)))
+       ;; When /dev/urandom is not available, we make do with time and pid
+       ;; Thread ID and/or address of a CONS cell would be even better, but...
+       (progn
+         (/show0 "No /dev/urandom, using randomness from time and pid")
+         (+ (get-internal-real-time)
+            #!+unix (ash (sb!unix:unix-getpid) 32))))))
+    ;; For convenience to users, we accept (simple-array (unsigned-byte 8) (*))
+    ;; We just convert it to (simple-array (unsigned-byte 32) (*)) in a
+    ;; completely straightforward way.
+    ;; TODO: probably similarly accept other word sizes.
+    ((simple-array (unsigned-byte 8) (*))
+     (/show0 "getting random seed from byte vector (converting to 32-bit-word vector)")
+     (let* ((l (length state))
+            (m (ceiling l 4))
+            (r (if (>= l 2496) 0 (mod l 4)))
+            (y (make-array (list m) :element-type '(unsigned-byte 32))))
+             (loop for i from 0 below (- m (if (zerop r) 0 1))
+               for j = (* i 4) do
+               (setf (aref y i)
+                     (+ (aref state j)
+                        (ash (aref state (+ j 1)) 8)
+                        (ash (aref state (+ j 2)) 16)
+                        (ash (aref state (+ j 3)) 24))))
+             (unless (zerop r) ;; The last word may require special treatment.
+               (let* ((p (1- m)) (q (* 4 p)))
+                 (setf (aref y p)
+                     (+ (aref state q)
+                        (if (< 1 r) (ash (aref state (+ q 1)) 8) 0)
+                        (if (= 3 r) (ash (aref state (+ q 2)) 16) 0)))))
+             (make-random-state y)))
+    ;; Also for convenience, we accept non-negative integers as seeds.
+    ;; Small ones get passed to init-random-state, as before.
+    ((unsigned-byte 32)
+     (/show0 "getting random seed from 32-bit word")
+     (%make-random-state :state (init-random-state state)))
+    ;; Larger ones ones get trivially chopped into an array of (unsigned-byte 32)
+    ((unsigned-byte)
+     (/show0 "getting random seed from bignum (converting to 32-bit-word vector)")
+     (loop with l = (ceiling (integer-length state) 32)
+       with s = (make-array (list l) :element-type '(unsigned-byte 32))
+       for i below l
+       for p from 0 by 32
+       do (setf (aref s i) (ldb (byte 32 p) state))
+       finally (return (make-random-state s))))
+    ;; Last but not least, when provided an array of 32-bit words, we truncate
+    ;; it to 19968 bits and mix these into an initial state. We reuse the same
+    ;; method as the authors of the original algorithm. See
+    ;; http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/MT2002/CODES/mt19937ar.c
+    ;; NB: their mt[i] is our (aref s (+ 3 i))
+    ((simple-array (unsigned-byte 32) (*))
+     (/show0 "getting random seed from 32-bit-word vector")
+     (let ((s (init-random-state 19650218))
+           (i 1) (j 0) (l (length state)))
+       (loop for k downfrom (max mt19937-n l) above 0 do
+         (setf (aref s (+ i 3))
+               (logand #xFFFFFFFF
+                       (+ (logxor (aref s (+ i 3))
+                                  (* 1664525
+                                     (logxor (aref s (+ i 2))
+                                             (ash (aref s (+ i 2)) -30))))
+                          (aref state j) j))) ;; non-linear
+         (incf i) (when (>= i mt19937-n) (setf (aref s 3) (aref s (+ 2 mt19937-n)) i 1))
+         (incf j) (when (>= j l) (setf j 0)))
+       (loop for k downfrom (1- mt19937-n) above 0 do
+         (setf (aref s (+ i 3))
+               (logand #xFFFFFFFF
+                       (- (logxor (aref s (+ i 3))
+                                  (* 1566083941
+                                     (logxor (aref s (+ i 2))
+                                             (ash (aref s (+ i 2)) -30))))
+                          i))) ;; non-linear
+         (incf i) (when (>= i mt19937-n) (setf (aref s 3) (aref s (+ 2 mt19937-n)) i 1)))
+       (setf (aref s 3) #x80000000) ;; MSB is 1; assuring non-zero initial array
+       (%make-random-state :state s)))))
 
 ;;;; random entries
 
@@ -104,15 +217,9 @@
 ;;; inclusive.
 #!-sb-fluid (declaim (inline random-chunk))
 ;;; portable implementation
-(defconstant mt19937-n 624)
-(defconstant mt19937-m 397)
-(defconstant mt19937-upper-mask #x80000000)
-(defconstant mt19937-lower-mask #x7fffffff)
-(defconstant mt19937-b #x9D2C5680)
-(defconstant mt19937-c #xEFC60000)
 #!-x86
 (defun random-mt19937-update (state)
-  (declare (type (simple-array (unsigned-byte 32) (627)) state)
+  (declare (type random-state-state state)
            (optimize (speed 3) (safety 0)))
   (let ((y 0))
     (declare (type (unsigned-byte 32) y))
