@@ -931,11 +931,6 @@
     (symbol (block-or-lose (gethash thing *free-funs*)))))
 
 ;;; Print cN.
-(defun print-continuation (cont)
-  (declare (type continuation cont))
-  (format t " c~D" (cont-num cont))
-  (values))
-
 (defun print-ctran (cont)
   (declare (type ctran cont))
   (format t "c~D " (cont-num cont))
