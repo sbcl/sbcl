@@ -523,7 +523,7 @@
               ((orig equal-but-no-car-recursion))
   (let ((u (uncross orig)))
     (or (info :type :builtin u)
-        (let ((spec (type-expand u)))
+        (let ((spec (typexpand u)))
           (cond
            ((and (not (eq spec u))
                  (info :type :builtin spec)))
@@ -548,7 +548,11 @@
                                 (not (eq (info :type :kind spec)
                                          :forthcoming-defclass-type)))
                        (signal 'parse-unknown-type :specifier spec))
-                     ;; (The RETURN-FROM here inhibits caching.)
+                     ;; (The RETURN-FROM here inhibits caching; this
+                     ;; does not only make sense from a compiler
+                     ;; diagnostics point of view but is also
+                     ;; indispensable for proper workingness of
+                     ;; VALID-TYPE-SPECIFIER-P.)
                      (return-from values-specifier-type
                        (make-unknown-type :specifier spec)))
                     (t
@@ -571,17 +575,103 @@
       *universal-type*
       (specifier-type x)))
 
-;;; Similar to MACROEXPAND, but expands DEFTYPEs. We don't bother
-;;; returning a second value.
-(defun type-expand (form)
-  (let ((def (cond ((symbolp form)
-                    (info :type :expander form))
-                   ((and (consp form) (symbolp (car form)))
-                    (info :type :expander (car form)))
-                   (t nil))))
-    (if def
-        (type-expand (funcall def (if (consp form) form (list form))))
-        form)))
+(defun typexpand-1 (type-specifier &optional env)
+  #!+sb-doc
+  "Takes and expands a type specifier once like MACROEXPAND-1.
+Returns two values: the expansion, and a boolean that is true when
+expansion happened."
+  (declare (type-specifier type-specifier))
+  (declare (ignore env))
+  (multiple-value-bind (expander lspec)
+      (let ((spec type-specifier))
+        (cond ((and (symbolp spec) (info :type :builtin spec))
+               ;; We do not expand builtins even though it'd be
+               ;; possible to do so sometimes (e.g. STRING) for two
+               ;; reasons:
+               ;;
+               ;; a) From a user's point of view, CL types are opaque.
+               ;;
+               ;; b) so (EQUAL (TYPEXPAND 'STRING) (TYPEXPAND-ALL 'STRING))
+               (values nil nil))
+              ((symbolp spec)
+               (values (info :type :expander spec) (list spec)))
+              ((and (consp spec) (symbolp (car spec)))
+               (values (info :type :expander (car spec)) spec))
+              (t nil)))
+    (if expander
+        (values (funcall expander lspec) t)
+        (values type-specifier nil))))
+
+(defun typexpand (type-specifier &optional env)
+  #!+sb-doc
+  "Takes and expands a type specifier repeatedly like MACROEXPAND.
+Returns two values: the expansion, and a boolean that is true when
+expansion happened."
+  (declare (type-specifier type-specifier))
+  (multiple-value-bind (expansion flag)
+      (typexpand-1 type-specifier env)
+    (if flag
+        (values (typexpand expansion env) t)
+        (values expansion flag))))
+
+(defun typexpand-all (type-specifier &optional env)
+  #!+sb-doc
+  "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
+  (declare (type-specifier type-specifier))
+  (declare (ignore env))
+  ;; I first thought this would not be a good implementation because
+  ;; it signals an error on e.g. (CONS 1 2) until I realized that
+  ;; walking and calling TYPEXPAND would also result in errors, and
+  ;; it actually makes sense.
+  ;;
+  ;; There's still a small problem in that
+  ;;   (TYPEXPAND-ALL '(CONS * FIXNUM)) => (CONS T FIXNUM)
+  ;; whereas walking+typexpand would result in (CONS * FIXNUM).
+  ;;
+  ;; Similiarly, (TYPEXPAND-ALL '(FUNCTION (&REST T) *)) => FUNCTION.
+  (type-specifier (values-specifier-type type-specifier)))
+
+(defun defined-type-name-p (name &optional env)
+  #!+sb-doc
+  "Returns T if NAME is known to name a type specifier, otherwise NIL."
+  (declare (symbol name))
+  (declare (ignore env))
+  (and (info :type :kind name) t))
+
+(defun valid-type-specifier-p (type-specifier &optional env)
+  #!+sb-doc
+  "Returns T if TYPE-SPECIFIER is a valid type specifier, otherwise NIL.
+
+There may be different metrics on what constitutes a \"valid type
+specifier\" depending on context. If this function does not suit your
+exact need, you may be able to craft a particular solution using a
+combination of DEFINED-TYPE-NAME-P and the TYPEXPAND functions.
+
+The definition of \"valid type specifier\" employed by this function
+is based on the following mnemonic:
+
+          \"Would TYPEP accept it as second argument?\"
+
+Except that unlike TYPEP, this function fully supports compound
+FUNCTION type specifiers, and the VALUES type specifier, too.
+
+In particular, VALID-TYPE-SPECIFIER-P will return NIL if
+TYPE-SPECIFIER is not a class, not a symbol that is known to name a
+type specifier, and not a cons that represents a known compound type
+specifier in a syntactically and recursively correct way.
+
+Examples:
+
+  (valid-type-specifier-p '(cons * *))     => T
+  (valid-type-specifier-p '#:foo)          => NIL
+  (valid-type-specifier-p '(cons * #:foo)) => NIL
+  (valid-type-specifier-p '(cons 1 *)      => NIL
+
+Experimental."
+  (declare (ignore env))
+  (handler-case (prog1 t (values-specifier-type type-specifier))
+    (parse-unknown-type () nil)
+    (error () nil)))
 
 ;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.

@@ -108,7 +108,7 @@
 ;;; T unless it's certain) and the second value to tell whether it's
 ;;; certain.
 (defun cross-typep (host-object raw-target-type)
-  (let ((target-type (type-expand raw-target-type)))
+  (let ((target-type (typexpand raw-target-type)))
     (flet ((warn-and-give-up ()
            ;; We don't have to keep track of this as long as system
            ;; performance is acceptable, since giving up

@@ -1,5 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.35:
+  * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and
+    SB-EXT:TYPEXPAND-ALL behave exactly like their MACROEXPAND counterparts
+    but work on type specifiers.
+  * new feature: SB-EXT:DEFINED-TYPE-NAME-P returns whether a symbol is known
+    to name a type specifier.
+  * new feature: SB-EXT:VALID-TYPE-SPECIFIER-P returns whether a given type
+    specifier is valid where "valid" basically means "would be accepted as
+    second argument of TYPEP".
   * new feature: SB-INTROSPECT:FUNCTION-TYPE takes a function-designator and
     returns the function's declared, or derived FTYPE.
   * new feature: SB-POSIX now supports accessing the d_ino member of

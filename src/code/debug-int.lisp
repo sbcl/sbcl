@@ -479,7 +479,7 @@
   ;; valid value at this code-location. (unexported).
   (%live-set :unparsed :type (or simple-bit-vector (member :unparsed)))
   ;; (unexported) To see SB!C::LOCATION-KIND, do
-  ;; (SB!KERNEL:TYPE-EXPAND 'SB!C::LOCATION-KIND).
+  ;; (SB!KERNEL:TYPEXPAND 'SB!C::LOCATION-KIND).
   (kind :unparsed :type (or (member :unparsed) sb!c::location-kind))
   (step-info :unparsed :type (or (member :unparsed :foo) simple-string)))
 

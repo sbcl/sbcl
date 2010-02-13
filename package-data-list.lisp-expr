@@ -756,6 +756,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*ED-FUNCTIONS*"
                "*MODULE-PROVIDER-FUNCTIONS*"
                "WITH-TIMEOUT" "TIMEOUT"
+               "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
+               "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"

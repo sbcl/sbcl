@@ -587,4 +587,114 @@
   (assert (or (equal '(or cons fixnum) (type-error-expected-type err))
               (equal '(or fixnum cons) (type-error-expected-type err)))))
 
+;;; TYPEXPAND & Co
+
+(deftype a-deftype (arg)
+  `(cons (eql ,arg) *))
+
+(deftype another-deftype (arg)
+  `(a-deftype ,arg))
+
+(deftype list-of-length (length &optional element-type)
+  (assert (not (minusp length)))
+  (if (zerop length)
+      'null
+      `(cons ,element-type (list-of-length ,(1- length) ,element-type))))
+
+(with-test (:name :typexpand-1)
+  (multiple-value-bind (expansion-1 expandedp-1)
+      (sb-ext:typexpand-1 '(another-deftype symbol))
+    (assert expandedp-1)
+    (assert (equal expansion-1 '(a-deftype symbol)))
+    (multiple-value-bind (expansion-2 expandedp-2)
+        (sb-ext:typexpand-1 expansion-1)
+      (assert expandedp-2)
+      (assert (equal expansion-2 '(cons (eql symbol) *)))
+      (multiple-value-bind (expansion-3 expandedp-3)
+          (sb-ext:typexpand-1 expansion-2)
+        (assert (not expandedp-3))
+        (assert (eq expansion-2 expansion-3))))))
+
+(with-test (:name :typexpand.1)
+  (multiple-value-bind (expansion-1 expandedp-1)
+      (sb-ext:typexpand '(another-deftype symbol))
+    (assert expandedp-1)
+    (assert (equal expansion-1 '(cons (eql symbol) *)))
+    (multiple-value-bind (expansion-2 expandedp-2)
+        (sb-ext:typexpand expansion-1)
+      (assert (not expandedp-2))
+      (assert (eq expansion-1 expansion-2)))))
+
+(with-test (:name :typexpand.2)
+  (assert (equal (sb-ext:typexpand '(list-of-length 3 fixnum))
+                 '(cons fixnum (list-of-length 2 fixnum)))))
+
+(with-test (:name :typexpand-all)
+  (assert (equal (sb-ext:typexpand-all '(list-of-length 3))
+                 '(cons t (cons t (cons t null)))))
+  (assert (equal (sb-ext:typexpand-all '(list-of-length 3 fixnum))
+                 '(cons fixnum (cons fixnum (cons fixnum null))))))
+
+(defclass a-deftype () ())
+
+(with-test (:name (:typexpand-1 :after-type-redefinition-to-class))
+  (multiple-value-bind (expansion expandedp)
+      (sb-ext:typexpand-1 '#1=(a-deftype symbol))
+    (assert (not expandedp))
+    (assert (eq expansion '#1#))))
+
+
+(with-test (:name :defined-type-name-p)
+  (assert (not (sb-ext:defined-type-name-p '#:foo)))
+  (assert (sb-ext:defined-type-name-p 'a-deftype))
+  (assert (sb-ext:defined-type-name-p 'structure-foo1))
+  (assert (sb-ext:defined-type-name-p 'structure-class-foo1))
+  (assert (sb-ext:defined-type-name-p 'standard-class-foo1))
+  (assert (sb-ext:defined-type-name-p 'condition-foo1))
+  (dolist (prim-type '(t nil fixnum cons atom))
+    (assert (sb-ext:defined-type-name-p prim-type))))
+
+
+(with-test (:name :valid-type-specifier-p)
+  (macrolet ((yes (form) `(assert ,form))
+             (no  (form) `(assert (not ,form))))
+    (no  (sb-ext:valid-type-specifier-p '(cons #(frob) *)))
+    (no  (sb-ext:valid-type-specifier-p 'list-of-length))
+    (no  (sb-ext:valid-type-specifier-p '(list-of-length 5 #(x))))
+    (yes (sb-ext:valid-type-specifier-p '(list-of-length 5 fixnum)))
+
+    (yes (sb-ext:valid-type-specifier-p 'structure-foo1))
+    (no  (sb-ext:valid-type-specifier-p '(structure-foo1 x)))
+    (yes (sb-ext:valid-type-specifier-p 'condition-foo1))
+    (yes (sb-ext:valid-type-specifier-p 'standard-class-foo1))
+    (yes (sb-ext:valid-type-specifier-p 'structure-class-foo1))
+
+    (yes (sb-ext:valid-type-specifier-p 'readtable))
+    (no  (sb-ext:valid-type-specifier-p '(readtable)))
+    (no  (sb-ext:valid-type-specifier-p '(readtable x)))
+
+    (yes (sb-ext:valid-type-specifier-p '(values)))
+    (no  (sb-ext:valid-type-specifier-p 'values))
+    (yes (sb-ext:valid-type-specifier-p '(and)))
+    (no  (sb-ext:valid-type-specifier-p 'and))))
+
+(with-test (:name (:valid-type-specifier-p :introspection-test))
+  (flet ((map-functions (fn)
+           (do-all-symbols (s)
+             (when (and (fboundp s)
+                        (not (macro-function s))
+                        (not (special-operator-p s)))
+               (funcall fn s)))))
+    (map-functions
+     #'(lambda (s)
+         (let* ((fun   (sb-kernel:%fun-fun (fdefinition s)))
+                (ftype (sb-kernel:%simple-fun-type fun)))
+           (unless (sb-ext:valid-type-specifier-p ftype)
+             (format *error-output*
+                     "~@<~S returned NIL on ~S's FTYPE: ~2I~_~S~@:>"
+                     'sb-ext:valid-type-specifier-p
+                     s
+                     ftype )
+             (error "FAILURE")))))))
+
 ;;; success
