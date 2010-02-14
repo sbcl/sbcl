@@ -1916,7 +1916,7 @@ size_lose(lispobj *where)
 void
 gc_init_tables(void)
 {
-    unsigned long i;
+    unsigned long i, j;
 
     /* Set default value in all slots of scavenge table.  FIXME
      * replace this gnarly sizeof with something based on
@@ -1931,11 +1931,14 @@ gc_init_tables(void)
      */
 
     for (i = 0; i < (1<<(N_WIDETAG_BITS-N_LOWTAG_BITS)); i++) {
-        scavtab[EVEN_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_immediate;
+        for (j = 0; j < (1<<N_LOWTAG_BITS); j++) {
+            if (fixnump(j)) {
+                scavtab[j|(i<<N_LOWTAG_BITS)] = scav_immediate;
+            }
+        }
         scavtab[FUN_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_fun_pointer;
         /* skipping OTHER_IMMEDIATE_0_LOWTAG */
         scavtab[LIST_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_list_pointer;
-        scavtab[ODD_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = scav_immediate;
         scavtab[INSTANCE_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] =
             scav_instance_pointer;
         /* skipping OTHER_IMMEDIATE_1_LOWTAG */
@@ -2213,11 +2216,14 @@ gc_init_tables(void)
     for (i = 0; i < ((sizeof sizetab)/(sizeof sizetab[0])); i++)
         sizetab[i] = size_lose;
     for (i = 0; i < (1<<(N_WIDETAG_BITS-N_LOWTAG_BITS)); i++) {
-        sizetab[EVEN_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = size_immediate;
+        for (j = 0; j < (1<<N_LOWTAG_BITS); j++) {
+            if (fixnump(j)) {
+                sizetab[j|(i<<N_LOWTAG_BITS)] = size_immediate;
+            }
+        }
         sizetab[FUN_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
         /* skipping OTHER_IMMEDIATE_0_LOWTAG */
         sizetab[LIST_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
-        sizetab[ODD_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = size_immediate;
         sizetab[INSTANCE_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
         /* skipping OTHER_IMMEDIATE_1_LOWTAG */
         sizetab[OTHER_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
