@@ -93,14 +93,14 @@
            (type index offset)
            (values sb!vm:word)
            (optimize (speed 3) (safety 0) #-sb-xc-host (inhibit-warnings 3)))
-  (sap-ref-word sap (the index (ash offset sb!vm:n-fixnum-tag-bits))))
+  (sap-ref-word sap (the index (ash offset sb!vm:word-shift))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
            (type index offset)
            (type sb!vm:word value)
            (values sb!vm:word)
            (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
-  (setf (sap-ref-word sap (the index (ash offset sb!vm:n-fixnum-tag-bits)))
+  (setf (sap-ref-word sap (the index (ash offset sb!vm:word-shift)))
         value))
 
 
@@ -120,15 +120,21 @@
         (declare (type system-area-pointer sap)
                  (type index offset)
                  (values system-area-pointer index))
-        (let ((address (sap-int sap)))
-          (values (int-sap #!-alpha (word-logical-andc2 address
-                                                        sb!vm:fixnum-tag-mask)
-                           #!+alpha (ash (ash address -2) 2))
+        (let ((address (sap-int sap))
+              (word-mask (1- (ash 1 word-shift))))
+          (values (int-sap #!-alpha (word-logical-andc2 address word-mask)
+                           ;; KLUDGE: WORD-LOGICAL-ANDC2 is defined in
+                           ;; terms of n-word-bits.  On all systems
+                           ;; where n-word-bits is not equal to
+                           ;; n-machine-word-bits we have to do this
+                           ;; another way.  At this time, these
+                           ;; systems are alphas, though there was
+                           ;; some talk about an x86-64 build option.
+                           #!+alpha (ash (ash address (- word-shift)) word-shift))
                   (+ ,(ecase bitsize
-                       (1 '(* (logand address sb!vm:fixnum-tag-mask) n-byte-bits))
-                       (2 '(* (logand address sb!vm:fixnum-tag-mask) (/ n-byte-bits 2)))
-                       (4 '(* (logand address sb!vm:fixnum-tag-mask) (/ n-byte-bits 4)))
-                       ((8 16 32 64) '(logand address sb!vm:fixnum-tag-mask)))
+                       ((1 2 4) `(* (logand address word-mask)
+                                    (/ n-byte-bits ,bitsize)))
+                       ((8 16 32 64) '(logand address word-mask)))
                      offset)))))))
 
 ;;; We cheat a little bit by using TRULY-THE in the copying function to

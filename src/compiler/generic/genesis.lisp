@@ -381,9 +381,9 @@
         ;; it's hard to see how it could have been wrong, since CMU CL
         ;; genesis worked. It would be nice to understand how this came
         ;; to be.. -- WHN 19990901
-        (logior (ash bits (- 1 sb!vm:n-lowtag-bits))
+        (logior (ash bits (- sb!vm:n-fixnum-tag-bits))
                 (ash -1 (1+ sb!vm:n-positive-fixnum-bits)))
-        (ash bits (- 1 sb!vm:n-lowtag-bits)))))
+        (ash bits (- sb!vm:n-fixnum-tag-bits)))))
 
 (defun descriptor-word-sized-integer (des)
   ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
@@ -458,9 +458,9 @@
 
 (defun make-fixnum-descriptor (num)
   (when (>= (integer-length num)
-            (1+ (- sb!vm:n-word-bits sb!vm:n-lowtag-bits)))
+            (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
     (error "~W is too big for a fixnum." num))
-  (make-random-descriptor (ash num (1- sb!vm:n-lowtag-bits))))
+  (make-random-descriptor (ash num sb!vm:n-fixnum-tag-bits)))
 
 (defun make-other-immediate-descriptor (data type)
   (make-descriptor (ash data (- sb!vm:n-widetag-bits descriptor-low-bits))
@@ -768,7 +768,7 @@ core and return a descriptor to it."
 (defun number-to-core (number)
   (typecase number
     (integer (if (< (integer-length number)
-                    (- (1+ sb!vm:n-word-bits) sb!vm:n-lowtag-bits))
+                    (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
                  (make-fixnum-descriptor number)
                  (bignum-to-core number)))
     (ratio (number-pair-to-core (number-to-core (numerator number))
@@ -2308,9 +2308,9 @@ core and return a descriptor to it."
                 (* total-elements
                    (logior (ash (descriptor-high dim)
                                 (- descriptor-low-bits
-                                   (1- sb!vm:n-lowtag-bits)))
+                                   sb!vm:n-fixnum-tag-bits))
                            (ash (descriptor-low dim)
-                                (- 1 sb!vm:n-lowtag-bits)))))
+                                sb!vm:n-fixnum-tag-bits))))
           (write-wordindexed result
                              (+ sb!vm:array-dimensions-offset axis)
                              dim)))

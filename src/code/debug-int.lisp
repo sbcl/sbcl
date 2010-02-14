@@ -527,11 +527,13 @@
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
          (sap<= control-stack-start x)
-         (or (not aligned) (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask))))
+         (or (not aligned) (zerop (logand (sap-int x)
+                                          (1- (ash 1 sb!vm:word-shift))))))
     #!+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
          (sap> control-stack-end x)
-         (or (not aligned) (zerop (logand (sap-int x) sb!vm:fixnum-tag-mask))))))
+         (or (not aligned) (zerop (logand (sap-int x)
+                                          (1- (ash 1 sb!vm:word-shift))))))))
 
 (declaim (inline component-ptr-from-pc))
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)

@@ -197,9 +197,9 @@ alloc_code_object (unsigned boxed, unsigned unboxed) {
     /* Coming in, boxed is the number of boxed words requested.
      * Converting it to a fixnum makes it measured in bytes. It's also
      * rounded up to double word along the way. */
-    boxed = make_fixnum(boxed + 1 +
-                        (offsetof(struct code, trace_table_offset) >>
-                         WORD_SHIFT));
+    boxed = (boxed + 1 +
+             (offsetof(struct code, trace_table_offset) >>
+              WORD_SHIFT)) << WORD_SHIFT;
     boxed &= ~LOWTAG_MASK;
 
     /* Unboxed is in bytes, round it up to double word boundary. Now
@@ -216,7 +216,7 @@ alloc_code_object (unsigned boxed, unsigned unboxed) {
         lose("alloc_code_object called with GC enabled.");
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;
-    code->code_size = unboxed;
+    code->code_size = unboxed >> (WORD_SHIFT - N_FIXNUM_TAG_BITS);
     code->entry_points = NIL;
     code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);

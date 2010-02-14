@@ -15,7 +15,7 @@
 ;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
 (defun fixnumize (num)
   (if (fixnump num)
-      (ash num (1- n-lowtag-bits))
+      (ash num n-fixnum-tag-bits)
       (error "~W is too big for a fixnum." num)))
 
 ;;; Determining whether a constant offset fits in an addressing mode.
