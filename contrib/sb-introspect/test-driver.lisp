@@ -450,7 +450,7 @@
 
 #+nil
 (progn
-  
+
   (defstruct (struct (:predicate our-struct-p)
                      (:copier copy-our-struct))
     (a 42 :type fixnum))

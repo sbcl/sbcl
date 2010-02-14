@@ -358,7 +358,7 @@ collection is initiated. This can be set with SETF."
                 (defun ,(symbolicate "GENERATION-" slot) (generation)
                   #!+sb-doc
                   ,doc
-		  #!+gencgc
+                  #!+gencgc
                   (declare (generation-index generation))
                   #!-gencgc
                   (declare (ignore generation))
@@ -369,7 +369,7 @@ collection is initiated. This can be set with SETF."
                   (slot (deref generations generation) ',slot))
                 ,@(when setfp
                         `((defun (setf ,(symbolicate "GENERATION-" slot)) (value generation)
-			    #!+gencgc
+                            #!+gencgc
                             (declare (generation-index generation))
                             #!-gencgc
                             (declare (ignore value generation))
