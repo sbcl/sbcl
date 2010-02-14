@@ -232,19 +232,8 @@ typedef int boolean;
 static inline boolean
 other_immediate_lowtag_p(lispobj header)
 {
-    switch (lowtag_of(header)) {
-    case OTHER_IMMEDIATE_0_LOWTAG:
-    case OTHER_IMMEDIATE_1_LOWTAG:
-#ifdef OTHER_IMMEDIATE_2_LOWTAG
-    case OTHER_IMMEDIATE_2_LOWTAG:
-#endif
-#ifdef OTHER_IMMEDIATE_3_LOWTAG
-    case OTHER_IMMEDIATE_3_LOWTAG:
-#endif
-        return 1;
-    default:
-        return 0;
-    }
+    /* These lowtags are spaced 4 apart throughout the lowtag space. */
+    return (lowtag_of(header) & 3) == OTHER_IMMEDIATE_0_LOWTAG;
 }
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying

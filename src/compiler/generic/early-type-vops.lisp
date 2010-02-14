@@ -48,8 +48,9 @@
                      &key &allow-other-keys)
   ;; Determine what interesting combinations we need to test for.
   (let* ((type-codes (mapcar #'eval type-codes))
-         (fixnump (and (member even-fixnum-lowtag type-codes)
-                       (member odd-fixnum-lowtag type-codes)
+         (fixnump (and (every (lambda (lowtag)
+                                (member lowtag type-codes))
+                              '#.(mapcar #'symbol-value fixnum-lowtags))
                        t))
          (lowtags (remove lowtag-limit type-codes :test #'<))
          (extended (remove lowtag-limit type-codes :test #'>))
@@ -66,8 +67,7 @@
     (cond
       (fixnump
        (when (remove-if (lambda (x)
-                          (or (= x even-fixnum-lowtag)
-                              (= x odd-fixnum-lowtag)))
+                          (member x '#.(mapcar #'symbol-value fixnum-lowtags)))
                         lowtags)
          (error "can't mix fixnum testing with other lowtags"))
        (when function-p

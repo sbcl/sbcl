@@ -11,7 +11,7 @@
 (in-package "SB!VM")
 
 (!define-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
-  (even-fixnum-lowtag odd-fixnum-lowtag)
+  #.fixnum-lowtags
   ;; we can save a register on the x86.
   :variant simple
   ;; we can save a couple of instructions and a branch on the ppc.
@@ -191,9 +191,7 @@
               (coerce *specialized-array-element-type-properties* 'list)))))
 
 (!define-type-vops numberp check-number nil object-not-number-error
-  (even-fixnum-lowtag
-   odd-fixnum-lowtag
-   bignum-widetag
+  (bignum-widetag
    ratio-widetag
    single-float-widetag
    double-float-widetag
@@ -201,22 +199,22 @@
    complex-widetag
    complex-single-float-widetag
    complex-double-float-widetag
-   #!+long-float complex-long-float-widetag))
+   #!+long-float complex-long-float-widetag
+   . #.fixnum-lowtags))
 
 (!define-type-vops rationalp check-rational nil object-not-rational-error
-  (even-fixnum-lowtag odd-fixnum-lowtag ratio-widetag bignum-widetag))
+  (ratio-widetag bignum-widetag . #.fixnum-lowtags))
 
 (!define-type-vops integerp check-integer nil object-not-integer-error
-  (even-fixnum-lowtag odd-fixnum-lowtag bignum-widetag))
+  (bignum-widetag . #.fixnum-lowtags))
 
 (!define-type-vops floatp check-float nil object-not-float-error
   (single-float-widetag double-float-widetag #!+long-float long-float-widetag))
 
 (!define-type-vops realp check-real nil object-not-real-error
-  (even-fixnum-lowtag
-   odd-fixnum-lowtag
-   ratio-widetag
+  (ratio-widetag
    bignum-widetag
    single-float-widetag
    double-float-widetag
-   #!+long-float long-float-widetag))
+   #!+long-float long-float-widetag
+   . #.fixnum-lowtags))

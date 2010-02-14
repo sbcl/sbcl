@@ -14,10 +14,7 @@
 
 static inline int fixnump(lispobj obj)
 {
-    return((obj &
-            (LOWTAG_MASK &
-             (~(EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG))))
-           == 0);
+    return((obj & FIXNUM_TAG_MASK) == 0);
 }
 
 #endif

@@ -279,6 +279,9 @@
 
 ;;;; representation of descriptors
 
+(defun is-fixnum-lowtag (lowtag)
+  (zerop (logand lowtag sb!vm:fixnum-tag-mask)))
+
 (defstruct (descriptor
             (:constructor make-descriptor
                           (high low &optional gspace word-offset))
@@ -300,8 +303,7 @@
 (def!method print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
-      (cond ((or (= lowtag sb!vm:even-fixnum-lowtag)
-                 (= lowtag sb!vm:odd-fixnum-lowtag))
+      (cond ((is-fixnum-lowtag lowtag)
              (let ((unsigned (logior (ash (descriptor-high des)
                                           (1+ (- descriptor-low-bits
                                                  sb!vm:n-lowtag-bits)))
@@ -387,8 +389,7 @@
   ;; Extract an (unsigned-byte 32), from either its fixnum or bignum
   ;; representation.
   (let ((lowtag (descriptor-lowtag des)))
-    (if (or (= lowtag sb!vm:even-fixnum-lowtag)
-            (= lowtag sb!vm:odd-fixnum-lowtag))
+    (if (is-fixnum-lowtag lowtag)
         (make-random-descriptor (descriptor-fixnum des))
         (read-wordindexed des 1))))
 
@@ -2301,8 +2302,7 @@ core and return a descriptor to it."
     (let ((total-elements 1))
       (dotimes (axis rank)
         (let ((dim (pop-stack)))
-          (unless (or (= (descriptor-lowtag dim) sb!vm:even-fixnum-lowtag)
-                      (= (descriptor-lowtag dim) sb!vm:odd-fixnum-lowtag))
+          (unless (is-fixnum-lowtag (descriptor-lowtag dim))
             (error "non-fixnum dimension? (~S)" dim))
           (setf total-elements
                 (* total-elements
