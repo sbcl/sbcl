@@ -194,14 +194,20 @@
 (define-vop (move-to-single)
   (:args (x :scs (descriptor-reg) :target tmp))
   (:temporary (:sc unsigned-reg) tmp)
-  (:results (y :scs (single-reg)))
+  (:results (y :scs (single-reg single-stack)))
   (:note "pointer to float coercion")
   (:generator 2
     (move tmp x)
     (inst shr tmp 32)
-    (inst movd y tmp)))
+    (sc-case y
+      (single-reg
+       (inst movd y tmp))
+      (single-stack
+       (let ((slot (make-ea :dword :base rbp-tn
+                            :disp (frame-byte-offset (tn-offset y)))))
+         (inst mov slot (reg-in-size tmp :dword)))))))
 
-(define-move-vop move-to-single :move (descriptor-reg) (single-reg))
+(define-move-vop move-to-single :move (descriptor-reg) (single-reg single-stack))
 
 (define-vop (move-to-double)
   (:args (x :scs (descriptor-reg)))
