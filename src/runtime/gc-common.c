@@ -1885,7 +1885,7 @@ scav_lose(lispobj *where, lispobj object)
 {
     lose("no scavenge function for object 0x%08x (widetag 0x%x)\n",
          (unsigned long)object,
-         widetag_of(object));
+         widetag_of(*where));
 
     return 0; /* bogus return value to satisfy static type checking */
 }
@@ -1904,7 +1904,7 @@ size_lose(lispobj *where)
 {
     lose("no size function for object at 0x%08x (widetag 0x%x)\n",
          (unsigned long)where,
-         widetag_of(LOW_WORD(where)));
+         widetag_of(*where));
     return 1; /* bogus return value to satisfy static type checking */
 }
 
