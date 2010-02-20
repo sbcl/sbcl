@@ -103,15 +103,13 @@
                  (simple-array-unsigned-byte-16-widetag . 1)
                  (simple-array-unsigned-byte-31-widetag . 2)
                  (simple-array-unsigned-byte-32-widetag . 2)
-                 (simple-array-unsigned-byte-60-widetag . 3)
+                 (simple-array-unsigned-fixnum-widetag . 3)
                  (simple-array-unsigned-byte-63-widetag . 3)
                  (simple-array-unsigned-byte-64-widetag . 3)
                  (simple-array-signed-byte-8-widetag . 0)
                  (simple-array-signed-byte-16-widetag . 1)
-                 (simple-array-unsigned-byte-29-widetag . 2)
-                 (simple-array-signed-byte-30-widetag . 2)
+                 (simple-array-fixnum-widetag . 2)
                  (simple-array-signed-byte-32-widetag . 2)
-                 (simple-array-signed-byte-61-widetag . 3)
                  (simple-array-signed-byte-64-widetag . 3)
                  (simple-array-single-float-widetag . 2)
                  (simple-array-double-float-widetag . 3)
@@ -573,7 +571,6 @@
              #.simple-array-unsigned-byte-32-widetag
              #.simple-array-signed-byte-8-widetag
              #.simple-array-signed-byte-16-widetag
-             ;; #.simple-array-signed-byte-30-widetag
              #.simple-array-signed-byte-32-widetag
              #.simple-array-single-float-widetag
              #.simple-array-double-float-widetag

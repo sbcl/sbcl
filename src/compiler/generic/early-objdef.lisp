@@ -186,11 +186,11 @@
   simple-bit-vector-widetag                 ; 10101010
   simple-vector-widetag                     ; 10101110
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-29-widetag     ; 10110010
+  simple-array-unsigned-fixnum-widetag     ; 10110010
   simple-array-unsigned-byte-31-widetag     ; 10110110
   simple-array-unsigned-byte-32-widetag     ; 10111010
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-byte-60-widetag
+  simple-array-unsigned-fixnum-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-unsigned-byte-63-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
@@ -198,10 +198,10 @@
   simple-array-signed-byte-8-widetag        ; 10111110
   simple-array-signed-byte-16-widetag       ; 11000010
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-signed-byte-30-widetag       ; 11000110
+  simple-array-fixnum-widetag       ; 11000110
   simple-array-signed-byte-32-widetag       ; 11001010
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-signed-byte-61-widetag
+  simple-array-fixnum-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-signed-byte-64-widetag
   simple-array-single-float-widetag         ; 11001110

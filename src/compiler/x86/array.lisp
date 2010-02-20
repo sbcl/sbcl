@@ -141,8 +141,8 @@
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
-  (def-full-data-vector-frobs simple-array-signed-byte-30 tagged-num any-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-byte-29 positive-fixnum any-reg)
+  (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
+  (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
     signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num

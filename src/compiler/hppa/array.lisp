@@ -130,9 +130,9 @@
   (def-partial-data-vector-frobs simple-array-signed-byte-16 tagged-num
     :short t signed-reg)
 
-  (def-full-data-vector-frobs simple-array-unsigned-byte-29 positive-fixnum
+  (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum
                               any-reg)
-  (def-full-data-vector-frobs simple-array-signed-byte-30 tagged-num
+  (def-full-data-vector-frobs simple-array-fixnum tagged-num
                               any-reg)
 
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num

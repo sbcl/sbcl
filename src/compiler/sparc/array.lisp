@@ -126,9 +126,9 @@
   (def-data-vector-frobs simple-array-unsigned-byte-32 word-index
     unsigned-num unsigned-reg)
 
-  (def-data-vector-frobs simple-array-unsigned-byte-29 word-index
+  (def-data-vector-frobs simple-array-unsigned-fixnum word-index
     positive-fixnum any-reg)
-  (def-data-vector-frobs simple-array-signed-byte-30 word-index
+  (def-data-vector-frobs simple-array-fixnum word-index
     tagged-num any-reg)
   (def-data-vector-frobs simple-array-signed-byte-32 word-index
     signed-num signed-reg))

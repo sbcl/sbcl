@@ -560,10 +560,8 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         return ptrans_vector(thing, 16, 0, 0, constant);
 
       case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
-#endif
+      case SIMPLE_ARRAY_FIXNUM_WIDETAG:
+      case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
       case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
@@ -571,17 +569,11 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         return ptrans_vector(thing, 32, 0, 0, constant);
 
 #if N_WORD_BITS == 64
-#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
-      case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
-#endif
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
       case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
       case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
-      case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
@@ -774,10 +766,10 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
-#endif
+
+              case SIMPLE_ARRAY_FIXNUM_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
+
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
               case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
@@ -788,10 +780,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
 #if N_WORD_BITS == 64
               case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
-              case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
-              case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
-#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
               case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:

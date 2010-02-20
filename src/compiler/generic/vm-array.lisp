@@ -116,7 +116,8 @@
          ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16
           :importance 12)
          #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-         ((unsigned-byte 29) 0 32 simple-array-unsigned-byte-29
+         ((unsigned-byte #.sb!vm:n-positive-fixnum-bits)
+          0 32 simple-array-unsigned-fixnum
           :importance 8
           :fixnum-p t)
          ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31
@@ -124,7 +125,8 @@
          ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32
           :importance 11)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-         ((unsigned-byte 60) 0 64 simple-array-unsigned-byte-60
+         ((unsigned-byte #.sb!vm:n-positive-fixnum-bits)
+          0 64 simple-array-unsigned-fixnum
           :importance 8
           :fixnum-p t)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
@@ -141,14 +143,14 @@
          ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
          ;; not (SIGNED-BYTE 30)
          #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-         (fixnum 0 32 simple-array-signed-byte-30
+         (fixnum 0 32 simple-array-fixnum
           :importance 8
           :fixnum-p t)
          ((signed-byte 32) 0 32 simple-array-signed-byte-32
           :importance 7)
          ;; KLUDGE: see above KLUDGE for the 32-bit case
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-         (fixnum 0 64 simple-array-signed-byte-61
+         (fixnum 0 64 simple-array-fixnum
           :importance 8
           :fixnum-p t)
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))

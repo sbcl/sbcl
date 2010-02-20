@@ -51,22 +51,20 @@
 (defun random-fixnum ()
   (random (1+ most-positive-fixnum)))
 
-(defconstant n-fixnum-bits #.(integer-length most-positive-fixnum))
-
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.
 (defmacro randomly-punting-lambda (lambda-list &body body)
   (with-unique-names (drops drop-pos)
     `(let ((,drops (random-fixnum))
-           (,drop-pos n-fixnum-bits))
+           (,drop-pos sb-vm:n-fixnum-bits))
        (declare (fixnum ,drops)
-                (type (integer 0 #.n-fixnum-bits) ,drop-pos))
+                (type (integer 0 #.sb-vm:n-fixnum-bits) ,drop-pos))
        (lambda ,lambda-list
          (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
            (locally ,@body))
          (when (zerop ,drop-pos)
            (setf ,drops (random-fixnum)
-                 ,drop-pos n-fixnum-bits))))))
+                 ,drop-pos sb-vm:n-fixnum-bits))))))
 
 ;;;; early definition of WRAPPER
 ;;;;

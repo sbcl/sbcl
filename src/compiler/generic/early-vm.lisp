@@ -22,8 +22,10 @@
 (def!constant n-fixnum-tag-bits (1- n-lowtag-bits))
 ;;; the fixnum tag mask
 (def!constant fixnum-tag-mask (1- (ash 1 n-fixnum-tag-bits)))
+;;; the bit width of fixnums
+(def!constant n-fixnum-bits (- n-word-bits n-fixnum-tag-bits))
 ;;; the bit width of positive fixnums
-(def!constant n-positive-fixnum-bits (- n-word-bits n-fixnum-tag-bits 1))
+(def!constant n-positive-fixnum-bits (1- n-fixnum-bits))
 
 ;;; the number of bits to shift between word addresses and byte addresses
 (def!constant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
