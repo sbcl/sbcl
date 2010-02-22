@@ -1017,7 +1017,7 @@
          ;; But a positive real to any power is well-defined.
          (merged-interval-expt x y))
         ((and (csubtypep x (specifier-type 'rational))
-              (csubtypep x (specifier-type 'rational)))
+              (csubtypep y (specifier-type 'rational)))
          ;; A rational to the power of a rational could be a rational
          ;; or a possibly-complex single float
          (specifier-type '(or rational single-float (complex single-float))))

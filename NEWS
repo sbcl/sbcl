@@ -23,16 +23,18 @@ changes relative to sbcl-1.0.35:
   * bug fix: Fix grammer and style issues for the docstrings of
     printer-related variables and functions.  (Thanks to mon_key; launchpad
     bug lp#518696)
-  * bug fix: fix compilation on chenygc platforms. Thanks to Larry Valkama and
+  * bug fix: Fix compilation on chenygc platforms. Thanks to Larry Valkama and
     Bruce O'Neel.
   * bug fix: SB-THREAD:CONDITION-WAIT sometimes signaled a deadline twice 
     in a row even though a handler defered the deadline long into the
     future. (lp#512914)
-  * bug fix: a deadline handler was run without interrupts enabled for a
+  * bug fix: A deadline handler was run without interrupts enabled for a
     deadline signaled within SB-THREAD:CONDITION-WAIT. That could result
     in infinitely spinning, non-killable threads.
-  * bug fix: backtrace from internal-errors on x86-64 os x was truncated
+  * bug fix: Backtrace from internal-errors on x86-64 os x was truncated
     before reaching the erring stack frame.
+  * bug fix: Fix type derivation for EXPT when raising a fixnum to a
+    real power.  (launchpad bug lp#525949)
 
 changes in sbcl-1.0.35 relative to sbcl-1.0.34:
   * optimization: ROUND with a single single-float or double-float argument
