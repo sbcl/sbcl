@@ -35,6 +35,8 @@ changes relative to sbcl-1.0.35:
     before reaching the erring stack frame.
   * bug fix: Fix type derivation for EXPT when raising a fixnum to a
     real power.  (launchpad bug lp#525949)
+  * bug fix: Fix SB-EXT:GENERATION-* accessors for generations > 0 on
+    GENCGC platforms.  (launchpad bug lp#529014)
 
 changes in sbcl-1.0.35 relative to sbcl-1.0.34:
   * optimization: ROUND with a single single-float or double-float argument
