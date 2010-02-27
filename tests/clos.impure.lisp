@@ -71,6 +71,15 @@
 (assert (expect-error (defgeneric foo5 (x &rest))))
 (assert (expect-error (defmethod foo6 (x &rest))))
 
+;;; legal method specializers
+(defclass bug-525916-1 () ())
+(defclass bug-525916-2 () ())
+(with-test (:name :bug-525916)
+(assert (expect-error (defmethod invalid ((arg)) arg)))
+(assert (expect-error (defmethod invalid (nil) 1)))
+(assert (expect-error (defmethod invalid ((arg . bug-525916-1)) arg)))
+(assert (expect-error (defmethod invalid ((arg bug-525916-1 bug-525916-2)) arg))))
+
 ;;; more lambda-list checking
 ;;;
 ;;; DEFGENERIC lambda lists are subject to various limitations, as per

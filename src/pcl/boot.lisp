@@ -2711,6 +2711,14 @@ bootstrapping.
           (t
            (multiple-value-bind (parameters lambda-list specializers required)
                (parse-specialized-lambda-list (cdr arglist))
+             ;; Check for valid arguments.
+             (unless (or (and (symbolp arg) (not (null arg)))
+                         (and (consp arg)
+                              (consp (cdr arg))
+                              (null (cddr arg))))
+               (error 'specialized-lambda-list-error
+                      :format-control "arg is not a non-NIL symbol or a list of two elements: ~A"
+                      :format-arguments (list arg)))
              (values (cons (if (listp arg) (car arg) arg) parameters)
                      (cons (if (listp arg) (car arg) arg) lambda-list)
                      (cons (if (listp arg) (cadr arg) t) specializers)

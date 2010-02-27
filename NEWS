@@ -37,6 +37,8 @@ changes relative to sbcl-1.0.35:
     real power.  (launchpad bug lp#525949)
   * bug fix: Fix SB-EXT:GENERATION-* accessors for generations > 0 on
     GENCGC platforms.  (launchpad bug lp#529014)
+  * bug fix: More robust checks for invalid DEFMETHOD argument specializers.
+    (launchpad bug lp#525916)
 
 changes in sbcl-1.0.35 relative to sbcl-1.0.34:
   * optimization: ROUND with a single single-float or double-float argument
