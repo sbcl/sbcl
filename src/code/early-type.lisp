@@ -580,7 +580,7 @@
   "Takes and expands a type specifier once like MACROEXPAND-1.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
-  (declare (type-specifier type-specifier))
+  (declare (type type-specifier type-specifier))
   (declare (ignore env))
   (multiple-value-bind (expander lspec)
       (let ((spec type-specifier))
@@ -607,7 +607,7 @@ expansion happened."
   "Takes and expands a type specifier repeatedly like MACROEXPAND.
 Returns two values: the expansion, and a boolean that is true when
 expansion happened."
-  (declare (type-specifier type-specifier))
+  (declare (type type-specifier type-specifier))
   (multiple-value-bind (expansion flag)
       (typexpand-1 type-specifier env)
     (if flag
@@ -617,7 +617,7 @@ expansion happened."
 (defun typexpand-all (type-specifier &optional env)
   #!+sb-doc
   "Takes and expands a type specifier recursively like MACROEXPAND-ALL."
-  (declare (type-specifier type-specifier))
+  (declare (type type-specifier type-specifier))
   (declare (ignore env))
   ;; I first thought this would not be a good implementation because
   ;; it signals an error on e.g. (CONS 1 2) until I realized that

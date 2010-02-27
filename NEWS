@@ -19,7 +19,7 @@ changes relative to sbcl-1.0.35:
     PRNG where possible.  (Thanks to Fare Rideau; launchpad bug lp#310116)
   * bug fix: Fix SB-SIMPLE-STREAMS:READ-VECTOR to correctly set the
     FILE-POSITION of the stream being read from.  (launchpad bug lp#491087)
-  * bug fix: Fix grammer and style issues for the docstrings of
+  * bug fix: Fix grammar and style issues for the docstrings of
     printer-related variables and functions.  (Thanks to mon_key; launchpad
     bug lp#518696)
   * bug fix: Fix compilation on chenygc platforms. Thanks to Larry Valkama and
