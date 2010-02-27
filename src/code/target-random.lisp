@@ -95,8 +95,26 @@
   provided randomness source where available, otherwise a poor substitute
   based on internal time and pid)
 
-  As an SBCL extension (starting with SBCL 1.0.33), we also support receiving
-  as a seed an object of the following types:
+  See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
+  (/show0 "entering MAKE-RANDOM-STATE")
+  (check-type state (or boolean random-state))
+  (seed-random-state state))
+
+(defun seed-random-state (&optional state)
+  #!+sb-doc
+  "Make a random state object. The optional STATE argument specifies a seed
+  for deterministic pseudo-random number generation.
+
+  As per the Common Lisp standard for MAKE-RANDOM-STATE,
+  - If STATE is NIL or not supplied or is NIL, return a copy of the default
+  *RANDOM-STATE*.
+  - If STATE is a random state, return a copy of it.
+  - If STATE is T, return a randomly initialized state (using operating-system
+  provided randomness source where available, otherwise a poor substitute
+  based on internal time and pid)
+
+  As a supported SBCL extension, we also support receiving as a seed an object
+  of the following types:
   - (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*))
   - UNSIGNED-BYTE
   While we support arguments of any size and will mix the provided bits into
@@ -110,7 +128,6 @@
   internal state only effectively contains about 19937 bits of information.
   http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 "
-  (/show0 "entering MAKE-RANDOM-STATE")
   (etypecase state
     ;; Easy standard cases
     (null
@@ -122,7 +139,7 @@
     ;; Standard case, less easy: try to randomly initialize a state.
     ((eql t)
      (/show0 "getting randomness from the operating system")
-     (make-random-state
+     (seed-random-state
       (or
        ;; On unices, we try to read from /dev/urandom and pass the results
        ;; to our (simple-array (unsigned-byte 32) (*)) processor below.
@@ -165,7 +182,7 @@
                      (+ (aref state q)
                         (if (< 1 r) (ash (aref state (+ q 1)) 8) 0)
                         (if (= 3 r) (ash (aref state (+ q 2)) 16) 0)))))
-             (make-random-state y)))
+             (seed-random-state y)))
     ;; Also for convenience, we accept non-negative integers as seeds.
     ;; Small ones get passed to init-random-state, as before.
     ((unsigned-byte 32)
@@ -179,7 +196,7 @@
        for i below l
        for p from 0 by 32
        do (setf (aref s i) (ldb (byte 32 p) state))
-       finally (return (make-random-state s))))
+       finally (return (seed-random-state s))))
     ;; Last but not least, when provided an array of 32-bit words, we truncate
     ;; it to 19968 bits and mix these into an initial state. We reuse the same
     ;; method as the authors of the original algorithm. See

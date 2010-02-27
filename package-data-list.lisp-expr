@@ -756,6 +756,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*ED-FUNCTIONS*"
                "*MODULE-PROVIDER-FUNCTIONS*"
                "WITH-TIMEOUT" "TIMEOUT"
+               "SEED-RANDOM-STATE"
                "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
                "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
 

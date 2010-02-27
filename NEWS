@@ -12,12 +12,11 @@ changes relative to sbcl-1.0.35:
     returns the function's declared, or derived FTYPE.
   * new feature: SB-POSIX now supports accessing the d_ino member of
     dirent structures.  (Thanks to Philipp Marek and Pierre THEIRRY)
-  * new feature: MAKE-RANDOM-STATE has been extended to accept octet vectors,
-    (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)), and UNSIGNED-BYTE arguments in
-    addition to the ones documented in the language specification.  Also,
-    (MAKE-RANDOM-STATE T) will attempt to initialize the returned state
-    from the operating system's PRNG where possible.  (Thanks to
-    Fare Rideau; launchpad bug lp#310116)
+  * new feature: The function SB-EXT:SEED-RANDOM-STATE has been added to
+    provide for seeding a RANDOM-STATE object with user-provided data or
+    from the operating system's PRNG.  Also, (MAKE-RANDOM-STATE T) will
+    attempt to initialize the returned state from the operating system's
+    PRNG where possible.  (Thanks to Fare Rideau; launchpad bug lp#310116)
   * bug fix: Fix SB-SIMPLE-STREAMS:READ-VECTOR to correctly set the
     FILE-POSITION of the stream being read from.  (launchpad bug lp#491087)
   * bug fix: Fix grammer and style issues for the docstrings of
