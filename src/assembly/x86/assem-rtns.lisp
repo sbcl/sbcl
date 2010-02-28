@@ -213,7 +213,7 @@
   (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (throw
-                          (:return-style :none))
+                          (:return-style :raw))
                          ((:arg target (descriptor-reg any-reg) edx-offset)
                           (:arg start any-reg ebx-offset)
                           (:arg count any-reg ecx-offset)
@@ -225,7 +225,17 @@
 
   LOOP
 
-  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
+  (let ((error (gen-label)))
+    (assemble (*elsewhere*)
+      (emit-label error)
+
+      ;; Fake up a stack frame so that backtraces come out right.
+      (inst push ebp-tn)
+      (inst mov ebp-tn esp-tn)
+
+      (emit-error-break nil error-trap
+                        (error-number-or-lose 'unseen-throw-tag-error)
+                        (list target)))
     (inst or catch catch)               ; check for NULL pointer
     (inst jmp :z error))
 

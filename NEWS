@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.36:
+  * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
+    stack frame thrown from.
+
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and
     SB-EXT:TYPEXPAND-ALL behave exactly like their MACROEXPAND counterparts

@@ -218,7 +218,7 @@
                               fun-pointer-lowtag))))
 
 (define-assembly-routine (throw
-                          (:return-style :none))
+                          (:return-style :raw))
                          ((:arg target (descriptor-reg any-reg) rdx-offset)
                           (:arg start any-reg rbx-offset)
                           (:arg count any-reg rcx-offset)
@@ -230,7 +230,17 @@
 
   LOOP
 
-  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
+  (let ((error (gen-label)))
+    (assemble (*elsewhere*)
+      (emit-label error)
+
+      ;; Fake up a stack frame so that backtraces come out right.
+      (inst push rbp-tn)
+      (inst mov rbp-tn rsp-tn)
+
+      (emit-error-break nil error-trap
+                        (error-number-or-lose 'unseen-throw-tag-error)
+                        (list target)))
     (inst or catch catch)               ; check for NULL pointer
     (inst jmp :z error))
 
