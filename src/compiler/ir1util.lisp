@@ -2190,8 +2190,11 @@ is :ANY, the function name is not checked."
                 (not (null (member (leaf-source-name leaf) names
                                    :test #'equal))))))))
 
+;;; Return true if LVAR's only use is a call to one of the named functions
+;;; (or any function if none are specified) with the specified number of
+;;; of arguments (or any number if number is not specified)
 (defun lvar-matches (lvar &key fun-names arg-count)
-  (let ((use (lvar-use lvar)))
+  (let ((use (lvar-uses lvar)))
     (and (combination-p use)
          (or (not fun-names)
              (multiple-value-bind (name ok)

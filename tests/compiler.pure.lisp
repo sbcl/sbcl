@@ -3419,3 +3419,13 @@
                 (compile nil src))))
     (assert (not warningp))
     (assert (= 1.0d0 (funcall fun)))))
+
+(with-test (:name :bug-523612)
+  (let ((fun
+         (compile nil
+                  `(lambda (&key toff)
+                     (make-array 3 :element-type 'double-float
+                                 :initial-contents
+                                 (if toff (list toff 0d0 0d0) (list 0d0 0d0 0d0)))))))
+    (assert (equalp (vector 0.0d0 0.0d0 0.0d0) (funcall fun :toff nil)))
+    (assert (equalp (vector 2.3d0 0.0d0 0.0d0) (funcall fun :toff 2.3d0)))))
