@@ -118,7 +118,7 @@
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t)
-                               (prin1 (class-info-name x)))))
+                               (prin1 (class-info-name x) s))))
             (:copier nil))
   ;; name of this class
   (name nil :type keyword :read-only t)
