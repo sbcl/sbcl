@@ -2,6 +2,9 @@
 changes relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
     stack frame thrown from.
+  * optimization: SLOT-VALUE and (SETF SLOT-VALUE) take advantage of
+    constraint propgation, allowing better compilation eg. when used to
+    access structures with WITH-SLOTS. (lp#520366)
   * bug fix: Fix compiler error involving MAKE-ARRAY and IF forms
     in :INITIAL-CONTENTS. (lp#523612)
   * bug fix: FUNCTION-LAMBDA-EXPRESSION lost declarations from interpreted

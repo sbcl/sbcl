@@ -43,7 +43,8 @@
 (defknown slot-value (t symbol) t (any))
 (defknown sb-pcl::set-slot-value (t symbol t) t (any))
 
-(deftransform slot-value ((object slot-name) (t (constant-arg symbol)))
+(deftransform slot-value ((object slot-name) (t (constant-arg symbol)) *
+                          :node node)
   (let ((c-slot-name (lvar-value slot-name)))
     (if (sb-pcl::interned-symbol-p c-slot-name)
         (let* ((type (lvar-type object))
@@ -52,9 +53,11 @@
                       (sb-kernel::structure-classoid-name type))))
                (dsd (when dd
                       (find c-slot-name (dd-slots dd) :key #'dsd-name))))
-          (if dsd
-              `(,(dsd-accessor-name dsd) object)
-              `(sb-pcl::accessor-slot-value object ',c-slot-name)))
+          (cond (dsd
+                 `(,(dsd-accessor-name dsd) object))
+                (t
+                 (delay-ir1-transform node :constraint)
+                 `(sb-pcl::accessor-slot-value object ',c-slot-name))))
         (give-up-ir1-transform "slot name is not an interned symbol"))))
 
 (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
@@ -68,12 +71,14 @@
                       (sb-kernel::structure-classoid-name type))))
                (dsd (when dd
                       (find c-slot-name (dd-slots dd) :key #'dsd-name))))
-          (if dsd
-              `(setf (,(dsd-accessor-name dsd) object) new-value)
-              (if (policy node (= safety 3))
-                  ;; Safe code wants to check the type, and the global
-                  ;; accessor won't do that. Also see the comment in the
-                  ;; compiler-macro.
-                  (give-up-ir1-transform "cannot use optimized accessor in safe code")
-                  `(sb-pcl::accessor-set-slot-value object ',c-slot-name new-value))))
+          (cond (dsd
+                 `(setf (,(dsd-accessor-name dsd) object) new-value))
+                ((policy node (= safety 3))
+                 ;; Safe code wants to check the type, and the global
+                 ;; accessor won't do that. Also see the comment in the
+                 ;; compiler-macro.
+                 (give-up-ir1-transform "cannot use optimized accessor in safe code"))
+                (t
+                 (delay-ir1-transform node :constraint)
+                 `(sb-pcl::accessor-set-slot-value object ',c-slot-name new-value))))
         (give-up-ir1-transform "slot name is not an interned symbol"))))

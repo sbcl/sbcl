@@ -11,8 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "compiler-test-util.lisp")
 (defpackage "CLOS-IMPURE"
-  (:use "CL" "ASSERTOID" "TEST-UTIL"))
+  (:use "CL" "ASSERTOID" "TEST-UTIL" "COMPILER-TEST-UTIL"))
 (in-package "CLOS-IMPURE")
 
 ;;; It should be possible to do DEFGENERIC and DEFMETHOD referring to
@@ -1785,5 +1786,23 @@
       (setf array (make-array 4)))
     bug-485019)
   (bug-485019 (make-instance 'bug-485019)))
+
+;;; The compiler didn't propagate the declarared type before applying
+;;; the transform for (SETF SLOT-VALUE), so the generic accessor was used.
+(defstruct foo-520366
+  slot)
+(defun quux-520366 (cont)
+  (funcall cont))
+(defun bar-520366 (foo-struct)
+  (declare (type foo-520366 foo-struct))
+  (with-slots (slot) foo-struct
+    (tagbody
+       (quux-520366 #'(lambda ()
+                        (setf slot :value)
+                        (go TAG)))
+     TAG)))
+(with-test (:name :bug-520366)
+  (let ((callees (find-named-callees #'bar-520366)))
+    (assert (equal (list #'quux) callees))))
 
 ;;;; success
