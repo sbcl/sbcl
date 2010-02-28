@@ -3446,3 +3446,12 @@
                                  (if toff (list toff 0d0 0d0) (list 0d0 0d0 0d0)))))))
     (assert (equalp (vector 0.0d0 0.0d0 0.0d0) (funcall fun :toff nil)))
     (assert (equalp (vector 2.3d0 0.0d0 0.0d0) (funcall fun :toff 2.3d0)))))
+
+(with-test (:name :bug-309788)
+  (let ((fun
+         (compile nil
+                  `(lambda (x)
+                     (declare (optimize speed))
+                     (let ((env nil))
+                       (typep x 'fixnum env))))))
+    (assert (not (ctu:find-named-callees fun)))))

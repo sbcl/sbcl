@@ -57,9 +57,11 @@
 ;;; constant. At worst, it will convert to %TYPEP, which will prevent
 ;;; spurious attempts at transformation (and possible repeated
 ;;; warnings.)
-(deftransform typep ((object type) * * :node node)
+(deftransform typep ((object type &optional env) * * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform "can't open-code test of non-constant type"))
+  (unless (and (constant-lvar-p env) (null (lvar-value env)))
+    (give-up-ir1-transform "environment argument present and not null"))
   (multiple-value-bind (expansion fail-p)
       (source-transform-typep 'object (lvar-value type))
     (if fail-p
@@ -584,14 +586,15 @@
           (t nil))
         `(%typep ,object ',type))))
 
-(define-source-transform typep (object spec)
+(define-source-transform typep (object spec &optional env)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
   ;; out that the DEFTRANSFORM for TYPEP detects any constant
   ;; lvar, transforms it into a quoted form, and gives this
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
-  (if (and (consp spec)
+  (if (and (not env)
+           (consp spec)
            (eq (car spec) 'quote)
            (or (not *allow-instrumenting*)
                (policy *lexenv* (= store-coverage-data 0))))
