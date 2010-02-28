@@ -36,8 +36,11 @@
     (sb!eval:interpreted-function
      (let ((name (sb!eval:interpreted-function-name fun))
            (lambda-list (sb!eval:interpreted-function-lambda-list fun))
+           (declarations (sb!eval:interpreted-function-declarations fun))
            (body (sb!eval:interpreted-function-body fun)))
-       (values `(lambda ,lambda-list ,@body)
+       (values `(lambda ,lambda-list
+                  ,@(when declarations `((declare ,@declarations)))
+                  ,@body)
                t name)))
     (function
      (let* ((fun (%simple-fun-self (%fun-fun fun)))

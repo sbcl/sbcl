@@ -249,4 +249,10 @@
               (simple-type-error () 'error)))
       t)))
 
+(with-test (:name :bug-524707)
+  (let ((*evaluator-mode* :interpret)
+        (lambda-form '(lambda (x) (declare (fixnum x)) (1+ x))))
+    (let ((fun (eval lambda-form)))
+      (assert (equal lambda-form (function-lambda-expression fun))))))
+
 ;;; success
