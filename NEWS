@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.36:
     in :INITIAL-CONTENTS. (lp#523612)
   * bug fix: FUNCTION-LAMBDA-EXPRESSION lost declarations from interpreted
     functions. (lp#524707)
+  * bug fix: bogus style warnings from certain (SETF SLOT-VALUE) and
+    WITH-SLOTS usages during compilation.
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

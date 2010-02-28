@@ -453,5 +453,13 @@ cat > $tmpfilename <<EOF
   (error "ERROR within EVAL-WHEN."))
 EOF
 expect_condition_during_compile sb-c:compiler-error $tmpfilename
+
+cat > $tmpfilename <<EOF
+(defun slot-name-incf (s)
+  (with-slots (no-such-slot) s
+    (incf no-such-slot)))
+EOF
+expect_clean_cload $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

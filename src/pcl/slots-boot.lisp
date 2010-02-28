@@ -56,18 +56,21 @@
     (setf reader-specializers (mapcar #'find-class reader-specializers))
     (setf writer-specializers (mapcar #'find-class writer-specializers))))
 
+(defmacro quiet-funcall (fun &rest args)
+  ;; Don't give a style-warning about undefined function here.
+  `(funcall (locally (declare (muffle-conditions style-warning))
+              ,fun)
+            ,@args))
+
 (defmacro accessor-slot-value (object slot-name &environment env)
   (aver (constantp slot-name env))
   (let* ((slot-name (constant-form-value slot-name env))
          (reader-name (slot-reader-name slot-name)))
     `(let ((.ignore. (load-time-value
                       (ensure-accessor 'reader ',reader-name ',slot-name))))
-      (declare (ignore .ignore.))
-      (truly-the (values t &optional)
-                 ;; Don't give a style-warning about undefined function here.
-                 (funcall (locally (declare (muffle-conditions style-warning))
-                            #',reader-name)
-                          ,object)))))
+       (declare (ignore .ignore.))
+       (truly-the (values t &optional)
+                  (quiet-funcall #',reader-name ,object)))))
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
   (aver (constantp slot-name env))
@@ -85,7 +88,7 @@
                    (ensure-accessor 'writer ',writer-name ',slot-name)))
                  (.new-value. ,new-value))
             (declare (ignore .ignore.))
-            (funcall #',writer-name .new-value. ,object)
+            (quiet-funcall #',writer-name .new-value. ,object)
             .new-value.)))
     (if bind-object
         `(let ,bind-object ,form)
