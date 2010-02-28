@@ -264,14 +264,32 @@
                              sb!vm:vector-data-offset
                              index offset t))))
 
-(defoptimizer (%data-vector-and-index derive-type) ((array index))
-  (let ((atype (lvar-type array)))
+(defun maybe-array-data-vector-type-specifier (array-lvar)
+  (let ((atype (lvar-type array-lvar)))
     (when (array-type-p atype)
-      (values-specifier-type
-       `(values (simple-array ,(type-specifier
-                                (array-type-specialized-element-type atype))
-                              (*))
-                index)))))
+      (let ((dims (array-type-dimensions atype)))
+        (if (or (array-type-complexp atype)
+                (eq '* dims)
+                (notevery #'integerp dims))
+           `(simple-array ,(type-specifier
+                            (array-type-specialized-element-type atype))
+                          (*))
+           `(simple-array ,(type-specifier
+                            (array-type-specialized-element-type atype))
+                          (,(apply #'* dims))))))))
+
+(macrolet ((def (name)
+             `(defoptimizer (,name derive-type) ((array-lvar))
+                (let ((spec (maybe-array-data-vector-type-specifier array-lvar)))
+                  (when spec
+                    (specifier-type spec))))))
+  (def %array-data-vector)
+  (def array-storage-vector))
+
+(defoptimizer (%data-vector-and-index derive-type) ((array index))
+  (let ((spec (maybe-array-data-vector-type-specifier array)))
+    (when spec
+      (values-specifier-type `(values ,spec index)))))
 
 (deftransform %data-vector-and-index ((%array %index)
                                       (simple-array t)

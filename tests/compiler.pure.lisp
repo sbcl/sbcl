@@ -3420,6 +3420,23 @@
     (assert (not warningp))
     (assert (= 1.0d0 (funcall fun)))))
 
+(with-test (:name :%array-data-vector-type-derivation)
+  (let* ((f (compile nil
+                     `(lambda (ary)
+                        (declare (type (simple-array (unsigned-byte 32) (3 3)) ary))
+                        (setf (aref ary 0 0) 0))))
+         (text (with-output-to-string (s)
+                 (disassemble f :stream s))))
+    (assert (not (search "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR" text)))))
+
+(with-test (:name :array-storage-vector-type-derivation)
+  (let ((f (compile nil
+                    `(lambda (ary)
+                       (declare (type (simple-array (unsigned-byte 32) (3 3)) ary))
+                       (ctu:compiler-derived-type (array-storage-vector ary))))))
+    (assert (equal '(simple-array (unsigned-byte 32) (9))
+                   (funcall f (make-array '(3 3) :element-type '(unsigned-byte 32)))))))
+
 (with-test (:name :bug-523612)
   (let ((fun
          (compile nil

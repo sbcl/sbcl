@@ -1388,6 +1388,9 @@
 (defknown get-bytes-consed () unsigned-byte (flushable))
 (defknown mask-signed-field ((integer 0 *) integer) integer
           (movable flushable foldable))
+
+(defknown array-storage-vector (array) (simple-array * (*))
+    (any))
 
 ;;;; magical compiler frobs
 
