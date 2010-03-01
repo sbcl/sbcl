@@ -1803,6 +1803,6 @@
      TAG)))
 (with-test (:name :bug-520366)
   (let ((callees (find-named-callees #'bar-520366)))
-    (assert (equal (list #'quux) callees))))
+    (assert (equal (list #'quux-520366) callees))))
 
 ;;;; success
