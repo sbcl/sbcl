@@ -298,6 +298,17 @@ is_valid_lisp_addr(os_vm_address_t addr)
 /* A tiny bit of interrupt.c state we want our paws on. */
 extern boolean internal_errors_enabled;
 
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
+#define IS_TRAP_EXCEPTION(exception_record, context) \
+    (((exception_record)->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION) && \
+     (((unsigned short *)((context)->Eip))[0] == 0x0b0f))
+#define TRAP_CODE_WIDTH 2
+#else
+#define IS_TRAP_EXCEPTION(exception_record, context) \
+    ((exception_record)->ExceptionCode == EXCEPTION_BREAKPOINT)
+#define TRAP_CODE_WIDTH 1
+#endif
+
 /*
  * A good explanation of the exception handling semantics is
  * http://win32assembly.online.fr/Exceptionhandling.html .
@@ -330,7 +341,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         return ExceptionContinueExecution;
     }
 
-    if (exception_record->ExceptionCode == EXCEPTION_BREAKPOINT) {
+    if (IS_TRAP_EXCEPTION(exception_record, context)) {
         unsigned char trap;
         /* This is just for info in case the monitor wants to print an
          * approximation. */
@@ -338,7 +349,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
             (lispobj *)*os_context_sp_addr(context);
         /* Unlike some other operating systems, Win32 leaves EIP
          * pointing to the breakpoint instruction. */
-        context->Eip++;
+        context->Eip += TRAP_CODE_WIDTH;
         /* Now EIP points just after the INT3 byte and aims at the
          * 'kind' value (eg trap_Cerror). */
         trap = *(unsigned char *)(*os_context_pc_addr(context));

@@ -35,7 +35,7 @@
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
-                   (fpaff '(:sb-thread :sb-package-locks :sb-unicode :gencgc)))
+                   (fpaff '(:sb-thread :sb-package-locks :sb-unicode :gencgc :ud2-breakpoints)))
                `(progn
                   ;; a list of *(SHEBANG-)FEATURES* flags which affect
                   ;; binary compatibility, i.e. which must be the same

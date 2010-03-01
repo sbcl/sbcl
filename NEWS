@@ -18,7 +18,7 @@ changes relative to sbcl-1.0.36:
     WITH-SLOTS usages during compilation.
   * bug fix: SB-C::CLASS-INFO now prints correctly (lp#514762)
   * enhancement: Can now build with ud2 instead of int3 as trap instruction on
-    all x86oid platforms (except win32) with :UD2-BREAKPOINTS target feature.
+    all x86oid platforms with :UD2-BREAKPOINTS target feature.
   * bug fix: Breakpoints now work when using ud2 instead of int3 as trap
     instruction (tested on x86oid linux with ud2-breakpoints).
 
