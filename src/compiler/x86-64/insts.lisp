@@ -2900,13 +2900,13 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
-    ;; FIXME: Make sure that BYTE-IMM-CODE is defined. The genesis
-    ;; map has it undefined; and it should be easier to look in the target
-    ;; Lisp (with (DESCRIBE 'BYTE-IMM-CODE)) than to definitively deduce
-    ;; from first principles whether it's defined in some way that genesis
-    ;; can't grok.
-    (case #!-darwin (byte-imm-code chunk dstate)
-          #!+darwin (word-imm-code chunk dstate)
+    ;; XXX: {BYTE,WORD}-IMM-CODE below is a macro defined by the
+    ;; DEFINE-INSTRUCTION-FORMAT for {BYTE,WORD}-IMM above.  Due to
+    ;; the spectacular design for DEFINE-INSTRUCTION-FORMAT (involving
+    ;; a call to EVAL in order to define the macros at compile-time
+    ;; only) they do not even show up as symbols in the target core.
+    (case #!-ud2-breakpoints (byte-imm-code chunk dstate)
+          #!+ud2-breakpoints (word-imm-code chunk dstate)
       (#.error-trap
        (nt "error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
@@ -2928,17 +2928,17 @@
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
-  #!-darwin (:printer byte-imm ((op #b11001100)) '(:name :tab code)
-                     :control #'break-control)
-  #!+darwin (:printer word-imm ((op #b0000101100001111)) '(:name :tab code)
-                     :control #'break-control)
+  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100)) '(:name :tab code)
+                               :control #'break-control)
+  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111)) '(:name :tab code)
+                               :control #'break-control)
   (:emitter
-   #!-darwin (emit-byte segment #b11001100)
+   #!-ud2-breakpoints (emit-byte segment #b11001100)
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
    ;; throw a sigill with 0x0b0f instead and check for this in the
    ;; SIGILL handler and pass it on to the sigtrap handler if
    ;; appropriate
-   #!+darwin (emit-word segment #b0000101100001111)
+   #!+ud2-breakpoints (emit-word segment #b0000101100001111)
    (emit-byte segment code)))
 
 (define-instruction int (segment number)

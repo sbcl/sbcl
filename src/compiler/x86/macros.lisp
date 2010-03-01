@@ -290,7 +290,7 @@
 ;;;; error code
 (defun emit-error-break (vop kind code values)
   (assemble ()
-    #!-darwin
+    #!-ud2-breakpoints
     (inst int 3)                        ; i386 breakpoint instruction
     ;; CLH 20060314
     ;; On Darwin, we need to use #x0b0f instead of int3 in order
@@ -298,7 +298,7 @@
     ;; doesn't seem to be reliably firing SIGTRAP
     ;; handlers. Hopefully this will be fixed by Apple at a
     ;; later date.
-    #!+darwin
+    #!+ud2-breakpoints
     (inst word #x0b0f)
     ;; The return PC points here; note the location for the debugger.
     (when vop

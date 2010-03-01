@@ -17,6 +17,10 @@ changes relative to sbcl-1.0.36:
   * bug fix: bogus style warnings from certain (SETF SLOT-VALUE) and
     WITH-SLOTS usages during compilation.
   * bug fix: SB-C::CLASS-INFO now prints correctly (lp#514762)
+  * enhancement: Can now build with ud2 instead of int3 as trap instruction on
+    all x86oid platforms (except win32) with :UD2-BREAKPOINTS target feature.
+  * bug fix: Breakpoints now work when using ud2 instead of int3 as trap
+    instruction (tested on x86oid linux with ud2-breakpoints).
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

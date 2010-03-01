@@ -67,7 +67,7 @@
  * for this instruction in the SIGILL handler and if we see it, we
  * advance the EIP by two bytes to skip over ud2 instruction and
  * call sigtrap_handler. */
-#if defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_UD2_BREAKPOINTS)
 #define TRAP ud2
 #else
 #define TRAP int3
