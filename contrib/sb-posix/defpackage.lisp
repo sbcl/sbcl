@@ -9,7 +9,7 @@
            #:filename
 
            ;; grovel structure accessors
-           #:dirent-name #:dirent-ino
+           #:dirent-name #-win32 #:dirent-ino
 
            ;; wrapper class accessors
            #:passwd-name #:passwd-passwd #:passwd-uid #:passwd-gid
