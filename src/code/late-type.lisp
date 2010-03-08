@@ -3375,42 +3375,45 @@ used for a COMPLEX component.~:@>"
 ;;; type without that particular element. This seems too hairy to be
 ;;; worthwhile, given its low utility.
 (defun type-difference (x y)
-  (let ((x-types (if (union-type-p x) (union-type-types x) (list x)))
-        (y-types (if (union-type-p y) (union-type-types y) (list y))))
-    (collect ((res))
-      (dolist (x-type x-types)
-        (if (member-type-p x-type)
-            (let ((xset (alloc-xset))
-                  (fp-zeroes nil))
-              (mapc-member-type-members
-               (lambda (elt)
-                 (multiple-value-bind (ok sure) (ctypep elt y)
-                   (unless sure
-                     (return-from type-difference nil))
-                   (unless ok
-                     (if (fp-zero-p elt)
-                         (pushnew elt fp-zeroes)
-                         (add-to-xset elt xset)))))
-               x-type)
-              (unless (and (xset-empty-p xset) (not fp-zeroes))
-                (res (make-member-type :xset xset :fp-zeroes fp-zeroes))))
-            (dolist (y-type y-types (res x-type))
-              (multiple-value-bind (val win) (csubtypep x-type y-type)
-                (unless win (return-from type-difference nil))
-                (when val (return))
-                (when (types-equal-or-intersect x-type y-type)
-                  (return-from type-difference nil))))))
-      (let ((y-mem (find-if #'member-type-p y-types)))
-        (when y-mem
+  (if (and (numeric-type-p x) (numeric-type-p y))
+      ;; Numeric types are easy. Are there any others we should handle like this?
+      (type-intersection x (type-negation y))
+      (let ((x-types (if (union-type-p x) (union-type-types x) (list x)))
+            (y-types (if (union-type-p y) (union-type-types y) (list y))))
+        (collect ((res))
           (dolist (x-type x-types)
-            (unless (member-type-p x-type)
-              (mapc-member-type-members
-               (lambda (member)
-                 (multiple-value-bind (ok sure) (ctypep member x-type)
-                   (when (or (not sure) ok)
-                     (return-from type-difference nil))))
-               y-mem)))))
-      (apply #'type-union (res)))))
+            (if (member-type-p x-type)
+                (let ((xset (alloc-xset))
+                      (fp-zeroes nil))
+                  (mapc-member-type-members
+                   (lambda (elt)
+                     (multiple-value-bind (ok sure) (ctypep elt y)
+                       (unless sure
+                         (return-from type-difference nil))
+                       (unless ok
+                         (if (fp-zero-p elt)
+                             (pushnew elt fp-zeroes)
+                             (add-to-xset elt xset)))))
+                   x-type)
+                  (unless (and (xset-empty-p xset) (not fp-zeroes))
+                    (res (make-member-type :xset xset :fp-zeroes fp-zeroes))))
+                (dolist (y-type y-types (res x-type))
+                  (multiple-value-bind (val win) (csubtypep x-type y-type)
+                    (unless win (return-from type-difference nil))
+                    (when val (return))
+                    (when (types-equal-or-intersect x-type y-type)
+                      (return-from type-difference nil))))))
+          (let ((y-mem (find-if #'member-type-p y-types)))
+            (when y-mem
+              (dolist (x-type x-types)
+                (unless (member-type-p x-type)
+                  (mapc-member-type-members
+                   (lambda (member)
+                     (multiple-value-bind (ok sure) (ctypep member x-type)
+                       (when (or (not sure) ok)
+                         (return-from type-difference nil))))
+                   y-mem)))))
+          (apply #'type-union (res))))))
 
 (!def-type-translator array (&optional (element-type '*)
                                        (dimensions '*))

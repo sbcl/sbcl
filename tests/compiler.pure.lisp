@@ -3455,3 +3455,21 @@
                      (let ((env nil))
                        (typep x 'fixnum env))))))
     (assert (not (ctu:find-named-callees fun)))))
+
+(with-test (:name :bug-309124)
+  (let ((fun
+         (compile nil
+                  `(lambda (x)
+                     (declare (integer x))
+                     (declare (optimize speed))
+                     (cond ((typep x 'fixnum)
+                            "hala")
+                           ((typep x 'fixnum)
+                            "buba")
+                           ((typep x 'bignum)
+                            "hip")
+                           (t
+                            "zuz"))))))
+    (assert (equal (list "hala" "hip")
+                   (sort (ctu:find-code-constants fun :type 'string)
+                         #'string<)))))

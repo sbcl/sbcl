@@ -18,6 +18,7 @@
            #:assert-no-consing
            #:compiler-derived-type
            #:find-value-cell-values
+           #:find-code-constants
            #:find-named-callees))
 
 (cl:in-package :ctu)
@@ -48,6 +49,13 @@
                            (or (not namep)
                                (equal name (sb-impl::fdefn-name c))))))
           collect (sb-impl::fdefn-fun c))))
+
+(defun find-code-constants (fun &key (type t))
+  (let ((code (sb-kernel:fun-code-header (sb-kernel:%fun-fun fun))))
+    (loop for i from sb-vm::code-constants-offset below (sb-kernel:get-header-data code)
+          for c = (sb-kernel:code-header-ref code i)
+          when (typep c type)
+          collect c)))
 
 (defmacro assert-no-consing (form &optional times)
   `(%assert-no-consing (lambda () ,form) ,times))
