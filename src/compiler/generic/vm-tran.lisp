@@ -112,8 +112,9 @@
 ;;; only made for bigger and up 1o 100% slower code.
 (deftransform hairy-data-vector-ref ((array index) (simple-array t) *)
   "avoid runtime dispatch on array element type"
-  (let ((element-ctype (extract-upgraded-element-type array))
-        (declared-element-ctype (extract-declared-element-type array)))
+  (let* ((type (lvar-type array))
+         (element-ctype (array-type-upgraded-element-type type))
+         (declared-element-ctype (array-type-declared-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -200,8 +201,9 @@
                                      (simple-array t t)
                                      *)
   "avoid runtime dispatch on array element type"
-  (let ((element-ctype (extract-upgraded-element-type array))
-        (declared-element-ctype (extract-declared-element-type array)))
+  (let* ((type (lvar-type array))
+         (element-ctype (array-type-upgraded-element-type type))
+         (declared-element-ctype (array-type-declared-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform

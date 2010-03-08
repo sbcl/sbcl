@@ -23,6 +23,8 @@ changes relative to sbcl-1.0.36:
     instruction (tested on x86oid linux with ud2-breakpoints).
   * bug fix: slam.sh now works on win32.
   * bug fix: better differences of numeric types (lp#309124)
+  * bug fix: arrays declared intersection and union types can have their
+    upgraded element type derived (lp#316078)
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

@@ -3473,3 +3473,14 @@
     (assert (equal (list "hala" "hip")
                    (sort (ctu:find-code-constants fun :type 'string)
                          #'string<)))))
+
+(with-test (:name :bug-316078)
+  (let ((fun
+         (compile nil
+                  `(lambda (x)
+                     (declare (type (and simple-bit-vector (satisfies bar)) x)
+                              (optimize speed))
+                     (elt x 5)))))
+    (assert (not (ctu:find-named-callees fun)))
+    (assert (= 1 (funcall fun #*000001)))
+    (assert (= 0 (funcall fun #*000010)))))

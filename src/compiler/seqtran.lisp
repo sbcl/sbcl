@@ -518,9 +518,9 @@
                     (vector t &key (:start t) (:end t))
                     *
                     :node node)
-  (let* ((element-ctype (extract-upgraded-element-type seq))
+  (let* ((type (lvar-type seq))
+         (element-ctype (array-type-upgraded-element-type type))
          (element-type (type-specifier element-ctype))
-         (type (lvar-type seq))
          (saetp (unless (eq *wild-type* element-ctype)
                   (find-saetp-by-ctype element-ctype))))
     (cond ((eq *wild-type* element-ctype)
