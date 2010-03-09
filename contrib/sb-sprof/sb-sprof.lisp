@@ -483,7 +483,7 @@ profiling")
           'trace-start))
   (incf (samples-index samples) 2))
 
-;;; List of thread currently profiled, or T for all threads.
+;;; List of thread currently profiled, or :ALL for all threads.
 (defvar *profiled-threads* nil)
 (declaim (type (or list (member :all)) *profiled-threads*))
 
@@ -798,7 +798,7 @@ The following keyword args are recognized:
          (let ((alloc-signal (1- alloc-interval)))
            #+sb-thread
            (progn
-             (when (eq t threads)
+             (when (eq :all threads)
                ;; Set the value new threads inherit.
                (sb-thread::with-all-threads-lock
                  (setf sb-thread::*default-alloc-signal* alloc-signal)))
@@ -1259,7 +1259,9 @@ The following keyword args are recognized:
 
 Value of this function is a CALL-GRAPH object representing the
 resulting call-graph, or NIL if there are no samples (eg. right after
-calling RESET.)"
+calling RESET.)
+
+Profiling is stopped before the call graph is generated."
   (cond (*samples*
          (let ((graph (or call-graph (make-call-graph most-positive-fixnum))))
            (ecase type
