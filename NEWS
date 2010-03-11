@@ -10,6 +10,8 @@ changes relative to sbcl-1.0.36:
     for accessing such arrays.
   * optimization: passing NIL as the environment argument to TYPEP no longer
     inhibits optimizing it. (lp#309788)
+  * optimization: ADJUST-ARRAY and STABLE-SORT on vectors no longer use
+    pre-allocated temporary vectors. (lp#496249)
   * bug fix: Fix compiler error involving MAKE-ARRAY and IF forms
     in :INITIAL-CONTENTS. (lp#523612)
   * bug fix: FUNCTION-LAMBDA-EXPRESSION lost declarations from interpreted

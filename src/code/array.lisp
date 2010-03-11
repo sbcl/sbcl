@@ -1170,36 +1170,8 @@ function to be removed without further warning."
                      (%array-data-vector array))
                  array)))
 
-;;;; used by SORT
-
-;;; temporary vector for stable sorting vectors, allocated for each new thread
-(defvar *merge-sort-temp-vector* (vector))
-(declaim (simple-vector *merge-sort-temp-vector*))
 
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
-
-;;; a temporary to be used when OLD-DATA and NEW-DATA are EQ.
-;;; KLUDGE: Boy, DYNAMIC-EXTENT would be nice. This is rebound
-;;; to length zero array in each new thread.
-;;;
-;;; DX is probably a bad idea, because a with a big array it would
-;;; be fairly easy to blow the stack.
-(defvar *zap-array-data-temp* (vector))
-(declaim (simple-vector *zap-array-data-temp*))
-
-(defun zap-array-data-temp (length initial-element initial-element-p)
-  (declare (fixnum length))
-  (let ((tmp *zap-array-data-temp*))
-    (declare (simple-vector tmp))
-    (cond ((> length (length tmp))
-           (setf *zap-array-data-temp*
-                 (if initial-element-p
-                     (make-array length :initial-element initial-element)
-                     (make-array length))))
-          (initial-element-p
-           (fill tmp initial-element :end length))
-          (t
-           tmp))))
 
 ;;; This does the grinding work for ADJUST-ARRAY. It zaps the data
 ;;; from the OLD-DATA in an arrangement specified by the OLD-DIMS to
@@ -1207,7 +1179,8 @@ function to be removed without further warning."
 ;;; is a displaced offset to be added to computed indices of OLD-DATA.
 (defun zap-array-data (old-data old-dims offset new-data new-dims new-length
                        element-type initial-element initial-element-p)
-  (declare (list old-dims new-dims))
+  (declare (list old-dims new-dims)
+           (fixnum new-length))
   ;; OLD-DIMS comes from array-dimensions, which returns a fresh list
   ;; at least in SBCL.
   ;; NEW-DIMS comes from the user.
@@ -1224,14 +1197,15 @@ function to be removed without further warning."
            (unless (typep initial-element element-type)
              (error "~S can't be used to initialize an array of type ~S."
                     initial-element element-type)))
-         (let ((temp (zap-array-data-temp new-length
-                                          initial-element initial-element-p)))
+         (let ((temp (if initial-element-p
+                         (make-array new-length :initial-element initial-element)
+                         (make-array new-length))))
            (declare (simple-vector temp))
            (zap-array-data-aux old-data old-dims offset temp new-dims)
            (dotimes (i new-length)
-             (setf (aref new-data i) (aref temp i)
-                   ;; zero out any garbage right away
-                   (aref temp i) 0))))
+             (setf (aref new-data i) (aref temp i)))
+           ;; Kill the temporary vector to prevent garbage retention.
+           (%shrink-vector temp 0)))
         (t
          ;; When OLD-DATA and NEW-DATA are not EQ, NEW-DATA has
          ;; already been filled with any

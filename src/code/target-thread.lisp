@@ -905,9 +905,6 @@ around and can be retrieved by JOIN-THREAD."
                    ;; internal printer variables
                    (sb!impl::*previous-case* nil)
                    (sb!impl::*previous-readtable-case* nil)
-                   (empty (vector))
-                   (sb!impl::*merge-sort-temp-vector* empty)
-                   (sb!impl::*zap-array-data-temp* empty)
                    (sb!impl::*internal-symbol-output-fun* nil)
                    (sb!impl::*descriptor-handlers* nil)) ; serve-event
               ;; Binding from C

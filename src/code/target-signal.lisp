@@ -12,22 +12,16 @@
 (in-package "SB!UNIX")
 
 (defmacro with-interrupt-bindings (&body body)
-  (with-unique-names (empty)
-    `(let*
-         ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
-         ;; handler runs doesn't really matter, since we're not on the
-         ;; same call stack, really -- and if we don't bind these (esp.
-         ;; the cache one) we can get a bogus metacircle if an interrupt
-         ;; handler calls a GF that was being computed when the interrupt
-         ;; hit.
-         ((sb!pcl::*cache-miss-values-stack* nil)
-          (sb!pcl::*dfun-miss-gfs-on-stack* nil)
-          ;; Unless we do this, ADJUST-ARRAY and SORT would need to
-          ;; disable interrupts.
-          (,empty (vector))
-          (sb!impl::*zap-array-data-temp* ,empty)
-          (sb!impl::*merge-sort-temp-vector* ,empty))
-       ,@body)))
+  `(let*
+       ;; KLUDGE: Whatever is on the PCL stacks before the interrupt
+       ;; handler runs doesn't really matter, since we're not on the
+       ;; same call stack, really -- and if we don't bind these (esp.
+       ;; the cache one) we can get a bogus metacircle if an interrupt
+       ;; handler calls a GF that was being computed when the interrupt
+       ;; hit.
+       ((sb!pcl::*cache-miss-values-stack* nil)
+        (sb!pcl::*dfun-miss-gfs-on-stack* nil))
+     ,@body))
 
 ;;; Evaluate CLEANUP-FORMS iff PROTECTED-FORM does a non-local exit.
 (defmacro nlx-protect (protected-form &rest cleanup-froms)
