@@ -499,11 +499,16 @@ semicolon, and the previous line is empty"
          (empty-p (1- line-number) lines))))
 
 (defun collect-lisp-section (lines line-number)
-  (let ((lisp (loop for index = line-number then (1+ index)
-                    for line = (and (< index (length lines)) (svref lines index))
-                    while (indentation line)
-                    collect line)))
-    (values (length lisp) `("@lisp" ,@lisp "@end lisp"))))
+  (flet ((maybe-line (index)
+           (and (< index (length lines)) (svref lines index))))
+    (let ((lisp (loop for index = line-number then (1+ index)
+                      for line = (maybe-line index)
+                      while (or (indentation line)
+                                ;; Allow empty lines in middle of lisp sections.
+                                (let ((next (1+ index)))
+                                  (lisp-section-p (maybe-line next) next lines)))
+                      collect line)))
+     (values (length lisp) `("@lisp" ,@lisp "@end lisp")))))
 
 ;;; itemized sections
 

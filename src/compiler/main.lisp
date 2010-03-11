@@ -161,38 +161,43 @@ Following options are defined:
       Supplying POLICY NIL is equivalent to the option not being supplied at
       all, ie. dynamic scoping of policy does not take place.
 
-      This option is an SBCL specific EXPERIMENTAL extension: Interface
+      This option is an SBCL-specific experimental extension: Interface
       subject to change.
-
-      Examples:
-
-        ;; Prevent OPTIMIZE proclamations from file leaking, and
-        ;; restrict SAFETY to 3 for the LOAD -- otherwise uses the
-        ;; current global policy.
-        (with-compilation-unit (:policy '(optimize))
-          (restrict-compiler-policy 'safety 3)
-          (load \"foo.lisp\"))
-
-        ;; Load using default policy instead of the current global one, except
-        ;; for DEBUG 3.
-        (with-compilation-unit (:policy '(optimize debug) :override t)
-          (load \"foo.lisp\"))
-
-        ;; Same as if :POLICY had not been specified at all: SAFETY 3
-        ;; leaks outside WITH-COMPILATION-UNIT.
-        (with-compilation-unit (:policy nil)
-          (declaim (optimize safety)))
 
   :SOURCE-PLIST Plist-Form
       Attaches the value returned by the Plist-Form to internal debug-source
-      information of functions compiled in within the dynamic contour.
-      Primarily for use by development environments, in order to eg. associate
-      function definitions with editor-buffers. Can be accessed as
-      SB-INTROSPECT:DEFINITION-SOURCE-PLIST. If multiple, nested
-      WITH-COMPILATION-UNITs provide :SOURCE-PLISTs, they are appended
-      togather, innermost left. Unaffected by :OVERRIDE.
+      information of functions compiled in within the dynamic extent of BODY.
 
-      This SBCL is and specific extension."
+      Primarily for use by development environments, in order to eg. associate
+      function definitions with editor-buffers. Can be accessed using
+      SB-INTROSPECT:DEFINITION-SOURCE-PLIST.
+
+      If an outer WITH-COMPILATION-UNIT form also provide a SOURCE-PLIST, it
+      is appended to the end of the provided SOURCE-PLIST. Unaffected
+      by :OVERRIDE.
+
+      This is an SBCL-specific extension.
+
+Examples:
+
+  ;; Prevent proclamations from the file leaking, and restrict
+  ;; SAFETY to 3 -- otherwise uses the current global policy.
+  (with-compilation-unit (:policy '(optimize))
+    (restrict-compiler-policy 'safety 3)
+    (load \"foo.lisp\"))
+
+  ;; Using default policy instead of the current global one,
+  ;; except for DEBUG 3.
+  (with-compilation-unit (:policy '(optimize debug)
+                          :override t)
+    (load \"foo.lisp\"))
+
+  ;; Same as if :POLICY had not been specified at all: SAFETY 3
+  ;; proclamation leaks out from WITH-COMPILATION-UNIT.
+  (with-compilation-unit (:policy nil)
+    (declaim (optimize safety))
+    (load \"foo.lisp\"))
+"
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
 (defvar *source-plist* nil)
