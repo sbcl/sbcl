@@ -136,60 +136,102 @@
 
 (defmacro sb!xc:with-compilation-unit (options &body body)
   #!+sb-doc
-  "WITH-COMPILATION-UNIT ({Key Value}*) Form*
-  This form affects compilations that take place within its dynamic extent. It
-  is intended to be wrapped around the compilation of all files in the same
-  system. These keywords are defined:
+  "Affects compilations that take place within its dynamic extent. It is
+intended to be eg. wrapped around the compilation of all files in the same system.
 
-    :OVERRIDE Boolean-Form
-        One of the effects of this form is to delay undefined warnings
-        until the end of the form, instead of giving them at the end of each
-        compilation. If OVERRIDE is NIL (the default), then the outermost
-        WITH-COMPILATION-UNIT form grabs the undefined warnings. Specifying
-        OVERRIDE true causes that form to grab any enclosed warnings, even if
-        it is enclosed by another WITH-COMPILATION-UNIT.
+Following options are defined:
 
-    :SOURCE-PLIST Plist-Form
-        Attaches the value returned by the Plist-Form to internal debug-source
-        information of functions compiled in within the dynamic contour.
-        Primarily for use by development environments, in order to eg. associate
-        function definitions with editor-buffers. Can be accessed as
-        SB-INTROSPECT:DEFINITION-SOURCE-PLIST. If multiple, nested
-        WITH-COMPILATION-UNITs provide :SOURCE-PLISTs, they are appended
-        togather, innermost left. If  Unaffected by :OVERRIDE."
+  :OVERRIDE Boolean-Form
+      One of the effects of this form is to delay undefined warnings until the
+      end of the form, instead of giving them at the end of each compilation.
+      If OVERRIDE is NIL (the default), then the outermost
+      WITH-COMPILATION-UNIT form grabs the undefined warnings. Specifying
+      OVERRIDE true causes that form to grab any enclosed warnings, even if it
+      is enclosed by another WITH-COMPILATION-UNIT.
+
+  :POLICY Optimize-Declaration-Form
+      Provides dynamic scoping for global compiler optimization qualities and
+      restrictions, limiting effects of subsequent OPTIMIZE proclamations and
+      calls to SB-EXT:RESTRICT-COMPILER-POLICY to the dynamic scope of BODY.
+
+      If OVERRIDE is false, specified POLICY is merged with current global
+      policy. If OVERRIDE is true, current global policy, including any
+      restrictions, is discarded in favor of the specified POLICY.
+
+      Supplying POLICY NIL is equivalent to the option not being supplied at
+      all, ie. dynamic scoping of policy does not take place.
+
+      This option is an SBCL specific EXPERIMENTAL extension: Interface
+      subject to change.
+
+      Examples:
+
+        ;; Prevent OPTIMIZE proclamations from file leaking, and
+        ;; restrict SAFETY to 3 for the LOAD -- otherwise uses the
+        ;; current global policy.
+        (with-compilation-unit (:policy '(optimize))
+          (restrict-compiler-policy 'safety 3)
+          (load \"foo.lisp\"))
+
+        ;; Load using default policy instead of the current global one, except
+        ;; for DEBUG 3.
+        (with-compilation-unit (:policy '(optimize debug) :override t)
+          (load \"foo.lisp\"))
+
+        ;; Same as if :POLICY had not been specified at all: SAFETY 3
+        ;; leaks outside WITH-COMPILATION-UNIT.
+        (with-compilation-unit (:policy nil)
+          (declaim (optimize safety)))
+
+  :SOURCE-PLIST Plist-Form
+      Attaches the value returned by the Plist-Form to internal debug-source
+      information of functions compiled in within the dynamic contour.
+      Primarily for use by development environments, in order to eg. associate
+      function definitions with editor-buffers. Can be accessed as
+      SB-INTROSPECT:DEFINITION-SOURCE-PLIST. If multiple, nested
+      WITH-COMPILATION-UNITs provide :SOURCE-PLISTs, they are appended
+      togather, innermost left. Unaffected by :OVERRIDE.
+
+      This SBCL is and specific extension."
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
 (defvar *source-plist* nil)
 
-(defun %with-compilation-unit (fn &key override source-plist)
+(defun %with-compilation-unit (fn &key override policy source-plist)
   (declare (type function fn))
-  (let ((succeeded-p nil)
-        (*source-plist* (append source-plist *source-plist*)))
-    (if (and *in-compilation-unit* (not override))
-        ;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
-        ;; ordinarily (unless OVERRIDE) basically a no-op.
-        (unwind-protect
-             (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
-          (unless succeeded-p
-            (incf *aborted-compilation-unit-count*)))
-        (let ((*aborted-compilation-unit-count* 0)
-              (*compiler-error-count* 0)
-              (*compiler-warning-count* 0)
-              (*compiler-style-warning-count* 0)
-              (*compiler-note-count* 0)
-              (*undefined-warnings* nil)
-              (*in-compilation-unit* t))
-          (with-world-lock ()
-            (handler-bind ((parse-unknown-type
-                            (lambda (c)
-                              (note-undefined-reference
-                               (parse-unknown-type-specifier c)
-                               :type))))
-              (unwind-protect
-                   (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
-                (unless succeeded-p
-                  (incf *aborted-compilation-unit-count*))
-                (summarize-compilation-unit (not succeeded-p)))))))))
+  (flet ((with-it ()
+           (let ((succeeded-p nil)
+                 (*source-plist* (append source-plist *source-plist*)))
+             (if (and *in-compilation-unit* (not override))
+                 ;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
+                 ;; ordinarily (unless OVERRIDE) basically a no-op.
+                 (unwind-protect
+                      (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
+                   (unless succeeded-p
+                     (incf *aborted-compilation-unit-count*)))
+                 (let ((*aborted-compilation-unit-count* 0)
+                       (*compiler-error-count* 0)
+                       (*compiler-warning-count* 0)
+                       (*compiler-style-warning-count* 0)
+                       (*compiler-note-count* 0)
+                       (*undefined-warnings* nil)
+                       (*in-compilation-unit* t))
+                   (with-world-lock ()
+                     (handler-bind ((parse-unknown-type
+                                     (lambda (c)
+                                       (note-undefined-reference
+                                        (parse-unknown-type-specifier c)
+                                        :type))))
+                       (unwind-protect
+                            (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
+                         (unless succeeded-p
+                           (incf *aborted-compilation-unit-count*))
+                         (summarize-compilation-unit (not succeeded-p))))))))))
+    (if policy
+        (let ((*policy* (process-optimize-decl policy (unless override *policy*)))
+              (*policy-restrictions* (unless override *policy-restrictions*)))
+          (with-it))
+        (with-it))))
 
 ;;; Is NAME something that no conforming program can rely on
 ;;; defining?

@@ -36,6 +36,8 @@ was MIN instead.
 This is intended to be used interactively, to facilitate recompiling large
 bodies of code with eg. a known minimum safety.
 
+See also :POLICY option in WITH-COMPILATION-UNIT.
+
 EXPERIMENTAL INTERFACE: Subject to change."
   (declare (type policy-quality min))
   (when quality

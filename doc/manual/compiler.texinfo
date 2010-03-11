@@ -924,6 +924,10 @@ is to slow the program by causing cache misses or even swapping.
 @c      _(end of section on compiler policy)
 @c      _-->
 
+@include fun-sb-ext-describe-compiler-policy.texinfo
+@include fun-sb-ext-restrict-compiler-policy.texinfo
+@include macro-common-lisp-with-compilation-unit.texinfo
+
 @node Compiler Errors
 @comment  node-name,  next,  previous,  up
 @section Compiler Errors

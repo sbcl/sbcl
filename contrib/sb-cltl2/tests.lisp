@@ -65,6 +65,8 @@
     (macroexpand-all '(symbol-macrolet ((srlt '(nil zool))) (testr)))
   (symbol-macrolet ((srlt '(nil zool))) 'zool))
 
+;;;; DECLARATION-INFORMATION
+
 (defmacro dinfo (thing &environment env)
   `',(declaration-information thing env))
 
@@ -89,6 +91,27 @@
   (def debug)
   (def compilation-speed)
   (def space))
+
+
+(deftest declaration-information.restrict-compiler-policy.1
+    (with-compilation-unit (:policy '(optimize) :override t)
+      (restrict-compiler-policy 'speed 3)
+      (eval '(cadr (assoc 'speed (dinfo optimize)))))
+  3)
+
+(deftest declaration-information.restrict-compiler-policy.2
+    (with-compilation-unit (:policy '(optimize) :override t)
+      (restrict-compiler-policy 'speed 3)
+      (locally (declare (optimize (speed 2)))
+        (cadr (assoc 'speed (dinfo optimize)))))
+  2)
+
+(deftest declaration-information.restrict-compiler-policy.3
+    (locally (declare (optimize (speed 2)))
+      (with-compilation-unit (:policy '(optimize) :override t)
+        (restrict-compiler-policy 'speed 3)
+        (cadr (assoc 'speed (dinfo optimize)))))
+  2)
 
 (deftest declaration-information.muffle-conditions.default
   (dinfo sb-ext:muffle-conditions)

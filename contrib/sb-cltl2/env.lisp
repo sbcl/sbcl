@@ -389,7 +389,7 @@ the condition types that have been muffled."
        (let ((policy (sb-c::lexenv-policy env)))
          (collect ((res))
            (dolist (name sb-c::*policy-qualities*)
-             (res (list name (cdr (assoc name policy)))))
+             (res (list name (sb-c::policy-quality policy name))))
            (loop for (name . nil) in sb-c::*policy-dependent-qualities*
                  do (res (list name (sb-c::policy-quality policy name))))
            (res))))
