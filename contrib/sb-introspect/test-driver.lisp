@@ -413,6 +413,7 @@
 
 ;; Interpreted functions
 
+#+sb-eval
 (deftest function-type.8
     (type-equal (function-type (interpret (lambda (x) (declare (fixnum x)) x)))
                 '(function (&rest t) *))
