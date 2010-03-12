@@ -46,6 +46,7 @@
 (defvar *bq-at-flag* '(|,@|))
 (defvar *bq-dot-flag* '(|,.|))
 (defvar *bq-vector-flag* '(|bqv|))
+(defvar *bq-error* "Comma not inside a backquote.")
 
 (/show0 "backq.lisp 50")
 
@@ -68,7 +69,7 @@
   (unless (> *backquote-count* 0)
     (when *read-suppress*
       (return-from comma-macro nil))
-    (simple-reader-error stream "comma not inside a backquote"))
+    (simple-reader-error stream *bq-error*))
   (let ((c (read-char stream))
         (*backquote-count* (1- *backquote-count*)))
     (cond ((char= c #\@)

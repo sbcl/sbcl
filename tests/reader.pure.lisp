@@ -255,3 +255,10 @@
       (get-macro-character #\" (copy-readtable nil))
     (declare (ignore reader-fn))
     (assert (not non-terminating-p))))
+
+(with-test (:name :bug-309093)
+  (assert (eq :error
+              (handler-case
+                  (read-from-string "`#2A((,(1+ 0) 0) (0 0))")
+                (reader-error ()
+                  :error)))))

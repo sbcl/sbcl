@@ -35,6 +35,8 @@ changes relative to sbcl-1.0.36:
     (lp#535658)
   * bug fix: SB-CLTL2:DECLARATION-INFORMATION did not take
     SB-EXT:RESTRICT-COMPILER-POLICY into account. (lp#313337)
+  * bug fix: Comma inside a backquoted array or structure resulted in nonsense
+    values instead of signaling an error. (lp#309093)
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

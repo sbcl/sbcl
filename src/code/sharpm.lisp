@@ -93,10 +93,15 @@
   (when *read-suppress*
     (read stream t nil t)
     (return-from sharp-A nil))
-  (unless dimensions (simple-reader-error stream
-                                          "no dimensions argument to #A"))
+  (unless dimensions
+    (simple-reader-error stream "No dimensions argument to #A."))
   (collect ((dims))
-    (let* ((contents (read stream t nil t))
+    (let* ((*bq-error*
+            (if (zerop *backquote-count*)
+                *bq-error*
+                "Comma inside a backquoted array (not a list or general vector.)"))
+           (*backquote-count* 0)
+           (contents (read stream t nil t))
            (seq contents))
       (dotimes (axis dimensions
                      (make-array (dims) :initial-contents contents))
@@ -122,8 +127,14 @@
   (when *read-suppress*
     (read stream t nil t)
     (return-from sharp-S nil))
-  (let ((body (if (char= (read-char stream t) #\( )
-                  (read-list stream nil)
+  (let* ((*bq-error*
+          (if (zerop *backquote-count*)
+              *bq-error*
+              "Comma inside backquoted structure (not a list or general vector.)"))
+         (*backquote-count* 0)
+         (body (if (char= (read-char stream t) #\( )
+                  (let ((*backquote-count* -1))
+                    (read-list stream nil))
                   (simple-reader-error stream "non-list following #S"))))
     (unless (listp body)
       (simple-reader-error stream "non-list following #S: ~S" body))
