@@ -813,4 +813,25 @@
   (flet ((foo (x) (declare (ignore x))))
     (let ((bad-boy (bad-boy (vec 2.0 3.0 4.0))))
       (assert-no-consing (funcall bad-boy #'foo)))))
+
+(with-test (:name :bug-497321)
+  (flet ((test (lambda type)
+           (let ((n 0))
+             (handler-bind ((condition (lambda (c)
+                                         (incf n)
+                                         (unless (typep c type)
+                                           (error "wanted ~S for~%  ~S~%got ~S"
+                                                  type lambda (type-of c))))))
+               (compile nil lambda))
+             (assert (= n 1)))))
+    (test `(lambda () (declare (dynamic-extent #'bar)))
+          'style-warning)
+    (test `(lambda () (declare (dynamic-extent bar)))
+          'style-warning)
+    (test `(lambda (bar) (cons bar (lambda () (declare (dynamic-extent bar)))))
+          'sb-ext:compiler-note)
+    (test `(lambda ()
+             (flet ((bar () t))
+               (cons #'bar (lambda () (declare (dynamic-extent #'bar))))))
+          'sb-ext:compiler-note)))
 
