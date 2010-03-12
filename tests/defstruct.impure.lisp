@@ -1065,3 +1065,9 @@ redefinition."
 (with-test (:name defstruct-copier-typechecks-argument)
   (assert (not (raises-error? (copy-person (make-astronaut :name "Neil")))))
   (assert (raises-error? (copy-astronaut (make-person :name "Fred")))))
+
+(with-test (:name :bug-528807)
+  (let ((*evaluator-mode* :compile))
+    (handler-bind ((style-warning #'error))
+      (eval `(defstruct (bug-528807 (:constructor make-528807 (&aux x)))
+               (x nil :type fixnum))))))

@@ -1535,12 +1535,12 @@
         (when auxp
           (arglist '&aux)
           (dolist (arg aux)
-            (arglist arg)
             (if (proper-list-of-length-p arg 2)
-              (let ((var (first arg)))
-                (vars var)
-                (types (get-slot var)))
-              (skipped-vars (if (consp arg) (first arg) arg))))))
+                (let ((var (first arg)))
+                  (arglist arg)
+                  (vars var)
+                  (types (get-slot var)))
+                (skipped-vars (if (consp arg) (first arg) arg))))))
 
       (funcall creator defstruct (first boa)
                (arglist) (vars) (types)
