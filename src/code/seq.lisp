@@ -224,6 +224,7 @@
                               ;; This seems silly, is there something better?
                               '(integer 0 (0))))))
 
+(declaim (ftype (function (t t t) nil) sequence-bounding-indices-bad-error))
 (defun sequence-bounding-indices-bad-error (sequence start end)
   (let ((size (length sequence)))
     (error 'bounding-indices-bad-error
@@ -232,6 +233,7 @@
                                  (integer ,start ,size))
            :object sequence)))
 
+(declaim (ftype (function (t t t) nil) array-bounding-indices-bad-error))
 (defun array-bounding-indices-bad-error (array start end)
   (let ((size (array-total-size array)))
     (error 'bounding-indices-bad-error
@@ -239,6 +241,16 @@
            :expected-type `(cons (integer 0 ,size)
                                  (integer ,start ,size))
            :object array)))
+
+(declaim (ftype (function (t) nil) circular-list-error))
+(defun circular-list-error (list)
+  (let ((*print-circle* t))
+    (error 'simple-type-error
+           :format-control "List is circular:~%  ~S"
+           :format-arguments (list list)
+           :datum list
+           :type '(and list (satisfies list-length)))))
+
 
 (defun elt (sequence index)
   #!+sb-doc "Return the element of SEQUENCE specified by INDEX."

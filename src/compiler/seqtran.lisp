@@ -1195,41 +1195,51 @@
                                    *
                                    :policy (> speed space))
                 "expand inline"
-                `(let ((index 0)
-                       (find nil)
+                `(let ((find nil)
                        (position nil))
-                   (declare (type index index))
-                   (dolist (i sequence
-                            (if (and end (> end index))
-                                (sequence-bounding-indices-bad-error
-                                 sequence start end)
-                                (values find position)))
-                     (when (and end (>= index end))
-                       (return (values find position)))
-                     (when (>= index start)
-                       (let ((key-i (funcall key i)))
-                         (,',condition (funcall predicate key-i)
-                                       ;; This hack of dealing with non-NIL
-                                       ;; FROM-END for list data by iterating
-                                       ;; forward through the list and keeping
-                                       ;; track of the last time we found a
-                                       ;; match might be more screwy than what
-                                       ;; the user expects, but it seems to be
-                                       ;; allowed by the ANSI standard. (And
-                                       ;; if the user is screwy enough to ask
-                                       ;; for FROM-END behavior on list data,
-                                       ;; turnabout is fair play.)
-                                       ;;
-                                       ;; It's also not enormously efficient,
-                                       ;; calling PREDICATE and KEY more often
-                                       ;; than necessary; but all the
-                                       ;; alternatives seem to have their own
-                                       ;; efficiency problems.
-                                       (if from-end
-                                           (setf find i
-                                                 position index)
-                                           (return (values i index))))))
-                     (incf index))))))
+                   (flet ((bounds-error ()
+                            (sequence-bounding-indices-bad-error sequence start end)))
+                     (if (and end (> start end))
+                         (bounds-error)
+                         (do ((slow sequence (cdr slow))
+                              (fast (cdr sequence) (cddr fast))
+                              (index 0 (+ index 1)))
+                             ((cond ((null slow)
+                                     (if (and end (> end index))
+                                         (bounds-error)
+                                         (return (values find position))))
+                                    ((and end (>= index end))
+                                     (return (values find position)))
+                                    ((eq slow fast)
+                                     (circular-list-error sequence)))
+                              (bug "never"))
+                           (declare (list slow fast))
+                           (when (>= index start)
+                             (let* ((element (car slow))
+                                    (key-i (funcall key element)))
+                               (,',condition (funcall predicate key-i)
+                                             ;; This hack of dealing with non-NIL
+                                             ;; FROM-END for list data by iterating
+                                             ;; forward through the list and keeping
+                                             ;; track of the last time we found a
+                                             ;; match might be more screwy than what
+                                             ;; the user expects, but it seems to be
+                                             ;; allowed by the ANSI standard. (And
+                                             ;; if the user is screwy enough to ask
+                                             ;; for FROM-END behavior on list data,
+                                             ;; turnabout is fair play.)
+                                             ;;
+                                             ;; It's also not enormously efficient,
+                                             ;; calling PREDICATE and KEY more often
+                                             ;; than necessary; but all the
+                                             ;; alternatives seem to have their own
+                                             ;; efficiency problems.
+                                             (if from-end
+                                                 (setf find element
+                                                       position index)
+                                                 (unless find
+                                                   (setf find element
+                                                         position index)))))))))))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
 

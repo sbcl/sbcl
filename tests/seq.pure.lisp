@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(in-package :cl-user)
+
 ;;; As reported by Paul Dietz from his ansi-test suite for gcl, REMOVE
 ;;; malfunctioned when given :START, :END and :FROM-END arguments.
 ;;; Make sure it doesn't happen again.
@@ -205,3 +207,38 @@
                       (b1 (make-array bsize :element-type '(unsigned-byte 8)))
                       (b2 (make-array l :element-type '(unsigned-byte 8))))
                  (replace b1 b2 :start2 0 :end2 l))))))
+
+(with-test (:name :bug-452008)
+  ;; FIND & POSITION on lists should check bounds and (in safe code) detect
+  ;; circular and dotted lists.
+  (macrolet ((test (type lambda)
+               `(let ((got (handler-case
+                               (funcall (compile nil ',lambda))
+                             (,type () :error)
+                             (:no-error (res)
+                               (list :no-error res)))))
+                  (let ((*print-circle* t))
+                    (format t "test: ~S~%" ',lambda))
+                  (unless (eq :error got)
+                    (error "wanted an error, got ~S for~%  ~S"
+                           (second got) ',lambda)))))
+    (test sb-kernel:bounding-indices-bad-error
+          (lambda ()
+            (find :foo '(1 2 3 :foo) :start 1 :end 5)))
+    (test sb-kernel:bounding-indices-bad-error
+          (lambda ()
+            (position :foo '(1 2 3 :foo) :start 1 :end 5)))
+    (test sb-kernel:bounding-indices-bad-error
+          (lambda ()
+            (find :foo '(1 2 3 :foo) :start 3 :end 0)))
+    (test sb-kernel:bounding-indices-bad-error
+          (lambda ()
+            (position :foo '(1 2 3 :foo) :start 3 :end 0)))
+    (test type-error
+          (lambda ()
+            (let ((list (list 1 2 3 :foo)))
+              (find :bar (nconc list list)))))
+    (test type-error
+          (lambda ()
+            (let ((list (list 1 2 3 :foo)))
+              (position :bar (nconc list list)))))))
