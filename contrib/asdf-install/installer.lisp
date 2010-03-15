@@ -33,11 +33,13 @@
      ,(merge-pathnames "systems/" *dot-sbcl*)
      "Personal installation")))
 
-(let* ((*package* (find-package :asdf-install-customize))
-       (file (probe-file (merge-pathnames
-                          (make-pathname :name ".asdf-install")
-                          (user-homedir-pathname)))))
-  (when file (load file)))
+(unless (sb-ext:posix-getenv "SBCL_BUILDING_CONTRIB")
+  ;; Not during build, thanks.
+  (let* ((*package* (find-package :asdf-install-customize))
+         (file (probe-file (merge-pathnames
+                            (make-pathname :name ".asdf-install")
+                            (user-homedir-pathname)))))
+    (when file (load file))))
 
 (define-condition download-error (error)
   ((url :initarg :url :reader download-url)
