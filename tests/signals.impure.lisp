@@ -56,3 +56,12 @@
     (loop until returning)
     (loop repeat 1000000000)
     (assert (= saved-errno (sb-unix::get-errno)))))
+
+(with-test (:name :handle-interactive-interrupt)
+  (assert (eq :condition
+              (handler-case
+                  (sb-thread::kill-safely
+                   (sb-thread::thread-os-thread sb-thread::*current-thread*)
+                   sb-unix:sigint)
+                (sb-sys:interactive-interrupt ()
+                  :condition)))))

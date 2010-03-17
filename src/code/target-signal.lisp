@@ -179,9 +179,13 @@
   (flet ((interrupt-it ()
            (with-alien ((context (* os-context-t) context))
              (with-interrupts
-               (%break 'sigint 'interactive-interrupt
-                       :context context
-                       :address (sap-int (sb!vm:context-pc context)))))))
+               (let ((int (make-condition 'interactive-interrupt
+                                          :context context
+                                          :address (sap-int (sb!vm:context-pc context)))))
+                 ;; First SIGNAL, so that handlers can run.
+                 (signal int)
+                 ;; Then enter the debugger like BREAK.
+                 (%break 'sigint int))))))
     (sb!thread:interrupt-thread (sb!thread::foreground-thread)
                                 #'interrupt-it)))
 
