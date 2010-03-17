@@ -486,4 +486,36 @@
   (assert (equal (make-pathname :directory '(:absolute))
                  (read-from-string "#p\"\\\\\\\\\""))))
 
+(with-test (:name :load-logical-pathname-translations)
+  (let* ((cwd (truename "."))
+         (foo (merge-pathnames "llpnt-foo.translations" cwd))
+         (bar (merge-pathnames "llpnt-bar.translations" cwd))
+         (translations (logical-pathname-translations "SYS")))
+    (unwind-protect
+         (progn
+           (with-open-file (f foo :direction :output)
+             (prin1 (list (list "*.TEXT" (make-pathname
+                                          :directory '(:absolute "my" "foo")
+                                          :name :wild :type "txt")))
+                    f))
+           (with-open-file (f bar :direction :output)
+             (prin1 (list (list "*.CL" (make-pathname
+                                        :directory '(:absolute "my" "bar")
+                                        :name :wild :type "lisp"))) f))
+           (setf (logical-pathname-translations "SYS")
+                 (list* (list "SITE;LLPNT-FOO.TRANSLATIONS.NEWEST" foo)
+                        (list "SITE;LLPNT-BAR.TRANSLATIONS.NEWEST" bar)
+                        translations))
+           (assert (load-logical-pathname-translations "LLPNT-FOO"))
+           (assert (load-logical-pathname-translations "LLPNT-BAR"))
+           (assert
+            (and
+             (equal "/my/bar/quux.lisp"
+                    (namestring (translate-logical-pathname "LLPNT-BAR:QUUX.CL")))
+             (equal "/my/foo/quux.txt"
+                    (namestring (translate-logical-pathname "LLPNT-FOO:QUUX.TEXT"))))))
+      (ignore-errors (delete-file foo))
+      (ignore-errors (delete-file bar))
+      (setf (logical-pathname-translations "SYS") translations))))
+
 ;;;; success

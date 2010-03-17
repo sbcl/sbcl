@@ -1256,7 +1256,7 @@ system's syntax for files."
 (defun translate-pathname (source from-wildname to-wildname &key)
   #!+sb-doc
   "Use the source pathname to translate the from-wildname's wild and
-   unspecified elements into a completed to-pathname based on the to-wildname."
+unspecified elements into a completed to-pathname based on the to-wildname."
   (declare (type pathname-designator source from-wildname to-wildname))
   (with-pathname (source source)
     (with-pathname (from from-wildname)
@@ -1708,17 +1708,33 @@ system's syntax for files."
 
 (defun load-logical-pathname-translations (host)
   #!+sb-doc
+  "Reads logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
+with HOST replaced by the supplied parameter. Returns T on success.
+
+If HOST is already defined as logical pathname host, no file is loaded and NIL
+is returned.
+
+The file should contain a single form, suitable for use with
+\(SETF LOGICAL-PATHNAME-TRANSLATIONS).
+
+Note: behaviour of this function is higly implementation dependent, and
+historically it used to be a no-op in SBcL -- the current approach is somewhat
+experimental and subject to change."
   (declare (type string host)
            (values (member t nil)))
   (if (find-logical-host host nil)
       ;; This host is already defined, all is well and good.
       nil
       ;; ANSI: "The specific nature of the search is
-      ;; implementation-defined." SBCL: doesn't search at all
-      ;;
-      ;; FIXME: now that we have a SYS host that the system uses, it
-      ;; might be cute to search in "SYS:TRANSLATIONS;<name>.LISP"
-      (error "logical host ~S not found" host)))
+      ;; implementation-defined."
+      (prog1 t
+        (setf (logical-pathname-translations host)
+              (with-open-file (lpt (make-pathname :host "SYS"
+                                                  :directory '(:absolute "SITE")
+                                                  :name host
+                                                  :type "TRANSLATIONS"
+                                                  :version :newest))
+                (read lpt))))))
 
 (defun !pathname-cold-init ()
   (let* ((sys *default-pathname-defaults*)

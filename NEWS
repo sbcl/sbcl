@@ -4,6 +4,9 @@ changes relative to sbcl-1.0.36:
     stack frame thrown from.
   * enhancement: WITH-COMPILATION-UNIT :POLICY allows restricting changes to
     compiler optimization qualities inside dynamic extent of its body.
+  * enhancement: LOAD-LOGICAL-PATHNAME-TRANSLATIONS can be used to load
+    translations from SYS:SITE;<HOST>.TRANSLATIONS.NEWEST (thanks to Michael
+    Weber)
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) take advantage of
     constraint propgation, allowing better compilation eg. when used to
     access structures with WITH-SLOTS. (lp#520366)
