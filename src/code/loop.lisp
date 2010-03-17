@@ -938,7 +938,8 @@ code to be loaded.
         ((sb!xc:subtypep data-type 'vector)
          (let ((ctype (sb!kernel:specifier-type data-type)))
            (when (sb!kernel:array-type-p ctype)
-             (let ((etype (sb!kernel:array-type-element-type ctype)))
+             (let ((etype (sb!kernel:type-*-to-t
+                           (sb!kernel:array-type-specialized-element-type ctype))))
                (make-array 0 :element-type (sb!kernel:type-specifier etype))))))
         (t
          nil)))

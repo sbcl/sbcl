@@ -247,3 +247,12 @@
 (loop with x of-type (simple-vector 1) = (make-array '(1))
       repeat 1
       return x)
+
+(with-test (:name :bug-540186)
+  (let ((fun (compile nil `(lambda (x)
+                             (loop for i from 0 below (length x)
+                                   for vec of-type vector = (aref x i)
+                                   collect vec)))))
+    (assert (equal '("foo" "bar")
+             (funcall fun
+                      (vector "foo" "bar"))))))
