@@ -1412,15 +1412,11 @@ copy_large_object(lispobj object, long nwords)
             gc_assert(page_table[next_page].region_start_offset ==
                       npage_bytes(next_page-first_page));
             gc_assert(page_table[next_page].bytes_used == PAGE_BYTES);
+            /* Should have been unprotected by unprotect_oldspace(). */
+            gc_assert(page_table[next_page].write_protected == 0);
 
             page_table[next_page].gen = new_space;
 
-            /* Remove any write-protection. We should be able to rely
-             * on the write-protect flag to avoid redundant calls. */
-            if (page_table[next_page].write_protected) {
-                os_protect(page_address(next_page), PAGE_BYTES, OS_VM_PROT_ALL);
-                page_table[next_page].write_protected = 0;
-            }
             remaining_bytes -= PAGE_BYTES;
             next_page++;
         }
@@ -3245,22 +3241,40 @@ static void
 unprotect_oldspace(void)
 {
     page_index_t i;
+    void *region_addr = 0;
+    void *page_addr = 0;
+    unsigned long region_bytes = 0;
 
     for (i = 0; i < last_free_page; i++) {
         if (page_allocated_p(i)
             && (page_table[i].bytes_used != 0)
             && (page_table[i].gen == from_space)) {
-            void *page_start;
-
-            page_start = (void *)page_address(i);
 
             /* Remove any write-protection. We should be able to rely
              * on the write-protect flag to avoid redundant calls. */
             if (page_table[i].write_protected) {
-                os_protect(page_start, PAGE_BYTES, OS_VM_PROT_ALL);
                 page_table[i].write_protected = 0;
+                page_addr = page_address(i);
+                if (!region_addr) {
+                    /* First region. */
+                    region_addr = page_addr;
+                    region_bytes = PAGE_BYTES;
+                } else if (region_addr + region_bytes == page_addr) {
+                    /* Region continue. */
+                    region_bytes += PAGE_BYTES;
+                } else {
+                    /* Unprotect previous region. */
+                    os_protect(region_addr, region_bytes, OS_VM_PROT_ALL);
+                    /* First page in new region. */
+                    region_addr = page_addr;
+                    region_bytes = PAGE_BYTES;
+                }
             }
         }
+    }
+    if (region_addr) {
+        /* Unprotect last region. */
+        os_protect(region_addr, region_bytes, OS_VM_PROT_ALL);
     }
 }
 
@@ -3297,17 +3311,8 @@ free_oldspace(void)
                 page_table[last_page].bytes_used;
             page_table[last_page].allocated = FREE_PAGE_FLAG;
             page_table[last_page].bytes_used = 0;
-
-            /* Remove any write-protection. We should be able to rely
-             * on the write-protect flag to avoid redundant calls. */
-            {
-                void  *page_start = (void *)page_address(last_page);
-
-                if (page_table[last_page].write_protected) {
-                    os_protect(page_start, PAGE_BYTES, OS_VM_PROT_ALL);
-                    page_table[last_page].write_protected = 0;
-                }
-            }
+            /* Should already be unprotected by unprotect_oldspace(). */
+            gc_assert(!page_table[last_page].write_protected);
             last_page++;
         }
         while ((last_page < last_free_page)
