@@ -697,4 +697,30 @@
                      ftype )
              (error "FAILURE")))))))
 
+(with-test (:name (:bug-309128 1))
+  (let* ((s (gensym))
+         (t1 (sb-kernel:specifier-type s)))
+    (eval `(defstruct ,s))
+    (multiple-value-bind (ok sure)
+        (sb-kernel:csubtypep t1 (sb-kernel:specifier-type s))
+      (assert (and ok sure)))))
+
+(with-test (:name (:bug-309128 2))
+  (let* ((s (gensym))
+         (t1 (sb-kernel:specifier-type s)))
+    (eval `(defstruct ,s))
+    (multiple-value-bind (ok sure)
+        (sb-kernel:csubtypep (sb-kernel:specifier-type s) t1)
+      (assert (and ok sure)))))
+
+(with-test (:name (:bug-309128 3))
+  (let* ((s (gensym))
+         (t1 (sb-kernel:specifier-type s))
+         (s2 (gensym))
+         (t2 (sb-kernel:specifier-type s2)))
+    (eval `(deftype ,s2 () ',s))
+    (eval `(defstruct ,s))
+    (multiple-value-bind (ok sure) (sb-kernel:csubtypep t1 t2)
+      (assert (and ok sure)))))
+
 ;;; success
