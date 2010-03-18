@@ -1124,7 +1124,8 @@
 
 (sb!disassem:define-instruction-format (xmm-xmm/mem-imm 24
                                         :default-printer
-                                        '(:name :tab reg ", " reg/mem " " imm))
+                                        '(:name
+                                          :tab reg ", " reg/mem ", " imm))
   (x0f     :field (byte 8 0)    :value #x0f)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -1134,7 +1135,8 @@
 
 (sb!disassem:define-instruction-format (rex-xmm-xmm/mem-imm 32
                                         :default-printer
-                                        '(:name :tab reg ", " reg/mem " " imm))
+                                        '(:name
+                                          :tab reg ", " reg/mem ", " imm))
   (rex     :field (byte 4 4)    :value #b0100)
   (wrxb    :field (byte 4 0)    :type 'wrxb)
   (x0f     :field (byte 8 8)    :value #x0f)
@@ -1146,7 +1148,8 @@
 
 (sb!disassem:define-instruction-format (ext-xmm-xmm/mem-imm 32
                                         :default-printer
-                                        '(:name :tab reg ", " reg/mem " " imm))
+                                        '(:name
+                                          :tab reg ", " reg/mem ", " imm))
   (prefix  :field (byte 8 0))
   (x0f     :field (byte 8 8)    :value #x0f)
   (op      :field (byte 8 16))
@@ -1157,7 +1160,8 @@
 
 (sb!disassem:define-instruction-format (ext-rex-xmm-xmm/mem-imm 40
                                         :default-printer
-                                        '(:name :tab reg ", " reg/mem " " imm))
+                                        '(:name
+                                          :tab reg ", " reg/mem ", " imm))
   (prefix  :field (byte 8 0))
   (rex     :field (byte 4 12)   :value #b0100)
   (wrxb    :field (byte 4 8)    :type 'wrxb)

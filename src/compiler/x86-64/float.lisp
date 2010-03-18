@@ -191,23 +191,39 @@
   (double-reg) (descriptor-reg))
 
 ;;; Move from a descriptor to a float register.
-(define-vop (move-to-single)
+(define-vop (move-to-single-reg)
+   (:args (x :scs (descriptor-reg) :target tmp
+             :load-if (not (sc-is x control-stack))))
+   (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
+   (:results (y :scs (single-reg)))
+   (:note "pointer to float coercion")
+   (:generator 2
+     (sc-case x
+       (descriptor-reg
+        (move tmp x)
+        (inst shr tmp 32)
+        (inst movd y tmp))
+       (control-stack
+        ;; When the single-float descriptor is in memory, the untagging
+        ;; is done in the target XMM register. This is faster than going
+        ;; through a general-purpose register and the code is smaller.
+        (inst movq y x)
+        (inst shufps y y #4r3331)))))
+(define-move-vop move-to-single-reg :move (descriptor-reg) (single-reg))
+
+;;; Move from a descriptor to a float stack.
+(define-vop (move-to-single-stack)
   (:args (x :scs (descriptor-reg) :target tmp))
-  (:temporary (:sc unsigned-reg) tmp)
-  (:results (y :scs (single-reg single-stack)))
+  (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
+  (:results (y :scs (single-stack)))
   (:note "pointer to float coercion")
   (:generator 2
     (move tmp x)
     (inst shr tmp 32)
-    (sc-case y
-      (single-reg
-       (inst movd y tmp))
-      (single-stack
-       (let ((slot (make-ea :dword :base rbp-tn
-                            :disp (frame-byte-offset (tn-offset y)))))
-         (inst mov slot (reg-in-size tmp :dword)))))))
-
-(define-move-vop move-to-single :move (descriptor-reg) (single-reg single-stack))
+    (let ((slot (make-ea :dword :base rbp-tn
+                         :disp (frame-byte-offset (tn-offset y)))))
+      (inst mov slot (reg-in-size tmp :dword)))))
+(define-move-vop move-to-single-stack :move (descriptor-reg) (single-stack))
 
 (define-vop (move-to-double)
   (:args (x :scs (descriptor-reg)))
