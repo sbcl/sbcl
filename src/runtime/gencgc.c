@@ -1161,21 +1161,21 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
     fprintf(stderr, "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
             gc_active_p ? "garbage collection" : "allocation",
             available, requested);
-    if (gc_active_p || (available == 0)) {
-        /* If we are in GC, or totally out of memory there is no way
-         * to sanely transfer control to the lisp-side of things.
-         */
-        print_generation_stats();
+    print_generation_stats();
         fprintf(stderr, "GC control variables:\n");
-        fprintf(stderr, "          *GC-INHIBIT* = %s\n          *GC-PENDING* = %s\n",
+        fprintf(stderr, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
                 SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
                 (SymbolValue(GC_PENDING, thread) == T) ?
                 "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
                   "false" : "in progress"));
 #ifdef LISP_FEATURE_SB_THREAD
-        fprintf(stderr, " *STOP-FOR-GC-PENDING* = %s\n",
+        fprintf(stderr, "   *STOP-FOR-GC-PENDING* = %s\n",
                 SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
 #endif
+    if (gc_active_p || (available == 0)) {
+        /* If we are in GC, or totally out of memory there is no way
+         * to sanely transfer control to the lisp-side of things.
+         */
         lose("Heap exhausted, game over.");
     }
     else {
