@@ -114,6 +114,15 @@
   (inline/1))
 
 
+(define-xref-test who-calls.struct-slot.1
+    (who-calls 'struct-slot)
+  (source-user))
+
+(define-xref-test who-calls.cmacro.1
+    (who-calls 'cmacro)
+  (source-user))
+
+
 (define-xref-test who-specializes-directly.1
     (who-specializes-directly 'a-class)
   ((method a-gf-1)

@@ -712,9 +712,12 @@
                       ;; suppresses compiler-macros.
                       (not (fun-lexically-notinline-p cmacro-fun-name)))
                  (let ((res (careful-expand-macro cmacro-fun form)))
-                   (if (eq res form)
-                       (ir1-convert-common-functoid start next result form op)
-                       (ir1-convert start next result res)))
+                   (cond ((eq res form)
+                          (ir1-convert-common-functoid start next result form op))
+                         (t
+                          (unless (policy *lexenv* (zerop store-xref-data))
+                            (record-call cmacro-fun-name (ctran-block start) *current-path*))
+                          (ir1-convert start next result res))))
                  (ir1-convert-common-functoid start next result form op)))))))
 
 ;;; Handles the "common" cases: any other forms except special forms
@@ -1021,14 +1024,16 @@
                    (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
         (ir1-convert-combination start next result form var)
-        (let ((transform (info :function
-                               :source-transform
-                               (leaf-source-name var))))
+        (let* ((name (leaf-source-name var))
+               (transform (info :function :source-transform name)))
           (if transform
               (multiple-value-bind (transformed pass) (funcall transform form)
-                (if pass
-                    (ir1-convert-maybe-predicate start next result form var)
-                    (ir1-convert start next result transformed)))
+                (cond (pass
+                       (ir1-convert-maybe-predicate start next result form var))
+                      (t
+                       (unless (policy *lexenv* (zerop store-xref-data))
+                         (record-call name (ctran-block start) *current-path*))
+                       (ir1-convert start next result transformed))))
               (ir1-convert-maybe-predicate start next result form var))))))
 
 ;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE

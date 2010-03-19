@@ -194,8 +194,13 @@
 (defun inline/4-user ()
   (inline/4 :a :b :c))
 
-;;; Test references to / from compiler-macros
+;;; Test references to / from compiler-macros and source-transforms
 
+(define-compiler-macro cmacro (x)
+  `(+ ,x 42))
+(defstruct struct slot)
+(defun source-user (x)
+  (cmacro (struct-slot x)))
 
 ;;; Test specialization
 

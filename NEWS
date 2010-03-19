@@ -57,6 +57,8 @@ changes relative to sbcl-1.0.36:
     parsing. (lp#309128)
   * bug fix: missing &REST type in a proclamation for a function with both
     &REST and &KEY in lambda-list caused miscompilation (lp#458354)
+  * bug fix: WHO-CALLS information for source-transformed and compiler-macro
+    expanded calls (lp#542174)
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

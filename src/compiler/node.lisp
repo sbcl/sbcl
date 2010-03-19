@@ -248,8 +248,9 @@
   (flag nil)
   ;; some kind of info used by the back end
   (info nil)
-  ;; what macroexpansions happened "in" this block, used for xref
-  (macroexpands nil :type list)
+  ;; what macroexpansions and source transforms happened "in" this block, used
+  ;; for xref
+  (xrefs nil :type list)
   ;; Cache the physenv of a block during lifetime analysis. :NONE if
   ;; no cached value has been stored yet.
   (physenv-cache :none :type (or null physenv (member :none))))
