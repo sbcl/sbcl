@@ -616,7 +616,7 @@
       (unless (optional-dispatch-keyp od)
         (frob (not (null (optional-dispatch-more-entry od)))
               (not (null (fun-type-rest type)))
-              "&REST arguments"))
+              "&REST argument"))
       (frob (optional-dispatch-allowp od) (fun-type-allowp type)
             "&ALLOW-OTHER-KEYS"))
 
@@ -776,14 +776,35 @@
   (let ((type (info :function :type name))
         (where (info :function :where-from name)))
     (when (eq where :declared)
-      (setf (leaf-type fun) type)
-      (assert-definition-type
-       fun type
-       :unwinnage-fun #'compiler-notify
-       :where "proclamation"
-       :really-assert (not (awhen (info :function :info name)
-                             (ir1-attributep (fun-info-attributes it)
-                                             explicit-check)))))))
+      (let ((type (massage-global-definition-type type fun)))
+        (setf (leaf-type fun) type)
+        (assert-definition-type
+         fun type
+         :unwinnage-fun #'compiler-notify
+         :where "proclamation"
+         :really-assert (not (awhen (info :function :info name)
+                               (ir1-attributep (fun-info-attributes it)
+                                               explicit-check))))))))
+
+;;; If the function has both &REST and &KEY, FIND-OPTIONAL-DISPATCH-TYPES
+;;; doesn't complain about the type missing &REST -- which is good, because in
+;;; that case &REST is really an implementation detail and not part of the
+;;; interface. However since we set the leaf type missing &REST from there
+;;; would be a bad thing -- to make up a new type if necessary.
+(defun massage-global-definition-type (type fun)
+  (if (and (fun-type-p type)
+           (optional-dispatch-p fun)
+           (optional-dispatch-keyp fun)
+           (optional-dispatch-more-entry fun)
+           (not (fun-type-rest type)))
+      (make-fun-type :required (fun-type-required type)
+                     :optional (fun-type-optional type)
+                     :rest *universal-type*
+                     :keyp (fun-type-keyp type)
+                     :keywords (fun-type-keywords type)
+                     :allowp (fun-type-allowp type)
+                     :returns (fun-type-returns type))
+      type))
 
 ;;; Call FUN with (arg-lvar arg-type)
 (defun map-combination-args-and-types (fun call)

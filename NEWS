@@ -55,6 +55,8 @@ changes relative to sbcl-1.0.36:
     due to it, so that handlers can run.
   * bug fix: reparsing undefined types if they have become defined since
     parsing. (lp#309128)
+  * bug fix: missing &REST type in a proclamation for a function with both
+    &REST and &KEY in lambda-list caused miscompilation (lp#458354)
 
 changes in sbcl-1.0.36 relative to sbcl-1.0.35:
   * new feature: SB-EXT:TYPEXPAND-1, SB-EXT:TYPEXPAND, and

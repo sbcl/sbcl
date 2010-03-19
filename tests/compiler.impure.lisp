@@ -1166,6 +1166,23 @@
   (let ((x (make-instance 'some-slot-thing :slot "foo")))
     (with-slots (slot) (the some-slot-thing x)
       (assert (equal "foo" slot)))))
+
+;;; Missing &REST type in proclamation causing a miscompile.
+(declaim (ftype
+          (function
+           (sequence unsigned-byte
+                     &key (:initial-element t) (:initial-contents sequence))
+           (values sequence &optional))
+          bug-458354))
+(defun bug-458354
+    (sequence length
+     &rest keys
+     &key (initial-element nil iep) (initial-contents nil icp))
+  (declare (sb-ext:unmuffle-conditions style-warning))
+  (declare (ignorable keys initial-element iep initial-contents icp))
+  (apply #'sb-sequence:make-sequence-like sequence length keys))
+(with-test (:name :bug-458354)
+  (assert (equalp #((a b) (a b)) (bug-458354 #(1 2) 2 :initial-element '(a b)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
