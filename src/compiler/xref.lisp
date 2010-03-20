@@ -31,17 +31,17 @@
                ;; Properly record the deferred macroexpansion and source
                ;; transform information that's been stored in the block.
                (dolist (xref-data (block-xrefs block))
-                 (record-xref (car xref-data)
-                              (cadr xref-data)
-                              ;; We use the debug-name of the functional
-                              ;; as an identifier. This works quite nicely,
-                              ;; except for (fast/slow)-methods with non-symbol,
-                              ;; non-number eql specializers, for which
-                              ;; the debug-name doesn't map exactly
-                              ;; to the fdefinition of the method.
-                              functional
-                              nil
-                              (cddr xref-data)))))
+                 (destructuring-bind (kind what path) xref-data
+                   (record-xref kind what
+                                ;; We use the debug-name of the functional
+                                ;; as an identifier. This works quite nicely,
+                                ;; except for (fast/slow)-methods with non-symbol,
+                                ;; non-number eql specializers, for which
+                                ;; the debug-name doesn't map exactly
+                                ;; to the fdefinition of the method.
+                                functional
+                                nil
+                                path)))))
         (call-with-block-external-functionals block #'handle-node)))))
 
 (defun call-with-block-external-functionals (block fun)
