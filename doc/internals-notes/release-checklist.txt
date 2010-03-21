@@ -71,41 +71,14 @@ Now we have e.g.:
       * sbcl-0.7.0-html.tar.bz2
       * sbcl-0.7.0-wnewman.asc
 
-for sf anonymous ftp:
- # no longer possible now that sf doesn't provide anonftp:
- # cd /usr/stuff/
- # scp sbcl-x.y.z-* shell1.sourceforge.net:/home/groups/ftp/pub/sbcl/
- # cd /usr/stuff/sbcl/
- # for stem in NEWS README INSTALL; do
- #   scp $stem shell1.sourceforge.net:/home/groups/ftp/pub/sbcl/$stem-x.y.z
- # done
-for sf 'module release' system:
- # no longer possible now that sf doesn't have upload.sourceforge.net
- # * Upload the distribution files via anonymous ftp to
- # upload.sourceforge.net in the /incoming directory.
- #
- # no longer possible in the new (as of July 2009) file management system
- # * Upload the distribution files via sftp to the uploads/ directory at 
- #   $sfuser@frs.sourceforge.net
- #   <https://sourceforge.net/project/admin/editpackages.php?group_id=1373>
- #   <https://sourceforge.net/project/admin/newrelease.php?package_id=1354&group_id=1373>
  * upload the distribution files via sftp to
    $sfuser,sbcl@frs.sourceforge.net to the directory
    /home/frs/project/s/sb/sbcl/sbcl/<version> (creating the directory
-   first)
+   first. The directory will be created with bad permissions, chmod
+   it to 0775 so that other developers can upload binaries too)
  * possible shortcuts:
     <https://sourceforge.net/project/admin/?group_id=1373>
     sftp $sfuser,sbcl@frs.sourceforge.net
- # * Do the misbegotten^Wunscriptable HTTPforms thing on the sourceforge
- # project home to make the distribution files visible.
- # ** (from "Admin", then "File Releases")
- # ** "Add release" for package "sbcl", "release name"="x.y.z". (not
- #    "release name"="sbcl-x.y.z")
- # ** boilerplate for "Release Notes":
- #     For information about this release, see the NEWS file
- #     in the distribution. The information is also available
- #     in the "Change Log"/"Changes" section of the SourceForge
- #     webbed description of this release.
  * Do the misbegotten^Wunscriptable AJAX thing on the sourceforge File
    Manager site to make the release notes associated with the file releases
    ** In the File Manager interface, click on the release notes file,
