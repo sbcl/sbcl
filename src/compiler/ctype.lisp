@@ -607,6 +607,7 @@
       (frob (- (optional-dispatch-max-args od) min) (length opt) "optional"))
     (flet ((frob (x y what)
              (unless (eq x y)
+               (break "~S" type)
                (note-lossage
                 "The definition ~:[doesn't have~;has~] ~A, but ~
                  ~A ~:[doesn't~;does~]."
@@ -796,7 +797,8 @@
            (optional-dispatch-p fun)
            (optional-dispatch-keyp fun)
            (optional-dispatch-more-entry fun)
-           (not (fun-type-rest type)))
+           (not (or (fun-type-rest type)
+                    (fun-type-wild-args type))))
       (make-fun-type :required (fun-type-required type)
                      :optional (fun-type-optional type)
                      :rest *universal-type*

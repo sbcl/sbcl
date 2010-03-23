@@ -1183,6 +1183,16 @@
   (apply #'sb-sequence:make-sequence-like sequence length keys))
 (with-test (:name :bug-458354)
   (assert (equalp #((a b) (a b)) (bug-458354 #(1 2) 2 :initial-element '(a b)))))
+
+(with-test (:name :bug-542807)
+  (handler-bind ((style-warning #'error))
+    (eval '(defstruct bug-542807 slot)))
+  (let (conds)
+    (handler-bind ((style-warning (lambda (c)
+                                    (push c conds))))
+      (eval '(defstruct bug-542807 slot)))
+    (assert (= 1 (length conds)))
+    (assert (typep (car conds) 'sb-kernel::redefinition-with-defun))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
