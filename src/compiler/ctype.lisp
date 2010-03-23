@@ -607,7 +607,6 @@
       (frob (- (optional-dispatch-max-args od) min) (length opt) "optional"))
     (flet ((frob (x y what)
              (unless (eq x y)
-               (break "~S" type)
                (note-lossage
                 "The definition ~:[doesn't have~;has~] ~A, but ~
                  ~A ~:[doesn't~;does~]."
