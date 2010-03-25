@@ -40,7 +40,7 @@ if [ "$CORE_DEFINED" = "no" ]; then
 fi
 
 if [ -x "$BASE"/src/runtime/sbcl -a -f "$BASE"/output/sbcl.core ]; then
-    echo "(running SBCL from: `pwd`)"
+    echo "(running SBCL from: $BASE)"
     SBCL_HOME="$BASE"/contrib "$BASE"/src/runtime/sbcl $ARGUMENTS "$@"
 else
     echo "No built SBCL here ($BASE): run 'sh make.sh' first!"
