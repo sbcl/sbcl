@@ -34,6 +34,26 @@
 (defstruct (unknown-type (:include hairy-type)
                          (:copier nil)))
 
+(defun maybe-reparse-specifier (type)
+  (when (unknown-type-p type)
+    (let* ((spec (unknown-type-specifier type))
+           (name (if (consp spec)
+                     (car spec)
+                     spec)))
+      (when (info :type :kind name)
+        (let ((new-type (specifier-type spec)))
+          (unless (unknown-type-p new-type)
+            new-type))))))
+
+;;; Evil macro.
+(defmacro maybe-reparse-specifier! (type)
+  (assert (symbolp type))
+  (with-unique-names (new-type)
+    `(let ((,new-type (maybe-reparse-specifier ,type)))
+       (when ,new-type
+         (setf ,type ,new-type)
+         t))))
+
 (defstruct (negation-type (:include ctype
                                     (class-info (type-class-or-lose 'negation))
                                     ;; FIXME: is this right?  It's
