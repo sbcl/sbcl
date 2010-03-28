@@ -4634,13 +4634,18 @@ gencgc_pickup_dynamic(void)
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
     do {
         lispobj *first,*ptr= (lispobj *)page_address(page);
-        page_table[page].gen = gen;
-        page_table[page].bytes_used = PAGE_BYTES;
-        page_table[page].large_object = 0;
-        page_table[page].write_protected = 0;
-        page_table[page].write_protected_cleared = 0;
-        page_table[page].dont_move = 0;
-        page_table[page].need_to_zero = 1;
+
+        if (!gencgc_partial_pickup || page_allocated_p(page)) {
+          /* It is possible, though rare, for the saved page table
+           * to contain free pages below alloc_ptr. */
+          page_table[page].gen = gen;
+          page_table[page].bytes_used = PAGE_BYTES;
+          page_table[page].large_object = 0;
+          page_table[page].write_protected = 0;
+          page_table[page].write_protected_cleared = 0;
+          page_table[page].dont_move = 0;
+          page_table[page].need_to_zero = 1;
+        }
 
         if (!gencgc_partial_pickup) {
             page_table[page].allocated = BOXED_PAGE_FLAG;

@@ -3,6 +3,7 @@ changes relative to sbcl-1.0.36:
   * enhancement: *STANDARD-OUTPUT*, *STANDARD-INPUT*, and *ERROR-OUTPUT* are
     now bivalent.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
+  * bug fix: a rare case of startup-time page table corruption.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
