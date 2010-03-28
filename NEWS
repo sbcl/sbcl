@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.36:
+  * new feature: added SB-THREAD:TRY-SEMAPHORE, a non-blocking variant of
+    SB-THREAD:WAIT-ON-SEMAPHORE.
   * enhancement: *STANDARD-OUTPUT*, *STANDARD-INPUT*, and *ERROR-OUTPUT* are
     now bivalent.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.

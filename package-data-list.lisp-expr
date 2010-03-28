@@ -1954,6 +1954,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SEMAPHORE-NAME"
                "SEMAPHORE-COUNT"
                "SIGNAL-SEMAPHORE"
+               "TRY-SEMAPHORE"
                "WAIT-ON-SEMAPHORE"))
 
    #s(sb-cold:package-data

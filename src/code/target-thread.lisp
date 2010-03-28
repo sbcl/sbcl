@@ -680,7 +680,25 @@ negative. Else blocks until the semaphore can be decremented."
                        do (condition-wait (semaphore-queue semaphore)
                                           (semaphore-mutex semaphore)))
                  (setf (semaphore-%count semaphore) (1- count)))
+            ;; Even safe when CONDITION-WAIT is unwinded without
+            ;; having reacquired the lock: a) we know at this point
+            ;; that an INCF must have happened before, b) the DECF
+            ;; will become visible to other CPUs as the implicit
+            ;; RELEASE-MUTEX involves a CAS and hence a memory
+            ;; barrier.
             (decf (semaphore-waitcount semaphore)))))))
+
+(defun try-semaphore (semaphore)
+  #!+sb-doc
+  "Try to decrement the count of SEMAPHORE if the count would not be
+negative. Else return NIL."
+  ;; No need for disabling interrupts; the mutex prevents interleaved
+  ;; modifications, and we don't leave temporarily inconsistent state
+  ;; around.
+  (with-mutex ((semaphore-mutex semaphore))
+    (let ((count (semaphore-%count semaphore)))
+      (when (plusp count)
+        (setf (semaphore-%count semaphore) (1- count))))))
 
 (defun signal-semaphore (semaphore &optional (n 1))
   #!+sb-doc

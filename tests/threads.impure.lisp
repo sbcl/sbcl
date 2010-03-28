@@ -357,11 +357,11 @@
     (wait-on-semaphore sem)
     (assert signalled-p)))
 
-(with-test (:name (:semaphore :multiple-signals))
+(defun test-semaphore-multiple-signals (wait-on-semaphore)
   (let* ((sem (make-semaphore :count 5))
-         (threads (loop repeat 20
-                        collect (make-thread (lambda ()
-                                               (wait-on-semaphore sem))))))
+         (threads (loop repeat 20 collecting
+                        (make-thread (lambda ()
+                                       (funcall wait-on-semaphore sem))))))
     (flet ((count-live-threads ()
              (count-if #'thread-alive-p threads)))
       (sleep 0.5)
@@ -375,6 +375,60 @@
       (signal-semaphore sem 4)
       (sleep 0.5)
       (assert (= 0 (count-live-threads))))))
+
+(with-test (:name (:semaphore :multiple-signals))
+  (test-semaphore-multiple-signals #'wait-on-semaphore))
+
+(with-test (:name (:try-semaphore :trivial-fail))
+  (assert (eq (try-semaphore (make-semaphore :count 0)) 'nil)))
+
+(with-test (:name (:try-semaphore :trivial-success))
+  (let ((sem (make-semaphore :count 1)))
+    (assert (try-semaphore sem))
+    (assert (zerop (semaphore-count sem)))))
+
+(with-test (:name (:try-semaphore :emulate-wait-on-semaphore))
+  (flet ((busy-wait-on-semaphore (sem)
+           (loop until (try-semaphore sem) do (sleep 0.001))))
+    (test-semaphore-multiple-signals #'busy-wait-on-semaphore)))
+
+;;; Here we test that interrupting TRY-SEMAPHORE does not leave a
+;;; semaphore in a bad state. 
+(with-test (:name (:try-semaphore :interrupt-safe))
+  (flet ((make-threads (count fn)
+           (loop repeat count collect (make-thread fn)))
+         (kill-thread (thread)
+           (when (thread-alive-p thread)
+             (ignore-errors (terminate-thread thread))))
+         (count-live-threads (threads)
+           (count-if #'thread-alive-p threads)))
+    ;; WAITERS will already be waiting on the semaphore while
+    ;; threads-being-interrupted will perform TRY-SEMAPHORE on that
+    ;; semaphore, and MORE-WAITERS are new threads trying to wait on
+    ;; the semaphore during the interruption-fire.
+    (let* ((sem (make-semaphore :count 50))
+           (waiters (make-threads 20 #'(lambda ()
+                                         (wait-on-semaphore sem))))
+           (triers  (make-threads 40 #'(lambda ()
+                                         (sleep (random 0.01))
+                                         (try-semaphore sem))))
+           (more-waiters
+            (loop repeat 10
+                  do (kill-thread (nth (random 40) triers))
+                  collect (make-thread #'(lambda () (wait-on-semaphore sem)))
+                  do (kill-thread (nth (random 40) triers)))))
+      (sleep 0.5)
+      ;; Now ensure that the waiting threads will all be waked up,
+      ;; i.e. that the semaphore is still working.
+      (loop repeat (+ (count-live-threads waiters)
+                      (count-live-threads more-waiters)) 
+            do (signal-semaphore sem))
+      (sleep 0.5)
+      (assert (zerop (count-live-threads triers)))
+      (assert (zerop (count-live-threads waiters)))
+      (assert (zerop (count-live-threads more-waiters))))))
+
+
 
 (format t "~&semaphore tests done~%")
 
