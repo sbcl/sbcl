@@ -783,7 +783,7 @@
           (let ((emf (get-effective-method-function generic-function
                                                     methods)))
             (invoke-emf emf args))
-          (apply #'no-applicable-method generic-function args)))))
+          (call-no-applicable-method generic-function args)))))
 
 (defun list-eq (x y)
   (loop (when (atom x) (return (eq x y)))

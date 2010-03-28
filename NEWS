@@ -4,6 +4,9 @@ changes relative to sbcl-1.0.36:
     SB-THREAD:WAIT-ON-SEMAPHORE.
   * enhancement: *STANDARD-OUTPUT*, *STANDARD-INPUT*, and *ERROR-OUTPUT* are
     now bivalent.
+  * enhancement: errors from NO-APPLICABLE-METHOD and
+    NO-PRIMARY-METHOD now have a RETRY restart available to retry the
+    generic function call.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
 

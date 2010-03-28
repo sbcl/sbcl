@@ -236,7 +236,7 @@
            (declare (ignore .pv. .next-method-call.))
            (declare (ignorable .args.))
            (flet ((%no-primary-method (gf args)
-                    (apply #'no-primary-method gf args))
+                    (call-no-primary-method gf args))
                   (%invalid-qualifiers (gf combin method)
                     (invalid-qualifiers gf combin method)))
              (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))

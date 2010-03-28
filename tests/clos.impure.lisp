@@ -1805,4 +1805,33 @@
   (let ((callees (find-named-callees #'bar-520366)))
     (assert (equal (list #'quux-520366) callees))))
 
+(defgeneric no-applicable-method/retry (x))
+(defmethod no-applicable-method/retry ((x string))
+  "string")
+(with-test (:name :no-applicable-method/retry)
+  (assert (equal "cons"
+                 (handler-bind ((error
+                                 (lambda (c)
+                                   (declare (ignore c))
+                                   (let ((r (find-restart 'sb-pcl::retry)))
+                                     (when r
+                                       (eval `(defmethod no-applicable-method/retry ((x cons))
+                                                "cons"))
+                                       (invoke-restart r))))))
+                   (no-applicable-method/retry (cons t t))))))
+
+(defgeneric no-primary-method/retry (x))
+(defmethod no-primary-method/retry :before (x) (assert x))
+(with-test (:name :no-primary-method/retry)
+  (assert (equal "ok!"
+                 (handler-bind ((error
+                                 (lambda (c)
+                                   (declare (ignore c))
+                                   (let ((r (find-restart 'sb-pcl::retry)))
+                                     (when r
+                                       (eval `(defmethod no-primary-method/retry (x)
+                                                "ok!"))
+                                       (invoke-restart r))))))
+                   (no-primary-method/retry (cons t t))))))
+
 ;;;; success

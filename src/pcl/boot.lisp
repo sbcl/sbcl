@@ -1001,8 +1001,24 @@ bootstrapping.
 (defun call-no-next-method (method-cell &rest args)
   (let ((method (car method-cell)))
     (aver method)
+    ;; Can't easily provide a RETRY restart here, as the return value here is
+    ;; for the method, not the generic function.
     (apply #'no-next-method (method-generic-function method)
            method args)))
+
+(defun call-no-applicable-method (gf args)
+  (restart-case
+          (apply #'no-applicable-method gf args)
+    (retry ()
+      :report "Retry calling the generic function."
+      (apply gf args))))
+
+(defun call-no-primary-method (gf args)
+  (restart-case
+      (apply #'no-primary-method gf args)
+    (retry ()
+      :report "Retry calling the generic function."
+      (apply gf args))))
 
 (defstruct (method-call (:copier nil))
   (function #'identity :type function)
