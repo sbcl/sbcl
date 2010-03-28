@@ -41,11 +41,8 @@
   (once-only ((value value))
     `(cond ((and (integerp ,value)
                  (not (typep ,value '(signed-byte 32))))
-            (multiple-value-bind (lo hi) (dwords-for-quad ,value)
-              (inst mov (make-ea-for-object-slot-half
-                         ,ptr ,slot ,lowtag) lo)
-              (inst mov (make-ea-for-object-slot-half
-                         ,ptr (+ ,slot 1/2) ,lowtag) hi)))
+            (inst mov temp-reg-tn ,value)
+            (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) temp-reg-tn))
            (t
             (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))))
 
