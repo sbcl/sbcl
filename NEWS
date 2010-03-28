@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.36:
     SB-THREAD:WAIT-ON-SEMAPHORE.
   * new feature: SB-EXT:ATOMIC-DECF has been added as a companion to
     SB-EXT:ATOMIC-INCF.
+  * new feature: a CANCEL-DEADLINE is associated with DEADLINE-TIMEOUT
+    conditions to defer the deadline for forever.
   * enhancement: *STANDARD-OUTPUT*, *STANDARD-INPUT*, and *ERROR-OUTPUT* are
     now bivalent.
   * enhancement: errors from NO-APPLICABLE-METHOD and

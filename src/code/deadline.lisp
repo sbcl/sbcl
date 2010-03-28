@@ -88,19 +88,30 @@ for calling this when a deadline is reached."
         (error 'deadline-timeout :seconds *deadline-seconds*)
       (defer-deadline (&optional (seconds *deadline-seconds*))
         :report "Defer the deadline for SECONDS more."
+        :interactive (lambda ()
+                       (sb!int:read-evaluated-form
+                        "By how many seconds shall the deadline ~
+                         be deferred?: "))
         (let* ((new-deadline-seconds (coerce seconds 'single-float))
                (new-deadline (+ (seconds-to-internal-time new-deadline-seconds)
                                 (get-internal-real-time))))
           (setf *deadline* new-deadline
-                *deadline-seconds* new-deadline-seconds)))))
+                *deadline-seconds* new-deadline-seconds)))
+      (cancel-deadline ()
+        :report "Cancel the deadline and continue."
+        (setf *deadline* nil *deadline-seconds* nil))))
   nil)
 
 (defun defer-deadline (seconds &optional condition)
   "Find the DEFER-DEADLINE restart associated with CONDITION, and
-calls it with SECONDS as argument (deferring the deadline by that many
-seconds.) Continues from the indicated restart, or returns NIL if the
-restart is not found."
+invoke it with SECONDS as argument (deferring the deadline by that many
+seconds.) Otherwise return NIL if the restart is not found."
   (try-restart 'defer-deadline condition seconds))
+
+(defun cancel-deadline (&optional condition)
+  "Find and invoke the CANCEL-DEADLINE restart associated with
+CONDITION, or return NIL if the restart is not found."
+  (try-restart 'cancel-deadline condition))
 
 ;;; Returns TIMEOUT-SEC, TIMEOUT-USEC, DEADLINE-SEC, DEADLINE-USEC, SIGNALP
 ;;;

@@ -156,8 +156,11 @@ with that condition (or with no condition) will be returned."
 ;;; READ-EVALUATED-FORM is used as the interactive method for restart cases
 ;;; setup by the Common Lisp "casing" (e.g., CCASE and CTYPECASE) macros
 ;;; and by CHECK-TYPE.
-(defun read-evaluated-form ()
-  (format *query-io* "~&Type a form to be evaluated:~%")
+(defun read-evaluated-form (&optional (prompt-control nil promptp)
+                            &rest prompt-args)
+  (apply #'format *query-io*
+         (if promptp prompt-control "~&Type a form to be evaluated: ")
+         prompt-args)
   (list (eval (read *query-io*))))
 
 (defun check-type-error (place place-value type type-string)

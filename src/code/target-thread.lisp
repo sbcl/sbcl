@@ -918,6 +918,7 @@ around and can be retrieved by JOIN-THREAD."
                    (*handler-clusters* (sb!kernel::initial-handler-clusters))
                    (*condition-restarts* nil)
                    (sb!impl::*deadline* nil)
+                   (sb!impl::*deadline-seconds* nil)
                    (sb!impl::*step-out* nil)
                    ;; internal printer variables
                    (sb!impl::*previous-case* nil)
