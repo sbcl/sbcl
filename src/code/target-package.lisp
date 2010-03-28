@@ -570,7 +570,7 @@ implementation it is ~S." *default-package-use-list*)
     ;; make the package.
     (when (find-package name)
       ;; ANSI specifies that this error is correctable.
-      (cerror "Leave existing package alone."
+      (cerror "Clobber existing package."
               "A package named ~S already exists" name))
     (let* ((name (package-namify name))
            (package (internal-make-package
