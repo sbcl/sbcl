@@ -599,11 +599,11 @@
   (:translate %raw-instance-atomic-incf/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (diff :scs (signed-reg) :target result))
+         (diff :scs (unsigned-reg) :target result))
   (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
-              signed-num)
+              unsigned-num)
   (:info index)
   (:temporary (:sc unsigned-reg) tmp)
   (:results (result :scs (unsigned-reg)))

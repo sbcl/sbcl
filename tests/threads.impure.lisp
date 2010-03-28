@@ -393,7 +393,7 @@
     (test-semaphore-multiple-signals #'busy-wait-on-semaphore)))
 
 ;;; Here we test that interrupting TRY-SEMAPHORE does not leave a
-;;; semaphore in a bad state. 
+;;; semaphore in a bad state.
 (with-test (:name (:try-semaphore :interrupt-safe))
   (flet ((make-threads (count fn)
            (loop repeat count collect (make-thread fn)))
@@ -421,7 +421,7 @@
       ;; Now ensure that the waiting threads will all be waked up,
       ;; i.e. that the semaphore is still working.
       (loop repeat (+ (count-live-threads waiters)
-                      (count-live-threads more-waiters)) 
+                      (count-live-threads more-waiters))
             do (signal-semaphore sem))
       (sleep 0.5)
       (assert (zerop (count-live-threads triers)))

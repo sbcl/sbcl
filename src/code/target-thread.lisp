@@ -524,7 +524,10 @@ IF-NOT-OWNER is :FORCE)."
   #!+sb-doc
   "Atomically release MUTEX and enqueue ourselves on QUEUE.  Another
 thread may subsequently notify us using CONDITION-NOTIFY, at which
-time we reacquire MUTEX and return to the caller."
+time we reacquire MUTEX and return to the caller.
+
+Note that if CONDITION-WAIT unwinds (due to eg. a timeout) instead of
+returning normally, it may do so without holding the mutex."
   #!-sb-thread (declare (ignore queue))
   (assert mutex)
   #!-sb-thread (error "Not supported in unithread builds.")
@@ -680,13 +683,9 @@ negative. Else blocks until the semaphore can be decremented."
                        do (condition-wait (semaphore-queue semaphore)
                                           (semaphore-mutex semaphore)))
                  (setf (semaphore-%count semaphore) (1- count)))
-            ;; Even safe when CONDITION-WAIT is unwinded without
-            ;; having reacquired the lock: a) we know at this point
-            ;; that an INCF must have happened before, b) the DECF
-            ;; will become visible to other CPUs as the implicit
-            ;; RELEASE-MUTEX involves a CAS and hence a memory
-            ;; barrier.
-            (decf (semaphore-waitcount semaphore)))))))
+            ;; Need to use ATOMIC-DECF instead of DECF, as CONDITION-WAIT
+            ;; may unwind without the lock being held due to timeouts.
+            (atomic-decf (semaphore-waitcount semaphore)))))))
 
 (defun try-semaphore (semaphore)
   #!+sb-doc

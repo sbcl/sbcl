@@ -586,6 +586,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Atomic operations
                "COMPARE-AND-SWAP"
                "ATOMIC-INCF"
+               "ATOMIC-DECF"
 
                ;; Time related things
                "CALL-WITH-TIMING"

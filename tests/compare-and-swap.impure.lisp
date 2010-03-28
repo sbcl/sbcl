@@ -105,7 +105,7 @@
            (sb-ext:compare-and-swap (symbol-value name) t 42)
          (error () :error)))))
 
-;;;; ATOMIC-INCF (we should probably rename this file atomic-ops...)
+;;;; ATOMIC-INCF and ATOMIC-DECF (we should probably rename this file atomic-ops...)
 
 (defstruct box
   (word 0 :type sb-vm:word))
@@ -118,13 +118,23 @@
 (defun dec-box (box n)
   (declare (fixnum n) (box box))
   (loop repeat n
-        do (sb-ext:atomic-incf (box-word box) -1)))
+        do (sb-ext:atomic-decf (box-word box))))
 
 (let ((box (make-box)))
   (inc-box box 10000)
   (assert (= 10000 (box-word box)))
   (dec-box box 10000)
   (assert (= 0 (box-word box))))
+
+(with-test (:name :atomic-incf-wraparound)
+  (let ((box (make-box :word (1- (ash 1 sb-vm:n-word-bits)))))
+    (sb-ext:atomic-incf (box-word box) 2)
+    (assert (= 1 (box-word box)))))
+
+(with-test (:name :atomic-decf-wraparound)
+  (let ((box (make-box :word 0)))
+    (sb-ext:atomic-decf (box-word box) 2)
+    (assert (= (- (ash 1 sb-vm:n-word-bits) 2) (box-word box)))))
 
 #+sb-thread
 (let* ((box (make-box))

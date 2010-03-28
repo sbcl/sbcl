@@ -166,7 +166,7 @@
   (unsafe always-translatable))
 
 #!+(or x86 x86-64)
-(defknown %raw-instance-atomic-incf/word (instance index sb!vm:signed-word) sb!vm:word
+(defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
     (unsafe always-translatable))
 
 ;;; These two are mostly used for bit-bashing operations.
