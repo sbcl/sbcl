@@ -747,6 +747,8 @@ calling @code{load-shared-object}.
 
 @include fun-sb-alien-load-shared-object.texinfo
 
+@include fun-sb-alien-unload-shared-object.texinfo
+
 @node  Foreign Function Calls
 @comment  node-name,  next,  previous,  up
 @section Foreign Function Calls
