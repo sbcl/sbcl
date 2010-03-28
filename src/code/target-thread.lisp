@@ -706,7 +706,7 @@ on this semaphore, then N of them is woken up."
   (declare (type (integer 1) n))
   ;; Need to disable interrupts so that we don't lose a wakeup after
   ;; we have incremented the count.
-  (with-system-mutex ((semaphore-mutex semaphore))
+  (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
     (let ((waitcount (semaphore-waitcount semaphore))
           (count (incf (semaphore-%count semaphore) n)))
       (when (plusp waitcount)

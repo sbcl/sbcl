@@ -15,6 +15,7 @@ changes relative to sbcl-1.0.36:
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due
     to timeouts could be left in an inconsistent state.
+  * bug fix: fix typo in "Reporting Bugs" section of the manual (lp#520366)
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
