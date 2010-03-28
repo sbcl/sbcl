@@ -1792,11 +1792,14 @@
       (when (or (not character-stream-p) bivalent-stream-p)
         (multiple-value-setq (bout-routine bout-type bout-size output-bytes
                                            normalized-external-format)
-          (pick-output-routine (if bivalent-stream-p
-                                   '(unsigned-byte 8)
-                                   target-type)
-                               (fd-stream-buffering fd-stream)
-                               external-format))
+          (let ((buffering (fd-stream-buffering fd-stream)))
+            (if bivalent-stream-p
+                (pick-output-routine '(unsigned-byte 8)
+                                     (if (eq :line buffering)
+                                         :full
+                                         buffering)
+                                     external-format)
+                (pick-output-routine target-type buffering external-format))))
         (unless bout-routine
           (error "could not find any output routine for ~S buffered ~S"
                  (fd-stream-buffering fd-stream)
@@ -2483,13 +2486,16 @@
   (with-output-to-string (*error-output*)
     (setf *stdin*
           (make-fd-stream 0 :name "standard input" :input t :buffering :line
-                            :external-format (stdstream-external-format nil)))
+                          :element-type :default
+                          :external-format (stdstream-external-format nil)))
     (setf *stdout*
           (make-fd-stream 1 :name "standard output" :output t :buffering :line
-                            :external-format (stdstream-external-format t)))
+                          :element-type :default
+                          :external-format (stdstream-external-format t)))
     (setf *stderr*
           (make-fd-stream 2 :name "standard error" :output t :buffering :line
-                            :external-format (stdstream-external-format t)))
+                          :element-type :default
+                          :external-format (stdstream-external-format t)))
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (if tty
