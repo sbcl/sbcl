@@ -644,7 +644,7 @@ should be considered an implementation detail, and may change in the
 future."
   (name nil :type (or null simple-string))
   (%count 0 :type (integer 0))
-  (waitcount 0 :type (integer 0))
+  (waitcount 0 :type sb!vm:word)
   (mutex (make-mutex))
   (queue (make-waitqueue)))
 
@@ -681,15 +681,16 @@ negative. Else blocks until the semaphore can be decremented."
                  ;; Need to use ATOMIC-INCF despite the lock, because on our
                  ;; way out from here we might not be locked anymore -- so
                  ;; another thread might be tweaking this in parallel using
-                 ;; ATOMIC-DECF.
-                 (atomic-incf (semaphore-waitcount semaphore))
+                 ;; ATOMIC-DECF. No danger over overflow, since there it
+                 ;; at most one increment per thread waiting on the semaphore.
+                 (sb!ext:atomic-incf (semaphore-waitcount semaphore))
                  (loop until (plusp (setf count (semaphore-%count semaphore)))
                        do (condition-wait (semaphore-queue semaphore)
                                           (semaphore-mutex semaphore)))
                  (setf (semaphore-%count semaphore) (1- count)))
             ;; Need to use ATOMIC-DECF instead of DECF, as CONDITION-WAIT
             ;; may unwind without the lock being held due to timeouts.
-            (atomic-decf (semaphore-waitcount semaphore)))))))
+            (sb!ext:atomic-decf (semaphore-waitcount semaphore)))))))
 
 (defun try-semaphore (semaphore &optional (n 1))
   #!+sb-doc
