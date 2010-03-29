@@ -387,6 +387,15 @@
     (assert (try-semaphore sem))
     (assert (zerop (semaphore-count sem)))))
 
+(with-test (:name (:try-semaphore :trivial-fail :n>1))
+  (assert (eq (try-semaphore (make-semaphore :count 1) 2) 'nil)))
+
+(with-test (:name (:try-semaphore :trivial-success :n>1))
+  (let ((sem (make-semaphore :count 10)))
+    (assert (try-semaphore sem 5))
+    (assert (try-semaphore sem 5))
+    (assert (zerop (semaphore-count sem)))))
+
 (with-test (:name (:try-semaphore :emulate-wait-on-semaphore))
   (flet ((busy-wait-on-semaphore (sem)
            (loop until (try-semaphore sem) do (sleep 0.001))))
@@ -406,12 +415,12 @@
     ;; threads-being-interrupted will perform TRY-SEMAPHORE on that
     ;; semaphore, and MORE-WAITERS are new threads trying to wait on
     ;; the semaphore during the interruption-fire.
-    (let* ((sem (make-semaphore :count 50))
+    (let* ((sem (make-semaphore :count 100))
            (waiters (make-threads 20 #'(lambda ()
                                          (wait-on-semaphore sem))))
            (triers  (make-threads 40 #'(lambda ()
                                          (sleep (random 0.01))
-                                         (try-semaphore sem))))
+                                         (try-semaphore sem (1+ (random 5))))))
            (more-waiters
             (loop repeat 10
                   do (kill-thread (nth (random 40) triers))

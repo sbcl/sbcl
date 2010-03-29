@@ -691,17 +691,15 @@ negative. Else blocks until the semaphore can be decremented."
             ;; may unwind without the lock being held due to timeouts.
             (atomic-decf (semaphore-waitcount semaphore)))))))
 
-(defun try-semaphore (semaphore)
+(defun try-semaphore (semaphore &optional (n 1))
   #!+sb-doc
-  "Try to decrement the count of SEMAPHORE if the count would not be
-negative. Else return NIL."
-  ;; No need for disabling interrupts; the mutex prevents interleaved
-  ;; modifications, and we don't leave temporarily inconsistent state
-  ;; around.
+  "Try to decrement the count of SEMAPHORE by N. If the count were to
+become negative, punt and return NIL, otherwise return true."
+  (declare (type (integer 1) n))
   (with-mutex ((semaphore-mutex semaphore))
-    (let ((count (semaphore-%count semaphore)))
-      (when (plusp count)
-        (setf (semaphore-%count semaphore) (1- count))))))
+    (let ((new-count (- (semaphore-%count semaphore) n)))
+      (when (not (minusp new-count))
+        (setf (semaphore-%count semaphore) new-count)))))
 
 (defun signal-semaphore (semaphore &optional (n 1))
   #!+sb-doc
