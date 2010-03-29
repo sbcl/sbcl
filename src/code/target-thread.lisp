@@ -678,7 +678,11 @@ negative. Else blocks until the semaphore can be decremented."
           (setf (semaphore-%count semaphore) (1- count))
           (unwind-protect
                (progn
-                 (incf (semaphore-waitcount semaphore))
+                 ;; Need to use ATOMIC-INCF despite the lock, because on our
+                 ;; way out from here we might not be locked anymore -- so
+                 ;; another thread might be tweaking this in parallel using
+                 ;; ATOMIC-DECF.
+                 (atomic-incf (semaphore-waitcount semaphore))
                  (loop until (plusp (setf count (semaphore-%count semaphore)))
                        do (condition-wait (semaphore-queue semaphore)
                                           (semaphore-mutex semaphore)))
