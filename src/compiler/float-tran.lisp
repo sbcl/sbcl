@@ -343,8 +343,8 @@
                   (if (minusp y)
                       '(%negate x)
                       'x)))))
-  (def * single-float 1.0 -1.0)
-  (def * double-float 1.0d0 -1.0d0))
+  (def single-float 1.0 -1.0)
+  (def double-float 1.0d0 -1.0d0))
 
 ;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
 (defun maybe-exact-reciprocal (x)
