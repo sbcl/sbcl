@@ -1,0 +1,80 @@
+@node sb-concurrency
+@section sb-concurrency
+@cindex Concurrency
+@cindex Sb-concurrency
+
+Additional data structures, synchronization primitives and tools for
+concurrent programming. Similiar to Java's @code{java.util.concurrent}
+package.
+
+@page
+@anchor{Section sb-concurrency:queue}
+@subsection Queue
+@cindex Queue, lock-free
+
+@code{sb-concurrency:queue} is a lock-free, thread-safe FIFO queue
+datatype.
+@*@*
+The implementation is based on @cite{An Optimistic Approach to
+Lock-Free FIFO Queues} by Edya Ladan-Mozes and Nir Shavit.
+@*@*
+Before SBCL 1.0.38, this implementation resided in its own contrib
+(@pxref{sb-queue}) which is still provided for backwards-compatibility
+but which has since been deprecated.
+
+@sp 1
+@unnumberedsubsubsec Synopsis:
+
+@code{enqueue} can be used to add objects to a queue, and
+@code{dequeue} retrieves items from a queue in FIFO order.
+
+@sp 1
+@unnumberedsubsubsec Dictionary:
+
+@include struct-sb-concurrency-queue.texinfo
+
+@include fun-sb-concurrency-dequeue.texinfo
+@include fun-sb-concurrency-enqueue.texinfo
+@include fun-sb-concurrency-list-queue-contents.texinfo
+@include fun-sb-concurrency-make-queue.texinfo
+@include fun-sb-concurrency-queue-count.texinfo
+@include fun-sb-concurrency-queue-empty-p.texinfo
+@include fun-sb-concurrency-queue-name.texinfo
+@include fun-sb-concurrency-queuep.texinfo
+
+@page
+@subsection Mailbox (lock-free)
+@cindex Mailbox, lock-free
+
+@code{sb-concurrency:mailbox} is a lock-free message queue where one
+or multiple ends can send messages to one or multiple receivers. The
+difference to @ref{Section sb-concurrency:queue} is that the receiving
+end may block until a message arrives.
+@*@*
+The implementation is based on the Queue implementation above
+(@pxref{Structure sb-concurrency:queue}.)
+
+@sp 1
+@unnumberedsubsubsec Synopsis:
+@code{send-message} can be used to send a message to a mailbox, and
+@code{receive-message} retrieves a message from a mailbox, or blocks
+until a new message arrives. @code{receive-message-no-hang} is the
+non-blocking variant.
+@*@*
+Messages can be any object.
+
+@sp 1
+@unnumberedsubsubsec Dictionary:
+
+@include struct-sb-concurrency-mailbox.texinfo
+
+@include fun-sb-concurrency-list-mailbox-messages.texinfo
+@include fun-sb-concurrency-mailbox-count.texinfo
+@include fun-sb-concurrency-mailbox-empty-p.texinfo
+@include fun-sb-concurrency-mailbox-name.texinfo
+@include fun-sb-concurrency-mailboxp.texinfo
+@include fun-sb-concurrency-make-mailbox.texinfo
+@include fun-sb-concurrency-receive-message.texinfo
+@include fun-sb-concurrency-receive-message-no-hang.texinfo
+@include fun-sb-concurrency-receive-pending-messages.texinfo
+@include fun-sb-concurrency-send-message.texinfo

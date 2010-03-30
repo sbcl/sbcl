@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.36:
+  * new contrib: SB-CONCURRENCY is a new contrib; it's supposed to contain
+    additional data structures and tools for concurrent programming; at the
+    moment it contains a lock-free queue, and a lock-free mailbox
+    implementation.
+  * deprecated contrib: the SB-QUEUE contrib was merged into the
+    SB-CONCURRENCY contrib and deprecated.
   * new feature: added SB-THREAD:TRY-SEMAPHORE, a non-blocking variant of
     SB-THREAD:WAIT-ON-SEMAPHORE.
   * new feature: SB-EXT:ATOMIC-DECF has been added as a companion to

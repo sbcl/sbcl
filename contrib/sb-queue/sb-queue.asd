@@ -9,25 +9,17 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage :sb-queue-system
-  (:use :asdf :cl))
+(in-package :cl-user)
 
-(in-package :sb-queue-system)
+(asdf:defsystem :sb-queue
+  :depends-on (:sb-concurrency)
+  :components ((:file "package")))
 
-(defsystem :sb-queue
-  :components ((:file "queue")))
-
-(defsystem :sb-queue-tests
-  :depends-on (:sb-queue :sb-rt)
-  :components ((:file "test-queue")))
-
-(defmethod perform :after ((o load-op) (c (eql (find-system :sb-queue))))
+(defmethod asdf:perform :after ((o asdf:load-op)
+                                (c (eql (asdf:find-system :sb-queue))))
   (provide 'sb-queue))
 
-(defmethod perform ((o test-op) (c (eql (find-system :sb-queue))))
-  (operate 'load-op :sb-queue-tests)
-  (operate 'test-op :sb-queue-tests))
 
-(defmethod perform ((op test-op) (com (eql (find-system :sb-queue-tests))))
-  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
-      (error "~S failed" 'test-op)))
+(defmethod asdf:perform ((o asdf:test-op)
+                         (c (eql (asdf:find-system :sb-queue))))
+  :pass)

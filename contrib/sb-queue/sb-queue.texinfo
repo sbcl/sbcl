@@ -2,19 +2,5 @@
 @section sb-queue
 @cindex Queue, FIFO
 
-The @code{sb-queue} module, loadable by 
-@lisp
-(require :sb-queue)
-@end lisp
-provides a thread-safe lockless FIFO queues.
-
-@include struct-sb-queue-queue.texinfo
-
-@include fun-sb-queue-dequeue.texinfo
-@include fun-sb-queue-enqueue.texinfo
-@include fun-sb-queue-list-queue-contents.texinfo
-@include fun-sb-queue-make-queue.texinfo
-@include fun-sb-queue-queue-count.texinfo
-@include fun-sb-queue-queue-empty-p.texinfo
-@include fun-sb-queue-queue-name.texinfo
-@include fun-sb-queue-queuep.texinfo
+Since SBCL 1.0.38, the @code{sb-queue} module has been merged into the
+@code{sb-concurrency} module (@pxref{sb-concurrency}.)
