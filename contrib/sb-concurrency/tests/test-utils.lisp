@@ -3,15 +3,17 @@
 #+sb-thread
 (progn
 
-(defparameter +timeout+ 60.0)
+(defparameter +timeout+ 30.0)
 
 (defun make-threads (n name fn)
   (loop for i from 1 to n
         collect (make-thread fn :name (format nil "~A-~D" name i))))
 
 (defun timed-join-thread (thread &optional (timeout +timeout+))
-  (sb-sys:with-deadline (:seconds timeout)
-    (join-thread thread :default :aborted)))
+  (handler-case (sb-sys:with-deadline (:seconds timeout)
+                  (join-thread thread :default :aborted))
+    (sb-ext:timeout ()
+      :timeout)))
 
 (defun hang ()
   (join-thread *current-thread*))
