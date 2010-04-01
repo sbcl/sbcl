@@ -18,39 +18,46 @@
 (defconstant +most-positive-word+ (1- (expt 2 sb-vm:n-word-bits)))
 
 (declaim (inline make-counter))
-(defstruct (counter (:copier nil))
-  (count 0 :type sb-vm:word)
-  (overflow 0 :type unsigned-byte)
-  (overflow-lock (sb-thread::make-spinlock) :type sb-thread::spinlock))
+(defstruct (counter (:constructor make-counter) (:copier nil))
+  (word 0 :type sb-vm:word)
+  (overflow 0 :type unsigned-byte))
 
 (defun incf-counter (counter delta)
   ;; When running multi-threaded we can easily get negative numbers for the
   ;; cons-counter. Don't count them at all.
   (when (plusp delta)
-    ;; ATOMIC-INCF is restricted to signed-word, but delta can be bigger: first
-    ;; count the number of full overflows...
-    (loop while (>= delta +most-positive-word+)
-          do (sb-thread::with-spinlock ((counter-overflow-lock counter))
-               (incf (counter-overflow counter) 1))
-          (decf delta +most-positive-word+))
-    (flet ((%incf (d)
-             (let ((prev (atomic-incf (counter-count counter) d)))
-               (when (< (logand +most-positive-word+ (+ prev d)) prev)
-                 (sb-thread::with-spinlock ((counter-overflow-lock counter))
-                   (incf (counter-overflow counter)))))))
-      (if (typep delta '(signed-byte 32))
+    (labels ((%incf-overflow (&optional (n 1))
+               ;; Overflow-counter can run into bignums... so we need to loop
+               ;; around CAS till the increment succeeds.
+               (loop for old = (counter-overflow counter)
+                     until (eq old (compare-and-swap (counter-overflow counter)
+                                                     old (+ old n)))))
+             (%incf (d)
+               ;; Increment the word-sized counter. If it overflows, record the
+               ;; overflow.
+               (let ((prev (atomic-incf (counter-word counter) d)))
+                 (when (< (logand +most-positive-word+ (+ prev d)) prev)
+                   (%incf-overflow)
+                   (atomic-incf (counter-word counter))))))
+      ;; DELTA can potentially be a bignum -- cut it down to word-size.
+      (unless (typep delta 'sb-vm:word)
+        (multiple-value-bind (n r) (truncate delta +most-positive-word+)
+          (%incf-overflow n)
+          (setf delta r)))
+      ;; ATOMIC-INCF can at most handle SIGNED-WORD: if DELTA doesn't fit that,
+      ;; DELTA/2 will.
+      (if (typep delta 'sb-vm:signed-word)
           (%incf delta)
           ;; ...and if delta is still too big, split it into four parts: they
           ;; are guaranteed to fit into a signed word.
-          (let ((quarter (truncate delta 4)))
-            (%incf quarter)
-            (%incf quarter)
-            (%incf quarter)
-            (%incf quarter)))))
+          (multiple-value-bind (n r) (truncate delta 2)
+            (%incf n)
+            (%incf n)
+            (%incf r)))))
   counter)
 
-(defun counter->integer (counter)
-  (+ (counter-count counter)
+(defun counter-count (counter)
+  (+ (counter-word counter)
      (* (counter-overflow counter)
         +most-positive-word+)))
 
@@ -103,6 +110,9 @@
 (declaim (counter *enclosed-profiles*))
 (defvar *enclosed-profiles*)
 
+(declaim (counter *enclosed-gc-run-time*))
+(defvar *enclosed-gc-run-time*)
+
 ;;; the encapsulated function we're currently computing profiling data
 ;;; for, recorded so that we can detect the problem of
 ;;; PROFILE-computing machinery calling a function which has itself
@@ -152,8 +162,9 @@
   (let* ((count (make-counter))
          (ticks (make-counter))
          (consing (make-counter))
-         (profiles (make-counter)))
-    (declare (counter count ticks consing profiles))
+         (profiles (make-counter))
+         (gc-run-time (make-counter)))
+    (declare (counter count ticks consing profiles gc-run-time))
     (values
      ;; ENCAPSULATION-FUN
      (lambda (&more arg-context arg-count)
@@ -171,16 +182,19 @@
        (incf-counter count 1)
        (let ((dticks 0)
              (dconsing 0)
-             (inner-enclosed-profiles 0))
+             (inner-enclosed-profiles 0)
+             (dgc-run-time 0))
          (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
              (let* ((start-ticks (get-internal-ticks))
+                    (start-gc-run-time *gc-run-time*)
                     (*enclosed-ticks* (make-counter))
                     (*enclosed-consing* (make-counter))
                     (*enclosed-profiles* (make-counter))
                     (nbf0 *n-bytes-freed-or-purified*)
-                    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
-               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing* *enclosed-profiles*))
+                    (dynamic-usage-0 (sb-kernel:dynamic-usage))
+                    (*enclosed-gc-run-time* (make-counter)))
+               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing* *enclosed-profiles* *enclosed-gc-run-time*))
                (unwind-protect
                    (multiple-value-call encapsulated-fun
                                         (sb-c:%more-arg-values arg-context
@@ -195,26 +209,31 @@
                                       (- dynamic-usage-1 dynamic-usage-0)
                                       ;; general case
                                       (- (get-bytes-consed) nbf0 dynamic-usage-0))
-                         inner-enclosed-profiles (counter->integer *enclosed-profiles*))
-                   (incf-counter ticks (- dticks (counter->integer *enclosed-ticks*)))
-                   (incf-counter consing (- dconsing (counter->integer *enclosed-consing*)))
+                         inner-enclosed-profiles (counter-count *enclosed-profiles*)
+                         dgc-run-time (- *gc-run-time* start-gc-run-time))
+                   (incf-counter ticks (- dticks (counter-count *enclosed-ticks*)))
+                   (incf-counter gc-run-time (- dgc-run-time (counter-count *enclosed-gc-run-time*)))
+                   (incf-counter consing (- dconsing (counter-count *enclosed-consing*)))
                    (incf-counter profiles inner-enclosed-profiles))))
            (when (boundp '*enclosed-ticks*)
              (incf-counter *enclosed-ticks* dticks)
              (incf-counter *enclosed-consing* dconsing)
-             (incf-counter *enclosed-profiles* (1+ inner-enclosed-profiles))))))
+             (incf-counter *enclosed-profiles* (1+ inner-enclosed-profiles))
+             (incf-counter *enclosed-gc-run-time* dgc-run-time)))))
      ;; READ-STATS-FUN
      (lambda ()
-       (values (counter->integer count)
-               (counter->integer ticks)
-               (counter->integer consing)
-               (counter->integer profiles)))
+       (values (counter-count count)
+               (counter-count ticks)
+               (counter-count consing)
+               (counter-count profiles)
+               (counter-count gc-run-time)))
      ;; CLEAR-STATS-FUN
      (lambda ()
        (setf count (make-counter)
              ticks (make-counter)
              consing (make-counter)
-             profiles (make-counter))))))
+             profiles (make-counter)
+             gc-run-time (make-counter))))))
 
 ;;;; interfaces
 
@@ -329,7 +348,8 @@
   name
   calls
   seconds
-  consing)
+  consing
+  gc-run-time)
 
 ;;; Return our best guess for the run time in a function, subtracting
 ;;; out factors for profiling overhead. We subtract out the internal
@@ -368,7 +388,7 @@ Lisp process."
         (warn "Function ~S has been redefined, so times may be inaccurate.~@
                PROFILE it again to record calls to the new definition."
               name))
-      (multiple-value-bind (calls ticks consing profile)
+      (multiple-value-bind (calls ticks consing profile gc-run-time)
           (funcall (profile-info-read-stats-fun pinfo))
         (if (zerop calls)
             (push name no-call-name-list)
@@ -377,7 +397,8 @@ Lisp process."
                                   :seconds (compensate-time calls
                                                             ticks
                                                             profile)
-                                  :consing consing)
+                                  :consing consing
+                                  :gc-run-time gc-run-time)
                   time-info-list))))
 
     (setf time-info-list
@@ -400,21 +421,26 @@ Lisp process."
   (let ((total-seconds 0.0)
         (total-consed 0)
         (total-calls 0)
+        (total-gc-run-time 0)
         (seconds-width (length "seconds"))
         (consed-width (length "consed"))
         (calls-width (length "calls"))
         (sec/call-width 10)
+        (gc-run-time-width (length "gc"))
         (name-width 6))
     (dolist (time-info time-info-list)
       (incf total-seconds (time-info-seconds time-info))
       (incf total-consed (time-info-consing time-info))
-      (incf total-calls (time-info-calls time-info)))
+      (incf total-calls (time-info-calls time-info))
+      (incf total-gc-run-time (time-info-gc-run-time time-info)))
     (setf seconds-width (max (length (format nil "~10,3F" total-seconds))
                              seconds-width)
           calls-width (max (length (format nil "~:D" total-calls))
                            calls-width)
           consed-width (max (length (format nil "~:D" total-consed))
-                            consed-width))
+                            consed-width)
+          gc-run-time-width (max (length (format nil "~10,3F" (/ total-gc-run-time internal-time-units-per-second)))
+                            gc-run-time-width))
 
     (flet ((dashes ()
              (dotimes (i (+ seconds-width consed-width calls-width
@@ -424,6 +450,7 @@ Lisp process."
              (terpri *trace-output*)))
       (format *trace-output* "~&~@{ ~v:@<~A~>~^|~}~%"
               seconds-width "seconds"
+              (1+ gc-run-time-width) "gc"
               (1+ consed-width) "consed"
               (1+ calls-width) "calls"
               (1+ sec/call-width) "sec/call"
@@ -432,8 +459,9 @@ Lisp process."
       (dashes)
 
       (dolist (time-info time-info-list)
-        (format *trace-output* "~v,3F | ~v:D | ~v:D | ~10,6F | ~S~%"
+        (format *trace-output* "~v,3F | ~v,3F | ~v:D | ~v:D | ~10,6F | ~S~%"
                 seconds-width (time-info-seconds time-info)
+                gc-run-time-width (/ (time-info-gc-run-time time-info) internal-time-units-per-second)
                 consed-width (time-info-consing time-info)
                 calls-width (time-info-calls time-info)
                 (/ (time-info-seconds time-info)
@@ -442,8 +470,9 @@ Lisp process."
 
       (dashes)
 
-      (format *trace-output* "~v,3F | ~v:D | ~v:D |            | Total~%"
+      (format *trace-output* "~v,3F | ~v,3F | ~v:D | ~v:D |            | Total~%"
                 seconds-width total-seconds
+                gc-run-time-width (/ total-gc-run-time internal-time-units-per-second)
                 consed-width total-consed
                 calls-width total-calls)
 

@@ -23,6 +23,11 @@ changes relative to sbcl-1.0.36:
        SOCKET-PEERNAME.
     ** SOCKET-MAKE-STREAM once more supports the :AUTO-CLOSE option.
        (lp#540413)
+  * improvements to the instrumenting profiler
+    ** new feature: report per-function GC overhead. (thanks to John Fremlin)
+    ** optimization: counters no longer use locks for the overflow mode.
+    ** bug fix: whenever a profiling counter wrapped into overflow mode, it
+       incurred an off-by-one miscount.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due
@@ -30,6 +35,7 @@ changes relative to sbcl-1.0.36:
   * bug fix: fix typo in "Reporting Bugs" section of the manual (lp#520366)
   * bug fix: misoptimization of multiplication by one in
     (SB-C::FLOAT-ACCURACY 0) policies.
+  * bug fix: miscounts in SB-PROFILE.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows

@@ -89,3 +89,16 @@
     (unless (equal res want)
       (error "wanted ~S, got ~S" want res)))
   (report))
+
+(with-test (:name :profiling-counter)
+  ;; Make sure our profiling counters don't miscount
+  (let ((c (sb-profile::make-counter))
+        (i 0))
+    (loop repeat 1000000
+          do (let ((n (random (* 12 (ash 1 sb-vm:n-word-bits)))))
+               (sb-profile::incf-counter c n)
+               (incf i n))
+             (let ((n (random (ash 1 sb-vm:n-word-bits))))
+               (sb-profile::incf-counter c n)
+               (incf i n)))
+    (assert (= i (sb-profile::counter-count c)))))
