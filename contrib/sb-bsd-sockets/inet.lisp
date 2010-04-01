@@ -17,6 +17,16 @@ Examples:
 ;;; XXX should we *...* this?
 (defparameter inet-address-any (vector 0 0 0 0))
 
+(defmethod socket-namestring ((socket inet-socket))
+  (ignore-errors
+    (multiple-value-bind (addr port) (socket-name socket)
+      (format nil "~{~A~^.~}:~A" (coerce addr 'list) port))))
+
+(defmethod socket-peerstring ((socket inet-socket))
+  (ignore-errors
+    (multiple-value-bind (addr port) (socket-peername socket)
+      (format nil "~{~A~^.~}:~A" (coerce addr 'list) port))))
+
 ;;; binding a socket to an address and port.  Doubt that anyone's
 ;;; actually using this much, to be honest.
 

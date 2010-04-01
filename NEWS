@@ -1,11 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.36:
+  * INCOMPATIBLE CHANGE: the SB-QUEUE contrib was merged into the
+    SB-CONCURRENCY contrib module.
   * new contrib: SB-CONCURRENCY is a new contrib; it's supposed to contain
     additional data structures and tools for concurrent programming; at the
     moment it contains a lock-free queue, and a lock-free mailbox
     implementation.
-  * deprecated contrib: the SB-QUEUE contrib was merged into the
-    SB-CONCURRENCY contrib and deprecated.
   * new feature: added SB-THREAD:TRY-SEMAPHORE, a non-blocking variant of
     SB-THREAD:WAIT-ON-SEMAPHORE.
   * new feature: SB-EXT:ATOMIC-DECF has been added as a companion to
@@ -17,6 +17,12 @@ changes relative to sbcl-1.0.36:
   * enhancement: errors from NO-APPLICABLE-METHOD and
     NO-PRIMARY-METHOD now have a RETRY restart available to retry the
     generic function call.
+  * enhancement: SB-BSD-SOCKET improvements
+    ** sockets and socket streams now have a more informative printed
+       representation based on the corresponding SOCKET-NAME and
+       SOCKET-PEERNAME.
+    ** SOCKET-MAKE-STREAM once more supports the :AUTO-CLOSE option.
+       (lp#540413)
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due

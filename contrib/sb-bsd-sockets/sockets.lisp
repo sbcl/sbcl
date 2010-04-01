@@ -25,9 +25,20 @@ directly instantiated.")))
 
 (defmethod print-object ((object socket) stream)
   (print-unreadable-object (object stream :type t :identity t)
-                           (princ "descriptor " stream)
-                           (princ (slot-value object 'file-descriptor) stream)))
+    (format stream "~@[~A, ~]~@[peer: ~A, ~]fd: ~A"
+            (socket-namestring object)
+            (socket-peerstring object)
+            (slot-value object 'file-descriptor))))
 
+(defgeneric socket-namestring (socket))
+
+(defmethod socket-namestring (socket)
+  nil)
+
+(defgeneric socket-peerstring (socket))
+
+(defmethod socket-peerstring (socket)
+  nil)
 
 (defmethod shared-initialize :after ((socket socket) slot-names
                                      &key protocol type
@@ -362,28 +373,34 @@ for the stream."))
                                (element-type 'character)
                                (buffering :full)
                                (external-format :default)
-                               timeout)
-  "Default method for SOCKET objects.  An ELEMENT-TYPE of :DEFAULT
-will construct a bivalent stream.  Acceptable values for BUFFERING
-are :FULL, :LINE and :NONE.  Streams will have no TIMEOUT
-by default.
-  The stream for SOCKET will be cached, and a second invocation of this
-method will return the same stream.  This may lead to oddities if this
-function is invoked with inconsistent arguments \(e.g., one might request
-an input stream and get an output stream in response\)."
+                               timeout
+                               auto-close)
+  "Default method for SOCKET objects. An ELEMENT-TYPE of :DEFAULT will
+construct a bivalent stream. Acceptable values for BUFFERING are :FULL, :LINE
+and :NONE. Streams will have no TIMEOUT by default. If AUTO-CLOSE is true, the
+underlying OS socket is automatically closed after the stream and the socket
+have been garbage collected.
+
+The stream for SOCKET will be cached, and a second invocation of this method
+will return the same stream. This may lead to oddities if this function is
+invoked with inconsistent arguments \(e.g., one might request an input stream
+and get an output stream in response\)."
   (let ((stream
          (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream
       (setf stream (sb-sys:make-fd-stream
                     (socket-file-descriptor socket)
-                    :name "a socket"
+                    :name (format nil "socket~@[ ~A~]~@[, peer: ~A~]"
+                                  (socket-namestring socket)
+                                  (socket-peerstring socket))
                     :dual-channel-p t
                     :input input
                     :output output
                     :element-type element-type
                     :buffering buffering
                     :external-format external-format
-                    :timeout timeout)))
+                    :timeout timeout
+                    :auto-close auto-close)))
       (setf (slot-value socket 'stream) stream)
     (sb-ext:cancel-finalization socket)
     stream))

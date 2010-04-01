@@ -5,6 +5,12 @@
   (:documentation "Class representing local domain (AF_LOCAL) sockets,
 also known as unix-domain sockets."))
 
+(defmethod socket-namestring ((socket local-socket))
+  (ignore-errors (socket-name socket)))
+
+(defmethod socket-peerstring ((socket local-socket))
+  (ignore-errors (socket-peername socket)))
+
 (defmethod make-sockaddr-for ((socket local-socket)
                               &optional sockaddr &rest address &aux (filename (first address)))
   (let ((sockaddr (or sockaddr (sockint::allocate-sockaddr-un))))
