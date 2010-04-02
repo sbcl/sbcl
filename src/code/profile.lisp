@@ -37,11 +37,10 @@
                ;; overflow.
                (let ((prev (atomic-incf (counter-word counter) d)))
                  (when (< (logand +most-positive-word+ (+ prev d)) prev)
-                   (%incf-overflow)
-                   (atomic-incf (counter-word counter))))))
+                   (%incf-overflow)))))
       ;; DELTA can potentially be a bignum -- cut it down to word-size.
       (unless (typep delta 'sb-vm:word)
-        (multiple-value-bind (n r) (truncate delta +most-positive-word+)
+        (multiple-value-bind (n r) (truncate delta (1+ +most-positive-word+))
           (%incf-overflow n)
           (setf delta r)))
       ;; ATOMIC-INCF can at most handle SIGNED-WORD: if DELTA doesn't fit that,
@@ -58,8 +57,7 @@
 
 (defun counter-count (counter)
   (+ (counter-word counter)
-     (* (counter-overflow counter)
-        +most-positive-word+)))
+     (* (counter-overflow counter) (1+ +most-positive-word+))))
 
 ;;;; High resolution timer
 
