@@ -1201,7 +1201,7 @@
                (sb-thread:make-thread
                 (lambda ()
                   (sleep (random 0.001)))
-                :name (list :sleep i))
+                :name (format nil "SLEEP-~D" i))
                (sb-thread:make-thread
                 (lambda ()
                   ;; KLUDGE: what we are doing here is explicit,
@@ -1211,7 +1211,7 @@
                   (sb-thread::with-all-threads-lock
                     (sb-thread::with-session-lock (sb-thread::*session*)
                       (sb-ext:gc))))
-                :name (list :gc i)))
+                :name (format nil "GC-~D" i)))
          (error (e)
            (format t "~%error creating thread ~D: ~A -- backing off for retry~%" i e)
            (sleep 0.1)
