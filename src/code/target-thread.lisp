@@ -540,7 +540,7 @@ IF-NOT-OWNER is :FORCE)."
   #!+(and sb-lutex sb-thread)
   (lutex (make-lutex))
   #!-sb-lutex
-  (data nil))
+  (token nil))
 
 (defun make-waitqueue (&key name)
   #!+sb-doc
@@ -552,9 +552,9 @@ IF-NOT-OWNER is :FORCE)."
       "The name of the waitqueue. Setfable.")
 
 #!+(and sb-thread (not sb-lutex))
-(define-structure-slot-addressor waitqueue-data-address
+(define-structure-slot-addressor waitqueue-token-address
     :structure waitqueue
-    :slot data)
+    :slot token)
 
 (defun condition-wait (queue mutex)
   #!+sb-doc
@@ -592,26 +592,26 @@ returning normally, it may do so without holding the mutex."
       ;; memory barrier semantics of lock acquire/release. This must
       ;; not be moved into the loop else wakeups may be lost upon
       ;; continuing after a deadline or EINTR.
-      (setf (waitqueue-data queue) me)
+      (setf (waitqueue-token queue) me)
       (loop
         (multiple-value-bind (to-sec to-usec)
             (allow-with-interrupts (decode-timeout nil))
           (case (unwind-protect
                      (with-pinned-objects (queue me)
                        ;; RELEASE-MUTEX is purposefully as close to
-                       ;; FUTEX-WAIT as possible to reduce the size
-                       ;; of the window where WAITQUEUE-DATA may be
-                       ;; set by a notifier.
+                       ;; FUTEX-WAIT as possible to reduce the size of
+                       ;; the window where the token may be set by a
+                       ;; notifier.
                        (release-mutex mutex)
                        ;; Now we go to sleep using futex-wait. If
                        ;; anyone else manages to grab MUTEX and call
                        ;; CONDITION-NOTIFY during this comment, it
-                       ;; will change queue->data, and so futex-wait
+                       ;; will change the token, and so futex-wait
                        ;; returns immediately instead of sleeping.
                        ;; Ergo, no lost wakeup. We may get spurious
                        ;; wakeups, but that's ok.
                        (allow-with-interrupts
-                         (futex-wait (waitqueue-data-address queue)
+                         (futex-wait (waitqueue-token-address queue)
                                      (get-lisp-obj-address me)
                                      ;; our way of saying "no
                                      ;; timeout":
@@ -627,7 +627,9 @@ returning normally, it may do so without holding the mutex."
             ;; signal a deadline unconditionally here because the
             ;; call to GET-MUTEX may already have signaled it.
             ((1))
-            ;; EINTR
+            ;; EINTR; we do not need to return to the caller because
+            ;; an interleaved wakeup would change the token causing an
+            ;; EWOULDBLOCK in the next iteration.
             ((2))
             ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup
             ;; case. 0 is the normal wakeup.
@@ -658,9 +660,9 @@ this call."
     ;; ^-- surely futex_wake() involves a memory barrier?
     #!-sb-lutex
     (progn
-      (setf (waitqueue-data queue) queue)
+      (setf (waitqueue-token queue) queue)
       (with-pinned-objects (queue)
-        (futex-wake (waitqueue-data-address queue) n)))))
+        (futex-wake (waitqueue-token-address queue) n)))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc

@@ -1,8 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.36:
-  * DEPRECIATION: the SB-QUEUE contrib was merged into the SB-CONCURRENCY
+  * INCOMPATIBLE CHANGE: Thread names are now restricted to SIMPLE-STRINGs
+    like for any other thread-related datastructure (MUTEX, etc.)
+  * DEPRECATION: the SB-QUEUE contrib was merged into the SB-CONCURRENCY
     contrib module. New code should depend on SB-CONCURRENCY, not SB-QUEUE.
-  * DEPRECIATION: SB-THEAD:GET-MUTEX was deprecated in favor of
+  * DEPRECATION: SB-THEAD:GET-MUTEX was deprecated in favor of
     SB-THREAD:GRAB-MUTEX.
   * new contrib: SB-CONCURRENCY is a new contrib; it's supposed to contain
     additional data structures and tools for concurrent programming; at the
