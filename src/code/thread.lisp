@@ -11,25 +11,32 @@
 
 (in-package "SB!THREAD")
 
+(def!type thread-name ()
+  'simple-string)
+
 (def!struct (thread (:constructor %make-thread))
   #!+sb-doc
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
-  name
-  %alive-p
-  os-thread
-  interruptions
-  (interruptions-lock (make-mutex :name "thread interruptions lock"))
-  result
-  (result-lock (make-mutex :name "thread result lock")))
+  (name          nil :type (or thread-name null))
+  (%alive-p      nil :type boolean)
+  (os-thread     nil :type (or integer null))
+  (interruptions nil :type list)
+  (result        nil :type list)
+  (interruptions-lock
+   (make-mutex :name "thread interruptions lock")
+   :type mutex)
+  (result-lock
+   (make-mutex :name "thread result lock")
+   :type mutex))
 
 (def!struct mutex
   #!+sb-doc
   "Mutex type."
-  (name nil :type (or null simple-string))
+  (name   nil :type (or null thread-name))
   (%owner nil :type (or null thread))
   #!+(and (not sb-lutex) sb-thread)
-  (state 0 :type fixnum)
+  (state    0 :type fixnum)
   #!+(and sb-lutex sb-thread)
   (lutex (make-lutex)))
 
@@ -60,7 +67,7 @@ stale value, use MUTEX-OWNER instead."
 (def!struct spinlock
   #!+sb-doc
   "Spinlock type."
-  (name nil :type (or null simple-string))
+  (name  nil :type (or null thread-name))
   (value nil))
 
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))

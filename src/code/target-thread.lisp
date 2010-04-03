@@ -500,7 +500,7 @@ IF-NOT-OWNER is :FORCE)."
 (defstruct (waitqueue (:constructor %make-waitqueue))
   #!+sb-doc
   "Waitqueue type."
-  (name nil :type (or null simple-string))
+  (name nil :type (or null thread-name))
   #!+(and sb-lutex sb-thread)
   (lutex (make-lutex))
   #!-sb-lutex
@@ -642,8 +642,8 @@ this call."
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
-  (name nil :type (or null simple-string))
-  (%count 0 :type (integer 0))
+  (name    nil :type (or null thread-name))
+  (%count    0 :type (integer 0))
   (waitcount 0 :type sb!vm:word)
   (mutex (make-mutex))
   (queue (make-waitqueue)))
