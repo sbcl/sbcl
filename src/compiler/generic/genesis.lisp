@@ -2131,6 +2131,15 @@ core and return a descriptor to it."
     (let ((symbol-des (allocate-symbol name)))
       (push-fop-table symbol-des))))
 
+;;;; cold fops for loading packages
+
+(clone-cold-fop (fop-named-package-save :stackp nil)
+                (fop-small-named-package-save)
+  (let* ((size (clone-arg))
+         (name (make-string size)))
+    (read-string-as-bytes *fasl-input-stream* name)
+    (push-fop-table (find-package name))))
+
 ;;;; cold fops for loading lists
 
 ;;; Make a list of the top LENGTH things on the fop stack. The last

@@ -270,6 +270,18 @@
 
 (define-fop (fop-package 14)
   (find-undeleted-package-or-lose (pop-stack)))
+
+(define-cloned-fops (fop-named-package-save 156 :stackp nil)
+                    (fop-small-named-package-save 157)
+  (let* ((arg (clone-arg))
+         (package-name (make-string arg)))
+    #+sb-xc-host
+    (read-string-as-bytes *fasl-input-stream* package-name)
+    #-sb-xc-host
+    (#!-sb-unicode read-string-as-bytes
+     #!+sb-unicode read-string-as-unsigned-byte-32
+     *fasl-input-stream* package-name)
+    (push-fop-table (find-undeleted-package-or-lose package-name))))
 
 ;;;; fops for loading numbers
 

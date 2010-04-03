@@ -620,21 +620,16 @@
   (declare (inline assoc))
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
         (t
-         (unless *cold-load-dump*
-           (dump-fop 'fop-normal-load file))
-         #+sb-xc-host
-         (dump-simple-base-string
-          (coerce (package-name pkg) 'simple-base-string)
-          file)
-         #-sb-xc-host
-         (#!+sb-unicode dump-simple-character-string
-          #!-sb-unicode dump-simple-base-string
-          (coerce (package-name pkg) '(simple-array character (*)))
-          file)
-         (dump-fop 'fop-package file)
-         (unless *cold-load-dump*
-           (dump-fop 'fop-maybe-cold-load file))
-         (let ((entry (dump-pop file)))
+         (let ((s (package-name pkg)))
+           (dump-fop* (length s) fop-small-named-package-save fop-named-package-save file)
+           #+sb-xc-host
+           (dump-base-chars-of-string (coerce s 'simple-base-string) file)
+           #-sb-xc-host
+           (#!+sb-unicode dump-characters-of-string
+            #!-sb-unicode dump-base-chars-of-string
+            (coerce s '(simple-array character (*))) file))
+         (let ((entry (fasl-output-table-free file)))
+           (incf (fasl-output-table-free file))
            (push (cons pkg entry) (fasl-output-packages file))
            entry))))
 
