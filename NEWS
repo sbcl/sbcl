@@ -42,6 +42,10 @@ changes relative to sbcl-1.0.36:
   * bug fix: misoptimization of multiplication by one in
     (SB-C::FLOAT-ACCURACY 0) policies.
   * bug fix: miscounts in SB-PROFILE.
+  * bug fix: Fix lost wakeup bug between SB-THREAD:CONDITION-WAIT and
+    CONDITION-NOTIFY on Linux. See threads "lost wakeup in condition-wait /
+    condition-notify" (Feb 2010) and "Condition-Wait, Deadline handler, waking
+    up itself" (March 2010) for further details.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows

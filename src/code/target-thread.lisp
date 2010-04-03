@@ -588,51 +588,50 @@ returning normally, it may do so without holding the mutex."
     ;; Need to disable interrupts so that we don't miss grabbing the
     ;; mutex on our way out.
     (without-interrupts
-      (let ((me nil))
-        ;; This setf becomes visible to other CPUS due to the usual
-        ;; memory barrier semantics of lock acquire/release. This must
-        ;; not be moved into the loop else wakeups may be lost upon
-        ;; continuing after a deadline or EINTR.
-        (setf (waitqueue-data queue) me)
-        (loop
-         (multiple-value-bind (to-sec to-usec)
-             (allow-with-interrupts (decode-timeout nil))
-           (case (unwind-protect
-                      (with-pinned-objects (queue me)
-                        ;; RELEASE-MUTEX is purposefully as close to
-                        ;; FUTEX-WAIT as possible to reduce the size
-                        ;; of the window where WAITQUEUE-DATA may be
-                        ;; set by a notifier.
-                        (release-mutex mutex)
-                        ;; Now we go to sleep using futex-wait. If
-                        ;; anyone else manages to grab MUTEX and call
-                        ;; CONDITION-NOTIFY during this comment, it
-                        ;; will change queue->data, and so futex-wait
-                        ;; returns immediately instead of sleeping.
-                        ;; Ergo, no lost wakeup. We may get spurious
-                        ;; wakeups, but that's ok.
-                        (allow-with-interrupts
-                          (futex-wait (waitqueue-data-address queue)
-                                      (get-lisp-obj-address me)
-                                      ;; our way of saying "no
-                                      ;; timeout":
-                                      (or to-sec -1)
-                                      (or to-usec 0))))
-                   ;; If we are interrupted while waiting, we should
-                   ;; do these things before returning. Ideally, in
-                   ;; the case of an unhandled signal, we should do
-                   ;; them before entering the debugger, but this is
-                   ;; better than nothing.
-                   (allow-with-interrupts (get-mutex mutex)))
-             ;; ETIMEDOUT; we know it was a timeout, yet we cannot
-             ;; signal a deadline unconditionally here because the
-             ;; call to GET-MUTEX may already have signaled it.
-             ((1))
-             ;; EINTR
-             ((2))
-             ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup
-             ;; case. 0 is the normal wakeup.
-             (otherwise (return)))))))))
+      ;; This setf becomes visible to other CPUS due to the usual
+      ;; memory barrier semantics of lock acquire/release. This must
+      ;; not be moved into the loop else wakeups may be lost upon
+      ;; continuing after a deadline or EINTR.
+      (setf (waitqueue-data queue) me)
+      (loop
+        (multiple-value-bind (to-sec to-usec)
+            (allow-with-interrupts (decode-timeout nil))
+          (case (unwind-protect
+                     (with-pinned-objects (queue me)
+                       ;; RELEASE-MUTEX is purposefully as close to
+                       ;; FUTEX-WAIT as possible to reduce the size
+                       ;; of the window where WAITQUEUE-DATA may be
+                       ;; set by a notifier.
+                       (release-mutex mutex)
+                       ;; Now we go to sleep using futex-wait. If
+                       ;; anyone else manages to grab MUTEX and call
+                       ;; CONDITION-NOTIFY during this comment, it
+                       ;; will change queue->data, and so futex-wait
+                       ;; returns immediately instead of sleeping.
+                       ;; Ergo, no lost wakeup. We may get spurious
+                       ;; wakeups, but that's ok.
+                       (allow-with-interrupts
+                         (futex-wait (waitqueue-data-address queue)
+                                     (get-lisp-obj-address me)
+                                     ;; our way of saying "no
+                                     ;; timeout":
+                                     (or to-sec -1)
+                                     (or to-usec 0))))
+                  ;; If we are interrupted while waiting, we should
+                  ;; do these things before returning. Ideally, in
+                  ;; the case of an unhandled signal, we should do
+                  ;; them before entering the debugger, but this is
+                  ;; better than nothing.
+                  (allow-with-interrupts (get-mutex mutex)))
+            ;; ETIMEDOUT; we know it was a timeout, yet we cannot
+            ;; signal a deadline unconditionally here because the
+            ;; call to GET-MUTEX may already have signaled it.
+            ((1))
+            ;; EINTR
+            ((2))
+            ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup
+            ;; case. 0 is the normal wakeup.
+            (otherwise (return))))))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
@@ -649,17 +648,19 @@ this call."
     #!+sb-lutex
     (with-lutex-address (lutex (waitqueue-lutex queue))
       (%lutex-wake lutex n))
-    ;; no problem if >1 thread notifies during the comment in
-    ;; condition-wait: as long as the value in queue-data isn't the
-    ;; waiting thread's id, it matters not what it is
+    ;; No problem if >1 thread notifies during the comment in condition-wait:
+    ;; as long as the value in queue-data isn't the waiting thread's id, it
+    ;; matters not what it is -- using the queue object itself is handy.
+    ;;
     ;; XXX we should do something to ensure that the result of this setf
-    ;; is visible to all CPUs
+    ;; is visible to all CPUs.
+    ;;
+    ;; ^-- surely futex_wake() involves a memory barrier?
     #!-sb-lutex
-    (let ((me *current-thread*))
-      (progn
-        (setf (waitqueue-data queue) me)
-        (with-pinned-objects (queue)
-          (futex-wake (waitqueue-data-address queue) n))))))
+    (progn
+      (setf (waitqueue-data queue) queue)
+      (with-pinned-objects (queue)
+        (futex-wake (waitqueue-data-address queue) n)))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc
