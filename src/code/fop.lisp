@@ -173,11 +173,9 @@
   (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))
 
-;;; In the normal loader, we just ignore these. GENESIS overwrites
-;;; FOP-MAYBE-COLD-LOAD with something that knows whether to revert to
-;;; cold-loading or not.
-(define-fop (fop-normal-load 81 :stackp nil))
-(define-fop (fop-maybe-cold-load 82 :stackp nil))
+;;; We used to have FOP-NORMAL-LOAD as 81 and FOP-MAYBE-COLD-LOAD as
+;;; 82 until GENESIS learned how to work with host symbols and
+;;; packages directly instead of piggybacking on the host code.
 
 (define-fop (fop-verify-table-size 62 :stackp nil)
   (let ((expected-index (read-word-arg)))

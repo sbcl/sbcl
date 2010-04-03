@@ -91,10 +91,6 @@
 ;;; dumping uses the table.
 (defvar *circularities-detected*)
 
-;;; used to inhibit table access when dumping forms to be read by the
-;;; cold loader
-(defvar *cold-load-dump* nil)
-
 ;;; used to turn off the structure validation during dumping of source
 ;;; info
 (defvar *dump-only-valid-structures* t)
@@ -194,71 +190,62 @@
     (incf (fasl-output-table-free fasl-output))))
 
 ;;; If X is in File's EQUAL-TABLE, then push the object and return T,
-;;; otherwise NIL. If *COLD-LOAD-DUMP* is true, then do nothing and
-;;; return NIL.
+;;; otherwise NIL.
 (defun equal-check-table (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (unless *cold-load-dump*
-    (let ((handle (gethash x (fasl-output-equal-table fasl-output))))
-      (cond
-        (handle (dump-push handle fasl-output) t)
-        (t nil)))))
+  (let ((handle (gethash x (fasl-output-equal-table fasl-output))))
+    (cond
+     (handle (dump-push handle fasl-output) t)
+     (t nil))))
 (defun string-check-table (x fasl-output)
   (declare (type fasl-output fasl-output)
            (type string x))
-  (unless *cold-load-dump*
-    (let ((handle (cdr (assoc
-                        #+sb-xc-host 'base-char ; for repeatable xc fasls
-                        #-sb-xc-host (array-element-type x)
-                        (gethash x (fasl-output-equal-table fasl-output))))))
-      (cond
-        (handle (dump-push handle fasl-output) t)
-        (t nil)))))
+  (let ((handle (cdr (assoc
+                      #+sb-xc-host 'base-char ; for repeatable xc fasls
+                      #-sb-xc-host (array-element-type x)
+                      (gethash x (fasl-output-equal-table fasl-output))))))
+    (cond
+     (handle (dump-push handle fasl-output) t)
+     (t nil))))
 
 ;;; These functions are called after dumping an object to save the
 ;;; object in the table. The object (also passed in as X) must already
-;;; be on the top of the FOP stack. If *COLD-LOAD-DUMP* is true, then
-;;; we don't do anything.
+;;; be on the top of the FOP stack.
 (defun eq-save-object (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (unless *cold-load-dump*
-    (let ((handle (dump-pop fasl-output)))
-      (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-      (dump-push handle fasl-output)))
+  (let ((handle (dump-pop fasl-output)))
+    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
+    (dump-push handle fasl-output))
   (values))
 (defun equal-save-object (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (unless *cold-load-dump*
-    (let ((handle (dump-pop fasl-output)))
-      (setf (gethash x (fasl-output-equal-table fasl-output)) handle)
-      (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-      (dump-push handle fasl-output)))
+  (let ((handle (dump-pop fasl-output)))
+    (setf (gethash x (fasl-output-equal-table fasl-output)) handle)
+    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
+    (dump-push handle fasl-output))
   (values))
 (defun string-save-object (x fasl-output)
   (declare (type fasl-output fasl-output)
            (type string x))
-  (unless *cold-load-dump*
-    (let ((handle (dump-pop fasl-output)))
-      (push (cons #+sb-xc-host 'base-char ; repeatable xc fasls
-                  #-sb-xc-host (array-element-type x)
-                  handle)
-            (gethash x (fasl-output-equal-table fasl-output)))
-      (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-      (dump-push handle fasl-output)))
+  (let ((handle (dump-pop fasl-output)))
+    (push (cons #+sb-xc-host 'base-char ; repeatable xc fasls
+                #-sb-xc-host (array-element-type x)
+                handle)
+          (gethash x (fasl-output-equal-table fasl-output)))
+    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
+    (dump-push handle fasl-output))
   (values))
-;;; Record X in File's CIRCULARITY-TABLE unless *COLD-LOAD-DUMP* is
-;;; true. This is called on objects that we are about to dump might
-;;; have a circular path through them.
+;;; Record X in File's CIRCULARITY-TABLE. This is called on objects
+;;; that we are about to dump might have a circular path through them.
 ;;;
 ;;; The object must not currently be in this table, since the dumper
 ;;; should never be recursively called on a circular reference.
 ;;; Instead, the dumping function must detect the circularity and
 ;;; arrange for the dumped object to be patched.
 (defun note-potential-circularity (x fasl-output)
-  (unless *cold-load-dump*
-    (let ((circ (fasl-output-circularity-table fasl-output)))
-      (aver (not (gethash x circ)))
-      (setf (gethash x circ) x)))
+  (let ((circ (fasl-output-circularity-table fasl-output)))
+    (aver (not (gethash x circ)))
+    (setf (gethash x circ) x))
   (values))
 
 ;;;; opening and closing fasl files
@@ -359,7 +346,7 @@
 ;;; When we go to dump the object, we enter it in the CIRCULARITY-TABLE.
 (defun dump-non-immediate-object (x file)
   (let ((index (gethash x (fasl-output-eq-table file))))
-    (cond ((and index (not *cold-load-dump*))
+    (cond (index
            (dump-push index file))
           (t
            (typecase x
@@ -649,9 +636,6 @@
 ;;;
 ;;; Otherwise, we recursively call the dumper to dump the current
 ;;; element.
-;;;
-;;; Marking of the conses is inhibited when *COLD-LOAD-DUMP* is true.
-;;; This inhibits all circularity detection.
 (defun dump-list (list file)
   (aver (and list
              (not (gethash list (fasl-output-circularity-table file)))))
@@ -676,8 +660,7 @@
         (terminate-undotted-list n file)
         (return)))
 
-    (unless *cold-load-dump*
-      (setf (gethash l circ) list))
+    (setf (gethash l circ) list)
 
     (let* ((obj (car l))
            (ref (gethash obj circ)))
@@ -970,10 +953,7 @@
   (values))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
-;;; but we are responsible for putting it there when appropriate. To
-;;; avoid too much special-casing, we always push the symbol in the
-;;; table, but don't record that we have done so if *COLD-LOAD-DUMP*
-;;; is true.
+;;; but we are responsible for putting it there when appropriate.
 (defun dump-symbol (s file)
   (declare (type fasl-output file))
   (let* ((pname (symbol-name s))
@@ -1030,9 +1010,8 @@
                   #!-sb-unicode dump-base-chars-of-string
                   pname file)
 
-    (unless *cold-load-dump*
-      (setf (gethash s (fasl-output-eq-table file))
-            (fasl-output-table-free file)))
+    (setf (gethash s (fasl-output-eq-table file))
+          (fasl-output-table-free file))
 
     (incf (fasl-output-table-free file)))
 

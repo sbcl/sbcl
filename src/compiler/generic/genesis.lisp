@@ -1933,8 +1933,6 @@ core and return a descriptor to it."
   ;; modified.
   (copy-seq *fop-funs*))
 
-(defvar *normal-fop-funs*)
-
 ;;; Cause a fop to have a special definition for cold load.
 ;;;
 ;;; This is similar to DEFINE-FOP, but unlike DEFINE-FOP, this version
@@ -1978,8 +1976,7 @@ core and return a descriptor to it."
 (defun cold-load (filename)
   #!+sb-doc
   "Load the file named by FILENAME into the cold load image being built."
-  (let* ((*normal-fop-funs* *fop-funs*)
-         (*fop-funs* *cold-fop-funs*)
+  (let* ((*fop-funs* *cold-fop-funs*)
          (*cold-load-filename* (etypecase filename
                                  (string filename)
                                  (pathname (namestring filename)))))
@@ -1995,15 +1992,6 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-empty-list) nil)
 (define-cold-fop (fop-truth) t)
-
-(define-cold-fop (fop-normal-load :stackp nil)
-  (setq *fop-funs* *normal-fop-funs*))
-
-(define-fop (fop-maybe-cold-load 82 :stackp nil)
-  (when *cold-load-filename*
-    (setq *fop-funs* *cold-fop-funs*)))
-
-(define-cold-fop (fop-maybe-cold-load :stackp nil))
 
 (clone-cold-fop (fop-struct)
                 (fop-small-struct)

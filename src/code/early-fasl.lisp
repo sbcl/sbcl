@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 77)
+(def!constant +fasl-file-version+ 78)
 ;;; (description of versions before 0.9.0.1 deleted in 0.9.17)
 ;;; 56: (2005-05-22) Something between 0.9.0.1 and 0.9.0.14. My money is
 ;;;     on 0.9.0.6 (MORE CASE CONSISTENCY).
@@ -112,6 +112,8 @@
 ;;;     Further fasl-file-version bumps should only be done for real changes
 ;;;     in the fasl format, not for changes in function/macro signatures or
 ;;;     lisp data structures.
+;;; 78: (2010-04-02) Add FOP-{SMALL-,}NAMED-PACKAGE, remove FOP-NORMAL-LOAD
+;;;     and FOP-MAYBE-COLD-LOAD.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
