@@ -356,30 +356,13 @@ HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
   (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
-(defun get-mutex (mutex &optional (new-owner *current-thread*) (waitp t))
+(defun get-mutex (mutex &optional (new-owner *current-thread*)
+                                  (waitp t) (timeout nil))
   #!+sb-doc
-  "Acquire MUTEX for NEW-OWNER, which must be a thread or NIL. If
-NEW-OWNER is NIL, it defaults to the current thread. If WAITP is
-non-NIL and the mutex is in use, sleep until it is available.
-
-Note: using GET-MUTEX to assign a MUTEX to another thread then the
-current one is not recommended, and liable to be deprecated.
-
-GET-MUTEX is not interrupt safe. The correct way to call it is:
-
- (WITHOUT-INTERRUPTS
-   ...
-   (ALLOW-WITH-INTERRUPTS (GET-MUTEX ...))
-   ...)
-
-WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding the
-call while the mutex is in an inconsistent state while
-ALLOW-WITH-INTERRUPTS allows the call to be interrupted from sleep.
-
-It is recommended that you use WITH-MUTEX instead of calling GET-MUTEX
-directly."
+  "Deprecated in favor of GRAB-MUTEX."
   (declare (type mutex mutex) (optimize (speed 3))
-           #!-sb-thread (ignore waitp))
+           #!-sb-thread (ignore waitp timeout)
+           #!+sb-lutex  (ignore timeout))
   (unless new-owner
     (setq new-owner *current-thread*))
   (let ((old (mutex-%owner mutex)))
@@ -424,13 +407,17 @@ directly."
                                                         +lock-contested+))))
              ;; Wait on the contested lock.
              (loop
-              (multiple-value-bind (to-sec to-usec) (decode-timeout nil)
+              (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
+                  (decode-timeout timeout)
+                (declare (ignore stop-sec stop-usec))
                 (case (with-pinned-objects (mutex)
                         (futex-wait (mutex-state-address mutex)
                                     (get-lisp-obj-address +lock-contested+)
                                     (or to-sec -1)
                                     (or to-usec 0)))
-                  ((1) (signal-deadline))
+                  ((1) (if deadlinep
+                           (signal-deadline)
+                           (return-from get-mutex nil)))
                   ((2))
                   (otherwise (return))))))
            (setf old (sb!ext:compare-and-swap (mutex-state mutex)
@@ -447,6 +434,55 @@ directly."
                t))
             (waitp
              (bug "Failed to acquire lock with WAITP."))))))
+
+(defun grab-mutex (mutex &key (new-owner *current-thread*)
+                              (waitp t) (timeout nil))
+  #!+sb-doc
+  "Acquire MUTEX for NEW-OWNER, which must be a thread or NIL. If
+NEW-OWNER is NIL, it defaults to the current thread. If WAITP is
+non-NIL and the mutex is in use, sleep until it is available.
+
+If TIMEOUT is given, it specifies a relative timeout, in seconds, on
+how long GRAB-MUTEX should try to acquire the lock in the contested
+case.
+
+If GRAB-MUTEX returns T, the lock acquisition was successful. In case
+of WAITP being NIL, or an expired TIMEOUT, GRAB-MUTEX may also return
+NIL which denotes that GRAB-MUTEX did -not- acquire the lock.
+
+Notes:
+
+  - Using the NEW-OWNER parameter to assign a MUTEX to another thread
+    than the current one is not recommended, and liable to be
+    deprecated.
+
+  - GRAB-MUTEX is not interrupt safe. The correct way to call it is:
+
+      (WITHOUT-INTERRUPTS
+        ...
+        (ALLOW-WITH-INTERRUPTS (GRAB-MUTEX ...))
+        ...)
+
+    WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding
+    the call while the mutex is in an inconsistent state while
+    ALLOW-WITH-INTERRUPTS allows the call to be interrupted from
+    sleep.
+
+   - The TIMEOUT parameter is currently only supported on non-SB-LUTEX
+     platforms like Linux or BSD.
+
+   - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
+     (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a
+     DEADLINE-TIMEOUT if the global deadline was due already on
+     entering GRAB-MUTEX.
+
+     The exact interplay of GRAB-MUTEX and deadlines are reserved to
+     change in future versions.
+
+   - It is recommended that you use WITH-MUTEX instead of calling
+     GRAB-MUTEX directly.
+"
+  (get-mutex mutex new-owner waitp timeout))
 
 (defun release-mutex (mutex &key (if-not-owner :punt))
   #!+sb-doc

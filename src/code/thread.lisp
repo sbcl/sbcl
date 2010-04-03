@@ -21,6 +21,7 @@ in future versions."
   (name          nil :type (or thread-name null))
   (%alive-p      nil :type boolean)
   (os-thread     nil :type (or integer null))
+  (whostate      nil :type (or null simple-string))
   (interruptions nil :type list)
   (result        nil :type list)
   (interruptions-lock
