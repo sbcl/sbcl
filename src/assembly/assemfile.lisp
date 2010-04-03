@@ -45,9 +45,6 @@
         (let ((*features* (cons :sb-assembling *features*)))
           (init-assembler)
           (load (merge-pathnames name (make-pathname :type "lisp")))
-          (fasl-dump-cold-load-form `(in-package ,(package-name
-                                                   (sane-package)))
-                                    lap-fasl-output)
           (sb!assem:append-segment *code-segment* *elsewhere*)
           (setf *elsewhere* nil)
           (let ((length (sb!assem:finalize-segment *code-segment*)))
