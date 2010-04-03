@@ -810,14 +810,10 @@ core and return a descriptor to it."
 
 ;;;; symbol magic
 
-;;; FIXME: This should be a &KEY argument of ALLOCATE-SYMBOL.
-(defvar *cold-symbol-allocation-gspace* nil)
-
 ;;; Allocate (and initialize) a symbol.
-(defun allocate-symbol (name)
+(defun allocate-symbol (name &key (gspace *dynamic*))
   (declare (simple-string name))
-  (let ((symbol (allocate-unboxed-object (or *cold-symbol-allocation-gspace*
-                                             *dynamic*)
+  (let ((symbol (allocate-unboxed-object gspace
                                          sb!vm:n-word-bits
                                          (1- sb!vm:symbol-size)
                                          sb!vm:symbol-header-widetag)))
@@ -1096,8 +1092,9 @@ core and return a descriptor to it."
 ;;; we allocate the symbol, make sure we record a reference to the
 ;;; symbol in the home package so that the package gets set.
 (defun cold-intern (symbol
-                    &optional
-                    (package (symbol-package-for-target-symbol symbol)))
+                    &key
+                    (package (symbol-package-for-target-symbol symbol))
+                    (gspace *dynamic*))
 
   (aver (package-ok-for-target-symbol-p package))
 
@@ -1121,7 +1118,7 @@ core and return a descriptor to it."
         (cold-intern-info (get symbol 'cold-intern-info)))
     (unless cold-intern-info
       (cond ((eq (symbol-package-for-target-symbol symbol) package)
-             (let ((handle (allocate-symbol (symbol-name symbol))))
+             (let ((handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
                (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
                (when (eq package *keyword-package*)
                  (cold-set handle handle))
@@ -1188,29 +1185,29 @@ core and return a descriptor to it."
 (defun initialize-non-nil-symbols ()
   #!+sb-doc
   "Initialize the cold load symbol-hacking data structures."
-  (let ((*cold-symbol-allocation-gspace* *static*))
-    ;; Intern the others.
-    (dolist (symbol sb!vm:*static-symbols*)
-      (let* ((des (cold-intern symbol))
-             (offset-wanted (sb!vm:static-symbol-offset symbol))
-             (offset-found (- (descriptor-low des)
-                              (descriptor-low *nil-descriptor*))))
-        (unless (= offset-wanted offset-found)
-          ;; FIXME: should be fatal
-          (warn "Offset from ~S to ~S is ~W, not ~W"
-                symbol
-                nil
-                offset-found
-                offset-wanted))))
-    ;; Establish the value of T.
-    (let ((t-symbol (cold-intern t)))
-      (cold-set t-symbol t-symbol))
-    ;; Establish the value of *PSEUDO-ATOMIC-BITS* so that the
-    ;; allocation sequences that expect it to be zero upon entrance
-    ;; actually find it to be so.
-    #!+(or x86-64 x86)
-    (let ((p-a-a-symbol (cold-intern 'sb!kernel:*pseudo-atomic-bits*)))
-      (cold-set p-a-a-symbol (make-fixnum-descriptor 0)))))
+  ;; Intern the others.
+  (dolist (symbol sb!vm:*static-symbols*)
+    (let* ((des (cold-intern symbol :gspace *static*))
+           (offset-wanted (sb!vm:static-symbol-offset symbol))
+           (offset-found (- (descriptor-low des)
+                            (descriptor-low *nil-descriptor*))))
+      (unless (= offset-wanted offset-found)
+        ;; FIXME: should be fatal
+        (warn "Offset from ~S to ~S is ~W, not ~W"
+              symbol
+              nil
+              offset-found
+              offset-wanted))))
+  ;; Establish the value of T.
+  (let ((t-symbol (cold-intern t :gspace *static*)))
+    (cold-set t-symbol t-symbol))
+  ;; Establish the value of *PSEUDO-ATOMIC-BITS* so that the
+  ;; allocation sequences that expect it to be zero upon entrance
+  ;; actually find it to be so.
+  #!+(or x86-64 x86)
+  (let ((p-a-a-symbol (cold-intern 'sb!kernel:*pseudo-atomic-bits*
+                                   :gspace *static*)))
+    (cold-set p-a-a-symbol (make-fixnum-descriptor 0))))
 
 ;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
 ;;; to be stored in *!INITIAL-LAYOUTS*.
@@ -3326,7 +3323,7 @@ initially undefined function references:~2%")
                    ;; nothing if NAME is NIL.
                    (chill (name)
                      (when name
-                       (cold-intern (intern name package) package))))
+                       (cold-intern (intern name package) :package package))))
             (mapc-on-tree #'chill (sb-cold:package-data-export pd))
             (mapc #'chill (sb-cold:package-data-reexport pd))
             (dolist (sublist (sb-cold:package-data-import-from pd))
