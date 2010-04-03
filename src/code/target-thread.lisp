@@ -468,19 +468,19 @@ Notes:
     ALLOW-WITH-INTERRUPTS allows the call to be interrupted from
     sleep.
 
-   - The TIMEOUT parameter is currently only supported on non-SB-LUTEX
-     platforms like Linux or BSD.
+  - The TIMEOUT parameter is currently only supported on non-SB-LUTEX
+    platforms like Linux or BSD.
 
-   - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
-     (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a
-     DEADLINE-TIMEOUT if the global deadline was due already on
-     entering GRAB-MUTEX.
+  - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
+    (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a
+    DEADLINE-TIMEOUT if the global deadline was due already on
+    entering GRAB-MUTEX.
 
-     The exact interplay of GRAB-MUTEX and deadlines are reserved to
-     change in future versions.
+    The exact interplay of GRAB-MUTEX and deadlines are reserved to
+    change in future versions.
 
-   - It is recommended that you use WITH-MUTEX instead of calling
-     GRAB-MUTEX directly.
+  - It is recommended that you use WITH-MUTEX instead of calling
+    GRAB-MUTEX directly.
 "
   (get-mutex mutex new-owner waitp timeout))
 

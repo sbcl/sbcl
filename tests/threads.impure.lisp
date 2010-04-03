@@ -126,7 +126,7 @@
                 (setf run t)
                 (dolist (th threads)
                   (sb-thread:join-thread th))
-                (assert (= (,op x) (* 10 n))))))       
+                (assert (= (,op x) (* 10 n))))))
        (,name 200000))))
 
 (def-test-cas test-cas-car (cons 0 nil) incf-car car)
@@ -335,6 +335,54 @@
             (kid2 (make-thread #'run)))
         (format t "contention ~A ~A~%" kid1 kid2)
         (wait-for-threads (list kid1 kid2))))))
+
+;;; GRAB-MUTEX
+
+(with-test (:name (:grab-mutex :waitp nil))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  #'(lambda ()
+                                      (grab-mutex m :waitp nil)))))))))
+
+(with-test (:name (:grab-mutex :timeout :acquisition-fail))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  #'(lambda ()
+                                      (grab-mutex m :timeout 0.1)))))))))
+
+(with-test (:name (:grab-mutex :timeout :acquisition-success))
+  (let ((m (make-mutex))
+        (child))
+    (with-mutex (m)
+      (setq child (make-thread #'(lambda () (grab-mutex m :timeout 1.0))))
+      (sleep 0.2))
+    (assert (eq (join-thread child) 't))))
+
+(with-test (:name (:grab-mutex :timeout+deadline))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (eq (join-thread
+                   (make-thread #'(lambda ()
+                                    (sb-sys:with-deadline (:seconds 0.0)
+                                      (handler-case
+                                          (grab-mutex m :timeout 0.0)
+                                        (sb-sys:deadline-timeout ()
+                                          :deadline))))))
+                  :deadline)))))
+
+(with-test (:name (:grab-mutex :waitp+deadline))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (eq (join-thread
+                   (make-thread #'(lambda ()
+                                    (sb-sys:with-deadline (:seconds 0.0)
+                                      (handler-case
+                                          (grab-mutex m :waitp nil)
+                                        (sb-sys:deadline-timeout ()
+                                          :deadline))))))
+                  'nil)))))
 
 ;;; semaphores
 

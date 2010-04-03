@@ -1929,6 +1929,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-YIELD"
                ;; Mutexes
                "GET-MUTEX"
+               "GRAB-MUTEX"
                "HOLDING-MUTEX-P"
                "MAKE-MUTEX"
                "MUTEX"

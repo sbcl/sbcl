@@ -1,11 +1,17 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.36:
-  * INCOMPATIBLE CHANGE: the SB-QUEUE contrib was merged into the
-    SB-CONCURRENCY contrib module.
+  * DEPRECIATION: the SB-QUEUE contrib was merged into the SB-CONCURRENCY
+    contrib module. New code should depend on SB-CONCURRENCY, not SB-QUEUE.
+  * DEPRECIATION: SB-THEAD:GET-MUTEX was deprecated in favor of
+    SB-THREAD:GRAB-MUTEX.
   * new contrib: SB-CONCURRENCY is a new contrib; it's supposed to contain
     additional data structures and tools for concurrent programming; at the
     moment it contains a lock-free queue, and a lock-free mailbox
     implementation.
+  * new feature: added SB-THREAD:GRAB-MUTEX; it's like the now deprecated
+    GET-MUTEX but takes &key rather than &optional parameters.  Also added
+    :TIMEOUT argument to GRAB-MUTEX on non-sb-lutex platforms like Linux and
+    BSD.
   * new feature: added SB-THREAD:TRY-SEMAPHORE, a non-blocking variant of
     SB-THREAD:WAIT-ON-SEMAPHORE.
   * new feature: SB-EXT:ATOMIC-DECF has been added as a companion to
