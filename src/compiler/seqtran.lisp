@@ -1237,9 +1237,7 @@
                                              (if from-end
                                                  (setf find element
                                                        position index)
-                                                 (unless find
-                                                   (setf find element
-                                                         position index)))))))))))))
+                                                 (return (values element index)))))))))))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
 

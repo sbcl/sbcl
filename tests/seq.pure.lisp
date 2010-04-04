@@ -224,16 +224,16 @@
                            (second got) ',lambda)))))
     (test sb-kernel:bounding-indices-bad-error
           (lambda ()
-            (find :foo '(1 2 3 :foo) :start 1 :end 5)))
+            (find :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t)))
     (test sb-kernel:bounding-indices-bad-error
           (lambda ()
-            (position :foo '(1 2 3 :foo) :start 1 :end 5)))
+            (position :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t)))
     (test sb-kernel:bounding-indices-bad-error
           (lambda ()
-            (find :foo '(1 2 3 :foo) :start 3 :end 0)))
+            (find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t)))
     (test sb-kernel:bounding-indices-bad-error
           (lambda ()
-            (position :foo '(1 2 3 :foo) :start 3 :end 0)))
+            (position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t)))
     (test type-error
           (lambda ()
             (let ((list (list 1 2 3 :foo)))
@@ -242,3 +242,11 @@
           (lambda ()
             (let ((list (list 1 2 3 :foo)))
               (position :bar (nconc list list)))))))
+
+(with-test (:name :bug-554385)
+  ;; FIND-IF shouldn't look through the entire list.
+  (assert (= 2 (find-if #'evenp '(1 2 1 1 1 1 1 1 1 1 1 1 :foo))))
+  ;; Even though the end bounds are incorrect, the
+  ;; element is found before that's an issue.
+  (assert (eq :foo (find :foo '(1 2 3 :foo) :start 1 :end 5)))
+  (assert (= 3 (position :foo '(1 2 3 :foo) :start 1 :end 5))))

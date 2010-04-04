@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.36:
+changes relative to sbcl-1.0.37:
   * INCOMPATIBLE CHANGE: Thread names are now restricted to SIMPLE-STRINGs
     like for any other thread-related datastructure (MUTEX, etc.)
   * DEPRECATION: the SB-QUEUE contrib was merged into the SB-CONCURRENCY
@@ -48,6 +48,9 @@ changes relative to sbcl-1.0.36:
     CONDITION-NOTIFY on Linux. See threads "lost wakeup in condition-wait /
     condition-notify" (Feb 2010) and "Condition-Wait, Deadline handler, waking
     up itself" (March 2010) for further details.
+  * bug fix: allow forward FIND and POSITION on lists to elide checking :END
+    against length of the list if the element is found before the specified
+    END is reached. (thanks to Alec Berryman, lp#554385)
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
