@@ -776,7 +776,7 @@
                (end1 (or end1 len1))
                (end2 (or end2 len2))
                (replace-len (min (- end1 start1) (- end2 start2))))
-          ,(unless (policy node (= safety 0))
+          ,(unless (policy node (= insert-array-bounds-checks 0))
              `(progn
                 (unless (<= 0 start1 end1 len1)
                   (sequence-bounding-indices-bad-error seq1 start1 end1))
@@ -1122,6 +1122,7 @@
           `(apply
             (lambda ,vars
               (declare (ignorable ,@vars))
+              (declare (optimize (insert-array-bounds-checks 0)))
               (let* ((.length. (+ ,@lengths))
                      (.pos. 0)
                      (.string. (make-string .length. :element-type ',element-type)))
