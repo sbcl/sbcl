@@ -29,13 +29,15 @@
   x)
 
 ;;; &REST lists
+
 (defun-with-dx dxlength (&rest rest)
   (declare (dynamic-extent rest))
   (length rest))
 
-(assert (= (dxlength 1 2 3) 3))
-(assert (= (dxlength t t t t t t) 6))
-(assert (= (dxlength) 0))
+(with-test (:name (:dx-&rest :basics))
+  (assert (= (dxlength 1 2 3) 3))
+  (assert (= (dxlength t t t t t t) 6))
+  (assert (= (dxlength) 0)))
 
 (defun callee (list)
   (destructuring-bind (a b c d e f &rest g) list
@@ -44,15 +46,20 @@
 (defun-with-dx dxcaller (&rest rest)
   (declare (dynamic-extent rest))
   (callee rest))
-(assert (= (dxcaller 1 2 3 4 5 6 7) 22))
+
+(with-test (:name (:dx-&rest :pass-down-to-callee :tail-call))
+  (assert (= (dxcaller 1 2 3 4 5 6 7) 22)))
 
 (defun-with-dx dxcaller-align-1 (x &rest rest)
   (declare (dynamic-extent rest))
   (+ x (callee rest)))
-(assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7) 39))
-(assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7 8) 40))
+
+(with-test (:name (:dx-&rest :pass-down-to-callee :non-tail-call))
+  (assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7) 39))
+  (assert (= (dxcaller-align-1 17 1 2 3 4 5 6 7 8) 40)))
 
 ;;; %NIP-VALUES
+
 (defun-with-dx test-nip-values ()
   (flet ((bar (x &rest y)
            (declare (dynamic-extent y))
@@ -63,16 +70,20 @@
       (bar 1 2 3 4 5 6)
       (bar -1 'a 'b))))
 
-(assert (equal (multiple-value-list (test-nip-values)) '(1 5 a)))
+(with-test (:name (:nip-values))
+  (assert (equal (multiple-value-list (test-nip-values)) '(1 5 a))))
 
 ;;; LET-variable substitution
+
 (defun-with-dx test-let-var-subst1 (x)
   (let ((y (list x (1- x))))
     (opaque-identity :foo)
     (let ((z (the list y)))
       (declare (dynamic-extent z))
       (length z))))
-(assert (eql (test-let-var-subst1 17) 2))
+
+(with-test (:name (:let-variable-substitution))
+  (assert (eql (test-let-var-subst1 17) 2)))
 
 (defun-with-dx test-let-var-subst2 (x)
   (let ((y (list x (1- x))))
@@ -80,16 +91,22 @@
     (opaque-identity :foo)
     (let ((z (the list y)))
       (length z))))
-(assert (eql (test-let-var-subst2 17) 2))
+
+(with-test (:name (:let-variable-substitution-2))
+  (assert (eql (test-let-var-subst2 17) 2)))
+
 
 ;;; DX propagation through LET-return.
+
 (defun-with-dx test-lvar-subst (x)
   (let ((y (list x (1- x))))
     (declare (dynamic-extent y))
     (second (let ((z (the list y)))
               (opaque-identity :foo)
               z))))
-(assert (eql (test-lvar-subst 11) 10))
+
+(with-test (:name (:dx-propagation-through-let-return))
+  (assert (eql (test-lvar-subst 11) 10)))
 
 ;;; this code is incorrect, but the compiler should not fail
 (defun-with-dx test-let-var-subst-incorrect (x)
@@ -101,17 +118,20 @@
       z)))
 
 ;;; alignment
+
 (defvar *x*)
 (defun-with-dx test-alignment-dx-list (form)
   (multiple-value-prog1 (eval form)
     (let ((l (list 1 2 3 4)))
       (declare (dynamic-extent l))
       (setq *x* (copy-list l)))))
-(dotimes (n 64)
-  (let* ((res (loop for i below n collect i))
-         (form `(values ,@res)))
-    (assert (equal (multiple-value-list (test-alignment-dx-list form)) res))
-    (assert (equal *x* '(1 2 3 4)))))
+
+(with-test (:name (:dx-list :alignment))
+  (dotimes (n 64)
+    (let* ((res (loop for i below n collect i))
+           (form `(values ,@res)))
+      (assert (equal (multiple-value-list (test-alignment-dx-list form)) res))
+      (assert (equal *x* '(1 2 3 4))))))
 
 ;;; closure
 
@@ -126,7 +146,8 @@
     (declare (dynamic-extent #'f))
     (true #'f)))
 
-(assert (eq t (dxclosure 13)))
+(with-test (:name (:dx-closure))
+  (assert (eq t (dxclosure 13))))
 
 ;;; value-cells
 
@@ -227,10 +248,14 @@
     (assert (eql s (fp-struct-1-s fp)))
     (assert (eql d (fp-struct-1-d fp)))))
 
-(test-fp-struct-1.1 123.456 876.243d0)
-(test-fp-struct-1.2 123.456 876.243d0)
-(test-fp-struct-1.3 123.456 876.243d0)
-(test-fp-struct-1.4 123.456 876.243d0)
+(with-test (:name (:test-fp-struct-1.1))
+  (test-fp-struct-1.1 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-1.2))
+  (test-fp-struct-1.2 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-1.3))
+  (test-fp-struct-1.3 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-1.4))
+  (test-fp-struct-1.4 123.456 876.243d0))
 
 (declaim (inline make-fp-struct-2))
 (defstruct fp-struct-2
@@ -261,10 +286,14 @@
     (assert (eql s (fp-struct-2-s fp)))
     (assert (eql d (fp-struct-2-d fp)))))
 
-(test-fp-struct-2.1 123.456 876.243d0)
-(test-fp-struct-2.2 123.456 876.243d0)
-(test-fp-struct-2.3 123.456 876.243d0)
-(test-fp-struct-2.4 123.456 876.243d0)
+(with-test (:name (:test-fp-struct-2.1))
+  (test-fp-struct-2.1 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-2.2))
+  (test-fp-struct-2.2 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-2.3))
+  (test-fp-struct-2.3 123.456 876.243d0))
+(with-test (:name (:test-fp-struct-2.4))
+  (test-fp-struct-2.4 123.456 876.243d0))
 
 (declaim (inline make-cfp-struct-1))
 (defstruct cfp-struct-1
@@ -295,10 +324,14 @@
     (assert (eql s (cfp-struct-1-s cfp)))
     (assert (eql d (cfp-struct-1-d cfp)))))
 
-(test-cfp-struct-1.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-1.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-1.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-1.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(with-test (:name (:test-cfp-struct-1.1))
+  (test-cfp-struct-1.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-1.2))
+  (test-cfp-struct-1.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-1.3))
+  (test-cfp-struct-1.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-1.4))
+  (test-cfp-struct-1.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
 
 (declaim (inline make-cfp-struct-2))
 (defstruct cfp-struct-2
@@ -329,10 +362,14 @@
     (assert (eql s (cfp-struct-2-s cfp)))
     (assert (eql d (cfp-struct-2-d cfp)))))
 
-(test-cfp-struct-2.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-2.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-2.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
-(test-cfp-struct-2.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0))
+(with-test (:name (:test-cfp-struct-2.1))
+  (test-cfp-struct-2.1 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-2.2))
+  (test-cfp-struct-2.2 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-2.3))
+  (test-cfp-struct-2.3 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
+(with-test (:name (:test-cfp-struct-2.4))
+  (test-cfp-struct-2.4 (complex 0.123 123.456) (complex 908132.41d0 876.243d0)))
 
 (declaim (inline make-foo1 make-foo2 make-foo3))
 (defstruct foo1 x)
@@ -349,19 +386,13 @@
   b
   c)
 
-(defmacro assert-eql (expected got)
-  `(let ((exp ,expected)
-         (got ,got))
-     (unless (eql exp got)
-       (error "Expected ~S, got ~S!" exp got))))
-
 (defun-with-dx make-foo2-on-stack (x y)
   (let ((foo (make-foo2 :y y :c 'c)))
     (declare (dynamic-extent foo))
-    (assert-eql 0.0 (foo2-x foo))
-    (assert-eql y (foo2-y foo))
-    (assert-eql 'c (foo2-c foo))
-    (assert-eql nil (foo2-b foo))))
+    (assert (eql 0.0 (foo2-x foo)))
+    (assert (eql y (foo2-y foo)))
+    (assert (eql 'c (foo2-c foo)))
+    (assert (eql nil (foo2-b foo)))))
 
 ;;; Check that constants work out as argument for all relevant
 ;;; slot types.
@@ -371,6 +402,7 @@
   (c 2 :type sb-vm:word)
   (d 3.0 :type single-float)
   (e 4.0d0 :type double-float))
+
 (defun-with-dx make-foo3-on-stack ()
   (let ((foo (make-foo3)))
     (declare (dynamic-extent foo))
@@ -450,17 +482,80 @@
 
 (defun dx-handler-bind (x)
   (handler-bind ((error
-                  (lambda (c) (break "OOPS: ~S caused ~S" x c)))
+                  #'(lambda (c)
+                      (break "OOPS: ~S caused ~S" x c)))
                  ((and serious-condition (not error))
-                  #'(lambda (c) (break "OOPS2: ~S did ~S" x c))))
+                  #'(lambda (c)
+                      (break "OOPS2: ~S did ~S" x c))))
     (/ 2 x)))
 
 (defun dx-handler-case (x)
   (assert (zerop (handler-case (/ 2 x)
                    (error (c)
-                     (break "OOPS: ~S caused ~S" x c))
+                     (break "OOPS: ~S caused ~S" x c)
+                     -1)
                    (:no-error (res)
                      (1- res))))))
+
+(defvar *a-cons* (cons nil nil))
+
+#+stack-allocatable-closures
+(with-test (:name (:no-consing :dx-closures))
+  (assert-no-consing (dxclosure 42)))
+
+#+stack-allocatable-lists
+(with-test (:name (:no-consing :dx-lists))
+  (assert-no-consing (dxlength 1 2 3))
+  (assert-no-consing (dxlength t t t t t t))
+  (assert-no-consing (dxlength))
+  (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
+  (assert-no-consing (test-nip-values))
+  (assert-no-consing (test-let-var-subst2 17))
+  (assert-no-consing (test-lvar-subst 11))
+  (assert-no-consing (nested-dx-lists))
+  (assert-consing (nested-dx-not-used *a-cons*))
+  (assert-no-consing (nested-evil-dx-used *a-cons*))
+  (assert-no-consing (multiple-dx-uses)))
+
+(with-test (:name (:no-consing :dx-value-cell))
+  (assert-no-consing (dx-value-cell 13)))
+
+#+stack-allocatable-fixed-objects
+(with-test (:name (:no-consing :dx-fixed-objects))
+  (assert-no-consing (cons-on-stack 42))
+  (assert-no-consing (make-foo1-on-stack 123))
+  (assert-no-consing (nested-good 42))
+  (assert-no-consing (nested-dx-conses))
+  (assert-no-consing (dx-handler-bind 2))
+  (assert-no-consing (dx-handler-case 2)))
+
+#+stack-allocatable-vectors
+(with-test (:name (:no-consing :dx-vectors))
+  (assert-no-consing (force-make-array-on-stack 128))
+  (assert-no-consing (make-array-on-stack-1))
+  (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
+  (assert-no-consing (make-array-on-stack-3 9 8 7))
+  (assert-no-consing (make-array-on-stack-4))
+  (assert-no-consing (make-array-on-stack-5))
+  (assert-no-consing (vector-on-stack :x :y)))
+
+#+raw-instance-init-vops
+(with-test (:name (:no-consing :dx-raw-instances))
+  (let (a b)
+    (setf a 1.24 b 1.23d0)
+    (assert-no-consing (make-foo2-on-stack a b)))
+    (assert-no-consing (make-foo3-on-stack)))
+
+;;; not really DX, but GETHASH and (SETF GETHASH) should not cons
+
+(defvar *table* (make-hash-table))
+
+(defun test-hash-table ()
+  (setf (gethash 5 *table*) 13)
+  (gethash 5 *table*))
+
+(with-test (:name (:no-consing :hash-tables))
+  (assert-no-consing (test-hash-table)))
 
 ;;; with-spinlock and with-mutex should use DX and not cons
 
@@ -476,83 +571,32 @@
   (sb-thread:with-mutex (*mutex*)
     (true *mutex*)))
 
-;;; not really DX, but GETHASH and (SETF GETHASH) should not cons
+#+sb-thread
+(with-test (:name (:no-consing :mutex))
+  (assert-no-consing (test-mutex)))
 
-(defvar *table* (make-hash-table))
-
-(defun test-hash-table ()
-  (setf (gethash 5 *table*) 13)
-  (gethash 5 *table*))
-
-(defvar *a-cons* (cons nil nil))
-
-(progn
-  #+stack-allocatable-closures
-  (assert-no-consing (dxclosure 42))
-  #+stack-allocatable-lists
-  (progn
-    (assert-no-consing (dxlength 1 2 3))
-    (assert-no-consing (dxlength t t t t t t))
-    (assert-no-consing (dxlength))
-    (assert-no-consing (dxcaller 1 2 3 4 5 6 7))
-    (assert-no-consing (test-nip-values))
-    (assert-no-consing (test-let-var-subst2 17))
-    (assert-no-consing (test-lvar-subst 11))
-    (assert-no-consing (nested-dx-lists))
-    (assert-consing (nested-dx-not-used *a-cons*))
-    (assert-no-consing (nested-evil-dx-used *a-cons*))
-    (assert-no-consing (multiple-dx-uses)))
-  (assert-no-consing (dx-value-cell 13))
-  #+stack-allocatable-fixed-objects
-  (progn
-    (assert-no-consing (cons-on-stack 42))
-    (assert-no-consing (make-foo1-on-stack 123))
-    (assert-no-consing (nested-good 42))
-    (assert-no-consing (nested-dx-conses))
-    (assert-no-consing (dx-handler-bind 2))
-    (assert-no-consing (dx-handler-case 2)))
-  #+stack-allocatable-vectors
-  (progn
-    (assert-no-consing (force-make-array-on-stack 128))
-    (assert-no-consing (make-array-on-stack-1))
-    (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
-    (assert-no-consing (make-array-on-stack-3 9 8 7))
-    (assert-no-consing (make-array-on-stack-4))
-    (assert-no-consing (make-array-on-stack-5))
-    (assert-no-consing (vector-on-stack :x :y)))
-  (let (a b)
-    (setf a 1.24 b 1.23d0)
-    (#+raw-instance-init-vops assert-no-consing
-     #-raw-instance-init-vops progn
-     (make-foo2-on-stack a b)))
-  (#+raw-instance-init-vops assert-no-consing
-   #-raw-instance-init-vops progn
-   (make-foo3-on-stack))
-  ;; Not strictly DX..
-  (assert-no-consing (test-hash-table))
-  #+sb-thread
-  (progn
-    (assert-no-consing (test-spinlock))
-    (assert-no-consing (test-mutex))))
+#+sb-thread
+(with-test (:name (:no-consing :spinlock))
+  (assert-no-consing (test-spinlock)))
 
 
+
 ;;; Bugs found by Paul F. Dietz
-(assert
- (eq
-  (funcall
-   (compile
-    nil
-    '(lambda (a b)
-      (declare (optimize (speed 2) (space 0) (safety 0)
-                (debug 1) (compilation-speed 3)))
-      (let* ((v5 (cons b b)))
-        (declare (dynamic-extent v5))
-        a)))
-   'x 'y)
-  'x))
 
-
-;;; other bugs
+(with-test (:name (:dx-bug-misc :pfdietz))
+  (assert
+   (eq
+    (funcall
+     (compile
+      nil
+      '(lambda (a b)
+        (declare (optimize (speed 2) (space 0) (safety 0)
+                  (debug 1) (compilation-speed 3)))
+        (let* ((v5 (cons b b)))
+          (declare (dynamic-extent v5))
+          a)))
+     'x 'y)
+    'x)))
 
 ;;; bug reported by Svein Ove Aas
 (defun svein-2005-ii-07 (x y)
@@ -560,13 +604,15 @@
   (let ((args (list* y 1 2 x)))
     (declare (dynamic-extent args))
     (apply #'aref args)))
-(assert (eql
-         (svein-2005-ii-07
-          '(0)
-          #3A(((1 1 1) (1 1 1) (1 1 1))
-              ((1 1 1) (1 1 1) (4 1 1))
-              ((1 1 1) (1 1 1) (1 1 1))))
-         4))
+
+(with-test (:name (:dx-bugs-misc :svein-2005-ii-07))
+  (assert (eql
+           (svein-2005-ii-07
+            '(0)
+            #3A(((1 1 1) (1 1 1) (1 1 1))
+                ((1 1 1) (1 1 1) (4 1 1))
+                ((1 1 1) (1 1 1) (1 1 1))))
+           4)))
 
 ;;; bug reported by Brian Downing: stack-allocated arrays were not
 ;;; filled with zeroes.
@@ -574,7 +620,8 @@
   (let ((a (make-array 11 :initial-element 0)))
     (declare (dynamic-extent a))
     (assert (every (lambda (x) (eql x 0)) a))))
-(with-test (:name :bdowning-2005-iv-16)
+
+(with-test (:name (:dx-bug-misc :bdowning-2005-iv-16))
   #+(or hppa mips x86 x86-64)
   (assert-no-consing (bdowning-2005-iv-16))
   (bdowning-2005-iv-16))
@@ -617,7 +664,9 @@
                (incf x z)))
         (declare (dynamic-extent #'mget #'mset))
         ((lambda (f g) (eval `(progn ,f ,g (values 4 5 6)))) #'mget #'mset)))))
-(assert (equal (bug419 42) '(1 2 3 4 5 6)))
+
+(with-test (:name (:dx-bug-misc :bug419))
+  (assert (equal (bug419 42) '(1 2 3 4 5 6))))
 
 ;;; Multiple DX arguments in a local function call
 (defun test-dx-flet-test (fun n f1 f2 f3)
@@ -631,6 +680,7 @@
   #+(or hppa mips x86 x86-64)
   (assert-no-consing (assert (eql n (funcall fun nil))))
   (assert (eql n (funcall fun nil))))
+
 (macrolet ((def (n f1 f2 f3)
              (let ((name (sb-pcl::format-symbol :cl-user "DX-FLET-TEST.~A" n)))
                `(progn
@@ -645,12 +695,14 @@
                       (f ,f2)
                       (f ,f3)
                       ,n))
-                  (test-dx-flet-test #',name ,n ,f1 ,f2 ,f3)))))
+                  (with-test (:name (:dx-flet-test ,n))
+                    (test-dx-flet-test #',name ,n ,f1 ,f2 ,f3))))))
   (def 0 (list :one) (list :two) (list :three))
   (def 1 (make-array 128) (list 1 2 3 4 5 6 7 8) (list 'list))
   (def 2 (list 1) (list 2 3) (list 4 5 6 7)))
 
-;;; Test that unknown-values coming after a DX value won't mess up the stack analysis
+;;; Test that unknown-values coming after a DX value won't mess up the
+;;; stack analysis
 (defun test-update-uvl-live-sets (x y z)
  (declare (optimize speed (safety 0)))
  (flet ((bar (a b)
@@ -665,7 +717,10 @@
                )                            ; uv pop
                14)
          ))))
-(assert (equal '((0 4) (3 ((1 2 3 5) 14))) (test-update-uvl-live-sets #() 4 5)))
+
+(with-test (:name (:update-uvl-live-sets))
+  (assert (equal '((0 4) (3 ((1 2 3 5) 14)))
+                 (test-update-uvl-live-sets #() 4 5))))
 
 (with-test (:name :regression-1.0.23.38)
   (compile nil '(lambda ()
@@ -736,7 +791,7 @@
   (flet ((assert-notes (j lambda)
            (let ((n 0))
              (handler-bind ((compiler-note (lambda (c)
-                                             (declare (ignore cc))
+                                             (declare (ignore c))
                                              (incf n))))
                (compile nil lambda)
                (unless (= j n)
