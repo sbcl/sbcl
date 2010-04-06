@@ -643,7 +643,7 @@ profiling, and :TIME for wallclock profilgin.")
                                 (max-samples '*max-samples*)
                                 (reset nil)
                                 (mode '*sampling-mode*)
-                                (loop t)
+                                (loop nil)
                                 (max-depth most-positive-fixnum)
                                 show-progress
                                 (threads '(list sb-thread:*current-thread*))
@@ -700,6 +700,7 @@ profiling, and :TIME for wallclock profilgin.")
      If true (the default) repeatedly evaluate BODY. If false, evaluate
      if only once."
   (declare (type report-type report))
+  (check-type loop boolean)
   `(let* ((*sample-interval* ,sample-interval)
           (*alloc-interval* ,alloc-interval)
           (*sampling* nil)
@@ -709,21 +710,22 @@ profiling, and :TIME for wallclock profilgin.")
      (unwind-protect
           (progn
             (start-profiling :max-depth ,max-depth :threads ,threads)
-            (loop
-               (when (>= (samples-trace-count *samples*)
-                         (samples-max-samples *samples*))
-                 (return))
-               ,@(when show-progress
-                       `((format t "~&===> ~d of ~d samples taken.~%"
-                                 (samples-trace-count *samples*)
-                                 (samples-max-samples *samples*))))
-               (let ((.last-index. (samples-index *samples*)))
-                 ,@body
-                 (when (= .last-index. (samples-index *samples*))
-                   (warn "No sampling progress; possibly a profiler bug.")
-                   (return)))
-               (unless ,loop
-                 (return))))
+            ,(if loop
+                 `(loop
+                     (when (>= (samples-trace-count *samples*)
+                               (samples-max-samples *samples*))
+                       (return))
+                     ,@(when show-progress
+                             `((format t "~&===> ~d of ~d samples taken.~%"
+                                       (samples-trace-count *samples*)
+                                       (samples-max-samples *samples*))))
+                     (let ((.last-index. (samples-index *samples*)))
+                       ,@body
+                       (when (= .last-index. (samples-index *samples*))
+                         (warn "No sampling progress; possibly a profiler bug.")
+                         (return))))
+                `(progn
+                   ,@body)))
        (stop-profiling))
      ,@(when report-p `((report :type ,report)))))
 
