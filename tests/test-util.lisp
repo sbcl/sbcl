@@ -48,7 +48,8 @@
   (incf *test-count*))
 
 (defun fail-test (type test-name condition)
-  (log-msg "~A ~S" type test-name)
+  (log-msg "~@<~A ~S ~:_due to ~S: ~4I~:_\"~A\"~:>"
+           type test-name condition condition)
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (when (or (and *break-on-failure*
