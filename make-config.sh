@@ -330,7 +330,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
-    printf ' :linkage-table' >> $ltf
+    printf ' :linkage-table :raw-instance-init-vops' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between

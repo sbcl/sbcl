@@ -288,6 +288,19 @@
 
 ;;;; raw instance slot accessors
 
+(defun offset-for-raw-slot (instance-length index n-words)
+  (+ (* (- instance-length instance-slots-offset index (1- n-words))
+        n-word-bytes)
+     (- instance-pointer-lowtag)))
+
+(define-vop (raw-instance-init/word)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (unsigned-reg)))
+  (:arg-types * unsigned-num)
+  (:info instance-length index)
+  (:generator 4
+    (inst stw value object (offset-for-raw-slot instance-length index 1))))
+
 (define-vop (raw-instance-ref/word)
   (:translate %raw-instance-ref/word)
   (:policy :fast-safe)
@@ -331,6 +344,14 @@
              instance-pointer-lowtag))
     (inst stwx value object offset)
     (move result value)))
+
+(define-vop (raw-instance-init/single)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (single-reg)))
+  (:arg-types * single-float)
+  (:info instance-length index)
+  (:generator 4
+    (inst stfs value object (offset-for-raw-slot instance-length index 1))))
 
 (define-vop (raw-instance-ref/single)
   (:translate %raw-instance-ref/single)
@@ -377,6 +398,14 @@
     (unless (location= result value)
       (inst frsp result value))))
 
+(define-vop (raw-instance-init/double)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (double-reg)))
+  (:arg-types * double-float)
+  (:info instance-length index)
+  (:generator 4
+    (inst stfd value object (offset-for-raw-slot instance-length index 2))))
+
 (define-vop (raw-instance-ref/double)
   (:translate %raw-instance-ref/double)
   (:policy :fast-safe)
@@ -421,6 +450,17 @@
     (inst stfdx value object offset)
     (unless (location= result value)
       (inst fmr result value))))
+
+(define-vop (raw-instance-init/complex-single)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (complex-single-reg)))
+  (:arg-types * complex-single-float)
+  (:info instance-length index)
+  (:generator 4
+    (inst stfs (complex-single-reg-real-tn value)
+          object (offset-for-raw-slot instance-length index 2))
+    (inst stfs (complex-single-reg-imag-tn value)
+          object (offset-for-raw-slot instance-length index 1))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
@@ -476,6 +516,17 @@
       (inst stfsx value-imag object offset)
       (unless (location= result-imag value-imag)
         (inst frsp result-imag value-imag)))))
+
+(define-vop (raw-instance-init/complex-double)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (complex-double-reg)))
+  (:arg-types * complex-double-float)
+  (:info instance-length index)
+  (:generator 4
+    (inst stfd (complex-single-reg-real-tn value)
+          object (offset-for-raw-slot instance-length index 4))
+    (inst stfd (complex-double-reg-imag-tn value)
+          object (offset-for-raw-slot instance-length index 2))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
