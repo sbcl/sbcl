@@ -1292,7 +1292,9 @@
   null)
 
 ;;; and analogous SBCL extension:
+(defknown sb!impl::%failed-aver (t) nil)
 (defknown bug (t &rest t) nil) ; never returns
+
 
 ;;;; from the "Miscellaneous" Chapter:
 
