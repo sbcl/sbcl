@@ -299,7 +299,7 @@
            (type (or simple-string null) doc-string)
            #!-sb-package-locks
            (ignore implement lock))
-  (with-packages ()
+  (with-package-graph ()
     (let* ((existing-package (find-package name))
            (use (use-list-packages existing-package use))
            (shadowing-imports (import-list-symbols shadowing-imports))

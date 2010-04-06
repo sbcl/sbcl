@@ -267,3 +267,16 @@ if a restart was invoked."
                 ((and simple-condition program-error) (c)
                   (assert (equal (list :foo) (simple-condition-format-arguments c)))
                   :good)))))
+
+;;; MAKE-PACKAGE error in another thread blocking FIND-PACKAGE & FIND-SYMBOL
+#+sb-thread
+(with-test (:name :bug-511072)
+  (let* ((p (make-package :bug-511072))
+         (sem (sb-thread:make-semaphore))
+         (t2 (sb-thread:make-thread (lambda ()
+                                      (handler-bind ((error (lambda (c)
+                                                              (sb-thread:signal-semaphore sem)
+                                                              (signal c))))
+                                        (make-package :bug-511072))))))
+    (sb-thread:wait-on-semaphore sem)
+    (assert (eq 'cons (read-from-string "CL:CONS")))))
