@@ -215,7 +215,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 
     if (!cheneygc_handle_wp_violation(context, addr)) {
         if (!handle_guard_page_triggered(context,addr))
-            lisp_memory_fault_error(context, fault_addr);
+            lisp_memory_fault_error(context, addr);
     }
 }
 
