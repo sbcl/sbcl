@@ -320,12 +320,14 @@ grow to before new connection attempts are refused.  See also listen(2)"))
       (open-stream-p (slot-value socket 'stream))
       (/= -1 (socket-file-descriptor socket))))
 
-(defgeneric socket-close (socket)
-  (:documentation "Close SOCKET.  May throw any kind of error that
-write(2) would have thrown.  If SOCKET-MAKE-STREAM has been called,
-calls CLOSE on that stream instead"))
+(defgeneric socket-close (socket &key abort)
+  (:documentation
+   "Close SOCKET, unless it was already closed.
 
-(defmethod socket-close ((socket socket))
+If SOCKET-MAKE-STREAM has been called, calls CLOSE using ABORT on that stream.
+Otherwise closes the socket file descriptor using close(2)."))
+
+(defmethod socket-close ((socket socket) &key abort)
   ;; the close(2) manual page has all kinds of warning about not
   ;; checking the return value of close, on the grounds that an
   ;; earlier write(2) might have returned successfully w/o actually
@@ -338,25 +340,30 @@ calls CLOSE on that stream instead"))
   ;; the socket will avoid doing anything to close the fd in case
   ;; the stream has done it already - if so, it may have been
   ;; reassigned to some other file, and closing it would be bad
-
   (let ((fd (socket-file-descriptor socket)))
-    (cond ((eql fd -1) ; already closed
-           nil)
-          ((slot-boundp socket 'stream)
-           (unwind-protect (close (slot-value socket 'stream)) ;; closes fd
+    (flet ((drop-it (&optional streamp)
              (setf (slot-value socket 'file-descriptor) -1)
-             (slot-makunbound socket 'stream)))
-          (t
-           (sb-ext:cancel-finalization socket)
-           (handler-case
-               (if (= (sockint::close fd) -1)
-                   (socket-error "close"))
-             (bad-file-descriptor-error (c) (declare (ignore c)) nil)
-             (:no-error (c)
-               (declare (ignore c))
-               (setf (slot-value socket 'file-descriptor) -1)
-               nil))))))
-
+             (if streamp
+                 (slot-makunbound socket 'stream)
+                 (sb-ext:cancel-finalization socket))
+             t))
+      (cond ((eql fd -1)
+             ;; already closed
+             nil)
+           ((slot-boundp socket 'stream)
+            (close (slot-value socket 'stream) :abort abort)
+            ;; Don't do this if there was an error from CLOSE -- the stream is
+            ;; still live.
+            (drop-it t))
+           (t
+            (handler-case
+                (when (minusp (sockint::close fd))
+                  (socket-error "close"))
+              (bad-file-descriptor-error ()
+                (drop-it))
+              (:no-error (r)
+                (declare (ignore r))
+                (drop-it))))))))
 
 (defgeneric socket-make-stream (socket &key input output
                                        element-type external-format

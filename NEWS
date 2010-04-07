@@ -31,6 +31,9 @@ changes relative to sbcl-1.0.37:
        SOCKET-PEERNAME.
     ** SOCKET-MAKE-STREAM once more supports the :AUTO-CLOSE option.
        (lp#540413)
+    ** SOCKET-CLOSE now accepts :ABORT argument, which is passed on to
+       CL:CLOSE when appropriate, and no longer disassociates the stream
+       from the socket if close failed. (lp#543951)
   * improvements to the instrumenting profiler
     ** new feature: report per-function GC overhead. (thanks to John Fremlin)
     ** optimization: counters no longer use locks for the overflow mode.
