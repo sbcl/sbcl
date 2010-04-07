@@ -53,6 +53,8 @@ changes relative to sbcl-1.0.37:
     END is reached. (thanks to Alec Berryman, lp#554385)
   * bug fix: errors signalled during package graph modification no longer
     block FIND-SYMBOL and FIND-PACKAGE in other threads. (lp#511072)
+  * bug fix: SB-POSIX build was broken when SBCL was compiled without the
+    :SB-DOC feature. (lp#552564)
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
