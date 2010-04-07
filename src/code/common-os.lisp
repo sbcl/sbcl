@@ -15,7 +15,10 @@
 
 (sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
 (sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
-(sb!alien:define-alien-routine os-get-runtime-executable-path sb!alien:c-string)
+(sb!alien:define-alien-routine
+ os-get-runtime-executable-path sb!alien:c-string (external-path boolean))
+(sb!alien:define-alien-variable
+ ("saved_runtime_path" *native-saved-runtime-path*) (* char))
 
 ;;; if something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
@@ -43,6 +46,8 @@
   (setf *core-pathname*
         (merge-pathnames (native-pathname *core-string*)))
   (/show0 "setting *RUNTIME-PATHNAME*")
-  (let ((exe (os-get-runtime-executable-path)))
-    (setf *runtime-pathname* (when exe (native-pathname exe))))
+  (let ((exe (os-get-runtime-executable-path t))
+        (saved (sb!alien:cast *native-saved-runtime-path* sb!alien:c-string)))
+    (setf *runtime-pathname*
+          (when (or exe saved) (native-pathname (or exe saved)))))
   (/show0 "leaving OS-COLD-INIT-OR-REINIT"))

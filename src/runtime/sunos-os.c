@@ -234,13 +234,11 @@ os_install_interrupt_handlers()
 }
 
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
-    int ret;
     char path[] = "/proc/self/object/a.out";
 
-    ret = access(path, R_OK);
-    if (ret == -1)
+    if (external || access(path, R_OK) == -1)
         return NULL;
 
     return copied_string(path);

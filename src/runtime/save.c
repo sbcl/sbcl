@@ -383,6 +383,25 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     exit(0);
 }
 
+/* Check if the build_id for the current runtime is present in a
+ * buffer. */
+int
+check_runtime_build_id(void *buf, size_t size)
+{
+    size_t idlen;
+    char *pos;
+
+    idlen = strlen(build_id) - 1;
+    while ((pos = memchr(buf, build_id[0], size)) != NULL) {
+        size -= (pos + 1) - (char *)buf;
+        buf = (pos + 1);
+        if (idlen <= size && memcmp(buf, build_id + 1, idlen) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
 /* Slurp the executable portion of the runtime into a malloced buffer
  * and return it.  Places the size in bytes of the runtime into
  * 'size_out'.  Returns NULL if the runtime cannot be loaded from
@@ -411,6 +430,12 @@ load_runtime(char *runtime_path, size_t *size_out)
     buf = successful_malloc(size);
     if ((count = fread(buf, 1, size, input)) != size) {
         fprintf(stderr, "Premature EOF while reading runtime.\n");
+        goto lose;
+    }
+
+    if (!check_runtime_build_id(buf, size)) {
+        fprintf(stderr, "Failed to locate current build_id in runtime: %s\n",
+            runtime_path);
         goto lose;
     }
 
@@ -460,15 +485,19 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
     char *runtime_path;
 
     if (prepend_runtime) {
-        runtime_path = os_get_runtime_executable_path();
+        runtime_path = os_get_runtime_executable_path(0);
 
-        if (runtime_path == NULL) {
+        if (runtime_path == NULL && saved_runtime_path == NULL) {
             fprintf(stderr, "Unable to get default runtime path.\n");
             return NULL;
         }
 
-        *runtime_bytes = load_runtime(runtime_path, runtime_size);
-        free(runtime_path);
+        if (runtime_path == NULL)
+            *runtime_bytes = load_runtime(saved_runtime_path, runtime_size);
+        else {
+            *runtime_bytes = load_runtime(runtime_path, runtime_size);
+            free(runtime_path);
+        }
 
         if (*runtime_bytes == NULL)
             return 0;

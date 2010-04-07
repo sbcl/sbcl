@@ -582,7 +582,7 @@ void scratch(void)
 }
 
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
     char path[MAX_PATH + 1];
     DWORD bufsize = sizeof(path);

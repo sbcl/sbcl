@@ -173,8 +173,10 @@ extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
 int os_get_errno(void);
 
 /* Return an absolute path to the runtime executable, or NULL if this
- * information is unavailable.  If a non-null pathname is returned, it
- * must be 'free'd. */
-extern char *os_get_runtime_executable_path(void);
+ * information is unavailable.  Unless external_path is non-zero the
+ * returned path may only be valid for the current process, ie:
+ * something like /proc/curproc/file.  If a non-null pathname is
+ * returned, it must be 'free'd. */
+extern char *os_get_runtime_executable_path(int external_path);
 
 #endif

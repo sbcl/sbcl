@@ -272,4 +272,7 @@ struct runtime_options {
     size_t thread_control_stack_size;
 };
 
+/* saved runtime path computed from argv[0] */
+extern char *saved_runtime_path;
+
 #endif /* _SBCL_RUNTIME_H_ */

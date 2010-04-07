@@ -135,9 +135,9 @@ os_install_interrupt_handlers(void)
 }
 
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
-    return copied_string("NOPE");
+    return NULL;
 }
 
 /* when inside call_into_lisp, we will first jump to the stub

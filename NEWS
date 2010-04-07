@@ -60,6 +60,7 @@ changes relative to sbcl-1.0.37:
   * bug fix: SB-POSIX build was broken when SBCL was compiled without the
     :SB-DOC feature. (lp#552564)
   * bug fix: SB-INTROSPECT build issues on GENGC/PPC. (lp#490490)
+  * bug fix: more robust runtime executable path detection. (lp#375549)
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows

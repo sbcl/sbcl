@@ -428,7 +428,7 @@ futex_wake(int *lock_word, int n)
 #endif
 
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
     char path[PATH_MAX + 1];
 
@@ -456,20 +456,16 @@ os_get_runtime_executable_path()
 }
 #elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
     struct stat sb;
-    char *path = strdup("/proc/curproc/file");
-    if (path && ((stat(path, &sb)) == 0))
-        return path;
-    else {
-        fprintf(stderr, "Couldn't stat /proc/curproc/file; is /proc mounted?\n");
-        return NULL;
-    }
+    if (!external && stat("/proc/curproc/file", &sb) == 0)
+        return copied_string("/proc/curproc/file");
+    return NULL;
 }
 #else /* Not DARWIN or FREEBSD or NETBSD or OPENBSD */
 char *
-os_get_runtime_executable_path()
+os_get_runtime_executable_path(int external)
 {
     return NULL;
 }
