@@ -171,7 +171,10 @@
 ;;; The current code doesn't seem to quite match that.
 (def!method print-object ((x condition) stream)
   (if *print-escape*
-      (print-unreadable-object (x stream :type t :identity t))
+      (if (typep x 'simple-condition)
+          (print-unreadable-object (x stream :type t :identity t)
+            (format stream "~S" (simple-condition-format-control x)))
+          (print-unreadable-object (x stream :type t :identity t)))
       ;; KLUDGE: A comment from CMU CL here said
       ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
       ;;   superclasses in define-condition call!
