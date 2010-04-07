@@ -171,7 +171,7 @@
 ;;; The current code doesn't seem to quite match that.
 (def!method print-object ((x condition) stream)
   (if *print-escape*
-      (if (typep x 'simple-condition)
+      (if (and (typep x 'simple-condition) (slot-boundp x 'format-control))
           (print-unreadable-object (x stream :type t :identity t)
             (format stream "~S" (simple-condition-format-control x)))
           (print-unreadable-object (x stream :type t :identity t)))
