@@ -258,16 +258,25 @@ Examples:
     HASH-FUNCTION is expected to return a non-negative fixnum hash code.
 
   :WEAKNESS
-    If NIL (the default) it is a normal non-weak hash table. If one
-    of :KEY, :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE it is a weak hash table.
-    Depending on the type of weakness the lack of references to the key and
-    the value may allow for removal of the entry. If WEAKNESS is :KEY and the
-    key would otherwise be garbage the entry is eligible for removal from the
-    hash table. Similarly, if WEAKNESS is :VALUE the life of an entry depends
-    on its value's references. If WEAKNESS is :KEY-AND-VALUE and either the
-    key or the value would otherwise be garbage the entry can be removed. If
-    WEAKNESS is :KEY-OR-VALUE and both the key and the value would otherwise
-    be garbage the entry can be removed.
+    When :WEAKNESS is not NIL, garbage collection may remove entries from the
+    hash table. The value of :WEAKNESS specifies how the presence of a key or
+    value in the hash table preserves their entries from garbage collection.
+
+    Valid values are:
+
+      :KEY means that the key of an entry must be live to guarantee that the
+        entry is preserved.
+
+      :VALUE means that the value of an entry must be live to guarantee that
+        the entry is preserved.
+
+      :KEY-AND-VALUE means that both the key and the value must be live to
+        guarantee that the entry is preserved.
+
+      :KEY-OR-VALUE means that either the key or the value must be live to
+        guarantee that the entry is preserved.
+
+      NIL (the default) means that entries are always preserved.
 
   :SYNCHRONIZED
     If NIL (the default), the hash-table may have multiple concurrent readers,
