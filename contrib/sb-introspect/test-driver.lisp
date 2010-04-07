@@ -284,6 +284,9 @@
     (tai 42 :immediate nil)
   t)
 
+;;; Skip the whole damn test on GENCGC PPC -- the combination is just
+;;; to flaky for this to make too much sense.
+#-(and ppc gencgc)
 (deftest allocation-information.4
     #+gencgc
     (tai #'cons :heap
