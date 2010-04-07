@@ -437,12 +437,10 @@ HOLDING-MUTEX-P."
             (waitp
              (bug "Failed to acquire lock with WAITP."))))))
 
-(defun grab-mutex (mutex &key (new-owner *current-thread*)
-                              (waitp t) (timeout nil))
+(defun grab-mutex (mutex &key (waitp t) (timeout nil))
   #!+sb-doc
-  "Acquire MUTEX for NEW-OWNER, which must be a thread or NIL. If
-NEW-OWNER is NIL, it defaults to the current thread. If WAITP is
-non-NIL and the mutex is in use, sleep until it is available.
+  "Acquire MUTEX for the current thread. If WAITP is true (the default) and
+the mutex is not immediately available, sleep until it is available.
 
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on
 how long GRAB-MUTEX should try to acquire the lock in the contested
@@ -454,10 +452,6 @@ of WAITP being NIL, or an expired TIMEOUT, GRAB-MUTEX may also return
 NIL which denotes that GRAB-MUTEX did -not- acquire the lock.
 
 Notes:
-
-  - Using the NEW-OWNER parameter to assign a MUTEX to another thread
-    than the current one is not recommended, and liable to be
-    deprecated.
 
   - GRAB-MUTEX is not interrupt safe. The correct way to call it is:
 
@@ -482,7 +476,7 @@ Notes:
   - It is recommended that you use WITH-MUTEX instead of calling
     GRAB-MUTEX directly.
 "
-  (get-mutex mutex new-owner waitp timeout))
+  (get-mutex mutex nil waitp timeout))
 
 (defun release-mutex (mutex &key (if-not-owner :punt))
   #!+sb-doc
