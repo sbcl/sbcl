@@ -346,6 +346,8 @@
                                       (grab-mutex m :waitp nil)))))))))
 
 (with-test (:name (:grab-mutex :timeout :acquisition-fail))
+  #+sb-lutex
+  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (null (join-thread (make-thread
@@ -353,6 +355,8 @@
                                       (grab-mutex m :timeout 0.1)))))))))
 
 (with-test (:name (:grab-mutex :timeout :acquisition-success))
+  #+sb-lutex
+  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex))
         (child))
     (with-mutex (m)
@@ -361,6 +365,8 @@
     (assert (eq (join-thread child) 't))))
 
 (with-test (:name (:grab-mutex :timeout+deadline))
+  #+sb-lutex
+  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (eq (join-thread
@@ -373,6 +379,8 @@
                   :deadline)))))
 
 (with-test (:name (:grab-mutex :waitp+deadline))
+  #+sb-lutex
+  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (eq (join-thread
@@ -555,6 +563,8 @@
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
 (with-test (:name (:interrupt-thread :interrupt-consing-child))
+  #+darwin
+  (error "Hangs on Darwin.")
   (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
@@ -573,6 +583,8 @@
 (format t "~&multi interrupt test done~%")
 
 (with-test (:name (:interrupt-thread :interrupt-consing-child :again))
+  #+darwin
+  (error "Hangs on Darwin.")
   (let ((c (make-thread (lambda () (loop (alloc-stuff))))))
     ;; NB this only works on x86: other ports don't have a symbol for
     ;; pseudo-atomic atomicity
@@ -660,6 +672,8 @@
     (assert (sb-thread:join-thread thread))))
 
 (with-test (:name (:two-threads-running-gc))
+  #+darwin
+  (error "Hangs on Darwin.")
   (let (a-done b-done)
     (make-thread (lambda ()
                    (dotimes (i 100)
@@ -981,6 +995,8 @@
 (format t "~&multiple reader hash table test done~%")
 
 (with-test (:name (:hash-table-single-accessor-parallel-gc))
+  #+darwin
+  (error "Prone to hang on Darwin due to interrupt issues.")
   (let ((hash (make-hash-table))
         (*errors* nil))
     (let ((threads (list (sb-thread:make-thread
@@ -1088,6 +1104,8 @@
     (assert (not deadline-handler-run-twice?))))
 
 (with-test (:name (:condition-wait :signal-deadline-with-interrupts-enabled))
+  #+darwin
+  (error "Bad Darwin")
   (let ((mutex (sb-thread:make-mutex))
         (waitq (sb-thread:make-waitqueue))
         (A-holds? :unknown)
@@ -1187,6 +1205,8 @@
 (format t "infodb test done~%")
 
 (with-test (:name (:backtrace))
+  #+darwin
+  (error "Prone to crash on Darwin, cause unknown.")
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
@@ -1206,6 +1226,8 @@
 (format t "~&starting gc deadlock test: WARNING: THIS TEST WILL HANG ON FAILURE!~%")
 
 (with-test (:name (:gc-deadlock))
+  #+darwin
+  (error "Prone to hang on Darwin due to interrupt issues.")
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier
   ;; versions and at least on one specific box this test is good enough

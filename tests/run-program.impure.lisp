@@ -154,6 +154,8 @@
 ;; forked process' signal mask to defaults. But the default is `stop'
 ;; of which we can be notified asynchronously by providing a status hook.
 (with-test (:name (:run-program :inherit-stdin))
+  #+(and darwin sb-thread)
+  (error "Hangs on threaded Darwin.")
   (let (stopped)
     (flet ((status-hook (proc)
              (case (sb-ext:process-status proc)

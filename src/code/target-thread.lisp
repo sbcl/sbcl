@@ -361,8 +361,7 @@ HOLDING-MUTEX-P."
   #!+sb-doc
   "Deprecated in favor of GRAB-MUTEX."
   (declare (type mutex mutex) (optimize (speed 3))
-           #!-sb-thread (ignore waitp timeout)
-           #!+sb-lutex  (ignore timeout))
+           #!-sb-thread (ignore waitp timeout))
   (unless new-owner
     (setq new-owner *current-thread*))
   (let ((old (mutex-%owner mutex)))
@@ -385,12 +384,15 @@ HOLDING-MUTEX-P."
     ;; but has that been checked?) (2) after the lutex call, but
     ;; before setting the mutex owner.
     #!+sb-lutex
-    (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
-                   (if waitp
-                       (with-interrupts (%lutex-lock lutex))
-                       (%lutex-trylock lutex))))
-      (setf (mutex-%owner mutex) new-owner)
-      t)
+    (progn
+      (when timeout
+        (error "Mutex timeouts not supported on this platform."))
+      (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
+                    (if waitp
+                        (with-interrupts (%lutex-lock lutex))
+                        (%lutex-trylock lutex))))
+       (setf (mutex-%owner mutex) new-owner)
+       t))
     #!-sb-lutex
     ;; This is a direct translation of the Mutex 2 algorithm from
     ;; "Futexes are Tricky" by Ulrich Drepper.
@@ -444,7 +446,8 @@ non-NIL and the mutex is in use, sleep until it is available.
 
 If TIMEOUT is given, it specifies a relative timeout, in seconds, on
 how long GRAB-MUTEX should try to acquire the lock in the contested
-case.
+case. Unsupported on :SB-LUTEX platforms (eg. Darwin), where a non-NIL
+TIMEOUT signals an error.
 
 If GRAB-MUTEX returns T, the lock acquisition was successful. In case
 of WAITP being NIL, or an expired TIMEOUT, GRAB-MUTEX may also return
@@ -467,9 +470,6 @@ Notes:
     the call while the mutex is in an inconsistent state while
     ALLOW-WITH-INTERRUPTS allows the call to be interrupted from
     sleep.
-
-  - The TIMEOUT parameter is currently only supported on non-SB-LUTEX
-    platforms like Linux or BSD.
 
   - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
     (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a

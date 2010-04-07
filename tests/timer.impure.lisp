@@ -241,6 +241,8 @@
 ;;; before they ran) and dying threads were open interrupts.
 #+sb-thread
 (with-test (:name (:timer :parallel-unschedule))
+  #+darwin
+  (error "Prone to hang on Darwin due to interrupt issues.")
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()

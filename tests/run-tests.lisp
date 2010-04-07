@@ -78,19 +78,8 @@
     (append-failures)))
 
 (defun run-in-child-sbcl (load-forms forms)
-  (declare (ignorable load-forms))
-  #-win32
-  (let ((pid (sb-posix:fork)))
-    (cond ((= pid 0)
-           (dolist (form forms)
-             (eval form)))
-          (t
-           (let ((status (make-array 1 :element-type '(signed-byte 32))))
-             (sb-posix:waitpid pid 0 status)
-             (if (sb-posix:wifexited (aref status 0))
-                 (sb-posix:wexitstatus (aref status 0))
-                 1)))))
-  #+win32
+  ;; We used to fork() for POSIX platforms, and use this for Windows.
+  ;; However, it seems better to use the same solution everywhere.
   (process-exit-code
    (sb-ext:run-program
     (first *POSIX-ARGV*)
