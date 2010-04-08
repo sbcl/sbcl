@@ -215,5 +215,15 @@
                        :no-error)
          (sb-int:standard-pprint-dispatch-table-modified-error ()
            :error)))))
+
+(with-test (:name :pprint-defmethod-lambda-list-function)
+  (flet ((to-string (form)
+           (let ((string (with-output-to-string (s) (pprint form s))))
+             (assert (eql #\newline (char string 0)))
+             (subseq string 1))))
+    (assert (equal "(DEFMETHOD FOO ((FUNCTION CONS)) FUNCTION)"
+                   (to-string `(defmethod foo ((function cons)) function))))
+    (assert (equal "(DEFMETHOD FOO :AFTER (FUNCTION CONS) FUNCTION)"
+                   (to-string `(defmethod foo :after (function cons) function))))))
 
 ;;; success

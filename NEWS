@@ -40,6 +40,7 @@ changes relative to sbcl-1.0.37:
     ** bug fix: whenever a profiling counter wrapped into overflow mode, it
        incurred an off-by-one miscount.
   * enhancement: improved MAKE-HASH-TABLE documentation (lp#543473)
+  * enhancement: improved DEFMETHOD pretty-printing.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due

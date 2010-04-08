@@ -1261,6 +1261,15 @@ line break."
            stream
            list))
 
+(defun pprint-defmethod (stream list &rest noise)
+  (declare (ignore noise))
+  (if (consp (third list))
+      (pprint-defun stream list)
+      (funcall (formatter
+                "~:<~^~W~^ ~@_~:I~W~^ ~W~^ ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
+               stream
+               list)))
+
 (defun pprint-defpackage (stream list &rest noise)
   (declare (ignore noise))
   (funcall  (formatter
@@ -1518,6 +1527,7 @@ line break."
                           (define-modify-macro pprint-defun)
                           (define-setf-expander pprint-defun)
                           (defmacro pprint-defun)
+                          (defmethod pprint-defmethod)
                           (defpackage pprint-defpackage)
                           (defparameter pprint-block)
                           (defsetf pprint-defun)
