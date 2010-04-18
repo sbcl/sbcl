@@ -41,10 +41,9 @@
            (inst cmp al-tn immediate))))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag (value target not-p lowtag &optional al-loaded)
-  (unless al-loaded
-    (move eax-tn value)
-    (inst and al-tn lowtag-mask))
+(defun %test-lowtag (value target not-p lowtag)
+  (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
+  (inst test al-tn lowtag-mask)
   ;; FIXME: another 'optimization' which doesn't appear to work:
   ;; prefetching the hypothetically pointed-to version should help,
   ;; but this is in fact non-ideal in plenty of ways: we emit way too
@@ -53,11 +52,10 @@
   ;; not too bad.  -- CSR, 2004-07-27
   (when (member :prefetch *backend-subfeatures*)
     (inst prefetchnta (make-ea :byte :base value :disp (- lowtag))))
-  (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
-                            &optional (drop-through (gen-label)) al-loaded)
+                            &optional (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
         ;; EQUAL, LESS-OR-EQUAL and GREATER-OR-EQUAL are the conditions for
@@ -67,7 +65,7 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (%test-lowtag value when-false t lowtag al-loaded)
+      (%test-lowtag value when-false t lowtag)
       (cond
         ((and (null (cdr headers))
               (numberp (car headers)))
@@ -255,9 +253,9 @@
             (values target not-target))
       (generate-fixnum-test value)
       (inst jmp :e yep)
-      (move eax-tn value)
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
+      (inst lea eax-tn (make-ea :dword :base value
+                                :disp (- other-pointer-lowtag)))
+      (inst test al-tn lowtag-mask)
       (inst jmp :ne nope)
       (loadw eax-tn value 0 other-pointer-lowtag)
       (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -271,9 +269,9 @@
                                      value)))
       (generate-fixnum-test value)
       (inst jmp :e yep)
-      (move eax-tn value)
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
+      (inst lea eax-tn (make-ea :dword :base value
+                                :disp (- other-pointer-lowtag)))
+      (inst test al-tn lowtag-mask)
       (inst jmp :ne nope)
       (loadw eax-tn value 0 other-pointer-lowtag)
       (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
