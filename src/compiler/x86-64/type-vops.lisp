@@ -238,8 +238,8 @@
       (inst and al-tn lowtag-mask)
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
-      (loadw rax-tn value 0 other-pointer-lowtag)
-      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+            (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
@@ -254,8 +254,8 @@
       (inst and al-tn lowtag-mask)
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
-      (loadw rax-tn value 0 other-pointer-lowtag)
-      (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+            (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp :ne nope))
     YEP
     (move result value)))
