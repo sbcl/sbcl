@@ -133,7 +133,7 @@
               "Comma inside backquoted structure (not a list or general vector.)"))
          (*backquote-count* 0)
          (body (if (char= (read-char stream t) #\( )
-                  (let ((*backquote-count* -1))
+                  (let ((*backquote-count* 0))
                     (read-list stream nil))
                   (simple-reader-error stream "non-list following #S"))))
     (unless (listp body)
