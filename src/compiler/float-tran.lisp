@@ -1522,16 +1522,19 @@
                                         (,type
                                          &optional (or ,type ,@other-float-arg-types integer))
                                         * :result result)
-                  (let ((result-type (lvar-derived-type result)))
+                  (let* ((result-type (and result
+                                           (lvar-derived-type result)))
+                         (compute-all (and (values-type-p result-type)
+                                           (not (type-single-value-p result-type)))))
                     (if (or (not y)
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
-                        (if (values-type-p result-type)
+                        (if compute-all
                             `(let ((res (,',unary x)))
                                (values res (- x (,',coerce res))))
                             `(let ((res (,',unary x)))
                                ;; Dummy secondary value!
                                (values res x)))
-                        (if (values-type-p result-type)
+                        (if compute-all
                             `(let* ((f (,',coerce y))
                                     (res (,',unary (/ x f))))
                                (values res (- x (* f (,',coerce res)))))
