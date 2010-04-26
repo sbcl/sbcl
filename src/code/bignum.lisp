@@ -777,6 +777,7 @@
         (setf u-len (make-gcd-bignum-odd u u-len))
         (rotatef u v)
         (rotatef u-len v-len))
+      (bignum-abs-buffer u u-len)
       (setf u (copy-bignum u u-len))
       (let ((n (bignum-mod-gcd v1 u)))
         (ash (bignum-mod-gcd u1 (if (fixnump n)

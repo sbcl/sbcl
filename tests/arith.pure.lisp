@@ -359,3 +359,9 @@
                       < <= = >= >
                       eql
                       eq))))
+
+;; GCD used to sometimes return negative values. The following did, on 32 bit
+;; builds.
+(with-test (:name :gcd)
+  (assert (plusp (gcd 20286123923750474264166990598656
+                      680564733841876926926749214863536422912))))
