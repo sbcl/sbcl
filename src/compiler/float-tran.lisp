@@ -382,7 +382,7 @@
   (def single-float)
   (def double-float))
 
-;;; Optimize addition and subsctraction of zero
+;;; Optimize addition and subtraction of zero
 (macrolet ((def (op type &rest args)
              `(deftransform ,op ((x y) (,type (constant-arg (member ,@args))) *
                                  ;; Beware the SNaN!
@@ -537,27 +537,27 @@
                 (deftransform ,name ((x) (single-float) *)
                   #!+x86 (cond ((csubtypep (lvar-type x)
                                            (specifier-type '(single-float
-                                                             (#.(- (expt 2f0 64)))
-                                                             (#.(expt 2f0 64)))))
+                                                             (#.(- (expt 2f0 63)))
+                                                             (#.(expt 2f0 63)))))
                                 `(coerce (,',prim-quick (coerce x 'double-float))
                                   'single-float))
                                (t
                                 (compiler-notify
                                  "unable to avoid inline argument range check~@
-                                  because the argument range (~S) was not within 2^64"
+                                  because the argument range (~S) was not within 2^63"
                                  (type-specifier (lvar-type x)))
                                 `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
                   #!-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
                (deftransform ,name ((x) (double-float) *)
                  #!+x86 (cond ((csubtypep (lvar-type x)
                                           (specifier-type '(double-float
-                                                            (#.(- (expt 2d0 64)))
-                                                            (#.(expt 2d0 64)))))
+                                                            (#.(- (expt 2d0 63)))
+                                                            (#.(expt 2d0 63)))))
                                `(,',prim-quick x))
                               (t
                                (compiler-notify
                                 "unable to avoid inline argument range check~@
-                                 because the argument range (~S) was not within 2^64"
+                                 because the argument range (~S) was not within 2^63"
                                 (type-specifier (lvar-type x)))
                                `(,',prim x)))
                  #!-x86 `(,',prim x)))))
