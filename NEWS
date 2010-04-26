@@ -41,6 +41,8 @@ changes relative to sbcl-1.0.37:
        incurred an off-by-one miscount.
   * enhancement: improved MAKE-HASH-TABLE documentation (lp#543473)
   * enhancement: improved DEFMETHOD pretty-printing.
+  * enhancement: perform range reduction when arguments are too large for
+    x87's transcendentals (instead of returning 0). (lp#327192)
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due

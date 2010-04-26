@@ -2160,6 +2160,10 @@
                 (:args (x :scs (double-reg) :target fr0))
                 (:temporary (:sc double-reg :offset fr0-offset
                                  :from :argument :to :result) fr0)
+                ;; FIXME: make that an arbitrary location and
+                ;; FXCH only when range reduction needed
+                (:temporary (:sc double-reg :offset fr1-offset
+                                 :from :argument :to :result) fr1)
                 (:temporary (:sc unsigned-reg :offset eax-offset
                              :from :argument :to :result) eax)
                 (:results (y :scs (double-reg)))
@@ -2171,21 +2175,34 @@
                 (:save-p :compute-only)
                 (:ignore eax)
                 (:generator 5
-                  (note-this-location vop :internal-error)
-                  (unless (zerop (tn-offset x))
-                          (inst fxch x)          ; x to top of stack
-                          (unless (location= x y)
-                                  (inst fst x))) ; maybe save it
-                  (inst ,op)
-                  (inst fnstsw)                  ; status word to ax
-                  (inst and ah-tn #x04)          ; C2
-                  (inst jmp :z DONE)
-                  ;; Else x was out of range so reduce it; ST0 is unchanged.
-                  (inst fstp fr0)               ; Load 0.0
-                  (inst fldz)
-                  DONE
-                  (unless (zerop (tn-offset y))
-                          (inst fstd y))))))
+                  (let ((DONE (gen-label))
+                        (REDUCE (gen-label))
+                        (REDUCE-LOOP (gen-label)))
+                    (note-this-location vop :internal-error)
+                    (unless (zerop (tn-offset x))
+                      (inst fxch x)          ; x to top of stack
+                      (unless (location= x y)
+                        (inst fst x))) ; maybe save it
+                    (inst ,op)
+                    (inst fnstsw)                  ; status word to ax
+                    (inst and ah-tn #x04)          ; C2
+                    (inst jmp :nz REDUCE)
+                    (emit-label DONE)
+                    (unless (zerop (tn-offset y))
+                      (inst fstd y))
+                    (assemble (*elsewhere*)
+                      (emit-label REDUCE)
+                      ;; Else x was out of range so reduce it; ST0 is unchanged.
+                      (with-empty-tn@fp-top (fr1)
+                        (inst fldpi)
+                        (inst fadd fr0))
+                      (emit-label REDUCE-LOOP)
+                      (inst fprem1)
+                      (inst fnstsw)
+                      (inst and ah-tn #x04)
+                      (inst jmp :nz REDUCE-LOOP)
+                      (inst ,op)
+                      (inst jmp DONE)))))))
           (frob fsin  %sin fsin)
           (frob fcos  %cos fcos))
 
@@ -2221,11 +2238,24 @@
                                    :sc (sc-or-lose 'double-reg)
                                    :offset (- (tn-offset x) 2)))))
     (inst fptan)
-    (inst fnstsw)                        ; status word to ax
-    (inst and ah-tn #x04)                ; C2
-    (inst jmp :z DONE)
-    ;; Else x was out of range so load 0.0
-    (inst fxch fr1)
+    (let ((REDUCE (gen-label))
+          (REDUCE-LOOP (gen-label)))
+      (inst fnstsw)                        ; status word to ax
+      (inst and ah-tn #x04)                ; C2
+      (inst jmp :nz REDUCE)
+      (assemble (*elsewhere*)
+        (emit-label REDUCE)
+        ;; Else x was out of range so reduce it; ST0 is unchanged.
+        (with-empty-tn@fp-top (fr1)
+          (inst fldpi)
+          (inst fadd fr0))
+        (emit-label REDUCE-LOOP)
+        (inst fprem1)
+        (inst fnstsw)
+        (inst and ah-tn #x04)
+        (inst jmp :nz REDUCE-LOOP)
+        (inst fptan)
+        (inst jmp DONE)))
     DONE
     ;; Result is in fr1
     (case (tn-offset y)
