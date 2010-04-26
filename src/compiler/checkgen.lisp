@@ -449,35 +449,41 @@
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar)))
          (value (cast-value cast))
-         (atype (cast-asserted-type cast)))
+         (atype (cast-asserted-type cast))
+         (condition 'type-warning)
+         (not-ok-uses '()))
     (do-uses (use value)
       (let ((dtype (node-derived-type use)))
-        (unless (values-types-equal-or-intersect dtype atype)
-          (let* ((*compiler-error-context* use)
-                 (atype-spec (type-specifier atype))
-                 (what (when (and (combination-p dest)
-                                  (eq (combination-kind dest) :local))
-                         (let ((lambda (combination-lambda dest))
-                               (pos (position-or-lose
-                                     lvar (combination-args dest))))
-                           (format nil "~:[A possible~;The~] binding of ~S"
-                                   (and (lvar-has-single-use-p lvar)
-                                        (eq (functional-kind lambda) :let))
-                                   (leaf-source-name (elt (lambda-vars lambda)
-                                                          pos)))))))
-            (cond ((and (ref-p use) (constant-p (ref-leaf use)))
-                   (warn 'type-warning
-                         :format-control
-                         "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
-                         :format-arguments
-                         (list what atype-spec
-                               (constant-value (ref-leaf use)))))
-                  (t
-                   (warn 'type-warning
-                         :format-control
-                         "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
-                         :format-arguments
-                         (list what (type-specifier dtype) atype-spec)))))))))
+        (if (values-types-equal-or-intersect dtype atype)
+            (setf condition 'type-style-warning)
+            (push use not-ok-uses))))
+    (dolist (use (nreverse not-ok-uses))
+      (let* ((*compiler-error-context* use)
+             (dtype      (node-derived-type use))
+             (atype-spec (type-specifier atype))
+             (what (when (and (combination-p dest)
+                              (eq (combination-kind dest) :local))
+                     (let ((lambda (combination-lambda dest))
+                           (pos (position-or-lose
+                                 lvar (combination-args dest))))
+                       (format nil "~:[A possible~;The~] binding of ~S"
+                               (and (lvar-has-single-use-p lvar)
+                                    (eq (functional-kind lambda) :let))
+                               (leaf-source-name (elt (lambda-vars lambda)
+                                                      pos)))))))
+        (cond ((and (ref-p use) (constant-p (ref-leaf use)))
+               (warn condition
+                     :format-control
+                     "~:[This~;~:*~A~] is not a ~<~%~9T~:;~S:~>~%  ~S"
+                     :format-arguments
+                     (list what atype-spec
+                           (constant-value (ref-leaf use)))))
+              (t
+               (warn condition
+                     :format-control
+                     "~:[Result~;~:*~A~] is a ~S, ~<~%~9T~:;not a ~S.~>"
+                     :format-arguments
+                     (list what (type-specifier dtype) atype-spec)))))))
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,

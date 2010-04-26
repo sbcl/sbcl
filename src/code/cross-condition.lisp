@@ -39,6 +39,9 @@
 (define-condition type-warning (reference-condition simple-warning)
   ()
   (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+(define-condition type-style-warning (reference-condition simple-style-warning)
+  ()
+  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
 
 (define-condition bug (simple-error)
   ()
