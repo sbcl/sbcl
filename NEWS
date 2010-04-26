@@ -71,6 +71,7 @@ changes relative to sbcl-1.0.37:
     The maximal magnitude is 2^63, not 2^64.
   * bug fix: Transforms for TRUNCATE don't die when the result is completely
     ignored anymore.
+  * bug fix: Maybe restore buildability on Alpha.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
