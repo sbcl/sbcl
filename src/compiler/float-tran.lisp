@@ -349,15 +349,20 @@
 ;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
 (defun maybe-exact-reciprocal (x)
   (unless (zerop x)
-    (multiple-value-bind (significand exponent sign)
-        ;; Signals an error for NaNs and infinities.
-        (handler-case (integer-decode-float x)
-          (error () (return-from maybe-exact-reciprocal nil)))
-      (let ((expected (/ sign significand (expt 2 exponent))))
-        (let ((reciprocal (/ 1 x)))
-          (multiple-value-bind (significand exponent sign) (integer-decode-float reciprocal)
-            (when (eql expected (* sign significand (expt 2 exponent)))
-              reciprocal)))))))
+    (handler-case
+        (multiple-value-bind (significand exponent sign)
+            (integer-decode-float x)
+          ;; only powers of 2 can be inverted exactly
+          (unless (zerop (logand significand (1- significand)))
+            (return-from maybe-exact-reciprocal nil))
+          (let ((expected   (/ sign significand (expt 2 exponent)))
+                (reciprocal (/ x)))
+            (multiple-value-bind (significand exponent sign)
+                (integer-decode-float reciprocal)
+              ;; Denorms can't be inverted safely.
+              (and (eql expected (* sign significand (expt 2 exponent)))
+                   reciprocal))))
+      (error () (return-from maybe-exact-reciprocal nil)))))
 
 ;;; Replace constant division by multiplication with exact reciprocal,
 ;;; if one exists.

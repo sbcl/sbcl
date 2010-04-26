@@ -62,7 +62,9 @@ changes relative to sbcl-1.0.37:
     :SB-DOC feature. (lp#552564)
   * bug fix: SB-INTROSPECT build issues on GENGC/PPC. (lp#490490)
   * bug fix: more robust runtime executable path detection. (lp#375549)
-  * bug fix: GCD always returns positive values. (lp#413680))
+  * bug fix: GCD always returns positive values. (lp#413680)
+  * bug fix: Converting division to multiplication by reciprocal handles
+    denormals.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
