@@ -1187,7 +1187,8 @@
        (storew dst dst -1 list-pointer-lowtag)
        (emit-label enter)
        ;; Grab one value and stash it in the car of this cons.
-       (inst lods rax)
+       (inst mov rax (make-ea :qword :base src))
+       (inst sub src n-word-bytes)
        (storew rax dst 0 list-pointer-lowtag)
        ;; Go back for more.
        (inst sub rcx n-word-bytes)

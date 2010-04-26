@@ -1884,7 +1884,7 @@
                                    (cond (ea-p (ea-base src))
                                          ((tn-p src) src)
                                          (t nil)))
-            (emit-byte segment #x63)    ;movsxd
+            (emit-byte segment (if signed-p #x63 #x8b)) ;movsxd or straight mov
             ;;(emit-byte segment opcode)
             (emit-ea segment src (reg-tn-encoding dst)))))))))
 

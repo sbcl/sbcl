@@ -45,6 +45,8 @@ changes relative to sbcl-1.0.37:
     x87's transcendentals (instead of returning 0). (lp#327192)
   * enhancement: eliminate some spurious TYPE-WARNINGs. Should help with
     some of CL-PPCRE's macros. (lp#570079)
+  * enhancement: our machine code is slightly less hostile to valgrind on 
+    x86-64.
   * bug fix: correct restart text for the continuable error in MAKE-PACKAGE.
   * bug fix: a rare case of startup-time page table corruption.
   * bug fix: a semaphore with multiple waiters and some of them unwinding due
