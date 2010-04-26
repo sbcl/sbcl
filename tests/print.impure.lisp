@@ -472,4 +472,11 @@
                      (format nil "~A" (make-instance 'a-class-name)))
                    :test #'char=)))
 
+;;; The PRINT-OBJECT method for RANDOM-STATE used to have a bogus
+;;; dimension argument for MAKE-ARRAY.
+(with-test (:name :print-random-state)
+  (assert (equalp *random-state*
+                  (read-from-string
+                   (write-to-string *random-state*)))))
+
 ;;; success

@@ -78,6 +78,7 @@ changes relative to sbcl-1.0.37:
   * bug fix: Maybe restore buildability on Alpha.
   * bug fix: READ-BYTE isn't inline anymore, fixing weird streams failures. 
     (lp#569404)
+  * bug fix: RANDOM-STATE can be printed readably again.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows

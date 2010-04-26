@@ -46,7 +46,7 @@
       (format stream "#S(~S ~S #.~S)"
               'random-state
               ':state
-              `(make-array (,(+ 3 mt19937-n))
+              `(make-array ,(+ 3 mt19937-n)
                 :element-type
                 '(unsigned-byte 32)
                 :initial-contents
