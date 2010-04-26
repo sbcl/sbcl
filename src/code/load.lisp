@@ -456,6 +456,8 @@
         ;; that this would go away?
         (fill *current-fop-table* nil))))
   t)
+
+(declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 
