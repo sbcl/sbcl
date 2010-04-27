@@ -491,7 +491,11 @@
                           (var2
                            (add 'eql var1 var2 nil))
                           ((constant-lvar-p arg2)
-                           (add 'eql var1 (ref-leaf (principal-lvar-use arg2))
+                           (add 'eql var1
+                                (let ((use (principal-lvar-use arg2)))
+                                  (if (ref-p use)
+                                      (ref-leaf use)
+                                      (find-constant (lvar-value arg2))))
                                 nil))
                           (t
                            (add-test-constraint 'typep var1 (lvar-type arg2)

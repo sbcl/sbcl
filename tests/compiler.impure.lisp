@@ -1944,4 +1944,21 @@
 (setf *mystery* :mystery)
 (assert (eq :ok (test-mystery (make-thing :slot :mystery))))
 
+;;; Singleton types can also be constant.
+(test-util:with-test (:name :propagate-singleton-types-to-eql)
+  (macrolet ((test (type value &aux (fun (gensym "FUN")))
+               `(progn
+                  (declaim (ftype (function () (values ,type &optional)) ,fun))
+                  (defun ,fun ()
+                    ',value)
+                  (lambda (x)
+                    (if (eql x (,fun))
+                        nil
+                        (eql x (,fun)))))))
+    (values
+      (test (eql foo) foo)
+      (test (integer 0 0) 0)
+      (test (double-float 0d0 0d0) 0d0)
+      (test (eql #\c) #\c))))
+
 ;;; success

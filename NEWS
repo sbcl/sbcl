@@ -80,6 +80,8 @@ changes relative to sbcl-1.0.37:
     (lp#569404)
   * bug fix: RANDOM-STATE can be printed readably again.
   * bug fix: Unreadable objects were sometimes printed like #<\nFoo>.
+  * bug fix: Using EQL with non-constant values of constant type (e.g. EQL
+    types) could result in type mismatches during compilation.
 
 changes in sbcl-1.0.37 relative to sbcl-1.0.36:
   * enhancement: Backtrace from THROW to uncaught tag on x86oids now shows
