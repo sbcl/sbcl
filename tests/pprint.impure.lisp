@@ -53,7 +53,7 @@
                :done))
            "#1=(1 2 3 . #1#)")))
 
-(with-test (:name :pprint :bug-99)
+(with-test (:name (:pprint :bug-99))
   (assert (equal
            (with-output-to-string (*standard-output*)
              (let* ((*print-circle* t))
@@ -113,7 +113,7 @@
 
 ;;; bug reported by Paul Dietz on sbcl-devel: unquoted lambda lists
 ;;; were leaking the SB-IMPL::BACKQ-COMMA implementation.
-(with-test (:name :pprint :leaking-backq-comma)
+(with-test (:name :pprint-leaking-backq-comma)
   (assert (equal
            (with-output-to-string (s)
              (write '`(foo ,x) :stream s :pretty t :readably t))
@@ -172,7 +172,7 @@
 (defun ppd-function-name (s o)
   (print (length o) s))
 
-(with-test (:name :set-pprint-dispatch :no-function-coerce))
+(with-test (:name (:set-pprint-dispatch :no-function-coerce)))
 (let ((s (with-output-to-string (s)
            (pprint '(frob a b) s))))
   (assert (position #\3 s)))
@@ -212,7 +212,7 @@
 
 ;;; Printing malformed defpackage forms without errors.
 (with-test (:name :pprint-defpackage)
-  (with-open-stream (null (make-broadcast-stream))
+  (let ((*standard-output* (make-broadcast-stream)))
     (pprint '(defpackage :foo nil))
     (pprint '(defpackage :foo 42))))
 
@@ -234,6 +234,19 @@
                    (to-string `(defmethod foo ((function cons)) function))))
     (assert (equal "(DEFMETHOD FOO :AFTER (FUNCTION CONS) FUNCTION)"
                    (to-string `(defmethod foo :after (function cons) function))))))
+
+(defclass frob () ())
+
+(defmethod print-object ((obj frob) stream)
+  (print-unreadable-object (obj stream :type nil :identity nil)
+    (format stream "FRABOTZICATOR")))
+
+;;; SBCL < 1.0.38 printed #<\nFRABOTIZICATOR>
+(with-test (:name (:pprint-unreadable-object :no-ugliness-when-type=nil))
+  (assert (equal "#<FRABOTZICATOR>"
+                 (let ((*print-right-margin* 5)
+                       (*print-pretty* t))
+                   (format nil "~@<~S~:>" (make-instance 'frob))))))
 
 
 ;;; success

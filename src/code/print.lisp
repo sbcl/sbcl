@@ -314,9 +314,9 @@
            (when type
              (write (type-of object) :stream stream :circle nil
                     :level nil :length nil)
-             (write-char #\space stream))
+             (write-char #\space stream)
+             (pprint-newline :fill stream))
            (when body
-             (pprint-newline :fill stream)
              (funcall body))
            (when identity
              (when (or body (not type))
