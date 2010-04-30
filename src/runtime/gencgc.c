@@ -3819,6 +3819,10 @@ scavenge_control_stack()
 
     control_stack_size = current_control_stack_pointer - control_stack;
     scavenge(control_stack, control_stack_size);
+
+    /* Scrub the unscavenged control stack space, so that we can't run
+     * into any stale pointers in a later GC. */
+    scrub_control_stack();
 }
 
 /* Scavenging Interrupt Contexts */
