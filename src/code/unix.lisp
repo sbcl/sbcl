@@ -808,7 +808,7 @@ corresponds to NAME, or NIL if there is none."
             (tm-zone c-string))) ; Timezone abbreviation.
 
 (define-alien-routine get-timezone sb!alien:void
-  (when sb!alien:long :in)
+  (when time-t :in)
   (seconds-west sb!alien:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 

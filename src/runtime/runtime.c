@@ -513,7 +513,7 @@ main(int argc, char *argv[], char *envp[])
         fflush(stdout);
     }
 
-#if defined(SVR4) || defined(__linux__)
+#if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
     tzset();
 #endif
 
