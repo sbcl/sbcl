@@ -564,9 +564,6 @@ arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
   inst = (19 << 26) | (20 << 21) | (528 << 1);
   *inst_ptr++ = inst;
 
-
-  *inst_ptr++ = inst;
-
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
 }
 
