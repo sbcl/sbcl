@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.9.38:
+  * bug fix: Backtrace from undefined function on x86 and x86-64 now show
+    the calling frame.
+
 changes in sbcl-1.0.38 relative to sbcl-1.0.37:
   * incompatible change: Thread names are now restricted to SIMPLE-STRINGs
     like for any other thread-related datastructure, MUTEX, etc. (lp#547095)

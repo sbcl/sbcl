@@ -266,6 +266,7 @@ GNAME(fpu_restore):
 	.globl  GNAME(undefined_tramp)
 	TYPE(GNAME(undefined_tramp))
 GNAME(undefined_tramp):
+	pop	8(%rbp)         # Save return PC for backtrace.
 	TRAP
 	.byte	trap_Error
         .byte   2

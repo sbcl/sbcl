@@ -338,6 +338,7 @@ GNAME(fpu_restore):
 	TYPE(GNAME(undefined_tramp))
         .byte   0, 0, 0, SIMPLE_FUN_HEADER_WIDETAG
 GNAME(undefined_tramp):
+	pop	4(%ebp)         # Save return PC for backtrace.
 	TRAP
 	.byte	trap_Error
         .byte   2
