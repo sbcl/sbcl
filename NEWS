@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.37:
+changes in sbcl-1.0.38 relative to sbcl-1.0.37:
   * incompatible change: Thread names are now restricted to SIMPLE-STRINGs
     like for any other thread-related datastructure, MUTEX, etc. (lp#547095)
   * deprecation: the SB-QUEUE contrib was merged into the SB-CONCURRENCY
