@@ -3362,6 +3362,23 @@ print_ptr(lispobj *addr)
 }
 #endif
 
+static int
+is_in_stack_space(lispobj ptr)
+{
+    /* For space verification: Pointers can be valid if they point
+     * to a thread stack space.  This would be faster if the thread
+     * structures had page-table entries as if they were part of
+     * the heap space. */
+    struct thread *th;
+    for_each_thread(th) {
+        if ((th->control_stack_start <= (lispobj *)ptr) &&
+            (th->control_stack_end >= (lispobj *)ptr)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void
 verify_space(lispobj *start, size_t words)
 {
@@ -3389,15 +3406,15 @@ verify_space(lispobj *start, size_t words)
                  * page. XX Could check the offset too. */
                 if (page_allocated_p(page_index)
                     && (page_table[page_index].bytes_used == 0))
-                    lose ("Ptr %x @ %x sees free page.\n", thing, start);
+                    lose ("Ptr %p @ %p sees free page.\n", thing, start);
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*((lispobj *)native_pointer(thing)) == 0x01) {
-                    lose("Ptr %x @ %x sees forwarding ptr.\n", thing, start);
+                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing, start);
                 }
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
                 if (is_in_readonly_space) {
-                    lose("ptr to dynamic space %x from RO space %x\n",
+                    lose("ptr to dynamic space %p from RO space %x\n",
                          thing, start);
                 }
                 /* Does it point to a plausible object? This check slows
@@ -3411,13 +3428,16 @@ verify_space(lispobj *start, size_t words)
                  * dynamically. */
                 /*
                 if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
-                    lose("ptr %x to invalid object %x\n", thing, start);
+                    lose("ptr %p to invalid object %p\n", thing, start);
                 }
                 */
             } else {
+                extern void funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
-                if (!to_readonly_space && !to_static_space) {
-                    lose("Ptr %x @ %x sees junk.\n", thing, start);
+                if (!to_readonly_space && !to_static_space
+                    && (thing != (lispobj)&funcallable_instance_tramp)
+                    && !is_in_stack_space(thing)) {
+                    lose("Ptr %p @ %p sees junk.\n", thing, start);
                 }
             }
         } else {
@@ -3494,7 +3514,7 @@ verify_space(lispobj *start, size_t words)
                             /* Only when enabled */
                             && verify_dynamic_code_check) {
                             FSHOW((stderr,
-                                   "/code object at %x in the dynamic space\n",
+                                   "/code object at %p in the dynamic space\n",
                                    start));
                         }
 
@@ -3610,7 +3630,7 @@ verify_space(lispobj *start, size_t words)
                     break;
 
                 default:
-                    lose("Unhandled widetag 0x%x at 0x%x\n",
+                    lose("Unhandled widetag %p at %p\n",
                          widetag_of(*start), start);
                 }
             }
