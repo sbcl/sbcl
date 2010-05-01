@@ -8,6 +8,9 @@ changes relative to sbcl-1.9.38:
   * bug fix: Scrub control stack after scavenging in gencgc on non-x86oid
     platforms, preventing the GC from seeing stale pointers on the control
     stack in subsequent GCs (which would, and does, break invariants).
+  * bug fix: 32-bit unicode external formats now work on big-endian systems.
+  * bug fix: Literal characters with code points greater than about 32767
+    now work on PPC UNICODE builds.
 
 changes in sbcl-1.0.38 relative to sbcl-1.0.37:
   * incompatible change: Thread names are now restricted to SIMPLE-STRINGs

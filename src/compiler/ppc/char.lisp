@@ -119,6 +119,10 @@
   (:translate char>)
   (:variant :gt :le))
 
+#!-sb-unicode (progn
+;; We can't use these when unicode is enabled because cmplwi has
+;; an immediate field far smaller than the width of some unicode
+;; code points.  -- AB, 2010-Apr-24.
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))
   (:arg-types character (:constant character))
@@ -142,3 +146,4 @@
 (define-vop (fast-char>/character/c character-compare/c)
   (:translate char>)
   (:variant :gt :le))
+) ;; Not sb-unicode

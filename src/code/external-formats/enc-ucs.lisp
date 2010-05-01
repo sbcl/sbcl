@@ -56,7 +56,7 @@
   #!-(or x86 x86-64)
   (dpb (sap-ref-8 sap (+ offset 3)) (byte 8 24)
        (dpb (sap-ref-8 sap (+ offset 2)) (byte 8 16)
-            (sap-ref-16 sap offset))))
+            (sap-ref-16le sap offset))))
 
 (defun (setf sap-ref-32le) (value sap offset)
   #!+(or x86 x86-64)

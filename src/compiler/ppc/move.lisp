@@ -33,7 +33,7 @@
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))
-  (inst li y (char-code (tn-value x))))
+  (inst lr y (char-code (tn-value x))))
 
 (define-move-fun (load-system-area-pointer 1) (vop x y)
   ((immediate) (sap-reg))

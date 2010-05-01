@@ -23,23 +23,31 @@
 
 (defvar *test-path* "external-format-test.tmp")
 
-(do-external-formats (xf)
-  (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
-    (assert (eq (read-char s nil s) s))))
+(with-test (:name :end-of-file)
+  (do-external-formats (xf)
+    (with-open-file (s #-win32 "/dev/null" #+win32 "nul" :direction :input :external-format xf)
+      (assert (eq (read-char s nil s) s)))))
 
 ;;; Test standard character read-write equivalency over all external formats.
-(let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
-  (do-external-formats (xf)
-    (with-open-file (s *test-path* :direction :output
-                     :if-exists :supersede :external-format xf)
-      (loop for character across standard-characters
-            do (write-char character s)))
-    (with-open-file (s *test-path* :direction :input
-                     :external-format xf)
-      (loop for character across standard-characters
-            do (let ((got (read-char s)))
-                 (unless (eql character got)
-                   (error "wanted ~S, got ~S" character got)))))))
+(macrolet
+    ((frob ()
+       (let ((tests nil))
+         (do-external-formats (xf)
+           (pushnew `(with-test (:name (:standard-character :read-write-equivalency ,xf))
+                       (let ((standard-characters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!$\"'(),_-./:;?+<=>#%&*@[\\]{|}`^~"))
+                         (with-open-file (s *test-path* :direction :output
+                                            :if-exists :supersede :external-format ,xf)
+                           (loop for character across standard-characters
+                                 do (write-char character s)))
+                         (with-open-file (s *test-path* :direction :input
+                                            :external-format ,xf)
+                           (loop for character across standard-characters
+                                 do (let ((got (read-char s)))
+                                      (unless (eql character got)
+                                        (error "wanted ~S, got ~S" character got)))))))
+                    tests :key #'cadr :test #'equal))
+         `(progn ,@tests))))
+  (frob))
 
 (delete-file *test-path*)
 #-sb-unicode
