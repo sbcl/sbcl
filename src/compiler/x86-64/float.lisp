@@ -794,6 +794,8 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
+     (unless (location= x y)
+       (inst xorpd y y))
      (note-this-location vop :internal-error)
      (inst sqrtsd y x)))
 
@@ -1071,6 +1073,9 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 5
+                  (sc-case y
+                    (single-reg (inst xorps y y))
+                    (double-reg (inst xorpd y y)))
                   (note-this-location vop :internal-error)
                   (inst ,inst y x)))))
   (frob %single-float/signed %single-float cvtsi2ss single-reg single-float)
@@ -1088,10 +1093,18 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 2
+                (unless (location= x y)
+                  (sc-case y
+                    (single-reg (inst xorps y y))
+                    (double-reg (inst xorpd y y))))
                 (note-this-location vop :internal-error)
                 (inst ,inst y (sc-case x
                                 (,(first from-scs) x)
-                                (,(second from-scs) (,ea-func x))))))))
+                                (,(second from-scs) (,ea-func x))))
+                ,(when (and (eq from-type 'double-float) ; if the input is wider
+                            (eq to-type 'single-float))  ; than the output, clear
+                   `(when (location= x y)                ; noise in the high part
+                      (inst shufps y y #4r3330)))))))
   (frob %single-float/double-float %single-float cvtsd2ss
         (double-reg double-stack) double-float ea-for-df-stack
         single-reg single-float)

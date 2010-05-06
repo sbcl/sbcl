@@ -278,3 +278,94 @@
   ;; That'd be one strange host, but just in case
   (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 65))))
   (assert (plusp (sb-kernel:%unary-truncate/double-float (expt 2d0 65)))))
+
+;; On x86-64, we sometimes forgot to clear the higher order bits of the
+;; destination register before using it with an instruction that doesn't
+;; clear the (unused) high order bits. Suspect instructions are operations
+;; with only one operand: for everything else, the destination has already
+;; been loaded with a value, making it safe (by induction).
+;;
+;; The tests are extremely brittle and could be broken by any number of
+;; back- or front-end optimisations. We should just keep the issue above
+;; in mind at all times when working with SSE or similar instruction sets.
+(macrolet ((with-pinned-floats ((count type &rest names) &body body)
+             "Force COUNT float values to be kept live (and hopefully in registers),
+              fill a temporary register with noise, and execute BODY."
+             (let ((dummy (loop repeat count
+                                collect (or (pop names)
+                                            (gensym "TEMP")))))
+               `(let ,(loop for i downfrom -1
+                            for var in dummy
+                            for j = (coerce i type)
+                            collect
+                            `(,var ,(complex j j))) ; we don't actually need that, but
+                  (declare (type (complex ,type) ,@dummy)) ; future-proofing can't hurt
+                  ,@(loop for var in dummy
+                          for i upfrom 0
+                          collect `(setf ,var ,(complex i (coerce i type))))
+                  (multiple-value-prog1
+                      (progn
+                        (let ((x ,(complex 1d0 1d0)))
+                          (declare (type (complex double-float) x))
+                          (setf x ,(complex most-positive-fixnum (float most-positive-fixnum 1d0)))
+                          (sb-vm::touch-object x))
+                        (locally ,@body))
+                    ,@(loop for var in dummy
+                            collect `(sb-vm::touch-object ,var)))))))
+  (with-test (:name :clear-sqrtsd)
+    (flet ((test-sqrtsd (float)
+             (declare (optimize speed (safety 1))
+                      (type (double-float (0d0)) float))
+             (with-pinned-floats (14 double-float x0)
+               (let ((x (sqrt float)))
+                 (values (+ x x0) float)))))
+      (declare (notinline test-sqrtsd))
+      (assert (zerop (imagpart (test-sqrtsd 4d0))))))
+
+  (with-test (:name :clear-sqrtsd-single)
+    (flet ((test-sqrtsd-float (float)
+             (declare (optimize speed (safety 1))
+                      (type (single-float (0f0)) float))
+             (with-pinned-floats (14 single-float x0)
+               (let ((x (sqrt float)))
+                 (values (+ x x0) float)))))
+      (declare (notinline test-sqrtsd-float))
+      (assert (zerop (imagpart (test-sqrtsd-float 4f0))))))
+
+  (with-test (:name :clear-cvtss2sd)
+    (flet ((test-cvtss2sd (float)
+             (declare (optimize speed (safety 1))
+                      (type single-float float))
+             (with-pinned-floats (14 double-float x0)
+               (let ((x (float float 0d0)))
+                 (values (+ x x0) (+ 1e0 float))))))
+      (declare (notinline test-cvtss2sd))
+      (assert (zerop (imagpart (test-cvtss2sd 1f0))))))
+
+  (with-test (:name :clear-cvtsd2ss)
+    (flet ((test-cvtsd2ss (float)
+             (declare (optimize speed (safety 1))
+                      (type double-float float))
+             (with-pinned-floats (14 single-float x0)
+               (let ((x (float float 1e0)))
+                 (values (+ x x0) (+ 1d0 float))))))
+      (declare (notinline test-cvtsd2ss))
+      (assert (zerop (imagpart (test-cvtsd2ss 4d0))))))
+
+  (with-test (:name :clear-cvtsi2sd)
+    (flet ((test-cvtsi2sd (int)
+             (declare (optimize speed (safety 0))
+                      (type (unsigned-byte 10) int))
+             (with-pinned-floats (15 double-float x0)
+               (+ (float int 0d0) x0))))
+      (declare (notinline test-cvtsi2sd))
+      (assert (zerop (imagpart (test-cvtsi2sd 4))))))
+
+  (with-test (:name :clear-cvtsi2ss)
+    (flet ((test-cvtsi2ss (int)
+             (declare (optimize speed (safety 0))
+                      (type (unsigned-byte 10) int))
+             (with-pinned-floats (15 single-float x0)
+               (+ (float int 0e0) x0))))
+      (declare (notinline test-cvtsi2ss))
+      (assert (zerop (imagpart (test-cvtsi2ss 4)))))))
