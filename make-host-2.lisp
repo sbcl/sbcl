@@ -60,6 +60,10 @@
       (funcall fun))))
 (compile 'in-target-cross-compilation-mode)
 
+
+;; Supress function/macro redefinition warnings under clisp.
+#+clisp (setf custom:*suppress-check-redefinition* t)
+
 (setf *target-compile-file* #'sb-xc:compile-file)
 (setf *target-assemble-file* #'sb!c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)

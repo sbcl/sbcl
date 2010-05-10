@@ -367,16 +367,12 @@
  ;; defining types
  ("src/compiler/parse-lambda-list")
 
- ;; The following two files trigger function/macro redefinition
- ;; warnings in clisp during make-host-2; as a workaround, we ignore
- ;; the failure values from COMPILE-FILE under clisp.
-
  ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
- ("src/code/host-alieneval" #+clisp :ignore-failure-p)
+ ("src/code/host-alieneval")
 
  ;; can't be done until definition of e.g. DEFINE-ALIEN-TYPE-CLASS in
  ;; host-alieneval.lisp
- ("src/code/host-c-call" #+clisp :ignore-failure-p)
+ ("src/code/host-c-call")
 
  ;; SB!XC:DEFTYPE is needed in order to compile late-type
  ;; in the host Common Lisp, and in order to run, it needs
