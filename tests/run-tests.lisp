@@ -81,18 +81,21 @@
   ;; We used to fork() for POSIX platforms, and use this for Windows.
   ;; However, it seems better to use the same solution everywhere.
   (process-exit-code
-   (sb-ext:run-program
-    (first *POSIX-ARGV*)
-    (append
-     (list "--core" SB-INT:*CORE-STRING*
-           "--noinform"
-           "--no-sysinit"
-           "--no-userinit")
-     (loop for form in (append load-forms forms)
-           collect "--eval"
-           collect (write-to-string form)))
-    :output sb-sys:*stdout*
-    :input sb-sys:*stdin*)))
+   (#-win32 with-open-file #-win32 (devnull "/dev/null") #+win32 progn
+     (sb-ext:run-program
+      (first *POSIX-ARGV*)
+      (append
+       (list "--core" SB-INT:*CORE-STRING*
+             "--noinform"
+             "--no-sysinit"
+             "--no-userinit"
+             "--noprint"
+             "--disable-debugger")
+       (loop for form in (append load-forms forms)
+             collect "--eval"
+             collect (write-to-string form)))
+      :output sb-sys:*stdout*
+      :input #-win32 devnull #+win32 sb-sys:*stdin*))))
 
 (defun run-impure-in-child-sbcl (test-file test-code)
   (run-in-child-sbcl

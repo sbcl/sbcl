@@ -153,9 +153,7 @@
 ;; We can't check for the signal itself since run-program.c resets the
 ;; forked process' signal mask to defaults. But the default is `stop'
 ;; of which we can be notified asynchronously by providing a status hook.
-(with-test (:name (:run-program :inherit-stdin)
-            :fails-on :sbcl)
-  (error "Hangs at least on threaded Darwin and threaded x86-64/Linux.")
+(with-test (:name (:run-program :inherit-stdin))
   (let (stopped)
     (flet ((status-hook (proc)
              (case (sb-ext:process-status proc)

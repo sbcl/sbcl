@@ -165,7 +165,7 @@
               ;; the presence of the IR1 stepper instrumentation (and
               ;; is thus again failing now that the instrumentation is
               ;; no more).
-              :fails-on '(or :x86 :x86-64 :alpha :mips :ppc))
+              :fails-on '(or :alpha :mips :ppc))
     (assert (verify-backtrace
              (lambda () (test #'not-optimized))
              (list *undefined-function-frame*
@@ -207,13 +207,6 @@
 
 (with-test (:name (:throw :no-such-tag)
             :fails-on '(or
-                        (and :x86 :openbsd)
-                        (and :x86 :sunos)
-                        (and :x86 :darwin)
-                        (and :x86 :linux)
-                        (and :x86-64 :darwin)
-                        (and :x86-64 :linux)
-                        (and :x86-64 :openbsd)
                         (and :sparc :linux)
                         :alpha
                         :mips))

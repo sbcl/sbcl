@@ -288,6 +288,7 @@
 ;; The tests are extremely brittle and could be broken by any number of
 ;; back- or front-end optimisations. We should just keep the issue above
 ;; in mind at all times when working with SSE or similar instruction sets.
+#+(or x86 x86-64) ;; No other platforms have SB-VM::TOUCH-OBJECT.
 (macrolet ((with-pinned-floats ((count type &rest names) &body body)
              "Force COUNT float values to be kept live (and hopefully in registers),
               fill a temporary register with noise, and execute BODY."
