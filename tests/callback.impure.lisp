@@ -134,20 +134,29 @@
   (sb-alien::alien-lambda void ()
     (values)))
 
-;;; tests for a sign extension problem in callback argument handling on x86-64
+;;; tests for integer-width problems in callback result handling
 
-(defvar *add-two-ints* (sb-alien::alien-callback (function int int int) #'+))
+(defvar *add-two-ints*
+  (sb-alien::alien-callback (function int int int) #'+))
+(defvar *add-two-shorts*
+  (sb-alien::alien-callback (function short short short) #'+))
 
-(with-test (:name :sign-extension)
+;;; The original test cases here were what are now (:int-result
+;;; :sign-extension) and (:int-result :underflow-detection), the latter
+;;; of which would fail on 64-bit platforms.  Upon further investigation,
+;;; it turned out that the same tests with a SHORT return type instead of
+;;; an INT return type would also fail on 32-bit platforms.
+
+(with-test (:name (:short-result :sign-extension))
+  (assert (= (alien-funcall *add-two-shorts* #x-8000 1) -32767)))
+
+(with-test (:name (:short-result :underflow-detection))
+  (assert (raises-error? (alien-funcall *add-two-shorts* #x-8000 -1))))
+
+(with-test (:name (:int-result :sign-extension))
   (assert (= (alien-funcall *add-two-ints* #x-80000000 1) -2147483647)))
 
-;;; On x86 This'll signal a TYPE-ERROR "The value -2147483649 is not of type
-;;; (SIGNED-BYTE 32)". On x86-64 it'll wrap around to 2147483647, probably
-;;; due to the sign-extension done by the (INTEGER :NATURALIZE-GEN)
-;;; alien-type-method. I believe the former behaviour is the one we want.
-;;; -- JES, 2005-10-16
-
-(with-test (:name :underflow-detection :fails-on :x86-64)
+(with-test (:name (:int-result :underflow-detection))
   (assert (raises-error? (alien-funcall *add-two-ints* #x-80000000 -1))))
 
 ;;; tests for handling 64-bit arguments - this was causing problems on

@@ -822,22 +822,31 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
                             :local ,(alien-callback-accessor-form
                                      spec 'args-sap offset))
                  do (incf offset (alien-callback-argument-bytes spec env)))
-           ,(flet ((store (spec)
+           ,(flet ((store (spec real-type)
                           (if spec
                               `(setf (deref (sap-alien res-sap (* ,spec)))
-                                     (funcall function ,@arguments))
+                                     ,(if real-type
+                                          `(the ,real-type
+                                             (funcall function ,@arguments))
+                                          `(funcall function ,@arguments)))
                               `(funcall function ,@arguments))))
                   (cond ((alien-void-type-p result-type)
-                         (store nil))
+                         (store nil nil))
                         ((alien-integer-type-p result-type)
+                         ;; Integer types should be padded out to a full
+                         ;; register width, to comply with most ABI calling
+                         ;; conventions, but should be typechecked on the
+                         ;; declared type width, hence the following:
                          (if (alien-integer-type-signed result-type)
                              (store `(signed
-                                      ,(alien-type-word-aligned-bits result-type)))
+                                      ,(alien-type-word-aligned-bits result-type))
+                                    `(signed-byte ,(alien-type-bits result-type)))
                              (store
                               `(unsigned
-                                ,(alien-type-word-aligned-bits result-type)))))
+                                ,(alien-type-word-aligned-bits result-type))
+                              `(unsigned-byte ,(alien-type-bits result-type)))))
                         (t
-                         (store (unparse-alien-type result-type)))))))
+                         (store (unparse-alien-type result-type) nil))))))
        (values))))
 
 (defun invalid-alien-callback (&rest arguments)
