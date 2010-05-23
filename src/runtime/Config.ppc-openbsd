@@ -1,0 +1,29 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+# XXX why do all the other Configs set LINKFLAGS instead of LDFLAGS?
+# LINKFLAGS is only used in src/runtime/GNUmakefile, this causes the
+# dladdr test in tools-for-build/ to fail.
+
+LINKFLAGS += -export-dynamic
+LDFLAGS += -export-dynamic
+
+ASSEM_SRC = ppc-assem.S ldso-stubs.S
+ARCH_SRC = ppc-arch.c
+
+OS_SRC = bsd-os.c ppc-bsd-os.c
+OS_LIBS = -lutil
+
+GC_SRC = gencgc.c
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

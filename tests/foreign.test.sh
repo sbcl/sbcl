@@ -36,14 +36,23 @@ build_so() (
 	  CFLAGS="$CFLAGS -fPIC"
 	  ;;
   esac
-  if [ "`uname`" = Darwin ]; then
-    SO_FLAGS="-bundle"
-    if run_sbcl --eval '(sb-ext:quit :unix-status #+x86-64 0 #-x86-64 1)'; then
-	CFLAGS="$CFLAGS -arch x86_64"
-    fi
-  else
-    SO_FLAGS="-shared"
-  fi
+  case "`uname`" in
+      Darwin)
+          SO_FLAGS="-bundle"
+          if run_sbcl --eval '(sb-ext:quit :unix-status #+x86-64 0 #-x86-64 1)'; then
+              CFLAGS="$CFLAGS -arch x86_64"
+          fi
+          ;;
+      OpenBSD)
+          SO_FLAGS="-shared"
+          if [ "`machine -a`" = "powerpc" ]; then
+              CFLAGS="$CFLAGS -fPIC"
+          fi
+          ;;
+      *)
+          SO_FLAGS="-shared"
+          ;;
+  esac
   cc -c $1.c -o $1.o $CFLAGS
   ld $SO_FLAGS -o $1.so $1.o  
 )

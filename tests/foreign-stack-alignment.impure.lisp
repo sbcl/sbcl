@@ -32,12 +32,12 @@
 
 (defvar *required-alignment*
   #+(and ppc darwin) 16
-  #+(and ppc linux) 8
+  #+(and ppc (not darwin)) 8
   #+x86-64 16
   #+mips 8
   #+(and x86 (not darwin)) 4
   #+(and x86 darwin) 16
-  #-(or x86 x86-64 mips (and ppc (or darwin linux))) (error "Unknown platform"))
+  #-(or x86 x86-64 mips ppc) (error "Unknown platform"))
 
 ;;;; Build the offset-tool as regular excutable, and run it with
 ;;;; fork/exec, so that no lisp is on the stack. This is our known-good

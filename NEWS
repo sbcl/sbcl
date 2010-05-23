@@ -16,6 +16,8 @@ changes relative to sbcl-1.9.38:
     this could lead to wrong results in mixed real/complex float arithmetic.
   * bug fix: Fix function/macro redefinition warnings when building with
     clisp.  (lp#576787, thanks to Josh Elsasser)
+  * new platform: experimental support for ppc/openbsd (thanks to Josh
+    Elsasser).
 
 changes in sbcl-1.0.38 relative to sbcl-1.0.37:
   * incompatible change: Thread names are now restricted to SIMPLE-STRINGs

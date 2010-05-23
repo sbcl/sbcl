@@ -137,6 +137,26 @@
     (def!constant dynamic-1-space-start #x67000000)
     (def!constant dynamic-1-space-end   #x7efff000)))
 
+;;; Text and data segments start at #x01800000.  Range for randomized
+;;; malloc() starts #x20000000 (MAXDSIZ) after end of data seg and
+;;; extends 256 MB.  Use 512 - 64 MB for dynamic space so we can run
+;;; under default resource limits.
+;;; FIXME: MAXDSIZ is a kernel parameter, and can vary as high as 1GB.
+;;; These parameters should probably be tested under such a configuration,
+;;; as rare as it might or might not be.
+#!+openbsd
+(progn
+  #!+gencgc
+  (progn
+    (def!constant dynamic-space-start #x4f000000)
+    (def!constant dynamic-space-end   #x6afff000))
+  #!-gencgc
+  (progn
+    (def!constant dynamic-0-space-start #x4f000000)
+    (def!constant dynamic-0-space-end   #x5cfff000)
+    (def!constant dynamic-1-space-start #x5f000000)
+    (def!constant dynamic-1-space-end   #x6cfff000)))
+
 #!+darwin
 (progn
   #!+gencgc
