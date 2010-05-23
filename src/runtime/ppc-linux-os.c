@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/prctl.h>
 
 #include "validate.h"
 #include "ppc-linux-mcontext.h"
@@ -41,6 +42,22 @@
 size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
+    /* For some reason, PPC Linux appears to default to not generating
+     * floating point exceptions.  PR_SET_FPEXC is a PPC-specific
+     * option new in kernel 2.4.21 and 2.5.32 that allows us to
+     * configure this.  Should we need to run on an older kenel, the
+     * equivalent trick is to get into a signal-handling context and
+     * modify the saved machine state register.
+     *
+     * PR_FP_EXC_PRECISE may be more accurate than we need,
+     * particularly if we move to the x86oid trick of inserting
+     * explicit synchronization for floating-point exception
+     * delivery.  If we wish to move to such a model, the other two
+     * exception delivery modes that we could use are PR_FP_EXC_ASYNC
+     * and PR_FP_EXC_NONRECOV, and exception delivery can be forced
+     * by any access to the FPSCR.  -- AB, 2010-May-23 */
+    prctl(PR_SET_FPEXC, PR_FP_EXC_PRECISE, 0, 0);
+
     return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {
