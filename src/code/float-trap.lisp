@@ -158,7 +158,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; disabled by default. Joe User can explicitly enable them if
 ;;; desired.
 (defvar *saved-floating-point-modes*
-  '(:traps (:overflow #!-netbsd :invalid :divide-by-zero)
+  '(:traps (:overflow #!-(or netbsd ppc) :invalid :divide-by-zero)
     :rounding-mode :nearest :current-exceptions nil
     :accrued-exceptions nil :fast-mode nil
     #!+x86 :precision #!+x86 :53-bit))

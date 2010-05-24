@@ -122,29 +122,21 @@ os_context_fp_control(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    unsigned long control;
+    /* KLUDGE: mtfsf has to be run against a float register, so we
+     * construct the float we need to use as an integer, then cast
+     * a pointer to its storage to a double and load that.  For
+     * this to work, control must be the same width as a double,
+     * 64 bits.  And why aren't we using a union here, anyway? */
+    unsigned long long control;
     double d;
 
+    /* FIXME: We are only preserving enabled traps and rounding
+     * mode here.  Do we also want to preserve "fast mode"? */
     control = os_context_fp_control(context) &
-        /* FIXME: Should we preserve the user's requested rounding mode?
-
-        Note that doing
-
-        ~(FLOAT_STICKY_BITS_MASK | FLOAT_EXCEPTIONS_BYTE_MASK)
-
-        here leads to infinite SIGFPE for invalid operations, as
-        there are bits in the control register that need to be
-        cleared that are let through by that mask. -- CSR, 2002-07-16 */
-
-        FLOAT_TRAPS_BYTE_MASK;
+        (FLOAT_TRAPS_BYTE_MASK | FLOAT_ROUNDING_MODE_MASK);
 
     d = *((double *) &control);
-    /* Hmp.  Apparently the following doesn't work either:
-
     asm volatile ("mtfsf 0xff,%0" : : "f" (d));
-
-    causing segfaults at the first GC.
-    */
 }
 
 void

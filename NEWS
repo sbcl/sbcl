@@ -18,6 +18,7 @@ changes relative to sbcl-1.9.38:
     clisp.  (lp#576787, thanks to Josh Elsasser)
   * new platform: experimental support for ppc/openbsd (thanks to Josh
     Elsasser).
+  * bug fix: Floating-point traps now work on ppc/linux.
 
 changes in sbcl-1.0.38 relative to sbcl-1.0.37:
   * incompatible change: Thread names are now restricted to SIMPLE-STRINGs
