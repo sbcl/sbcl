@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.9.38:
+changes in sbcl-1.0.39 relative to sbcl-1.0.38:
   * bug fix: Backtrace from undefined function on x86 and x86-64 now show
     the calling frame.
   * bug fix: linkage-table entries on PPC now no longer overflow their
