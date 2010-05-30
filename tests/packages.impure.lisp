@@ -248,7 +248,7 @@ if a restart was invoked."
 ;;; Make sure that resolving a name-conflict in IMPORT doesn't leave
 ;;; multiple symbols of the same name in the package (this particular
 ;;; scenario found in 1.0.38.9, but clearly a longstanding issue).
-(with-test (:name import-conflict-resolution :fails-on :sbcl)
+(with-test (:name import-conflict-resolution)
   (with-packages (("FOO" (:export "NIL"))
                   ("BAR" (:use)))
     (with-name-conflict-resolution ((sym "FOO" "NIL"))

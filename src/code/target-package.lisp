@@ -1116,6 +1116,7 @@ the importation, then a correctable error is signalled."
                    (let ((found (member sym syms :test #'string=)))
                      (if found
                          (when (not (eq (car found) sym))
+                           (setf syms (remove (car found) syms))
                            (name-conflict package 'import sym sym (car found)))
                          (push sym syms))))
                   ((not (eq s sym))

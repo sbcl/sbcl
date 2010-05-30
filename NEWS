@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.39:
+  * bug fix: Name conflicts between symbols passed as arguments to a
+single call to IMPORT no longer add multiple symbols with the same name
+to the package (detectable via DO-SYMBOLS).
+
 changes in sbcl-1.0.39 relative to sbcl-1.0.38:
   * bug fix: Backtrace from undefined function on x86 and x86-64 now show
     the calling frame.
