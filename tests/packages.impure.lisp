@@ -245,6 +245,17 @@ if a restart was invoked."
       (is (eql 1 (length conflict-sets)))
       (is (eql 3 (length (first conflict-sets)))))))
 
+;;; Make sure that resolving a name-conflict in IMPORT doesn't leave
+;;; multiple symbols of the same name in the package (this particular
+;;; scenario found in 1.0.38.9, but clearly a longstanding issue).
+(with-test (:name import-conflict-resolution :fails-on :sbcl)
+  (with-packages (("FOO" (:export "NIL"))
+                  ("BAR" (:use)))
+    (with-name-conflict-resolution ((sym "FOO" "NIL"))
+      (import (list 'CL:NIL (sym "FOO" "NIL")) "BAR"))
+    (do-symbols (sym "BAR")
+      (assert (eq sym (sym "FOO" "NIL"))))))
+
 ;;; UNINTERN
 (with-test (:name unintern.1)
   (with-packages (("FOO" (:export "SYM"))
