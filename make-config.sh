@@ -146,12 +146,11 @@ echo //setting up OS-dependent information
 
 # Under Darwin x86-64, guess whether Darwin 9+ or below.
 if [ "$sbcl_os" = "darwin" ] && [ "$sbcl_arch" = "x86-64" ]; then
-	darwin_version=`uname -r`
-	darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
-	if (( 8 < $darwin_version_major )); then
-		ver9_or_above="9+"
-		printf ' :inode64' >> $ltf
-	fi
+    darwin_version=`uname -r`
+    darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
+    if (( 8 < $darwin_version_major )); then
+	printf ' :inode64 :darwin9-or-better' >> $ltf
+    fi
 fi
 
 original_dir=`pwd`
@@ -247,7 +246,7 @@ case "$sbcl_os" in
         fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
-        link_or_copy Config.$sbcl_arch-darwin$ver9_or_above Config
+        link_or_copy Config.$sbcl_arch-darwin Config
         ;;
     sunos)
         printf ' :unix' >> $ltf

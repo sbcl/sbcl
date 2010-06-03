@@ -23,6 +23,10 @@
 #include "bsd-os.h"
 #include <errno.h>
 
+#ifndef LISP_FEATURE_DLSHIM
+#include <dlfcn.h>
+#endif
+
 char *
 os_get_runtime_executable_path(int external)
 {

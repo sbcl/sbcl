@@ -18,6 +18,8 @@
  * more information.
  */
 
+#include "genesis/config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -34,12 +36,13 @@
   #include <sys/wait.h>
   #include <sys/ioctl.h>
   #include <sys/termios.h>
-  #ifdef __APPLE_CC__
-    #include "../src/runtime/darwin-dlshim.h"
+  #ifdef LISP_FEATURE_DARWIN
     #include "../src/runtime/darwin-langinfo.h"
+  #endif
+  #ifdef LISP_FEATURE_DLSHIM
+    #include "../src/runtime/darwin-dlshim.h"
   #else
     #include <dlfcn.h>
-    #include <langinfo.h>
   #endif
 #endif
 
@@ -48,8 +51,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-
-#include "genesis/config.h"
 
 #ifdef LISP_FEATURE_HPUX
 #include <sys/bsdtty.h> /* for TIOCGPGRP */

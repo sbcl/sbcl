@@ -133,8 +133,8 @@ ldso_stub__ ## fct ## $lazy_ptr:                @\\
 #define LDSO_STUBIFY(fct)                       \\
 .text                           ;               \\
         .align 4 ;                              \\
-.globl _ldso_stub___ ## fct ;                    \\
-_ldso_stub___ ## fct: ;                          \\
+.globl _ldso_stub__ ## fct ;                    \\
+_ldso_stub__ ## fct: ;                          \\
         jmp L ## fct ## $stub ;                 \\
         .section __IMPORT,__jump_table,symbol_stubs,self_modifying_code+pure_instructions,5 ;   \\
 L ## fct ## $stub: ;                    \\
@@ -150,8 +150,8 @@ L ## fct ## $stub: ;                    \\
 #!+(and darwin x86-64) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 4 ;                              \\
-.globl _ldso_stub___ ## fct ;                    \\
-_ldso_stub___ ## fct: ;                          \\
+.globl _ldso_stub__ ## fct ;                    \\
+_ldso_stub__ ## fct: ;                          \\
         jmp _ ## fct ;                          \\
 .L ## fct ## e1: ;                            "
 
@@ -324,7 +324,7 @@ ldso_stub__ ## fct: ;                  \\
                    "unlockpt")
                  #!+openbsd
                  '("openpty")
-                 #!-darwin
+                 #!-dlshim
                  '("dlclose"
                    "dlerror"
                    "dlopen"

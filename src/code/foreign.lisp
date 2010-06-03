@@ -16,8 +16,8 @@
 
 (defun extern-alien-name (name)
   (handler-case
-      #!+elf (coerce name 'base-string)
-      #!+(or mach-o win32) (concatenate 'base-string "_" name)
+      #!+(or elf (and mach-o (not dlshim))) (coerce name 'base-string)
+      #!+(or (and mach-o dlshim) win32) (concatenate 'base-string "_" name)
     (error ()
       (error "invalid external alien name: ~S" name))))
 
@@ -35,8 +35,9 @@
     (values
      (or (gethash extern table)
          (gethash (concatenate 'base-string
-                               #!+(and darwin (or x86 x86-64 ppc)) "_ldso_stub__"
-                               #!-(and darwin (or x86 x86-64 ppc)) "ldso_stub__"
+                               #!+(and mach-o dlshim) "_ldso_stub_"
+                               #!+(and mach-o (not dlshim)) "ldso_stub__"
+                               #!-mach-o "ldso_stub__"
                                extern) table)))))
 
 (defun find-foreign-symbol-address (name)

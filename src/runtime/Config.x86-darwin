@@ -9,9 +9,21 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -arch i386 -g -Wall -O2 -fdollars-in-identifiers -mmacosx-version-min=10.4
-LINKFLAGS += -arch i386 -mmacosx-version-min=10.4
-OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-dlshim.c darwin-langinfo.c
+CFLAGS = -arch i386 -g -Wall -O2 -fdollars-in-identifiers
+LINKFLAGS += -arch i386
+ifdef LISP_FEATURE_DARWIN9_OR_BETTER
+CFLAGS += -mmacosx-version-min=10.5
+LINKFLAGS += -mmacosx-version-min=10.5
+else
+CFLAGS += -mmacosx-version-min=10.4
+LINKFLAGS += -mmacosx-version-min=10.4
+endif
+
+OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-langinfo.c
+ifdef LISP_FEATURE_DLSHIM
+  OS_SRC += darwin-dlshim.c
+endif
+
 OS_LIBS = -lSystem -lc -ldl
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
