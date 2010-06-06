@@ -2214,8 +2214,6 @@ search_dynamic_space(void *pointer)
                             (lispobj *)pointer));
 }
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-
 /* Helper for valid_lisp_pointer_p and
  * possibly_valid_dynamic_space_pointer.
  *
@@ -2304,6 +2302,23 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
         }
         break;
     case OTHER_POINTER_LOWTAG:
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+        /* The all-architecture test below is good as far as it goes,
+         * but an LRA object is similar to a FUN-POINTER: It is
+         * embedded within a CODE-OBJECT pointed to by start_addr, and
+         * cannot be found by simply walking the heap, therefore we
+         * need to check for it. -- AB, 2010-Jun-04 */
+        if ((widetag_of(start_addr[0]) == CODE_HEADER_WIDETAG)) {
+            lispobj *potential_lra =
+                (lispobj *)(((unsigned long)pointer) - OTHER_POINTER_LOWTAG);
+            if ((widetag_of(potential_lra[0]) == RETURN_PC_HEADER_WIDETAG) &&
+                ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
+                return 1; /* It's as good as we can verify. */
+            }
+        }
+#endif
+
         if ((unsigned long)pointer !=
             ((unsigned long)start_addr+OTHER_POINTER_LOWTAG)) {
             if (gencgc_verbose) {
@@ -2498,6 +2513,8 @@ valid_lisp_pointer_p(lispobj *pointer)
     else
         return 0;
 }
+
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 /* Is there any possibility that pointer is a valid Lisp object
  * reference, and/or something else (e.g. subroutine call return

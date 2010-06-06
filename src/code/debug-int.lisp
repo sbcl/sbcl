@@ -536,7 +536,7 @@
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
-#!+(or x86 x86-64)
+#!+gencgc
 (sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
   (pointer system-area-pointer))
 
@@ -1970,12 +1970,12 @@ register."
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)
        ;; pointer
-       #!+(or x86 x86-64)
+       #!+gencgc
        (not (zerop (valid-lisp-pointer-p (int-sap val))))
        ;; FIXME: There is no fundamental reason not to use the above
        ;; function on other platforms as well, but I didn't have
        ;; others available while doing this. --NS 2007-06-21
-       #!-(or x86 x86-64)
+       #!-gencgc
        (and (logbitp 0 val)
             (or (< sb!vm:read-only-space-start val
                    (* sb!vm:*read-only-space-free-pointer*
