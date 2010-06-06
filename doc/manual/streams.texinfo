@@ -41,7 +41,7 @@ of the Franz Allegro simple-streams proposal.
 @section External Formats
 @cindex External formats
 
-@findex stream-external-format
+@findex @cl{stream-external-format}
 The encodings supported by SBCL as external formats are named by
 keyword.  Each encoding has a canonical name, which will be encoding
 returned by @code{stream-external-format}, and a number of aliases for
@@ -49,8 +49,8 @@ convenience, as shown in the table below:
 
 @include encodings.texi-temp
 
-@findex open 
-@findex with-open-file
+@findex @cl{open}
+@findex @cl{with-open-file}
 In situations where an external file format designator is required, such
 as the @code{:external-format} argument in calls to @code{open} or
 @code{with-open-file}, users may supply the name of an encoding to

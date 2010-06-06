@@ -74,8 +74,8 @@ implementation-defined and so need documentation.
 
 @cindex Logical pathnames
 @cindex Pathnames, logical
-@findex logical-pathname-translations
-@findex (setf logical-pathname-translations)
+@findex @cl{logical-pathname-translations}
+@findex @setf{@cl{logical-pathname-translations}}
 
 @c * The existence and meaning of SYS: logical pathnames is
 @c   implementation-defined.  (19.3.1.1.1)

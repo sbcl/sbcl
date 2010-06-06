@@ -226,9 +226,14 @@ symbols or lists of symbols."))
   (let ((kind (get-kind doc)))
     (format nil "~:(~A~) ~(~A~)" kind (name-using-kind/name kind (get-name doc) doc))))
 
-(defun short-package-name (package)
-  (car (sort (copy-list (cons (package-name package) (package-nicknames package)))
-             #'< :key #'length)))
+(defun package-shortest-name (package)
+  (let* ((names (cons (package-name package) (package-nicknames package)))
+         (sorted (sort (copy-list names) #'< :key #'length)))
+    (car sorted)))
+
+(defun package-macro-name (package)
+  (let ((short-name (package-shortest-name package)))
+    (remove-if-not #'alpha-char-p (string-downcase short-name))))
 
 ;;; Definition titles for DOCUMENTATION instances
 
@@ -240,12 +245,18 @@ symbols or lists of symbols."))
 
 (defmethod title-using-kind/name (kind (name symbol) doc)
   (declare (ignore kind))
-  (format nil "~A:~A" (short-package-name (get-package doc)) name))
+  (let* ((symbol-name (symbol-name name))
+         (earmuffsp (and (char= (char symbol-name 0) #\*)
+                         (char= (char symbol-name (1- (length symbol-name))) #\*)
+                         (some #'alpha-char-p symbol-name))))
+    (if earmuffsp
+        (format nil "@~A{@earmuffs{~A}}" (package-macro-name (get-package doc)) (subseq symbol-name 1 (1- (length symbol-name))))
+        (format nil "@~A{~A}" (package-macro-name (get-package doc)) name))))
 
 (defmethod title-using-kind/name (kind (name list) doc)
   (declare (ignore kind))
   (assert (setf-name-p name))
-  (format nil "(setf ~A:~A)" (short-package-name (get-package doc)) (second name)))
+  (format nil "@setf{@~A{~A}}" (package-macro-name (get-package doc)) (second name)))
 
 (defmethod title-using-kind/name ((kind (eql 'method)) name doc)
   (format nil "~{~A ~}~A"
@@ -723,16 +734,6 @@ followed another tabulation label or a tabulation body."
                           name))
                     (lambda-list doc)))))
 
-(defun texinfo-index (doc)
-  (let ((title (title-name doc)))
-    (case (get-kind doc)
-      ((structure type class condition)
-       (format *texinfo-output* "@tindex ~A~%" title))
-      ((variable constant)
-       (format *texinfo-output* "@vindex ~A~%" title))
-      ((compiler-macro function method-combination macro generic-function)
-       (format *texinfo-output* "@findex ~A~%" title)))))
-
 (defun texinfo-inferred-body (doc)
   (when (member (get-kind doc) '(class structure condition))
     (let ((name (get-name doc)))
@@ -779,7 +780,6 @@ followed another tabulation label or a tabulation body."
   "Writes TexInfo for a DOCUMENTATION instance to *TEXINFO-OUTPUT*."
   (texinfo-anchor doc)
   (texinfo-begin doc)
-  (texinfo-index doc)
   (texinfo-inferred-body doc)
   (texinfo-body doc)
   (texinfo-end doc)
@@ -828,6 +828,44 @@ package, as well as for the package itself."
                                     :if-exists :supersede)
     ,@forms))
 
+(defun write-package-macro (package)
+  (let* ((package-name (package-shortest-name package))
+         (macro-name (package-macro-name package)))
+    (write-packageish-macro package-name macro-name)))
+
+(defun write-packageish-macro (package-name macro-name)
+  ;; a word of explanation about the iftex branch here is probably
+  ;; warranted.  The package information should be present for
+  ;; clarity, because these produce body text as well as index
+  ;; entries (though in info output it's more important to use a
+  ;; very restricted character set because the info reader parses
+  ;; the link, and colon is a special character).  In TeX output we
+  ;; make the package name unconditionally small, and arrange such
+  ;; that the start of the symbol name is at a constant horizontal
+  ;; offset, that offset being such that the longest package names
+  ;; have the "sb-" extending into the left margin.  (At the moment,
+  ;; the length of the longest package name, sb-concurrency, is
+  ;; hard-coded).
+  (format *texinfo-output* "~
+@iftex
+@macro ~A{name}
+{@smallertt@phantom{concurrency:}~@[@llap{~(~A~):}~]}\\name\\
+@end macro
+@end iftex
+@ifinfo
+@macro ~2:*~A{name}
+\\name\\
+@end macro
+@end ifinfo
+@ifnottex
+@ifnotinfo
+@macro ~:*~A{name}
+\\name\\ ~@[[~(~A~)]~]
+@end macro
+@end ifnotinfo
+@end ifnottex~%"
+          macro-name package-name))
+
 (defun generate-includes (directory &rest packages)
   "Create files in `directory' containing Texinfo markup of all
 docstrings of each exported symbol in `packages'. `directory' is
@@ -844,6 +882,10 @@ markup, you lose."
         (dolist (doc (collect-documentation (find-package package)))
           (with-texinfo-file (merge-pathnames (include-pathname doc) directory)
             (write-texinfo doc))))
+      (with-texinfo-file (merge-pathnames "package-macros.texinfo" directory)
+        (dolist (package packages)
+          (write-package-macro package))
+        (write-packageish-macro nil "nopkg"))
       directory)))
 
 (defun document-package (package &optional filename)

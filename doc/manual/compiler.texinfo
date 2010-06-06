@@ -64,17 +64,17 @@ Local control:
       (* x -5))))
 @end lisp
 
-@deffn {Declaration} sb-ext:muffle-conditions
+@deffn {Declaration} @sbext{muffle-conditions}
 Syntax: type*
 
 Muffles the diagnostic messages that would be caused by compile-time
 signals of given types.
 @end deffn
 
-@deffn {Declaration} sb-ext:unmuffle-conditions
+@deffn {Declaration} @sbext{unmuffle-conditions}
 Syntax: type*
 
-Cancels the effect of a previous @code{sb-ext:muffle-condition}
+Cancels the effect of a previous @code{sb-ext:muffle-conditions}
 declaration.
 @end deffn
 
@@ -130,11 +130,11 @@ compiler, see @ref{Customization Hooks for Users}.
 @subsection Diagnostic Severity
 @cindex Severity of compiler messages
 @cindex Compiler Diagnostic Severity
-@tindex error
-@tindex warning
-@tindex style-warning
-@tindex compiler-note
-@tindex code-deletion-note
+@tindex @cl{error}
+@tindex @cl{warning}
+@tindex @cl{style-warning}
+@tindex @sbext{compiler-note}
+@tindex @sbext{code-deletion-note}
 
 There are four levels of compiler diagnostic severity: 
 
@@ -217,7 +217,7 @@ diagnostic:
 @enumerate
 
 @item
-@findex with-compilation-unit
+@findex @cl{with-compilation-unit}
 @samp{file: /tmp/foo.lisp} This is the name of the file that the
 compiler read the relevant code from.  The file name is displayed
 because it may not be immediately obvious when there is an error
@@ -467,7 +467,7 @@ discussed in the chapter on performance (@pxref{Efficiency}), the use
 of appropriate type declarations can be very important for performance
 as well.
 
-@findex satisfies
+@findex @cl{satisfies}
 The SBCL compiler also has a greater knowledge of the Common Lisp
 type system than other compilers. Support is incomplete only for types
 involving the @code{satisfies} type specifier.
@@ -490,7 +490,7 @@ involving the @code{satisfies} type specifier.
 @node Declarations as Assertions
 @comment  node-name,  next,  previous,  up
 @subsection Declarations as Assertions
-@findex safety
+@cindex Safety optimization quality
 
 The SBCL compiler treats type declarations differently from most other
 Lisp compilers. Under default compilation policy the compiler doesn't
@@ -1114,7 +1114,7 @@ a more efficient calling convention that forbids redefinition.
 @comment  node-name,  next,  previous,  up
 @section Interpreter
 @cindex Interpreter
-@vindex sb-ext:*evaluator-mode*
+@vindex @sbext{@earmuffs{evaluator-mode}}
 
 By default SBCL implements @code{eval} by calling the native code
 compiler. SBCL also includes an interpreter for use in special cases

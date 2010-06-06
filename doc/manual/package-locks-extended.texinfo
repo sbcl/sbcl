@@ -49,8 +49,8 @@ but this is not currently done by default.
 
 @node Implementation Packages
 @subsection Implementation Packages
-@vindex *package*
-@findex defpackage
+@vindex @cl{@earmuffs{package}}
+@findex @cl{defpackage}
 
 Each package has a list of associated implementation packages. A
 locked package, and the symbols whose home package it is, can be
@@ -64,27 +64,22 @@ Unless explicitly altered by @code{defpackage},
 
 @node Package Lock Violations
 @subsection Package Lock Violations
-@tindex sb-ext:package-lock-violation
-@tindex sb-ext:package-locked-error
-@tindex sb-ext:symbol-package-locked-error
-@tindex package-lock-violation
-@tindex package-locked-error
-@tindex symbol-package-locked-error
-@tindex package-error
+@tindex @sbext{package-lock-violation}
+@tindex @sbext{package-locked-error}
+@tindex @sbext{symbol-package-locked-error}
+@tindex @cl{package-error}
 
 @subsubsection Lexical Bindings and Declarations
-@findex let
-@findex let*
-@findex flet
-@findex labels
-@findex macrolet
-@findex symbol-macrolet
-@findex declare
+@findex @cl{let}
+@findex @cl{let*}
+@findex @cl{flet}
+@findex @cl{labels}
+@findex @cl{macrolet}
+@findex @cl{symbol-macrolet}
+@findex @cl{declare}
 @cindex Declarations
-@findex sb-ext:disable-package-locks
-@findex sb-ext:enable-package-locks
-@findex disable-package-locks
-@findex enable-package-locks
+@findex @sbext{disable-package-locks}
+@findex @sbext{enable-package-locks}
 
 Lexical bindings or declarations that violate package locks cause
 result in a @code{program-error} being signalled at when the form that
@@ -300,7 +295,7 @@ Defining it as a hash table test using @code{sb-ext:define-hash-table-test}.
 @node Package Lock Dictionary
 @section Package Lock Dictionary
 
-@deftp {Declaration} sb-ext:disable-package-locks
+@deffn {Declaration} @sbext{disable-package-locks}
 
 Syntax: @code{(sb-ext:disable-package-locks symbol*)}
 
@@ -308,9 +303,9 @@ Disables package locks affecting the named symbols during compilation
 in the lexical scope of the declaration. Disabling locks on symbols
 whose home package is unlocked, or disabling an already disabled lock,
 has no effect.
-@end deftp
+@end deffn
 
-@deftp {Declaration} sb-ext:enable-package-locks
+@deffn {Declaration} @sbext{enable-package-locks}
 
 Syntax: @code{(sb-ext:enable-package-locks symbol*)}
 
@@ -318,13 +313,13 @@ Re-enables package locks affecting the named symbols during compilation
 in the lexical scope of the declaration. Enabling locks that were not
 first disabled with @code{sb-ext:disable-package-locks} declaration, or
 enabling locks that are already enabled has no effect.
-@end deftp
+@end deffn
 
 @include condition-sb-ext-package-lock-violation.texinfo
 @include condition-sb-ext-package-locked-error.texinfo
 @include condition-sb-ext-symbol-package-locked-error.texinfo
 
-@defun sb-ext:package-locked-error-symbol symbol-package-locked-error
+@defun @sbext{package-locked-error-symbol} symbol-package-locked-error
 
 Returns the symbol that caused the @code{symbol-package-locked-error}
 condition.
@@ -340,7 +335,7 @@ condition.
 @include macro-sb-ext-without-package-locks.texinfo
 @include macro-sb-ext-with-unlocked-packages.texinfo
 
-@defmac defpackage name [[option]]* @result{} package
+@defmac @cl{defpackage} name [[option]]* @result{} package
 
 Options are extended to include the following:
 

@@ -70,7 +70,8 @@ lazily set up during those calls.
 @node  Dynamic-extent allocation
 @comment  node-name,  next,  previous,  up
 @section Dynamic-extent allocation
-@cindex Dynamic-extent declaration
+@cindex @code{dynamic-extent} declaration
+@cindex declaration, @code{dynamic-extent}
 
 SBCL has limited support for performing allocation on the stack when a
 variable is declared @code{dynamic-extent}. The @code{dynamic-extent}
@@ -93,21 +94,31 @@ useful. At present, SBCL implements stack allocation for
 @code{&rest} lists, when these are declared @code{dynamic-extent}.
 
 @item
+@findex @cl{cons}
+@findex @cl{list}
+@findex @cl{list*}
+@findex @cl{vector}
 @code{cons}, @code{list}, @code{list*}, and @code{vector} when the
 result is bound to a variable declared @code{dynamic-extent}.
 
 @item
+@findex @cl{make-array}
 simple forms of @code{make-array}, whose result is bound to a variable
 declared @code{dynamic-extent}: stack allocation is possible only if
 the resulting array is known to be both simple and one-dimensional,
 and has a constant @code{:element-type}.
 
+@cindex Safety optimization quality
 @strong{Note}: stack space is limited, so allocation of a large vector
 may cause stack overflow. For this reason potentially large vectors,
 which might circumvent stack overflow detection, are stack allocated
 only in zero @code{safety} policies.
 
 @item
+@findex @cl{flet}
+@findex @cl{labels}
+@cindex @code{safety} optimization quality
+@cindex optimization quality, @code{safety}
 closures defined with @code{flet} or @code{labels}, with a bound
 @code{dynamic-extent} declaration. Closed-over variables, which are
 assigned to (either inside or outside the closure) are still allocated
@@ -189,7 +200,7 @@ closure, even when the closure is not declared @code{dynamic-extent}.
 @cindex Modular arithmetic
 @cindex Arithmetic, modular
 @cindex Arithmetic, hardware
-
+@findex @cl{logand}
 Some numeric functions have a property: @var{N} lower bits of the
 result depend only on @var{N} lower bits of (all or some)
 arguments. If the compiler sees an expression of form @code{(logand
@@ -230,7 +241,7 @@ currently this is not implemented.
 
 @include macro-sb-ext-defglobal.texinfo
 
-@deftp {Declaration} sb-ext:global
+@deffn {Declaration} @sbext{global}
 
 Syntax: @code{(sb-ext:global symbol*)}
 
@@ -241,9 +252,9 @@ declared @code{special}. Proclaiming an already special or constant
 variable name as @code{global} signal an error. Allows more efficient
 value lookup in threaded environments in addition to expressing
 programmer intention.
-@end deftp
+@end deffn
 
-@deftp {Declaration} sb-ext:always-bound
+@deffn {Declaration} @sbext{always-bound}
 
 Syntax: @code{(sb-ext:always-bound symbol*)}
 
@@ -252,7 +263,7 @@ Only valid as a global proclamation.
 Specifies that the named symbols is always bound. Inhibits @code{makunbound}
 of the named symbols. Proclaiming an unbound symbol as @code{always-bound} signals
 an error. Allows compiler to elide boundness checks from value lookups.
-@end deftp
+@end deffn
 
 @node  Miscellaneous Efficiency Issues
 @comment  node-name,  next,  previous,  up
@@ -287,6 +298,10 @@ points to keep in mind.
 @itemize
 
 @item
+@findex @cl{let}
+@findex @cl{let*}
+@findex @cl{setq}
+@findex @cl{setf}
 The CMUCL manual doesn't seem to state it explicitly, but Python has a
 mental block about type inference when assignment is involved. Python
 is very aggressive and clever about inferring the types of values

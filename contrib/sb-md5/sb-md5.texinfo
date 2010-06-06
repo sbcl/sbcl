@@ -23,5 +23,5 @@ Following this, SBCL's compiler was extended to implement efficient
 compilation of modular arithmetic (@pxref{Modular arithmetic}), which
 enabled the implementation to be expressed in portable arithmetical
 terms, apart from the use of @code{rotate-byte} for bitwise rotation.
-@findex rotate-byte
+@findex @sbrotatebyte{rotate-byte}
 

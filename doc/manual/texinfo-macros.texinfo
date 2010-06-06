@@ -25,3 +25,13 @@
 \word\@c
 @end ifnottex
 @end macro
+
+@c Some index prettification helper macros, for tricking the texindex
+@c collation "engine"
+@macro earmuffs{name}
+*\name\*
+@end macro
+@macro setf{name}
+(setf \name\)
+@end macro
+@include docstrings/package-macros.texinfo

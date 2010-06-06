@@ -667,6 +667,8 @@ reset to ~S."
 ;;; halt-on-failures and prompt-on-failures modes, suitable for
 ;;; noninteractive and interactive use respectively
 (defun disable-debugger ()
+  "When invoked, this function will turn off both the SBCL debugger
+and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   ;; *DEBUG-IO* used to be set here to *ERROR-OUTPUT* which is sort
   ;; of unexpected but mostly harmless, but then ENABLE-DEBUGGER had
   ;; to set it to a suitable value again and be very careful,
@@ -681,6 +683,7 @@ reset to ~S."
                                                  (function sb!alien:void))))
 
 (defun enable-debugger ()
+  "Restore the debugger if it has been turned off by DISABLE-DEBUGGER."
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
     (setf *invoke-debugger-hook* *old-debugger-hook*
           *old-debugger-hook* nil))

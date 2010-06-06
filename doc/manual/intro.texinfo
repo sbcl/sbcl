@@ -209,7 +209,7 @@ leads to some oddities, e.g. collapsing @code{functionp} and
 @node Defining Constants
 @comment  node-name,  next,  previous,  up
 @subsection Defining Constants
-@findex defconstant
+@findex @cl{defconstant}
 
 SBCL is quite strict about ANSI's definition of @code{defconstant}.
 ANSI says that doing @code{defconstant} of the same symbol more than

@@ -18,6 +18,7 @@ the debugger, single-stepper and @code{trace}, and the effect of
 * Information Commands::        
 * Function Tracing::            
 * Single Stepping::             
+* Enabling and Disabling the Debugger::
 @end menu
 
 @node Debugger Entry
@@ -168,25 +169,25 @@ These commands move to a new stack frame and print the name of the
 function and the values of its arguments in the style of a Lisp
 function call:
 
-@deffn {Debugger Command} up
+@deffn {Debugger Command} @nopkg{up}
 Move up to the next higher frame.  More recent function calls are
 considered to be higher on the stack.
 @end deffn
 
-@deffn {Debugger Command} down
+@deffn {Debugger Command} @nopkg{down}
 Move down to the next lower frame.
 @end deffn
 
-@deffn {Debugger Command} top
+@deffn {Debugger Command} @nopkg{top}
 Move to the highest frame, that is, the frame where the debugger was
 entered.
 @end deffn
 
-@deffn {Debugger Command} bottom
+@deffn {Debugger Command} @nopkg{bottom}
 Move to the lowest frame.
 @end deffn
 
-@deffn {Debugger Command} frame [@var{n}]
+@deffn {Debugger Command} @nopkg{frame} [@var{n}]
 Move to the frame with the specified number.  Prompts for the number if not
 supplied.  The frame with number 0 is the frame where the debugger
 was entered.
@@ -461,7 +462,7 @@ X  =  1
 X#1  =  2
 @end example
 
-@deffn {Debugger Command} list-locals [@var{prefix}]
+@deffn {Debugger Command} @nopkg{list-locals} [@var{prefix}]
 This command prints the name and value of all variables in the current
 frame whose name has the specified @var{prefix}.  @var{prefix} may be
 a string or a symbol.  If no @var{prefix} is given, then all available
@@ -471,7 +472,7 @@ suffix, where @var{identifier} is the small integer used to make the
 name unique.
 @end deffn
 
-@defun sb-debug:var @var{name} &optional @var{identifier}
+@defun @sbdebug{var} @var{name} &optional @var{identifier}
 This function returns the value of the variable in the current frame
 with the specified @var{name}.  If supplied, @var{identifier}
 determines which value to return when there are ambiguous variables.
@@ -604,7 +605,7 @@ One of the debugger's capabilities is source level debugging of
 compiled code.  These commands display the source location for the
 current frame:
 
-@deffn {Debugger Command} source [@var{context}]
+@deffn {Debugger Command} @nopkg{source} [@var{context}]
 This command displays the file that the current frame's function was
 defined from (if it was defined from a file), and then the source form
 responsible for generating the code that the current frame was
@@ -881,35 +882,35 @@ the original function.
 
 These commands get you out of the debugger.
 
-@deffn {Debugger Command} toplevel
+@deffn {Debugger Command} @nopkg{toplevel}
 Throw to top level.
 @end deffn
 
-@deffn {Debugger Command} restart [@var{n}]
+@deffn {Debugger Command} @nopkg{restart} [@var{n}]
 Invokes the @var{n}th restart case as displayed by the @code{error}
 command.  If @var{n} is not specified, the available restart cases are
 reported.
 @end deffn
 
-@deffn {Debugger Command} continue
+@deffn {Debugger Command} @nopkg{continue}
 Calls @code{continue} on the condition given to @code{debug}.  If there is no
 restart case named @var{continue}, then an error is signaled.
 @end deffn
 
-@deffn {Debugger Command} abort
+@deffn {Debugger Command} @nopkg{abort}
 Calls @code{abort} on the condition given to @code{debug}.  This is
 useful for popping debug command loop levels or aborting to top level,
 as the case may be.
 @end deffn
 
-@deffn {Debugger Command} return @var{value} 
+@deffn {Debugger Command} @nopkg{return} @var{value} 
 Returns @var{value} from the current stack frame.  This command is
 available when the @code{debug} optimization quality is greater than
 both @code{speed} and @code{space}.  Care must be taken that the value
 is of the same type as SBCL expects the stack frame to return.
 @end deffn
 
-@deffn {Debugger Command} restart-frame
+@deffn {Debugger Command} @nopkg{restart-frame}
 Restarts execution of the current stack frame. This command is
 available when the @code{debug} optimization quality is greater than
 both @code{speed} and @code{space} and when the frame is for is a global
@@ -924,27 +925,27 @@ is restarted, the new function will be used.
 Most of these commands print information about the current frame or
 function, but a few show general information.
 
-@deffn {Debugger Command} help
-@deffnx {Debugger Command} ?
+@deffn {Debugger Command} @nopkg{help}
+@deffnx {Debugger Command} @nopkg{?}
 Displays a synopsis of debugger commands.
 @end deffn
 
-@deffn {Debugger Command} describe
+@deffn {Debugger Command} @nopkg{describe}
 Calls @code{describe} on the current function and displays the number of
 local variables.
 @end deffn
 
-@deffn {Debugger Command} print
+@deffn {Debugger Command} @nopkg{print}
 Displays the current function call as it would be displayed by moving to
 this frame.
 @end deffn
 
-@deffn {Debugger Command} error
+@deffn {Debugger Command} @nopkg{error}
 Prints the condition given to @code{invoke-debugger} and the active
 proceed cases.
 @end deffn
 
-@deffn {Debugger Command} backtrace [@var{n}]
+@deffn {Debugger Command} @nopkg{backtrace} [@var{n}]
 Displays all the frames from the current to the bottom. Only shows
 @var{n} frames if specified. The printing is controlled by
 @code{*debug-print-variable-alist*}.
@@ -1125,30 +1126,49 @@ stepping for compiled code.
 
 The following debugger commands are used for controlling single stepping.
 
-@deffn {Debugger Command} start
+@deffn {Debugger Command} @nopkg{start}
 Selects the @code{continue} restart if one exists and starts single stepping.
 None of the other single stepping commands can be used before stepping has
 been started either by using @code{start} or by using the standard 
 @code{step} macro.
 @end deffn
 
-@deffn {Debugger Command} step
+@deffn {Debugger Command} @nopkg{step}
 Steps into the current form. Stepping will be resumed when the next
 form that has been compiled with stepper instrumentation is evaluated.
 @end deffn
 
-@deffn {Debugger Command} next
+@deffn {Debugger Command} @nopkg{next}
 Steps over the current form. Stepping will be disabled until evaluation of
 the form is complete.
 @end deffn
 
-@deffn {Debugger Command} out
+@deffn {Debugger Command} @nopkg{out}
 Steps out of the current frame. Stepping will be disabled until the 
 topmost stack frame that had been stepped into returns.
 @end deffn
 
-@deffn {Debugger Command} stop
+@deffn {Debugger Command} @nopkg{stop}
 Stops the single stepper and resumes normal execution.
 @end deffn
 
 @include macro-common-lisp-step.texinfo
+
+@node Enabling and Disabling the Debugger
+@comment  node-name,  next,  previous,  up
+@section Enabling and Disabling the Debugger
+
+@cindex debugger, enabling
+@cindex debugger, disabling
+@cindex disabling debugger
+@cindex ldb, enabling
+@cindex ldb, disabling
+@cindex disabling ldb
+
+In certain contexts (e.g., non-interactive applications), it may be
+desirable to turn off the SBCL debugger (and possibly re-enable it).
+The functions here control the debugger.
+
+@include fun-sb-ext-disable-debugger.texinfo
+
+@include fun-sb-ext-enable-debugger.texinfo

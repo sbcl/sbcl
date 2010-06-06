@@ -19,6 +19,7 @@ MODULES=':sb-md5 :sb-queue :sb-concurrency :sb-rotate-byte :sb-grovel \
          :sb-sprof :sb-bsd-sockets :sb-cover :sb-posix'
 # List of package names that docstring docs will be created for.
 PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP \
+	  :SB-PCL :SB-SYS \
           :SB-PROFILE :SB-THREAD :SB-MD5 :SB-QUEUE :SB-ROTATE-BYTE  \
           :SB-SPROF :SB-BSD-SOCKETS :SB-COVER :SB-POSIX :SB-CONCURRENCY"
 

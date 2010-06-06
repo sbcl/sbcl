@@ -57,11 +57,6 @@ file, mailing list archives, CVS commit messages, and so on. Please
 feel free to ask for advice on the sbcl-help list.
 
 @table @strong
-@item Christophe Rhodes
-is a long-time SBCL developer, available for custom programming.
-
-Email: @email{csr21@@cam.ac.uk}
-
 @item Steel Bank Studio Ltd
 provides commercial SBCL support and custom development, is run by
 SBCL developer @emph{Nikodemus Siivola}, and has another SBCL
@@ -70,6 +65,13 @@ developer @emph{Richard Kreuter} as an affiliated consultant.
 Website: @url{http://sb-studio.net/}
 
 Email: @email{info@@sb-studio.net}
+
+@item Christophe Rhodes
+is a researcher and long-time SBCL developer, available for custom
+development, particularly in the area of language extension.
+
+Email: @email{c.rhodes@@gold.ac.uk}
+
 @end table
 
 @node Reporting Bugs
@@ -126,6 +128,7 @@ send a useful bug report then:
 @enumerate
 
 @item
+@cindex ldb
 Compile sbcl with ldb support (feature @code{:sb-ldb}, see
 @file{base-target-features.lisp-expr}) and change @code{#define QSHOW_SIGNAL 0} to
 @code{#define QSHOW_SIGNAL 1} in @file{src/runtime/runtime.h}.
@@ -158,6 +161,6 @@ stderr) produced by SBCL.
 Don't forget to include OS and SBCL version.
 
 @item
-If available include, information on outcome of the same test with
+If available, include information on outcome of the same test with
 other versions of SBCL, OS, ...
 @end enumerate

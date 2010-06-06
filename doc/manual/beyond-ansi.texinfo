@@ -76,20 +76,18 @@ are:
 @itemize
 
 @item
-@findex compute-effective-method
-@findex sb-mop:compute-effective-method
+@findex @sbmop{compute-effective-method}
 @code{compute-effective-method} only returns one value, not two.
 
 There is no record of what the second return value was meant to
 indicate, and apparently no clients for it.
 
 @item
-@tindex generic-function
-@tindex standard-generic-function
-@tindex funcallable-standard-object
-@tindex sb-mop:funcallable-standard-object
-@tindex standard-object
-@tindex function
+@tindex @cl{generic-function}
+@tindex @cl{standard-generic-function}
+@tindex @sbmop{funcallable-standard-object}
+@tindex @cl{standard-object}
+@tindex @cl{function}
 The direct superclasses of @code{sb-mop:funcallable-standard-object} are
 @code{(function standard-object)}, not @code{(standard-object function)}.
 
@@ -100,9 +98,8 @@ precedence list of @code{generic-function} and
 ANSI specification.
 
 @item
-@findex ensure-generic-function
-@findex generic-function-declarations
-@findex sb-mop:generic-function-declarations
+@findex @cl{ensure-generic-function}
+@findex @sbmop{generic-function-declarations}
 the arguments @code{:declare} and @code{:declarations} to
 @code{ensure-generic-function} are both accepted, with the leftmost
 argument defining the declarations to be stored and returned by
@@ -113,16 +110,12 @@ Where AMOP specifies @code{:declarations} as the keyword argument to
 @code{:declare}.  Portable code should use @code{:declare}.
 
 @item
-@findex validate-superclass
-@findex finalize-inheritance
-@findex sb-mop:validate-superclass
-@findex sb-mop:finalize-inheritance
-@tindex standard-class
-@tindex funcallable-standard-class
-@tindex sb-mop:funcallable-standard-class
-@tindex function
-@findex sb-mop:class-prototype
-@findex class-prototype
+@findex @sbmop{validate-superclass}
+@findex @sbmop{finalize-inheritance}
+@tindex @cl{standard-class}
+@tindex @sbmop{funcallable-standard-class}
+@tindex @cl{function}
+@findex @sbmop{class-prototype}
 although SBCL obeys the requirement in AMOP that
 @code{validate-superclass} should treat @code{standard-class} and
 @code{funcallable-standard-class} as compatible metaclasses, we
@@ -131,9 +124,9 @@ of metaclass @code{funcallable-standard-class} must have
 @code{function} in its superclasses, and a class of metaclass
 @code{standard-class} must not.
 
-@findex typep
-@findex class-of
-@findex subtypep
+@findex @cl{typep}
+@findex @cl{class-of}
+@findex @cl{subtypep}
 After a class has been finalized, it is associated with a class
 prototype which is accessible by a standard mop function
 @code{sb-mop:class-prototype}.  The user can then ask whether this
@@ -165,8 +158,7 @@ The following definition is acceptable:
 @end lisp
 and leads to a class whose instances are funcallable and have one slot.
 
-@tindex funcallable-standard-object
-@tindex sb-mop:funcallable-standard-object
+@tindex @sbmop{funcallable-standard-object}
 Note that this requirement also applies to the class
 @code{sb-mop:funcallable-standard-object}, which has metaclass
 @code{sb-mop:funcallable-standard-class} rather than
@@ -187,12 +179,9 @@ by symbols in the Common Lisp package: preventing two independent pieces
 of software from colliding with each other.
 
 @item
-@findex slot-value-using-class
-@findex sb-mop:slot-value-using-class
-@findex (setf slot-value-using-class)
-@findex (setf sb-mop:slot-value-using-class)
-@findex slot-boundp-using-class
-@findex sb-mop:slot-boundp-using-class
+@findex @sbmop{slot-value-using-class}
+@findex @setf{@sbmop{slot-value-using-class}}
+@findex @sbmop{slot-boundp-using-class}
 specializations of the @code{new-value} argument to @code{(setf
 sb-mop:slot-value-using-class)} are not allowed: all user-defined
 methods must have a specializer of the class @code{t}.
@@ -211,13 +200,11 @@ Note that application code may specialize on the @code{new-value}
 argument of slot accessors.
 
 @item
-@findex defclass
-@findex ensure-class
-@findex ensure-class-using-class
-@findex sb-mop:ensure-class
-@findex sb-mop:ensure-class-using-class
-@findex find-class
-@findex class-name
+@findex @cl{defclass}
+@findex @sbmop{ensure-class}
+@findex @sbmop{ensure-class-using-class}
+@findex @cl{find-class}
+@findex @cl{class-name}
 the class named by the @code{name} argument to @code{ensure-class}, if
 any, is only redefined if it is the proper name of that class;
 otherwise, a new class is created.
@@ -236,14 +223,11 @@ AMOP; at present, they are:
 @itemize
 
 @item
-@findex defmethod
-@findex find-class
-@findex intern-eql-specializer
-@findex sb-mop:intern-eql-specializer
-@findex make-method-specializers-form
-@findex sb-pcl:make-method-specializers-form
-@findex make-method-lambda
-@findex sb-mop:make-method-lambda
+@findex @cl{defmethod}
+@findex @cl{find-class}
+@findex @sbmop{intern-eql-specializer}
+@findex @sbpcl{make-method-specializers-form}
+@findex @sbmop{make-method-lambda}
 compile-time support for generating specializer metaobjects from
 specializer names in @code{defmethod} forms is provided by the
 @code{make-method-specializers-form} function, which returns a form
@@ -259,11 +243,9 @@ name, and a call to @code{intern-eql-specializer} for each @code{(eql
 @var{x})} specializer name.
 
 @item
-@findex find-method
-@findex parse-specializer-using-class
-@findex unparse-specializer-using-class
-@findex sb-pcl:parse-specializer-using-class
-@findex sb-pcl:unparse-specializer-using-class
+@findex @cl{find-method}
+@findex @sbpcl{parse-specializer-using-class}
+@findex @sbpcl{unparse-specializer-using-class}
 run-time support for converting between specializer names and
 specializer metaobjects, mostly for the purposes of
 @code{find-method}, is provided by
@@ -288,8 +270,7 @@ between classes and proper names and between lists of the form
 
 @node Command-line arguments
 @subsection Command-line arguments
-@vindex sb-ext:*posix-argv*
-@vindex *posix-argv*
+@vindex @sbext{@earmuffs{posix-argv}}
 
 The UNIX command line can be read from the variable
 @code{sb-ext:*posix-argv*}.
@@ -379,8 +360,8 @@ muffle these warnings at runtime, SBCL provides a variable
 @node Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @section Tools To Help Developers
-@findex trace
-@findex inspect
+@findex @cl{trace}
+@findex @cl{inspect}
 
 SBCL provides a profiler and other extensions to the ANSI @code{trace}
 facility.  For more information, see @ref{Macro common-lisp:trace}.
@@ -393,10 +374,8 @@ the @code{inspect} prompt.
 
 @node Resolution of Name Conflicts
 @section Resolution of Name Conflicts
-@tindex sb-ext:name-conflict
-@tindex name-conflict
-@findex sb-ext:name-conflict-symbols
-@findex name-conflict-symbols
+@tindex @sbext{name-conflict}
+@findex @sbext{name-conflict-symbols}
 
 The ANSI standard (section 11.1.1.2.5) requires that name conflicts in
 packages be resolvable in favour of any of the conflicting symbols.  In
