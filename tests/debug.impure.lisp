@@ -389,7 +389,7 @@
 ;;; on that platform.
 #-(and (or ppc x86 x86-64) darwin)
 (with-test (:name (trace :encapsulate nil)
-            :fails-on '(or :ppc :sparc :mips))
+            :fails-on '(or (and :ppc (not :linux)) :sparc :mips))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-this :encapsulate nil)
                (assert (eq 'ok (trace-this)))
@@ -399,7 +399,7 @@
 
 #-(and (or ppc x86 x86-64) darwin)
 (with-test (:name (trace-recursive :encapsulate nil)
-            :fails-on '(or :ppc :sparc :mips))
+            :fails-on '(or (and :ppc (not :linux)) :sparc :mips))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-fact :encapsulate nil)
                (assert (= 120 (trace-fact 5)))

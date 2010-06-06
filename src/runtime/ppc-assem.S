@@ -574,23 +574,75 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 	mtctr reg_LIP
 	bctr
 	SET_SIZE(funcallable_instance_tramp)
-	
-	GFUNCDEF(fun_end_breakpoint_trap)
-	.long 0
-	SET_SIZE(fun_end_breakpoint_trap)
-
-	GFUNCDEF(fun_end_breakpoint)
-	.long 0
-	SET_SIZE(fun_end_breakpoint)
-
+
+	/* The fun_end_breakpoint support here is considered by the
+	authors of the other $ARCH-assem.S files to be magic, and it
+	is.  It is a small fragment of code that is copied into a heap
+	code-object when needed, and contains an LRA object, code to
+	convert a single-value return to unknown-values format, and a
+	trap_FunEndBreakpoint. */
 	GFUNCDEF(fun_end_breakpoint_guts)
-	.long 0
+	.globl CSYMBOL(fun_end_breakpoint_trap)
+	.globl CSYMBOL(fun_end_breakpoint_end)
+
+	/* Due to pointer verification in MAKE-LISP-OBJ on GENCGC
+	targets, which includes PPC, this must include its header data
+	(the offset from the start of the code-object to the LRA).
+	The code-object header is five words, there are two words of
+	constants, and the instruction space is doubleword-aligned,
+	making an offset of eight.  This is header data for a widetag,
+	so shift left eight bits and add. */
+	.long RETURN_PC_HEADER_WIDETAG + 0x800
+
+	/* We are receiving unknown multiple values, thus must deal
+	with the single-value and multiple-value cases separately. */
+	b fun_end_breakpoint_multiple_values
+	nop
+
+	/* Compute the correct value for reg_CODE based on the LRA.
+	This is a "simple" matter of subtracting a constant from
+	reg_CODE (where the LRA is stored by the return sequence) to
+	obtain a tagged pointer to the enclosing code component.  Both
+	values are tagged OTHER_POINTER_LOWTAG, so we just have to
+	account for the eight words (see calculation for
+	RETURN_PC_HEADER_WIDETAG, above) between the two addresses.
+	Restoring reg_CODE doesn't appear to be strictly necessary
+	here, but let's observe the niceties.*/
+	addi reg_CODE, reg_CODE, -32
+
+	/* Multiple values are stored relative to reg_OCFP, which we
+	set to be the current top-of-stack. */
+	mr reg_OCFP, reg_CSP
+
+	/* Reserve a save location for the one value we have. */
+	addi reg_CSP, reg_CSP, 4
+
+	/* Record the number of values we have as a FIXNUM. */
+	li reg_NARGS, 4
+
+	/* Blank the remaining arg-passing registers. */
+	mr reg_A1, reg_NULL
+	mr reg_A2, reg_NULL
+	mr reg_A3, reg_NULL
+
+	/* And branch to our trap. */
+	b CSYMBOL(fun_end_breakpoint_trap)
+
+fun_end_breakpoint_multiple_values:
+	/* Compute the correct value for reg_CODE.  See the
+	explanation for the single-value case, above. */
+	addi reg_CODE, reg_CODE, -32
+
+	/* The actual magic trap. */
+CSYMBOL(fun_end_breakpoint_trap):
+	twllei	reg_ZERO, trap_FunEndBreakpoint
+
+	/* Finally, the debugger needs to know where the end of the
+	fun_end_breakpoint_guts are, so that it may calculate its size
+	in order to populate out a suitably-sized code object. */
+CSYMBOL(fun_end_breakpoint_end):
 	SET_SIZE(fun_end_breakpoint_guts)
-
-	GFUNCDEF(fun_end_breakpoint_end)
-	.long 0
-	SET_SIZE(fun_end_breakpoint_end)
-
+
 
 	GFUNCDEF(ppc_flush_cache_line)
 	dcbf 0,REG(3)
