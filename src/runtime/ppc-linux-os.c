@@ -94,6 +94,34 @@ os_context_lr_addr(os_context_t *context)
 #endif
 }
 
+os_context_register_t *
+os_context_ctr_addr(os_context_t *context)
+{
+    /* Like os_context_fp_control() and os_context_lr_addr(), this
+     * uses an index beyond the declared end of the array in order to
+     * find the correct register value in the context. */
+#if defined(GLIBC231_STYLE_UCONTEXT)
+    /* FIXME: This probably should be ->ctr instead of ->gpr[PT_CTR]. */
+    return &((context->uc_mcontext.regs)->gpr[PT_CTR]);
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &((context->uc_mcontext.uc_regs)->gregs[PT_CTR]);
+#endif
+}
+
+os_context_register_t *
+os_context_cr_addr(os_context_t *context)
+{
+    /* Like os_context_fp_control() and os_context_lr_addr(), this
+     * uses an index beyond the declared end of the array in order to
+     * find the correct register value in the context. */
+#if defined(GLIBC231_STYLE_UCONTEXT)
+    /* FIXME: This probably should be ->ccr instead of ->gpr[PT_CCR]. */
+    return &((context->uc_mcontext.regs)->gpr[PT_CCR]);
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &((context->uc_mcontext.uc_regs)->gregs[PT_CCR]);
+#endif
+}
+
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {

@@ -122,6 +122,20 @@ os_context_lr_addr(os_context_t *context)
 }
 
 os_context_register_t *
+os_context_ctr_addr(os_context_t *context)
+{
+    /* FIXME: Figure out how to make this happen. */
+    lose("was asked for context Counter (CTR) register, but don't know how");
+}
+
+os_context_register_t *
+os_context_cr_addr(os_context_t *context)
+{
+    /* FIXME: Figure out how to make this happen. */
+    lose("was asked for context Condition (CR) register, but don't know how");
+}
+
+os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
   return &context->uc_mcontext->PPC_DARWIN_REGIFY(ss).PPC_DARWIN_REGIFY(srr0);

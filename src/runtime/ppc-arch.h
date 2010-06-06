@@ -18,4 +18,7 @@ release_spinlock(lispobj *word)
 
 extern void ppc_flush_icache(os_vm_address_t address, os_vm_size_t length);
 
+os_context_register_t *os_context_ctr_addr(os_context_t *context);
+os_context_register_t *os_context_cr_addr(os_context_t *context);
+
 #endif /* _PPC_ARCH_H */

@@ -51,6 +51,9 @@
 #endif
 #endif
 
+/* Magic encoding for the instruction used for traps. */
+#define TRAP_INSTRUCTION(trap) ((3<<26) | (6 << 21) | (trap))
+
 void arch_init() {
 }
 
@@ -117,7 +120,7 @@ arch_install_breakpoint(void *pc)
 {
     unsigned int *ptr = (unsigned int *)pc;
     unsigned int result = *ptr;
-    *ptr = (3<<26) | (5 << 21) | trap_Breakpoint;
+    *ptr = TRAP_INSTRUCTION(trap_Breakpoint);
     os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     return result;
 }
@@ -149,12 +152,33 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
+static boolean
+should_branch(os_context_t *context, unsigned int orig_inst)
+{
+    /* orig_inst is a conditional branch instruction.  We need to
+     * know if the branch will be taken if executed in context. */
+    int ctr = *os_context_ctr_addr(context);
+    int cr = *os_context_cr_addr(context);
+    int bo_field = (orig_inst >> 21) & 0x1f;
+    int bi_field = (orig_inst >> 16) & 0x1f;
+    int ctr_ok;
+
+    if (!(bo_field & 4)) ctr--; /* Decrement CTR if necessary. */
+
+    ctr_ok = (bo_field & 4) || ((ctr == 0) == ((bo_field & 2) == 2));
+    return ctr_ok && ((bo_field & 0x10) ||
+                      !(((cr >> (31-bi_field)) ^ (bo_field >> 3)) & 1));
+}
+
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
     unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *next_pc;
+    int op = orig_inst >> 26;
+    int sub_op = (orig_inst & 0x7fe) >> 1;  /* XL-form sub-opcode */
 
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
@@ -163,9 +187,53 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
     skipped_break_addr = pc;
 
-    /* FIXME: we should apparently be installing the after-breakpoint
-     * here, but would need to find the next instruction address for
-     * it first. alpha-arch.c shows how to do it. --NS 2007-04-02 */
+    /* Figure out where we will end up after running the displaced
+     * instruction by defaulting to the next instruction in the stream
+     * and then checking for branch instructions.  FIXME: This will
+     * probably screw up if it attempts to step a trap instruction. */
+    next_pc = pc + 1;
+
+    if (op == 18) {
+        /* Branch  I-form */
+        unsigned int displacement = orig_inst & 0x03fffffc;
+        /* Sign extend */
+        if (displacement & 0x02000000) {
+            displacement |= 0xc0000000;
+        }
+        if (orig_inst & 2) { /* Absolute Address */
+            next_pc = (unsigned int *)displacement;
+        } else {
+            next_pc = (unsigned int *)(((unsigned int)pc) + displacement);
+        }
+    } else if ((op == 16)
+               && should_branch(context, orig_inst)) {
+        /* Branch Conditional  B-form */
+        unsigned int displacement = orig_inst & 0x0000fffc;
+        /* Sign extend */
+        if (displacement & 0x00008000) {
+            displacement |= 0xffff0000;
+        }
+        if (orig_inst & 2) { /* Absolute Address */
+            next_pc = (unsigned int *)displacement;
+        } else {
+            next_pc = (unsigned int *)(((unsigned int)pc) + displacement);
+        }
+    } else if ((op == 19) && (sub_op == 16)
+               && should_branch(context, orig_inst)) {
+        /* Branch Conditional to Link Register  XL-form */
+        next_pc = (unsigned int *)
+            ((*os_context_lr_addr(context)) & ~3);
+    } else if ((op == 19) && (sub_op == 528)
+               && should_branch(context, orig_inst)) {
+        /* Branch Conditional to Count Register  XL-form */
+        next_pc = (unsigned int *)
+            ((*os_context_ctr_addr(context)) & ~3);
+    }
+
+    /* Set the "after" breakpoint. */
+    displaced_after_inst = *next_pc;
+    *next_pc = TRAP_INSTRUCTION(trap_AfterBreakpoint);
+    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned int));
 }
 
 #ifdef LISP_FEATURE_GENCGC
@@ -411,7 +479,9 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
 void
 arch_handle_after_breakpoint(os_context_t *context)
 {
-    *skipped_break_addr = trap_Breakpoint;
+    *skipped_break_addr = TRAP_INSTRUCTION(trap_Breakpoint);
+    os_flush_icache((os_vm_address_t) skipped_break_addr,
+                    sizeof(unsigned int));
     skipped_break_addr = NULL;
     *(unsigned int *)*os_context_pc_addr(context)
         = displaced_after_inst;
