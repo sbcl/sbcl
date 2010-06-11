@@ -108,10 +108,12 @@
       (sb-posix:mkdir #-win32 "/" #+win32 "C:/" 0)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #-win32
-  #.sb-posix::eexist
+  #+darwin
+  #.sb-posix:eisdir
   #+win32
-  #.sb-posix:eacces)
+  #.sb-posix:eacces
+  #-(or darwin win32)
+  #.sb-posix::eexist)
 
 (define-eacces-test mkdir.error.3
   (let* ((dir (merge-pathnames
@@ -167,10 +169,12 @@
       (sb-posix:rmdir #-win32 "/" #+win32 "C:/")
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #-win32
-  #.sb-posix::ebusy
+  #+darwin
+  #.sb-posix:eisdir
   #+win32
-  #.sb-posix::eacces)
+  #.sb-posix::eacces
+  #-(or darwin win32)
+  #.sb-posix::ebusy)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
@@ -504,7 +508,8 @@
   nil)
 
 (deftest readdir.1
-  (let ((dir (sb-posix:opendir "/")))
+  (let ((dir (sb-posix:opendir "/"))
+        (sb-alien::*default-c-string-external-format* :latin-1))
     (unwind-protect
        (block dir-loop
          (loop for dirent = (sb-posix:readdir dir)
