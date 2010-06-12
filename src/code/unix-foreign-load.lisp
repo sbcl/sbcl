@@ -46,6 +46,9 @@
   (dlerror)
   (let (dlerror)
     (cond ((and (not objp) *runtime-dlhandle*)
+           ;; CLH: if we're on darwin/ppc we can't close
+           ;; *runtime-dlhandle* for some reason, so don't.
+           #!-(and darwin ppc)
            (dlclose *runtime-dlhandle*)
            (setf dlerror (dlerror)
                  *runtime-dlhandle* nil))
