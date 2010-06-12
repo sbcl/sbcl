@@ -126,6 +126,15 @@
 (define-call* "unlink" int minusp (pathname filename))
 (define-call #-netbsd "opendir" #+netbsd "_opendir"
     (* t) null-alien (pathname filename))
+#+inode64
+(define-call ("readdir" :c-name "readdir$INODE64" :options :largefile)
+  (* dirent)
+  ;; readdir() has the worst error convention in the world.  It's just
+  ;; too painful to support.  (return is NULL _and_ errno "unchanged"
+  ;; is not an error, it's EOF).
+  not
+  (dir (* t)))
+#-inode64
 (define-call (#-netbsd "readdir" #+netbsd "_readdir" :options :largefile)
   (* dirent)
   ;; readdir() has the worst error convention in the world.  It's just

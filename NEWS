@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.39:
+  * bug fix: readdir now works on :inode64 darwin builds (lp#592897)
   * bug fix: Name conflicts between symbols passed as arguments to a
 single call to IMPORT no longer add multiple symbols with the same name
 to the package (detectable via DO-SYMBOLS).
