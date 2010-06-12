@@ -12,7 +12,7 @@
 CFLAGS = -g -Wall -O2 -fdollars-in-identifiers -mmacosx-version-min=10.4
 LINKFLAGS += -mmacosx-version-min=10.4
 
-OS_SRC = bsd-os.c darwin-os.c ppc-darwin-os.c darwin-langinfo.c
+OS_SRC = bsd-os.c darwin-os.c ppc-darwin-os.c
 ifdef LISP_FEATURE_DLSHIM
   OS_SRC += darwin-dlshim.c
 endif

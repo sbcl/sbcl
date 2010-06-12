@@ -508,8 +508,7 @@
   nil)
 
 (deftest readdir.1
-  (let ((dir (sb-posix:opendir "/"))
-        (sb-alien::*default-c-string-external-format* :latin-1))
+  (let ((dir (sb-posix:opendir "/")))
     (unwind-protect
        (block dir-loop
          (loop for dirent = (sb-posix:readdir dir)

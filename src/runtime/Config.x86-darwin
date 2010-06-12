@@ -19,7 +19,7 @@ CFLAGS += -mmacosx-version-min=10.4
 LINKFLAGS += -mmacosx-version-min=10.4
 endif
 
-OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c darwin-langinfo.c
+OS_SRC = bsd-os.c x86-bsd-os.c darwin-os.c x86-darwin-os.c
 ifdef LISP_FEATURE_DLSHIM
   OS_SRC += darwin-dlshim.c
 endif
