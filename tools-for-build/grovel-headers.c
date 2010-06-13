@@ -37,11 +37,7 @@
   #include <sys/ioctl.h>
   #include <sys/termios.h>
   #include <langinfo.h>
-  #ifdef LISP_FEATURE_DLSHIM
-    #include "../src/runtime/darwin-dlshim.h"
-  #else
-    #include <dlfcn.h>
-  #endif
+  #include <dlfcn.h>
 #endif
 
 #include <sys/stat.h>

@@ -324,7 +324,6 @@ ldso_stub__ ## fct: ;                  \\
                    "unlockpt")
                  #!+openbsd
                  '("openpty")
-                 #!-dlshim
                  '("dlclose"
                    "dlerror"
                    "dlopen"

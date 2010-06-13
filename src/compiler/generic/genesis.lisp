@@ -1597,11 +1597,11 @@ core and return a descriptor to it."
                                 (subseq line (1+ p2)))
                         (values (parse-integer line :end p1 :radix 16)
                                 (subseq line (1+ p2))))
-                  ; KLUDGE CLH 2010-05-31: on darwin, nm gives us
+                  ;; KLUDGE CLH 2010-05-31: on darwin, nm gives us
                   ;; _function but dlsym expects us to look up
                   ;; function, without the leading _ . Therefore, we
                   ;; strip it off here.
-                  #!+(and darwin (not dlshim))
+                  #!+darwin
                   (when (equal (char name 0) #\_)
                     (setf name (subseq name 1)))
                   (multiple-value-bind (old-value found)
