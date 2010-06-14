@@ -92,11 +92,12 @@
                (inst push other)
                (inst push target)
                (emit-label get-tls-index-lock)
-               (inst mov target 1)
-               (zeroize rax-tn)
-               (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*)
-                     target :lock)
-               (inst jmp :ne get-tls-index-lock)
+               (let ((not-rax ,(if (eql 'rax reg) 'other 'target)))
+                 (inst mov not-rax 1)
+                 (zeroize rax-tn)
+                 (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*)
+                       not-rax :lock)
+                 (inst jmp :ne get-tls-index-lock))
                ;; The symbol is now in OTHER.
                (inst pop other)
                ;; Now with the lock held, see if the symbol's tls index has been
