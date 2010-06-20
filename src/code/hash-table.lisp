@@ -24,12 +24,12 @@
   ;; values: the index hashing and T if that might change with the
   ;; next GC.
   (hash-fun (missing-arg) :type function :read-only t)
-  ;; how much to grow the hash table by when it fills up. If an index,
+  ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
   (rehash-size (missing-arg) :type (or index (single-float (1.0)))
                :read-only t)
-  ;; how full the hash table has to get before we rehash
+  ;; How full the hash table has to get before we rehash
   (rehash-threshold (missing-arg) :type (single-float (0.0) 1.0) :read-only t)
   ;; The number of entries before a rehash, just one less than the
   ;; size of the next-vector, hash-vector, and half the size of the
@@ -54,21 +54,18 @@
   (cache nil :type (or null index))
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector (missing-arg)
-                :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
+  (index-vector (missing-arg) :type (simple-array sb!vm:word (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets and the free list. A slot will only ever be in
   ;; one of these lists.
-  (next-vector (missing-arg)
-               :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
+  (next-vector (missing-arg) :type (simple-array sb!vm:word (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
   ;; respective key.
-  (hash-vector nil :type (or null (simple-array (unsigned-byte
-                                                 #.sb!vm:n-word-bits) (*))))
+  (hash-vector nil :type (or null (simple-array sb!vm:word (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (spinlock (sb!thread::make-spinlock :name "hash-table lock")
             :type sb!thread::spinlock :read-only t)
