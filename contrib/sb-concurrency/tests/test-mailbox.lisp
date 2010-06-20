@@ -148,8 +148,8 @@
 (deftest mailbox.single-producer-single-consumer
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 1
-                                      :n-messages 10000)
-  (:received . 10000)
+                                      :n-messages 1000)
+  (:received . 1000)
   (:garbage  . 0)
   (:errors   . 0)
   (:timeouts . 0))
@@ -157,17 +157,17 @@
 (deftest mailbox.single-producer-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 100
-                                      :n-messages 10000)
-  (:received . 10000)
+                                      :n-messages 1000)
+  (:received . 1000)
   (:garbage  . 0)
   (:errors   . 0)
   (:timeouts . 0))
 
 (deftest mailbox.multiple-producers-single-consumer
-    (test-mailbox-producers-consumers :n-senders 100
+    (test-mailbox-producers-consumers :n-senders 10
                                       :n-receivers 1
                                       :n-messages 100)
-  (:received . 10000)
+  (:received . 1000)
   (:garbage  . 0)
   (:errors   . 0)
   (:timeouts . 0))
@@ -175,8 +175,8 @@
 (deftest mailbox.multiple-producers-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 100
                                       :n-receivers 100
-                                      :n-messages 10000)
-  (:received . 1000000)
+                                      :n-messages 1000)
+  (:received . 100000)
   (:garbage  . 0)
   (:errors   . 0)
   (:timeouts . 0))
