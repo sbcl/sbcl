@@ -9,7 +9,7 @@
   :depends-on (sb-posix sb-bsd-sockets)
   :version "0.2"
   #+sb-building-contrib :pathname
-  #+sb-building-contrib "SYS:CONTRIB;ASDF-INSTALL;"
+  #+sb-building-contrib #p"SYS:CONTRIB;ASDF-INSTALL;"
   :components ((:file "defpackage")
                (:file "installer" :depends-on ("defpackage"))))
 

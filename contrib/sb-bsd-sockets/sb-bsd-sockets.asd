@@ -8,7 +8,7 @@
     :version "0.58"
     :depends-on (sb-grovel)
     #+sb-building-contrib :pathname
-    #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
+    #+sb-building-contrib #p"SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
                  (:file "split" :depends-on ("defpackage"))
                  #+win32

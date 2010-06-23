@@ -7,7 +7,7 @@
 (defsystem sb-posix
     :depends-on (sb-grovel)
     #+sb-building-contrib :pathname
-    #+sb-building-contrib "SYS:CONTRIB;SB-POSIX;"
+    #+sb-building-contrib #p"SYS:CONTRIB;SB-POSIX;"
     :components ((:file "defpackage")
                  (:file "designator" :depends-on ("defpackage"))
                  (:file "macros" :depends-on ("designator"))

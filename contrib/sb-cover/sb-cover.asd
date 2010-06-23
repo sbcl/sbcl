@@ -2,7 +2,7 @@
 
 (defsystem sb-cover
     #+sb-building-contrib :pathname
-    #+sb-building-contrib "SYS:CONTRIB;SB-COVER;"
+    #+sb-building-contrib #p"SYS:CONTRIB;SB-COVER;"
     :depends-on (sb-md5)
     :components ((:file "cover")))
 

@@ -7,7 +7,7 @@
     :author "Kevin Rosenberg <kevin@rosenberg.net>"
     :description "An AllegroCL compatible REPL"
     #+sb-building-contrib :pathname
-    #+sb-building-contrib "SYS:CONTRIB;SB-ACLREPL;"
+    #+sb-building-contrib #p"SYS:CONTRIB;SB-ACLREPL;"
     :components ((:file "toplevel")
                  (:file "repl" :depends-on ("toplevel"))
                  (:file "inspect" :depends-on ("repl"))

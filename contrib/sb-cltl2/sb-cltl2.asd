@@ -6,7 +6,7 @@
 (defsystem sb-cltl2
     :description "Functionality mentioned in CLtL2 but not present in ANSI."
     #+sb-building-contrib :pathname
-    #+sb-building-contrib "SYS:CONTRIB;SB-CLTL2;"
+    #+sb-building-contrib #p"SYS:CONTRIB;SB-CLTL2;"
     :components ((:file "defpackage")
                  (:file "compiler-let" :depends-on ("defpackage"))
                  (:file "macroexpand" :depends-on ("defpackage"))
