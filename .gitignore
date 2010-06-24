@@ -37,4 +37,5 @@ contrib/*/test-passed
 contrib/*/foo.c
 contrib/*/a.out
 contrib/*/a.exe
+contrib/asdf/asdf-upstream
 contrib/sb-cover/test-output
