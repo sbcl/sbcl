@@ -239,17 +239,17 @@
 (define-vop (unwind-to-frame-and-call)
     (:args (ofp :scs (descriptor-reg))
            (uwp :scs (descriptor-reg))
-           (function :scs (descriptor-reg)))
+           (function :scs (descriptor-reg) :to :load :target saved-function))
   (:arg-types system-area-pointer system-area-pointer t)
   (:temporary (:sc sap-reg) temp)
+  (:temporary (:sc descriptor-reg :offset rbx-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
   (:generator 22
     ;; Store the function into a non-stack location, since we'll be
     ;; unwinding the stack and destroying register contents before we
-    ;; use it.
-    (store-tl-symbol-value function
-                           *unwind-to-frame-function*
-                           temp)
+    ;; use it.  It turns out that RBX is preserved as part of the
+    ;; normal multiple-value handling of an unwind, so use that.
+    (move saved-function function)
 
     ;; Allocate space for magic UWP block.
     (inst sub rsp-tn (* unwind-block-size n-word-bytes))
@@ -270,8 +270,8 @@
     (inst jmp temp-reg-tn)
     ENTRY-LABEL
 
-    ;; Load function from symbol
-    (load-tl-symbol-value block *unwind-to-frame-function*)
+    ;; Move our saved function to where we want it now.
+    (move block saved-function)
 
     ;; No parameters
     (zeroize rcx-tn)
