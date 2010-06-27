@@ -14,6 +14,7 @@
 set -e
 
 BASE=`dirname "$0"`
+BASE=`readlink -f ${BASE}`
 CORE_DEFINED=no
 
 for arg in $*; do
