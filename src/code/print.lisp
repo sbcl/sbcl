@@ -1277,71 +1277,63 @@
   ;; FIXME: I think only FORMAT-DOLLARS calls FLONUM-TO-STRING with
   ;; possibly-negative X.
   (setf x (abs x))
-  (cond ((zerop x)
-         ;; Zero is a special case which FLOAT-STRING cannot handle.
-         (if fdigits
-             (let ((s (make-string (1+ fdigits) :initial-element #\0)))
-               (setf (schar s 0) #\.)
-               (values s (length s) t (zerop fdigits) 0))
-             (values "." 1 t t 0)))
-        (t
-         (multiple-value-bind (e string)
-             (if fdigits
-                 (flonum-to-digits x (min (- (+ fdigits (or scale 0)))
-                                          (- (or fmin 0))))
-                 (if (and width (> width 1))
-                     (let ((w (multiple-value-list
-                               (flonum-to-digits x
-                                                 (max 1
-                                                      (+ (1- width)
-                                                         (if (and scale (minusp scale))
-                                                             scale 0)))
-                                                 t)))
-                           (f (multiple-value-list
-                               (flonum-to-digits x (- (+ (or fmin 0)
-                                                         (if scale scale 0)))))))
-                       (cond
-                         ((>= (length (cadr w)) (length (cadr f)))
-                          (values-list w))
-                         (t (values-list f))))
-                     (flonum-to-digits x)))
-           (let ((e (+ e (or scale 0)))
-                 (stream (make-string-output-stream)))
-             (if (plusp e)
-                 (progn
-                   (write-string string stream :end (min (length string)
-                                                         e))
-                   (dotimes (i (- e (length string)))
-                     (write-char #\0 stream))
-                   (write-char #\. stream)
-                   (write-string string stream :start (min (length
-                                                            string) e))
-                   (when fdigits
-                     (dotimes (i (- fdigits
-                                    (- (length string)
-                                       (min (length string) e))))
-                       (write-char #\0 stream))))
-                 (progn
-                   (write-string "." stream)
-                   (dotimes (i (- e))
-                     (write-char #\0 stream))
-                   (write-string string stream)
-                   (when fdigits
-                     (dotimes (i (+ fdigits e (- (length string))))
-                       (write-char #\0 stream)))))
-             (let ((string (get-output-stream-string stream)))
-               (values string (length string)
-                       (char= (char string 0) #\.)
-                       (char= (char string (1- (length string))) #\.)
-                       (position #\. string))))))))
+  (multiple-value-bind (e string)
+      (if fdigits
+          (flonum-to-digits x (min (- (+ fdigits (or scale 0)))
+                                   (- (or fmin 0))))
+          (if (and width (> width 1))
+              (let ((w (multiple-value-list
+                        (flonum-to-digits x
+                                          (max 1
+                                               (+ (1- width)
+                                                  (if (and scale (minusp scale))
+                                                      scale 0)))
+                                          t)))
+                    (f (multiple-value-list
+                        (flonum-to-digits x (- (+ (or fmin 0)
+                                                  (if scale scale 0)))))))
+                (cond
+                  ((>= (length (cadr w)) (length (cadr f)))
+                   (values-list w))
+                  (t (values-list f))))
+              (flonum-to-digits x)))
+    (let ((e (+ e (or scale 0)))
+          (stream (make-string-output-stream)))
+      (if (plusp e)
+          (progn
+            (write-string string stream :end (min (length string) e))
+            (dotimes (i (- e (length string)))
+              (write-char #\0 stream))
+            (write-char #\. stream)
+            (write-string string stream :start (min (length string) e))
+            (when fdigits
+              (dotimes (i (- fdigits
+                             (- (length string)
+                                (min (length string) e))))
+                (write-char #\0 stream))))
+          (progn
+            (write-string "." stream)
+            (dotimes (i (- e))
+              (write-char #\0 stream))
+            (write-string string stream)
+            (when fdigits
+              (dotimes (i (+ fdigits e (- (length string))))
+                (write-char #\0 stream)))))
+      (let ((string (get-output-stream-string stream)))
+        (values string (length string)
+                (char= (char string 0) #\.)
+                (char= (char string (1- (length string))) #\.)
+                (position #\. string))))))
 
-;;; implementation of figure 1 from Burger and Dybvig, 1996.  As the
-;;; implementation of the Dragon from Classic CMUCL (and previously in
-;;; SBCL above FLONUM-TO-STRING) says: "DO NOT EVEN THINK OF
-;;; ATTEMPTING TO UNDERSTAND THIS CODE WITHOUT READING THE PAPER!",
-;;; and in this case we have to add that even reading the paper might
-;;; not bring immediate illumination as CSR has attempted to turn
-;;; idiomatic Scheme into idiomatic Lisp.
+;;; implementation of figure 1 from Burger and Dybvig, 1996. It is
+;;; extended in order to handle rounding.
+;;;
+;;; As the implementation of the Dragon from Classic CMUCL (and
+;;; previously in SBCL above FLONUM-TO-STRING) says: "DO NOT EVEN
+;;; THINK OF ATTEMPTING TO UNDERSTAND THIS CODE WITHOUT READING THE
+;;; PAPER!", and in this case we have to add that even reading the
+;;; paper might not bring immediate illumination as CSR has attempted
+;;; to turn idiomatic Scheme into idiomatic Lisp.
 ;;;
 ;;; FIXME: figure 1 from Burger and Dybvig is the unoptimized
 ;;; algorithm, noticeably slow at finding the exponent.  Figure 2 has
@@ -1384,9 +1376,10 @@
                                (r r (* r print-base))
                                (m+ m+ (* m+ print-base))
                                (m- m- (* m- print-base)))
-                              ((not (or (< (* (+ r m+) print-base) s)
-                                        (and (not high-ok)
-                                             (= (* (+ r m+) print-base) s))))
+                              ((not (and (plusp (- r m-)) ; Extension to handle zero
+                                         (or (< (* (+ r m+) print-base) s)
+                                             (and (not high-ok)
+                                                  (= (* (+ r m+) print-base) s)))))
                                (values k (generate r s m+ m-)))))))
                    (generate (r s m+ m-)
                      (let (d tc1 tc2)
