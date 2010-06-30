@@ -16,7 +16,8 @@
 
 (defun extern-alien-name (name)
   (handler-case
-      (coerce name 'base-string)
+      #!-win32 (coerce name 'base-string)
+      #!+win32 (concatenate 'base-string "_" name)
     (error ()
       (error "invalid external alien name: ~S" name))))
 
