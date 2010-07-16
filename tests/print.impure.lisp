@@ -479,4 +479,8 @@
                   (read-from-string
                    (write-to-string *random-state*)))))
 
+(with-test (:name :write-return-value)
+  (assert (= 123 (funcall (compile nil (lambda ()
+                                         (write 123)))))))
+
 ;;; success

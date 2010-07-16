@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes in sbcl-1.0.41 relative to sbcl-1.0.40:
+  * bug fix: WRITE always returns the correct value
+
 changes in sbcl-1.0.40 relative to sbcl-1.0.39:
   * bug fix: readdir now works on :inode64 darwin builds (lp#592897)
   * bug fix: Name conflicts between symbols passed as arguments to a single

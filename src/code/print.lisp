@@ -193,9 +193,11 @@
         (push (list variable value) bind)))
     (unless (assoc 'stream bind)
       (push (list 'stream '*standard-output*) bind))
-    `(let ,(nreverse bind)
-       ,@(when ignore `((declare (ignore ,@ignore))))
-       (output-object ,object stream))))
+    (once-only ((object object))
+      `(let ,(nreverse bind)
+         ,@(when ignore `((declare (ignore ,@ignore))))
+         (output-object ,object stream)
+         ,object))))
 
 (defun prin1 (object &optional stream)
   #!+sb-doc
