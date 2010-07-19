@@ -908,14 +908,15 @@
 ;;; *******************************
 
 (defun update-ctors (reason &key class name generic-function method)
-  (labels ((reset (class &optional ri-cache-p (ctorsp t))
+  (labels ((reset (class &optional initarg-caches-p (ctorsp t))
              (when ctorsp
                (dolist (ctor (plist-value class 'ctors))
                  (install-initial-constructor ctor)))
-             (when ri-cache-p
-               (setf (plist-value class 'ri-initargs) ()))
+             (when initarg-caches-p
+               (dolist (cache '(mi-initargs ri-initargs))
+                 (setf (plist-value class cache) ())))
              (dolist (subclass (class-direct-subclasses class))
-               (reset subclass ri-cache-p ctorsp))))
+               (reset subclass initarg-caches-p ctorsp))))
     (ecase reason
       ;; CLASS must have been specified.
       (finalize-inheritance
@@ -960,6 +961,30 @@
       (let ((class (find-class (ctor-class-or-name ctor) nil)))
         (when (and class (class-finalized-p class))
           (install-optimized-constructor ctor))))))
+
+;;; FIXME: CHECK-FOO-INITARGS share most of their bodies.
+(defun check-mi-initargs (class initargs)
+  (let* ((class-proto (class-prototype class))
+         (keys (plist-keys initargs))
+         (cache (plist-value class 'mi-initargs))
+         (cached (assoc keys cache :test #'equal))
+         (invalid-keys
+          (if (consp cached)
+              (cdr cached)
+              (let ((invalid
+                     (check-initargs-1
+                      class initargs
+                      (list (list* 'allocate-instance class initargs)
+                            (list* 'initialize-instance class-proto initargs)
+                            (list* 'shared-initialize class-proto t initargs))
+                      t nil)))
+                (setf (plist-value class 'mi-initargs)
+                      (acons keys invalid cache))
+                invalid))))
+    (when invalid-keys
+      ;; FIXME: should have an operation here, and maybe a set of
+      ;; valid keys.
+      (error 'initarg-error :class class :initargs invalid-keys))))
 
 (defun check-ri-initargs (instance initargs)
   (let* ((class (class-of instance))

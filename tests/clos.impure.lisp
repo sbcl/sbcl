@@ -1833,5 +1833,33 @@
                                                 "ok!"))
                                        (invoke-restart r))))))
                    (no-primary-method/retry (cons t t))))))
-
+
+;;; test that a cacheing strategy for make-instance initargs checking
+;;; can handle class redefinitions
+(defclass cacheing-initargs-redefinitions-check ()
+  ((slot :initarg :slot)))
+(defun cacheing-initargs-redefinitions-check-fun (&optional (initarg :slot))
+  (declare (notinline make-instance))
+  (make-instance 'cacheing-initargs-redefinitions-check)
+  (make-instance 'cacheing-initargs-redefinitions-check initarg 3))
+(with-test (:name :make-instance-initargs)
+  (make-instance 'cacheing-initargs-redefinitions-check)
+  (make-instance 'cacheing-initargs-redefinitions-check :slot 3)
+  (cacheing-initargs-redefinitions-check-fun :slot)
+  (assert (raises-error? (cacheing-initargs-redefinitions-check-fun :slot2))))
+(defclass cacheing-initargs-redefinitions-check ()
+  ((slot :initarg :slot2)))
+(with-test (:name :make-instance-redefined-initargs)
+  (make-instance 'cacheing-initargs-redefinitions-check)
+  (make-instance 'cacheing-initargs-redefinitions-check :slot2 3)
+  (cacheing-initargs-redefinitions-check-fun :slot2)
+  (assert (raises-error? (cacheing-initargs-redefinitions-check-fun :slot))))
+(defmethod initialize-instance :after ((class cacheing-initargs-redefinitions-check) &key slot)
+  nil)
+(with-test (:name :make-instance-new-method-initargs)
+  (make-instance 'cacheing-initargs-redefinitions-check)
+  (make-instance 'cacheing-initargs-redefinitions-check :slot2 3)
+  (cacheing-initargs-redefinitions-check-fun :slot2)
+  (let ((thing (cacheing-initargs-redefinitions-check-fun :slot)))
+    (assert (not (slot-boundp thing 'slot)))))
 ;;;; success

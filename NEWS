@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes in sbcl-1.0.41 relative to sbcl-1.0.40:
-  * bug fix: WRITE always returns the correct value
+changes relative to sbcl-1.0.40:
+  * optimization: validity of observed keyword initargs to MAKE-INSTANCE is
+    cached, leading to many fewer expensive calls to
+    COMPUTE-APPLICABLE-METHODS.
+  * bug fix: WRITE always returns the correct value.
 
 changes in sbcl-1.0.40 relative to sbcl-1.0.39:
   * bug fix: readdir now works on :inode64 darwin builds (lp#592897)
