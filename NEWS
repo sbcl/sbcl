@@ -3,6 +3,9 @@ changes relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is
     cached, leading to many fewer expensive calls to
     COMPUTE-APPLICABLE-METHODS.
+  * optimization: in the (unoptimized) general method for MAKE-INSTANCE on a
+    CLASS argument, search for and call an appropriate optimized ctor function
+    if it exists.
   * bug fix: WRITE always returns the correct value.
 
 changes in sbcl-1.0.40 relative to sbcl-1.0.39:

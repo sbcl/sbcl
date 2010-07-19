@@ -29,6 +29,9 @@
   (apply #'make-instance (find-class class) initargs))
 
 (defmethod make-instance ((class class) &rest initargs)
+  (let ((instance-or-nil (maybe-call-ctor class initargs)))
+    (when instance-or-nil
+      (return-from make-instance instance-or-nil)))
   (unless (class-finalized-p class) (finalize-inheritance class))
   (let ((class-default-initargs (class-default-initargs class)))
     (when class-default-initargs

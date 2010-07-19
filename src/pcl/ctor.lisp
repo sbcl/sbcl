@@ -124,7 +124,7 @@
 ;;; funcallable instance is set to it.
 ;;;
 (!defstruct-with-alternate-metaclass ctor
-  :slot-names (function-name class-or-name class initargs safe-p)
+  :slot-names (function-name class-or-name class initargs state safe-p)
   :boa-constructor %make-ctor
   :superclass-name function
   :metaclass-name static-classoid
@@ -142,7 +142,8 @@
 ;;; optimized constructor function when called.
 (defun install-initial-constructor (ctor &key force-p)
   (when (or force-p (ctor-class ctor))
-    (setf (ctor-class ctor) nil)
+    (setf (ctor-class ctor) nil
+          (ctor-state ctor) 'initial)
     (setf (funcallable-instance-fun ctor)
           #'(lambda (&rest args)
               (install-optimized-constructor ctor)
@@ -163,7 +164,7 @@
 ;;; Keep this a separate function for testing.
 (defun make-ctor (function-name class-name initargs safe-p)
   (without-package-locks ; for (setf symbol-function)
-    (let ((ctor (%make-ctor function-name class-name nil initargs safe-p)))
+    (let ((ctor (%make-ctor function-name class-name nil initargs nil safe-p)))
       (install-initial-constructor ctor :force-p t)
       (push ctor *all-ctors*)
       (setf (fdefinition function-name) ctor)
@@ -465,14 +466,15 @@
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
       (pushnew ctor (plist-value class 'ctors) :test #'eq)
-      (setf (funcallable-instance-fun ctor)
-            (multiple-value-bind (form locations names)
-                (constructor-function-form ctor)
+      (multiple-value-bind (form locations names optimizedp)
+          (constructor-function-form ctor)
+        (setf (funcallable-instance-fun ctor)
               (apply
                (let ((*compiling-optimized-constructor* t))
                  (handler-bind ((compiler-note #'muffle-warning))
                    (compile nil `(lambda ,names ,form))))
-               locations))))))
+               locations)
+              (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
 (defun constructor-function-form (ctor)
   (let* ((class (ctor-class ctor))
@@ -617,7 +619,8 @@
              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
            ,(wrap-in-allocate-forms ctor body before-method-p)))
        locations
-       names))))
+       names
+       t))))
 
 ;;; Return a form wrapped around BODY that allocates an instance
 ;;; constructed by CTOR.  BEFORE-METHOD-P set means we have to run
@@ -964,6 +967,28 @@
       (let ((class (find-class (ctor-class-or-name ctor) nil)))
         (when (and class (class-finalized-p class))
           (install-optimized-constructor ctor))))))
+
+(defun maybe-call-ctor (class initargs)
+  (flet ((frob-initargs (ctor)
+           (do ((ctail (ctor-initargs ctor))
+                (itail initargs)
+                (args nil))
+               ((or (null ctail) (null itail))
+                (values (nreverse args) (and (null ctail) (null itail))))
+             (unless (eq (pop ctail) (pop itail))
+               (return nil))
+             (let ((cval (pop ctail))
+                   (ival (pop itail)))
+               (if (constantp cval)
+                   (unless (eql cval ival)
+                     (return nil))
+                   (push ival args))))))
+    (dolist (ctor (plist-value class 'ctors))
+      (when (eq (ctor-state ctor) 'optimized)
+        (multiple-value-bind (ctor-args matchp)
+            (frob-initargs ctor)
+          (when matchp
+            (return (apply ctor ctor-args))))))))
 
 ;;; FIXME: CHECK-FOO-INITARGS share most of their bodies.
 (defun check-mi-initargs (class initargs)
