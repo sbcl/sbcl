@@ -103,6 +103,7 @@
                   *the-class-std-class*
                   *the-class-standard-class*
                   *the-class-funcallable-standard-class*
+                  *the-class-forward-referenced-class*
                   *the-class-method*
                   *the-class-standard-method*
                   *the-class-standard-reader-method*
