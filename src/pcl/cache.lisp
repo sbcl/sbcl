@@ -53,7 +53,7 @@
 ;;;;
 ;;;; * Since the cache is used for memoization only we don't need to
 ;;;;   worry about which of simultaneous replacements (when expanding
-;;;;   the cache) takes place: the loosing one will have its work
+;;;;   the cache) takes place: the losing one will have its work
 ;;;;   redone later. This also allows us to drop entries when the
 ;;;;   cache is about to grow insanely huge.
 ;;;;
@@ -336,8 +336,8 @@
              (cache-mask copy) (compute-cache-mask length (cache-line-size cache))
              (cache-limit copy) (compute-limit (/ length (cache-line-size cache))))
        ;; First insert the new one -- if we don't do this first and
-       ;; the cache has reached it's maximum size we may end up
-       ;; looping in FILL-CACHE.
+       ;; the cache has reached its maximum size we may end up looping
+       ;; in FILL-CACHE.
        (unless (try-update-cache copy layouts value)
          (bug "Could not insert ~S:~S to supposedly empty ~S." layouts value copy))
        (map-cache (if drop-random-entries
@@ -348,9 +348,9 @@
                       ;; rut: add A causing B to drop, then add B
                       ;; causing A to drop... repeat ad nauseam,
                       ;; spending most of the time here instead of
-                      ;; doing real work. 50% because if we drop to
+                      ;; doing real work. 50% because if we drop too
                       ;; few we need to do this almost right away
-                      ;; again, and if we drop to many, we need to
+                      ;; again, and if we drop too many, we need to
                       ;; recompute more then we'd like.
                       ;; _Experimentally_ 50% seems to perform the
                       ;; best, but it would be nice to have a proper

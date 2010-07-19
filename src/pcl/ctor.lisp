@@ -348,9 +348,9 @@
 
 (define-compiler-macro make-instance (&whole form &rest args &environment env)
   (declare (ignore args))
-  ;; Compiling an optimized constructor for a non-standard class means compiling a
-  ;; lambda with (MAKE-INSTANCE #<SOME-CLASS X> ...) in it -- need
-  ;; to make sure we don't recurse there.
+  ;; Compiling an optimized constructor for a non-standard class means
+  ;; compiling a lambda with (MAKE-INSTANCE #<SOME-CLASS X> ...) in it
+  ;; -- need to make sure we don't recurse there.
   (or (unless *compiling-optimized-constructor*
         (make-instance->constructor-call form (safe-code-p env)))
       form))
@@ -402,9 +402,9 @@
                 (setf (info :function :where-from function-name) :defined)
                 (when (info :function :assumed-type function-name)
                   (setf (info :function :assumed-type function-name) nil)))
-              ;; Return code constructing a ctor at load time, which, when
-              ;; called, will set its funcallable instance function to an
-              ;; optimized constructor function.
+              ;; Return code constructing a ctor at load time, which,
+              ;; when called, will set its funcallable instance
+              ;; function to an optimized constructor function.
               `(locally
                    (declare (disable-package-locks ,function-name))
                  (let ((.x. (load-time-value
@@ -420,7 +420,8 @@
                            ,function-name))
                    (funcall (function ,function-name) ,@value-forms))))
             (when (and class-arg (not (constantp class-arg)))
-              ;; Build an inline cache: a CONS, with the actual cache in the CDR.
+              ;; Build an inline cache: a CONS, with the actual cache
+              ;; in the CDR.
               `(locally (declare (disable-package-locks .cache. .class-arg. .store. .fun.
                                                         make-instance))
                  (let* ((.cache. (load-time-value (cons 'ctor-cache nil)))
@@ -428,9 +429,10 @@
                         (.class-arg. ,class-arg))
                    (multiple-value-bind (.fun. .new-store.)
                        (ensure-cached-ctor .class-arg. .store. ',initargs ',safe-code-p)
-                     ;; Thread safe: if multiple threads hit this in paralle, the update
-                     ;; from the other one is just lost -- no harm done, except for the
-                     ;; need to redo the work next time.
+                     ;; Thread safe: if multiple threads hit this in
+                     ;; parallel, the update from the other one is
+                     ;; just lost -- no harm done, except for the need
+                     ;; to redo the work next time.
                      (unless (eq .store. .new-store.)
                        (setf (cdr .cache.) .new-store.))
                      (funcall (truly-the function .fun.) ,@value-forms))))))))))
@@ -582,8 +584,9 @@
         `(lambda ,lambda-list
            (declare #.*optimize-speed*)
            ;; The CTOR MAKE-INSTANCE optimization checks for
-           ;; *COMPILING-OPTIMIZED-CONSTRUCTOR* which is bound around compilation of
-           ;; the constructor, hence avoiding the possibility of endless recursion.
+           ;; *COMPILING-OPTIMIZED-CONSTRUCTOR* which is bound around
+           ;; compilation of the constructor, hence avoiding the
+           ;; possibility of endless recursion.
            (make-instance ,class ,@initargs))
         (let ((defaults (class-default-initargs class)))
           (when defaults
