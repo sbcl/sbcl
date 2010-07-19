@@ -932,8 +932,16 @@
        (flet ((class-of-1st-method-param (method)
                 (type-class (first (method-specializers method)))))
          (case (generic-function-name generic-function)
-           ((make-instance allocate-instance
-             initialize-instance shared-initialize)
+           ((make-instance allocate-instance)
+            ;; FIXME: I can't see a way of working out which classes a
+            ;; given metaclass specializer are applicable to short of
+            ;; iterating and testing with class-of.  It would be good
+            ;; to not invalidate caches of system classes at this
+            ;; point (where it is not legal to define a method
+            ;; applicable to them on system functions).  -- CSR,
+            ;; 2010-07-13
+            (reset (find-class 'standard-object) t t))
+           ((initialize-instance shared-initialize)
             (reset (class-of-1st-method-param method) t t))
            ((reinitialize-instance)
             (reset (class-of-1st-method-param method) t nil))
@@ -956,8 +964,8 @@
 (defun check-ri-initargs (instance initargs)
   (let* ((class (class-of instance))
          (keys (plist-keys initargs))
-         (cached (assoc keys (plist-value class 'ri-initargs)
-                        :test #'equal))
+         (cache (plist-value class 'ri-initargs))
+         (cached (assoc keys cache :test #'equal))
          (invalid-keys
           (if (consp cached)
               (cdr cached)
@@ -971,7 +979,7 @@
                             (list* 'shared-initialize instance nil initargs))
                       t nil)))
                 (setf (plist-value class 'ri-initargs)
-                      (acons keys invalid cached))
+                      (acons keys invalid cache))
                 invalid))))
     (when invalid-keys
       (error 'initarg-error :class class :initargs invalid-keys))))
