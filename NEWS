@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.40:
+changes in sbcl-1.0.41 relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is
     cached, leading to many fewer expensive calls to
     COMPUTE-APPLICABLE-METHODS.
