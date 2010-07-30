@@ -1112,7 +1112,9 @@
             (assert (= (method-on-defined-type-and-class 3) 4)))))
 
 ;; bug 281
-(let ((sb-pcl::*max-emf-precomputation-methods* 0))
+(let (#+nil ; no more sb-pcl::*max-emf-precomputation-methods* as of
+            ; sbcl-1.0.41.x
+      (sb-pcl::*max-emf-precomputation-methods* 0))
   (eval '(defgeneric bug-281 (x)
           (:method-combination +)
           (:method ((x symbol)) 1)

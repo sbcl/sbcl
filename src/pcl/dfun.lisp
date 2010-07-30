@@ -272,10 +272,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     (:include dfun-info)
                     (:copier nil)))
 
-(defstruct (initial-dispatch (:constructor initial-dispatch-dfun-info ())
-                             (:include dfun-info)
-                             (:copier nil)))
-
 (defstruct (dispatch (:constructor dispatch-dfun-info ())
                      (:include dfun-info)
                      (:copier nil)))
@@ -674,7 +670,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (make-dispatch-dfun gf))
 
 (defun update-dispatch-dfuns ()
-  (dolist (gf (gfs-of-type '(dispatch initial-dispatch)))
+  (dolist (gf (gfs-of-type '(dispatch)))
     (dfun-update gf #'make-dispatch-dfun)))
 
 (defun make-final-ordinary-dfun-cache
@@ -732,71 +728,21 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
 
-;;; This variable is used for controlling the load-time effective
-;;; method precomputation: precomputation will only be done for emfs
-;;; with fewer than methods than this value. This value has
-;;; traditionally been NIL on SBCL (meaning that precomputation will
-;;; always be done) but that makes method loading O(n^2). Use a small
-;;; value for now, to flush out any possible problems that doing a
-;;; limited amount of precomputation might cause. If none appear, we
-;;; might change it to a larger value later. -- JES, 2006-12-01
-(declaim (type (or null unsigned-byte) *max-emf-precomputation-methods*))
-(defvar *max-emf-precomputation-methods* 1)
-
-(defun finalize-specializers (gf)
-  (let ((methods (generic-function-methods gf)))
-    (when (or (null *max-emf-precomputation-methods*)
-              (<= (length methods) *max-emf-precomputation-methods*))
-      (let ((all-finalized t))
-        (dolist (method methods all-finalized)
-          (dolist (specializer (method-specializers method))
-            (when (and (classp specializer)
-                       (not (class-finalized-p specializer)))
-              (if (class-has-a-forward-referenced-superclass-p specializer)
-                  (setq all-finalized nil)
-                  (finalize-inheritance specializer)))))))))
-
 (defun make-initial-dfun (gf)
-  (let ((initial-dfun
-         #'(lambda (&rest args)
-             (initial-dfun gf args))))
+  (let ((initial-dfun #'(lambda (&rest args) (initial-dfun gf args))))
     (multiple-value-bind (dfun cache info)
-        (cond
-          ((and (eq **boot-state** 'complete)
-                (not (finalize-specializers gf)))
-           (values initial-dfun nil (initial-dfun-info)))
-          ((and (eq **boot-state** 'complete)
-                (compute-applicable-methods-emf-std-p gf))
-           (let* ((caching-p (use-caching-dfun-p gf))
-                  ;; KLUDGE: the only effect of this (when
-                  ;; *LAZY-DFUN-COMPUTE-P* is true, as it usually is)
-                  ;; is to signal an error when we try to add methods
-                  ;; with the wrong qualifiers to a generic function.
-                  (classes-list (precompute-effective-methods
-                                 gf caching-p
-                                 (not *lazy-dfun-compute-p*))))
-             (if *lazy-dfun-compute-p*
-                 (cond ((use-dispatch-dfun-p gf caching-p)
-                        (values initial-dfun
-                                nil
-                                (initial-dispatch-dfun-info)))
-                       (caching-p
-                        (insure-caching-dfun gf)
-                        (values initial-dfun nil (initial-dfun-info)))
-                       (t
-                        (values initial-dfun nil (initial-dfun-info))))
-                 (make-final-dfun-internal gf classes-list))))
-          (t
-           (let ((arg-info (if (early-gf-p gf)
-                               (early-gf-arg-info gf)
-                               (gf-arg-info gf)))
-                 (type nil))
-             (if (and (gf-precompute-dfun-and-emf-p arg-info)
-                      (setq type (final-accessor-dfun-type gf)))
-                 (if *early-p*
-                     (values (make-early-accessor gf type) nil nil)
-                     (make-final-accessor-dfun gf type))
-                 (values initial-dfun nil (initial-dfun-info))))))
+        (if (eq **boot-state** 'complete)
+            (values initial-dfun nil (initial-dfun-info))
+            (let ((arg-info (if (early-gf-p gf)
+                                (early-gf-arg-info gf)
+                                (gf-arg-info gf)))
+                  (type nil))
+              (if (and (gf-precompute-dfun-and-emf-p arg-info)
+                       (setq type (final-accessor-dfun-type gf)))
+                  (if *early-p*
+                      (values (make-early-accessor gf type) nil nil)
+                      (make-final-accessor-dfun gf type))
+                  (values initial-dfun nil (initial-dfun-info)))))
       (set-dfun gf dfun cache info))))
 
 (defun make-early-accessor (gf type)
@@ -1464,9 +1410,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 ;;; CMUCL comment: used only in map-all-orders
 (defun class-might-precede-p (class1 class2)
-  (if (not *in-precompute-effective-methods-p*)
-      (not (member class1 (cdr (class-precedence-list class2)) :test #'eq))
-      (class-can-precede-p class1 class2)))
+  (not (member class1 (cdr (class-precedence-list class2)) :test #'eq)))
 
 (defun compute-precedence (lambda-list nreq argument-precedence-order)
   (if (null argument-precedence-order)
@@ -1553,7 +1497,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((pred (memq specl (cpl-or-nil type))))
     (values pred
             (or pred
-                (if (not *in-precompute-effective-methods-p*)
+                (if (not *in-*subtypep*)
                     ;; classes might get common subclass
                     (superclasses-compatible-p specl type)
                     ;; worry only about existing classes

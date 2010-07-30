@@ -406,16 +406,10 @@
 (defun gf-requires-emf-keyword-checks (generic-function)
   (member '&key (gf-lambda-list generic-function)))
 
-(defvar *in-precompute-effective-methods-p* nil)
-
 (defun standard-compute-effective-method
     (generic-function combin applicable-methods)
   (collect ((before) (primary) (after) (around))
-    (flet ((invalid (gf combin m)
-             (if *in-precompute-effective-methods-p*
-                 (return-from standard-compute-effective-method
-                   `(%invalid-qualifiers ',gf ',combin ',m))
-                 (invalid-qualifiers gf combin m))))
+    (flet ((invalid (gf combin m) (invalid-qualifiers gf combin m)))
       (dolist (m applicable-methods)
         (let ((qualifiers (if (listp m)
                               (early-method-qualifiers m)

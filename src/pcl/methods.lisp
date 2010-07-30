@@ -1183,35 +1183,6 @@
         (class-eq (cadr type))
         (class (cadr type)))))
 
-(defun precompute-effective-methods (gf caching-p &optional classes-list-p)
-  (let* ((arg-info (gf-arg-info gf))
-         (methods (generic-function-methods gf))
-         (precedence (arg-info-precedence arg-info))
-         (*in-precompute-effective-methods-p* t)
-         (classes-list nil))
-    (generate-discrimination-net-internal
-     gf methods nil
-     (lambda (methods known-types)
-       (when methods
-         (when classes-list-p
-           (push (mapcar #'class-from-type known-types) classes-list))
-         (let ((no-eql-specls-p (not (methods-contain-eql-specializer-p
-                                      methods))))
-           (map-all-orders
-            methods precedence
-            (lambda (methods)
-              (get-secondary-dispatch-function1
-               gf methods known-types
-               nil caching-p no-eql-specls-p))))))
-     (lambda (position type true-value false-value)
-       (declare (ignore position type true-value false-value))
-       nil)
-     (lambda (type)
-       (if (and (consp type) (eq (car type) 'eql))
-           `(class-eq ,(class-of (cadr type)))
-           type)))
-    classes-list))
-
 ;;; We know that known-type implies neither new-type nor `(not ,new-type).
 (defun augment-type (new-type known-type)
   (if (or (eq known-type t)

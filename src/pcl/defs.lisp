@@ -155,16 +155,14 @@
 ;;;
 ;;; FIXME: SB-KERNEL has fast-and-not-quite-precise type code for use
 ;;; in the compiler. Could we share some of it here?
+(defvar *in-*subtypep* nil)
+
 (defun *subtypep (type1 type2)
   (if (equal type1 type2)
       (values t t)
       (if (eq **boot-state** 'early)
           (values (eq type1 type2) t)
-          (let ((*in-precompute-effective-methods-p* t))
-            (declare (special *in-precompute-effective-methods-p*))
-            ;; FIXME: *IN-PRECOMPUTE-EFFECTIVE-METHODS-P* is not a
-            ;; good name. It changes the way
-            ;; CLASS-APPLICABLE-USING-CLASS-P works.
+          (let ((*in-*subtypep* t))
             (setq type1 (*normalize-type type1))
             (setq type2 (*normalize-type type2))
             (case (car type2)
