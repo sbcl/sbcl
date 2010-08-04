@@ -66,6 +66,7 @@ and secondary value."
             (tail (queue-tail queue))
             (first-node-prev (node-prev head))
             (val (node-value head)))
+       (barrier (:read))
        (when (eq head (queue-head queue))
          (cond ((not (eq val +dummy+))
                 (if (eq tail head)

@@ -325,7 +325,12 @@ created and old ones may exit at any time."
   ;; FIXME: this does not work on SMP Pentium Pro and OOSTORE systems,
   ;; neither on most non-x86 architectures (but we don't have threads
   ;; on those).
-  (setf (spinlock-value spinlock) nil))
+  (setf (spinlock-value spinlock) nil)
+
+  ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
+  ;; barrier instead?
+  #!+(not (or x86 x86-64))
+  (barrier (:memory)))
 
 
 ;;;; Mutexes
@@ -364,6 +369,7 @@ HOLDING-MUTEX-P."
            #!-sb-thread (ignore waitp timeout))
   (unless new-owner
     (setq new-owner *current-thread*))
+  (barrier (:read))
   (let ((old (mutex-%owner mutex)))
     (when (eq new-owner old)
       (error "Recursive lock attempt ~S." mutex))
@@ -392,6 +398,7 @@ HOLDING-MUTEX-P."
                         (with-interrupts (%lutex-lock lutex))
                         (%lutex-trylock lutex))))
        (setf (mutex-%owner mutex) new-owner)
+       (barrier (:write))
        t))
     #!-sb-lutex
     ;; This is a direct translation of the Mutex 2 algorithm from
@@ -563,6 +570,7 @@ returning normally, it may do so without holding the mutex."
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (let ((me *current-thread*))
+    (barrier (:read))
     (assert (eq me (mutex-%owner mutex)))
     (/show0 "CONDITION-WAITing")
     #!+sb-lutex
@@ -577,7 +585,8 @@ returning normally, it may do so without holding the mutex."
                (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
                  (with-local-interrupts
                    (%lutex-wait queue-lutex-address mutex-lutex-address)))))
-        (setf (mutex-%owner mutex) me)))
+        (barrier (:write)
+          (setf (mutex-%owner mutex) me))))
     #!-sb-lutex
     ;; Need to disable interrupts so that we don't miss grabbing the
     ;; mutex on our way out.
