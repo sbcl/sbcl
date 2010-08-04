@@ -352,3 +352,38 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:info index)
   (:generator 0
     (inst inc (make-ea-for-vector-data count-vector :offset index))))
+
+;;;; Memory barrier support
+
+#!+memory-barrier-vops
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+#!+memory-barrier-vops
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+    (inst add (make-ea :dword :base esp-tn) 0 :lock)))
+
+#!+memory-barrier-vops
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+    (inst add (make-ea :dword :base esp-tn) 0 :lock)))
+
+#!+memory-barrier-vops
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst add (make-ea :dword :base esp-tn) 0 :lock)))
+
+#!+memory-barrier-vops
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))
