@@ -361,3 +361,38 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     (inst inc (make-ea :qword :base count-vector
                        :disp (- (* (+ vector-data-offset index) n-word-bytes)
                                 other-pointer-lowtag)))))
+
+;;;; Memory barrier support
+
+#!+memory-barrier-vops
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+#!+memory-barrier-vops
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+    (inst mfence)))
+
+#!+memory-barrier-vops
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+    (inst lfence)))
+
+#!+memory-barrier-vops
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst sfence)))
+
+#!+memory-barrier-vops
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))
