@@ -23,6 +23,7 @@ directions.
 * Mutex Support::               
 * Semaphores::                  
 * Waitqueue/condition variables::  
+* Barriers::                    
 * Sessions/Debugging::          
 * Foreign threads::             
 * Implementation (Linux x86/x86-64)::  
@@ -244,6 +245,36 @@ it.
 @include fun-sb-thread-condition-wait.texinfo
 @include fun-sb-thread-condition-notify.texinfo
 @include fun-sb-thread-condition-broadcast.texinfo
+
+@node Barriers
+@comment  node-name,  next,  previous,  up
+@section Barriers
+
+These are based on the Linux kernel barrier design, which is in turn
+based on the Alpha CPU memory model.  They are presently implemented for
+x86, x86-64, and PPC systems, and behave as compiler barriers on all
+other CPUs.
+
+In addition to explicit use of the @code{sb-thread:barrier} macro, the
+following functions and macros also serve as @code{:memory} barriers:
+
+@itemize
+@item
+@code{sb-ext:atomic-decf} and @code{sb-ext:atomic-incf}.
+@item
+@code{sb-ext:compare-and-swap}.
+@item
+@code{sb-thread:get-mutex}, @code{sb-thread:release-mutex},
+@code{sb-thread:with-mutex} and @code{sb-thread:with-recursive-lock}.
+@item
+@code{sb-thread:signal-semaphore}, @code{sb-thread:try-semaphore} and
+@code{sb-thread:wait-on-semaphore}.
+@item
+@code{sb-thread:condition-wait}, @code{sb-thread:condition-notify} and
+@code{sb-thread:condition-broadcast}.
+@end itemize
+
+@include macro-sb-thread-barrier.texinfo
 
 @node Sessions/Debugging
 @comment  node-name,  next,  previous,  up

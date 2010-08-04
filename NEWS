@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.41
   * optimization: the default implementation of
     COMPUTE-DISCRIMINATING-FUNCTION does much less wasted work.
+  * enhancement: Explicit memory barrier operations are now available for use
+    by multithreaded code.  See documentation for details.
 
 changes in sbcl-1.0.41 relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is
