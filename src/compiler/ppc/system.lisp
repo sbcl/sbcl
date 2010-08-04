@@ -234,3 +234,38 @@
       (inst lwz count count-vector offset)
       (inst addi count count 1)
       (inst stw count count-vector offset))))
+
+;;;; Memory barrier support
+
+#!+memory-barrier-vops
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+#!+memory-barrier-vops
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+     (inst sync)))
+
+#!+memory-barrier-vops
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+     (inst sync)))
+
+#!+memory-barrier-vops
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst sync)))
+
+#!+memory-barrier-vops
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))
