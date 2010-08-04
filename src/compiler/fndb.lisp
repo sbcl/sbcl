@@ -1577,6 +1577,16 @@
   ())
 (defknown style-warn (t &rest t) null ())
 
+
+;;;; memory barriers
+
+(defknown sb!vm:%compiler-barrier () (values) ())
+(defknown sb!vm:%memory-barrier () (values) ())
+(defknown sb!vm:%read-barrier () (values) ())
+(defknown sb!vm:%write-barrier () (values) ())
+(defknown sb!vm:%data-dependency-barrier () (values) ())
+
+
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     (unsafe))

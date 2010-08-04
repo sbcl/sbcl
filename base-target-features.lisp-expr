@@ -390,6 +390,10 @@
  ;;   :compare-and-swap-vops
  ;;     The backend implements compare-and-swap VOPs.
  ;;
+ ;;   :memory-barrier-vops
+ ;;     Memory barriers (for multi-threaded synchronization) have been
+ ;;     implemented for this platform.
+ ;;
  ;; operating system features:
  ;;   :unix    = We're intended to run under some Unix-like OS. (This is not
  ;;              exclusive with the features which indicate which particular

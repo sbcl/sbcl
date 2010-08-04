@@ -467,6 +467,9 @@
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
  ("src/compiler/early-assem")
 
+ ;; This has the BARRIER stuff that the threading support needs.
+ ("src/code/barrier")
+
  ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
  ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
  ;; before "compiler/main.lisp" so that those can be coded efficiently
