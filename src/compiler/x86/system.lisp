@@ -372,15 +372,13 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 (define-vop (%read-barrier)
   (:policy :fast-safe)
   (:translate %read-barrier)
-  (:generator 3
-    (inst add (make-ea :dword :base esp-tn) 0 :lock)))
+  (:generator 3))
 
 #!+memory-barrier-vops
 (define-vop (%write-barrier)
   (:policy :fast-safe)
   (:translate %write-barrier)
-  (:generator 3
-    (inst add (make-ea :dword :base esp-tn) 0 :lock)))
+  (:generator 3))
 
 #!+memory-barrier-vops
 (define-vop (%data-dependency-barrier)
