@@ -319,6 +319,11 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection.  This is currently implemented by disabling GC"
+  #!-gencgc
   (declare (ignore objects))            ; should we eval these for side-effect?
+  #!-gencgc
   `(without-gcing
-    ,@body))
+    ,@body)
+  #!+gencgc
+  `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
+     ,@body))

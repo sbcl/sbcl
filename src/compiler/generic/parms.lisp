@@ -71,6 +71,10 @@
     sb!impl::*data-vector-reffers/check-bounds*
     sb!impl::*data-vector-setters/check-bounds*
 
+    ;; non-x86oid gencgc object pinning
+    #!+(and gencgc (not (or x86 x86-64)))
+    *pinned-objects*
+
     ;; hash table weaknesses
     :key
     :value

@@ -55,6 +55,9 @@
 #if defined(LUTEX_WIDETAG)
 #include "pthread-lutex.h"
 #endif
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#include "genesis/cons.h"
+#endif
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
@@ -2533,6 +2536,8 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
     return looks_like_valid_lisp_pointer_p(pointer, start_addr);
 }
 
+#endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+
 /* Adjust large bignum and vector objects. This will adjust the
  * allocated region if the size has shrunk, and move unboxed objects
  * into unboxed pages. The pages are not promoted here, and the
@@ -2751,11 +2756,17 @@ preserve_pointer(void *addr)
      * address referring to something in a CodeObject). This is
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
-     * a pointer which prevents a page from moving. */
+     * a pointer which prevents a page from moving.
+     *
+     * This only needs to happen on x86oids, where this is used for
+     * conservative roots.  Non-x86oid systems only ever call this
+     * function on known-valid lisp objects. */
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     if (!(code_page_p(addr_page_index)
           || (is_lisp_pointer((lispobj)addr) &&
               possibly_valid_dynamic_space_pointer(addr))))
         return;
+#endif
 
     /* Find the beginning of the region.  Note that there may be
      * objects in the region preceding the one that we were passed a
@@ -2834,9 +2845,6 @@ preserve_pointer(void *addr)
     /* Check that the page is now static. */
     gc_assert(page_table[addr_page_index].dont_move != 0);
 }
-
-#endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-
 
 /* If the given page is not write-protected, then scan it for pointers
  * to younger generations or the top temp. generation, if no
@@ -3888,9 +3896,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     unsigned long bytes_freed;
     page_index_t i;
     unsigned long static_space_size;
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     struct thread *th;
-#endif
+
     gc_assert(generation <= HIGHEST_NORMAL_GENERATION);
 
     /* The oldest generation can't be raised. */
@@ -3988,6 +3995,19 @@ garbage_collect_generation(generation_index_t generation, int raise)
             for (ptr = ((void **)th->control_stack_end)-1; ptr >= esp;  ptr--) {
                 preserve_pointer(*ptr);
             }
+        }
+    }
+#else
+    /* Non-x86oid systems don't have "conservative roots" as such, but
+     * the same mechanism is used for objects pinned for use by alien
+     * code. */
+    for_each_thread(th) {
+        lispobj pin_list = SymbolTlValue(PINNED_OBJECTS,th);
+        while (pin_list != NIL) {
+            struct cons *list_entry =
+                (struct cons *)native_pointer(pin_list);
+            preserve_pointer(list_entry->car);
+            pin_list = list_entry->cdr;
         }
     }
 #endif

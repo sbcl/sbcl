@@ -25,6 +25,13 @@
 #!+sb-thread
 (defvar *stop-for-gc-pending*)
 
+;;; This one is initialized by the runtime, at thread creation.  On
+;;; non-x86oid gencgc targets, this is a per-thread list of objects
+;;; which must not be moved during GC.  It is frobbed by the code for
+;;; with-pinned-objects in src/compiler/target/macros.lisp.
+#!+(and gencgc (not (or x86 x86-64)))
+(defvar sb!vm::*pinned-objects*)
+
 (defmacro without-gcing (&body body)
   #!+sb-doc
   "Executes the forms in the body without doing a garbage collection. It
