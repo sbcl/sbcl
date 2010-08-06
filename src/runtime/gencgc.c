@@ -3984,7 +3984,7 @@ scavenge_interrupt_contexts(void)
 
 #endif
 
-#if defined(LISP_FEATURE_SB_THREAD)
+#if defined(LISP_FEATURE_SB_THREAD) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static void
 preserve_context_registers (os_context_t *c)
 {
