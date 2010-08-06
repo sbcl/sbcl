@@ -2545,3 +2545,152 @@ scrub_control_stack(void)
     } while (((unsigned long)++sp) & (BYTES_ZERO_BEFORE_END - 1));
 #endif
 }
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+
+/* scavenging interrupt contexts */
+
+static int boxed_registers[] = BOXED_REGISTERS;
+
+static void
+scavenge_interrupt_context(os_context_t *context)
+{
+    int i;
+
+#ifdef reg_LIP
+    unsigned long lip;
+    unsigned long lip_offset;
+    int lip_register_pair;
+#endif
+    unsigned long pc_code_offset;
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    unsigned long lr_code_offset;
+#endif
+#ifdef ARCH_HAS_NPC_REGISTER
+    unsigned long npc_code_offset;
+#endif
+#ifdef DEBUG_SCAVENGE_VERBOSE
+    fprintf(stderr, "Scavenging interrupt context at 0x%x\n",context);
+#endif
+
+#ifdef reg_LIP
+    /* Find the LIP's register pair and calculate its offset */
+    /* before we scavenge the context. */
+
+    /*
+     * I (RLT) think this is trying to find the boxed register that is
+     * closest to the LIP address, without going past it.  Usually, it's
+     * reg_CODE or reg_LRA.  But sometimes, nothing can be found.
+     */
+    lip = *os_context_register_addr(context, reg_LIP);
+    /* 0x7FFFFFFF on 32-bit platforms;
+       0x7FFFFFFFFFFFFFFF on 64-bit platforms */
+    lip_offset = (((unsigned long)1) << (N_WORD_BITS - 1)) - 1;
+    lip_register_pair = -1;
+    for (i = 0; i < (int)(sizeof(boxed_registers) / sizeof(int)); i++) {
+        unsigned long reg;
+        unsigned long offset;
+        int index;
+
+        index = boxed_registers[i];
+        reg = *os_context_register_addr(context, index);
+        /* would be using PTR if not for integer length issues */
+        if ((reg & ~((1L<<N_LOWTAG_BITS)-1)) <= lip) {
+            offset = lip - reg;
+            if (offset < lip_offset) {
+                lip_offset = offset;
+                lip_register_pair = index;
+            }
+        }
+    }
+#endif /* reg_LIP */
+
+    /* Compute the PC's offset from the start of the CODE */
+    /* register. */
+    pc_code_offset = *os_context_pc_addr(context)
+        - *os_context_register_addr(context, reg_CODE);
+#ifdef ARCH_HAS_NPC_REGISTER
+    npc_code_offset = *os_context_npc_addr(context)
+        - *os_context_register_addr(context, reg_CODE);
+#endif /* ARCH_HAS_NPC_REGISTER */
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    lr_code_offset =
+        *os_context_lr_addr(context) -
+        *os_context_register_addr(context, reg_CODE);
+#endif
+
+    /* Scavenge all boxed registers in the context. */
+    for (i = 0; i < (int)(sizeof(boxed_registers) / sizeof(int)); i++) {
+        int index;
+        lispobj foo;
+
+        index = boxed_registers[i];
+        foo = *os_context_register_addr(context,index);
+        scavenge((lispobj *) &foo, 1);
+        *os_context_register_addr(context,index) = foo;
+
+        /* this is unlikely to work as intended on bigendian
+         * 64 bit platforms */
+
+        scavenge((lispobj *) os_context_register_addr(context, index), 1);
+    }
+
+#ifdef reg_LIP
+    /* Fix the LIP */
+
+    /*
+     * But what happens if lip_register_pair is -1?
+     * *os_context_register_addr on Solaris (see
+     * solaris_register_address in solaris-os.c) will return
+     * &context->uc_mcontext.gregs[2]. But gregs[2] is REG_nPC. Is
+     * that what we really want? My guess is that that is not what we
+     * want, so if lip_register_pair is -1, we don't touch reg_LIP at
+     * all. But maybe it doesn't really matter if LIP is trashed?
+     */
+    if (lip_register_pair >= 0) {
+        *os_context_register_addr(context, reg_LIP) =
+            *os_context_register_addr(context, lip_register_pair)
+            + lip_offset;
+    }
+#endif /* reg_LIP */
+
+    /* Fix the PC if it was in from space */
+    if (from_space_p(*os_context_pc_addr(context)))
+        *os_context_pc_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + pc_code_offset;
+
+#ifdef ARCH_HAS_LINK_REGISTER
+    /* Fix the LR ditto; important if we're being called from
+     * an assembly routine that expects to return using blr, otherwise
+     * harmless */
+    if (from_space_p(*os_context_lr_addr(context)))
+        *os_context_lr_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + lr_code_offset;
+#endif
+
+#ifdef ARCH_HAS_NPC_REGISTER
+    if (from_space_p(*os_context_npc_addr(context)))
+        *os_context_npc_addr(context) =
+            *os_context_register_addr(context, reg_CODE) + npc_code_offset;
+#endif /* ARCH_HAS_NPC_REGISTER */
+}
+
+void scavenge_interrupt_contexts(struct thread *th)
+{
+    int i, index;
+    os_context_t *context;
+
+    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+
+#ifdef DEBUG_SCAVENGE_VERBOSE
+    fprintf(stderr, "%d interrupt contexts to scan\n",index);
+#endif
+
+    for (i = 0; i < index; i++) {
+        context = th->interrupt_contexts[i];
+        scavenge_interrupt_context(context);
+    }
+}
+#endif /* x86oid targets */
