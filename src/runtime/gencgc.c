@@ -3824,22 +3824,17 @@ write_protect_generation_pages(generation_index_t generation)
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 
 static void
-scavenge_control_stack()
+scavenge_control_stack(struct thread *th)
 {
     unsigned long control_stack_size;
 
     /* This is going to be a big problem when we try to port threads
      * to PPC... CLH */
-    struct thread *th = arch_os_get_current_thread();
     lispobj *control_stack =
         (lispobj *)(th->control_stack_start);
 
     control_stack_size = current_control_stack_pointer - control_stack;
     scavenge(control_stack, control_stack_size);
-
-    /* Scrub the unscavenged control stack space, so that we can't run
-     * into any stale pointers in a later GC. */
-    scrub_control_stack();
 }
 
 /* Scavenging Interrupt Contexts */
@@ -3963,14 +3958,12 @@ scavenge_interrupt_context(os_context_t * context)
 }
 
 void
-scavenge_interrupt_contexts(void)
+scavenge_interrupt_contexts(struct thread *th)
 {
     int i, index;
     os_context_t *context;
 
-    struct thread *th=arch_os_get_current_thread();
-
-    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,0));
+    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
 
 #if defined(DEBUG_PRINT_CONTEXT_INDEX)
     printf("Number of active contexts: %d\n", index);
@@ -4156,8 +4149,18 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * If not x86, we need to scavenge the interrupt context(s) and the
      * control stack.
      */
-    scavenge_interrupt_contexts();
-    scavenge_control_stack();
+    {
+        struct thread *th;
+        for_each_thread(th) {
+            scavenge_interrupt_contexts(th);
+            scavenge_control_stack(th);
+        }
+
+        /* Scrub the unscavenged control stack space, so that we can't run
+         * into any stale pointers in a later GC (this is done by the
+         * stop-for-gc handler in the other threads). */
+        scrub_control_stack();
+    }
 #endif
 
     /* Scavenge the Lisp functions of the interrupt handlers, taking

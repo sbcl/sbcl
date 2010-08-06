@@ -17,6 +17,7 @@
 #define _GC_INTERNAL_H_
 
 #include <genesis/simple-fun.h>
+#include "thread.h"
 
 /* disabling gc assertions made no discernable difference to GC speed,
  * last I tried it - dan 2003.12.21
@@ -112,7 +113,7 @@ extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
 extern void scavenge(lispobj *start, long n_words);
-extern void scavenge_interrupt_contexts(void);
+extern void scavenge_interrupt_contexts(struct thread *thread);
 extern void scav_weak_hash_tables(void);
 extern void scan_weak_hash_tables(void);
 extern void scan_weak_pointers(void);

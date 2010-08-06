@@ -140,7 +140,7 @@ collect_garbage(generation_index_t ignore)
 #ifdef PRINTNOISE
     printf("Scavenging interrupt contexts ...\n");
 #endif
-    scavenge_interrupt_contexts();
+    scavenge_interrupt_contexts(th);
 
 #ifdef PRINTNOISE
     printf("Scavenging interrupt handlers (%d bytes) ...\n",
@@ -391,12 +391,10 @@ scavenge_interrupt_context(os_context_t *context)
 #endif
 }
 
-void scavenge_interrupt_contexts(void)
+void scavenge_interrupt_contexts(struct thread *th)
 {
     int i, index;
     os_context_t *context;
-
-    struct thread *th=arch_os_get_current_thread();
 
     index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,0));
 
