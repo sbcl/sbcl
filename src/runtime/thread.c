@@ -396,10 +396,14 @@ create_thread_struct(lispobj initial_function) {
   make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
 
         STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
+#ifdef BINDING_STACK_POINTER
         STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
+#endif
         STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
         STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
+#ifdef ALIEN_STACK
         STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
+#endif
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
         STATIC_TLS_INIT(PSEUDO_ATOMIC_BITS,pseudo_atomic_bits);
 #endif
