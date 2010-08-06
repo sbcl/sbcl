@@ -2576,6 +2576,8 @@ static int boxed_registers[] = BOXED_REGISTERS;
     *os_context_lr_addr(context)
 #define ACCESS_INTERIOR_POINTER_npc \
     *os_context_npc_addr(context)
+#define ACCESS_INTERIOR_POINTER_ctr \
+    *os_context_ctr_addr(context)
 
 #define INTERIOR_POINTER_VARS(name) \
     unsigned long name##_offset;    \
@@ -2673,6 +2675,9 @@ scavenge_interrupt_context(os_context_t * context)
 #ifdef ARCH_HAS_NPC_REGISTER
     INTERIOR_POINTER_VARS(npc);
 #endif
+#ifdef LISP_FEATURE_PPC
+    INTERIOR_POINTER_VARS(ctr);
+#endif
 
     PAIR_INTERIOR_POINTER(pc);
 #ifdef reg_LIP
@@ -2683,6 +2688,9 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     PAIR_INTERIOR_POINTER(npc);
+#endif
+#ifdef LISP_FEATURE_PPC
+    PAIR_INTERIOR_POINTER(ctr);
 #endif
 
     /* Scavenge all boxed registers in the context. */
@@ -2712,6 +2720,9 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     FIXUP_INTERIOR_POINTER(npc);
+#endif
+#ifdef LISP_FEATURE_PPC
+    FIXUP_INTERIOR_POINTER(ctr);
 #endif
 }
 
