@@ -214,7 +214,7 @@ previous_info(struct call_info *info)
 }
 
 void
-backtrace(int nframes)
+lisp_backtrace(int nframes)
 {
     struct call_info info;
 
@@ -523,7 +523,7 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
-/* This function has been split from backtrace() to enable Lisp
+/* This function has been split from lisp_backtrace() to enable Lisp
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
  * example when debugging threading deadlocks.
  */
@@ -571,7 +571,7 @@ backtrace_from_fp(void *fp, int nframes)
 }
 
 void
-backtrace(int nframes)
+lisp_backtrace(int nframes)
 {
   void *fp;
 

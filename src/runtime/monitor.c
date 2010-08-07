@@ -393,7 +393,7 @@ print_context_cmd(char **ptr)
 static void
 backtrace_cmd(char **ptr)
 {
-    void backtrace(int frames);
+    void lisp_backtrace(int frames);
     int n;
 
     if (more_p(ptr))
@@ -402,7 +402,7 @@ backtrace_cmd(char **ptr)
         n = 100;
 
     printf("Backtrace:\n");
-    backtrace(n);
+    lisp_backtrace(n);
 }
 
 static void
