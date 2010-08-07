@@ -964,7 +964,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 
     pscav( (lispobj *)all_threads->binding_stack_start,
-          (lispobj *)current_binding_stack_pointer -
+           (lispobj *)get_binding_stack_pointer(all_threads) -
            all_threads->binding_stack_start,
           0);
 

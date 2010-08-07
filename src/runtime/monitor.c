@@ -194,7 +194,7 @@ regs_cmd(char **ptr)
     printf("CFP\t=\t0x%08lx   ", (unsigned long)current_control_frame_pointer);
 
 #ifdef reg_BSP
-    printf("BSP\t=\t0x%08lx\n", (unsigned long)current_binding_stack_pointer);
+    printf("BSP\t=\t0x%08lx\n", (unsigned long)get_binding_stack_pointer(thread));
 #else
     /* printf("BSP\t=\t0x%08lx\n",
            (unsigned long)SymbolValue(BINDING_STACK_POINTER)); */

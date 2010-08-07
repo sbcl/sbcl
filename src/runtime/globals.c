@@ -28,7 +28,7 @@ int foreign_function_call_active;
 
 lispobj *current_control_stack_pointer;
 lispobj *current_control_frame_pointer;
-#ifndef BINDING_STACK_POINTER
+#if !defined(BINDING_STACK_POINTER) && !defined(LISP_FEATURE_SB_THREAD)
 lispobj *current_binding_stack_pointer;
 #endif
 

@@ -27,20 +27,12 @@
 #include "genesis/thread.h"
 #include "genesis/static-symbols.h"
 
-#if defined(BINDING_STACK_POINTER)
-#define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER,thread))
-#define SetBSP(value) SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value),thread)
-#else
-#define GetBSP() ((struct binding *)current_binding_stack_pointer)
-#define SetBSP(value) (current_binding_stack_pointer=(lispobj *)(value))
-#endif
-
 void bind_variable(lispobj symbol, lispobj value, void *th)
 {
     struct binding *binding;
     struct thread *thread=(struct thread *)th;
-    binding = GetBSP();
-    SetBSP(binding+1);
+    binding = (struct binding *)get_binding_stack_pointer(thread);
+    set_binding_stack_pointer(thread,binding+1);
 #ifdef LISP_FEATURE_SB_THREAD
     {
         struct symbol *sym=(struct symbol *)native_pointer(symbol);
@@ -78,7 +70,7 @@ unbind(void *th)
     struct binding *binding;
     lispobj symbol;
 
-    binding = GetBSP() - 1;
+    binding = ((struct binding *)get_binding_stack_pointer(thread)) - 1;
 
     symbol = binding->symbol;
 
@@ -87,7 +79,7 @@ unbind(void *th)
     binding->symbol = 0;
     binding->value = 0;
 
-    SetBSP(binding);
+    set_binding_stack_pointer(thread,binding);
 }
 
 void
@@ -95,7 +87,7 @@ unbind_to_here(lispobj *bsp,void *th)
 {
     struct thread *thread=(struct thread *)th;
     struct binding *target = (struct binding *)bsp;
-    struct binding *binding = GetBSP();
+    struct binding *binding = (struct binding *)get_binding_stack_pointer(thread);
     lispobj symbol;
 
     while (target < binding) {
@@ -110,5 +102,5 @@ unbind_to_here(lispobj *bsp,void *th)
             binding->value = 0;
         }
     }
-    SetBSP(binding);
+    set_binding_stack_pointer(thread,binding);
 }

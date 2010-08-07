@@ -49,9 +49,9 @@ extern pthread_key_t specials;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
-# if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_binding_stack_pointer;
-# endif
+#endif
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 /* This is unused on X86 and X86_64, but is used as the global

@@ -420,7 +420,7 @@ create_thread_struct(lispobj initial_function) {
     th->control_stack_guard_page_protected = T;
     th->alien_stack_start=
         (lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
-    th->binding_stack_pointer=th->binding_stack_start;
+    set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
 #ifdef LISP_FEATURE_SB_THREAD
@@ -467,11 +467,9 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
     SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-    SetSymbolValue(BINDING_STACK_POINTER,(lispobj)th->binding_stack_pointer,th);
     SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
 #else
-    current_binding_stack_pointer=th->binding_stack_pointer;
     current_control_stack_pointer=th->control_stack_start;
 #endif
 #endif

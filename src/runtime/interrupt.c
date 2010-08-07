@@ -688,9 +688,8 @@ fake_foreign_function_call(os_context_t *context)
 #endif
 #endif
 #ifdef reg_BSP
-    current_binding_stack_pointer =
-        (lispobj *)(unsigned long)
-            (*os_context_register_addr(context, reg_BSP));
+    set_binding_stack_pointer(thread,
+        *os_context_register_addr(context, reg_BSP));
 #endif
 
     build_fake_control_stack_frames(thread,context);

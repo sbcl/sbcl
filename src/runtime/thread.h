@@ -170,6 +170,25 @@ StaticSymbolFunction(lispobj sym)
     return ((struct fdefn *)native_pointer(SymbolValue(sym, 0)))->fun;
 }
 
+/* These are for use during GC, on the current thread, or on prenatal
+ * threads only. */
+#if defined(LISP_FEATURE_SB_THREAD)
+#define get_binding_stack_pointer(thread)       \
+    ((thread)->binding_stack_pointer)
+#define set_binding_stack_pointer(thread,value) \
+    ((thread)->binding_stack_pointer = (lispobj *)(value))
+#elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#define get_binding_stack_pointer(thread)       \
+    SymbolValue(BINDING_STACK_POINTER, thread)
+#define set_binding_stack_pointer(thread,value) \
+    SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value), thread)
+#else
+#define get_binding_stack_pointer(thread)       \
+    (current_binding_stack_pointer)
+#define set_binding_stack_pointer(thread,value) \
+    (current_binding_stack_pointer = (lispobj *)(value))
+#endif
+
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_GCC_TLS)
 extern __thread struct thread *current_thread;
 #endif
