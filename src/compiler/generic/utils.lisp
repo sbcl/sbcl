@@ -59,7 +59,7 @@
 
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
-(defun static-fun-offset (name)
+(defun static-fdefn-offset (name)
   (let ((static-syms (length *static-symbols*))
         (static-fun-index (position name *static-funs*)))
     (unless static-fun-index
@@ -68,7 +68,14 @@
        (pad-data-block (1- symbol-size))
        (- list-pointer-lowtag)
        (* static-fun-index (pad-data-block fdefn-size))
-       (* fdefn-raw-addr-slot n-word-bytes))))
+       other-pointer-lowtag)))
+
+;;; Return the (byte) offset from NIL to the raw-addr slot of the
+;;; fdefn object for the static function NAME.
+(defun static-fun-offset (name)
+  (+ (static-fdefn-offset name)
+     (- other-pointer-lowtag)
+     (* fdefn-raw-addr-slot n-word-bytes)))
 
 ;;; Various error-code generating helpers
 (defvar *adjustable-vectors* nil)
