@@ -262,6 +262,7 @@
   (defregtn code descriptor-reg)
   (defregtn alloc any-reg)
   (defregtn lra descriptor-reg)
+  (defregtn lexenv descriptor-reg)
 
   (defregtn nargs any-reg)
   (defregtn bsp any-reg)

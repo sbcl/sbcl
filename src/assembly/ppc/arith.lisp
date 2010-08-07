@@ -46,7 +46,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst lwz lip null-tn (static-fun-offset 'two-arg-+) )
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-+))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
@@ -94,7 +96,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst lwz lip null-tn (static-fun-offset 'two-arg--))
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg--))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
@@ -171,7 +175,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst lwz lip null-tn (static-fun-offset 'two-arg-*))
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-*))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
@@ -303,7 +309,9 @@
           (inst beq DO-COMPARE)
 
           DO-STATIC-FN
-          (inst lwz lip null-tn (static-fun-offset ',static-fn))
+          (inst addi lexenv-tn null-tn (static-fdefn-offset ',static-fn))
+          (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+          (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
           (inst li nargs (fixnumize 2))
           (inst mr ocfp cfp-tn)
           (inst mr cfp-tn csp-tn)
@@ -348,7 +356,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst lwz lip null-tn (static-fun-offset 'eql))
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'eql))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
@@ -384,7 +394,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst lwz lip null-tn (static-fun-offset 'two-arg-=))
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-=))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst mr cfp-tn csp-tn)
@@ -419,7 +431,9 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst lwz lip null-tn (static-fun-offset 'two-arg-/=))
+  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-/=))
+  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
   (inst li nargs (fixnumize 2))
   (inst mr ocfp cfp-tn)
   (inst j lip 0)
