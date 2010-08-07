@@ -666,8 +666,12 @@ fake_foreign_function_call(os_context_t *context)
 
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
+#ifdef LISP_FEATURE_SB_THREAD
+    thread->pseudo_atomic_bits =
+#else
     dynamic_space_free_pointer =
         (lispobj *)(unsigned long)
+#endif
             (*os_context_register_addr(context, reg_ALLOC));
 /*     fprintf(stderr,"dynamic_space_free_pointer: %p\n", */
 /*             dynamic_space_free_pointer); */
@@ -728,7 +732,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
 
-#ifdef reg_ALLOC
+#if defined(reg_ALLOC) && !defined(LISP_FEATURE_SB_THREAD)
     /* Put the dynamic space free pointer back into the context. */
     *os_context_register_addr(context, reg_ALLOC) =
         (unsigned long) dynamic_space_free_pointer
@@ -739,6 +743,17 @@ undo_fake_foreign_function_call(os_context_t *context)
       & ~LOWTAG_MASK)
       | ((unsigned long) dynamic_space_free_pointer & LOWTAG_MASK);
     */
+#endif
+#if defined(reg_ALLOC) && defined(LISP_FEATURE_SB_THREAD)
+    /* Put the pseudo-atomic bits and dynamic space free pointer back
+     * into the context (p-a-bits for p-a, and dynamic space free
+     * pointer for ROOM). */
+    *os_context_register_addr(context, reg_ALLOC) =
+        (unsigned long) dynamic_space_free_pointer
+        | (thread->pseudo_atomic_bits & LOWTAG_MASK);
+    /* And clear them so we don't get bit later by call-in/call-out
+     * not updating them. */
+    thread->pseudo_atomic_bits = 0;
 #endif
 }
 

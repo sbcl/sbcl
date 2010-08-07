@@ -410,7 +410,7 @@
   ;; starting, running, suspended, dead
   (state :c-type "lispobj")
   (tls-cookie)                          ;  on x86, the LDT index
-  #!+(or x86 x86-64) (pseudo-atomic-bits)
+  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
   (stepping)

@@ -439,7 +439,7 @@ create_thread_struct(lispobj initial_function) {
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
-#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64) || defined(LISP_FEATURE_SB_THREAD)
     th->pseudo_atomic_bits=0;
 #endif
 #ifdef LISP_FEATURE_GENCGC
