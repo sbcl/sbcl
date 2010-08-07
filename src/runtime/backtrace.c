@@ -110,13 +110,13 @@ cs_valid_pointer_p(struct call_frame *pointer)
 {
     struct thread *thread=arch_os_get_current_thread();
     return (((char *) thread->control_stack_start <= (char *) pointer) &&
-            ((char *) pointer < (char *) current_control_stack_pointer));
+            ((char *) pointer < (char *) access_control_stack_pointer(thread)));
 }
 
 static void
 call_info_from_lisp_state(struct call_info *info)
 {
-    info->frame = (struct call_frame *)current_control_frame_pointer;
+    info->frame = (struct call_frame *)access_control_frame_pointer(arch_os_get_current_thread());
     info->interrupted = 0;
     info->code = NULL;
     info->lra = 0;

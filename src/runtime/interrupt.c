@@ -609,23 +609,23 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 
     /* Build a fake stack frame or frames */
 
-    current_control_frame_pointer =
+    access_control_frame_pointer(th) =
         (lispobj *)(unsigned long)
             (*os_context_register_addr(context, reg_CSP));
     if ((lispobj *)(unsigned long)
             (*os_context_register_addr(context, reg_CFP))
-        == current_control_frame_pointer) {
+        == access_control_frame_pointer(th)) {
         /* There is a small window during call where the callee's
          * frame isn't built yet. */
         if (lowtag_of(*os_context_register_addr(context, reg_CODE))
             == FUN_POINTER_LOWTAG) {
             /* We have called, but not built the new frame, so
              * build it for them. */
-            current_control_frame_pointer[0] =
+            access_control_frame_pointer(th)[0] =
                 *os_context_register_addr(context, reg_OCFP);
-            current_control_frame_pointer[1] =
+            access_control_frame_pointer(th)[1] =
                 *os_context_register_addr(context, reg_LRA);
-            current_control_frame_pointer += 8;
+            access_control_frame_pointer(th) += 8;
             /* Build our frame on top of it. */
             oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
         }
@@ -644,11 +644,11 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
 
-    current_control_stack_pointer = current_control_frame_pointer + 8;
+    access_control_stack_pointer(th) = access_control_frame_pointer(th) + 8;
 
-    current_control_frame_pointer[0] = oldcont;
-    current_control_frame_pointer[1] = NIL;
-    current_control_frame_pointer[2] =
+    access_control_frame_pointer(th)[0] = oldcont;
+    access_control_frame_pointer(th)[1] = NIL;
+    access_control_frame_pointer(th)[2] =
         (lispobj)(*os_context_register_addr(context, reg_CODE));
 #endif
 }
@@ -1475,7 +1475,7 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_register_addr(context,reg_LIP) =
         (os_context_register_t)(unsigned long)code;
     *os_context_register_addr(context,reg_CFP) =
-        (os_context_register_t)(unsigned long)current_control_frame_pointer;
+        (os_context_register_t)(unsigned long)access_control_frame_pointer(th);
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
     *os_context_npc_addr(context) =

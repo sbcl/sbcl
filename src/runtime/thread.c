@@ -469,8 +469,6 @@ create_thread_struct(lispobj initial_function) {
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
-#else
-    current_control_stack_pointer=th->control_stack_start;
 #endif
 #endif
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
@@ -486,6 +484,9 @@ create_thread_struct(lispobj initial_function) {
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
     bind_variable(STOP_FOR_GC_PENDING,NIL,th);
+#endif
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    access_control_stack_pointer(th)=th->control_stack_start;
 #endif
 
     th->interrupt_data = (struct interrupt_data *)

@@ -3833,14 +3833,11 @@ write_protect_generation_pages(generation_index_t generation)
 static void
 scavenge_control_stack(struct thread *th)
 {
-    unsigned long control_stack_size;
-
-    /* This is going to be a big problem when we try to port threads
-     * to PPC... CLH */
     lispobj *control_stack =
         (lispobj *)(th->control_stack_start);
+    unsigned long control_stack_size =
+        access_control_stack_pointer(th) - control_stack;
 
-    control_stack_size = current_control_stack_pointer - control_stack;
     scavenge(control_stack, control_stack_size);
 }
 #endif

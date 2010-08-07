@@ -177,6 +177,12 @@ StaticSymbolFunction(lispobj sym)
     ((thread)->binding_stack_pointer)
 #define set_binding_stack_pointer(thread,value) \
     ((thread)->binding_stack_pointer = (lispobj *)(value))
+#define access_control_stack_pointer(thread) \
+    ((thread)->control_stack_pointer)
+#  if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+#define access_control_frame_pointer(thread) \
+    ((thread)->control_frame_pointer)
+#  endif
 #elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 #define get_binding_stack_pointer(thread)       \
     SymbolValue(BINDING_STACK_POINTER, thread)
@@ -187,6 +193,10 @@ StaticSymbolFunction(lispobj sym)
     (current_binding_stack_pointer)
 #define set_binding_stack_pointer(thread,value) \
     (current_binding_stack_pointer = (lispobj *)(value))
+#define access_control_stack_pointer(thread) \
+    (current_control_stack_pointer)
+#define access_control_frame_pointer(thread) \
+    (current_control_frame_pointer)
 #endif
 
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_GCC_TLS)

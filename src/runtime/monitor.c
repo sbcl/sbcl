@@ -190,8 +190,10 @@ regs_cmd(char **ptr)
 {
     struct thread *thread=arch_os_get_current_thread();
 
-    printf("CSP\t=\t0x%08lx   ", (unsigned long)current_control_stack_pointer);
-    printf("CFP\t=\t0x%08lx   ", (unsigned long)current_control_frame_pointer);
+    printf("CSP\t=\t0x%08lx   ", (unsigned long)access_control_stack_pointer(thread));
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+    printf("CFP\t=\t0x%08lx   ", (unsigned long)access_control_frame_pointer(thread));
+#endif
 
 #ifdef reg_BSP
     printf("BSP\t=\t0x%08lx\n", (unsigned long)get_binding_stack_pointer(thread));

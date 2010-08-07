@@ -26,8 +26,12 @@
 int foreign_function_call_active;
 #endif
 
+#if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 lispobj *current_control_stack_pointer;
+#endif
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
 lispobj *current_control_frame_pointer;
+#endif
 #if !defined(BINDING_STACK_POINTER) && !defined(LISP_FEATURE_SB_THREAD)
 lispobj *current_binding_stack_pointer;
 #endif
@@ -56,7 +60,9 @@ void globals_init(void)
 {
     /* Space, stack, and free pointer vars are initialized by
      * validate() and coreparse(). */
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
     current_control_frame_pointer = (lispobj *)0;
+#endif
 
 #ifndef LISP_FEATURE_GENCGC
     /* no GC trigger yet */

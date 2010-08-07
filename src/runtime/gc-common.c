@@ -2514,7 +2514,7 @@ scrub_control_stack(void)
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     sp = (lispobj *)&sp - 1;
 #else
-    sp = current_control_stack_pointer;
+    sp = access_control_stack_pointer(th);
 #endif
  scrub:
     if ((((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size)) &&

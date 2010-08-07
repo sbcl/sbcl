@@ -954,7 +954,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
     pscav((lispobj *)all_threads->control_stack_start,
-          current_control_stack_pointer -
+          access_control_stack_pointer(all_threads) -
           all_threads->control_stack_start,
           0);
 
@@ -1030,10 +1030,10 @@ purify(lispobj static_roots, lispobj read_only_roots)
             (os_vm_size_t) dynamic_space_size);
 
     /* Zero the stack. */
-    os_zero((os_vm_address_t) current_control_stack_pointer,
+    os_zero((os_vm_address_t) access_control_stack_pointer(all_threads),
             (os_vm_size_t)
             ((all_threads->control_stack_end -
-              current_control_stack_pointer) * sizeof(lispobj)));
+              access_control_stack_pointer(all_threads)) * sizeof(lispobj)));
 
     /* It helps to update the heap free pointers so that free_heap can
      * verify after it's done. */

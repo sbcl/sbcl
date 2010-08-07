@@ -420,6 +420,14 @@
   ;; the runtime, but it's clearly a per-thread value.
   #!+sb-thread
   (foreign-function-call-active :c-type "boolean")
+  ;; Same as above for the location of the current control stack frame.
+  #!+(and sb-thread (not (or x86 x86-64)))
+  (control-frame-pointer :c-type "lispobj *")
+  ;; Same as above for the location of the current control stack
+  ;; pointer.  This is also used on threaded x86oids to allow LDB to
+  ;; print an approximation of the CSP as needed.
+  #!+(and sb-thread)
+  (control-stack-pointer :c-type "lispobj *")
   ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
   ;; bit slots came in pairs. However the C compiler will align
   ;; interrupt_contexts on a double word boundary. This logic should

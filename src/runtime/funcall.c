@@ -85,7 +85,9 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 lispobj
 funcall0(lispobj function)
 {
-    lispobj *args = current_control_stack_pointer;
+    lispobj **stack_pointer
+        = &access_control_stack_pointer(arch_os_get_current_thread());
+    lispobj *args = *stack_pointer;
 
     return safe_call_into_lisp(function, args, 0);
 }
@@ -93,9 +95,11 @@ funcall0(lispobj function)
 lispobj
 funcall1(lispobj function, lispobj arg0)
 {
-    lispobj *args = current_control_stack_pointer;
+    lispobj **stack_pointer
+        = &access_control_stack_pointer(arch_os_get_current_thread());
+    lispobj *args = *stack_pointer;
 
-    current_control_stack_pointer += 1;
+    *stack_pointer += 1;
     args[0] = arg0;
 
     return safe_call_into_lisp(function, args, 1);
@@ -104,9 +108,11 @@ funcall1(lispobj function, lispobj arg0)
 lispobj
 funcall2(lispobj function, lispobj arg0, lispobj arg1)
 {
-    lispobj *args = current_control_stack_pointer;
+    lispobj **stack_pointer
+        = &access_control_stack_pointer(arch_os_get_current_thread());
+    lispobj *args = *stack_pointer;
 
-    current_control_stack_pointer += 2;
+    *stack_pointer += 2;
     args[0] = arg0;
     args[1] = arg1;
 
@@ -116,9 +122,11 @@ funcall2(lispobj function, lispobj arg0, lispobj arg1)
 lispobj
 funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 {
-    lispobj *args = current_control_stack_pointer;
+    lispobj **stack_pointer
+        = &access_control_stack_pointer(arch_os_get_current_thread());
+    lispobj *args = *stack_pointer;
 
-    current_control_stack_pointer += 3;
+    *stack_pointer += 3;
     args[0] = arg0;
     args[1] = arg1;
     args[2] = arg2;

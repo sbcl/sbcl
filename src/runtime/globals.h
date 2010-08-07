@@ -47,8 +47,12 @@ extern char **ENVIRON;
 extern pthread_key_t specials;
 #endif
 
+#if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 extern lispobj *current_control_stack_pointer;
+#endif
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_control_frame_pointer;
+#endif
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_SB_THREAD)
 extern lispobj *current_binding_stack_pointer;
 #endif
@@ -118,7 +122,9 @@ extern void globals_init(void);
 EXTERN(foreign_function_call_active, 4)
 #endif
 
+#if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 EXTERN(current_control_stack_pointer, POINTERSIZE)
+#endif
 EXTERN(current_control_frame_pointer, POINTERSIZE)
 # if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 EXTERN(current_binding_stack_pointer, POINTERSIZE)

@@ -276,7 +276,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
-    current_control_stack_pointer =
+    access_control_stack_pointer(arch_os_get_current_thread()) =
         (lispobj *)*os_context_sp_addr(context);
 
     /* On entry %eip points just after the INT3 byte and aims at the
