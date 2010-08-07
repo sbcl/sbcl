@@ -321,8 +321,8 @@ x:
 	load(reg_OCFP,CSYMBOL(current_control_frame_pointer))
 
 	/* No longer atomic, and check for interrupt */
-	andi. reg_NL3, reg_ALLOC, 1
 	subi reg_ALLOC,reg_ALLOC,4
+	andi. reg_NL3, reg_ALLOC, 1
 	twnei reg_NL3, 0
 
 	/* Pass in the arguments */
@@ -380,8 +380,8 @@ lra:
 	store(reg_NL1,reg_NL2,CSYMBOL(foreign_function_call_active))
 
 	/* Check for interrupt */
-	andi. reg_NL3, reg_ALLOC, 1
 	subi reg_ALLOC, reg_ALLOC, 4
+	andi. reg_NL3, reg_ALLOC, 1
 	twnei reg_NL3,0
 	
 	/* Back to C */
@@ -432,8 +432,8 @@ lra:
 	store(reg_CSP,reg_CFUNC,CSYMBOL(foreign_function_call_active))
 	/* load(reg_POLL,saver2) */
 	/* Disable pseudo-atomic; check pending interrupt */
-	andi. reg_NL3, reg_ALLOC, 1
 	subi reg_ALLOC, reg_ALLOC, 4
+	andi. reg_NL3, reg_ALLOC, 1
 	twnei reg_NL3, 0
 
 	mr reg_NL3,reg_NARGS
@@ -499,8 +499,8 @@ lra:
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
 	/* No longer atomic */
-	andi. reg_NL3, reg_ALLOC, 1
 	subi reg_ALLOC, reg_ALLOC, 4
+	andi. reg_NL3, reg_ALLOC, 1
 	twnei reg_NL3, 0
 
 	mtlr reg_LIP
