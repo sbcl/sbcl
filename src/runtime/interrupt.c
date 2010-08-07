@@ -1185,6 +1185,7 @@ void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
+    boolean was_in_lisp;
 
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
      * pseudo atomic until gc is finally allowed. */
@@ -1205,8 +1206,12 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
 
     /* Not PA and GC not inhibited -- we can stop now. */
 
-    /* need the context stored so it can have registers scavenged */
-    fake_foreign_function_call(context);
+    was_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
+
+    if (was_in_lisp) {
+        /* need the context stored so it can have registers scavenged */
+        fake_foreign_function_call(context);
+    }
 
     /* Not pending anymore. */
     SetSymbolValue(GC_PENDING,NIL,thread);
@@ -1251,7 +1256,9 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
              fixnum_value(thread_state(thread)));
     }
 
-    undo_fake_foreign_function_call(context);
+    if (was_in_lisp) {
+        undo_fake_foreign_function_call(context);
+    }
 }
 
 #endif
