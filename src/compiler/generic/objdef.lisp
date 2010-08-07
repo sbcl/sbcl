@@ -414,6 +414,12 @@
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
   (stepping)
+  ;; For various reasons related to pseudo-atomic and interrupt
+  ;; handling, we need to know if the machine context is in Lisp code
+  ;; or not.  On non-threaded targets, this is a global variable in
+  ;; the runtime, but it's clearly a per-thread value.
+  #!+sb-thread
+  (foreign-function-call-active :c-type "boolean")
   ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
   ;; bit slots came in pairs. However the C compiler will align
   ;; interrupt_contexts on a double word boundary. This logic should

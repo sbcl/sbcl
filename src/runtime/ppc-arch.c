@@ -99,7 +99,7 @@ arch_pseudo_atomic_atomic(os_context_t *context)
      * The foreign_function_call_active used to live at each call-site
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
-    return (!foreign_function_call_active)
+    return (!foreign_function_call_active_p(arch_os_get_current_thread()))
         && ((*os_context_register_addr(context,reg_ALLOC)) & 4);
 }
 
@@ -318,7 +318,7 @@ handle_allocation_trap(os_context_t * context)
 
     /* I don't think it's possible for us NOT to be in lisp when we get
      * here.  Remove this later? */
-    were_in_lisp = !foreign_function_call_active;
+    were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
 
     if (were_in_lisp) {
         fake_foreign_function_call(context);

@@ -705,8 +705,11 @@ fake_foreign_function_call(os_context_t *context)
 
     thread->interrupt_contexts[context_index] = context;
 
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-    foreign_function_call_active = 1;
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+    /* x86oid targets don't maintain the foreign function call flag at
+     * all, so leave them to believe that they are never in foreign
+     * code. */
+    foreign_function_call_active_p(thread) = 1;
 #endif
 }
 
@@ -720,9 +723,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* Block all blockable signals. */
     block_blockable_signals(0, 0);
 
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-    foreign_function_call_active = 0;
-#endif
+    foreign_function_call_active_p(thread) = 0;
 
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
@@ -954,9 +955,7 @@ interrupt_handle_pending(os_context_t *context)
 void
 interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 {
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
     boolean were_in_lisp;
-#endif
     union interrupt_handler handler;
 
     check_blockables_blocked_or_lose(0);
@@ -972,10 +971,8 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         return;
     }
 
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
-    were_in_lisp = !foreign_function_call_active;
+    were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
     if (were_in_lisp)
-#endif
     {
         fake_foreign_function_call(context);
     }
@@ -1032,9 +1029,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         (*handler.c)(signal, info, context);
     }
 
-#ifdef FOREIGN_FUNCTION_CALL_FLAG
     if (were_in_lisp)
-#endif
     {
         undo_fake_foreign_function_call(context); /* block signals again */
     }

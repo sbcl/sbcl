@@ -445,6 +445,16 @@ create_thread_struct(lispobj initial_function) {
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
 #endif
+#ifdef LISP_FEATURE_SB_THREAD
+    /* This parallels the same logic in globals.c for the
+     * single-threaded foreign_function_call_active, KLUDGE and
+     * all. */
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    th->foreign_function_call_active = 0;
+#else
+    th->foreign_function_call_active = 1;
+#endif
+#endif
 
 #ifndef LISP_FEATURE_SB_THREAD
     /* the tls-points-into-struct-thread trick is only good for threaded
