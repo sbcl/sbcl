@@ -650,9 +650,8 @@ default-value-8
                             :from (:argument ,(if (eq return :tail) 0 1))
                             :to :eval)
                        lexenv))
-     ,@(unless named
-         '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                       function)))
+     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                 function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -784,8 +783,17 @@ default-value-8
                    ;; FUNCTION is loaded, but before ENTRY-POINT is
                    ;; calculated.
                    (insert-step-instrumenting name-pass)
-                   (loadw entry-point name-pass fdefn-raw-addr-slot
-                          other-pointer-lowtag)
+                   ;; The raw-addr (ENTRY-POINT) will be one of:
+                   ;; closure_tramp, undefined_tramp, or somewhere
+                   ;; within a simple-fun object.  If the latter, then
+                   ;; it is essential (due to it being an interior
+                   ;; pointer) that the function itself be in a
+                   ;; register before the raw-addr is loaded.
+                   (sb!assem:without-scheduling ()
+                     (loadw function name-pass fdefn-fun-slot
+                            other-pointer-lowtag)
+                     (loadw entry-point name-pass fdefn-raw-addr-slot
+                            other-pointer-lowtag))
                    (do-next-filler))
                  `((sc-case arg-fun
                      (descriptor-reg (move lexenv arg-fun))
