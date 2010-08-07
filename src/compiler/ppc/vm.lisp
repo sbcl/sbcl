@@ -261,6 +261,7 @@
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn alloc any-reg)
+  (defregtn lra descriptor-reg)
 
   (defregtn nargs any-reg)
   (defregtn bsp any-reg)

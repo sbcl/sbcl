@@ -40,7 +40,7 @@
             (without-scheduling ()
               (move csp-tn ocfp-tn)
               (inst nop))
-            (inst compute-code-from-lra code-tn code-tn
+            (inst compute-code-from-lra code-tn lra-tn
                   lra-label ,temp)
             (when cur-nfp
               (load-stack-tn cur-nfp ,nfp-save))))

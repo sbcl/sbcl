@@ -169,7 +169,7 @@
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra lip :frob-code nil)
+  (lisp-return lra lip)
 
   DO-UWP
 

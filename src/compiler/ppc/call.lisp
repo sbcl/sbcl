@@ -258,7 +258,7 @@ default-value-8
           (note-this-location vop :single-value-return)
           (move csp-tn ocfp-tn)
           (inst nop))
-        (inst compute-code-from-lra code-tn code-tn lra-label temp))
+        (inst compute-code-from-lra code-tn lra-tn lra-label temp))
       (let ((regs-defaulted (gen-label))
             (defaulting-done (gen-label))
             (default-stack-vals (gen-label)))
@@ -314,7 +314,7 @@ default-value-8
                   (inst b defaulting-done)
                   (trace-table-entry trace-table-normal))))))
 
-        (inst compute-code-from-lra code-tn code-tn lra-label temp)))
+        (inst compute-code-from-lra code-tn lra-tn lra-label temp)))
   (values))
 
 
@@ -344,7 +344,7 @@ default-value-8
       (inst b variable-values)
       (inst nop))
 
-    (inst compute-code-from-lra code-tn code-tn lra-label temp)
+    (inst compute-code-from-lra code-tn lra-tn lra-label temp)
     (inst addi csp-tn csp-tn 4)
     (storew (first *register-arg-tns*) csp-tn -1)
     (inst subi start csp-tn 4)
@@ -355,7 +355,7 @@ default-value-8
     (assemble (*elsewhere*)
       (trace-table-entry trace-table-fun-prologue)
       (emit-label variable-values)
-      (inst compute-code-from-lra code-tn code-tn lra-label temp)
+      (inst compute-code-from-lra code-tn lra-tn lra-label temp)
       (do ((arg *register-arg-tns* (rest arg))
            (i 0 (1+ i)))
           ((null arg))
@@ -882,14 +882,16 @@ default-value-8
 
 ;;; Return a single value using the unknown-values convention.
 (define-vop (return-single)
-  (:args (old-fp :scs (any-reg))
-         (return-pc :scs (descriptor-reg))
+  (:args (old-fp :scs (any-reg) :to :eval)
+         (return-pc :scs (descriptor-reg) :target lra)
          (value))
   (:ignore value)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 6
     (trace-table-entry trace-table-fun-epilogue)
+    (move lra return-pc)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -900,7 +902,7 @@ default-value-8
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (lisp-return return-pc lip :offset 2)
+    (lisp-return lra lip :offset 2)
     (trace-table-entry trace-table-normal)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
@@ -918,7 +920,7 @@ default-value-8
 (define-vop (return)
   (:args
    (old-fp :scs (any-reg))
-   (return-pc :scs (descriptor-reg) :to (:eval 1))
+   (return-pc :scs (descriptor-reg) :to (:eval 1) :target lra)
    (values :more t))
   (:ignore values)
   (:info nvals)
@@ -926,12 +928,14 @@ default-value-8
   (:temporary (:sc descriptor-reg :offset a1-offset :from (:eval 0)) a1)
   (:temporary (:sc descriptor-reg :offset a2-offset :from (:eval 0)) a2)
   (:temporary (:sc descriptor-reg :offset a3-offset :from (:eval 0)) a3)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:eval 1)) lra)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 6
     (trace-table-entry trace-table-fun-epilogue)
+    (move lra return-pc)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -943,7 +947,7 @@ default-value-8
            (move csp-tn cfp-tn)
            (move cfp-tn old-fp)
            ;; Out of here.
-           (lisp-return return-pc lip :offset 2))
+           (lisp-return lra lip :offset 2))
           (t
            ;; Establish the values pointer and values count.
            (move val-ptr cfp-tn)
@@ -957,7 +961,7 @@ default-value-8
              (dolist (reg (subseq (list a0 a1 a2 a3) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return return-pc lip)))
+           (lisp-return lra lip)))
     (trace-table-entry trace-table-normal)))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
@@ -981,6 +985,7 @@ default-value-8
   (:vop-var vop)
   (:generator 13
     (trace-table-entry trace-table-fun-epilogue)
+    (move lra lra-arg)
     (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
@@ -999,7 +1004,6 @@ default-value-8
       ;; Nope, not the single case.
       (emit-label not-single)
       (move old-fp old-fp-arg)
-      (move lra lra-arg)
       (move vals vals-arg)
       (move nvals nvals-arg)
       (inst lr temp (make-fixup 'return-multiple :assembly-routine))

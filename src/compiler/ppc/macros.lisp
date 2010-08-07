@@ -79,16 +79,13 @@
     ;; (loadw ,lip ,function function-code-offset function-pointer-type)
     (inst addi ,lip ,function (- (* n-word-bytes simple-fun-code-offset) fun-pointer-lowtag))
     (inst mtctr ,lip)
-    (move code-tn ,function)
     (inst bctr)))
 
-(defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
+(defmacro lisp-return (return-pc lip &key (offset 0))
   "Return to RETURN-PC."
   `(progn
      (inst addi ,lip ,return-pc (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
      (inst mtlr ,lip)
-     ,@(if frob-code
-         `((move code-tn ,return-pc)))
      (inst blr)))
 
 (defmacro emit-return-pc (label)

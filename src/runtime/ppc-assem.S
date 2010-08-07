@@ -601,14 +601,14 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 
 	/* Compute the correct value for reg_CODE based on the LRA.
 	This is a "simple" matter of subtracting a constant from
-	reg_CODE (where the LRA is stored by the return sequence) to
+	reg_LRA (where the LRA is stored by the return sequence) to
 	obtain a tagged pointer to the enclosing code component.  Both
 	values are tagged OTHER_POINTER_LOWTAG, so we just have to
 	account for the eight words (see calculation for
 	RETURN_PC_HEADER_WIDETAG, above) between the two addresses.
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_CODE, -32
+	addi reg_CODE, reg_LRA, -32
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */
@@ -631,7 +631,7 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 fun_end_breakpoint_multiple_values:
 	/* Compute the correct value for reg_CODE.  See the
 	explanation for the single-value case, above. */
-	addi reg_CODE, reg_CODE, -32
+	addi reg_CODE, reg_LRA, -32
 
 	/* The actual magic trap. */
 CSYMBOL(fun_end_breakpoint_trap):
