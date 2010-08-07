@@ -49,15 +49,21 @@ os_context_lr_addr(os_context_t *context)
 os_context_register_t *
 os_context_ctr_addr(os_context_t *context)
 {
-    /* FIXME: Figure out how to make this happen. */
-    lose("was asked for context Counter (CTR) register, but don't know how");
+#if defined(LISP_FEATURE_NETBSD)
+    return &context->uc_mcontext.__gregs[_REG_CTR];
+#elif defined(LISP_FEATURE_OPENBSD)
+    return &context->sc_frame.ctr;
+#endif
 }
 
 os_context_register_t *
 os_context_cr_addr(os_context_t *context)
 {
-    /* FIXME: Figure out how to make this happen. */
-    lose("was asked for context Condition (CR) register, but don't know how");
+#if defined(LISP_FEATURE_NETBSD)
+    return &context->uc_mcontext.__gregs[_REG_CR];
+#elif defined(LISP_FEATURE_OPENBSD)
+    return &context->sc_frame.cr;
+#endif
 }
 
 /* FIXME: If this can be a no-op on BSD/x86, then it
