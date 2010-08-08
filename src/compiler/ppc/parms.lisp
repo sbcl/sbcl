@@ -207,6 +207,11 @@
    '(
      #!+gencgc *restart-lisp-function*
 
+     ;; Swiped from x86-64 thread implementation.
+     #!+sb-thread *stop-for-gc-pending*
+     #!+sb-thread *free-tls-index*
+     #!+sb-thread *tls-index-lock*
+
      ;; CLH: 20060210 Taken from x86-64/parms.lisp per JES' suggestion
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory

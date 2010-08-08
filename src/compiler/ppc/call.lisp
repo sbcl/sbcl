@@ -750,12 +750,10 @@ default-value-8
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     ;; Get the symbol-value of SB!IMPL::*STEPPING*
-                    (loadw stepping
-                           null-tn
-                           (+ symbol-value-slot
-                              (truncate (static-symbol-offset 'sb!impl::*stepping*)
-                                        n-word-bytes))
-                           other-pointer-lowtag)
+                    #!-sb-thread
+                    (load-symbol-value stepping sb!impl::*stepping*)
+                    #!+sb-thread
+                    (loadw stepping thread-base-tn thread-stepping-slot)
                     (inst cmpw stepping null-tn)
                     ;; If it's not null, trap.
                     (inst beq step-done-label)
@@ -1239,12 +1237,10 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     ;; Get the symbol-value of SB!IMPL::*STEPPING*
-    (loadw stepping
-           null-tn
-           (+ symbol-value-slot
-              (truncate (static-symbol-offset 'sb!impl::*stepping*)
-                        n-word-bytes))
-           other-pointer-lowtag)
+    #!-sb-thread
+    (load-symbol-value stepping sb!impl::*stepping*)
+    #!+sb-thread
+    (loadw stepping thread-base-tn thread-stepping-slot)
     (inst cmpw stepping null-tn)
     ;; If it's not null, trap.
     (inst beq DONE)
