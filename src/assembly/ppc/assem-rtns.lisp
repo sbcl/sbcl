@@ -157,7 +157,7 @@
     (inst cmpwi block 0)
     (inst beq error))
 
-  (load-symbol-value cur-uwp *current-unwind-protect-block*)
+  (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst cmpw cur-uwp target-uwp)
   (inst bne do-uwp)
@@ -174,7 +174,7 @@
   DO-UWP
 
   (loadw next-uwp cur-uwp unwind-block-current-uwp-slot)
-  (store-symbol-value next-uwp *current-unwind-protect-block*)
+  (store-tl-symbol-value next-uwp *current-unwind-protect-block* cfp-tn)
   (inst b do-exit))
 
 (define-assembly-routine (throw
@@ -187,7 +187,7 @@
 
   (declare (ignore start count))
 
-  (load-symbol-value catch *current-catch-block*)
+  (load-tl-symbol-value catch *current-catch-block*)
 
   loop
 
