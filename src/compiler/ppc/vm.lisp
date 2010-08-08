@@ -81,7 +81,7 @@
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 #+nil nl7 cfunc nargs nfp)
 
   (defregset descriptor-regs
-      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 l2 )
+      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 #!-sb-thread l2 )
 
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
@@ -326,6 +326,11 @@
                               :sc (sc-or-lose 'descriptor-reg)
                               :offset n))
           *register-arg-offsets*))
+
+#!+sb-thread
+(defparameter thread-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
+                  :offset l2-offset))
 
 (export 'single-value-return-byte-offset)
 
