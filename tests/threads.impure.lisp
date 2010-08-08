@@ -582,6 +582,7 @@
 
 (format t "~&multi interrupt test done~%")
 
+#+(or x86 x86-64) ;; x86oid-only, see internal commentary.
 (with-test (:name (:interrupt-thread :interrupt-consing-child :again))
   #+darwin
   (error "Hangs on Darwin.")

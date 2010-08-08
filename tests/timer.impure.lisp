@@ -240,9 +240,11 @@
 ;;; running out of stack (due to repeating timers being rescheduled
 ;;; before they ran) and dying threads were open interrupts.
 #+sb-thread
-(with-test (:name (:timer :parallel-unschedule))
+(with-test (:name (:timer :parallel-unschedule) :fails-on :ppc)
   #+darwin
   (error "Prone to hang on Darwin due to interrupt issues.")
+  #+ppc
+  (error "Prone to hang the host on linux/ppc for unknown reasons.")
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()

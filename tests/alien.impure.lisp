@@ -20,8 +20,8 @@
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)
 ;;; was messed up so badly that trying to execute expressions like
 ;;; this signalled an error.
-(setf (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned)
-      (sb-alien:extern-alien "current_control_stack_pointer" sb-alien:unsigned))
+(setf (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)
+      (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned))
 
 ;;; bug 133, fixed in 0.7.0.5: Somewhere in 0.pre7.*, C void returns
 ;;; were broken ("unable to use values types here") when

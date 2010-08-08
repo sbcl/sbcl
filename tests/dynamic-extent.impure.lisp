@@ -554,7 +554,10 @@
   (setf (gethash 5 *table*) 13)
   (gethash 5 *table*))
 
-(with-test (:name (:no-consing :hash-tables))
+;; This fails on threaded PPC because the hash-table implementation
+;; uses recursive system spinlocks, which cons (see below for test
+;; (:no-consing :spinlock), which also fails on threaded PPC).
+(with-test (:name (:no-consing :hash-tables) :fails-on (and :ppc :sb-thread))
   (assert-no-consing (test-hash-table)))
 
 ;;; with-spinlock and with-mutex should use DX and not cons
@@ -572,11 +575,11 @@
     (true *mutex*)))
 
 #+sb-thread
-(with-test (:name (:no-consing :mutex))
+(with-test (:name (:no-consing :mutex) :fails-on :ppc)
   (assert-no-consing (test-mutex)))
 
 #+sb-thread
-(with-test (:name (:no-consing :spinlock))
+(with-test (:name (:no-consing :spinlock) :fails-on :ppc)
   (assert-no-consing (test-spinlock)))
 
 
