@@ -201,67 +201,68 @@
              (inst addi alloc-tn alloc-tn ,alloc-size)
              (inst add alloc-tn alloc-tn ,alloc-size))))
     #!+gencgc
-    (let ((fix-addr (gensym))
-          (inline-alloc (gensym)))
-      `(let ((,fix-addr (gen-label))
-             (,inline-alloc (gen-label)))
-         ;; Make temp-tn be the size
-         (cond ((numberp ,size)
-                (inst lr ,temp-tn ,size))
-               (t
-                (move ,temp-tn ,size)))
+    `(progn
+       ;; Make temp-tn be the size
+       (cond ((numberp ,size)
+              (inst lr ,temp-tn ,size))
+             (t
+              (move ,temp-tn ,size)))
 
-         #!-sb-thread
-         (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
-         #!-sb-thread
-         (inst lwz ,result-tn ,flag-tn 0)
-         #!+sb-thread
-         (inst lwz ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                                n-word-bytes))
-
-         ;; we can optimize this to only use one fixup here, once we get
-         ;; it working
-         ;; (inst lr ,flag-tn (make-fixup "boxed_region" :foreign 4))
-         ;; (inst lwz ,flag-tn ,flag-tn 0)
-         #!-sb-thread
-         (inst lwz ,flag-tn ,flag-tn 4)
-         #!+sb-thread
-         (inst lwz ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+       #!-sb-thread
+       (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+       #!-sb-thread
+       (inst lwz ,result-tn ,flag-tn 0)
+       #!+sb-thread
+       (inst lwz ,result-tn thread-base-tn (* thread-alloc-region-slot
                                               n-word-bytes))
 
-         (without-scheduling ()
-           ;; CAUTION: The C code depends on the exact order of
-           ;; instructions here.  In particular, three instructions before
-           ;; the TW instruction must be an ADD or ADDI instruction, so it
-           ;; can figure out the size of the desired allocation.
-           ;; Now make result-tn point at the end of the object, to
-           ;; figure out if we overflowed the current region.
-           (inst add ,result-tn ,result-tn ,temp-tn)
-           ;; result-tn points to the new end of the region.  Did we go past
-           ;; the actual end of the region?  If so, we need a full alloc.
-           ;; The C code depends on this exact form of instruction.  If
-           ;; either changes, you have to change the other appropriately!
-           (inst cmpw ,result-tn ,flag-tn)
+       ;; we can optimize this to only use one fixup here, once we get
+       ;; it working
+       ;; (inst lr ,flag-tn (make-fixup "boxed_region" :foreign 4))
+       ;; (inst lwz ,flag-tn ,flag-tn 0)
+       #!-sb-thread
+       (inst lwz ,flag-tn ,flag-tn 4)
+       #!+sb-thread
+       (inst lwz ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+                                            n-word-bytes))
 
-           (inst bng ,inline-alloc)
-           (inst tw :lge ,result-tn ,flag-tn))
-         (inst b ,fix-addr)
+       (without-scheduling ()
+         ;; CAUTION: The C code depends on the exact order of
+         ;; instructions here.  In particular, immediately before the
+         ;; TW instruction must be an ADD or ADDI instruction, so it
+         ;; can figure out the size of the desired allocation and
+         ;; storing the new base pointer back to the allocation region
+         ;; must take two instructions (one on threaded targets).
 
-         (emit-label ,inline-alloc)
+         ;; Now make result-tn point at the end of the object, to
+         ;; figure out if we overflowed the current region.
+         (inst add ,result-tn ,result-tn ,temp-tn)
+         ;; result-tn points to the new end of the region.  Did we go past
+         ;; the actual end of the region?  If so, we need a full alloc.
+         ;; The C code depends on this exact form of instruction.  If
+         ;; either changes, you have to change the other appropriately!
+         (inst tw :lge ,result-tn ,flag-tn)
+
+         ;; The C code depends on this instruction sequence taking up
+         ;; #!-sb-thread three #!+sb-thread one machine instruction.
+         ;; The lr of a fixup counts as two instructions.
          #!-sb-thread
          (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
          #!-sb-thread
          (inst stw ,result-tn ,flag-tn 0)
          #!+sb-thread
          (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                                n-word-bytes))
+                                                n-word-bytes)))
 
-         (emit-label ,fix-addr)
-         ;; At this point, result-tn points at the end of the object.
-         ;; Adjust to point to the beginning.
-         (inst sub ,result-tn ,result-tn ,temp-tn)
-         ;; Set the lowtag appropriately
-         (inst ori ,result-tn ,result-tn ,lowtag))))
+       ;; Should the allocation trap above have fired, the runtime
+       ;; arranges for execution to resume here, just after where we
+       ;; would have updated the free pointer in the alloc region.
+
+       ;; At this point, result-tn points at the end of the object.
+       ;; Adjust to point to the beginning.
+       (inst sub ,result-tn ,result-tn ,temp-tn)
+       ;; Set the lowtag appropriately
+       (inst ori ,result-tn ,result-tn ,lowtag)))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
                                             &key (lowtag other-pointer-lowtag))

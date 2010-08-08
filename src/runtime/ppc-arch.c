@@ -300,15 +300,15 @@ allocation_trap_p(os_context_t * context)
         && (4 == ((inst >> 1) & 0x3ff))) {
         /*
          * We got the instruction.  Now, look back to make sure it was
-         * proceeded by what we expected.  2 instructions back should be
-         * an ADD or ADDI instruction.
+         * proceeded by what we expected.  The previous instruction
+         * should be an ADD or ADDI instruction.
          */
         unsigned int add_inst;
 
-        add_inst = pc[-3];
+        add_inst = pc[-1];
 #if 0
         fprintf(stderr, "   add inst at %p:  inst = 0x%08x\n",
-                pc - 3, add_inst);
+                pc - 1, add_inst);
 #endif
         opcode = add_inst >> 26;
         if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
@@ -389,7 +389,7 @@ handle_allocation_trap(os_context_t * context)
      * is the size of the allocation.  Get it and call alloc to allocate
      * new space.
      */
-    inst = pc[-3];
+    inst = pc[-1];
     opcode = inst >> 26;
 #if 0
     fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
@@ -491,6 +491,15 @@ handle_allocation_trap(os_context_t * context)
         undo_fake_foreign_function_call(context);
     }
 
+    /* Skip the allocation trap and the write of the updated free
+     * pointer back to the allocation region.  This is two
+     * instructions when threading is enabled and four instructions
+     * otherwise. */
+#ifdef LISP_FEATURE_SB_THREAD
+    (*os_context_pc_addr(context)) = pc + 2;
+#else
+    (*os_context_pc_addr(context)) = pc + 4;
+#endif
 
 }
 #endif
@@ -550,7 +559,6 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     /* Is this an allocation trap? */
     if (allocation_trap_p(context)) {
         handle_allocation_trap(context);
-        arch_skip_instruction(context);
         return;
     }
 #endif
