@@ -228,6 +228,63 @@
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
 
+#!+sb-thread
+(define-vop (bind)
+  (:args (val :scs (any-reg descriptor-reg))
+         (symbol :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
+  (:temporary (:scs (descriptor-reg)) temp tls-index)
+  (:generator 5
+     (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+     (inst cmpwi tls-index 0)
+     (inst bne TLS-VALID)
+
+     ;; No TLS slot allocated, so allocate one.
+     (pseudo-atomic (pa-flag)
+       (without-scheduling ()
+         (assemble ()
+           (inst li temp (+ (static-symbol-offset '*tls-index-lock*)
+                            (ash symbol-value-slot word-shift)
+                            (- other-pointer-lowtag)))
+           OBTAIN-LOCK
+           (inst lwarx tls-index null-tn temp)
+           (inst cmpwi tls-index 0)
+           (inst bne OBTAIN-LOCK)
+           (inst stwcx. thread-base-tn null-tn temp)
+           (inst bne OBTAIN-LOCK)
+           (inst isync)
+
+           ;; Check to see if the TLS index was set while we were waiting.
+           (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+           (inst cmpwi tls-index 0)
+           (inst bne RELEASE-LOCK)
+
+           (load-symbol-value tls-index *free-tls-index*)
+           ;; FIXME: Check for TLS index overflow.
+           (inst addi tls-index tls-index n-word-bytes)
+           (store-symbol-value tls-index *free-tls-index*)
+           (inst addi tls-index tls-index (- n-word-bytes))
+           (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+
+           ;; The sync instruction doesn't need to happen if we branch
+           ;; directly to RELEASE-LOCK as we didn't do any stores in that
+           ;; case.
+           (inst sync)
+           RELEASE-LOCK
+           (inst stwx zero-tn null-tn temp)
+
+           ;; temp is a boxed register, but we've been storing crap in it.
+           ;; fix it before we leave pseudo-atomic.
+           (inst li temp 0))))
+
+     TLS-VALID
+     (inst lwzx temp thread-base-tn tls-index)
+     (inst addi bsp-tn bsp-tn (* 2 n-word-bytes))
+     (storew temp bsp-tn (- binding-value-slot binding-size))
+     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
+     (inst stwx val thread-base-tn tls-index)))
+
+#!-sb-thread
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -239,7 +296,19 @@
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
+#!+sb-thread
+(define-vop (unbind)
+  (:temporary (:scs (descriptor-reg)) tls-index value)
+  (:generator 0
+    (loadw tls-index bsp-tn (- binding-symbol-slot binding-size))
+    (loadw tls-index tls-index symbol-tls-index-slot other-pointer-lowtag)
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    (inst stwx value thread-base-tn tls-index)
+    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+    (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))))
 
+#!-sb-thread
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
@@ -268,6 +337,11 @@
       (inst cmpwi symbol 0)
       (inst beq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
+      #!+sb-thread
+      (loadw symbol symbol symbol-tls-index-slot other-pointer-lowtag)
+      #!+sb-thread
+      (inst stwx value thread-base-tn symbol)
+      #!-sb-thread
       (storew value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
