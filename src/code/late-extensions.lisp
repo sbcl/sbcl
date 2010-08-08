@@ -189,7 +189,7 @@ EXPERIMENTAL: Interface subject to change."
               (when (dsd-read-only slotd)
                 (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
                        name place))
-              #!+(or x86 x86-64)
+              #!+(or x86 x86-64 ppc)
               `(truly-the sb!vm:word
                           (%raw-instance-atomic-incf/word
                            (the ,structure ,@args) ,index
@@ -200,7 +200,7 @@ EXPERIMENTAL: Interface subject to change."
                                            (atomic-decf
                                             `(- (the sb!vm:signed-word ,diff)))))))
               ;; No threads outside x86 and x86-64 for now, so this is easy...
-              #!-(or x86 x86-64)
+              #!-(or x86 x86-64 ppc)
               (with-unique-names (structure old)
                 `(sb!sys:without-interrupts
                    (let* ((,structure ,@args)

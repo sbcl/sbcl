@@ -508,6 +508,38 @@
   (:generator 4
     (inst stw value object (offset-for-raw-slot instance-length index 1))))
 
+(define-vop (raw-instance-atomic-incf/word)
+  (:translate %raw-instance-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (diff :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:temporary (:sc unsigned-reg) offset)
+  (:temporary (:sc non-descriptor-reg) sum)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:generator 4
+    (loadw offset object 0 instance-pointer-lowtag)
+    ;; offset = (offset >> n-widetag-bits) << 2
+    (inst rlwinm offset offset (- 32 (- n-widetag-bits 2)) (- n-widetag-bits 2) 29)
+    (inst subf offset index offset)
+    (inst addi
+          offset
+          offset
+          (- (* (1- instance-slots-offset) n-word-bytes)
+             instance-pointer-lowtag))
+    ;; load the slot value, add DIFF, write the sum back, and return
+    ;; the original slot value, atomically, and include a memory
+    ;; barrier.
+    (inst sync)
+    LOOP
+    (inst lwarx result offset object)
+    (inst add sum result diff)
+    (inst stwcx. sum offset object)
+    (inst bne LOOP)
+    (inst isync)))
+
 (define-vop (raw-instance-ref/word)
   (:translate %raw-instance-ref/word)
   (:policy :fast-safe)
