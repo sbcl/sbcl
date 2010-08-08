@@ -55,7 +55,37 @@
                         (ash ,',offset word-shift)
                         (- other-pointer-lowtag))))))))
   (frob value)
-  (frob function))
+  (frob function)
+
+  ;; FIXME: These are only good for static-symbols, so why not
+  ;; statically-allocate the static-symbol TLS slot indices at
+  ;; cross-compile time so we can just use a fixed offset within the
+  ;; TLS block instead of mucking about with the extra memory access
+  ;; (and temp register, for stores)?
+  #!+sb-thread
+  (defmacro load-tl-symbol-value (reg symbol)
+    `(progn
+       (inst lwz ,reg null-tn
+             (+ (static-symbol-offset ',symbol)
+                (ash symbol-tls-index-slot word-shift)
+                (- other-pointer-lowtag)))
+       (inst lwzx ,reg thread-base-tn ,reg)))
+  #!-sb-thread
+  (defmacro load-tl-symbol-value (reg symbol)
+    `(load-symbol-value ,reg ,symbol))
+
+  #!+sb-thread
+  (defmacro store-tl-symbol-value (reg symbol temp)
+    `(progn
+       (inst lwz ,temp null-tn
+             (+ (static-symbol-offset ',symbol)
+                (ash symbol-tls-index-slot word-shift)
+                (- other-pointer-lowtag)))
+       (inst stwx ,reg thread-base-tn ,temp)))
+  #!-sb-thread
+  (defmacro store-tl-symbol-value (reg symbol temp)
+    (declare (ignore temp))
+    `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
