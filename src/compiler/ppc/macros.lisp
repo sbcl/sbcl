@@ -211,14 +211,23 @@
                (t
                 (move ,temp-tn ,size)))
 
+         #!-sb-thread
          (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+         #!-sb-thread
          (inst lwz ,result-tn ,flag-tn 0)
+         #!+sb-thread
+         (inst lwz ,result-tn thread-base-tn (* thread-alloc-region-slot
+                                                n-word-bytes))
 
          ;; we can optimize this to only use one fixup here, once we get
          ;; it working
          ;; (inst lr ,flag-tn (make-fixup "boxed_region" :foreign 4))
          ;; (inst lwz ,flag-tn ,flag-tn 0)
+         #!-sb-thread
          (inst lwz ,flag-tn ,flag-tn 4)
+         #!+sb-thread
+         (inst lwz ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+                                              n-word-bytes))
 
          (without-scheduling ()
            ;; CAUTION: The C code depends on the exact order of
@@ -239,8 +248,13 @@
          (inst b ,fix-addr)
 
          (emit-label ,inline-alloc)
+         #!-sb-thread
          (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+         #!-sb-thread
          (inst stw ,result-tn ,flag-tn 0)
+         #!+sb-thread
+         (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
+                                                n-word-bytes))
 
          (emit-label ,fix-addr)
          ;; At this point, result-tn points at the end of the object.
