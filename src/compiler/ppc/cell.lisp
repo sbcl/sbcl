@@ -31,8 +31,68 @@
   (:generator 1
     (storew value object offset lowtag)))
 
+#!+compare-and-swap-vops
+(define-vop (compare-and-swap-slot)
+  (:args (object :scs (descriptor-reg))
+         (old :scs (descriptor-reg any-reg))
+         (new :scs (descriptor-reg any-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:info name offset lowtag)
+  (:ignore name)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:generator 5
+    (inst sync)
+    (inst li temp (- (* offset n-word-bytes) lowtag))
+    LOOP
+    (inst lwarx result temp object)
+    (inst cmpw result old)
+    (inst bne EXIT)
+    (inst stwcx. new temp object)
+    (inst bne LOOP)
+    EXIT
+    (inst isync)))
+
 
 ;;;; Symbol hacking VOPs:
+
+#!+compare-and-swap-vops
+(define-vop (%compare-and-swap-symbol-value)
+  (:translate %compare-and-swap-symbol-value)
+  (:args (symbol :scs (descriptor-reg))
+         (old :scs (descriptor-reg any-reg))
+         (new :scs (descriptor-reg any-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:results (result :scs (descriptor-reg any-reg) :from :load))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 15
+    (inst sync)
+    #!+sb-thread
+    (assemble ()
+      (loadw temp symbol symbol-tls-index-slot other-pointer-lowtag)
+      ;; Thread-local area, no synchronization needed.
+      (inst lwzx result thread-base-tn temp)
+      (inst cmpw result old)
+      (inst bne DONT-STORE-TLS)
+      (inst stwx new thread-base-tn temp)
+      DONT-STORE-TLS
+
+      (inst cmpwi result no-tls-value-marker-widetag)
+      (inst bne CHECK-UNBOUND))
+
+    (inst li temp (- (* symbol-value-slot n-word-bytes)
+                     other-pointer-lowtag))
+    LOOP
+    (inst lwarx result symbol temp)
+    (inst cmpw result old)
+    (inst bne CHECK-UNBOUND)
+    (inst stwcx. new symbol temp)
+    (inst bne LOOP)
+
+    CHECK-UNBOUND
+    (inst isync)
+    (inst cmpwi result unbound-marker-widetag)
+    (inst beq (generate-error-code vop 'unbound-symbol-error symbol))))
 
 ;;; The compiler likes to be able to directly SET symbols.
 (define-vop (%set-symbol-global-value cell-set)
@@ -411,7 +471,12 @@
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance positive-fixnum *))
 
-
+#!+compare-and-swap-vops
+(define-vop (%compare-and-swap-instance-ref word-index-cas)
+  (:policy :fast-safe)
+  (:translate %compare-and-swap-instance-ref)
+  (:variant instance-slots-offset instance-pointer-lowtag)
+  (:arg-types instance tagged-num * *))
 
 
 ;;;; Code object frobbing.

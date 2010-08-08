@@ -104,3 +104,39 @@
 (define-indexer signed-byte-index-ref nil lbz lbzx 2 t)
 (define-indexer byte-index-set t stb stbx 2)
 
+#!+compare-and-swap-vops
+(define-vop (word-index-cas)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg zero immediate))
+         (old-value :scs (any-reg descriptor-reg))
+         (new-value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num * *)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:results (result :scs (any-reg descriptor-reg) :from :load))
+  (:result-types *)
+  (:variant-vars offset lowtag)
+  (:policy :fast-safe)
+  (:generator 5
+    (sc-case index
+      ((immediate zero)
+       (let ((offset (- (+ (if (sc-is index zero)
+                               0
+                             (ash (tn-value index) word-shift))
+                           (ash offset word-shift))
+                        lowtag)))
+         (inst lr temp offset)))
+      (t
+       ;; KLUDGE: This relies on N-FIXNUM-TAG-BITS being the same as
+       ;; WORD-SHIFT.  I know better than to do this.  --AB, 2010-Jun-16
+       (inst addi temp index
+             (- (ash offset word-shift) lowtag))))
+
+    (inst sync)
+    LOOP
+    (inst lwarx result temp object)
+    (inst cmpw result old-value)
+    (inst bne EXIT)
+    (inst stwcx. new-value temp object)
+    (inst bne LOOP)
+    EXIT
+    (inst isync)))

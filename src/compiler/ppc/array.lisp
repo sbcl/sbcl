@@ -140,6 +140,13 @@
   (def-data-vector-frobs simple-array-signed-byte-32 word-index
     signed-num signed-reg))
 
+#!+compare-and-swap-vops
+(define-vop (%compare-and-swap-svref word-index-cas)
+  (:note "inline array compare-and-swap")
+  (:policy :fast-safe)
+  (:variant vector-data-offset other-pointer-lowtag)
+  (:translate %compare-and-swap-svref)
+  (:arg-types simple-vector positive-fixnum * *))
 
 ;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
