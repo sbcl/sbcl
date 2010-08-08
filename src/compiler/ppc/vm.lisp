@@ -74,7 +74,7 @@
   (defreg a3 27)
   (defreg l0 28)
   (defreg l1 29)
-  (defreg l2 30)
+  (defreg #!-sb-thread l2 #!+sb-thread thread 30)
   (defreg lip 31)
 
   (defregset non-descriptor-regs
@@ -330,7 +330,7 @@
 #!+sb-thread
 (defparameter thread-base-tn
   (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset l2-offset))
+                  :offset thread-offset))
 
 (export 'single-value-return-byte-offset)
 

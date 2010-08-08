@@ -48,8 +48,18 @@
 #define reg_A3        REG(27)   /* Last of (only) 4 arg regs */
 #define reg_L0        REG(28)   /* Tagged temp regs */
 #define reg_L1        REG(29)
+#ifdef LISP_FEATURE_SB_THREAD
+#define reg_THREAD    REG(30)   /* TLS block pointer */
+#else
 #define reg_L2        REG(30)   /* Last lisp temp reg */
+#endif
 #define reg_LIP       REG(31)   /* Lisp Interior Pointer, e.g., locative */
+
+#ifdef LISP_FEATURE_SB_THREAD
+#define REG30_NAME "THREAD"
+#else
+#define REG30_NAME "L2"
+#endif
 
 #define REGNAMES \
         "ZERO",         "NSP",          "???",          "NL0", \
@@ -59,10 +69,10 @@
         "CSP",          "ALLOC",        "NULL",         "CODE", \
         "CNAME",        "LEXENV",       "OCFP",         "LRA", \
         "A0",           "A1",           "A2",           "A3", \
-        "L0",           "L1",           "L2",           "LIP"
+        "L0",           "L1",           REG30_NAME,     "LIP"
 
 #define BOXED_REGISTERS { \
     reg_FDEFN, reg_CODE, reg_CNAME, reg_LEXENV, reg_OCFP, reg_LRA, \
     reg_A0, reg_A1, reg_A2, reg_A3, \
-    reg_L0, reg_L1, reg_L2 \
+    reg_L0, reg_L1, REG(30) \
 }
