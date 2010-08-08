@@ -131,6 +131,10 @@ initial_thread_trampoline(struct thread *th)
 #ifdef LISP_FEATURE_SB_THREAD
     pthread_setspecific(lisp_thread, (void *)1);
 #endif
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_PPC)
+    /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
+    unblock_gc_signals(0,0);
+#endif
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;

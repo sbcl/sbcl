@@ -28,6 +28,10 @@
 #include "gencgc-alloc-region.h"
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+#include "pseudo-atomic.h"
+#endif
+
   /* The header files may not define PT_DAR/PT_DSISR.  This definition
      is correct for all versions of ppc linux >= 2.0.30
 
@@ -89,6 +93,13 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
+#ifdef LISP_FEATURE_SB_THREAD
+    struct thread *thread = arch_os_get_current_thread();
+
+    if (foreign_function_call_active_p(thread)) {
+        return get_pseudo_atomic_atomic(thread);
+    } else return
+#else
     /* FIXME: this foreign_function_call_active test is dubious at
      * best. If a foreign call is made in a pseudo atomic section
      * (?) or more likely a pseudo atomic section is in a foreign
@@ -99,20 +110,37 @@ arch_pseudo_atomic_atomic(os_context_t *context)
      * The foreign_function_call_active used to live at each call-site
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
-    return (!foreign_function_call_active_p(arch_os_get_current_thread()))
-        && ((*os_context_register_addr(context,reg_ALLOC)) & 4);
+    return (!foreign_function_call_active_p(arch_os_get_current_thread())) &&
+#endif
+        ((*os_context_register_addr(context,reg_ALLOC)) & flag_PseudoAtomic);
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) |= 1;
+#ifdef LISP_FEATURE_SB_THREAD
+    struct thread *thread = arch_os_get_current_thread();
+
+    if (foreign_function_call_active_p(thread)) {
+        set_pseudo_atomic_interrupted(thread);
+    } else
+#endif
+        *os_context_register_addr(context,reg_ALLOC)
+            |= flag_PseudoAtomicInterrupted;
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+#ifdef LISP_FEATURE_SB_THREAD
+    struct thread *thread = arch_os_get_current_thread();
+
+    if (foreign_function_call_active_p(thread)) {
+        clear_pseudo_atomic_interrupted(thread);
+    } else
+#endif
+        *os_context_register_addr(context,reg_ALLOC)
+            &= ~flag_PseudoAtomicInterrupted;
 }
 
 unsigned int
@@ -450,10 +478,14 @@ handle_allocation_trap(os_context_t * context)
 #endif
 
     *os_context_register_addr(context, target) = (unsigned long) memory;
+#ifndef LISP_FEATURE_SB_THREAD
+    /* This is handled by the fake_foreign_function_call machinery on
+     * threaded targets. */
     *os_context_register_addr(context, reg_ALLOC) =
       (unsigned long) dynamic_space_free_pointer
       | (*os_context_register_addr(context, reg_ALLOC)
          & LOWTAG_MASK);
+#endif
 
     if (were_in_lisp) {
         undo_fake_foreign_function_call(context);

@@ -42,6 +42,10 @@
 size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
+#if defined(LISP_FEATURE_SB_THREAD)
+    pthread_setspecific(specials,thread);
+#endif
+
     /* For some reason, PPC Linux appears to default to not generating
      * floating point exceptions.  PR_SET_FPEXC is a PPC-specific
      * option new in kernel 2.4.21 and 2.5.32 that allows us to

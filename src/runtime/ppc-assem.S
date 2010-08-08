@@ -9,6 +9,9 @@
 #include "genesis/closure.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
+#ifdef LISP_FEATURE_SB_THREAD
+#include "genesis/thread.h"
+#endif
 
 #ifdef LISP_FEATURE_DARWIN
 #define CSYMBOL(x) _ ## x
@@ -286,6 +289,33 @@ x:
 
 	GFUNCDEF(call_into_lisp)
 	C_FULL_PROLOG
+	/* NL0 - function, NL1 - frame pointer, NL2 - nargs. */
+#if defined(LISP_FEATURE_SB_THREAD)
+	/* We need to obtain a pointer to our TLS block before we do
+	 * anything else.  For this, we call pthread_getspecific().
+	 * We've preserved all of the callee-saves registers, so we
+	 * can use them to stash our arguments temporarily while we
+	 * make the call. */
+	mr reg_A0, reg_NL0
+	mr reg_A1, reg_NL1
+	mr reg_A2, reg_NL2
+
+	/* Call out to obtain our TLS block. */
+	load(reg_NL0,CSYMBOL(specials))
+	/* This won't work on darwin: wrong fixup style.  And is it
+	 * supposed to be lis/ori or lis/addi?  Or does it differ
+	 * between darwin and everything else again? */
+	lis reg_CFUNC,CSYMBOL(pthread_getspecific)@h
+	ori reg_CFUNC,reg_CFUNC,CSYMBOL(pthread_getspecific)@l
+	mtctr reg_CFUNC
+	bctrl
+	mr reg_THREAD, reg_NL0
+
+	/* Restore our original parameters. */
+	mr reg_NL2, reg_A2
+	mr reg_NL1, reg_A1
+	mr reg_NL0, reg_A0
+#endif
 	/* store(reg_POLL,11,saver2) */
 	/* Initialize tagged registers */
 	li reg_ZERO,0
@@ -301,7 +331,9 @@ x:
 	li reg_A3,0
 	li reg_L0,0
 	li reg_L1,0
+#if !defined(LISP_FEATURE_SB_THREAD)
 	li reg_L2,0
+#endif
 	li reg_LIP,0
 #ifdef LISP_FEATURE_DARWIN	
 	lis reg_NULL,hi16(NIL)
@@ -313,12 +345,23 @@ x:
 	/* Turn on pseudo-atomic */
 
 	li reg_ALLOC,4
+#if defined(LISP_FEATURE_SB_THREAD)
+	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_L2)
+	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_L2)
+	lwz reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_L2)
+	lwz reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_L2)
+#else
 	store(reg_ZERO,reg_NL4,CSYMBOL(foreign_function_call_active))
-	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
-	add reg_ALLOC,reg_ALLOC,reg_NL4
 	load(reg_BSP,CSYMBOL(current_binding_stack_pointer))
 	load(reg_CSP,CSYMBOL(current_control_stack_pointer))
 	load(reg_OCFP,CSYMBOL(current_control_frame_pointer))
+#endif
+	/* This is important for CHENEYGC: It's the allocation
+	 * pointer.  It's also important for ROOM on GENCGC:
+	 * It's a pointer to the end of dynamic space, used to
+	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
+	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
+	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* No longer atomic, and check for interrupt */
 	subi reg_ALLOC,reg_ALLOC,4
@@ -366,6 +409,15 @@ lra:
 	/* Turn on  pseudo-atomic */
 	la reg_ALLOC,4(reg_ALLOC)
 
+#if defined(LISP_FEATURE_SB_THREAD)
+	/* Store lisp state */
+	stw reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_L2)
+	stw reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_L2)
+	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_L2)
+
+	/* No longer in Lisp. */
+	stw reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_L2)
+#else
 	/* Store lisp state */
 	clrrwi reg_NL1,reg_ALLOC,3
 	store(reg_NL1,reg_NL2,CSYMBOL(dynamic_space_free_pointer))
@@ -378,6 +430,7 @@ lra:
 
 	/* No longer in Lisp. */
 	store(reg_NL1,reg_NL2,CSYMBOL(foreign_function_call_active))
+#endif
 
 	/* Check for interrupt */
 	subi reg_ALLOC, reg_ALLOC, 4
@@ -419,6 +472,15 @@ lra:
 	la reg_NFP,OTHER_POINTER_LOWTAG(reg_NFP)
 	stw reg_NFP,4(reg_CFP)
 
+#ifdef LISP_FEATURE_SB_THREAD
+	/* Store Lisp state */
+	stw reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_L2)
+	stw reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_L2)
+	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_L2)
+
+	/* No longer in Lisp. */
+	stw reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_L2)
+#else
 	/* Store Lisp state */
 	clrrwi reg_NFP,reg_ALLOC,3
 	store(reg_NFP,reg_CFUNC,CSYMBOL(dynamic_space_free_pointer))
@@ -430,6 +492,7 @@ lra:
 
 	/* No longer in Lisp */
 	store(reg_CSP,reg_CFUNC,CSYMBOL(foreign_function_call_active))
+#endif
 	/* load(reg_POLL,saver2) */
 	/* Disable pseudo-atomic; check pending interrupt */
 	subi reg_ALLOC, reg_ALLOC, 4
@@ -472,22 +535,38 @@ lra:
 	li reg_A3,0
 	li reg_L0,0
 	li reg_L1,0
+#if !defined(LISP_FEATURE_SB_THREAD)
+	/* reg_L2 is our TLS block pointer. */
 	li reg_L2,0
+#endif
 	li reg_LIP,0
 
 	/* Atomic ... */
         li reg_NL3,-4        
 	li reg_ALLOC,4
 
+#if defined(LISP_FEATURE_SB_THREAD)
+	/* No longer in foreign function call. */
+	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_L2)
+
+	/* The binding stack pointer isn't preserved by C. */
+	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_L2)
+#else
 	/* No long in foreign function call. */
 	store(reg_ZERO,reg_NL2,CSYMBOL(foreign_function_call_active))
 
 	/* The free pointer may have moved */
-	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
-	add reg_ALLOC,reg_ALLOC,reg_NL4
+	/* (moved below) */
 
 	/* The BSP wasn't preserved by C, so load it */
 	load(reg_BSP,CSYMBOL(current_binding_stack_pointer))
+#endif
+	/* This is important for CHENEYGC: It's the allocation
+	 * pointer.  It's also important for ROOM on GENCGC:
+	 * It's a pointer to the end of dynamic space, used to
+	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
+	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
+	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* Other lisp stack/frame pointers were preserved by C.
 	I can't imagine why they'd have moved */

@@ -32,6 +32,21 @@ release_spinlock(lispobj *word)
     *word=0;
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
+static inline lispobj
+swap_lispobjs(volatile lispobj *dest, lispobj value)
+{
+    lispobj old_value;
+    asm volatile ("1: lwarx %0,0,%1;"
+                  "   stwcx. %2,0,%1;"
+                  "   bne- 1b;"
+                  "   isync"
+         : "=&r" (old_value)
+         : "r" (dest), "r" (value)
+         : "cr0", "memory");
+    return old_value;
+}
+#endif
 
 #define ARCH_HAS_LINK_REGISTER
 

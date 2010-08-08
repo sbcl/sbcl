@@ -25,6 +25,10 @@ else
   GC_SRC = cheneygc.c
 endif
 
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
+
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers
 after-grovel-headers:
