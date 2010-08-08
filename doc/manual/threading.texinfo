@@ -12,8 +12,8 @@ SB-THREAD package.
 Threads are part of the default build on x86[-64] Linux only.
 
 They are also experimentally supported on: x86[-64] Darwin (Mac OS X),
-x86[-64] FreeBSD, and x86 SunOS (Solaris). On these platforms threads
-must be explicitly enabled at build-time, see @file{INSTALL} for
+x86[-64] FreeBSD, x86 SunOS (Solaris), and PPC Linux. On these platforms
+threads must be explicitly enabled at build-time, see @file{INSTALL} for
 directions.
 
 @menu

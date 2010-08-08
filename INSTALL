@@ -169,8 +169,8 @@ INSTALLING SBCL
 
     :SB-THREAD
       Native threads. Enabled by default on x86[-64] Linux only, also
-      available on x86[-64] Max OS X, x86[-64] FreeBSD, and x86
-      Solaris.
+      available on x86[-64] Max OS X, x86[-64] FreeBSD, x86 Solaris,
+      and PPC Linux.
 
     :SB-UNICODE
       Unicode support. Enabled by default. Disabling this feature
