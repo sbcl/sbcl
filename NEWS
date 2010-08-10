@@ -5,6 +5,7 @@ changes relative to sbcl-1.0.41
   * enhancement: Explicit memory barrier operations are now available for use
     by multithreaded code.  See documentation for details.
   * enhancement: Experimental support for threading on Linux/PPC.
+  * bug fix: RENAME-PACKAGE returns the package.  (Thanks to Eric Marsden)
 
 changes in sbcl-1.0.41 relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is

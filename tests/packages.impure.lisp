@@ -17,6 +17,11 @@
 (assert (eq *foo* (find-package "")))
 (assert (delete-package ""))
 
+(make-package "BAR")
+(defvar *baz* (rename-package "BAR" "BAZ"))
+(assert (eq *baz* (find-package "BAZ")))
+(assert (delete-package *baz*))
+
 (handler-case
     (export :foo)
   (package-error (c) (princ c))

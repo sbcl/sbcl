@@ -640,9 +640,10 @@ implementation it is ~S." *default-package-use-list*)
 (defun rename-package (package-designator name &optional (nicknames ()))
   #!+sb-doc
   "Changes the name and nicknames for a package."
+  (let ((package nil))
   (tagbody :restart
-     (let* ((package (find-undeleted-package-or-lose package-designator))
-            (name (package-namify name))
+       (setq package (find-undeleted-package-or-lose package-designator))
+       (let* ((name (package-namify name))
             (found (find-package name))
             (nicks (mapcar #'string nicknames)))
        (unless (or (not found) (eq found package))
@@ -668,8 +669,8 @@ implementation it is ~S." *default-package-use-list*)
            (setf (package-%name package) name
                  (gethash name names) package
                  (package-%nicknames package) ()))
-         (%enter-new-nicknames package nicknames))
-       package)))
+           (%enter-new-nicknames package nicknames))))
+    package))
 
 (defun delete-package (package-designator)
   #!+sb-doc
