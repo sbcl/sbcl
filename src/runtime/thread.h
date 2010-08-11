@@ -188,6 +188,8 @@ StaticSymbolFunction(lispobj sym)
     SymbolValue(BINDING_STACK_POINTER, thread)
 #define set_binding_stack_pointer(thread,value) \
     SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value), thread)
+#define access_control_stack_pointer(thread)    \
+    (current_control_stack_pointer)
 #else
 #define get_binding_stack_pointer(thread)       \
     (current_binding_stack_pointer)

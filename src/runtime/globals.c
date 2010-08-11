@@ -26,7 +26,7 @@
 int foreign_function_call_active;
 #endif
 
-#if !defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+#if !defined(LISP_FEATURE_SB_THREAD)
 lispobj *current_control_stack_pointer;
 #endif
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || !defined(LISP_FEATURE_SB_THREAD)
