@@ -10,12 +10,13 @@ ensure_dirs ()
     done;
 }
 
+. output/prefix.def
+DEFAULT_INSTALL_ROOT=$SBCL_PREFIX
+
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
-    DEFAULT_INSTALL_ROOT="$PROGRAMFILES/sbcl"
     RUNTIME=sbcl.exe
     OLD_RUNTIME=sbcl.exe.old
 else
-    DEFAULT_INSTALL_ROOT=/usr/local
     RUNTIME=sbcl
     OLD_RUNTIME=sbcl.old
 fi

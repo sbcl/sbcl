@@ -80,7 +80,7 @@ case "$HOST_TYPE" in
            CORE="-core"
            ;;
     sbcl)  LISP="sbcl"
-           INIT="--sysinit version.lisp-expr --userinit version.lisp-expr"
+           INIT="--no-sysinit --no-userinit"
            CORE="--core"
            ;;
     clisp) LISP="clisp"

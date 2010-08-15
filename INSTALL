@@ -34,7 +34,11 @@ INSTALLING SBCL
     $ INSTALL_ROOT=/home/me sh install.sh
 
   In other words, "install.sh" installs SBCL under the directory named
-  by the environment variable "INSTALL_ROOT".
+  by the environment variable INSTALL_ROOT.
+
+  If INSTALL_ROOT is not specified, SBCL is installed into location
+  configured at build-time: for official binary distributions under
+  "/usr/local" directory.
 
   If you install SBCL from binary distribution in other location than
   "/usr/local", see section 1.2, "Finding ancillary files".
@@ -114,13 +118,21 @@ INSTALLING SBCL
 
     $ sh make.sh
 
+  To configure SBCL to install to a non-standard location, you can use
+  the --prefix option:
+
+    $ sh make.sh --prefix=/opt/mysbcl
+
+  This also sets the default SBCL_HOME to prefix/lib/sbcl/ for the
+  built binaries.
+
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
   cross-compilation host. For example, to use CMUCL (assuming has
   been installed under its default name "lisp") as the
   cross-compilation host:
 
-    $ sh make.sh 'lisp -batch -noinit'
+    $ sh make.sh --xc-host='lisp -batch -noinit'
 
   The build may take a long time, especially on older hardware. A
   successful build ends with a message beginning: "The build seems to

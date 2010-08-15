@@ -23,9 +23,11 @@ NM = nm -gp
 DEPEND_FLAGS = -MM
 GREP = grep
 
+include ../../output/prefix.def
+
 CFLAGS = -g -Wall -Wsign-compare -O3
 ASFLAGS = $(CFLAGS)
-CPPFLAGS = -I.
+CPPFLAGS = -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features

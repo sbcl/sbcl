@@ -67,7 +67,7 @@
 #endif
 
 #ifndef SBCL_HOME
-#define SBCL_HOME "/usr/local/lib/sbcl/"
+#define SBCL_HOME SBCL_PREFIX"/lib/sbcl/"
 #endif
 
 #ifdef LISP_FEATURE_HPUX

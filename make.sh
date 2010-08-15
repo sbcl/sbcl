@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+LANG=C
+LC_ALL=C
+export LANG LC_ALL
+
 # "When we build software, it's a good idea to have a reliable method
 # for getting an executable from it. We want any two reconstructions
 # starting from the same source to end up in the same result. That's
@@ -16,34 +20,128 @@ set -e
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-# The value of SBCL_XC_HOST should be a command to invoke the
-# cross-compilation Lisp system in such a way that it reads commands
-# from standard input, and terminates when it reaches end of file on
-# standard input. Some suitable values are:
-#   "sbcl"        to use an existing SBCL binary as a cross-compilation host
-#   "sbcl --sysinit /dev/null --userinit /dev/null"
-#                 to use an existing SBCL binary as a cross-compilation host
-#                 even though you have stuff in your initialization files
-#                 which makes it behave in such a non-standard way that
-#                 it keeps the build from working
-#   "sbcl --disable-debugger"
-#                 to use an existing SBCL binary as a cross-compilation host
-#                 and tell it to handle errors as best it can by itself
-#                 (probably by dying with an error code) instead of waiting
-#                 endlessly for a programmer to help it out with input
-#                 on *DEBUG-IO*
-#   "lisp -batch" to use an existing CMU CL binary as a cross-compilation host
-#   "lisp -noinit -batch"
-#                 to use an existing CMU CL binary as a cross-compilation host
-#                 when you have weird things in your .cmucl-init file
-#   "openmcl --batch"
-#                 to use an OpenMCL binary as a cross-compilation host
-#   "clisp"
-#                 to use a CLISP binary as a cross-compilation host
-#
-# FIXME: Make a more sophisticated command line parser, probably
-# accepting "sh make.sh --xc-host foolisp" instead of the
-# the present "sh make.sh foolisp".
+print_help="no"
+
+# The classic form here was to use --userinit $DEVNULL --sysinit
+# $DEVNULL, but that doesn't work on Win32 because SBCL doesn't handle
+# device names properly. We still need $DEVNULL to be NUL on Win32
+# because it's used elsewhere (such as canonicalize-whitespace), so we
+# need an alternate solution for the init file overrides. --no-foos
+# have now been available long enough that this should not stop anyone
+# from building.
+if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ]
+then
+    SBCL_PREFIX="$PROGRAMFILES/sbcl"
+else
+    SBCL_PREFIX="/usr/local"
+fi
+SBCL_XC_HOST="sbcl --disable-debugger --no-userinit --no-sysinit"
+export SBCL_XC_HOST
+
+# Parse command-line options.
+for option
+do
+  # Split --foo=bar into --foo and bar.
+  case $option in
+      *=*)
+        optarg=`expr "X$option" : '[^=]*=\(.*\)'`
+        option=`expr "X$option" : 'X\([^=]*\)=.*'`
+	;;
+      *)
+        optarg=""
+	;;
+  esac
+
+  case $option in
+      --help | -help | -h)
+	  print_help="yes" ;;
+      --prefix)
+	  SBCL_PREFIX=$optarg ;;
+      --xc-host)
+	  SBCL_XC_HOST=$optarg ;;
+
+  *)
+    echo "Unknown command-line option to $0: $option"
+    print_help="yes"
+  esac
+done
+
+if test "$print_help" = "yes"
+then
+  cat <<EOF
+\`make.sh' drives the SBCL build.
+
+Usage: $0 [OPTION]...
+
+  Important: make.sh does not currently control the entirety of the
+  build: configuration file customize-target-features.lisp and certain
+  environment variables play a role as well. see file INSTALL for
+  details.
+
+Options:
+  -h, --help           Display this help and exit.
+
+  --prefix=<path>      Specify the install location.
+
+      Script install.sh installs SBCL under the specified prefix
+      path: runtime as prefix/bin/sbcl, additional files under
+      prefix/lib/sbcl, and documentation under prefix/share.
+
+      This option also affects the binaries: built-in default for
+      SBCL_HOME is: prefix/lib/sbcl/
+
+      Default prefix is: /usr/local
+
+  --xc-host=<string>   Specify the Common Lisp compilation host.
+
+      The string provided should be a command to invoke the
+      cross-compilation Lisp system in such a way, that it reads
+      commands from standard input, and terminates when it reaches end
+      of file on standard input.
+
+      Examples:
+
+       "sbcl --disable-debugger --no-sysinit --no-userinit"
+                  Use an existing SBCL binary as a cross-compilation
+                  host even though you have stuff in your
+                  initialization files which makes it behave in such a
+                  non-standard way that it keeps the build from
+                  working. Also disable the debugger instead of
+                  waiting endlessly for a programmer to help it out
+                  with input on *DEBUG-IO*. (This is the default.)
+
+       "sbcl"
+                  Use an existing SBCL binary as a cross-compilation
+                  host, including your initialization files and
+                  building with the debugger enabled. Not recommended
+                  for casual users.
+
+       "lisp -noinit -batch"
+                  Use an existing CMU CL binary as a cross-compilation
+                  host when you have weird things in your .cmucl-init
+                  file.
+
+       "openmcl --batch"
+                  Use an OpenMCL binary as a cross-compilation host.
+
+       "clisp"
+                  Use a CLISP binary as a cross-compilation host.
+                  Note: historically clisp hosted builds have been
+                  frequently broken. While reports of this are always
+                  appreciated, bootstrapping another host is
+                  recommended.
+EOF
+  exit
+fi
+
+build_started=`date`
+echo "//Starting build: $build_started"
+# Apparently option parsing succeeded. Print out the results.
+echo "//Options: --prefix='$SBCL_PREFIX' --xc-host='$SBCL_XC_HOST'"
+
+# Save prefix for make and install.sh.
+echo "SBCL_PREFIX='$SBCL_PREFIX'" > output/prefix.def
+
 # FIXME: Tweak this script, and the rest of the system, to support
 # a second bootstrapping pass in which the cross-compilation host is
 # known to be SBCL itself, so that the cross-compiler can do some
@@ -53,29 +151,12 @@ set -e
 # whether the cross-compilation host returns suitable values from
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
-LANG=C
-LC_ALL=C
-export LANG LC_ALL
-
-build_started=`date`
-echo "//starting build: $build_started"
-
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
     DEVNULL=NUL
 else
     DEVNULL=/dev/null
 fi
-# The classic form here was to use --userinit $DEVNULL --sysinit
-# $DEVNULL, but that doesn't work on Win32 because SBCL doesn't handle
-# device names properly.  We still need $DEVNULL to be NUL on Win32
-# because it's used elsewhere (such as canonicalize-whitespace), so we
-# need an alternate solution for the init file overrides.  It turns
-# out that version.lisp-expr has no side effects from evaluation, so
-# we may as well use that.
-SBCL_XC_HOST="${1:-sbcl --disable-debugger --userinit version.lisp-expr --sysinit version.lisp-expr}"
 export DEVNULL
-export SBCL_XC_HOST
-echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 
 . ./find-gnumake.sh
 find_gnumake

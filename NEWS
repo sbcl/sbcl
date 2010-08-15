@@ -1,6 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.41
-  * optimization: the default implementation of
+  * build changes
+    ** Cross-compilation host is now specified to make.sh using
+       command-line argument --xc-host=<command> instead of a positional
+       argument. (thanks to Daniel Herring)
+    ** Install location can be specified to make.sh using command-line
+       argument --prefix=<path>. (lp#550889s, thanks to Daniel Herring)
+  * optimization: The default implementation of
     COMPUTE-DISCRIMINATING-FUNCTION does much less wasted work.
   * enhancement: Explicit memory barrier operations are now available for use
     by multithreaded code.  See documentation for details.
