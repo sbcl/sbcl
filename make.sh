@@ -39,13 +39,23 @@ SBCL_XC_HOST="sbcl --disable-debugger --no-userinit --no-sysinit"
 export SBCL_XC_HOST
 
 # Parse command-line options.
+function bad_option() {
+    echo $1
+    echo "Enter \"$0 --help\" for list of valid options."
+    exit 1
+}
+
 for option
 do
   # Split --foo=bar into --foo and bar.
   case $option in
       *=*)
-        optarg=`expr "X$option" : '[^=]*=\(.*\)'`
-        option=`expr "X$option" : 'X\([^=]*\)=.*'`
+        optarg=`expr "X$option" : '[^=]*=\(.*\)'` || true
+        option=`expr "X$option" : 'X\([^=]*=\).*'`
+	if test -z "$optarg"
+	then
+	    bad_option "Command-line option has no value: $option"
+	fi
 	;;
       *)
         optarg=""
@@ -55,14 +65,13 @@ do
   case $option in
       --help | -help | -h)
 	  print_help="yes" ;;
-      --prefix)
+      --prefix=)
 	  SBCL_PREFIX=$optarg ;;
-      --xc-host)
+      --xc-host=)
 	  SBCL_XC_HOST=$optarg ;;
 
   *)
-    echo "Unknown command-line option to $0: $option"
-    print_help="yes"
+    bad_option "Unknown command-line option to $0: \"$option\""
   esac
 done
 
@@ -120,16 +129,6 @@ Options:
                   Use an existing CMU CL binary as a cross-compilation
                   host when you have weird things in your .cmucl-init
                   file.
-
-       "openmcl --batch"
-                  Use an OpenMCL binary as a cross-compilation host.
-
-       "clisp"
-                  Use a CLISP binary as a cross-compilation host.
-                  Note: historically clisp hosted builds have been
-                  frequently broken. While reports of this are always
-                  appreciated, bootstrapping another host is
-                  recommended.
 EOF
   exit
 fi
