@@ -12,6 +12,8 @@ changes relative to sbcl-1.0.41
     by multithreaded code.  See documentation for details.
   * enhancement: Experimental support for threading on Linux/PPC.
   * bug fix: RENAME-PACKAGE returns the package.  (Thanks to Eric Marsden)
+  * bug fix: EXPT signals an error if first argument is a zero and second
+    argument is a floating point zero. (lp#571581, thanks to Roman Marynchak)
 
 changes in sbcl-1.0.41 relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is

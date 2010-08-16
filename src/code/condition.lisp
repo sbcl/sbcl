@@ -900,6 +900,10 @@
 (define-condition simple-reference-warning (reference-condition simple-warning)
   ())
 
+(define-condition arguments-out-of-domain-error
+    (arithmetic-error reference-condition)
+  ())
+
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
   (:report (lambda (c s)

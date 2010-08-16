@@ -365,3 +365,10 @@
 (with-test (:name :gcd)
   (assert (plusp (gcd 20286123923750474264166990598656
                       680564733841876926926749214863536422912))))
+
+(with-test (:name :expt-zero-zero)
+  ;; Check that (expt 0.0 0.0) and (expt 0 0.0) signal error, but (expt 0.0 0)
+  ;; returns 1.0
+  (assert (raises-error? (expt 0.0 0.0) sb-int:arguments-out-of-domain-error))
+  (assert (raises-error? (expt 0 0.0) sb-int:arguments-out-of-domain-error))
+  (assert (eql (expt 0.0 0) 1.0)))
