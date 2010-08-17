@@ -1193,6 +1193,10 @@
       (eval '(defstruct bug-542807 slot)))
     (assert (= 1 (length conds)))
     (assert (typep (car conds) 'sb-kernel::redefinition-with-defun))))
+
+(with-test (:name :defmacro-not-list-lambda-list)
+  (assert (raises-error? (eval `(defmacro ,(gensym) "foo"))
+                         type-error)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -19,11 +19,12 @@
 (defun %deftype (name)
   (setf (classoid-cell-pcl-class (find-classoid-cell name :create t)) nil))
 
-(def!macro sb!xc:deftype (name lambda-list &body body)
+(def!macro sb!xc:deftype (&whole form name lambda-list &body body)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
   (unless (symbolp name)
-    (error "type name not a symbol: ~S" name))
+    (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
+              form))
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body)
         ;; FIXME: We could use CONSTANTP here to deal with slightly more

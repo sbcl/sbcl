@@ -624,6 +624,15 @@
 (define-condition simple-style-warning (simple-condition style-warning) ())
 (define-condition simple-type-error (simple-condition type-error) ())
 
+;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...
+(declaim (ftype (sfunction (t t t &rest t) nil) bad-type))
+(defun bad-type (datum type control &rest arguments)
+  (error 'simple-type-error
+         :datum datum
+         :expected-type type
+         :format-control control
+         :format-arguments arguments))
+
 (define-condition program-error (error) ())
 (define-condition parse-error   (error) ())
 (define-condition control-error (error) ())

@@ -39,6 +39,9 @@
                        ((:default-default *default-default*))
                        (error-fun 'error)
                        (wrap-block t))
+  (unless (listp lambda-list)
+    (bad-type lambda-list 'list "~S lambda-list is not a list: ~S"
+              context lambda-list))
   (multiple-value-bind (forms declarations documentation)
       (parse-body body :doc-string-allowed doc-string-allowed)
     (let ((*arg-tests* ())

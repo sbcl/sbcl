@@ -898,6 +898,7 @@ possibly temporariliy, because it might be used internally."
 
                ;; error-reporting facilities
                "ARGUMENTS-OUT-OF-DOMAIN-ERROR"
+               "BAD-TYPE"
                "CLOSED-STREAM-ERROR"
                "COMPILED-PROGRAM-ERROR"
                "ENCAPSULATED-CONDITION"

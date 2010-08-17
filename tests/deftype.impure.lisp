@@ -49,3 +49,6 @@
 (defconstant whatever 't)
 (deftype anything () whatever)
 (assert (typep 42 'anything))
+
+(with-test (:name :deftype-not-list-lambda-list)
+  (assert (raises-error? (eval `(deftype ,(gensym) non-list-argument)))))
