@@ -39,7 +39,7 @@ SBCL_XC_HOST="sbcl --disable-debugger --no-userinit --no-sysinit"
 export SBCL_XC_HOST
 
 # Parse command-line options.
-function bad_option() {
+bad_option() {
     echo $1
     echo "Enter \"$0 --help\" for list of valid options."
     exit 1
