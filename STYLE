@@ -1,9 +1,42 @@
+SBCL Style Guide
+
+  (This is not a most actively maintained file, but recommended
+  reading anyways.)
+
+Patch Submissions
+=================
+
+Preferred patch format is output from "git format-patch", but unified
+diffs and links to public git repos are acceptable as well.
+
+Please include test-cases in your patch if possible.
+
+Please format your submission for ease of reading: unless the change
+is whitespace only, avoid re-indenting code you are not touching, etc.
+Unless your patch is large and best understood as a series of
+sequential changes, please send it in as single patch file.
+
+If your patch includes algorithmic changes, explain them. If your
+patch uses a published algorithm, please include a link to the paper.
+We aren't always as well-educated as we'd like to...
+
+Patches can be either mailed to sbcl-devel, or submitted via
+Launchpad. If you submit a patch on Launchpad, please add the tag
+"review" to the associated bug.
+
+If you have any questions, feel free to ask them on sbcl-devel.
+
+Coding Style
+============
+
+See also PRINCIPLES and TLA files.
+
 Most of the style hints in the Lisp FAQ apply.
 
-When porting the system, I would really prefer code which factors
-dependencies into a set of interface functions and constants and
-includes implementations of the interface for the different systems.
-Patches which require conditional compilation (like all the old
+When porting code we prefer code which factors dependencies into a set
+of interface functions and constants and includes implementations of
+the interface for the different systems. Patches which require
+conditional compilation (like all the old
 #T+HPUX or #T-X86 tests in the sources inherited from CMUCL) might be
 accepted if they're simple, in hopes of factoring out the differences
 more cleanly later, but even if accepted, such code may not be
@@ -94,6 +127,6 @@ which are not good examples to follow:
     (DEFUN CL:CADDDR (..) ..) as reminders that they're required by
     ANSI and can't be deleted no matter how obscure and useless some
     of them might look.:-)
-Most of these are common in the code inherited from CMUCL. I've
+Most of these are common in the code inherited from CMUCL. We've
 eliminated them in some places, but there's a *lot* of code inherited
 from CMUCL..
