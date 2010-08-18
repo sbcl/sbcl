@@ -45,35 +45,52 @@ bad_option() {
     exit 1
 }
 
+some_options=false
 for option
 do
+  optarg_ok=true
   # Split --foo=bar into --foo and bar.
   case $option in
       *=*)
-        optarg=`expr "X$option" : '[^=]*=\(.*\)'` || true
+        # For ease of scripting treat skip valued options with empty
+        # values.
+        optarg=`expr "X$option" : '[^=]*=\(.*\)'` || optarg_ok=false
         option=`expr "X$option" : 'X\([^=]*=\).*'`
-	if test -z "$optarg"
-	then
-	    bad_option "Command-line option has no value: $option"
-	fi
-	;;
+        ;;
       *)
         optarg=""
-	;;
+        ;;
   esac
 
   case $option in
       --help | -help | -h)
-	  print_help="yes" ;;
+        print_help="yes" ;;
       --prefix=)
-	  SBCL_PREFIX=$optarg ;;
+        $optarg_ok && SBCL_PREFIX=$optarg
+        ;;
       --xc-host=)
-	  SBCL_XC_HOST=$optarg ;;
-
-  *)
-    bad_option "Unknown command-line option to $0: \"$option\""
+        $optarg_ok && SBCL_XC_HOST=$optarg
+        ;
+      -*)
+        bad_option "Unknown command-line option to $0: \"$option\""
+        ;;
+      *)
+        if $some_options
+        then
+            bad_option "Unknown command-line option to $0: \"$option\""
+        else
+            legacy_xc_spec=$option
+        fi
+        ;;
   esac
+  some_options=true
 done
+
+# Previously XC host was provided as a positional argument. 
+if test -n "$legacy_xc_spec"
+then
+    SBCL_XC_HOST="$legacy_xc_spec"
+fi
 
 if test "$print_help" = "yes"
 then
@@ -221,6 +238,23 @@ echo
 echo "To install SBCL (more information in INSTALL):"
 echo
 echo "  sh install.sh"
+
+# This is probably the best place to ensure people will see this.
+if test -n "$legacy_xc_spec"
+then
+    echo <<EOF
+******************************************************************************
+**
+**  Old-style XC-host specification detected: '$SBCL_XC_HOST'
+**
+**  Since 1.0.41.45 SBCL expects the XC-host to be specified using
+**  the --xc-host='myhost' command line option, not with a positional
+**  argument. The legacy style still works, but will not be supported
+**  indefinitely. Please update your build procedure.
+**
+******************************************************************************
+EOF
+fi
 
 build_finished=`date`
 echo
