@@ -70,7 +70,7 @@ do
         ;;
       --xc-host=)
         $optarg_ok && SBCL_XC_HOST=$optarg
-        ;
+        ;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
         ;;
@@ -156,6 +156,7 @@ echo "//Starting build: $build_started"
 echo "//Options: --prefix='$SBCL_PREFIX' --xc-host='$SBCL_XC_HOST'"
 
 # Save prefix for make and install.sh.
+mkdir -p output
 echo "SBCL_PREFIX='$SBCL_PREFIX'" > output/prefix.def
 
 # FIXME: Tweak this script, and the rest of the system, to support
