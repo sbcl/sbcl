@@ -11,7 +11,7 @@ set -e
 
 b=${1:?"missing base directory name argument"}
 tar -cf $b-binary.tar \
-    $b/output/sbcl.core $b/src/runtime/sbcl \
+    $b/output/sbcl.core $b/src/runtime/sbcl $b/output/prefix.def \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
     $b/install.sh $b/find-gnumake.sh $b/sbcl-pwd.sh $b/run-sbcl.sh \
     $b/doc/sbcl.1 \
