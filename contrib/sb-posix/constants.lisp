@@ -157,7 +157,7 @@
  (:errno ecomm "ECOMM" nil t)
  (:errno eproto "EPROTO" nil t)
  (:errno emultihop "EMULTIHOP" nil t)
- (:errno edotdot "EDOTDOT" nil t)
+#-sunos (:errno edotdot "EDOTDOT" nil t)
  (:errno ebadmsg "EBADMSG" nil t)
  (:errno eoverflow "EOVERFLOW" nil t)
  (:errno enotuniq "ENOTUNIQ" nil t)
@@ -201,13 +201,13 @@
  (:errno ealready "EALREADY" nil t)
  (:errno einprogress "EINPROGRESS" nil t)
  (:errno estale "ESTALE" nil t)
- (:errno euclean "EUCLEAN" nil t)
- (:errno enotnam "ENOTNAM" nil t)
- (:errno enavail "ENAVAIL" nil t)
- (:errno eremoteio "EREMOTEIO" nil t)
- (:errno edquot "EDQUOT" nil t)
- (:errno enomedium "ENOMEDIUM" nil t)
- (:errno emediumtype "EMEDIUMTYPE" nil t)
+#-sunos (:errno euclean "EUCLEAN" nil t)
+#-sunos (:errno enotnam "ENOTNAM" nil t)
+#-sunos (:errno enavail "ENAVAIL" nil t)
+#-sunos (:errno eremoteio "EREMOTEIO" nil t)
+#-sunos (:errno edquot "EDQUOT" nil t)
+#-sunos (:errno enomedium "ENOMEDIUM" nil t)
+#-sunos (:errno emediumtype "EMEDIUMTYPE" nil t)
 
  ;; wait
  (:integer wnohang "WNOHANG")
@@ -223,7 +223,7 @@
  (:integer s-ifreg "S_IFREG" nil t)
  (:integer s-iflnk "S_IFLNK" nil t)
  (:integer s-ifsock "S_IFSOCK" nil t)
- (:integer s-ifwht "S_IFWHT" nil t)
+#-sunos (:integer s-ifwht "S_IFWHT" nil t)
  (:integer s-isuid "S_ISUID" nil t)
  (:integer s-isgid "S_ISGID" nil t)
  (:integer s-isvtx "S_ISVTX" nil t)
@@ -340,9 +340,9 @@
  (:integer o-ndelay "O_NDELAY" nil t)
  (:integer o-sync "O_SYNC" nil t)
  (:integer o-nofollow "O_NOFOLLOW" nil t)
- (:integer o-directory "O_DIRECTORY" nil t)
- (:integer o-direct "O_DIRECT" nil t)
- (:integer o-async "O_ASYNC" nil t)
+#-sunos (:integer o-directory "O_DIRECTORY" nil t)
+#-sunos (:integer o-direct "O_DIRECT" nil t)
+#-sunos (:integer o-async "O_ASYNC" nil t)
  (:integer o-largefile "O_LARGEFILE" nil t)     ; hmm...
  (:integer o-dsync "O_DSYNC" nil t)
  (:integer o-rsync "O_RSYNC" nil t)
@@ -553,7 +553,7 @@
  ;; Additional, non-standard openlog() facilities (most of which
  ;; probably won't be needed by Lisp programs, but here for
  ;; completeness).
- #-win32
+ #-(or win32 sunos)
  (:integer
   log-authpriv "LOG_AUTHPRIV" "openlog() facility for authorization messages" t)
  #-win32
@@ -562,7 +562,7 @@
  #-win32
  (:integer
   log-daemon "LOG_DAEMON" "openlog() facility for arbitrary daemons" t)
- #-win32
+ #-(or win32 sunos)
  (:integer
   log-ftp "LOG_FTP" "openlog() facility for FTP daemons" t)
  #-win32
@@ -611,7 +611,7 @@
   "If supplied to openlog(), do not wait for child processes created by calls to syslog()."
   t)
  ;; Not in SUSv3, but at least Glibc and BSD libc have this
- #-win32
+ #-(or win32 sunos)
  (:integer
   log-perror "LOG_PERROR"
   "If supplied to openlog(), write log messages to the process's standard error descriptor in addition to the logging facility."

@@ -11,6 +11,7 @@ UNAME:=$(shell uname -s)
 
 ifeq (SunOS,$(UNAME))
   EXTRA_CFLAGS=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+  PATH:=/usr/xpg4/bin:${PATH}
 endif
 ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
   EXTRA_CFLAGS=-mno-cygwin

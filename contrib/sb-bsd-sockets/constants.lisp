@@ -47,7 +47,7 @@
            "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
- #-freebsd
+ #+linux
  (:integer so-no-check "SO_NO_CHECK")
  #+linux (:integer so-priority "SO_PRIORITY")
  (:integer so-linger "SO_LINGER"
@@ -85,7 +85,7 @@
  (:integer NO-RECOVERY "NO_RECOVERY" "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
  (:integer NO-DATA "NO_DATA" "Valid name, no data record of requested type.")
  (:integer NO-ADDRESS "NO_ADDRESS" "No address, look for MX record.")
- #-hpux (:function h-strerror ("hstrerror" c-string (errno int)))
+ #-(or hpux sunos) (:function h-strerror ("hstrerror" c-string (errno int)))
 
  (:integer O-NONBLOCK "O_NONBLOCK")
  (:integer f-getfl "F_GETFL")
@@ -98,7 +98,7 @@
  (:integer msg-eor "MSG_EOR")
  (:integer msg-dontroute "MSG_DONTROUTE")
  (:integer msg-dontwait "MSG_DONTWAIT")
- (:integer msg-nosignal "MSG_NOSIGNAL")
+ #+linux (:integer msg-nosignal "MSG_NOSIGNAL")
  #+linux (:integer msg-confirm "MSG_CONFIRM")
  #+linux (:integer msg-more "MSG_MORE")
 

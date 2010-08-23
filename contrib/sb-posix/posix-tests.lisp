@@ -173,7 +173,9 @@
   #.sb-posix:eisdir
   #+win32
   #.sb-posix::eacces
-  #-(or darwin win32)
+  #+sunos
+  #.sb-posix::einval
+  #-(or darwin win32 sunos)
   #.sb-posix::ebusy)
 
 (deftest rmdir.error.4
@@ -774,7 +776,7 @@
 
 ;#-(or win32 sunos hpux)
 ;;;; mkdtemp is unimplemented on at least Solaris 10
-#-(or win32 hpux)
+#-(or win32 hpux sunos)
 ;;; But it is implemented on OpenSolaris 2008.11
 (deftest mkdtemp.1
     (let ((pathname
