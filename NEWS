@@ -16,6 +16,8 @@ changes relative to sbcl-1.0.41
     argument is a floating point zero. (lp#571581, thanks to Roman Marynchak)
   * bug fix: DEFTYPE signals an error for non-list lambda-lists.
     (lp#576594, thanks to Roman Marynchak)
+  * bug fix: make ASDF-INSTALL compatible with the now-included ASDF2.
+    (lp#612998, reported by Phil Hargett; patch from Jim Wise)
 
 changes in sbcl-1.0.41 relative to sbcl-1.0.40:
   * optimization: validity of observed keyword initargs to MAKE-INSTANCE is

@@ -200,7 +200,7 @@
     (loop for l = (read-line (process-output proc) nil nil)
           while l
           when (> (mismatch l "[GNUPG:]") 6)
-          do (destructuring-bind (_ tag &rest data) (asdf::split l)
+          do (destructuring-bind (_ tag &rest data) (asdf::split-string l)
                (declare (ignore _))
                (pushnew (cons (intern tag :keyword)
                               data) tags)))
