@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.41
+changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes
     ** Cross-compilation host is now specified to make.sh using
        command-line argument --xc-host=<command> instead of a positional
