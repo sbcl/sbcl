@@ -5,6 +5,11 @@ changes relative to sbcl-1.0.42
     was non-negative. (lp#622958)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to
     Roman Marynchak)
+  * bug fix: WRITE-TO-STRING compiler macro binding special variable names,
+    breaking code that tried to write the value of a printer control variable.
+    (lp#581564, thanks to Stas Boukarev)
+  * bug fix: WRITE compiler macro did not handle output stream designators
+    correctly. (lp#598374, thanks to Stas Boukarev)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

@@ -483,4 +483,22 @@
   (assert (= 123 (funcall (compile nil (lambda ()
                                          (write 123)))))))
 
+(with-test (:name :write/write-to-string-compiler-macro-lp/598374+581564)
+  (let ((test (compile nil
+                       `(lambda (object &optional output-stream)
+                          (write object
+                                 :stream output-stream)))))
+    (assert (equal "(HELLO WORLD)"
+                   (with-output-to-string (*standard-output*)
+                     (let ((list '(hello world)))
+                       (assert (eq list (funcall test list)))))))
+    (assert (equal "12"
+                   (with-output-to-string (*standard-output*)
+                     (assert (eql 12 (funcall test 12)))))))
+  (let ((test (compile nil
+                       `(lambda ()
+                          (let ((*print-length* 42))
+                            (write-to-string *print-length* :length nil))))))
+    (assert (equal "42" (funcall test)))))
+
 ;;; success

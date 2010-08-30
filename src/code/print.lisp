@@ -196,7 +196,7 @@
     (once-only ((object object))
       `(let ,(nreverse bind)
          ,@(when ignore `((declare (ignore ,@ignore))))
-         (output-object ,object stream)
+         (output-object ,object (out-synonym-of stream))
          ,object))))
 
 (defun prin1 (object &optional stream)
@@ -277,9 +277,10 @@
           (push variable ignore))
         (push (list variable value) bind)))
     (if bind
-        `(let ,(nreverse bind)
-           ,@(when ignore `((declare (ignore ,@ignore))))
-           (stringify-object ,object))
+        (once-only ((object object))
+          `(let ,(nreverse bind)
+             ,@(when ignore `((declare (ignore ,@ignore))))
+             (stringify-object ,object)))
         `(stringify-object ,object))))
 
 (defun prin1-to-string (object)
