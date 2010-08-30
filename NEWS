@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.42
+  * bug fix: bogus type errors from (AREF A (+ POSITIVE-OFFSET N)) under
+    certain circumstances when N was negative but (+ POSITIVE-OFFSET N)
+    was non-negative. (lp#622958)
+
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes
     ** Cross-compilation host is now specified to make.sh using

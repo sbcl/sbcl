@@ -3502,3 +3502,32 @@
                                                (declare (optimize (sb-c::float-accuracy 0)))
                                                (* x -1.0d0)))
                                1))))
+
+(with-test (:name :data-vector-ref-with-offset-neg-index)
+  (let ((fun (compile nil
+                      `(lambda ()
+                         (let ((table (make-array 7
+                                                  :element-type 'fixnum
+                                                  :initial-contents '(0 1 2 3 4 5 6))))
+                           (loop for n from -3 upto 3
+                                 collect (aref table (+ 3 n))))))))
+    (assert (equal '(0 1 2 3 4 5 6) (funcall fun)))))
+
+(with-test (:name :aref-bignum-offset-and-index)
+  ;; These don't get the data-vector-ref-with-offset vop.
+  (let ((fun (compile nil
+                      `(lambda ()
+                         (let ((table (make-array 7
+                                                  :element-type 'fixnum
+                                                  :initial-contents '(0 1 2 3 4 5 6))))
+                           (loop for n from most-negative-fixnum upto (+ most-negative-fixnum 6)
+                                 collect (aref table (+ #.(1+ most-positive-fixnum) n))))))))
+    (assert (equal '(0 1 2 3 4 5 6) (funcall fun))))
+  (let ((fun (compile nil
+                      `(lambda ()
+                         (let ((table (make-array 7
+                                                  :element-type 'fixnum
+                                                  :initial-contents '(0 1 2 3 4 5 6))))
+                           (loop for n from (+ most-positive-fixnum 1) upto (+ most-positive-fixnum 7)
+                                 collect (aref table (- n (+ most-positive-fixnum 1)))))))))
+    (assert (equal '(0 1 2 3 4 5 6) (funcall fun)))))
