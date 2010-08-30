@@ -328,7 +328,7 @@ evaluated as a PROGN."
 ;;; ASAP, at the cost of being unable to use the standard
 ;;; destructuring mechanisms.
 (defmacro-mundanely dotimes ((var count &optional (result nil)) &body body)
-  (cond ((numberp count)
+  (cond ((integerp count)
         `(do ((,var 0 (1+ ,var)))
              ((>= ,var ,count) ,result)
            (declare (type unsigned-byte ,var))

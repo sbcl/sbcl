@@ -3531,3 +3531,6 @@
                            (loop for n from (+ most-positive-fixnum 1) upto (+ most-positive-fixnum 7)
                                  collect (aref table (- n (+ most-positive-fixnum 1)))))))))
     (assert (equal '(0 1 2 3 4 5 6) (funcall fun)))))
+
+(with-test (:name :dotimes-non-integer-counter-value)
+  (assert (raises-error? (dotimes (i 8.6)) type-error)))
