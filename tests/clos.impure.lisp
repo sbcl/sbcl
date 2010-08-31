@@ -1864,4 +1864,12 @@
   (cacheing-initargs-redefinitions-check-fun :slot2)
   (let ((thing (cacheing-initargs-redefinitions-check-fun :slot)))
     (assert (not (slot-boundp thing 'slot)))))
+
+(with-test (:name :defmethod-specializer-builtin-class-alias)
+  (let ((alias (gensym)))
+    (setf (find-class alias) (find-class 'symbol))
+    (eval `(defmethod lp-618387 ((s ,alias))
+             (symbol-name s)))
+    (assert (equal "FOO" (funcall 'lp-618387 :foo)))))
+
 ;;;; success

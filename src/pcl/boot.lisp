@@ -914,7 +914,7 @@ bootstrapping.
                   ;; the user defines a type and calls (SETF
                   ;; FIND-CLASS) in a consistent way.
                  (when (and class (typep class 'built-in-class))
-                   `(type ,specializer-nameoid ,parameter))))
+                   `(type ,(class-name class) ,parameter))))
               ((:instance nil)
                (let ((class (specializer-nameoid-class)))
                  (cond
