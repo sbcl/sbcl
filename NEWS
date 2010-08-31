@@ -7,6 +7,8 @@ changes relative to sbcl-1.0.42
     (lp#581564, thanks to Stas Boukarev)
   * bug fix: WRITE compiler macro did not handle output stream designators
     correctly. (lp#598374, thanks to Stas Boukarev)
+  * bug fix: better availability of names of foreign functions in backtraces
+    on Linux. (lp#626962, thanks to Stas Boukarev)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes
