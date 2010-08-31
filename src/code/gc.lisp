@@ -224,8 +224,13 @@ run in any thread.")
                    (let ((start-time (get-internal-run-time)))
                      (collect-garbage gen)
                      (setf *gc-epoch* (cons nil nil))
-                     (incf *gc-run-time*
-                           (- (get-internal-run-time) start-time)))
+                     (let ((run-time (- (get-internal-run-time) start-time)))
+                       ;; KLUDGE: Sometimes we see the second getrusage() call
+                       ;; return a smaller value than the first, which can
+                       ;; lead to *GC-RUN-TIME* to going negative, which in
+                       ;; turn is a type-error.
+                       (when (plusp run-time)
+                         (incf *gc-run-time* run-time))))
                    (setf *gc-pending* nil
                          new-usage (dynamic-usage))
                    #!+sb-thread
