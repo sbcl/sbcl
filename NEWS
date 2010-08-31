@@ -1,8 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.42
-  * bug fix: bogus type errors from (AREF A (+ POSITIVE-OFFSET N)) under
-    certain circumstances when N was negative but (+ POSITIVE-OFFSET N)
-    was non-negative. (lp#622958)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to
     Roman Marynchak)
   * bug fix: WRITE-TO-STRING compiler macro binding special variable names,
