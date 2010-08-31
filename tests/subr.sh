@@ -33,7 +33,8 @@ SBCL_ARGS="--noinform --no-sysinit --no-userinit --noprint --disable-debugger"
 
 # Scripts that use these variables should quote them.
 TEST_BASENAME="`basename $0`"
-TEST_FILESTEM="`echo ${TEST_BASENAME%.sh} | sed 's/\./-/g'`"
+TEST_FILESTEM="`basename "${TEST_BASENAME}" | sed 's/\.sh$//'`"
+TEST_FILESTEM="`echo "${TEST_FILESTEM}" | sed 's/\./-/g'`"
 TEST_DIRECTORY="$SBCL_PWD/$TEST_FILESTEM-$$"
 
 # "Ten four" is the closest numerical slang I can find to "OK", so

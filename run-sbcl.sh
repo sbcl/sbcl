@@ -14,15 +14,22 @@
 set -e
 
 BASE=`dirname "$0"`
-BASE=`(readlink -f ${BASE} 2> /dev/null || echo ${BASE})`
+if (readlink -f "${BASE}") >/dev/null 2>&1; then
+    BASE=`readlink -f ${BASE}`
+else
+    opwd=`pwd`
+    cd "${BASE}"
+    BASE=`pwd`
+    cd "${opwd}"
+fi
 CORE_DEFINED=no
 
 for arg in $*; do
     case $arg in
-        (--core)
+        --core)
           CORE_DEFINED=yes
           ;;
-        (--help)
+        --help)
           echo "usage: run-sbcl.sh sbcl-options*"
           echo
           echo "Runs SBCL from the build directory or binary tarball without need for"
