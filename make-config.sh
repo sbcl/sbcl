@@ -310,6 +310,10 @@ if [ "$sbcl_arch" = "x86" ]; then
         # roughly-equivalent magic nevertheless.
         printf ' :os-provides-dlopen' >> $ltf
     fi
+    if [ "$sbcl_os" = "openbsd" ]; then
+        rm -f src/runtime/openbsd-sigcontext.h
+        sh tools-for-build/openbsd-sigcontext.sh > src/runtime/openbsd-sigcontext.h
+    fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf

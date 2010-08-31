@@ -9,6 +9,10 @@ changes relative to sbcl-1.0.42
     correctly. (lp#598374, thanks to Stas Boukarev)
   * bug fix: better availability of names of foreign functions in backtraces
     on Linux. (lp#626962, thanks to Stas Boukarev)
+  * bug fix: scripting fixes for Solaris and FreeBSD. (lp#615497, thanks to
+    Josh Elsasser)
+  * bug fix: build fixes for OpenBSD -current and 4.8 (lp#615489, thanks to
+    Josh Elsasser)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

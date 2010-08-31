@@ -20,9 +20,12 @@
 #endif
 
 #if defined(LISP_FEATURE_OPENBSD)
-#include <machine/frame.h>
 #include <machine/npx.h>
 #include <stddef.h>
+#include "openbsd-sigcontext.h"
+#ifdef OS_OPENBSD_FPSTATE_IN_SIGFRAME
+# include <machine/frame.h>
+#endif
 #endif
 
 /* KLUDGE: There is strong family resemblance in the signal context
@@ -248,11 +251,14 @@ os_restore_fp_control(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    struct sigframe *frame;
-    union savefpu *fpu;
+#ifdef OS_OPENBSD_FPSTATE_IN_SIGFRAME
+    struct sigframe *frame = (struct sigframe *)((char*)context -
+        offsetof(struct sigframe, sf_sc));
+    union savefpu *fpu = frame->sf_fpstate;
+#elif defined(OS_OPENBSD_FPSTATE_IN_SIGCONTEXT)
+    union savefpu *fpu = context->sc_fpstate;
+#endif
 
-    frame = (struct sigframe *)((char*)context - offsetof(struct sigframe, sf_sc));
-    fpu = frame->sf_fpstate;
     if (openbsd_use_fxsave)
         __asm__ __volatile__ ("fldcw %0" : : "m" (fpu->sv_xmm.sv_env.en_cw));
     else
