@@ -41,4 +41,9 @@ arch_os_context_mxcsr_addr(os_context_t *context)
 }
 #endif
 
+#if defined LISP_FEATURE_OPENBSD
+#define RESTORE_FP_CONTROL_FROM_CONTEXT
+void os_restore_fp_control(os_context_t *context);
+#endif
+
 #endif /* _X86_64_BSD_OS_H */

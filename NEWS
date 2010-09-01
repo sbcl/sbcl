@@ -17,8 +17,8 @@ changes relative to sbcl-1.0.42
     on Linux. (lp#626962, thanks to Stas Boukarev)
   * bug fix: scripting fixes for Solaris and FreeBSD. (lp#615497, thanks to
     Josh Elsasser)
-  * bug fix: build fixes for OpenBSD -current and 4.8 (lp#615489, thanks to
-    Josh Elsasser)
+  * bug fix: build fixes for OpenBSD -current and 4.8 (lp#615489, lp#615492,
+    thanks to Josh Elsasser)
   * bug fix: using aliases for builtin classes as defmethod specializers
     without adding DEFTYPEs for them works. (lp#618387)
   * bug fix: timetravel by getrusage() no longer causes type-errors during GC.

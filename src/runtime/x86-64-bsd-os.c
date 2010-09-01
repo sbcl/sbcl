@@ -8,6 +8,10 @@
 #include <machine/fpu.h>
 #endif
 
+#if defined(LISP_FEATURE_OPENBSD)
+#include <machine/fpu.h>
+#endif
+
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 #include <mach/mach.h>
 
@@ -180,5 +184,18 @@ os_restore_fp_control(os_context_t *context)
     asm ("ldmxcsr %0" : : "m" (temp));
     /* same for x87 FPU. */
     asm ("fldcw %0" : : "m" (ex->en_cw));
+}
+#endif
+
+#if defined(LISP_FEATURE_OPENBSD)
+void
+os_restore_fp_control(os_context_t *context)
+{
+    if (context->sc_fpstate != NULL) {
+        u_int32_t mxcsr = context->sc_fpstate->fx_mxcsr & ~0x3F;
+        u_int16_t cw = context->sc_fpstate->fx_fcw;
+        asm ("ldmxcsr %0" : : "m" (mxcsr));
+        asm ("fldcw %0" : : "m" (cw));
+    }
 }
 #endif
