@@ -594,8 +594,7 @@
 ;;; functional instead.
 (defun reference-leaf (start next result leaf &optional (name '.anonymous.))
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
-  (when (functional-p leaf)
-    (assure-functional-live-p leaf))
+  (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
                         (not (eq (defined-fun-inlinep leaf)

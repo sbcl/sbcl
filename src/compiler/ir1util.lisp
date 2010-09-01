@@ -1052,6 +1052,7 @@
 (defun delete-lambda-var (leaf)
   (declare (type lambda-var leaf))
 
+  (setf (lambda-var-deleted leaf) t)
   ;; Iterate over all local calls flushing the corresponding argument,
   ;; allowing the computation of the argument to be deleted. We also
   ;; mark the LET for reoptimization, since it may be that we have
@@ -2034,6 +2035,15 @@ is :ANY, the function name is not checked."
               ;; LET-converted functionals are even worse.
               (memq (functional-kind functional) '(:deleted :zombie))))
     (throw 'locall-already-let-converted functional)))
+
+(defun assure-leaf-live-p (leaf)
+  (typecase leaf
+    (lambda-var
+     (when (lambda-var-deleted leaf)
+       (throw 'locall-already-let-converted leaf)))
+    (functional
+     (assure-functional-live-p leaf))))
+
 
 (defun call-full-like-p (call)
   (declare (type combination call))

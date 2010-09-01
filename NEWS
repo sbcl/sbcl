@@ -25,6 +25,8 @@ changes relative to sbcl-1.0.42
     (lp#544421)
   * bug fix: legally dynamic-extent lists and vectors used as
     initialization arguments to MAKE-ARRAY can be stack allocated. (lp#586105)
+  * bug fix: inline-expansion creating references to dead lambda-variables
+    (lp#454681, thanks to Alexey Dejneka)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

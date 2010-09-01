@@ -3505,3 +3505,16 @@
 
 (with-test (:name :dotimes-non-integer-counter-value)
   (assert (raises-error? (dotimes (i 8.6)) type-error)))
+
+(with-test (:name :bug-454681)
+  ;; This used to break due to reference to a dead lambda-var during
+  ;; inline expansion.
+  (assert (compile nil
+                   `(lambda ()
+                      (multiple-value-bind (iterator+977 getter+978)
+                          (does-not-exist-but-does-not-matter)
+                        (flet ((iterator+976 ()
+                                 (funcall iterator+977)))
+                          (declare (inline iterator+976))
+                          (let ((iterator+976 #'iterator+976))
+                            (funcall iterator+976))))))))

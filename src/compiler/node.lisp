@@ -1102,7 +1102,11 @@
   ;; This is set by physical environment analysis if it chooses an
   ;; indirect (value cell) representation for this variable because it
   ;; is both set and closed over.
-  indirect)
+  indirect
+  ;; true if the last reference has been deleted (and new references
+  ;; should not be made)
+  deleted
+  )
 
 (def!struct (lambda-var (:include basic-var))
   (flags (lambda-var-attributes)
@@ -1143,6 +1147,8 @@
   `(lambda-var-attributep (lambda-var-flags ,var) ignore))
 (defmacro lambda-var-indirect (var)
   `(lambda-var-attributep (lambda-var-flags ,var) indirect))
+(defmacro lambda-var-deleted (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) deleted))
 
 ;;;; basic node types
 
