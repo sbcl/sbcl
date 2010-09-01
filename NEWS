@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.42
     &co.
   * enhancement: ASDF has been updated to version 2.004. (lp#605260, thanks to
     Faré Rideau)
+  * bug fix: SB-BSD-SOCKETS:SOCKET-CONNECT was not thread safe. (lp#505497,
+    thanks to Andrew Golding)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to
     Roman Marynchak)
   * bug fix: WRITE-TO-STRING compiler macro binding special variable names,

@@ -74,6 +74,7 @@
  (:integer EOPNOTSUPP "EOPNOTSUPP")
  (:integer EPERM "EPERM")
  (:integer EPROTONOSUPPORT "EPROTONOSUPPORT")
+ (:integer ERANGE "ERANGE")
  (:integer ESOCKTNOSUPPORT "ESOCKTNOSUPPORT")
  (:integer ENETUNREACH "ENETUNREACH")
  (:integer ENOTCONN "ENOTCONN")
@@ -123,8 +124,30 @@
                        (integer proto "int" "p_proto")))
  (:function getprotobyname ("getprotobyname" (* protoent)
                                              (name c-string)))
+
+;; getprotobyname_r is a thread-safe reentrant version of getprotobyname
+ #+os-provides-getprotoby-r
+ (:function getprotobyname-r ("getprotobyname_r" int
+                                                 (name c-string)
+                                                 (result_buf (* protoent))
+                                                 (buffer (* char))
+                                                 (buffer-len size-t)
+                                                 #-solaris
+                                                 (result (* (* protoent)))))
+
+
  (:function getprotobynumber ("getprotobynumber" (* protoent)
                                                  (proto int)))
+ ;;ditto, save for the getprotobynumber part
+ #+os-provides-getprotoby-r
+ (:function getprotobynumber-r ("getprotobynumber_r" int
+                                                 (proto int)
+                                                 (result_buf (* protoent))
+                                                 (buffer (* char))
+                                                 (buffer-len size-t)
+                                                 #-solaris
+                                                 (result (* (* protoent)))))
+
  (:integer inaddr-any "INADDR_ANY")
  (:structure in-addr ("struct in_addr"
                       ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
