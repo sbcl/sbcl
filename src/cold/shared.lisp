@@ -33,24 +33,6 @@
 (defvar *host-obj-prefix*)
 (defvar *target-obj-prefix*)
 
-;;; suffixes for filename stems when cross-compiling
-(defvar *host-obj-suffix*
-  (or
-   ;; On some xc hosts, it's impossible to LOAD a fasl file unless it
-   ;; has the same extension that the host uses for COMPILE-FILE
-   ;; output, so we have to be careful to use the xc host's preferred
-   ;; extension.
-   ;;
-   ;; FIXME: This is a little ugly and annoying to maintain. And
-   ;; there's very likely some way to rearrange the build process so
-   ;; that we never explicitly refer to host object file suffixes,
-   ;; only to the result of CL:COMPILE-FILE-PATHNAME.
-   #+lispworks ".ufsl" ; as per Lieven Marchand sbcl-devel 2002-02-01
-   #+(and openmcl (not darwin)) ".pfsl"
-   #+(and openmcl darwin) ".dfsl"
-   ;; On most xc hosts, any old extension works, so we use an
-   ;; arbitrary one.
-   ".lisp-obj"))
 (defvar *target-obj-suffix*
   ;; Target fasl files are LOADed (actually only quasi-LOADed, in
   ;; GENESIS) only by SBCL code, and it doesn't care about particular
@@ -242,7 +224,14 @@
   (multiple-value-bind
         (obj-prefix obj-suffix)
       (ecase mode
-        (:host-compile (values *host-obj-prefix* *host-obj-suffix*))
+        (:host-compile
+         ;; On some xc hosts, it's impossible to LOAD a fasl file unless it
+         ;; has the same extension that the host uses for COMPILE-FILE
+         ;; output, so we have to be careful to use the xc host's preferred
+         ;; extension.
+         (values *host-obj-prefix*
+                 (concatenate 'string "."
+                              (pathname-type (compile-file-pathname stem)))))
         (:target-compile (values *target-obj-prefix*
                                  (if (find :assem flags)
                                      *target-assem-obj-suffix*
