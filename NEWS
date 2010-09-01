@@ -27,6 +27,8 @@ changes relative to sbcl-1.0.42
     initialization arguments to MAKE-ARRAY can be stack allocated. (lp#586105)
   * bug fix: inline-expansion creating references to dead lambda-variables
     (lp#454681, thanks to Alexey Dejneka)
+  * bug fix: better error message for bogus numerical arguments to RANDOM.
+    (lp#598986, thanks to Stas Boukarev)  
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

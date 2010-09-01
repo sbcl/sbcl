@@ -380,7 +380,8 @@
 (defknown deposit-field (integer byte-specifier integer) integer
   (movable foldable flushable))
 (defknown random ((or (float (0.0)) (integer 1)) &optional random-state)
-  (or (float 0.0) (integer 0)) ())
+  (or (float 0.0) (integer 0))
+  (explicit-check))
 (defknown make-random-state (&optional
                              (or (member nil t) random-state unsigned-byte
                                  (simple-array (unsigned-byte 8) (*))
