@@ -21,7 +21,7 @@
          (output
           (with-output-to-string (s)
             (setf proc (run-program program arguments
-                                    :search (not (eql #\. (char program 0)))
+                                    :environment (test-util::test-env)
                                     :output s)))))
     (unless (zerop (process-exit-code proc))
       (error "Bad exit code: ~S~%Output:~% ~S"
@@ -29,13 +29,9 @@
              output))
     output))
 
-(run "cc" "-O3"
-     "-I" "../src/runtime/"
-     "kill-non-lisp-thread.c"
-     #+(and (or linux freebsd) (or x86-64 ppc mips)) "-fPIC"
-     #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
-     #+darwin "-bundle" #-darwin "-shared"
-     "-o" "kill-non-lisp-thread.so")
+(run "/bin/sh" "run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+     "-O3" "-I" "../src/runtime/"
+     "kill-non-lisp-thread.c" "-o" "kill-non-lisp-thread.so")
 
 (load-shared-object (truename "kill-non-lisp-thread.so"))
 

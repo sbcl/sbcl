@@ -198,14 +198,10 @@
 
 (with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
   (format o "void loop_forever() { while(1) ; }~%"))
-(sb-ext:run-program
- #-sunos "cc" #+sunos "gcc"
- (or #+(or linux freebsd sunos) '(#+x86-64 "-fPIC"
-                                  "-shared" "-o" "threads-foreign.so" "threads-foreign.c")
-     #+darwin '(#+x86-64 "-arch" #+x86-64 "x86_64"
-                "-dynamiclib" "-o" "threads-foreign.so" "threads-foreign.c")
-     (error "Missing shared library compilation options for this platform"))
- :search t)
+(sb-ext:run-program "/bin/sh"
+                    '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                      "-o" "threads-foreign.so" "threads-foreign.c")
+                    :environment (test-util::test-env))
 (sb-alien:load-shared-object (truename "threads-foreign.so"))
 (sb-alien:define-alien-routine loop-forever sb-alien:void)
 (delete-file "threads-foreign.c")

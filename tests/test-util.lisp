@@ -65,3 +65,8 @@
     (let ((*invoke-debugger-hook* *invoke-debugger-hook*))
       (enable-debugger)
       (invoke-debugger condition))))
+
+(defun test-env ()
+  (cons (format nil "SBCL_MACHINE_TYPE=~A" (machine-type))
+        (cons (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type))
+              (posix-environ))))

@@ -30,31 +30,7 @@ PUNT=$EXIT_TEST_WIN
 
 build_so() (
   echo building $1.so
-  set +u
-  case "`uname -m`" in
-      x86_64|amd64|mips|mips64)
-	  CFLAGS="$CFLAGS -fPIC"
-	  ;;
-  esac
-  case "`uname`" in
-      Darwin)
-          SO_FLAGS="-bundle"
-          if run_sbcl --eval '(sb-ext:quit :unix-status #+x86-64 0 #-x86-64 1)'; then
-              CFLAGS="$CFLAGS -arch x86_64"
-          fi
-          ;;
-      OpenBSD)
-          SO_FLAGS="-shared"
-          if [ "`machine -a`" = "powerpc" ]; then
-              CFLAGS="$CFLAGS -fPIC"
-          fi
-          ;;
-      *)
-          SO_FLAGS="-shared"
-          ;;
-  esac
-  cc -c $1.c -o $1.o $CFLAGS
-  ld $SO_FLAGS -o $1.so $1.o  
+  /bin/sh ../run-compiler.sh -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
 )
 
 # We want to bail out in case any of these Unix programs fails.

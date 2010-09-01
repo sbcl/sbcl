@@ -22,7 +22,7 @@
          (output
           (with-output-to-string (s)
             (setf proc (run-program program arguments
-                                    :search (not (eql #\. (char program 0)))
+                                    :environment (test-util::test-env)
                                     :output s)))))
     (unless (zerop (process-exit-code proc))
       (error "Bad exit code: ~S~%Output:~% ~S"
@@ -43,9 +43,7 @@
 ;;;; fork/exec, so that no lisp is on the stack. This is our known-good
 ;;;; number.
 
-(run "cc"
-     #+(and (or linux freebsd) (or x86-64 ppc mips)) "-fPIC"
-     #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
+(run "/bin/sh" "run-compiler.sh" "-sbcl-pic"
      "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
 (defparameter *good-offset*
@@ -54,11 +52,8 @@
 
 ;;;; Build the tool again, this time as a shared object, and load it
 
-(run "cc" "stack-alignment-offset.c"
-     #+(and (not darwin) (or x86-64 ppc mips)) "-fPIC"
-     #+(and x86-64 darwin) "-arch" #+(and x86-64 darwin) "x86_64"
-     #+darwin "-bundle" #-darwin "-shared"
-     "-o" "stack-alignment-offset.so")
+(run "/bin/sh" "run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+     "stack-alignment-offset.c" "-o" "stack-alignment-offset.so")
 
 (load-shared-object (truename "stack-alignment-offset.so"))
 
