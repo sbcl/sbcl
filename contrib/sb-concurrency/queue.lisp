@@ -80,11 +80,19 @@ and secondary value."
                       (go :continue)))
                 (when (eq head (sb-ext:compare-and-swap (queue-head queue)
                                                         head first-node-prev))
-                  ;; This assignment is not present in the paper, but is
-                  ;; equivalent to the free(head.ptr) call there: it unlinks
-                  ;; the HEAD from the queue -- the code in the paper leaves
-                  ;; the dangling pointer in place.
-                  (setf (node-next first-node-prev) nil)
+                  ;; These assignment is not present in the paper, but are
+                  ;; equivalent to the free(head.ptr) call there.
+                  ;;
+                  ;; First we unlink the HEAD from the queue -- the code in
+                  ;; the paper leaves the dangling pointer in place.
+                  ;;
+                  ;; Then we NIL out the slots in HEAD to help the GC,
+                  ;; otherwise conservativism might lead to massive chains of
+                  ;; nodes being retained.
+                  (setf (node-next first-node-prev) nil
+                        (node-prev head) nil
+                        (node-next head) nil
+                        (node-value head) nil)
                   (return-from dequeue (values val t))))
                ((eq tail head)
                 (return-from dequeue (values nil nil)))
