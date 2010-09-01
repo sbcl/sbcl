@@ -583,10 +583,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*POSIX-ARGV*" "*CORE-PATHNAME*" "*RUNTIME-PATHNAME*"
                "POSIX-GETENV" "POSIX-ENVIRON"
 
-               ;; Atomic operations
+               ;; Atomic operations and types related to them
                "COMPARE-AND-SWAP"
                "ATOMIC-INCF"
                "ATOMIC-DECF"
+               "WORD"
 
                ;; Time related things
                "CALL-WITH-TIMING"
@@ -2469,6 +2470,7 @@ no guarantees of interface stability."
 structure representations"
       :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!ASSEM" "SB!C"
                  "SB!EXT" "SB!FASL" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!UNIX")
+      :reexport ("WORD")
       :export ("*ALLOC-SIGNAL*"
                "*ASSEMBLY-UNIT-LENGTH*"
                "*PRIMITIVE-OBJECTS*"
@@ -2720,7 +2722,7 @@ structure representations"
                "WEAK-POINTER-BROKEN-SLOT" "WEAK-POINTER-NEXT-SLOT"
                "WEAK-POINTER-SIZE" "WEAK-POINTER-WIDETAG"
                "WEAK-POINTER-VALUE-SLOT"
-               "WORD" "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS"
+               "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS"
                "WORD-REG-SC-NUMBER" "WORD-SHIFT"
                #!+win32 "CONTEXT-RESTORE-TRAP"
                "ZERO-SC-NUMBER"))

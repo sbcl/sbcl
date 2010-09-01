@@ -226,7 +226,8 @@ PLACE.
 
 PLACE must be an accessor form whose CAR is the name of a DEFSTRUCT accessor
 whose declared type is (UNSIGNED-BYTE 32) on 32 bit platforms,
-and (UNSIGNED-BYTE 64) on 64 bit platforms.
+and (UNSIGNED-BYTE 64) on 64 bit platforms -- the type SB-EXT:WORD can be used
+for this purpose.
 
 DIFF defaults to 1, and must be a (SIGNED-BYTE 32) on 32 bit platforms,
 and (SIGNED-BYTE 64) on 64 bit platforms.
@@ -245,7 +246,8 @@ PLACE.
 
 PLACE must be an accessor form whose CAR is the name of a DEFSTRUCT accessor
 whose declared type is (UNSIGNED-BYTE 32) on 32 bit platforms,
-and (UNSIGNED-BYTE 64) on 64 bit platforms.
+and (UNSIGNED-BYTE 64) on 64 bit platforms -- the type SB-EXT:WORD can be used
+for this purpose.
 
 DIFF defaults to 1, and must be a (SIGNED-BYTE 32) on 32 bit platforms,
 and (SIGNED-BYTE 64) on 64 bit platforms.
