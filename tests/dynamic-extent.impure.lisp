@@ -894,4 +894,11 @@
              (flet ((bar () t))
                (cons #'bar (lambda () (declare (dynamic-extent #'bar))))))
           'sb-ext:compiler-note)))
+
+(with-test (:name :bug-586105)
+  (flet ((test (x)
+           (let ((vec (make-array 1 :initial-contents (list (list x)))))
+             (declare (dynamic-extent vec))
+             (assert (eql x (car (aref vec 0)))))))
+    (assert-no-consing (test 42))))
 

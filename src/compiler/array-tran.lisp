@@ -333,21 +333,48 @@
                        ,@(when initial-element
                            '(:initial-element initial-element)))))
 
-;;; Prevent open coding DIMENSION and :INITIAL-CONTENTS arguments,
-;;; so that we can pick them apart.
-(define-source-transform make-array (&whole form dimensions &rest keyargs
-                                     &environment env)
+(defun rewrite-initial-contents (rank initial-contents env)
+  (if (plusp rank)
+      (if (and (consp initial-contents)
+               (member (car initial-contents) '(list vector sb!impl::backq-list)))
+          `(list ,@(mapcar (lambda (dim)
+                             (rewrite-initial-contents (1- rank) dim env))
+                           (cdr initial-contents)))
+          initial-contents)
+      ;; This is the important bit: once we are past the level of
+      ;; :INITIAL-CONTENTS that relates to the array structure, reinline LIST
+      ;; and VECTOR so that nested DX isn't screwed up.
+      `(locally (declare (inline list vector))
+         ,initial-contents)))
+
+;;; Prevent open coding DIMENSION and :INITIAL-CONTENTS arguments, so that we
+;;; can pick them apart in the DEFTRANSFORMS, and transform '(3) style
+;;; dimensions to integer args directly.
+(define-source-transform make-array (dimensions &rest keyargs &environment env)
   (if (and (fun-lexically-notinline-p 'list)
            (fun-lexically-notinline-p 'vector))
       (values nil t)
-      `(locally (declare (notinline list vector))
-         ;; Transform '(3) style dimensions to integer args directly.
-         ,(if (sb!xc:constantp dimensions env)
-              (let ((dims (constant-form-value dimensions env)))
-                (if (and (listp dims) (= 1 (length dims)))
-                    `(make-array ',(car dims) ,@keyargs)
-                    form))
-              form))))
+      (multiple-value-bind (new-dimensions rank)
+          (flet ((constant-dims (dimensions)
+                   (let* ((dims (constant-form-value dimensions env))
+                          (canon (if (listp dims) dims (list dims)))
+                          (rank (length canon)))
+                     (values (if (= rank 1)
+                                 (list 'quote (car canon))
+                                 (list 'quote canon))
+                             rank))))
+            (cond ((sb!xc:constantp dimensions env)
+                   (constant-dims dimensions))
+                  ((and (consp dimensions) (eq 'list dimensions))
+                   (values dimensions (length (cdr dimensions))))
+                  (t
+                   (values dimensions nil))))
+        (let ((initial-contents (getf keyargs :initial-contents)))
+          (when (and initial-contents rank)
+            (setf (getf keyargs :initial-contents)
+                  (rewrite-initial-contents rank initial-contents env))))
+        `(locally (declare (notinline list vector))
+           (make-array ,new-dimensions ,@keyargs)))))
 
 ;;; This baby is a bit of a monster, but it takes care of any MAKE-ARRAY
 ;;; call which creates a vector with a known element type -- and tries
