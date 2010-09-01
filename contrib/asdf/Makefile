@@ -6,11 +6,7 @@ test::
 	true
 
 up:
-	test -d asdf-upstream || \
-	git clone \
-	git://common-lisp.net/projects/asdf/asdf.git asdf-upstream
-	: Using development ASDF. For stable ASDF, should use --branch release above.
-	cd asdf-upstream && git pull
+	sh pull-asdf.sh
 	cp asdf-upstream/asdf.lisp asdf.lisp
 	cp asdf-upstream/doc/asdf.texinfo asdf.texinfo
 	cp asdf-upstream/README README

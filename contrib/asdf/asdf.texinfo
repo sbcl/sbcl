@@ -65,7 +65,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 @titlepage
-@title asdf: another system definition facility
+@title ASDF: Another System Definition Facility
 
 @c The following two commands start the copyright page.
 @page
@@ -2494,13 +2494,45 @@ as pathname specifiers for components.
 
 @defun system-source-directory system-designator
 
-ASDF does not provide a turnkey solution for locating data (or other
-miscellaneous) files that are distributed together with the source code
-of a system.  Programmers can use @code{system-source-directory} to find
-such files.  Returns a pathname object.  The @var{system-designator} may
-be a string, symbol, or ASDF system object.
+ASDF does not provide a turnkey solution for locating
+data (or other miscellaneous) files
+that are distributed together with the source code of a system.
+Programmers can use @code{system-source-directory} to find such files.
+Returns a pathname object.
+The @var{system-designator} may be a string, symbol, or ASDF system object.
 @end defun
 
+@defun clear-system system-designator
+
+It is sometimes useful to force recompilation of a previously loaded system.
+In these cases, it may be useful to @code{(asdf:clear-system :foo)}
+to remove the system from the table of currently loaded systems;
+the next time the system @code{foo} or one that depends on it is re-loaded,
+@code{foo} will then be loaded again.
+Alternatively, you could touch @code{foo.asd} or
+remove the corresponding fasls from the output file cache.
+(It was once conceived that one should provide
+a list of systems the recompilation of which to force
+as the @code{:force} keyword argument to @code{load-system};
+but this has never worked, and though the feature was fixed in ASDF 2.000,
+it remains @code{cerror}'ed out as nobody ever used it.)
+
+Note that this does not and cannot by itself undo the previous loading
+of the system. Common Lisp has no provision for such an operation,
+and its reliance on irreversible side-effects to global datastructures
+makes such a thing impossible in the general case.
+If the software being re-loaded is not conceived with hot upgrade in mind,
+this re-loading may cause many errors, warnings or subtle silent problems,
+as packages, generic function signatures, structures, types, macros, constants, etc.
+are being redefined incompatibly.
+It is up to the user to make sure that reloading is possible and has the desired effect.
+In some cases, extreme measures such as recursively deleting packages,
+unregistering symbols, defining methods on @code{update-instance-for-redefined-class}
+and much more are necessary for reloading to happen smoothly.
+ASDF itself goes through notable pains to make such a hot upgrade possible
+with respect to its own code, and what it does is ridiculously complex;
+look at the beginning of @file{asdf.lisp} to see what it does.
+@end defun
 
 @node Getting the latest version, FAQ, Miscellaneous additional functionality, Top
 @comment  node-name,  next,  previous,  up

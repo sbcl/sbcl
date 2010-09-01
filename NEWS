@@ -1,7 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.42
-  * convenience: SB-EXT:WORD type is provided for use with SB-EXT:ATOMIC-INCF
+  * enhancement: SB-EXT:WORD type is provided for use with SB-EXT:ATOMIC-INCF
     &co.
+  * enhancement: ASDF has been updated to version 2.004. (lp#605260, thanks to
+    Faré Rideau)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to
     Roman Marynchak)
   * bug fix: WRITE-TO-STRING compiler macro binding special variable names,

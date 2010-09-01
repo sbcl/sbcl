@@ -70,7 +70,7 @@
 
 (eval-when (:load-toplevel :compile-toplevel :execute)
   (let* ((asdf-version ;; the 1+ helps the version bumping script discriminate
-          (subseq "VERSION:2.003" (1+ (length "VERSION")))) ; NB: same as 2.105.
+          (subseq "VERSION:2.004" (1+ (length "VERSION")))) ; NB: same as 2.111.
          (existing-asdf (find-package :asdf))
          (vername '#:*asdf-version*)
          (versym (and existing-asdf
@@ -727,8 +727,12 @@ actually-existing directory."
 #+clisp (defun get-uid () (posix:uid))
 #+sbcl (defun get-uid () (sb-unix:unix-getuid))
 #+cmu (defun get-uid () (unix:unix-getuid))
-#+ecl (ffi:clines "#include <sys/types.h>" "#include <unistd.h>")
-#+ecl (defun get-uid () (ffi:c-inline () () :int "getuid()" :one-liner t))
+#+ecl #.(cl:and (cl:< ext:+ecl-version-number+ 100601)
+         '(ffi:clines "#include <sys/types.h>" "#include <unistd.h>"))
+#+ecl (defun get-uid ()
+        #.(cl:if (cl:< ext:+ecl-version-number+ 100601)
+            '(ffi:c-inline () () :int "getuid()" :one-liner t)
+            '(ext::getuid)))
 #+allegro (defun get-uid () (excl.osi:getuid))
 #-(or cmu sbcl clisp allegro ecl)
 (defun get-uid ()
@@ -1072,6 +1076,17 @@ of which is a system object.")
 
 (defun system-registered-p (name)
   (gethash (coerce-name name) *defined-systems*))
+
+(defun clear-system (name)
+  "Clear the entry for a system in the database of systems previously loaded.
+Note that this does NOT in any way cause the code of the system to be unloaded."
+  ;; There is no "unload" operation in Common Lisp, and a general such operation
+  ;; cannot be portably written, considering how much CL relies on side-effects
+  ;; of global data structures.
+  ;; Note that this does a setf gethash instead of a remhash
+  ;; this way there remains a hint in the *defined-systems* table
+  ;; that the system was loaded at some point.
+  (setf (gethash (coerce-name name) *defined-systems*) nil))
 
 (defun map-systems (fn)
   "Apply FN to each defined system.
@@ -2392,7 +2407,9 @@ located."
 (defparameter *architecture-features*
   '((:x86-64 :amd64 :x86_64 :x8664-target)
     (:x86 :i686 :i586 :pentium3 :i486 :i386 :pc386 :iapx386 :x8632-target :pentium4)
-    :hppa64 :hppa :ppc64 (:ppc32 :ppc :powerpc) :sparc64 :sparc))
+    :hppa64 :hppa :ppc64 (:ppc32 :ppc :powerpc) :sparc64 :sparc
+    :java-1.4 :java-1.5 :java-1.6 :java-1.7))
+
 
 (defun lisp-version-string ()
   (let ((s (lisp-implementation-version)))
@@ -2409,6 +2426,7 @@ located."
                        (:-ics "8")
                        (:+ics ""))
                       (if (member :64bit *features*) "-64bit" ""))
+    #+armedbear (format nil "~a-fasl~a" s system::*fasl-version*)
     #+clisp (subseq s 0 (position #\space s))
     #+clozure (format nil "~d.~d-fasl~d"
                       ccl::*openmcl-major-version*
@@ -2423,8 +2441,8 @@ located."
     #+gcl (subseq s (1+ (position #\space s)))
     #+lispworks (format nil "~A~@[~A~]" s
                         (when (member :lispworks-64bit *features*) "-64bit"))
-    ;; #+sbcl (format nil "~a-fasl~d" s sb-fasl:+fasl-file-version+) ; fasl-f-v is redundant
-    #+(or armedbear cormanlisp mcl sbcl scl) s
+    ;; #+sbcl (format nil "~a-fasl~d" s sb-fasl:+fasl-file-version+) ; f-f-v redundant w/ version
+    #+(or cormanlisp mcl sbcl scl) s
     #-(or allegro armedbear clisp clozure cmu cormanlisp digitool
           ecl gcl lispworks mcl sbcl scl) s))
 
@@ -2508,7 +2526,7 @@ located."
       `(,@`(#+lispworks ,(try (sys:get-folder-path :local-appdata) "common-lisp/config/")
            ;;; read-windows-registry HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\Common AppData
         ,(try (getenv "ALLUSERSPROFILE") "Application Data/common-lisp/config/"))))
-    (list #p"/etc/"))))
+    (list #p"/etc/common-lisp/"))))
 (defun in-first-directory (dirs x)
   (loop :for dir :in dirs
     :thereis (and dir (ignore-errors
@@ -2955,7 +2973,7 @@ effectively disabling the output translation facility."
    :defaults x))
 
 (defun delete-file-if-exists (x)
-  (when (probe-file x)
+  (when (and x (probe-file x))
     (delete-file x)))
 
 (defun compile-file* (input-file &rest keys &key &allow-other-keys)
@@ -3352,14 +3370,18 @@ with a different configuration, so the configuration would be re-read then."
 (defun initialize-source-registry (&optional parameter)
   (setf (source-registry) (compute-source-registry parameter)))
 
-;; checks an initial variable to see whether the state is initialized
+;; Checks an initial variable to see whether the state is initialized
 ;; or cleared. In the former case, return current configuration; in
 ;; the latter, initialize.  ASDF will call this function at the start
-;; of (asdf:find-system).
-(defun ensure-source-registry ()
+;; of (asdf:find-system) to make sure the source registry is initialized.
+;; However, it will do so *without* a parameter, at which point it
+;; will be too late to provide a parameter to this function, though
+;; you may override the configuration explicitly by calling
+;; initialize-source-registry directly with your parameter.
+(defun ensure-source-registry (&optional parameter)
   (if (source-registry-initialized-p)
       (source-registry)
-      (initialize-source-registry)))
+      (initialize-source-registry parameter)))
 
 (defun sysdef-source-registry-search (system)
   (ensure-source-registry)
