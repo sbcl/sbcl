@@ -21,7 +21,7 @@ then
 
     sbclsystem=$SBCL_PWD/../../src/runtime/sbcl
     sbclcore=$SBCL_PWD/../../output/sbcl.core
-    if [ -e $sbclsystem ] && [ -e $sbclcore ]
+    if [ -f $sbclsystem ] && [ -f $sbclcore ]
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
         SBCL_HOME=$SBCL_PWD/../../contrib/; export SBCL_HOME

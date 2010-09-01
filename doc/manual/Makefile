@@ -97,7 +97,7 @@ info: $(INFOFILES)
 CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIBDIR)|g") -name '*.fasl')
 docstrings: $(CONTRIB_FASLS) tempfiles-stamp
 	for module in $(shell echo $(MODULES)); do \
-		test -e $(CONTRIBDIR)/$${module#:}/test-passed \
+		test -f $(CONTRIBDIR)/`echo $$module | tr -d :`/test-passed \
 		|| { echo "The documented contrib $$module seems \
                            to have failed its tests." && exit 1; } \
 	done

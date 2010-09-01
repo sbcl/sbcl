@@ -272,7 +272,9 @@
               #-(and linux largefile) "struct dirent"
               #-win32 (:ino-t ino "ino_t" "d_ino")
               (:c-string name "char *" "d_name"
-                         :distrust-length #+sunos t #-sunos nil)) t)
+                         ;; FIXME: sunos should really have :distrust-length
+                         ;; t, but this is currently broken. -- Jim Wise 2010-08-31
+                         :distrust-length nil)) t)
 
  ;; password database
  #-win32

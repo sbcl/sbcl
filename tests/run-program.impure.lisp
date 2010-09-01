@@ -91,9 +91,10 @@
   (when command
     (write-line command *ed-in*)
     (force-output *ed-in*))
-  (let ((got (read-linish *ed-out*)))
-    (unless (equal response got)
-      (error "wanted ~S from ed, got ~S" response got)))
+  (when response
+    (let ((got (read-linish *ed-out*)))
+      (unless (equal response got)
+        (error "wanted '~A' from ed, got '~A'" response got))))
   *ed*)
 
 (unwind-protect
@@ -101,7 +102,7 @@
        (assert-ed nil "4")
        (assert-ed ".s/bar/baz/g" "")
        (assert-ed "w" "4")
-       (assert-ed "q" "")
+       (assert-ed "q" nil)
        (process-wait *ed*)
        (with-open-file (f *tmpfile*)
          (assert (equal "baz" (read-line f)))))

@@ -10,6 +10,7 @@ sbcl
 *.dvi
 *.fn
 *.fns
+*.html
 *.info
 *.info-1
 *.info-2
