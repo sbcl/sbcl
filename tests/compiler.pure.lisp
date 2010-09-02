@@ -3518,3 +3518,16 @@
                           (declare (inline iterator+976))
                           (let ((iterator+976 #'iterator+976))
                             (funcall iterator+976))))))))
+
+(with-test (:name :complex-float-local-fun-args :fails-on :x86-64)
+  ;; As of 1.0.27.14, the lambda below failed to compile due to the
+  ;; compiler attempting to pass unboxed complex floats to Z and the
+  ;; MOVE-ARG method not expecting the register being used as a
+  ;; temporary frame pointer.  Reported by sykopomp in #lispgames,
+  ;; reduced test case provided by _3b`.
+  (compile nil '(lambda (a)
+                  (labels ((z (b c)
+                              (declare ((complex double-float) b c))
+                              (* b (z b c))))
+                          (loop for i below 10 do
+                                (setf a (z a a)))))))
