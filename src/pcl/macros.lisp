@@ -96,7 +96,8 @@
                   (ensure-non-standard-class symbol classoid))))))
       (cond ((null errorp) nil)
             ((legal-class-name-p symbol)
-             (error "There is no class named ~S." symbol))
+             (error "There is no class named ~
+                     ~/sb-impl::print-symbol-with-prefix/." symbol))
             (t
              (error "~S is not a legal class name." symbol)))))
 

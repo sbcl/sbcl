@@ -767,7 +767,8 @@
             (:primitive
              (error "Cannot redefine standard type ~S." name))
             (:defined
-             (warn "Redefining DEFTYPE type to be a class: ~S" name)
+             (warn "redefining DEFTYPE type to be a class: ~
+                    ~/sb-impl::print-symbol-with-prefix/" name)
                 (setf (info :type :expander name) nil
                       (info :type :lambda-list name) nil
                       (info :type :source-location name) nil)))

@@ -4,6 +4,9 @@ changes relative to sbcl-1.0.42
     &co.
   * enhancement: ASDF has been updated to version 2.004. (lp#605260, thanks to
     Faré Rideau)
+  * enhancement: symbols are printed using fully qualified names in several
+    error and warning messages which are often associated with package
+    conflicts or mixups (lp#622789, thanks to Attila Lendvai)
   * bug fix: SB-BSD-SOCKETS:SOCKET-CONNECT was not thread safe. (lp#505497,
     thanks to Andrew Golding)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to

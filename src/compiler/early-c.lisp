@@ -186,7 +186,8 @@ the stack without triggering overflow protection.")
     ;; FIXME: should be COMPILER-STYLE-WARNING?
     (style-warn 'sb!kernel:asterisks-around-lexical-variable-name
                 :format-control
-                "using the lexical binding of the symbol ~S, not the~@
+                "using the lexical binding of the symbol ~
+                 ~/sb-impl::print-symbol-with-prefix/, not the~@
                  dynamic binding"
                 :format-arguments (list symbol)))
   (values))

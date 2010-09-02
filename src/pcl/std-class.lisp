@@ -963,7 +963,7 @@
               (style-warn
                "~@<slot names with the same SYMBOL-NAME but ~
                   different SYMBOL-PACKAGE (possible package problem) ~
-                  for class ~S:~4I~@:_~<~@{~S~^~:@_~}~:>~@:>"
+                  for class ~S:~4I~@:_~<~@{~/sb-impl::print-symbol-with-prefix/~^~:@_~}~:>~@:>"
                class dupes)))
         (let* ((slot (car slots))
                (oslots (remove (slot-definition-name slot) (cdr slots)

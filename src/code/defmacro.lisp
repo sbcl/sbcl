@@ -89,7 +89,8 @@
                     ;; being incompatibly redefined. Doing this right
                     ;; will involve finding the old macro lambda-list
                     ;; and comparing it with the new one.
-                    (style-warn "redefining ~S in DEFMACRO" name))
+                    (style-warn "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+                                 in DEFMACRO" name))
             (setf (sb!xc:macro-function name) definition)
             ,(when set-p
                    `(setf (%fun-doc definition) doc
