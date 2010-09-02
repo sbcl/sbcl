@@ -31,9 +31,12 @@ changes relative to sbcl-1.0.42
   * bug fix: inline-expansion creating references to dead lambda-variables
     (lp#454681, thanks to Alexey Dejneka)
   * bug fix: better error message for bogus numerical arguments to RANDOM.
-    (lp#598986, thanks to Stas Boukarev)  
+    (lp#598986, thanks to Stas Boukarev)
+  * bug fix: the compiler occasionally inlined references from incompatible
+    environments occurs. (lp#308951)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
+
   * build changes
     ** Cross-compilation host is now specified to make.sh using
        command-line argument --xc-host=<command> instead of a positional

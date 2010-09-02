@@ -1259,11 +1259,32 @@
 
 ;;; Return functional for DEFINED-FUN which has been converted in policy
 ;;; corresponding to the current one, or NIL if no such functional exists.
+;;;
+;;; Also check that the parent of the functional is visible in the current
+;;; environment.
 (defun defined-fun-functional (defined-fun)
-  (let ((policy (lexenv-%policy *lexenv*)))
-    (dolist (functional (defined-fun-functionals defined-fun))
-      (when (equal policy (lexenv-%policy (functional-lexenv functional)))
-        (return functional)))))
+  (let ((functionals (defined-fun-functionals defined-fun)))
+    (when functionals
+      (let* ((sample (car functionals))
+             (there (lambda-parent (if (lambda-p sample)
+                                       sample
+                                       (optional-dispatch-main-entry sample)))))
+        (when there
+          (labels ((lookup (here)
+                     (unless (eq here there)
+                       (if here
+                           (lookup (lambda-parent here))
+                           ;; We looked up all the way up, and didn't find the parent
+                           ;; of the functional -- therefore it is nested in a lambda
+                           ;; we don't see, so return nil.
+                           (return-from defined-fun-functional nil)))))
+            (lookup (lexenv-lambda *lexenv*)))))
+      ;; Now find a functional whose policy matches the current one, if we already
+      ;; have one.
+      (let ((policy (lexenv-%policy *lexenv*)))
+        (dolist (functional functionals)
+          (when (equal policy (lexenv-%policy (functional-lexenv functional)))
+            (return functional)))))))
 
 ;;; Do stuff to delete the semantic attachments of a REF node. When
 ;;; this leaves zero or one reference, we do a type dispatch off of

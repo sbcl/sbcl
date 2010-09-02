@@ -600,15 +600,7 @@
                         (not (eq (defined-fun-inlinep leaf)
                                  :notinline))
                         (let ((functional (defined-fun-functional leaf)))
-                          (when (and functional
-                                     (not (functional-kind functional))
-                                     ;; Bug MISC.320: ir1-transform
-                                     ;; can create a reference to a
-                                     ;; inline-expanded function,
-                                     ;; defined in another component.
-                                     (not (and (lambda-p functional)
-                                               (neq (lambda-component functional)
-                                                    *current-component*))))
+                          (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
                    (when (and (lambda-p leaf)
                               (memq (functional-kind leaf)

@@ -1197,6 +1197,18 @@
 (with-test (:name :defmacro-not-list-lambda-list)
   (assert (raises-error? (eval `(defmacro ,(gensym) "foo"))
                          type-error)))
+
+(with-test (:name :bug-308951)
+  (let ((x 1))
+    (dotimes (y 10)
+      (let ((y y))
+        (when (funcall (eval #'(lambda (x) (eql x 2))) y)
+          (defun bug-308951-foo (z)
+            (incf x (incf y z))))))
+    (defun bug-308951-bar (z)
+      (bug-308951-foo z)
+      (values x)))
+  (assert (= 4 (bug-308951-bar 1))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
