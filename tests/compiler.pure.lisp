@@ -3519,7 +3519,7 @@
                           (let ((iterator+976 #'iterator+976))
                             (funcall iterator+976))))))))
 
-(with-test (:name :complex-float-local-fun-args :fails-on :x86-64)
+(with-test (:name :complex-float-local-fun-args)
   ;; As of 1.0.27.14, the lambda below failed to compile due to the
   ;; compiler attempting to pass unboxed complex floats to Z and the
   ;; MOVE-ARG method not expecting the register being used as a

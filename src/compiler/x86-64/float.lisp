@@ -51,9 +51,7 @@
                       (+ (tn-offset ,tn)
                        (cond ((= (tn-offset ,base) rsp-offset)
                               sp->fp-offset)
-                             ((= (tn-offset ,base) rbp-offset)
-                              0)
-                             (t (error "Unexpected offset.")))
+                             (t 0))
                        (ecase ,kind
                          (:single
                             (ecase ,slot
