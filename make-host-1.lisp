@@ -15,6 +15,9 @@
 (set-dispatch-macro-character #\# #\+ #'she-reader)
 (set-dispatch-macro-character #\# #\- #'she-reader)
 
+;; Supress function/macro redefinition warnings under clisp.
+#+clisp (setf custom:*suppress-check-redefinition* t)
+
 (load-or-cload-xcompiler #'host-cload-stem)
 
 ;;; Let's check that the type system, and various other things, are
