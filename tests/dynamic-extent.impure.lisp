@@ -557,7 +557,7 @@
 ;; This fails on threaded PPC because the hash-table implementation
 ;; uses recursive system spinlocks, which cons (see below for test
 ;; (:no-consing :spinlock), which also fails on threaded PPC).
-(with-test (:name (:no-consing :hash-tables) :fails-on (and :ppc :sb-thread))
+(with-test (:name (:no-consing :hash-tables) :fails-on '(and :ppc :sb-thread))
   (assert-no-consing (test-hash-table)))
 
 ;;; with-spinlock and with-mutex should use DX and not cons

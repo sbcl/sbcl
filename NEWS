@@ -34,6 +34,9 @@ changes relative to sbcl-1.0.42
     (lp#598986, thanks to Stas Boukarev)
   * bug fix: the compiler occasionally inlined references from incompatible
     environments occurs. (lp#308951)
+  * bug fix: the compiler threw an error when trying to compile a local
+    function (labels or flet) known to take a specialized complex argument.
+    (not in launchpad, reported by sykopomp in #lispgames)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
 
