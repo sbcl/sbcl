@@ -71,6 +71,8 @@ Examples:
 ;;; getprotobyname only works in the internet domain, which is why this
 ;;; is here
 (defun get-protocol-by-name (name)      ;exported
+  "Given a protocol name, return the protocol number, the protocol name, and
+a list of protocol aliases"
 
   ;; Brownie Points.  Hopefully there's one person out there using
   ;; RSPF sockets and SBCL who will appreciate the extra info
