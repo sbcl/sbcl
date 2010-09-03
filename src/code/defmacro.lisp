@@ -61,41 +61,43 @@
             ;; the functional value."
             ,@(unless set-p
                 '((declare (ignore lambda-list debug-name))))
-            (ecase (info :function :kind name)
-              ((nil))
-              (:function
-               ;; (remhash name *free-funs*)
-               (undefine-fun-name name)
-               (style-warn
-                "~S is being redefined as a macro when it was ~
-                 previously ~(~A~) to be a function."
-                name
-                (info :function :where-from name)))
-              (:macro)
-              (:special-form
-               (error "The special form ~S can't be redefined as a macro."
-                      name)))
-            (clear-info :function :where-from name)
-            ;; FIXME: It would be nice to warn about DEFMACRO of an
-            ;; already-defined macro, but that's slightly hard to do
-            ;; because in common usage DEFMACRO is defined at compile
-            ;; time and then redefined at load time. We'd need to make a
-            ;; distinction between the defined-at-compile-time state and
-            ;; the defined-at-load-time state to make this work. (Trying
-            ;; to warn about duplicate DEFTYPEs runs into the same
-            ;; problem.)
-            #+nil (when (sb!xc:macro-function name)
-                    ;; Someday we could check for macro arguments
-                    ;; being incompatibly redefined. Doing this right
-                    ;; will involve finding the old macro lambda-list
-                    ;; and comparing it with the new one.
-                    (style-warn "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+            (with-single-package-locked-error ()
+              (case (info :function :kind name)
+                (:function
+                 (let ((where-from (info :function :where-from name)))
+                   (when (eq :defined where-from)
+                     (assert-symbol-home-package-unlocked name "defining ~S as a macro"))
+                   (style-warn
+                    "~S is being redefined as a macro when it was ~
+                     previously ~(~A~) to be a function."
+                    name where-from))
+                 (undefine-fun-name name))
+                (:special-form
+                 (error "The special form ~S can't be redefined as a macro."
+                        name)))
+              (clear-info :function :where-from name)
+
+              ;; FIXME: It would be nice to warn about DEFMACRO of an
+              ;; already-defined macro, but that's slightly hard to do
+              ;; because in common usage DEFMACRO is defined at compile
+              ;; time and then redefined at load time. We'd need to make a
+              ;; distinction between the defined-at-compile-time state and
+              ;; the defined-at-load-time state to make this work. (Trying
+              ;; to warn about duplicate DEFTYPEs runs into the same
+              ;; problem.)
+              #+nil
+              (when (sb!xc:macro-function name)
+                ;; Someday we could check for macro arguments
+                ;; being incompatibly redefined. Doing this right
+                ;; will involve finding the old macro lambda-list
+                ;; and comparing it with the new one.
+                (style-warn "redefining ~/sb-impl::print-symbol-with-prefix/ ~
                                  in DEFMACRO" name))
-            (setf (sb!xc:macro-function name) definition)
-            ,(when set-p
-                   `(setf (%fun-doc definition) doc
-                          (%fun-lambda-list definition) lambda-list
-                          (%fun-name definition) debug-name))
+              (setf (sb!xc:macro-function name) definition)
+              ,(when set-p
+                     `(setf (%fun-doc definition) doc
+                            (%fun-lambda-list definition) lambda-list
+                            (%fun-name definition) debug-name)))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)

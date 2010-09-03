@@ -37,6 +37,8 @@ changes relative to sbcl-1.0.42
   * bug fix: the compiler threw an error when trying to compile a local
     function (labels or flet) known to take a specialized complex argument.
     (not in launchpad, reported by sykopomp in #lispgames)
+  * bug fix: package-locks failed to protect against compile-time effects of
+    DEFUN when the symbol previously had a macro definition. (lp#576637)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
 

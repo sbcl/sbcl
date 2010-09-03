@@ -41,15 +41,28 @@
   ;; legal name?
   (check-fun-name name)
 
-  ;; scrubbing old data I: possible collision with old definition
-  (when (fboundp name)
-    (ecase (info :function :kind name)
-      (:function) ; happy case
-      ((nil)) ; another happy case
-      (:macro ; maybe-not-so-good case
-       (compiler-style-warn "~S was previously defined as a macro." name)
-       (setf (info :function :where-from name) :assumed)
-       (clear-info :function :macro-function name))))
+
+  ;; KLUDGE: This can happen when eg. compiling a NAMED-LAMBDA, and isn't
+  ;; guarded against elsewhere -- so we want to assert package locks here. The
+  ;; reason we do it only when stomping on existing stuff is because we want
+  ;; to keep
+  ;;   (WITHOUT-PACKAGE-LOCKS (DEFUN LOCKED:FOO ...))
+  ;; viable, which requires no compile-time violations in the harmless cases.
+  (with-single-package-locked-error ()
+    (flet ((assert-it ()
+             (assert-symbol-home-package-unlocked name "proclaiming ~S as a function")))
+
+      (let ((kind (info :function :kind name)))
+        ;; scrubbing old data I: possible collision with a macro
+        (when (and (fboundp name) (eq :macro kind))
+          (assert-it)
+          (compiler-style-warn "~S was previously defined as a macro." name)
+          (setf (info :function :where-from name) :assumed)
+          (clear-info :function :macro-function name))
+
+        (unless (eq :function kind)
+          (assert-it)
+          (setf (info :function :kind name) :function)))))
 
   ;; scrubbing old data II: dangling forward references
   ;;
@@ -58,11 +71,9 @@
   ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
   ;; case it's reasonable style. Either way, NAME is no longer a free
   ;; function.)
-  (when (boundp '*free-funs*) ; when compiling
+  (when (boundp '*free-funs*)       ; when compiling
     (remhash name *free-funs*))
 
-  ;; recording the ordinary case
-  (setf (info :function :kind name) :function)
   (note-if-setf-fun-and-macro name)
 
   (values))

@@ -226,29 +226,29 @@
                (error "not a function type: ~S" (first args)))
              (dolist (name (rest args))
                (with-single-package-locked-error
-                   (:symbol name "globally declaring the ftype of ~A"))
-               (when (eq (info :function :where-from name) :declared)
-                 (let ((old-type (info :function :type name)))
-                   (when (type/= ctype old-type)
-                     ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
-                     ;; broke late-proclaim.lisp.
-                     (style-warn
-                      "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
+                   (:symbol name "globally declaring the ftype of ~A")
+                 (when (eq (info :function :where-from name) :declared)
+                   (let ((old-type (info :function :type name)))
+                     (when (type/= ctype old-type)
+                       ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
+                       ;; broke late-proclaim.lisp.
+                       (style-warn
+                        "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
                        does not match the old FTYPE proclamation:~@:_  ~S~@:>"
-                      name (type-specifier ctype) (type-specifier old-type)))))
+                        name (type-specifier ctype) (type-specifier old-type)))))
 
-               ;; Now references to this function shouldn't be warned
-               ;; about as undefined, since even if we haven't seen a
-               ;; definition yet, we know one is planned.
-               ;;
-               ;; Other consequences of we-know-you're-a-function-now
-               ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
-               (proclaim-as-fun-name name)
-               (note-name-defined name :function)
+                 ;; Now references to this function shouldn't be warned
+                 ;; about as undefined, since even if we haven't seen a
+                 ;; definition yet, we know one is planned.
+                 ;;
+                 ;; Other consequences of we-know-you're-a-function-now
+                 ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
+                 (proclaim-as-fun-name name)
+                 (note-name-defined name :function)
 
-               ;; the actual type declaration
-               (setf (info :function :type name) ctype
-                     (info :function :where-from name) :declared)))
+                 ;; the actual type declaration
+                 (setf (info :function :type name) ctype
+                       (info :function :where-from name) :declared))))
            (push raw-form *queued-proclaims*)))
       (freeze-type
        (dolist (type args)

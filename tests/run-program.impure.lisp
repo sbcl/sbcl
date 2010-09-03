@@ -84,8 +84,8 @@
 (defun read-linish (stream)
   (with-output-to-string (s)
     (loop for c = (read-char stream)
-       while (and c (not (eq #\newline c)) (not (eq #\return c)))
-       do (write-char c s))))
+          while (and c (not (eq #\newline c)) (not (eq #\return c)))
+          do (write-char c s))))
 
 (defun assert-ed (command response)
   (when command
@@ -100,7 +100,7 @@
 (unwind-protect
      (with-test (:name :run-program-ed)
        (assert-ed nil "4")
-       (assert-ed ".s/bar/baz/g" "")
+       (assert-ed ".s/bar/baz/g" #-sunos "" #+sunos nil)
        (assert-ed "w" "4")
        (assert-ed "q" nil)
        (process-wait *ed*)

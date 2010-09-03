@@ -190,10 +190,10 @@
     (unintern (or (find-symbol *interned* :test) (error "bugo")) :test)
     (delete-package :test-delete)
 
-    ;; defining or undefining as a function
-    (defun test:unused () 'foo)
-    (setf (fdefinition 'test:unused) (lambda () 'bar))
-    (setf (symbol-function 'test:unused) (lambda () 'quux))
+    ;; redefining or undefining as a function
+    (defun test:function () 'foo)
+    (setf (fdefinition 'test:function) (lambda () 'bar))
+    (setf (symbol-function 'test:function) (lambda () 'quux))
     (tmp-fmakunbound 'test:function)
 
     ;; defining or undefining as a macro or compiler macro
@@ -332,29 +332,33 @@
 ;;; Unlocked. No errors nowhere.
 (reset-test nil)
 
-(dolist (form (append *legal-forms* *illegal-forms*))
-  (with-error-info ("~Unlocked form: ~S~%" form)
-    (eval form)))
+(with-test (:name :unlocked-package)
+  (dolist (form (append *legal-forms* *illegal-forms*))
+    (with-error-info ("~Unlocked form: ~S~%" form)
+      (eval form))))
 
 ;;; Locked. Errors for all illegal forms, none for legal.
 (reset-test t)
 
-(dolist (form *legal-forms*)
-  (with-error-info ("locked legal form: ~S~%" form)
-    (eval form)))
+(with-test (:name :locked-package/legal-forms)
+  (dolist (form *legal-forms*)
+    (with-error-info ("locked legal form: ~S~%" form)
+      (eval form))))
 
-(dolist (form (append *illegal-runtime-forms* *illegal-double-forms*))
-  (with-error-info ("locked illegal runtime form: ~S~%" form)
-    (let ((fun (compile nil `(lambda () ,form))))
-      (assert (raises-error? (funcall fun) sb-ext:package-lock-violation)))
-    (assert (raises-error? (eval form) sb-ext:package-lock-violation))))
-
-(dolist (pair *illegal-lexical-forms-alist*)
-  (let ((form (cdr pair)))
-    (with-error-info ("compile locked illegal lexical form: ~S~%" form)
+(with-test (:name :locked-package/illegal-runtime-forms)
+  (dolist (form (append *illegal-runtime-forms* *illegal-double-forms*))
+    (with-error-info ("locked illegal runtime form: ~S~%" form)
       (let ((fun (compile nil `(lambda () ,form))))
-        (assert (raises-error? (funcall fun) program-error)))
-      (assert (raises-error? (eval form) program-error)))))
+        (assert (raises-error? (funcall fun) sb-ext:package-lock-violation)))
+      (assert (raises-error? (eval form) sb-ext:package-lock-violation)))))
+
+(with-test (:name :locked-package/illegal-lexical-forms)
+  (dolist (pair *illegal-lexical-forms-alist*)
+    (let ((form (cdr pair)))
+      (with-error-info ("compile locked illegal lexical form: ~S~%" form)
+        (let ((fun (compile nil `(lambda () ,form))))
+          (assert (raises-error? (funcall fun) program-error)))
+        (assert (raises-error? (eval form) program-error))))))
 
 ;;; Locked, WITHOUT-PACKAGE-LOCKS
 (reset-test t)
@@ -451,6 +455,7 @@
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.
 (assert (trace test:function :break t))
+(untrace test:function)
 
 ;;;; No bogus violations from defclass with accessors in a locked
 ;;;; package. Reported by by Francois-Rene Rideau.
@@ -488,5 +493,15 @@
 
 (assert (equal (loop :for *print-base* :from 2 :to 3 :collect *print-base*)
                '(2 3)))
+
+;;; Package lock for DEFMACRO -> DEFUN and vice-versa.
+(reset-test t)
+(with-test (:name :bug-576637)
+  (assert (raises-error? (eval `(defun test:macro (x) x))
+                         sb-ext:package-lock-violation))
+  (assert (eq 'test:macro (eval `(test:macro))))
+  (assert (raises-error? (eval `(defmacro test:function (x) x))
+                         sb-ext:package-lock-violation))
+  (assert (eq 'test:function (eval `(test:function)))))
 
 ;;; WOOT! Done.
