@@ -550,7 +550,7 @@
         (declare ,(make-pv-type-declaration '.pv.))
         ,@forms)))
 
-(defun split-declarations (body args maybe-reads-params-p)
+(defun split-declarations (body args req-args cnm-p parameters-setqd)
   (let ((inner-decls nil)
         (outer-decls nil)
         decl)
@@ -579,7 +579,7 @@
                            ;; args when a next-method is involved, to
                            ;; prevent compiler warnings about ignored
                            ;; args being read.
-                           (unless (and (eq 'ignore name) maybe-reads-params-p)
+                           (unless (and (eq 'ignore name) (member var req-args :test #'eq) (or cnm-p (member var parameters-setqd)))
                              (push var outers))
                            (push var inners)))
                      (when outers
@@ -677,7 +677,7 @@
          (outer-parameters req-args)
          ;; The lambda-list used by BIND-ARGS
          (bind-list lambda-list)
-         (setq-p (getf (cdr lmf-params) :setq-p))
+         (parameters-setqd (getf (cdr lmf-params) :parameters-setqd))
          (auxp (member '&aux bind-list))
          (call-next-method-p (getf (cdr lmf-params) :call-next-method-p)))
     ;; Try to use the normal function call machinery instead of BIND-ARGS
@@ -702,7 +702,7 @@
             bind-list req-args))
     (multiple-value-bind (outer-decls inner-decls body-sans-decls)
         (split-declarations
-         body outer-parameters (or call-next-method-p setq-p))
+         body outer-parameters req-args call-next-method-p parameters-setqd)
       (let* ((rest-arg (when restp
                          '.rest-arg.))
              (fmf-lambda-list (if rest-arg

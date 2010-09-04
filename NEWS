@@ -39,6 +39,8 @@ changes relative to sbcl-1.0.42
     (not in launchpad, reported by sykopomp in #lispgames)
   * bug fix: package-locks failed to protect against compile-time effects of
     DEFUN when the symbol previously had a macro definition. (lp#576637)
+  * bug fix: spurious ignore warnings even given (DECLARE IGNORE) in methods
+    when parameter bindings mutated.  (reported by Faré Rideau; lp #611361)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
 

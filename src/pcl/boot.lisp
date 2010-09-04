@@ -733,6 +733,7 @@ bootstrapping.
                                            ,call-next-method-p
                                            :next-method-p-p ,next-method-p-p
                                            :setq-p ,setq-p
+                                           :parameters-setqd ,parameters-setqd
                                            :method-cell ,method-cell
                                            :closurep ,closurep
                                            :applyp ,applyp)
@@ -967,7 +968,7 @@ bootstrapping.
 
 (defmacro bind-simple-lexical-method-functions
     ((method-args next-methods (&key call-next-method-p next-method-p-p setq-p
-                                     closurep applyp method-cell))
+                                     parameters-setqd closurep applyp method-cell))
      &body body
      &environment env)
   (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
@@ -1318,6 +1319,7 @@ bootstrapping.
     ((args rest-arg next-method-call (&key
                                       call-next-method-p
                                       setq-p
+                                      parameters-setqd
                                       method-cell
                                       next-method-p-p
                                       closurep
@@ -1491,23 +1493,6 @@ bootstrapping.
                     (setq next-method-p-p t)
                     form)
                    ((memq (car form) '(setq multiple-value-setq))
-                    ;; FIXME: this is possibly a little strong as
-                    ;; conditions go.  Ideally we would want to detect
-                    ;; which, if any, of the method parameters are
-                    ;; being set, and communicate that information to
-                    ;; e.g. SPLIT-DECLARATIONS.  However, the brute
-                    ;; force method doesn't really cost much; a little
-                    ;; loss of discrimination over IGNORED variables
-                    ;; should be all.  -- CSR, 2004-07-01
-                    ;;
-                    ;; As of 2006-09-18 modified parameter bindings
-                    ;; are now tracked with more granularity than just
-                    ;; one SETQ-P flag, in order to disable SLOT-VALUE
-                    ;; optimizations for parameters that are SETQd.
-                    ;; The old binary SETQ-P flag is still used for
-                    ;; all other purposes, since as noted above, the
-                    ;; extra cost is minimal. -- JES, 2006-09-18
-                    ;;
                     ;; The walker will split (SETQ A 1 B 2) to
                     ;; separate (SETQ A 1) and (SETQ B 2) forms, so we
                     ;; only need to handle the simple case of SETQ
