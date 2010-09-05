@@ -344,7 +344,7 @@ x:
 #endif
 	/* Turn on pseudo-atomic */
 
-	li reg_ALLOC,4
+	li reg_ALLOC,flag_PseudoAtomic
 #if defined(LISP_FEATURE_SB_THREAD)
 	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
@@ -364,8 +364,8 @@ x:
 	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* No longer atomic, and check for interrupt */
-	subi reg_ALLOC,reg_ALLOC,4
-	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC,reg_ALLOC,flag_PseudoAtomic
+	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
 
 	/* Pass in the arguments */
@@ -407,7 +407,7 @@ lra:
 	mr REG(3),reg_A0
 
 	/* Turn on  pseudo-atomic */
-	la reg_ALLOC,4(reg_ALLOC)
+	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* Store lisp state */
@@ -433,8 +433,8 @@ lra:
 #endif
 
 	/* Check for interrupt */
-	subi reg_ALLOC, reg_ALLOC, 4
-	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
+	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3,0
 	
 	/* Back to C */
@@ -465,7 +465,7 @@ lra:
 	mr reg_NARGS,reg_NL3
 
 	/* Turn on pseudo-atomic */
-	la reg_ALLOC,4(reg_ALLOC)
+	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
 
 	/* Convert the return address to an offset and save it on the stack. */
 	sub reg_NFP,reg_LIP,reg_CODE
@@ -495,8 +495,8 @@ lra:
 #endif
 	/* load(reg_POLL,saver2) */
 	/* Disable pseudo-atomic; check pending interrupt */
-	subi reg_ALLOC, reg_ALLOC, 4
-	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
+	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
 
 	mr reg_NL3,reg_NARGS
@@ -542,8 +542,7 @@ lra:
 	li reg_LIP,0
 
 	/* Atomic ... */
-        li reg_NL3,-4        
-	li reg_ALLOC,4
+	li reg_ALLOC,flag_PseudoAtomic
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* No longer in foreign function call. */
@@ -578,8 +577,8 @@ lra:
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
 	/* No longer atomic */
-	subi reg_ALLOC, reg_ALLOC, 4
-	andi. reg_NL3, reg_ALLOC, 1
+	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
+	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
 
 	mtlr reg_LIP

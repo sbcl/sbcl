@@ -341,19 +341,18 @@
        ;; Extra debugging stuff:
        #+debug
        (progn
-         (inst andi. ,flag-tn alloc-tn 7)
+         (inst andi. ,flag-tn alloc-tn lowtag-mask)
          (inst twi :ne ,flag-tn 0))
-       (inst ori alloc-tn alloc-tn 4))
+       (inst ori alloc-tn alloc-tn pseudo-atomic-flag))
      ,@forms
      (without-scheduling ()
-       (inst li ,flag-tn -5)
-       (inst and alloc-tn alloc-tn ,flag-tn)
+       (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
        ;; Now test to see if the pseudo-atomic interrupted bit is set.
-       (inst andi. ,flag-tn alloc-tn 1)
+       (inst andi. ,flag-tn alloc-tn pseudo-atomic-interrupted-flag)
        (inst twi :ne ,flag-tn 0))
      #+debug
      (progn
-       (inst andi. ,flag-tn alloc-tn 7)
+       (inst andi. ,flag-tn alloc-tn lowtag-mask)
        (inst twi :ne ,flag-tn 0))))
 
 (def!macro with-pinned-objects ((&rest objects) &body body)
