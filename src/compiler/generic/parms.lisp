@@ -65,6 +65,11 @@
     #!-sb-thread
     *stepping*
 
+    ;; threading support
+    #!+sb-thread *stop-for-gc-pending*
+    #!+sb-thread *free-tls-index*
+    #!+sb-thread *tls-index-lock*
+
     ;; Dispatch tables for generic array access
     sb!impl::*data-vector-reffers*
     sb!impl::*data-vector-setters*
