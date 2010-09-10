@@ -207,17 +207,11 @@
                 (:temporary (:sc unsigned-reg :offset edi-offset
                                  :from (:argument 1))
                             edi)
-
-                (:temporary (:sc unsigned-reg :offset ecx-offset
-                                 :from :eval)
-                            ecx)
                 (:conditional ,test)
                 (:generator 10
                    (move edx x)
                    (move edi y)
-                   (inst lea ecx (make-ea :dword
-                                          :disp (make-fixup ',name :assembly-routine)))
-                   (inst call ecx)))))
+                   (inst call (make-fixup ',name :assembly-routine))))))
 
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
@@ -279,16 +273,11 @@
                :from (:argument 1))
               edi)
 
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-               :from :eval)
-              ecx)
   (:conditional :e)
   (:generator 10
     (move edx x)
     (move edi y)
-    (inst lea ecx (make-ea :dword
-                           :disp (make-fixup 'generic-eql :assembly-routine)))
-    (inst call ecx)))
+    (inst call (make-fixup 'generic-eql :assembly-routine))))
 
 #+sb-assembling
 (define-assembly-routine (generic-=
@@ -341,16 +330,11 @@
                :from (:argument 1))
               edi)
 
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-               :from :eval)
-              ecx)
   (:conditional :e)
   (:generator 10
     (move edx x)
     (move edi y)
-    (inst lea ecx (make-ea :dword
-                           :disp (make-fixup 'generic-= :assembly-routine)))
-    (inst call ecx)))
+    (inst call (make-fixup 'generic-= :assembly-routine))))
 
 
 ;;; Support for the Mersenne Twister, MT19937, random number generator
