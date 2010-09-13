@@ -88,7 +88,13 @@
   (setf (stream-open-p stream) nil)
   t)
 
-(setf (fdefinition 'close) #'pcl-close)
+(progn
+  ;; KLUDGE: Get in a call to PCL-CLOSE with a string-output-stream before
+  ;; setting it as CLOSE. Otherwise using NAMED-LAMBDAs as DFUNs causes a
+  ;; vicious metacircle from FORMAT NIL somewhere in the compiler. This is
+  ;; enough to get the dispatch settled down before we need it.
+  (pcl-close (make-string-output-stream))
+  (setf (fdefinition 'close) #'pcl-close))
 
 (let ()
   (fmakunbound 'input-stream-p)

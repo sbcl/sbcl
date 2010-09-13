@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.42
   * enhancement: SB-EXT:WORD type is provided for use with SB-EXT:ATOMIC-INCF
     &co.
+  * enhancement: CLOS effective method functions and defclass slot typechecking
+    function now have debug names for use in backtraces and profiles.
   * enhancement: ASDF has been updated to version 2.004. (lp#605260, thanks to
     Faré Rideau)
   * enhancement: symbols are printed using fully qualified names in several

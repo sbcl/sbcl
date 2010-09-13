@@ -366,6 +366,26 @@
                           '(((lambda (x)) 13)
                             ((lambda (y)) 13))))
 
+(with-test (:name :clos-slot-typecheckfun-named)
+  (assert
+   (verify-backtrace
+    (lambda ()
+      (eval `(locally (declare (optimize safety))
+               (defclass clos-typecheck-test ()
+                 ((slot :type fixnum)))
+               (setf (slot-value (make-instance 'clos-typecheck-test) 'slot) t))))
+    '(((sb-pcl::slot-typecheck clos-typecheck-test slot) t)))))
+
+(with-test (:name :clos-emf-named)
+  (assert
+   (verify-backtrace
+    (lambda ()
+      (eval `(progn
+               (defmethod clos-emf-named-test ((x symbol)) x)
+               (defmethod clos-emf-named-test :before (x) (assert x))
+               (clos-emf-named-test nil))))
+    '(((sb-pcl::emf clos-emf-named-test) ? ? nil)))))
+
 ;;;; test TRACE
 
 (defun trace-this ()

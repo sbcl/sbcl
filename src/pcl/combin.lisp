@@ -229,18 +229,19 @@
              ;; Otherwise the METHOD-COMBINATION slot is not bound.
              (let ((combin (generic-function-method-combination gf)))
                (and (long-method-combination-p combin)
-                    (long-method-combination-args-lambda-list combin))))))
+                    (long-method-combination-args-lambda-list combin)))))
+          (name `(emf ,(generic-function-name gf))))
       (cond
         (error-p
-         `(lambda (.pv. .next-method-call. &rest .args.)
-           (declare (ignore .pv. .next-method-call.))
-           (declare (ignorable .args.))
-           (flet ((%no-primary-method (gf args)
-                    (call-no-primary-method gf args))
-                  (%invalid-qualifiers (gf combin method)
-                    (invalid-qualifiers gf combin method)))
-             (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
-             ,effective-method)))
+         `(named-lambda ,name (.pv. .next-method-call. &rest .args.)
+            (declare (ignore .pv. .next-method-call.))
+            (declare (ignorable .args.))
+            (flet ((%no-primary-method (gf args)
+                     (call-no-primary-method gf args))
+                   (%invalid-qualifiers (gf combin method)
+                     (invalid-qualifiers gf combin method)))
+              (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
+              ,effective-method)))
         (mc-args-p
          (let* ((required (make-dfun-required-args nreq))
                 (gf-args (if applyp
@@ -250,17 +251,17 @@
                                       (the (and unsigned-byte fixnum)
                                         .dfun-more-count.)))
                              `(list ,@required))))
-           `(lambda ,ll
-             (declare (ignore .pv. .next-method-call.))
-             (let ((.gf-args. ,gf-args))
-               (declare (ignorable .gf-args.))
-               ,@check-applicable-keywords
-               ,effective-method))))
+           `(named-lambda ,name ,ll
+              (declare (ignore .pv. .next-method-call.))
+              (let ((.gf-args. ,gf-args))
+                (declare (ignorable .gf-args.))
+                ,@check-applicable-keywords
+                ,effective-method))))
         (t
-         `(lambda ,ll
-           (declare (ignore ,@(if error-p ll '(.pv. .next-method-call.))))
-           ,@check-applicable-keywords
-           ,effective-method))))))
+         `(named-lambda ,name ,ll
+            (declare (ignore ,@(if error-p ll '(.pv. .next-method-call.))))
+            ,@check-applicable-keywords
+            ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
   (declare (ignore gf metatypes applyp env))

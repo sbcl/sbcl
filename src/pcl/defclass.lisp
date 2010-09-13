@@ -234,10 +234,11 @@
         (let* ((type-check-function
                 (if (eq type t)
                     nil
-                    `('type-check-function (lambda (value)
-                                             (declare (type ,type value)
-                                                      (optimize (sb-c:store-coverage-data 0)))
-                                             value))))
+                    `('type-check-function
+                      (named-lambda (slot-typecheck ,class-name ,name) (value)
+                        (declare (type ,type value)
+                                 (optimize (sb-c:store-coverage-data 0)))
+                        value))))
                (canon `(:name ',name :readers ',readers :writers ',writers
                               :initargs ',initargs
                               ,@type-check-function

@@ -64,9 +64,9 @@
 
 (defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
 
-(defmacro define-internal-pcl-function-name-syntax (name &body body)
+(defmacro define-internal-pcl-function-name-syntax (name (var) &body body)
   `(progn
-     (define-function-name-syntax ,name ,@body)
+     (define-function-name-syntax ,name (,var) ,@body)
      (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
 
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
