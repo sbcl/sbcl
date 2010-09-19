@@ -133,9 +133,6 @@ corresponds to NAME, or NIL if there is none."
 ;;; layer.
 (define-alien-type fd-mask unsigned-long)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant fd-setsize 1024))
-
 (define-alien-type nil
   (struct fd-set
           (fds-bits (array fd-mask #.(/ fd-setsize

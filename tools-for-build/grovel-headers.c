@@ -41,6 +41,7 @@
 #endif
 
 #include <sys/stat.h>
+#include <sys/select.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
@@ -248,6 +249,8 @@ main(int argc, char *argv[])
     defconstant ("rtld-global", RTLD_GLOBAL);
 
     printf("(in-package \"SB!UNIX\")\n\n");
+
+    defconstant("fd-setsize", FD_SETSIZE);
 
     printf(";;; langinfo\n");
     defconstant("codeset", CODESET);
