@@ -189,22 +189,32 @@
 
 (defun order-uvl-sets (component)
   (clear-flags component)
+  ;; KLUDGE: Workaround for lp#308914: we keep track of number of blocks
+  ;; needing repeats, and bug out if we get stuck.
   (loop with head = (component-head component)
-        with repeat-p do
-        (setq repeat-p nil)
-        (do-blocks (block component)
-          (unless (block-flag block)
-            (let ((pred (find-if #'block-flag (block-pred block))))
-              (when (and (eq pred head)
-                         (not (bind-p (block-start-node block))))
-                (let ((entry (nle-block-entry-block block)))
-                  (setq pred (if (block-flag entry) entry nil))))
-              (cond (pred
-                     (setf (block-flag block) t)
-                     (order-block-uvl-sets block pred))
-                    (t
-                     (setq repeat-p t))))))
-        while repeat-p))
+        with todo = 0
+        with last-todo = 0
+        do (psetq last-todo todo
+                  todo 0)
+        do (do-blocks (block component)
+             (unless (block-flag block)
+               (let ((pred (find-if #'block-flag (block-pred block))))
+                 (when (and (eq pred head)
+                            (not (bind-p (block-start-node block))))
+                   (let ((entry (nle-block-entry-block block)))
+                     (setq pred (if (block-flag entry) entry nil))))
+                 (cond (pred
+                        (setf (block-flag block) t)
+                        (order-block-uvl-sets block pred))
+                       (t
+                        (incf todo))))))
+        do (when (= last-todo todo)
+             ;; If the todo count is the same as on last iteration, it means
+             ;; we are stuck, which in turn means the unmarked blocks are
+             ;; actually unreachable, so UVL set ordering for them doesn't
+             ;; matter.
+             (return-from order-uvl-sets))
+        while (plusp todo)))
 
 ;;; This is called when we discover that the stack-top unknown-values
 ;;; lvar at the end of BLOCK1 is different from that at the start of

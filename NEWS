@@ -43,6 +43,7 @@ changes relative to sbcl-1.0.42
     DEFUN when the symbol previously had a macro definition. (lp#576637)
   * bug fix: spurious ignore warnings even given (DECLARE IGNORE) in methods
     when parameter bindings mutated.  (reported by Faré Rideau; lp #611361)
+  * bug fix: workaround for compiler hang in ORDER-UVL-SETS (lp#308914)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
 

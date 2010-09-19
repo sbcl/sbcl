@@ -1209,6 +1209,24 @@
       (bug-308951-foo z)
       (values x)))
   (assert (= 4 (bug-308951-bar 1))))
+
+(declaim (inline bug-308914-storage))
+(defun bug-308914-storage (x)
+  (the (simple-array flt (*)) (bug-308914-unknown x)))
+
+(with-test (:name :bug-308914-workaround)
+  ;; This used to hang in ORDER-UVL-SETS.
+  (handler-case
+      (with-timeout 10
+        (compile nil
+                 `(lambda (lumps &key cg)
+                    (let ((nodes (map 'list (lambda (lump)
+                                              (bug-308914-storage lump))
+                                      lumps)))
+                      (setf (aref nodes 0) 2)
+                      (assert (every #'~= (apply #'concatenate 'list nodes) '(2 3 6 9)))))))
+    (sb-ext:timeout ()
+      (error "Hang in ORDER-UVL-SETS?"))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
