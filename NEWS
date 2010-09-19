@@ -1,5 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.42
+  * incompatible change: FD-STREAMS no longer participate in the serve-event
+    event-loop by default.
+    ** In addition to streams created by explicit calls to MAKE-FD-STREAM this
+       affects streams from CL:OPEN.
+    ** Streams from SOCKET-MAKE-STREAM still participate in serve-event by
+       default, but this is liable to change: applications needing serve-event
+       for socket streams should explicitly request it using :SERVE-EVENTS T
+       in the call.
   * enhancement: SB-EXT:WORD type is provided for use with SB-EXT:ATOMIC-INCF
     &co.
   * enhancement: CLOS effective method functions and defclass slot typechecking
@@ -9,8 +17,8 @@ changes relative to sbcl-1.0.42
   * enhancement: symbols are printed using fully qualified names in several
     error and warning messages which are often associated with package
     conflicts or mixups (lp#622789, thanks to Attila Lendvai)
-  * optimization: use poll(2) instead of select(2) to check for blocking IO
-    on a single FD.
+  * optimization: where available, use poll(2) instead of select(2) to check
+    for blocking IO on a single FD.
   * bug fix: SB-BSD-SOCKETS:SOCKET-CONNECT was not thread safe. (lp#505497,
     thanks to Andrew Golding)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to

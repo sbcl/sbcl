@@ -258,6 +258,7 @@ main(int argc, char *argv[])
     defconstant("pollin", POLLIN);
     defconstant("pollout", POLLOUT);
     defconstant("pollpri", POLLPRI);
+    defconstant("pollhup", POLLHUP);
     DEFTYPE("nfds-t", nfds_t);
 
     printf(";;; langinfo\n");

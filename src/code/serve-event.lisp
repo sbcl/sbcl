@@ -138,42 +138,81 @@
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
 
+;;; When a *periodic-polling-function* is defined the server will not
+;;; block for more than the maximum event timeout and will call the
+;;; polling function if it does time out.
+(declaim (type (or null symbol function) *periodic-polling-function*))
+(defvar *periodic-polling-function* nil
+  "Either NIL, or a designator for a function callable without any
+arguments. Called when the system has been waiting for input for
+longer then *PERIODIC-POLLING-PERIOD* seconds. Shared between all
+threads, unless locally bound. EXPERIMENTAL.")
+(declaim (real *periodic-polling-period*))
+(defvar *periodic-polling-period* 0
+  "A real number designating the number of seconds to wait for input
+at maximum, before calling the *PERIODIC-POLLING-FUNCTION* \(if any.)
+Shared between all threads, unless locally bound. EXPERIMENTAL.")
+
 ;;; Wait until FD is usable for DIRECTION. The timeout given to serve-event is
 ;;; recalculated each time through the loop so that WAIT-UNTIL-FD-USABLE will
 ;;; timeout at the correct time irrespective of how many events are handled in
 ;;; the meantime.
-(defun wait-until-fd-usable (fd direction &optional timeout)
+(defun wait-until-fd-usable (fd direction &optional timeout (serve-events t))
   #!+sb-doc
   "Wait until FD is usable for DIRECTION. DIRECTION should be either :INPUT or
 :OUTPUT. TIMEOUT, if supplied, is the number of seconds to wait before giving
-up."
-  (prog (usable)
+up. Returns true once the FD is usable, NIL return indicates timeout.
+
+If SERVE-EVENTS is true (the default), events on other FDs are served while
+waiting."
+  (tagbody
    :restart
      (multiple-value-bind (to-sec to-usec stop-sec stop-usec signalp)
          (decode-timeout timeout)
        (declare (type (or integer null) to-sec to-usec))
-       (with-fd-handler (fd direction (lambda (fd)
-                                        (declare (ignore fd))
-                                        (setf usable t)))
-         (loop
-           (sub-serve-event to-sec to-usec signalp)
-           (when usable
-             (return-from wait-until-fd-usable t))
-           (when to-sec
-             (multiple-value-bind (sec usec)
-                 (decode-internal-time (get-internal-real-time))
-               (setf to-sec (- stop-sec sec))
-               (cond ((> usec stop-usec)
-                      (decf to-sec)
-                      (setf to-usec (- (+ stop-usec 1000000) usec)))
-                     (t
-                      (setf to-usec (- stop-usec usec)))))
-             (when (or (minusp to-sec) (minusp to-usec))
-               (if signalp
-                   (progn
-                     (signal-deadline)
-                     (go :restart))
-                   (return-from wait-until-fd-usable nil)))))))))
+       (flet ((maybe-update-timeout ()
+                ;; If we return early, recompute the timeouts, possibly
+                ;; signaling the deadline or returning with NIL to caller.
+                (multiple-value-bind (sec usec)
+                    (decode-internal-time (get-internal-real-time))
+                  (setf to-sec (- stop-sec sec))
+                  (cond ((> usec stop-usec)
+                         (decf to-sec)
+                         (setf to-usec (- (+ stop-usec 1000000) usec)))
+                        (t
+                         (setf to-usec (- stop-usec usec)))))
+                (when (or (minusp to-sec) (and (zerop to-sec) (not (plusp to-usec))))
+                  (cond (signalp
+                         (signal-deadline)
+                         (go :restart))
+                        (t
+                         (return-from wait-until-fd-usable nil))))))
+         (if (and serve-events
+                  ;; No timeout or non-zero timeout
+                  (or (not to-sec)
+                      (not (= 0 to-sec to-usec)))
+                  ;; Something to do while we wait
+                  (or *descriptor-handlers* *periodic-polling-function*))
+             ;; Loop around SUB-SERVE-EVENT till done.
+             (dx-let ((usable (list nil)))
+               (dx-flet ((usable! (fd)
+                                  (declare (ignore fd))
+                                  (setf (car usable) t)))
+                 (with-fd-handler (fd direction #'usable!)
+                   (loop
+                     (sub-serve-event to-sec to-usec signalp)
+                     (when (car usable)
+                       (return-from wait-until-fd-usable t))
+                     (when to-sec
+                       (maybe-update-timeout))))))
+             ;; If we don't have to serve events, just poll on the single FD instead.
+             (loop for to-msec = (if (and to-sec to-usec)
+                                     (+ (* 1000 to-sec) (truncate to-usec 1000))
+                                     -1)
+                   when (sb!unix:unix-simple-poll fd direction to-msec)
+                   do (return-from wait-until-fd-usable t)
+                   else
+                   do (when to-sec (maybe-update-timeout))))))))
 
 ;;; Wait for up to timeout seconds for an event to happen. Make sure all
 ;;; pending events are processed before returning.
@@ -200,21 +239,6 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
       (decode-timeout timeout)
     (declare (ignore stop-sec stop-usec))
     (sub-serve-event to-sec to-usec signalp)))
-
-;;; When a *periodic-polling-function* is defined the server will not
-;;; block for more than the maximum event timeout and will call the
-;;; polling function if it does time out.
-(declaim (type (or null symbol function) *periodic-polling-function*))
-(defvar *periodic-polling-function* nil
-  "Either NIL, or a designator for a function callable without any
-arguments. Called when the system has been waiting for input for
-longer then *PERIODIC-POLLING-PERIOD* seconds. Shared between all
-threads, unless locally bound. EXPERIMENTAL.")
-(declaim (real *periodic-polling-period*))
-(defvar *periodic-polling-period* 0
-  "A real number designating the number of seconds to wait for input
-at maximum, before calling the *PERIODIC-POLLING-FUNCTION* \(if any.)
-Shared between all threads, unless locally bound. EXPERIMENTAL.")
 
 ;;; Takes timeout broken into seconds and microseconds, NIL timeout means
 ;;; to wait as long as needed.

@@ -1245,7 +1245,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (lambda (condition stream)
      (declare (type stream stream))
      (format stream
-             "I/O timeout ~(~A~)ing ~S."
+             "I/O timeout while doing ~(~A~) on ~S."
              (io-timeout-direction condition)
              (stream-error-stream condition)))))
 

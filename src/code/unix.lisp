@@ -570,8 +570,6 @@ corresponds to NAME, or NIL if there is none."
                       (slot usage 'ru-nivcsw))
               who (addr usage))))
 
-;;;; poll.h
-
 (defvar *on-dangerous-wait* :warn)
 
 ;;; Calling select in a bad place can hang in a nasty manner, so it's better
@@ -594,32 +592,36 @@ corresponds to NAME, or NIL if there is none."
                type)
        (sb!debug:backtrace)))
     nil))
+
+;;;; poll.h
+#!+os-provides-poll
+(progn
+  (define-alien-type nil
+      (struct pollfd
+              (fd      int)
+              (events  short)           ; requested events
+              (revents short)))         ; returned events
 
-(define-alien-type nil
-  (struct pollfd
-    (fd      int)
-    (events  short)   ; requested events
-    (revents short))) ; returned events
-
-;; Just for a single fd.
-(defun unix-simple-poll (fd direction to-msec)
-  (declare (fixnum fd to-msec))
-  (when (and (minusp to-msec) (not *interrupts-enabled*))
-    (note-dangerous-wait "poll(2)"))
-  (let ((events (ecase direction
-                  (:input (logior pollin pollpri))
-                  (:output pollout))))
-    (with-alien ((fds (struct pollfd)))
-      (sb!unix:with-restarted-syscall (count errno)
-        (progn
-          (setf (slot fds 'fd) fd
-                (slot fds 'events) events
-                (slot fds 'revents) 0)
-          (int-syscall ("poll" (* (struct pollfd)) int int)
-                       (addr fds) 1 to-msec))
-        (if (zerop errno)
-            (and (eql 1 count) (logtest events (slot fds 'revents)))
-            (error "Syscall poll(2) failed: ~A" (strerror)))))))
+  (defun unix-simple-poll (fd direction to-msec)
+    (declare (fixnum fd to-msec))
+    (when (and (minusp to-msec) (not *interrupts-enabled*))
+      (note-dangerous-wait "poll(2)"))
+    (let ((events (ecase direction
+                    (:input (logior pollin pollpri))
+                    (:output pollout))))
+      (with-alien ((fds (struct pollfd)))
+        (with-restarted-syscall (count errno)
+          (progn
+            (setf (slot fds 'fd) fd
+                  (slot fds 'events) events
+                  (slot fds 'revents) 0)
+            (int-syscall ("poll" (* (struct pollfd)) int int)
+                         (addr fds) 1 to-msec))
+          (if (zerop errno)
+              (let ((revents (slot fds 'revents)))
+                (or (and (eql 1 count) (logtest events revents))
+                    (logtest pollhup revents)))
+              (error "Syscall poll(2) failed: ~A" (strerror))))))))
 
 ;;;; sys/select.h
 
@@ -707,6 +709,65 @@ corresponds to NAME, or NIL if there is none."
                        (fd-set-to-num nfds xpf))
                nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
                (if to-secs (alien-sap (addr tv)) (int-sap 0))))))
+
+;;; Lisp-side implmentations of FD_FOO macros. Abandon all hope who enters
+;;; here...
+;;;
+(defmacro fd-set (offset fd-set)
+  (with-unique-names (word bit)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+                                              sb!vm:n-machine-word-bits)
+       (setf (deref (slot ,fd-set 'fds-bits) ,word)
+             (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                                (ash 1 ,bit))
+                     (deref (slot ,fd-set 'fds-bits) ,word))))))
+
+(defmacro fd-clr (offset fd-set)
+  (with-unique-names (word bit)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+                                              sb!vm:n-machine-word-bits)
+       (setf (deref (slot ,fd-set 'fds-bits) ,word)
+             (logand (deref (slot ,fd-set 'fds-bits) ,word)
+                     (sb!kernel:word-logical-not
+                      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                                 (ash 1 ,bit))))))))
+
+(defmacro fd-isset (offset fd-set)
+  (with-unique-names (word bit)
+    `(multiple-value-bind (,word ,bit) (floor ,offset
+                                              sb!vm:n-machine-word-bits)
+       (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))
+
+(defmacro fd-zero (fd-set)
+  `(progn
+     ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
+         collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
+
+#!-os-provides-poll
+(defun unix-simple-poll (fd direction to-msec)
+  (multiple-value-bind (to-sec to-usec)
+      (if (minusp to-msec)
+          (values nil nil)
+          (multiple-value-bind (to-sec to-msec2) (truncate to-msec 1000)
+            (values to-sec (* to-msec2 1000))))
+    (sb!unix:with-restarted-syscall (count errno)
+      (sb!alien:with-alien ((fds (sb!alien:struct sb!unix:fd-set)))
+        (sb!unix:fd-zero fds)
+        (sb!unix:fd-set fd fds)
+        (multiple-value-bind (read-fds write-fds)
+            (ecase direction
+              (:input
+               (values (addr fds) nil))
+              (:output
+               (values nil (addr fds))))
+          (sb!unix:unix-fast-select (1+ fd)
+                                    read-fds write-fds nil
+                                    to-sec to-usec)))
+      (case count
+        ((1) t)
+        ((0) nil)
+        (otherwise
+         (error "Syscall select(2) failed on fd ~D: ~A" fd (strerror)))))))
 
 ;;;; sys/stat.h
 
@@ -1121,43 +1182,3 @@ the UNIX epoch (January 1st 1970.)"
 ;;;; the headers that may or may not be the same thing. To be
 ;;;; investigated. -- CSR, 2002-03-25
 (defconstant wstopped #o177)
-
-
-;;;; stuff not yet found in the header files
-;;;;
-;;;; Abandon all hope who enters here...
-
-;;; not checked for linux...
-(defmacro fd-set (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (setf (deref (slot ,fd-set 'fds-bits) ,word)
-             (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-                                (ash 1 ,bit))
-                     (deref (slot ,fd-set 'fds-bits) ,word))))))
-
-;;; not checked for linux...
-(defmacro fd-clr (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (setf (deref (slot ,fd-set 'fds-bits) ,word)
-             (logand (deref (slot ,fd-set 'fds-bits) ,word)
-                     (sb!kernel:word-logical-not
-                      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-                                 (ash 1 ,bit))))))))
-
-;;; not checked for linux...
-(defmacro fd-isset (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))
-
-;;; not checked for linux...
-(defmacro fd-zero (fd-set)
-  `(progn
-     ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
-         collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
-

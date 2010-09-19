@@ -9,7 +9,7 @@ cd ./tools-for-build > /dev/null
 featurep() {
     bin="$1-test"
     rm -f $bin
-    $GNUMAKE $bin -I ../src/runtime > /dev/null 2>&1 && ./$bin > /dev/null 2>&1
+    $GNUMAKE $bin -I ../src/runtime > /dev/null 2>&1 && echo "input" | ./$bin> /dev/null 2>&1
     if [ "$?" = 104 ]
     then
         printf " :$1"
@@ -30,3 +30,5 @@ featurep os-provides-blksize-t
 featurep os-provides-suseconds-t
 
 featurep os-provides-getprotoby-r
+
+featurep os-provides-poll

@@ -185,7 +185,8 @@
                 (not (equalp-with-case r (vals entry)))))
 
       (when (pend entry)
-        (let ((*print-circle* *print-circle-on-failure*))
+        (let ((*print-circle* *print-circle-on-failure*)
+              (*print-escape* nil))
           (format s "~&Test ~:@(~S~) failed~
                    ~%Form: ~S~
                    ~%Expected value~P: ~

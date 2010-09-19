@@ -381,12 +381,17 @@ for the stream."))
                                (buffering :full)
                                (external-format :default)
                                timeout
-                               auto-close)
-  "Default method for SOCKET objects. An ELEMENT-TYPE of :DEFAULT will
-construct a bivalent stream. Acceptable values for BUFFERING are :FULL, :LINE
+                               auto-close
+                               (serve-events t))
+  "Default method for SOCKET objects.
+
+An ELEMENT-TYPE of :DEFAULT will construct a bivalent stream, capable of both
+binary and character IO. Acceptable values for BUFFERING are :FULL, :LINE
 and :NONE. Streams will have no TIMEOUT by default. If AUTO-CLOSE is true, the
 underlying OS socket is automatically closed after the stream and the socket
-have been garbage collected.
+have been garbage collected. If SERVE-EVENTS is true, blocking IO on the
+socket will dispatch to the recursive event loop -- the default is currently
+true, but this liable to change.
 
 The stream for SOCKET will be cached, and a second invocation of this method
 will return the same stream. This may lead to oddities if this function is
@@ -407,8 +412,9 @@ and get an output stream in response\)."
                     :buffering buffering
                     :external-format external-format
                     :timeout timeout
-                    :auto-close auto-close)))
-      (setf (slot-value socket 'stream) stream)
+                    :auto-close auto-close
+                    :serve-events serve-events))
+      (setf (slot-value socket 'stream) stream))
     (sb-ext:cancel-finalization socket)
     stream))
 
