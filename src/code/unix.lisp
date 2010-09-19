@@ -625,6 +625,14 @@ corresponds to NAME, or NIL if there is none."
 
 ;;;; sys/select.h
 
+(defmacro with-fd-setsize ((n) &body body)
+  `(let ((,n (if (< 0 ,n fd-setsize)
+                 ,n
+                 (error "Cannot select(2) on ~D: above FD_SETSIZE limit."
+                        (1- num-descriptors)))))
+     (declare (type (integer 0 #.fd-setsize) ,n))
+     ,@body))
+
 ;;;; FIXME: Why have both UNIX-SELECT and UNIX-FAST-SELECT?
 
 ;;; Perform the UNIX select(2) system call.
@@ -632,24 +640,25 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-fast-select (num-descriptors
                          read-fds write-fds exception-fds
                          timeout-secs timeout-usecs)
-  (declare (type (integer 0 #.fd-setsize) num-descriptors)
+  (declare (type integer num-descriptors)
            (type (or (alien (* (struct fd-set))) null)
                  read-fds write-fds exception-fds)
            (type (or null (unsigned-byte 31)) timeout-secs timeout-usecs))
-  (flet ((select (tv-sap)
-           (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-                                  (* (struct fd-set)) (* (struct timeval)))
-                        num-descriptors read-fds write-fds exception-fds
-                        tv-sap)))
-    (cond ((or timeout-secs timeout-usecs)
-           (with-alien ((tv (struct timeval)))
-             (setf (slot tv 'tv-sec) (or timeout-secs 0))
-             (setf (slot tv 'tv-usec) (or timeout-usecs 0))
-             (select (alien-sap (addr tv)))))
-          (t
-           (unless *interrupts-enabled*
-             (note-dangerous-wait "select(2)"))
-           (select (int-sap 0))))))
+  (with-fd-setsize (num-descriptors)
+    (flet ((select (tv-sap)
+             (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+                                    (* (struct fd-set)) (* (struct timeval)))
+                          num-descriptors read-fds write-fds exception-fds
+                          tv-sap)))
+      (cond ((or timeout-secs timeout-usecs)
+             (with-alien ((tv (struct timeval)))
+               (setf (slot tv 'tv-sec) (or timeout-secs 0))
+               (setf (slot tv 'tv-usec) (or timeout-usecs 0))
+               (select (alien-sap (addr tv)))))
+            (t
+             (unless *interrupts-enabled*
+               (note-dangerous-wait "select(2)"))
+             (select (int-sap 0)))))))
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
@@ -680,35 +689,36 @@ corresponds to NAME, or NIL if there is none."
 ;;; they are ready for reading and writing. See the UNIX Programmer's
 ;;; Manual for more information.
 (defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
-  (declare (type (integer 0 #.fd-setsize) nfds)
+  (declare (type integer nfds)
            (type unsigned-byte rdfds wrfds xpfds)
            (type (or (unsigned-byte 31) null) to-secs)
            (type (unsigned-byte 31) to-usecs)
            (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
-  (with-alien ((tv (struct timeval))
-               (rdf (struct fd-set))
-               (wrf (struct fd-set))
-               (xpf (struct fd-set)))
-    (cond (to-secs
-           (setf (slot tv 'tv-sec) to-secs
-                 (slot tv 'tv-usec) to-usecs))
-          ((not *interrupts-enabled*)
-           (note-dangerous-wait "select(2)")))
-    (num-to-fd-set rdf rdfds)
-    (num-to-fd-set wrf wrfds)
-    (num-to-fd-set xpf xpfds)
-    (macrolet ((frob (lispvar alienvar)
-                 `(if (zerop ,lispvar)
-                      (int-sap 0)
-                      (alien-sap (addr ,alienvar)))))
-      (syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
-                         (* (struct fd-set)) (* (struct timeval)))
-               (values result
-                       (fd-set-to-num nfds rdf)
-                       (fd-set-to-num nfds wrf)
-                       (fd-set-to-num nfds xpf))
-               nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
-               (if to-secs (alien-sap (addr tv)) (int-sap 0))))))
+  (with-fd-setsize (nfds)
+    (with-alien ((tv (struct timeval))
+                 (rdf (struct fd-set))
+                 (wrf (struct fd-set))
+                 (xpf (struct fd-set)))
+      (cond (to-secs
+             (setf (slot tv 'tv-sec) to-secs
+                   (slot tv 'tv-usec) to-usecs))
+            ((not *interrupts-enabled*)
+             (note-dangerous-wait "select(2)")))
+      (num-to-fd-set rdf rdfds)
+      (num-to-fd-set wrf wrfds)
+      (num-to-fd-set xpf xpfds)
+      (macrolet ((frob (lispvar alienvar)
+                   `(if (zerop ,lispvar)
+                        (int-sap 0)
+                        (alien-sap (addr ,alienvar)))))
+        (syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+                           (* (struct fd-set)) (* (struct timeval)))
+                 (values result
+                         (fd-set-to-num nfds rdf)
+                         (fd-set-to-num nfds wrf)
+                         (fd-set-to-num nfds xpf))
+                 nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
+                 (if to-secs (alien-sap (addr tv)) (int-sap 0)))))))
 
 ;;; Lisp-side implmentations of FD_FOO macros. Abandon all hope who enters
 ;;; here...

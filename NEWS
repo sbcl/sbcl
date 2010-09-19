@@ -1,7 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.42
   * incompatible change: FD-STREAMS no longer participate in the serve-event
-    event-loop by default.
+    event-loop by default. (lp#316072)
     ** In addition to streams created by explicit calls to MAKE-FD-STREAM this
        affects streams from CL:OPEN.
     ** Streams from SOCKET-MAKE-STREAM still participate in serve-event by
@@ -17,10 +17,9 @@ changes relative to sbcl-1.0.42
   * enhancement: symbols are printed using fully qualified names in several
     error and warning messages which are often associated with package
     conflicts or mixups (lp#622789, thanks to Attila Lendvai)
-  * optimization: where available, use poll(2) instead of select(2) to check
-    for blocking IO on a single FD.
   * bug fix: SB-BSD-SOCKETS:SOCKET-CONNECT was not thread safe. (lp#505497,
     thanks to Andrew Golding)
+  * bug fix: reading /proc files on Linux works. (lp#425199)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to
     Roman Marynchak)
   * bug fix: WRITE-TO-STRING compiler macro binding special variable names,
@@ -56,6 +55,8 @@ changes relative to sbcl-1.0.42
   * bug fix: workaround for compiler hang in ORDER-UVL-SETS (lp#308914)
   * bug fix: evaluation in debugger REPL works using the global context when
     in frames that do not have sufficient debug information.
+  * bug fix: exceeding FD_SETSIZE limit now results in an sensible error
+    (lp#316068)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

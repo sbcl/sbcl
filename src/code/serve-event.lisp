@@ -72,6 +72,8 @@
   (unless (member direction '(:input :output))
     ;; FIXME: should be TYPE-ERROR?
     (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
+  (unless (<= 0 fd (1- sb!unix:fd-setsize))
+    (error "Cannot add an FD handler for ~D: not under FD_SETSIZE limit." fd))
   (let ((handler (make-handler direction fd function)))
     (with-descriptor-handlers
       (push handler *descriptor-handlers*))
