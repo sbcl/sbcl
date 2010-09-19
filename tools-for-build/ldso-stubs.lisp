@@ -260,6 +260,7 @@ ldso_stub__ ## fct: ;                  \\
                    "open"
                    "opendir"
                    "pipe"
+                   "poll"
                    "pow"
                    "read"
                    "readdir"

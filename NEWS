@@ -9,6 +9,8 @@ changes relative to sbcl-1.0.42
   * enhancement: symbols are printed using fully qualified names in several
     error and warning messages which are often associated with package
     conflicts or mixups (lp#622789, thanks to Attila Lendvai)
+  * optimization: use poll(2) instead of select(2) to check for blocking IO
+    on a single FD.
   * bug fix: SB-BSD-SOCKETS:SOCKET-CONNECT was not thread safe. (lp#505497,
     thanks to Andrew Golding)
   * bug fix: DOTIMES accepted literal non-integer reals. (lp#619393, thanks to

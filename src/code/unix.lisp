@@ -570,28 +570,58 @@ corresponds to NAME, or NIL if there is none."
                       (slot usage 'ru-nivcsw))
               who (addr usage))))
 
-;;;; sys/select.h
+;;;; poll.h
 
-(defvar *on-dangerous-select* :warn)
+(defvar *on-dangerous-wait* :warn)
 
 ;;; Calling select in a bad place can hang in a nasty manner, so it's better
 ;;; to have some way to detect these.
-(defun note-dangerous-select ()
-  (let ((action *on-dangerous-select*)
-        (*on-dangerous-select* nil))
+(defun note-dangerous-wait (type)
+  (let ((action *on-dangerous-wait*)
+        (*on-dangerous-wait* nil))
     (case action
       (:warn
-       (warn "Starting a select without a timeout while interrupts are ~
-             disabled."))
+       (warn "Starting a ~A without a timeout while interrupts are ~
+             disabled."
+             type))
       (:error
-       (error "Starting a select without a timeout while interrupts are ~
-              disabled."))
+       (error "Starting a ~A without a timeout while interrupts are ~
+              disabled."
+              type))
       (:backtrace
-       (write-line
-        "=== Starting a select without a timeout while interrupts are disabled. ==="
-        *debug-io*)
+       (format *debug-io*
+               "~&=== Starting a ~A without a timeout while interrupts are disabled. ===~%"
+               type)
        (sb!debug:backtrace)))
     nil))
+
+(define-alien-type nil
+  (struct pollfd
+    (fd      int)
+    (events  short)   ; requested events
+    (revents short))) ; returned events
+
+;; Just for a single fd.
+(defun unix-simple-poll (fd direction to-msec)
+  (declare (fixnum fd to-msec))
+  (when (and (minusp to-msec) (not *interrupts-enabled*))
+    (note-dangerous-wait "poll(2)"))
+  (let ((events (ecase direction
+                  (:input (logior pollin pollpri))
+                  (:output pollout))))
+    (with-alien ((fds (struct pollfd)))
+      (sb!unix:with-restarted-syscall (count errno)
+        (progn
+          (setf (slot fds 'fd) fd
+                (slot fds 'events) events
+                (slot fds 'revents) 0)
+          (int-syscall ("poll" (* (struct pollfd)) int int)
+                       (addr fds) 1 to-msec))
+        (if (zerop errno)
+            (and (eql 1 count) (logtest events (slot fds 'revents)))
+            (error "Syscall poll(2) failed: ~A" (strerror)))))))
+
+;;;; sys/select.h
 
 ;;;; FIXME: Why have both UNIX-SELECT and UNIX-FAST-SELECT?
 
@@ -616,7 +646,7 @@ corresponds to NAME, or NIL if there is none."
              (select (alien-sap (addr tv)))))
           (t
            (unless *interrupts-enabled*
-             (note-dangerous-select))
+             (note-dangerous-wait "select(2)"))
            (select (int-sap 0))))))
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
@@ -661,7 +691,7 @@ corresponds to NAME, or NIL if there is none."
            (setf (slot tv 'tv-sec) to-secs
                  (slot tv 'tv-usec) to-usecs))
           ((not *interrupts-enabled*)
-           (note-dangerous-select)))
+           (note-dangerous-wait "select(2)")))
     (num-to-fd-set rdf rdfds)
     (num-to-fd-set wrf wrfds)
     (num-to-fd-set xpf xpfds)

@@ -17,7 +17,7 @@
 (use-package :test-util)
 (use-package "ASSERTOID")
 
-(setf sb-unix::*on-dangerous-select* :error)
+(setf sb-unix::*on-dangerous-wait* :error)
 
 (defun wait-for-threads (threads)
   (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)

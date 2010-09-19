@@ -32,6 +32,8 @@
   #include <shlobj.h>
   #undef boolean
 #else
+  #include <poll.h>
+  #include <sys/select.h>
   #include <sys/times.h>
   #include <sys/wait.h>
   #include <sys/ioctl.h>
@@ -41,7 +43,6 @@
 #endif
 
 #include <sys/stat.h>
-#include <sys/select.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
@@ -250,7 +251,14 @@ main(int argc, char *argv[])
 
     printf("(in-package \"SB!UNIX\")\n\n");
 
+    printf(";;; select()\n");
     defconstant("fd-setsize", FD_SETSIZE);
+
+    printf(";;; poll()\n");
+    defconstant("pollin", POLLIN);
+    defconstant("pollout", POLLOUT);
+    defconstant("pollpri", POLLPRI);
+    DEFTYPE("nfds-t", nfds_t);
 
     printf(";;; langinfo\n");
     defconstant("codeset", CODESET);

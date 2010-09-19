@@ -941,20 +941,7 @@
   ;; This answers T at EOF on win32, I think.
   (not (sb!win32:fd-listen (fd-stream-fd stream)))
   #!-win32
-  (sb!unix:with-restarted-syscall (count errno)
-    (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set)))
-      (sb!unix:fd-zero read-fds)
-      (sb!unix:fd-set (fd-stream-fd stream) read-fds)
-      (sb!unix:unix-fast-select (1+ (fd-stream-fd stream))
-                                (sb!alien:addr read-fds)
-                                nil nil 0 0))
-    (case count
-      ((1) nil)
-      ((0) t)
-      (otherwise
-       (simple-stream-perror "couldn't check whether ~S is readable"
-                             stream
-                             errno)))))
+  (not (sb!unix:unix-simple-poll (fd-stream-fd stream) :input 0)))
 
 ;;; If the read would block wait (using SERVE-EVENT) till input is available,
 ;;; then fill the input buffer, and return the number of bytes read. Throws
