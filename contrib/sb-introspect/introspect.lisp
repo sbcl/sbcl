@@ -96,7 +96,8 @@ include the pathname of the file and the position of the definition."
   (elt (sb-c::compiled-debug-info-fun-map debug-info) 0))
 
 (defun valid-function-name-p (name)
-  "True if NAME denotes a function name that can be passed to MACRO-FUNCTION or FDEFINITION "
+  "True if NAME denotes a valid function name, ie. one that can be passed to
+FBOUNDP."
   (and (sb-int:valid-function-name-p name) t))
 
 ;;;; Finding definitions
