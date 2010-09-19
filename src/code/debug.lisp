@@ -820,9 +820,14 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
    forms that explicitly control this kind of evaluation.")
 
 (defun debug-eval (expr)
-  (if (and (fboundp 'compile) *auto-eval-in-frame*)
-      (sb!di:eval-in-frame *current-frame* expr)
-      (eval expr)))
+  (cond ((not (and (fboundp 'compile) *auto-eval-in-frame*))
+         (eval expr))
+        ((frame-has-debug-vars-p *current-frame*)
+         (sb!di:eval-in-frame *current-frame* expr))
+        (t
+         (format *debug-io* "; No debug variables for current frame: ~
+                               using EVAL instead of EVAL-IN-FRAME.~%")
+         (eval expr))))
 
 (defun debug-eval-print (expr)
   (/noshow "entering DEBUG-EVAL-PRINT" expr)
@@ -1548,6 +1553,11 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   (not (null (find-binding-stack-pointer frame)))
   #!-unwind-to-frame-and-call-vop
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
+
+(defun frame-has-debug-vars-p (frame)
+  (sb!di:debug-var-info-available
+   (sb!di:code-location-debug-fun
+    (sb!di:frame-code-location frame))))
 
 ;; Hack: ensure that *U-T-F-F* has a tls index.
 #!+unwind-to-frame-and-call-vop
