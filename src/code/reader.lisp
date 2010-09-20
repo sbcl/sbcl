@@ -1577,7 +1577,7 @@ standard Lisp readtable when NIL."
 
 (define-compiler-macro read-from-string (&whole form string &rest args)
   ;; Check this at compile-time, and rewrite it so we're silent at runtime.
-  (destructuring-bind (&optional eof-error-p eof-value &rest keys)
+  (destructuring-bind (&optional (eof-error-p t) eof-value &rest keys)
       args
     (cond ((maybe-note-read-from-string-signature-issue eof-error-p)
            `(read-from-string ,string t ,eof-value ,@keys))
@@ -1598,7 +1598,7 @@ standard Lisp readtable when NIL."
                              (:preserve-whitespace preserve-whitespace)
                              (otherwise
                               (return-from read-from-string form)))))
-                 (when (assoc key seen)
+                 (when (member key seen)
                    (setf var (gensym "IGNORE"))
                    (push var ignore))
                  (push key seen)
