@@ -702,7 +702,7 @@
                       ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
                       ;; suppresses compiler-macros.
                       (not (fun-lexically-notinline-p cmacro-fun-name)))
-                 (let ((res (careful-expand-macro cmacro-fun form)))
+                 (let ((res (careful-expand-macro cmacro-fun form t)))
                    (cond ((eq res form)
                           (ir1-convert-common-functoid start next result form op))
                          (t
@@ -763,7 +763,7 @@
 
 ;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
 ;;; errors which occur during the macroexpansion.
-(defun careful-expand-macro (fun form)
+(defun careful-expand-macro (fun form &optional cmacro)
   (let (;; a hint I (WHN) wish I'd known earlier
         (hint "(hint: For more precise location, try *BREAK-ON-SIGNALS*.)"))
     (flet (;; Return a string to use as a prefix in error reporting,
@@ -775,10 +775,11 @@
                    (*print-level* 3))
                (format
                 nil
-                #-sb-xc-host "(in macroexpansion of ~S)"
+                #-sb-xc-host "(in ~A of ~S)"
                 ;; longer message to avoid ambiguity "Was it the xc host
                 ;; or the cross-compiler which encountered the problem?"
-                #+sb-xc-host "(in cross-compiler macroexpansion of ~S)"
+                #+sb-xc-host "(in cross-compiler ~A of ~S)"
+                (if cmacro "compiler-macroexpansion" "macroexpansion")
                 form))))
       (handler-bind ((style-warning (lambda (c)
                                       (compiler-style-warn
