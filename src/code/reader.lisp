@@ -1542,14 +1542,19 @@ standard Lisp readtable when NIL."
 
 ;;;; READ-FROM-STRING
 
-(defun read-from-string (string &optional (eof-error-p t) eof-value
-                                &key (start 0) end
-                                preserve-whitespace)
-  #!+sb-doc
-  "The characters of string are successively given to the lisp reader
-   and the lisp object built by the reader is returned. Macro chars
-   will take effect."
-  (declare (string string))
+(defun maybe-note-read-from-string-signature-issue (eof-error-p)
+  ;; The interface is so unintuitive that we explicitly check for the common
+  ;; error.
+  (when (member eof-error-p '(:start :end :preserve-whitespace))
+    (style-warn "~@<~S as EOF-ERROR-P argument to ~S: probable error. ~
+               Two optional arguments must be provided before the ~
+               first keyword argument.~:@>"
+                eof-error-p 'read-from-string)
+    t))
+
+(declaim (ftype (sfunction (string t t index (or null index) t) (values t index))
+                %read-from-string))
+(defun %read-from-string (string eof-error-p eof-value start end preserve-whitespace)
   (with-array-data ((string string :offset-var offset)
                     (start start)
                     (end end)
@@ -1559,6 +1564,55 @@ standard Lisp readtable when NIL."
                   (%read-preserving-whitespace stream eof-error-p eof-value nil)
                   (read stream eof-error-p eof-value))
               (- (string-input-stream-current stream) offset)))))
+
+(defun read-from-string (string &optional (eof-error-p t) eof-value
+                                &key (start 0) end preserve-whitespace)
+  #!+sb-doc
+  "The characters of string are successively given to the lisp reader
+   and the lisp object built by the reader is returned. Macro chars
+   will take effect."
+  (declare (string string))
+  (maybe-note-read-from-string-signature-issue eof-error-p)
+  (%read-from-string string eof-error-p eof-value start end preserve-whitespace))
+
+(define-compiler-macro read-from-string (&whole form string &rest args)
+  ;; Check this at compile-time, and rewrite it so we're silent at runtime.
+  (destructuring-bind (&optional eof-error-p eof-value &rest keys)
+      args
+    (cond ((maybe-note-read-from-string-signature-issue eof-error-p)
+           `(read-from-string ,string t ,eof-value ,@keys))
+          (t
+           (let* ((start (gensym "START"))
+                  (end (gensym "END"))
+                  (preserve-whitespace (gensym "PRESERVE-WHITESPACE"))
+                  bind seen ignore)
+             (do ()
+                 ((not (cdr keys))
+                  ;; Odd number of keys, punt.
+                  (when keys (return-from read-from-string form)))
+               (let* ((key (pop keys))
+                      (value (pop keys))
+                      (var (case key
+                             (:start start)
+                             (:end end)
+                             (:preserve-whitespace preserve-whitespace)
+                             (otherwise
+                              (return-from read-from-string form)))))
+                 (when (assoc key seen)
+                   (setf var (gensym "IGNORE"))
+                   (push var ignore))
+                 (push key seen)
+                 (push (list var value) bind)))
+             (dolist (default (list (list start 0)
+                                    (list end nil)
+                                    (list preserve-whitespace nil)))
+               (unless (assoc (car default) bind)
+                 (push default bind)))
+             (once-only ((string string))
+               `(let ,(nreverse bind)
+                  ,@(when ignore `((declare (ignore ,@ignore))))
+                  (%read-from-string ,string ,eof-error-p ,eof-value
+                                     ,start ,end ,preserve-whitespace))))))))
 
 ;;;; PARSE-INTEGER
 
