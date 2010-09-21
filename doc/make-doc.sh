@@ -3,4 +3,4 @@
 . ../find-gnumake.sh
 find_gnumake
 
-(cd ./manual ; $GNUMAKE html)
+(cd ./manual ; $GNUMAKE html pdf info)
