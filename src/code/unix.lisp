@@ -916,12 +916,27 @@ corresponds to NAME, or NIL if there is none."
                (rem (struct timespec)))
     (setf (slot req 'tv-sec) secs)
     (setf (slot req 'tv-nsec) nsecs)
-    (loop while (eql sb!unix:eintr
-                     (nth-value 1
-                                (int-syscall ("nanosleep" (* (struct timespec))
-                                                          (* (struct timespec)))
-                                             (addr req) (addr rem))))
-       do (rotatef req rem))))
+    (loop while (and (eql sb!unix:eintr
+                          (nth-value 1
+                                     (int-syscall ("nanosleep" (* (struct timespec))
+                                                               (* (struct timespec)))
+                                                  (addr req) (addr rem))))
+                     ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
+                     ;; take longer than the requested time, the call will
+                     ;; return with EINT and (unsigned)-1 seconds in the
+                     ;; remainder timespec, which would cause us to enter
+                     ;; nanosleep again for ~136 years. So, we check that the
+                     ;; remainder time is actually decreasing. Since the cost
+                     ;; of this check is neglible, do it on all platforms.
+                     ;; http://osdir.com/ml/darwin-kernel/2010-03/msg00007.html
+                     (let ((rem-sec (slot rem 'tv-sec))
+                           (rem-nsec (slot rem 'tv-nsec)))
+                       (when (or (> secs rem-sec)
+                                 (and (= secs rem-sec) (>= nsecs rem-nsec)))
+                         (setf secs rem-sec
+                               nsecs rem-nsec)
+                         t)))
+          do (rotatef req rem))))
 
 (defun unix-get-seconds-west (secs)
   (multiple-value-bind (ignore seconds dst) (get-timezone secs)

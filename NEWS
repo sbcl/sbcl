@@ -59,6 +59,8 @@ changes relative to sbcl-1.0.42
     (lp#316068)
   * bug fix: (SETF DOCUMENTATION) of a macro works properly. (lp#643958, thanks
     to Stas Boukarev)
+  * bug fix: interrupt taking longer than the requested period caused SLEEP
+    to hang on Darwin. (lp#640516, thanks to Joe Lebroco for the analysis)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes

@@ -65,3 +65,19 @@
                    sb-unix:sigint)
                 (sb-sys:interactive-interrupt ()
                   :condition)))))
+
+(with-test (:name :bug-640516)
+  ;; On Darwin interrupting a SLEEP so that it took longer than
+  ;; the requested amount caused it to hang.
+  (assert
+   (handler-case
+       (sb-ext:with-timeout 10
+         (let (to)
+           (handler-bind ((sb-ext:timeout (lambda (c)
+                                            (unless to
+                                              (setf to t)
+                                              (sleep 2)
+                                              (continue c)))))
+             (sb-ext:with-timeout 0.1 (sleep 1) t))))
+     (sb-ext:timeout ()
+       nil))))
