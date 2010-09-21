@@ -239,6 +239,9 @@ main(int argc, char *argv[])
     DEFTYPE("wst-nlink-t", wst_nlink_t);
     DEFTYPE("wst-uid-t", wst_uid_t);
     DEFTYPE("wst-gid-t", wst_gid_t);
+
+    /* KLUDGE */
+    defconstant("fd-setsize", 1024);
     printf("\n");
 #else
     printf("(in-package \"SB!ALIEN\")\n\n");
