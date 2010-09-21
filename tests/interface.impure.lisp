@@ -247,5 +247,14 @@
   (flet ((zoo () (gogo)))
     (defmethod gogo () nil)
     (describe 'gogo)))
+
+(defmacro bug-643958-test ()
+  "foo"
+  :ding!)
+
+(with-test (:name :bug-643958)
+  (assert (equal "foo" (documentation 'bug-643958-test 'function)))
+  (setf (documentation 'bug-643958-test 'function) "bar")
+  (assert (equal "bar" (documentation 'bug-643958-test 'function))))
 
 ;;;; success

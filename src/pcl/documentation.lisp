@@ -63,7 +63,8 @@
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
   (when (and (legal-fun-name-p x) (fboundp x))
-    (setf (documentation (symbol-function x) t) new-value)))
+    (setf (documentation (or (macro-function x) (symbol-function x)) t)
+          new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)

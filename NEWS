@@ -57,6 +57,8 @@ changes relative to sbcl-1.0.42
     in frames that do not have sufficient debug information.
   * bug fix: exceeding FD_SETSIZE limit now results in an sensible error
     (lp#316068)
+  * bug fix: (SETF DOCUMENTATION) of a macro works properly. (lp#643958, thanks
+    to Stas Boukarev)
 
 changes in sbcl-1.0.42 relative to sbcl-1.0.41
   * build changes
