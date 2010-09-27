@@ -926,9 +926,16 @@ corresponds to NAME, or NIL if there is none."
                      ;; return with EINT and (unsigned)-1 seconds in the
                      ;; remainder timespec, which would cause us to enter
                      ;; nanosleep again for ~136 years. So, we check that the
-                     ;; remainder time is actually decreasing. Since the cost
-                     ;; of this check is neglible, do it on all platforms.
-                     ;; http://osdir.com/ml/darwin-kernel/2010-03/msg00007.html
+                     ;; remainder time is actually decreasing.
+                     ;;
+                     ;; It would be neat to do this bit of defensive
+                     ;; programming on all platforms, but unfortunately on
+                     ;; Linux, REM can be a little higher than REQ if the
+                     ;; nanosleep() call is interrupted quickly enough,
+                     ;; probably due to the request being rounded up to the
+                     ;; nearest HZ. This would cause the sleep to return way
+                     ;; too early.
+                     #!+darwin
                      (let ((rem-sec (slot rem 'tv-sec))
                            (rem-nsec (slot rem 'tv-nsec)))
                        (when (or (> secs rem-sec)
