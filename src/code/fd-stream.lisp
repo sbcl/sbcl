@@ -2520,6 +2520,7 @@
                 (make-fd-stream tty :name "the terminal"
                                 :input t :output t :buffering :line
                                 :external-format (stdstream-external-format t)
+                                :serve-events t
                                 :auto-close t))
           (setf *tty* (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))
