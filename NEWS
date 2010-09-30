@@ -13,6 +13,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: interrupts arriving due to CL:OPEN caused an error.
   * bug fix: overeager character buffering could cause input to block
     spuriously when reading from a pipe (lp#643686)
+  * bug fix: more efficient timer expiry should avoid starvation on systems
+    where number of SIGALRMs per second is restricted. (lp#375515)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

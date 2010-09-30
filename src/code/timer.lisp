@@ -355,23 +355,26 @@ triggers."
               (warn "Timer ~S failed to interrupt thread ~S."
                     timer thread)))))))
 
-;;; Called from the signal handler.
+;;; Called from the signal handler. We loop until all the expired timers
+;;; have been run.
 (defun run-expired-timers ()
-  (let (timer)
-    (with-scheduler-lock ()
-      (setq timer (peek-schedule))
-      (when (or (null timer)
-                (< (get-internal-real-time)
-                   (%timer-expire-time timer)))
-        ;; Seemingly this is a spurious SIGALRM, but play it safe and
-        ;; reset the system timer because if the system clock was set
-        ;; back after the SIGALRM had been delivered then we won't get
-        ;; another chance.
-        (set-system-timer)
-        (return-from run-expired-timers nil))
-      (assert (eq timer (priority-queue-extract-maximum *schedule*)))
-      (set-system-timer))
-    (run-timer timer)))
+  (loop
+    (let ((now (get-internal-real-time))
+          (timers nil))
+      (flet ((run-timers ()
+               (dolist (timer (nreverse timers))
+                 (run-timer timer))))
+        (with-scheduler-lock ()
+          (loop for timer = (peek-schedule)
+                when (or (null timer) (< now (%timer-expire-time timer)))
+                ;; No more timers to run for now, reset the system timer.
+                do (run-timers)
+                   (set-system-timer)
+                   (return-from run-expired-timers nil)
+                else
+                do (assert (eq timer (priority-queue-extract-maximum *schedule*)))
+                   (push timer timers)))
+        (run-timers)))))
 
 (defun timeout-cerror ()
   (cerror "Continue" 'sb!ext::timeout))

@@ -158,7 +158,16 @@
 (with-test (:name (:timer :stress))
   (let ((time (1+ (get-universal-time))))
     (loop repeat 200 do
-          (schedule-timer (make-timer (lambda ())) time :absolute-p t))
+             (schedule-timer (make-timer (lambda ())) time :absolute-p t))
+    (sleep 2)
+    (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
+
+(with-test (:name (:timer :stress2))
+  (let ((time (1+ (get-universal-time)))
+        (n 0))
+    (loop for time-n from time upto (+ 1/10 time) by (/ 1/10 200)
+          do (schedule-timer (make-timer (lambda ())) time-n :absolute-p t)
+             (incf n))
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
