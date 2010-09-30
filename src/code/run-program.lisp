@@ -578,7 +578,8 @@ status slot."
                     (if-output-exists :error)
                     (error :output)
                     (if-error-exists :error)
-                    status-hook)
+                    status-hook
+                    (external-format :default))
   #+sb-doc
   #.(concatenate
      'string
@@ -661,7 +662,9 @@ Users Manual for details about the PROCESS structure."#-win32"
       same place as normal output.
    :STATUS-HOOK
       This is a function the system calls whenever the status of the
-      process changes.  The function takes the process as an argument.")
+      process changes.  The function takes the process as an argument.
+   :EXTERNAL-FORMAT
+      The external-format to use for :INPUT, :OUTPUT, and :ERROR :STREAMs.")
   #-win32
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
@@ -733,18 +736,18 @@ Users Manual for details about the PROCESS structure."#-win32"
                                       input cookie
                                       :direction :input
                                       :if-does-not-exist if-input-does-not-exist
-                                      :external-format :default
+                                      :external-format external-format
                                       :wait wait)
                (with-fd-and-stream-for ((stdout output-stream) :output
                                         output cookie
                                         :direction :output
                                         :if-exists if-output-exists
-                                        :external-format :default)
+                                        :external-format external-format)
                  (with-fd-and-stream-for ((stderr error-stream)  :error
                                           error cookie
                                           :direction :output
                                           :if-exists if-error-exists
-                                          :external-format :default)
+                                          :external-format external-format)
                    (with-open-pty ((pty-name pty-stream) (pty cookie))
                      ;; Make sure we are not notified about the child
                      ;; death before we have installed the PROCESS
