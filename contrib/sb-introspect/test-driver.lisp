@@ -293,7 +293,7 @@
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
          ;; :LARGE T, which doesn't seem right -- but ignore that for now.
          '(:space :dynamic :generation 6 :write-protected t :boxed t :pinned nil :large nil)
-         :ignore #+ppc '(:large) #-ppc nil)
+         :ignore (list :page #+ppc :large))
     #-gencgc
     (tai :cons :heap
          ;; FIXME: Figure out what's the right cheney-result. SPARC at least

@@ -787,6 +787,15 @@ For :HEAP objects the secondary value is a plist:
     even if :PINNED in NIL if the GC has not had the need to mark the the page
     as pinned. (GENCGC and :SPACE :DYNAMIC only.)
 
+  :WRITE-PROTECTED
+    Indicates that the page on which the object starts is write-protected,
+    which indicates for :BOXED objects that it hasn't been written to since
+    the last GC of its generation. (GENCGC and :SPACE :DYNAMIC only.)
+
+  :PAGE
+    The index of the page the object resides on. (GENGC and :SPACE :DYNAMIC
+    only.)
+
 For :STACK objects secondary value is the thread on whose stack the object is
 allocated.
 
@@ -834,7 +843,8 @@ Experimental: interface subject to change."
                                    :write-protected (logbitp 0 flags)
                                    :boxed (logbitp 2 flags)
                                    :pinned (logbitp 5 flags)
-                                   :large (logbitp 6 flags)))))
+                                   :large (logbitp 6 flags)
+                                   :page index))))
                        (list :space space))
                    #-gencgc
                    (list :space space))))))
