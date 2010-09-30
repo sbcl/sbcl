@@ -4,6 +4,7 @@ changes relative to sbcl-1.0.43:
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
     (lp#646796)
+  * bug fix: interrupts arriving due to CL:OPEN caused an error.
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

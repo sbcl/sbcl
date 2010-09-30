@@ -156,12 +156,13 @@ corresponds to NAME, or NIL if there is none."
   (declare (type unix-pathname path)
            (type fixnum flags)
            (type unix-file-mode mode))
-  (int-syscall ("open" c-string int int)
-               path
-               (logior #!+win32 o_binary
-                       #!+largefile o_largefile
-                       flags)
-               mode))
+  (with-restarted-syscall (value errno)
+    (int-syscall ("open" c-string int int)
+                 path
+                 (logior #!+win32 o_binary
+                         #!+largefile o_largefile
+                         flags)
+                 mode)))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
 ;;; associated with it.
