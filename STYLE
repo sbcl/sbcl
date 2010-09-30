@@ -6,10 +6,11 @@ SBCL Style Guide
 Patch Submissions
 =================
 
-Preferred patch format is output from "git format-patch", but unified
-diffs and links to public git repos are acceptable as well.
+Preferred patch format is output from "git format-patch", including
+the commit message. The commit message should explain the why and how
+of the change.
 
-Please include test-cases in your patch if possible.
+Please include test-cases in your patch if at all possible.
 
 Please format your submission for ease of reading: unless the change
 is whitespace only, avoid re-indenting code you are not touching, etc.
@@ -20,9 +21,11 @@ If your patch includes algorithmic changes, explain them. If your
 patch uses a published algorithm, please include a link to the paper.
 We aren't always as well-educated as we'd like to...
 
-Patches can be either mailed to sbcl-devel, or submitted via
-Launchpad. If you submit a patch on Launchpad, please add the tag
-"review" to the associated bug.
+Ready-to-apply patches should be submitted via Launchpad: please add
+the tag "review" to the associated bug.
+
+Patches requiring more widespread discussion and feedback should be
+sent to the sbcl-devel mailing list.
 
 If you have any questions, feel free to ask them on sbcl-devel.
 
