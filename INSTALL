@@ -126,6 +126,15 @@ INSTALLING SBCL
   This also sets the default SBCL_HOME to prefix/lib/sbcl/ for the
   built binaries.
 
+  To configure SBCL with a non-standard default dynamic-space size,
+  use the --dynamic-space-size option:
+
+    $ sh make.sh --dynamic-space-size=1Gb
+    $ sh make.sh --dynamic-space-size=500Mb
+
+  If mega- or gigabytes are not specified, the number is taken to be
+  in megabytes. The standard default is platform specific.
+
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
   cross-compilation host. For example, to use CMUCL (assuming has

@@ -71,6 +71,9 @@ do
       --xc-host=)
         $optarg_ok && SBCL_XC_HOST=$optarg
         ;;
+      --dynamic-space-size=)
+        $optarg_ok && SBCL_DYNAMIC_SPACE_SIZE=$optarg
+	;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
         ;;
@@ -118,6 +121,12 @@ Options:
 
       Default prefix is: /usr/local
 
+  --dynamic-space-size=<size> Specify default dynamic-space size.
+
+      If not provided, the default is platform-specific. <size> is
+      taken to be megabytes unless explicitly suffixed with Gb in
+      order to specify the size in gigabytes.
+
   --xc-host=<string>   Specify the Common Lisp compilation host.
 
       The string provided should be a command to invoke the
@@ -155,9 +164,10 @@ echo "//Starting build: $build_started"
 # Apparently option parsing succeeded. Print out the results.
 echo "//Options: --prefix='$SBCL_PREFIX' --xc-host='$SBCL_XC_HOST'"
 
-# Save prefix for make and install.sh.
 mkdir -p output
+# Save prefix for make and install.sh.
 echo "SBCL_PREFIX='$SBCL_PREFIX'" > output/prefix.def
+echo "$SBCL_DYNAMIC_SPACE_SIZE" > output/dynamic-space-size.txt
 
 # FIXME: Tweak this script, and the rest of the system, to support
 # a second bootstrapping pass in which the cross-compilation host is

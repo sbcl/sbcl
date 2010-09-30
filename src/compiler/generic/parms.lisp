@@ -12,6 +12,23 @@
 
 (in-package "SB!VM")
 
+(def!macro !configure-dynamic-space-end (default)
+  (with-open-file (f "output/dynamic-space-size.txt")
+    (let ((line (read-line f)))
+      (multiple-value-bind (number end)
+          (parse-integer line :junk-allowed t)
+        (if number
+            (let* ((ext (subseq line end))
+                   (mult (cond ((or (zerop (length ext))
+                                    (member ext '("MB MIB") :test #'equalp))
+                                (expt 2 20))
+                               ((member ext '("GB" "GIB") :test #'equalp)
+                                (expt 2 30))
+                               (t
+                                (error "Invalid --dynamic-space-size=~A" line)))))
+              `(+ dynamic-space-start ,(* number mult)))
+            default)))))
+
 (defparameter *c-callable-static-symbols*
   '(sub-gc
     sb!kernel::post-gc
