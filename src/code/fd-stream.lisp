@@ -1546,8 +1546,8 @@
                 (return-from ,in-function total-copied)))
             (setf (buffer-head ibuf) head)
             ;; Maybe we need to refill the stream buffer.
-            (cond ( ;; If there were enough data in the stream buffer, we're done.
-                   (= total-copied requested)
+            (cond ( ;; If was data in the stream buffer, we're done.
+                   (plusp total-copied)
                    (return total-copied))
                   ( ;; If EOF, we're done in another way.
                    (or (eq decode-break-reason 'eof)

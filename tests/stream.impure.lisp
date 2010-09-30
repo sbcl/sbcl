@@ -639,4 +639,40 @@
       (when fifo
         (ignore-errors (delete-file fifo))))))
 
+#-win32
+(require :sb-posix)
+#-win32
+(with-test (:name :overager-character-buffering)
+  (let ((fifo nil)
+        (proc nil))
+    (maphash
+     (lambda (format _)
+       (declare (ignore _))
+       (format t "trying ~A~%" format)
+       (finish-output t)
+       (unwind-protect
+            (progn
+              (setf fifo (sb-posix:mktemp "SBCL-fifo-XXXXXXX.tmp"))
+              (sb-posix:mkfifo fifo (logior sb-posix:s-iwusr sb-posix:s-irusr))
+              ;; KLUDGE: because we have both ends in the same process, we would
+              ;; need to use O_NONBLOCK, but this works too.
+              (setf proc
+                    (run-program "/bin/sh"
+                                 (list "-c"
+                                       (format nil "cat > ~A" (native-namestring fifo)))
+                                 :input :stream
+                                 :wait nil
+                                 :external-format format))
+              (write-line "foobar" (process-input proc))
+              (finish-output (process-input proc))
+              (with-open-file (f fifo :direction :input :external-format format)
+                (assert (equal "foobar" (read-line f)))))
+         (when proc
+           (ignore-errors (process-close proc))
+           (setf proc nil))
+         (when fifo
+           (ignore-errors (delete-file fifo))
+           (setf fifo nil))))
+     sb-impl::*external-formats*)))
+
 ;;; success
