@@ -3558,3 +3558,10 @@
                                   (list (vector-push-extend (svref x 0) x))))
                 ((and warning (not style-warning)) ()
                   :warning)))))
+
+(with-test (:name :bug)
+  (assert 42
+          (funcall
+           (compile nil
+                    `(lambda ()
+                       (load-time-value (the (values fixnum) 42)))))))

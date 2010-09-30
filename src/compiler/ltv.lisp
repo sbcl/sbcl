@@ -30,7 +30,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
                       (cond ((consp form)
                              (let ((op (car form)))
                                (cond ((member op '(the truly-the))
-                                      (specifier-type (second form)))
+                                      (values-specifier-type (second form)))
                                      ((eq 'function op)
                                       (specifier-type 'function))
                                      ((and (legal-fun-name-p op)
