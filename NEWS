@@ -15,6 +15,12 @@ changes relative to sbcl-1.0.43:
     spuriously when reading from a pipe (lp#643686)
   * bug fix: more efficient timer expiry should avoid starvation on systems
     where number of SIGALRMs per second is restricted. (lp#375515)
+  * improvements to the Windows port:
+    ** bug fix: stackoverwriting due to incorrect usage of PeekConsoleInput
+       on Windows. (thanks to Kalyanov Dmitry)
+    ** bug fix: build now works on cygwin with GCC 4.x installed. (thanks to
+       Kalyanov Dmitry)
+    ** bug fix: run-sbcl.sh now works on Cygwin. (thanks to Kalyanov Dmitry)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

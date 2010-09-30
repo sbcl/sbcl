@@ -15,6 +15,8 @@ ifeq (SunOS,$(UNAME))
 endif
 ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
   EXTRA_CFLAGS=-mno-cygwin
+  # GCC 4.x doesn't accept -mno-cygwin.
+  CC:=gcc=3
   # SBCL can't read cygwin symlinks, and cygwin likes to symlink
   # gcc.  To further complicate things, SBCL can't handle cygwin
   # paths, either.

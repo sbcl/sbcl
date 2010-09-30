@@ -118,7 +118,7 @@
 
     (unless (zerop (peek-console-input handle
                                        (cast buf (* t))
-                                       input-record-size (addr avail)))
+                                       1 (addr avail)))
       (return-from handle-listen (plusp avail)))
 
     ;; FIXME-SOCKETS: Try again here with WSAEventSelect in case

@@ -22,6 +22,10 @@ else
     BASE=`pwd`
     cd "${opwd}"
 fi
+if [ "$OSTYPE" = "cygwin" ]
+then
+    BASE=`cygpath -w "$BASE"`
+fi
 CORE_DEFINED=no
 
 for arg in $*; do
