@@ -7,6 +7,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
     (lp#646796)
   * bug fix: interrupts arriving due to CL:OPEN caused an error.
+  * bug fix: overeager character buffering could cause input to block
+    spuriously when reading from a pipe (lp#643686)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

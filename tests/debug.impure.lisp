@@ -151,7 +151,7 @@
 
   (with-test (:name (:undefined-function :bug-346)
               :fails-on '(or :alpha :ppc :sparc :mips
-                          (and :x86-64 (or :freebsd :darwin))))
+                          (and :x86-64 :freebsd)))
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
@@ -194,12 +194,12 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
   (with-test (:name (:divide-by-zero :bug-346)
-              :fails-on '(or :alpha (and :x86-64 :darwin)))   ; bug 346
+              :fails-on :alpha)  ; bug 346
     (assert (verify-backtrace (lambda () (test #'optimized))
                               (list '(/ 42 &rest)
                                     (list '(flet test) #'optimized)))))
   (with-test (:name (:divide-by-zero :bug-356)
-              :fails-on '(or :alpha (and :x86-64 :darwin)))   ; bug 356
+              :fails-on :alpha)  ; bug 356
     (assert (verify-backtrace (lambda () (test #'not-optimized))
                               (list '(/ 42 &rest)
                                     '((flet not-optimized))
@@ -266,7 +266,7 @@
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :misc)
-            :fails-on '(or (and :x86 (or :sunos)) (and :x86-64 :darwin)))
+            :fails-on '(and :x86 (or :sunos)))
   (write-line "//tl-xep")
   (with-details t
     (assert (verify-backtrace #'namestring
