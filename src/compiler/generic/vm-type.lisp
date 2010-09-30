@@ -96,6 +96,9 @@
         (types `(simple-array ,type ,dims))))
     (types)))
 
+(sb!xc:deftype complex-vector (&optional element-type length)
+  `(and (vector ,element-type ,length) (not simple-array)))
+
 ;;; Return the symbol that describes the format of FLOAT.
 (declaim (ftype (function (float) symbol) float-format-name))
 (defun float-format-name (x)

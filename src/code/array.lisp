@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 #!-sb-fluid
-(declaim (inline fill-pointer array-has-fill-pointer-p adjustable-array-p
+(declaim (inline adjustable-array-p
                  array-displacement))
 
 ;;;; miscellaneous accessor functions
@@ -755,6 +755,7 @@ of specialized arrays is supported."
 
 ;;;; fill pointer frobbing stuff
 
+(declaim (inline array-has-fill-pointer-p))
 (defun array-has-fill-pointer-p (array)
   #!+sb-doc
   "Return T if the given ARRAY has a fill pointer, or NIL otherwise."
@@ -777,6 +778,7 @@ of specialized arrays is supported."
                 :format-control "~S is not an array with a fill pointer."
                 :format-arguments (list vector)))))
 
+(declaim (inline fill-pointer))
 (defun fill-pointer (vector)
   #!+sb-doc
   "Return the FILL-POINTER of the given VECTOR."
@@ -804,7 +806,6 @@ of specialized arrays is supported."
    to NEW-EL, and increment the fill pointer by one. If the fill pointer is
    too large, NIL is returned, otherwise the index of the pushed element is
    returned."
-  (declare (vector array))
   (let ((fill-pointer (fill-pointer array)))
     (declare (fixnum fill-pointer))
     (cond ((= fill-pointer (%array-available-elements array))
@@ -822,7 +823,7 @@ of specialized arrays is supported."
                             (let ((length (length vector)))
                               (min (1+ length)
                                    (- array-dimension-limit length)))))
-  (declare (vector vector) (fixnum min-extension))
+  (declare (fixnum min-extension))
   (let ((fill-pointer (fill-pointer vector)))
     (declare (fixnum fill-pointer))
     (when (= fill-pointer (%array-available-elements vector))
@@ -837,7 +838,6 @@ of specialized arrays is supported."
   #!+sb-doc
   "Decrease the fill pointer by 1 and return the element pointed to by the
   new fill pointer."
-  (declare (vector array))
   (let ((fill-pointer (fill-pointer array)))
     (declare (fixnum fill-pointer))
     (if (zerop fill-pointer)

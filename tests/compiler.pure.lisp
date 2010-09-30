@@ -3531,3 +3531,30 @@
                               (* b (z b c))))
                           (loop for i below 10 do
                                 (setf a (z a a)))))))
+
+(with-test (:name :bug-309130)
+  (assert (eq :warning
+              (handler-case
+                  (compile nil `(lambda () (svref (make-array 8 :adjustable t) 1)))
+                ((and warning (not style-warning)) ()
+                  :warning))))
+  (assert (eq :warning
+              (handler-case
+                  (compile nil `(lambda (x)
+                                  (declare (optimize (debug 0)))
+                                  (declare (type vector x))
+                                  (list (fill-pointer x) (svref x 1))))
+                ((and warning (not style-warning)) ()
+                  :warning))))
+  (assert (eq :warning
+              (handler-case
+                  (compile nil `(lambda (x)
+                                  (list (vector-push (svref x 0) x))))
+                ((and warning (not style-warning)) ()
+                  :warning))))
+  (assert (eq :warning
+              (handler-case
+                  (compile nil `(lambda (x)
+                                  (list (vector-push-extend (svref x 0) x))))
+                ((and warning (not style-warning)) ()
+                  :warning)))))

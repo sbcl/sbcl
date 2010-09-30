@@ -122,14 +122,6 @@
        (lexenv-policy (node-lexenv (lvar-dest new-value))))))
   (lvar-type new-value))
 
-(defun assert-array-complex (array)
-  (assert-lvar-type
-   array
-   (make-array-type :complexp t
-                    :element-type *wild-type*)
-   (lexenv-policy (node-lexenv (lvar-dest array))))
-  nil)
-
 ;;; Return true if ARG is NIL, or is a constant-lvar whose
 ;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)
@@ -137,6 +129,12 @@
   (or (not arg)
       (and (constant-lvar-p arg)
            (not (lvar-value arg)))))
+
+(defun supplied-and-true (arg)
+  (and arg
+       (constant-lvar-p arg)
+       (lvar-value arg)
+       t))
 
 ;;;; DERIVE-TYPE optimizers
 
@@ -271,51 +269,39 @@
 (defoptimizer (make-array derive-type)
               ((dims &key initial-element element-type initial-contents
                 adjustable fill-pointer displaced-index-offset displaced-to))
-  (let ((simple (and (unsupplied-or-nil adjustable)
-                     (unsupplied-or-nil displaced-to)
-                     (unsupplied-or-nil fill-pointer))))
-    (or (careful-specifier-type
-         `(,(if simple 'simple-array 'array)
-            ,(cond ((not element-type) t)
-                   ((constant-lvar-p element-type)
-                    (let ((ctype (careful-specifier-type
-                                  (lvar-value element-type))))
-                      (cond
-                        ((or (null ctype) (unknown-type-p ctype)) '*)
-                        (t (sb!xc:upgraded-array-element-type
-                            (lvar-value element-type))))))
-                   (t
-                    '*))
-            ,(cond ((constant-lvar-p dims)
-                    (let* ((val (lvar-value dims))
-                           (cdims (if (listp val) val (list val))))
-                      (if simple
-                          cdims
-                          (length cdims))))
-                   ((csubtypep (lvar-type dims)
-                               (specifier-type 'integer))
-                    '(*))
-                   (t
-                    '*))))
-        (specifier-type 'array))))
-
-;;; Complex array operations should assert that their array argument
-;;; is complex.  In SBCL, vectors with fill-pointers are complex.
-(defoptimizer (fill-pointer derive-type) ((vector))
-  (assert-array-complex vector))
-(defoptimizer (%set-fill-pointer derive-type) ((vector index))
-  (declare (ignorable index))
-  (assert-array-complex vector))
-
-(defoptimizer (vector-push derive-type) ((object vector))
-  (declare (ignorable object))
-  (assert-array-complex vector))
-(defoptimizer (vector-push-extend derive-type)
-    ((object vector &optional index))
-  (declare (ignorable object index))
-  (assert-array-complex vector))
-(defoptimizer (vector-pop derive-type) ((vector))
-  (assert-array-complex vector))
+  (let* ((simple (and (unsupplied-or-nil adjustable)
+                      (unsupplied-or-nil displaced-to)
+                      (unsupplied-or-nil fill-pointer)))
+         (spec
+          (or `(,(if simple 'simple-array 'array)
+                 ,(cond ((not element-type) t)
+                        ((constant-lvar-p element-type)
+                         (let ((ctype (careful-specifier-type
+                                       (lvar-value element-type))))
+                           (cond
+                             ((or (null ctype) (unknown-type-p ctype)) '*)
+                             (t (sb!xc:upgraded-array-element-type
+                                 (lvar-value element-type))))))
+                        (t
+                         '*))
+                 ,(cond ((constant-lvar-p dims)
+                         (let* ((val (lvar-value dims))
+                                (cdims (if (listp val) val (list val))))
+                           (if simple
+                               cdims
+                               (length cdims))))
+                        ((csubtypep (lvar-type dims)
+                                    (specifier-type 'integer))
+                         '(*))
+                        (t
+                         '*)))
+              'array)))
+    (if (and (not simple)
+             (or (supplied-and-true adjustable)
+                 (supplied-and-true displaced-to)
+                 (supplied-and-true fill-pointer)))
+        (careful-specifier-type `(and ,spec (not simple-array)))
+        (careful-specifier-type spec))))
 
 ;;;; constructors
 
