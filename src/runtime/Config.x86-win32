@@ -34,7 +34,7 @@ CFLAGS =  -g -Wall -O3 -mno-cygwin
 ASFLAGS = $(CFLAGS)
 
 CPP = cpp
-CC = gcc
+CC = gcc-3
 LD = ld
 NM = nm
 
