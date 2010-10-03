@@ -21,6 +21,7 @@ changes relative to sbcl-1.0.43:
     ** bug fix: build now works on cygwin with GCC 4.x installed. (thanks to
        Kalyanov Dmitry)
     ** bug fix: run-sbcl.sh now works on Cygwin. (thanks to Kalyanov Dmitry)
+  * bug fix: non-unicode builds no longer fail (broken since 1.0.36.15).
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

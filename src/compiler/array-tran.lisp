@@ -73,7 +73,7 @@
                  (apply #'type-intersection element-supertypes)))))
     (union-type
      (let ((union-types (union-type-types type))
-           (element-type *empty-type*)
+           (element-type nil)
            (element-supertypes nil))
        (dolist (union-type union-types)
          (multiple-value-bind (cur-type cur-supertype)
@@ -81,7 +81,7 @@
            (cond
              ((eq element-type *wild-type*)
               nil)
-             ((eq element-type *empty-type*)
+             ((eq element-type nil)
               (setf element-type cur-type))
              ((or (eq cur-type *wild-type*)
                   ;; If each of the two following tests fail, it is not
