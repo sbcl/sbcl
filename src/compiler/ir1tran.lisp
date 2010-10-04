@@ -487,16 +487,19 @@
           (trail form))
       (declare (fixnum pos))
       (macrolet ((frob ()
-                   '(progn
+                   `(progn
                       (when (atom subform) (return))
                       (let ((fm (car subform)))
-                        (if (consp fm)
-                            ;; If it's a cons, recurse
-                            (sub-find-source-paths fm (cons pos path))
-                            ;; Otherwise store the containing form. It's
-                            ;; not perfect, but better than nothing.
-                            (unless (zerop pos)
-                              (note-source-path subform pos path)))
+                        (cond ((consp fm)
+                               ;; If it's a cons, recurse.
+                               (sub-find-source-paths fm (cons pos path)))
+                              ((eq 'quote fm)
+                               ;; Don't look into quoted constants.
+                               (return))
+                              ((not (zerop pos))
+                               ;; Otherwise store the containing form. It's not
+                               ;; perfect, but better than nothing.
+                               (note-source-path subform pos path)))
                         (incf pos))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))

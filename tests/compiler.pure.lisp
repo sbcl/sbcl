@@ -3559,9 +3559,26 @@
                 ((and warning (not style-warning)) ()
                   :warning)))))
 
-(with-test (:name :bug)
+(with-test (:name :bug-646796)
   (assert 42
           (funcall
            (compile nil
                     `(lambda ()
                        (load-time-value (the (values fixnum) 42)))))))
+
+(with-test (:name :bug-654289)
+  (let* ((big (labels ((make-tree (n acc)
+                         (cond ((zerop n) acc)
+                               (t (make-tree (1- n) (cons acc acc))))))
+                (make-tree 10000 nil)))
+         (small '((1) (2) (3)))
+         (t0 (get-internal-run-time))
+         (f1 (compile nil `(lambda (x) (eq x (quote ,big)))))
+         (t1 (get-internal-run-time))
+         (f2 (compile nil `(lambda (x) (eq x (quote ,small)))))
+         (t2 (get-internal-run-time)))
+    (assert (funcall f1 big))
+    (assert (funcall f2 small))
+    ;; Compile time should not explode just because there's a big constant
+    ;; object in the source.
+    (assert (> 10 (abs (- (- t1 t0) (- t2 t1)))))))
