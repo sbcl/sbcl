@@ -24,6 +24,7 @@ changes relative to sbcl-1.0.43:
   * bug fix: non-unicode builds no longer fail (broken since 1.0.36.15).
   * bug fix: compile-times no longer scale linearly with the size of
     quoted lists in source-code. (lp#654289)
+  * bug fix: better errors for unknown external-formats in OPEN. (lp#561974)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

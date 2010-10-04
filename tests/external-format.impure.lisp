@@ -991,5 +991,34 @@
       (write-string string s))
     (with-open-file (s *test-path* :external-format :utf-32be)
       (assert (string= " ???? " (read-line s))))))
+
+(with-test (:name :invalid-external-format)
+  (labels ((test-error (e)
+             (assert (typep e 'error))
+             (unless (equal "Undefined external-format: :BAD-FORMAT"
+                            (princ-to-string e))
+               (error "Bad error:~%  ~A" e)))
+           (test (direction)
+             (test-error
+              (handler-case
+                  (open "/dev/null" :direction direction :external-format :bad-format
+                        :if-exists :overwrite)
+                (error (e) e)))))
+    (test :input)
+    (test :output)
+    (test :io)
+    (test-error
+     (handler-case
+         (run-program "sh" '() :input :stream :external-format :bad-format)
+       (error (e) e)))
+    (test-error
+     (handler-case
+         (string-to-octets "foobar" :external-format :bad-format)
+       (error (e) e)))
+    (test-error
+     (let ((octets (string-to-octets "foobar" :external-format :latin1)))
+       (handler-case
+           (octets-to-string octets :external-format :bad-format)
+         (error (e) e))))))
 
 ;;;; success

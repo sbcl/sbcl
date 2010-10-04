@@ -851,7 +851,7 @@
 
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
-      (error "Undefined external-format ~A" external-format)))
+      (error "Undefined external-format: ~S" external-format)))
 
 (defun external-format-keyword (external-format)
   (typecase external-format
@@ -871,17 +871,16 @@
 ;;; number of bytes per element.
 (defun pick-output-routine (type buffering &optional external-format)
   (when (subtypep type 'character)
-    (let ((entry (get-external-format external-format)))
-      (when entry
-        (return-from pick-output-routine
-          (values (ecase buffering
-                    (:none (ef-write-char-none-buffered-fun entry))
-                    (:line (ef-write-char-line-buffered-fun entry))
-                    (:full (ef-write-char-full-buffered-fun entry)))
-                  'character
-                  1
-                  (ef-write-n-bytes-fun entry)
-                  (canonize-external-format external-format entry))))))
+    (let ((entry (get-external-format-or-lose external-format)))
+      (return-from pick-output-routine
+        (values (ecase buffering
+                  (:none (ef-write-char-none-buffered-fun entry))
+                  (:line (ef-write-char-line-buffered-fun entry))
+                  (:full (ef-write-char-full-buffered-fun entry)))
+                'character
+                1
+                (ef-write-n-bytes-fun entry)
+                (canonize-external-format external-format entry)))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
                (eq buffering (second entry))
@@ -1221,14 +1220,13 @@
 ;;; bytes per element (and for character types string input routine).
 (defun pick-input-routine (type &optional external-format)
   (when (subtypep type 'character)
-    (let ((entry (get-external-format external-format)))
-      (when entry
-        (return-from pick-input-routine
-          (values (ef-read-char-fun entry)
-                  'character
-                  1
-                  (ef-read-n-chars-fun entry)
-                  (canonize-external-format external-format entry))))))
+    (let ((entry (get-external-format-or-lose external-format)))
+      (return-from pick-input-routine
+        (values (ef-read-char-fun entry)
+                'character
+                1
+                (ef-read-n-chars-fun entry)
+                (canonize-external-format external-format entry)))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
                (or (not (fourth entry))
