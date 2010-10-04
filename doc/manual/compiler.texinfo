@@ -1114,15 +1114,15 @@ a more efficient calling convention that forbids redefinition.
 @comment  node-name,  next,  previous,  up
 @section Interpreter
 @cindex Interpreter
+@findex @cl{eval}
 @vindex @sbext{@earmuffs{evaluator-mode}}
 
 By default SBCL implements @code{eval} by calling the native code
-compiler. SBCL also includes an interpreter for use in special cases
-where using the compiler is undesirable, for example due to compilation
-overhead. Unlike in some other Lisp implementations, in SBCL interpreted
-code is not safer or more debuggable than compiled code.
+compiler.
 
-Switching between the compiler and the interpreter is done using the
-special variable @code{sb-ext:*evaluator-mode*}. As of 0.9.17, valid
-values for @code{sb-ext:*evaluator-mode*} are @code{:compile} and
-@code{:interpret}.
+SBCL also includes an interpreter for use in special cases where using
+the compiler is undesirable, for example due to compilation overhead.
+Unlike in some other Lisp implementations, in SBCL interpreted code is
+not safer or more debuggable than compiled code.
+
+@include var-sb-ext-star-evaluator-mode-star.texinfo
