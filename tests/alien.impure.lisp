@@ -294,4 +294,17 @@
     (verify (signed 16)   #x003f8042 #x-7fbe)
     (verify (signed 16)   #x003f7042 #x7042)))
 
+(with-test (:name :bug-654485)
+  ;; DEBUG 2 used to prevent let-conversion of the open-coded ALIEN-FUNCALL body,
+  ;; which in turn led the dreaded %SAP-ALIEN note.
+  (handler-case
+      (compile nil
+               `(lambda (program argv)
+                  (declare (optimize (debug 2)))
+                  (with-alien ((sys-execv1 (function int c-string (* c-string)) :extern
+                                           "execv"))
+                    (values (alien-funcall sys-execv1 program argv)))))
+    (compiler-note (n)
+      (error n))))
+
 ;;; success

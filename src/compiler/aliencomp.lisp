@@ -706,6 +706,7 @@
               (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body))))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
             `(lambda (function ,@(params))
+               (declare (optimize (let-conversion 3)))
                ,body)))))))
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))

@@ -25,6 +25,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: compile-times no longer scale linearly with the size of
     quoted lists in source-code. (lp#654289)
   * bug fix: better errors for unknown external-formats in OPEN. (lp#561974)
+  * bug fix: DEBUG>SPEED no longer degrades ALIEN-FUNCALL performance quite
+    so badly. (lp#654485)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
