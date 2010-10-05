@@ -37,11 +37,25 @@
 ;;; the DEFUN is just LOADed instead of COMPILE-FILEd, and it's
 ;;; not immediately obvious what's the best way to set up
 ;;; the COMPILE-FILE test.
-#|
+#||
 (assert
   (equal
    (format nil "~A" (sb-int:info :function :type 'foo))
    "#<FUN-TYPE (FUNCTION (T T) LIST)>"))
-|#
+||#
+
+(with-test (:name :bug-458015)
+  ;; Make sure layouts have sane source-locations
+  (dolist (env sb-c::*info-environment*)
+    (sb-c::do-info (env :class class :type type :name info-name :value value)
+      (when (and (symbolp info-name)
+                 (eql class :type)
+                 (eql type :kind))
+        (let* ((classoid (sb-kernel:find-classoid info-name nil))
+               (layout (and classoid (sb-kernel:classoid-layout classoid)))
+               (srcloc (and layout (sb-kernel::layout-source-location layout))))
+          (when (and layout)
+            (assert (or (sb-c::definition-source-location-p srcloc)
+                        (null srcloc)))))))))
 
 ;;; success

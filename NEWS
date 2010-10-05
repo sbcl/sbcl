@@ -27,6 +27,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: better errors for unknown external-formats in OPEN. (lp#561974)
   * bug fix: DEBUG>SPEED no longer degrades ALIEN-FUNCALL performance quite
     so badly. (lp#654485)
+  * bug fix: SB-INTROSPECT:FIND-DEFINITION-SOURCES-BY-NAME no longer signals
+    an error for eg. STRUCTURE. (lp#458015)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

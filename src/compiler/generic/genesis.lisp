@@ -936,6 +936,7 @@ core and return a descriptor to it."
     (cold-set-layout-slot result 'info *nil-descriptor*)
     (cold-set-layout-slot result 'pure *nil-descriptor*)
     (cold-set-layout-slot result 'n-untagged-slots nuntagged)
+    (cold-set-layout-slot result 'source-location *nil-descriptor*)
     (cold-set-layout-slot result 'for-std-class-p *nil-descriptor*)
 
     (setf (gethash name *cold-layouts*)
