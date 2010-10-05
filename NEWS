@@ -29,6 +29,8 @@ changes relative to sbcl-1.0.43:
     so badly. (lp#654485)
   * bug fix: SB-INTROSPECT:FIND-DEFINITION-SOURCES-BY-NAME no longer signals
     an error for eg. STRUCTURE. (lp#458015)
+  * bug fix: LOOP WITH NIL = ... signalled an unused variable style-warning.
+    (lp#613871, thanks to Roman Marynchak)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

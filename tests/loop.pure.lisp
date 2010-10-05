@@ -256,3 +256,15 @@
     (assert (equal '("foo" "bar")
              (funcall fun
                       (vector "foo" "bar"))))))
+
+(with-test (:name :bug-lp613871)
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil '(lambda () (loop with nil = 1 repeat 2 collect t)))
+    (assert (null warnings-p))
+    (assert (null failure-p))
+    (assert (equal '(t t) (funcall function))))
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil '(lambda () (loop with nil repeat 2 collect t)))
+    (assert (null warnings-p))
+    (assert (null failure-p))
+    (assert (equal '(t t) (funcall function)))))
