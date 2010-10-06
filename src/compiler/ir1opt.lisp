@@ -1706,8 +1706,8 @@
 ;;; variable, we compute the union of the types across all calls and
 ;;; propagate this type information to the var's refs.
 ;;;
-;;; If the function has an XEP, then we don't do anything, since we
-;;; won't discover anything.
+;;; If the function has an entry-fun, then we don't do anything: since
+;;; it has a XEP we would not discover anything.
 ;;;
 ;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
 ;;; corresponding to changed arguments in CALL, since the only use in
@@ -1715,8 +1715,7 @@
 ;;; right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
-  (unless (or (functional-entry-fun fun)
-              (lambda-optional-dispatch fun))
+  (unless (functional-entry-fun fun)
     (let* ((vars (lambda-vars fun))
            (union (mapcar (lambda (arg var)
                             (when (and arg
