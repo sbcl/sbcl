@@ -254,6 +254,8 @@
         (when (eq (info :variable :where-from symbol) :declared)
           (format stream "~@:_Declared type: ~S"
                   (type-specifier (info :variable :type symbol))))
+        (when (info :variable :always-bound symbol)
+          (format stream "~@:_Declared always-bound."))
         (cond
           ((eq kind :alien)
            (let ((info (info :variable :alien-info symbol)))
