@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.43:
     resides on.
   * enhancement: default dynamic-space size can be configured at build-time
     without touching source, using the --dynamic-space-size argument to make.sh.
+  * enhancement: DESCRIBE recognizes symbols naming optimization policy
+    qualities.
   * bug fix: compiler failed to derive the result-type of MAKE-ARRAY as
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
@@ -31,6 +33,7 @@ changes relative to sbcl-1.0.43:
     an error for eg. STRUCTURE. (lp#458015)
   * bug fix: LOOP WITH NIL = ... signalled an unused variable style-warning.
     (lp#613871, thanks to Roman Marynchak)
+  * bug fix: more reliable &REST list type derivation, a
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

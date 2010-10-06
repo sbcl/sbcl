@@ -308,6 +308,17 @@
             (format stream "~@:_Expansion: ~S" (funcall fun (list symbol))))))
       (terpri stream)))
 
+  (when (or (member symbol sb-c::*policy-qualities*)
+            (assoc symbol sb-c::*policy-dependent-qualities*))
+    (pprint-logical-block (stream nil)
+      (pprint-newline :mandatory stream)
+      (pprint-indent :block 2 stream)
+      (format stream "~A names a~:[ dependent~;n~] optimization policy quality:"
+              symbol
+              (member symbol sb-c::*policy-qualities*))
+      (describe-documentation symbol 'optimize stream t))
+    (terpri stream))
+
   ;; Print out properties.
   (let ((plist (symbol-plist symbol)))
     (when plist
