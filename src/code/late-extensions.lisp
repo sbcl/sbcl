@@ -173,47 +173,80 @@ EXPERIMENTAL: Interface subject to change."
     (unless (consp place)
       (invalid-place))
     (destructuring-bind (op &rest args) place
-      (when (cdr args)
-        (invalid-place))
-      (let ((dd (info :function :structure-accessor op)))
-        (if dd
-            (let* ((structure (dd-name dd))
-                   (slotd (find op (dd-slots dd) :key #'dsd-accessor-name))
-                   (index (dsd-index slotd))
-                   (type (dsd-type slotd)))
-              (declare (ignorable structure index))
-              (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
-                           (type= (specifier-type type) (specifier-type 'sb!vm:word)))
-                (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
-                       name sb!vm:n-word-bits type place))
-              (when (dsd-read-only slotd)
-                (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
-                       name place))
-              #!+(or x86 x86-64 ppc)
-              `(truly-the sb!vm:word
-                          (%raw-instance-atomic-incf/word
-                           (the ,structure ,@args) ,index
-                           (logand #.(1- (ash 1 sb!vm:n-word-bits))
-                                   ,(ecase name
-                                           (atomic-incf
-                                            `(the sb!vm:signed-word ,diff))
-                                           (atomic-decf
-                                            `(- (the sb!vm:signed-word ,diff)))))))
-              ;; No threads outside x86 and x86-64 for now, so this is easy...
-              #!-(or x86 x86-64 ppc)
-              (with-unique-names (structure old)
-                `(sb!sys:without-interrupts
-                   (let* ((,structure ,@args)
-                          (,old (,op ,structure)))
-                     (setf (,op ,structure)
-                           (logand #.(1- (ash 1 sb!vm:n-word-bits))
-                                   ,(ecase name
-                                           (atomic-incf
-                                            `(+ ,old (the sb!vm:signed-word ,diff)))
-                                           (atomic-decf
-                                            `(- ,old (the sb!vm:signed-word ,diff))))))
-                     ,old))))
-            (invalid-place))))))
+      (case op
+        (aref
+         (when (cddr args)
+           (invalid-place))
+         #!+(or)
+         (with-unique-names (array)
+           `(let ((,array (the (simple-array sb!ext:word (*)) ,(car args))))
+              (%array-atomic-incf/word
+               ,array
+               (%check-bound ,array (array-dimension ,array 0) ,(cadr args))
+               (logand #.(1- (ash 1 sb!vm:n-word-bits))
+                       ,(ecase name
+                               (atomic-incf
+                                `(the sb!vm:signed-word ,diff))
+                               (atomic-decf
+                                `(- (the sb!vm:signed-word ,diff))))))))
+         #!-(or)
+         (with-unique-names (array index old-value)
+           (let ((incremented-value
+                  (ecase name
+                         (atomic-incf
+                          `(+ ,old-value (the sb!vm:signed-word ,diff)))
+                         (atomic-decf
+                          `(- ,old-value (the sb!vm:signed-word ,diff))))))
+             `(sb!sys:without-interrupts
+               (let* ((,array ,(car args))
+                      (,index ,(cadr args))
+                      (,old-value (aref ,array ,index)))
+                 (setf (aref ,array ,index)
+                       (logand #.(1- (ash 1 sb!vm:n-word-bits))
+                               ,incremented-value))
+                 ,old-value)))))
+        (t
+         (when (cdr args)
+           (invalid-place))
+         (let ((dd (info :function :structure-accessor op)))
+           (if dd
+               (let* ((structure (dd-name dd))
+                      (slotd (find op (dd-slots dd) :key #'dsd-accessor-name))
+                      (index (dsd-index slotd))
+                      (type (dsd-type slotd)))
+                 (declare (ignorable structure index))
+                 (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
+                              (type= (specifier-type type) (specifier-type 'sb!vm:word)))
+                   (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
+                          name sb!vm:n-word-bits type place))
+                 (when (dsd-read-only slotd)
+                   (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
+                          name place))
+                 #!+(or x86 x86-64 ppc)
+                 `(truly-the sb!vm:word
+                             (%raw-instance-atomic-incf/word
+                              (the ,structure ,@args) ,index
+                              (logand #.(1- (ash 1 sb!vm:n-word-bits))
+                                      ,(ecase name
+                                              (atomic-incf
+                                               `(the sb!vm:signed-word ,diff))
+                                              (atomic-decf
+                                               `(- (the sb!vm:signed-word ,diff)))))))
+                 ;; No threads outside x86 and x86-64 for now, so this is easy...
+                 #!-(or x86 x86-64 ppc)
+                 (with-unique-names (structure old)
+                                    `(sb!sys:without-interrupts
+                                      (let* ((,structure ,@args)
+                                             (,old (,op ,structure)))
+                                        (setf (,op ,structure)
+                                              (logand #.(1- (ash 1 sb!vm:n-word-bits))
+                                                      ,(ecase name
+                                                              (atomic-incf
+                                                               `(+ ,old (the sb!vm:signed-word ,diff)))
+                                                              (atomic-decf
+                                                               `(- ,old (the sb!vm:signed-word ,diff))))))
+                                        ,old))))
+             (invalid-place))))))))
 
 (defmacro atomic-incf (place &optional (diff 1))
   #!+sb-doc
@@ -226,8 +259,8 @@ PLACE.
 
 PLACE must be an accessor form whose CAR is the name of a DEFSTRUCT accessor
 whose declared type is (UNSIGNED-BYTE 32) on 32 bit platforms,
-and (UNSIGNED-BYTE 64) on 64 bit platforms -- the type SB-EXT:WORD can be used
-for this purpose.
+and (UNSIGNED-BYTE 64) on 64 bit platforms or an AREF of a (SIMPLE-ARRAY
+SB-EXT:WORD (*) -- the type SB-EXT:WORD can be used for this purpose.
 
 DIFF defaults to 1, and must be a (SIGNED-BYTE 32) on 32 bit platforms,
 and (SIGNED-BYTE 64) on 64 bit platforms.
@@ -246,14 +279,22 @@ PLACE.
 
 PLACE must be an accessor form whose CAR is the name of a DEFSTRUCT accessor
 whose declared type is (UNSIGNED-BYTE 32) on 32 bit platforms,
-and (UNSIGNED-BYTE 64) on 64 bit platforms -- the type SB-EXT:WORD can be used
-for this purpose.
+and (UNSIGNED-BYTE 64) on 64 bit platforms or an AREF of a (SIMPLE-ARRAY
+SB-EXT:WORD (*) -- the type SB-EXT:WORD can be used for this purpose.
 
 DIFF defaults to 1, and must be a (SIGNED-BYTE 32) on 32 bit platforms,
 and (SIGNED-BYTE 64) on 64 bit platforms.
 
 EXPERIMENTAL: Interface subject to change."
   (expand-atomic-frob 'atomic-decf place diff))
+
+;; Interpreter stubs for ATOMIC-INCF.
+#!+(or)
+(defun %array-atomic-incf/word (array index diff)
+  (declare (type (simple-array word (*)) array)
+           (fixnum index)
+           (type sb!vm:signed-word diff))
+  (%array-atomic-incf/word array index diff))
 
 (defun call-hooks (kind hooks &key (on-error :error))
   (dolist (hook hooks)

@@ -168,6 +168,9 @@
 #!+(or x86 x86-64 ppc)
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
     (unsafe always-translatable))
+#!+(or)
+(defknown %array-atomic-incf/word (t index sb!vm:word) sb!vm:word
+  (unsafe always-translatable))
 
 ;;; These two are mostly used for bit-bashing operations.
 (defknown %vector-raw-bits (t fixnum) sb!vm:word
