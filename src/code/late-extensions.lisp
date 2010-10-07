@@ -177,7 +177,7 @@ EXPERIMENTAL: Interface subject to change."
         (aref
          (when (cddr args)
            (invalid-place))
-         #!+(or x86 x86-64)
+         #!+(or x86 x86-64 ppc)
          (with-unique-names (array)
            `(let ((,array (the (simple-array sb!ext:word (*)) ,(car args))))
               (%array-atomic-incf/word
@@ -189,7 +189,7 @@ EXPERIMENTAL: Interface subject to change."
                                 `(the sb!vm:signed-word ,diff))
                                (atomic-decf
                                 `(- (the sb!vm:signed-word ,diff))))))))
-         #!-(or x86 x86-64)
+         #!-(or x86 x86-64 ppc)
          (with-unique-names (array index old-value)
            (let ((incremented-value
                   (ecase name
@@ -289,7 +289,7 @@ EXPERIMENTAL: Interface subject to change."
   (expand-atomic-frob 'atomic-decf place diff))
 
 ;; Interpreter stubs for ATOMIC-INCF.
-#!+(or x86 x86-64)
+#!+(or x86 x86-64 ppc)
 (defun %array-atomic-incf/word (array index diff)
   (declare (type (simple-array word (*)) array)
            (fixnum index)

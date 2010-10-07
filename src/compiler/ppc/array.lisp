@@ -558,4 +558,31 @@
          (value :scs (signed-reg)))
   (:results (result :scs (signed-reg)))
   (:result-types tagged-num))
+
+;;;; ATOMIC-INCF for arrays
 
+(define-vop (array-atomic-incf/word)
+  (:translate %array-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg) :target offset)
+         (diff :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) offset)
+  (:temporary (:sc non-descriptor-reg) sum)
+  (:generator 4
+    (inst addi offset index
+          (- (* vector-data-offset n-word-bytes)
+             other-pointer-lowtag))
+    ;; load the slot value, add DIFF, write the sum back, and return
+    ;; the original slot value, atomically, and include a memory
+    ;; barrier.
+    (inst sync)
+    LOOP
+    (inst lwarx result offset object)
+    (inst add sum result diff)
+    (inst stwcx. sum offset object)
+    (inst bne LOOP)
+    (inst isync)))
