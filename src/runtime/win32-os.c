@@ -573,8 +573,12 @@ void scratch(void)
     strerror(42);
     write(0, 0, 0);
     RtlUnwind(0, 0, 0, 0);
+    MapViewOfFile(0,0,0,0,0);
+    UnmapViewOfFile(0);
+    FlushViewOfFile(0,0);
     #ifndef LISP_FEATURE_SB_UNICODE
       CreateDirectoryA(0,0);
+      CreateFileMappingA(0,0,0,0,0,0);
       GetComputerNameA(0, 0);
       GetCurrentDirectoryA(0,0);
       GetEnvironmentVariableA(0, 0, 0);
@@ -585,6 +589,7 @@ void scratch(void)
       SetEnvironmentVariableA(0, 0);
     #else
       CreateDirectoryW(0,0);
+      CreateFileMappingW(0,0,0,0,0,0);
       FormatMessageW(0, 0, 0, 0, 0, 0, 0);
       GetComputerNameW(0, 0);
       GetCurrentDirectoryW(0,0);

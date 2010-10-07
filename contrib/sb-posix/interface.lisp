@@ -442,8 +442,29 @@ not supported."
  (define-call "munmap" int minusp
    (start sb-sys:system-area-pointer) (length unsigned))
 
+#-win32
 (define-call "msync" int minusp
   (addr sb-sys:system-area-pointer) (length unsigned) (flags int)))
+#+win32
+(progn
+  ;; No attempt is made to offer a full mmap-like interface on Windows.
+  ;; It would be possible to do so (and has been done by AK on his
+  ;; branch), but the use case is unclear to me.  However, the following
+  ;; definitions are needed to keep existing code in sb-simple-streams
+  ;; running. --DFL
+  (defconstant PROT-READ #x02)
+  (defconstant PROT-WRITE #x04)
+  (defconstant PROT-EXEC #x10)
+  (defconstant PROT-NONE 0)
+  (defconstant MAP-SHARED 0)
+  (defconstant MAP-PRIVATE 1)
+  (defconstant MS-ASYNC nil)
+  (defconstant MS-SYNC nil)
+  (export                            ;export on the fly like define-call
+   (defun msync (address length flags)
+     (declare (ignore flags))
+     (when (zerop (sb-win32:flush-view-of-file address length))
+       (sb-win32::win32-error "FlushViewOfFile")))))
 
 ;;; mlockall, munlockall
 (define-call "mlockall" int minusp (flags int))

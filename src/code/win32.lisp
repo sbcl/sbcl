@@ -637,3 +637,33 @@ UNIX epoch: January 1st 1970."
           (setf aname (make-system-buffer length))
           (alien-funcall afunc aname (addr length))))
       (cast-and-free aname))))
+
+;; File mapping support routines
+(define-alien-routine (#!+sb-unicode "CreateFileMappingW"
+                       #!-sb-unicode "CreateFileMappingA"
+                       create-file-mapping)
+    handle
+  (handle handle)
+  (security-attributes (* t))
+  (protection dword)
+  (maximum-size-high dword)
+  (maximum-size-low dword)
+  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2)))
+
+(define-alien-routine ("MapViewOfFile" map-view-of-file)
+    system-area-pointer
+  (file-mapping handle)
+  (desired-access dword)
+  (offset-high dword)
+  (offset-low dword)
+  (size dword))
+
+(define-alien-routine ("UnmapViewOfFile" unmap-view-of-file) bool
+  (address (* t)))
+
+(define-alien-routine ("FlushViewOfFile" flush-view-of-file) bool
+  (address (* t))
+  (length dword))
+
+(define-alien-routine ("CloseHandle" close-handle) bool
+  (handle handle))
