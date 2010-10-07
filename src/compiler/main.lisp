@@ -1234,8 +1234,10 @@ Examples:
                  (*print-level* 2)
                  (*print-pretty* nil))
              (with-compiler-io-syntax
-                 (compiler-mumble "~&; ~:[compiling~;converting~] ~S"
-                                  *block-compile* form)))
+                 (compiler-mumble
+                  #-sb-xc-host "~&; ~:[compiling~;converting~] ~S"
+                  #+sb-xc-host "~&; ~:[x-compiling~;x-converting~] ~S"
+                  *block-compile* form)))
              form)
           ((and finalp
                 (eq :top-level-forms *compile-print*)
