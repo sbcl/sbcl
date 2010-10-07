@@ -642,7 +642,7 @@
 #-win32
 (require :sb-posix)
 #-win32
-(with-test (:name :overager-character-buffering)
+(with-test (:name :overeager-character-buffering)
   (let ((fifo nil)
         (proc nil))
     (maphash
@@ -652,7 +652,7 @@
        (finish-output t)
        (unwind-protect
             (progn
-              (setf fifo (sb-posix:mktemp "SBCL-fifo-XXXXXXX.tmp"))
+              (setf fifo (sb-posix:mktemp "SBCL-fifo-XXXXXXX"))
               (sb-posix:mkfifo fifo (logior sb-posix:s-iwusr sb-posix:s-irusr))
               ;; KLUDGE: because we have both ends in the same process, we would
               ;; need to use O_NONBLOCK, but this works too.
