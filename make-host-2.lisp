@@ -13,7 +13,7 @@
 
 (defun proclaim-target-optimization ()
   (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
-    (proclaim
+    (sb-xc:proclaim
      `(optimize
        (compilation-speed 1) (debug ,debug)
        ;; CLISP's pretty-printer is fragile and tends to cause stack
