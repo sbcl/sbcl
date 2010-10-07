@@ -168,7 +168,7 @@
 #!+(or x86 x86-64 ppc)
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
     (unsafe always-translatable))
-#!+(or x86-64)
+#!+(or x86 x86-64)
 (defknown %array-atomic-incf/word (t index sb!vm:word) sb!vm:word
   (unsafe always-translatable))
 
