@@ -730,3 +730,22 @@
 
 (define-vop (get-vector-subtype get-header-data))
 (define-vop (set-vector-subtype set-header-data))
+
+;;;; ATOMIC-INCF for arrays
+
+(define-vop (array-atomic-incf/word)
+  (:translate %array-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (diff :scs (unsigned-reg) :target result))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 4
+    (inst xadd (make-ea :qword :base array
+                        :scale 1 :index index
+                        :disp (- (* vector-data-offset n-word-bytes)
+                                 other-pointer-lowtag))
+          diff :lock)
+    (move result diff)))

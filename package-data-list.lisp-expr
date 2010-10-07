@@ -1223,7 +1223,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%ARRAY-DISPLACED-FROM"
                "%ARRAY-DISPLACEMENT" "%ARRAY-FILL-POINTER"
                "%ARRAY-FILL-POINTER-P" "%ARRAY-RANK"
-               #!+(or)
+               #!+(or x86-64)
                "%ARRAY-ATOMIC-INCF/WORD"
                "%ASSOC"
                "%ASSOC-EQ"
