@@ -8,6 +8,8 @@ changes relative to sbcl-1.0.43:
     without touching source, using the --dynamic-space-size argument to make.sh.
   * enhancement: DESCRIBE recognizes symbols naming optimization policy
     qualities, and mentions ALWAYS-BOUND declarations.
+  * enhancement: ATOMIC-INCF now supports AREF of (SIMPLE-ARRAY SB-EXT:WORD (*))
+    as a place.
   * bug fix: compiler failed to derive the result-type of MAKE-ARRAY as
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
