@@ -39,6 +39,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: more reliable &REST list type derivation. (lp#655203)
   * bug fix: PPRINT-LOGICAL-BLOCK multiply-evaluated :PER-LINE-PREFIX,
     and issued pointles code-deletion notes for it, :PREFIX, and :SUFFIX.
+  * bug fix: the compiler didn't utilize the proclaimed ftype for functions
+    also declared NOTINLINE. (lp#655581)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

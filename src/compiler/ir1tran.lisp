@@ -205,14 +205,16 @@
                (inlinep (info :function :inlinep name)))
            (setf (gethash name *free-funs*)
                  (if (or expansion inlinep)
-                     (make-defined-fun
-                      :%source-name name
-                      :inline-expansion expansion
-                      :inlinep inlinep
-                      :where-from (info :function :where-from name)
-                      :type (if (eq inlinep :notinline)
-                                (specifier-type 'function)
-                                (info :function :type name)))
+                     (let ((where (info :function :where-from name)))
+                       (make-defined-fun
+                        :%source-name name
+                        :inline-expansion expansion
+                        :inlinep inlinep
+                        :where-from where
+                        :type (if (and (eq inlinep :notinline)
+                                       (neq where :declared))
+                                  (specifier-type 'function)
+                                  (info :function :type name))))
                      (find-global-fun name nil))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function

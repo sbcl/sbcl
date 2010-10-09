@@ -1995,4 +1995,15 @@
       (test (double-float 0d0 0d0) 0d0)
       (test (eql #\c) #\c))))
 
+(declaim (ftype (function () (integer 42 42)) bug-655581))
+(defun bug-655581 ()
+  42)
+(declaim (notinline bug-655581))
+(test-util:with-test (:name :bug-655581)
+  (multiple-value-bind (type derived)
+      (funcall (compile nil `(lambda ()
+                               (ctu:compiler-derived-type (bug-655581)))))
+    (assert derived)
+    (assert (equal '(integer 42 42) type))))
+
 ;;; success
