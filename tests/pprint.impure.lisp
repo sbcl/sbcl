@@ -248,5 +248,26 @@
                        (*print-pretty* t))
                    (format nil "~@<~S~:>" (make-instance 'frob))))))
 
+(with-test (:name :pprint-logical-block-code-deletion-node)
+  (handler-case
+      (compile nil
+               `(lambda (words &key a b c)
+                  (pprint-logical-block (nil words :per-line-prefix (or a b c))
+                    (pprint-fill *standard-output* (sort (copy-seq words) #'string<) nil))))
+    ((or sb-ext:compiler-note warning) (c)
+      (error e))))
+
+(with-test (:name :pprint-logical-block-multiple-per-line-prefix-eval)
+  (funcall (compile nil
+                    `(lambda ()
+                       (let ((n 0))
+                         (with-output-to-string (s)
+                           (pprint-logical-block (s nil :per-line-prefix (if (eql 1 (incf n))
+                                                                             "; "
+                                                                             (error "oops")))
+                             (pprint-newline :mandatory s)
+                             (pprint-newline :mandatory s)))
+                         n)))))
+
 
 ;;; success
