@@ -1612,7 +1612,19 @@ core and return a descriptor to it."
                       (warn "redefining ~S from #X~X to #X~X"
                             name old-value value)))
                   (/show "adding to *cold-foreign-symbol-table*:" name value)
-                  (setf (gethash name *cold-foreign-symbol-table*) value))))))
+                  (setf (gethash name *cold-foreign-symbol-table*) value)
+                  #!+win32
+                  (let ((at-position (position #\@ name)))
+                    (when at-position
+                      (let ((name (subseq name 0 at-position)))
+                        (multiple-value-bind (old-value found)
+                            (gethash name *cold-foreign-symbol-table*)
+                          (when (and found
+                                     (not (= old-value value)))
+                            (warn "redefining ~S from #X~X to #X~X"
+                                  name old-value value)))
+                        (setf (gethash name *cold-foreign-symbol-table*)
+                              value)))))))))
   (values))     ;; PROGN
 
 (defun cold-foreign-symbol-address (name)
