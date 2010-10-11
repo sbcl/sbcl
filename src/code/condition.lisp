@@ -620,6 +620,19 @@
              (type-error-datum condition)
              (type-error-expected-type condition)))))
 
+(def!method print-object ((condition type-error) stream)
+  (if *print-escape*
+      (flet ((maybe-string (thing)
+               (ignore-errors
+                 (write-to-string thing :lines 1 :readably nil :array nil :pretty t))))
+        (let ((type (maybe-string (type-error-expected-type condition)))
+              (datum (maybe-string (type-error-datum condition))))
+          (if (and type datum)
+              (print-unreadable-object (condition stream :type t)
+                (format stream "~@<expected-type: ~A ~_datum: ~A~:@>" type datum))
+              (call-next-method))))
+      (call-next-method)))
+
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())
 (define-condition simple-type-error (simple-condition type-error) ())
