@@ -635,22 +635,14 @@
 
 ;;;; IF optimization
 
-;;; If the test has multiple uses, replicate the node when possible.
-;;; Also check whether the predicate is known to be true or false,
+;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
 ;;; is the case.
+;;; Also, if the test has multiple uses, replicate the node when possible.
 (defun ir1-optimize-if (node)
   (declare (type cif node))
   (let ((test (if-test node))
         (block (node-block node)))
-
-    (when (and (eq (block-start-node block) node)
-               (listp (lvar-uses test)))
-      (do-uses (use test)
-        (when (immediately-used-p test use)
-          (convert-if-if use node)
-          (when (not (listp (lvar-uses test))) (return)))))
-
     (let* ((type (lvar-type test))
            (victim
             (cond ((constant-lvar-p test)
@@ -666,7 +658,15 @@
         (when (rest (block-succ block))
           (unlink-blocks block victim))
         (setf (component-reanalyze (node-component node)) t)
-        (unlink-node node))))
+        (unlink-node node)
+        (return-from ir1-optimize-if (values))))
+
+    (when (and (eq (block-start-node block) node)
+               (listp (lvar-uses test)))
+      (do-uses (use test)
+        (when (immediately-used-p test use)
+          (convert-if-if use node)
+          (when (not (listp (lvar-uses test))) (return))))))
   (values))
 
 ;;; Create a new copy of an IF node that tests the value of the node
