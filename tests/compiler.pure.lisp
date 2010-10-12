@@ -3590,3 +3590,9 @@
     ;; Compile time should not explode just because there's a big constant
     ;; object in the source.
     (assert (> 10 (abs (- (- t1 t0) (- t2 t1)))))))
+
+(with-test (:name :bug-309063)
+  (let ((fun (compile nil `(lambda (x)
+                             (declare (type (integer 0 0) x))
+                             (ash x 100)))))
+    (assert (zerop (funcall fun 0)))))

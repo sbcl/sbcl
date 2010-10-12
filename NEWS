@@ -11,6 +11,14 @@ changes relative to sbcl-1.0.43:
   * enhancement: ATOMIC-INCF now supports AREF of (SIMPLE-ARRAY SB-EXT:WORD (*))
     as a place.
   * enhancement: ASDF has been updated to 2.009.
+  * optimization: constant-folding exploits numeric and character types, in
+    addition member types.
+  * optimization: numeric, character and member types that are inhabited by
+    exactly one value are tested with EQL.
+  * optimization: more conditional branches are eliminated during IR1.
+    Branches are simplified before performing if/if-conversion, and simple
+    equivalent branches (that only read the same constant or variable) are
+    merged.
   * bug fix: compiler failed to derive the result-type of MAKE-ARRAY as
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
@@ -41,6 +49,8 @@ changes relative to sbcl-1.0.43:
     and issued pointles code-deletion notes for it, :PREFIX, and :SUFFIX.
   * bug fix: the compiler didn't utilize the proclaimed ftype for functions
     also declared NOTINLINE. (lp#655581)
+  * bug fix: the compiler could attempt to emit constant left shifts of 
+    greater value than n-word-bits. (lp#309063)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
