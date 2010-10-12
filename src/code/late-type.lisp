@@ -978,6 +978,20 @@
   (declare (type ctype type))
   (funcall (type-class-negate (type-class-info type)) type))
 
+(defun-cached (type-singleton-p :hash-function (lambda (type)
+                                              (logand (type-hash-value type)
+                                                      #xff))
+                             :hash-bits 8
+                             :values 2
+                             :default (values nil t)
+                             :init-wrapper !cold-init-forms)
+              ((type eq))
+  (declare (type ctype type))
+  (let ((function (type-class-singleton-p (type-class-info type))))
+    (if function
+        (funcall function type)
+        (values nil nil))))
+
 ;;; (VALUES-SPECIFIER-TYPE and SPECIFIER-TYPE moved from here to
 ;;; early-type.lisp by WHN ca. 19990201.)
 
@@ -1709,6 +1723,17 @@
         ((nil)
          (aver (eq base+bounds 'real))
          'number)))))
+
+(!define-type-method (number :singleton-p) (type)
+  (let ((low  (numeric-type-low  type))
+        (high (numeric-type-high type)))
+    (if (and low
+             (eql low high)
+             (eql (numeric-type-complexp type) :real)
+             (member (numeric-type-class type) '(integer rational
+                                                 #!-sb-xc-host float)))
+        (values t (numeric-type-low type))
+        (values nil nil))))
 
 ;;; Return true if X is "less than or equal" to Y, taking open bounds
 ;;; into consideration. CLOSED is the predicate used to test the bound
@@ -2656,6 +2681,11 @@ used for a COMPLEX component.~:@>"
       ((type= type (specifier-type 'standard-char)) 'standard-char)
       (t `(member ,@members)))))
 
+(!define-type-method (member :singleton-p) (type)
+  (if (eql 1 (member-type-size type))
+      (values t (first (member-type-members type)))
+      (values nil nil)))
+
 (!define-type-method (member :simple-subtypep) (type1 type2)
    (values (and (xset-subset-p (member-type-xset type1)
                                  (member-type-xset type2))
@@ -3270,6 +3300,14 @@ used for a COMPLEX component.~:@>"
         `(member ,@(loop for (low . high) in pairs
                          nconc (loop for code from low upto high
                                      collect (sb!xc:code-char code))))))))
+
+(!define-type-method (character-set :singleton-p) (type)
+  (let* ((pairs (character-set-type-pairs type))
+         (pair  (first pairs)))
+    (if (and (typep pairs '(cons t null))
+             (eql (car pair) (cdr pair)))
+        (values t (code-char (car pair)))
+        (values nil nil))))
 
 (!define-type-method (character-set :simple-=) (type1 type2)
   (let ((pairs1 (character-set-type-pairs type1))

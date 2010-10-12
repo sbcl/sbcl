@@ -90,7 +90,12 @@
   ;; a function which returns a Common Lisp type specifier
   ;; representing this type
   (unparse #'must-supply-this :type function)
-
+  ;; a function which returns T if the CTYPE is inhabited by a single
+  ;; object and, as a value, the object.  Otherwise, returns NIL, NIL.
+  ;; The default case (NIL) is interpreted as a function that always
+  ;; returns NIL, NIL.
+  (singleton-p nil :type (or function null))
+  
   #|
   Not used, and not really right. Probably we want a TYPE= alist for the
   unary operations, since there are lots of interesting unary predicates that
@@ -123,7 +128,8 @@
       (:simple-= . type-class-simple-=)
       (:complex-= . type-class-complex-=)
       (:negate . type-class-negate)
-      (:unparse . type-class-unparse))))
+      (:unparse . type-class-unparse)
+      (:singleton-p . type-class-singleton-p))))
 
 (declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
