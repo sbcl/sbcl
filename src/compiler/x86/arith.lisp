@@ -621,7 +621,7 @@
                     (aver (not "Impossible: fixnum ASH should not be called with
 constant shift greater than word length")))
                   (if (sc-is result any-reg)
-                      (zeroize result)
+                      (inst xor result result)
                       (inst mov result 0)))
                  (t (inst sar result 31)
                     (inst and result (lognot fixnum-tag-mask))))))))
