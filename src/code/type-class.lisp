@@ -95,7 +95,7 @@
   ;; The default case (NIL) is interpreted as a function that always
   ;; returns NIL, NIL.
   (singleton-p nil :type (or function null))
-  
+
   #|
   Not used, and not really right. Probably we want a TYPE= alist for the
   unary operations, since there are lots of interesting unary predicates that

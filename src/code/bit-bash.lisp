@@ -13,7 +13,8 @@
 
 ;;;; types
 
-(deftype bit-offset () '(integer 0 (#.sb!vm:n-word-bits)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (deftype bit-offset () '(integer 0 (#.sb!vm:n-word-bits))))
 
 ;;;; support routines
 
@@ -39,32 +40,34 @@
 ;;; at the "end" and removing bits from the "start". On big-endian
 ;;; machines this is a left-shift and on little-endian machines this
 ;;; is a right-shift.
-(defun shift-towards-start (number countoid)
-  (declare (type sb!vm:word number) (fixnum countoid))
-  (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) countoid)))
-    (declare (type bit-offset count))
-    (if (zerop count)
-        number
-        (ecase sb!c:*backend-byte-order*
-          (:big-endian
-           (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))
-          (:little-endian
-           (ash number (- count)))))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun shift-towards-start (number countoid)
+    (declare (type sb!vm:word number) (fixnum countoid))
+    (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) countoid)))
+      (declare (type bit-offset count))
+      (if (zerop count)
+          number
+          (ecase sb!c:*backend-byte-order*
+            (:big-endian
+               (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))
+            (:little-endian
+               (ash number (- count))))))))
 
 ;;; Shift NUMBER by COUNT bits, adding zero bits at the "start" and
 ;;; removing bits from the "end". On big-endian machines this is a
 ;;; right-shift and on little-endian machines this is a left-shift.
-(defun shift-towards-end (number count)
-  (declare (type sb!vm:word number) (fixnum count))
-  (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) count)))
-    (declare (type bit-offset count))
-    (if (zerop count)
-        number
-        (ecase sb!c:*backend-byte-order*
-          (:big-endian
-           (ash number (- count)))
-          (:little-endian
-           (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun shift-towards-end (number count)
+    (declare (type sb!vm:word number) (fixnum count))
+    (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) count)))
+      (declare (type bit-offset count))
+      (if (zerop count)
+          number
+          (ecase sb!c:*backend-byte-order*
+            (:big-endian
+               (ash number (- count)))
+            (:little-endian
+               (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count)))))))
 
 #!-sb-fluid (declaim (inline start-mask end-mask))
 

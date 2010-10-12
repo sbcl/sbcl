@@ -27,8 +27,7 @@
              (and (ref-p use) (constant-p (ref-leaf use))))
            ;; check for EQL types (but not singleton numeric types)
            (let ((type (lvar-type thing)))
-             (and (member-type-p type)
-                  (eql 1 (member-type-size type)))))))
+             (values (type-singleton-p type))))))
 
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
@@ -37,14 +36,13 @@
   (let ((use  (principal-lvar-use lvar))
         (type (lvar-type lvar))
         leaf)
-    (cond ((and (ref-p use)
-                (constant-p (setf leaf (ref-leaf use))))
-           (constant-value leaf))
-          ((and (member-type-p type)
-                (eql 1 (member-type-size type)))
-           (first (member-type-members type)))
-          (t
-           (error "~S used on non-constant LVAR ~S" 'lvar-value lvar)))))
+    (if (and (ref-p use)
+             (constant-p (setf leaf (ref-leaf use))))
+        (constant-value leaf)
+        (multiple-value-bind (constantp value) (type-singleton-p type)
+          (unless constantp
+            (error "~S used on non-constant LVAR ~S" 'lvar-value lvar))
+          value))))
 
 ;;;; interface for obtaining results of type inference
 
