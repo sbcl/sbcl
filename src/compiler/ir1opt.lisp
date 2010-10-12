@@ -635,24 +635,43 @@
 
 ;;;; IF optimization
 
+;;; Utility: return T if both argument cblocks are equivalent.  For now,
+;;; detect only blocks that read the same leaf into the same lvar, and
+;;; continue to the same block.
+(defun cblocks-equivalent-p (x y)
+  (declare (type cblock x y))
+  (and (ref-p (block-start-node x))
+       (eq (block-last x) (block-start-node x))
+
+       (ref-p (block-start-node y))
+       (eq (block-last y) (block-start-node y))
+
+       (equal (block-succ x) (block-succ y))
+       (eql (ref-lvar (block-start-node x)) (ref-lvar (block-start-node y)))
+       (eql (ref-leaf (block-start-node x)) (ref-leaf (block-start-node y)))))
+
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
 ;;; is the case.
+;;; Similarly, when both branches are equivalent, branch directly to either
+;;; of them.
 ;;; Also, if the test has multiple uses, replicate the node when possible.
 (defun ir1-optimize-if (node)
   (declare (type cif node))
   (let ((test (if-test node))
         (block (node-block node)))
     (let* ((type (lvar-type test))
+           (consequent  (if-consequent  node))
+           (alternative (if-alternative node))
            (victim
             (cond ((constant-lvar-p test)
-                   (if (lvar-value test)
-                       (if-alternative node)
-                       (if-consequent node)))
+                   (if (lvar-value test) alternative consequent))
                   ((not (types-equal-or-intersect type (specifier-type 'null)))
-                   (if-alternative node))
+                   alternative)
                   ((type= type (specifier-type 'null))
-                   (if-consequent node)))))
+                   consequent)
+                  ((cblocks-equivalent-p alternative consequent)
+                   alternative))))
       (when victim
         (flush-dest test)
         (when (rest (block-succ block))
