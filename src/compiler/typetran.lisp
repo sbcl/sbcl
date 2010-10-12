@@ -81,7 +81,14 @@
           ((eq type *empty-type*)
            nil)
           (t
-           (give-up-ir1-transform)))))
+           (let ((intersect (type-intersection2 type otype)))
+             (unless intersect
+               (give-up-ir1-transform))
+             (multiple-value-bind (constantp value)
+                 (type-singleton-p intersect)
+               (if constantp
+                   `(eql object ',value)
+                   (give-up-ir1-transform))))))))
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type))
@@ -554,6 +561,9 @@
     (or (when (not ctype)
           (compiler-warn "illegal type specifier for TYPEP: ~S" type)
           (return-from source-transform-typep (values nil t)))
+        (multiple-value-bind (constantp value) (type-singleton-p ctype)
+          (and constantp
+               `(eql ,object ',value)))
         (let ((pred (cdr (assoc ctype *backend-type-predicates*
                                 :test #'type=))))
           (when pred `(,pred ,object)))
