@@ -51,6 +51,8 @@ changes relative to sbcl-1.0.43:
     also declared NOTINLINE. (lp#655581)
   * bug fix: the compiler could attempt to emit constant left shifts of 
     greater value than n-word-bits. (lp#309063)
+  * bug fix: (SETF SYMBOL-FUNCTION) and (SETF FDEFINITION) clear derived
+    type information for the function being set. (lp#659220)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

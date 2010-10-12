@@ -2006,4 +2006,16 @@
     (assert derived)
     (assert (equal '(integer 42 42) type))))
 
+(test-util:with-test (:name :clear-derived-types-on-set-fdefn)
+  (let ((*evaluator-mode* :compile)
+        (*derive-function-types* t))
+    (eval `(progn
+             (defun clear-derived-types-on-set-fdefn-1 ()
+               "foo")
+             (setf (symbol-function 'clear-derived-types-on-set-fdefn-1)
+                   (constantly "foobar"))
+             (defun clear-derived-types-on-set-fdefn-2 ()
+               (length (clear-derived-types-on-set-fdefn-1)))))
+    (assert (= 6 (clear-derived-types-on-set-fdefn-2)))))
+
 ;;; success

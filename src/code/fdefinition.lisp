@@ -60,6 +60,10 @@
         (setf (info :function :definition name) (make-fdefn name))
         fdefn)))
 
+(defun maybe-clobber-ftype (name)
+  (unless (eq :declared (info :function :where-from name))
+    (clear-info :function :type name)))
+
 ;;; Return the fdefinition of NAME, including any encapsulations.
 ;;; The compiler emits calls to this when someone tries to FUNCALL
 ;;; something. SETFable.
@@ -69,6 +73,7 @@
     (or (and fdefn (fdefn-fun fdefn))
         (error 'undefined-function :name name))))
 (defun (setf %coerce-name-to-fun) (function name)
+  (maybe-clobber-ftype name)
   (let ((fdefn (fdefinition-object name t)))
     (setf (fdefn-fun fdefn) function)))
 
@@ -233,6 +238,7 @@
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
+    (maybe-clobber-ftype name)
 
     ;; Check for hash-table stuff. Woe onto him that mixes encapsulation
     ;; with this.
