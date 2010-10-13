@@ -56,6 +56,9 @@ changes relative to sbcl-1.0.43:
   * bug fix: the system used to signal bogus STYLE-WARNINGs when functions
     containing self-calls were recompiled with a new signature, and failed
     to warn when a self-call using the old signature was left in. (lp#655126)
+  * bug fix: incorrect FILE-POSITION on streams opened using :EXTERNAL-FORMAT
+    :DEFAULT when the default external had character size other than 8 bits.
+    (lp#657183)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

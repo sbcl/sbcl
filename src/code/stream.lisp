@@ -133,12 +133,9 @@
   (setf (ansi-stream-sout stream) #'closed-flame)
   (setf (ansi-stream-misc stream) #'closed-flame))
 
-;;;; file position and file length
+;;;; for file position and file length
 (defun external-format-char-size (external-format)
-  (let ((ef-entry (get-external-format external-format)))
-    (if (variable-width-external-format-p ef-entry)
-        (bytes-for-char-fun ef-entry)
-        (funcall (bytes-for-char-fun ef-entry) #\x))))
+  (ef-char-size (get-external-format external-format)))
 
 ;;; Call the MISC method with the :FILE-POSITION operation.
 #!-sb-fluid (declaim (inline ansi-stream-file-position))

@@ -187,7 +187,8 @@
   (timeout nil :type (or single-float null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null))
-  (external-format :default)
+  ;; Not :DEFAULT, because we want to match CHAR-SIZE!
+  (external-format :latin-1)
   ;; fixed width, or function to call with a character
   (char-size 1 :type (or fixnum function))
   (output-bytes #'ill-out :type function)
@@ -791,6 +792,11 @@
   (octets-to-string-fun (missing-arg) :type function)
   (string-to-octets-fun (missing-arg) :type function))
 
+(defun ef-char-size (ef-entry)
+  (if (variable-width-external-format-p ef-entry)
+      (bytes-for-char-fun ef-entry)
+      (funcall (bytes-for-char-fun ef-entry) #\x)))
+
 (defun wrap-external-format-functions (external-format fun)
   (let ((result (%copy-external-format external-format)))
     (macrolet ((frob (accessor)
@@ -880,6 +886,7 @@
                 'character
                 1
                 (ef-write-n-bytes-fun entry)
+                (ef-char-size entry)
                 (canonize-external-format external-format entry)))))
   (dolist (entry *output-routines*)
     (when (and (subtypep type (first entry))
@@ -1226,6 +1233,7 @@
                 'character
                 1
                 (ef-read-n-chars-fun entry)
+                (ef-char-size entry)
                 (canonize-external-format external-format entry)))))
   (dolist (entry *input-routines*)
     (when (and (subtypep type (first entry))
@@ -1700,6 +1708,7 @@
          (character-stream-p (subtypep target-type 'character))
          (bivalent-stream-p (eq element-type :default))
          normalized-external-format
+         char-size
          (bin-routine #'ill-bin)
          (bin-type nil)
          (bin-size nil)
@@ -1743,24 +1752,23 @@
     (when output-p
       (setf (fd-stream-char-pos fd-stream) 0))
 
-    (when (and character-stream-p
-               (eq external-format :default))
+    (when (and character-stream-p (eq external-format :default))
       (/show0 "/getting default external format")
       (setf external-format (default-external-format)))
 
     (when input-p
       (when (or (not character-stream-p) bivalent-stream-p)
-        (multiple-value-setq (bin-routine bin-type bin-size read-n-characters
-                                          normalized-external-format)
-          (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
-                                  target-type)
-                              external-format))
+        (setf (values bin-routine bin-type bin-size read-n-characters
+                      char-size normalized-external-format)
+              (pick-input-routine (if bivalent-stream-p '(unsigned-byte 8)
+                                      target-type)
+                                  external-format))
         (unless bin-routine
           (error "could not find any input routine for ~S" target-type)))
       (when character-stream-p
-        (multiple-value-setq (cin-routine cin-type cin-size read-n-characters
-                                          normalized-external-format)
-          (pick-input-routine target-type external-format))
+        (setf (values cin-routine cin-type cin-size read-n-characters
+                      char-size normalized-external-format)
+              (pick-input-routine target-type external-format))
         (unless cin-routine
           (error "could not find any input routine for ~S" target-type)))
       (setf (fd-stream-in fd-stream) cin-routine
@@ -1769,8 +1777,8 @@
       (setf input-size (or cin-size bin-size))
       (setf input-type (or cin-type bin-type))
       (when normalized-external-format
-        (setf (fd-stream-external-format fd-stream)
-              normalized-external-format))
+        (setf (fd-stream-external-format fd-stream) normalized-external-format
+              (fd-stream-char-size fd-stream) char-size))
       (when (= (or cin-size 1) (or bin-size 1) 1)
         (setf (fd-stream-n-bin fd-stream) ;XXX
               (if (and character-stream-p (not bivalent-stream-p))
@@ -1797,33 +1805,33 @@
 
     (when output-p
       (when (or (not character-stream-p) bivalent-stream-p)
-        (multiple-value-setq (bout-routine bout-type bout-size output-bytes
-                                           normalized-external-format)
-          (let ((buffering (fd-stream-buffering fd-stream)))
-            (if bivalent-stream-p
-                (pick-output-routine '(unsigned-byte 8)
-                                     (if (eq :line buffering)
-                                         :full
-                                         buffering)
-                                     external-format)
-                (pick-output-routine target-type buffering external-format))))
+        (setf (values bout-routine bout-type bout-size output-bytes
+                      char-size normalized-external-format)
+              (let ((buffering (fd-stream-buffering fd-stream)))
+                (if bivalent-stream-p
+                    (pick-output-routine '(unsigned-byte 8)
+                                         (if (eq :line buffering)
+                                             :full
+                                             buffering)
+                                         external-format)
+                    (pick-output-routine target-type buffering external-format))))
         (unless bout-routine
           (error "could not find any output routine for ~S buffered ~S"
                  (fd-stream-buffering fd-stream)
                  target-type)))
       (when character-stream-p
-        (multiple-value-setq (cout-routine cout-type cout-size output-bytes
-                                           normalized-external-format)
-          (pick-output-routine target-type
-                               (fd-stream-buffering fd-stream)
-                               external-format))
+        (setf (values cout-routine cout-type cout-size output-bytes
+                      char-size normalized-external-format)
+              (pick-output-routine target-type
+                                   (fd-stream-buffering fd-stream)
+                                   external-format))
         (unless cout-routine
           (error "could not find any output routine for ~S buffered ~S"
                  (fd-stream-buffering fd-stream)
                  target-type)))
       (when normalized-external-format
-        (setf (fd-stream-external-format fd-stream)
-              normalized-external-format))
+        (setf (fd-stream-external-format fd-stream) normalized-external-format
+              (fd-stream-char-size fd-stream) char-size))
       (when character-stream-p
         (setf (fd-stream-output-bytes fd-stream) output-bytes))
       (setf (fd-stream-out fd-stream) cout-routine
@@ -2220,9 +2228,7 @@
                                  :pathname pathname
                                  :buffering buffering
                                  :dual-channel-p dual-channel-p
-                                 :external-format external-format
                                  :bivalent-p (eq element-type :default)
-                                 :char-size (external-format-char-size external-format)
                                  :serve-events serve-events
                                  :timeout
                                  (if timeout

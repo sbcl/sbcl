@@ -675,4 +675,35 @@
            (setf fifo nil))))
      sb-impl::*external-formats*)))
 
+(with-test (:name :bug-657183)
+  (let ((name (merge-pathnames "stream-impure.temp-test"))
+        (text '(#\GREEK_SMALL_LETTER_LAMDA
+                #\JAPANESE_BANK_SYMBOL
+                #\Space
+                #\HEAVY_BLACK_HEART))
+        (positions '(2 5 6 9))
+        (sb-impl::*default-external-format* :utf-8))
+    (unwind-protect
+         (progn
+           (with-open-file (f name :external-format :default :direction :output
+                              :if-exists :supersede)
+             (assert (eql 0 (file-position f)))
+             (mapc (lambda (char pos)
+                     (write-char char f)
+                     (assert (eql pos (file-position f))))
+                   text
+                   positions))
+           (with-open-file (f name :external-format :default :direction :input)
+             (assert (eql 0 (file-position f)))
+             (assert (eql (pop text) (read-char f)))
+             (assert (eql (file-position f) 2))
+             (assert (eql (pop text) (read-char f)))
+             (assert (eql (file-position f) 5))
+             (assert (eql (pop text) (read-char f)))
+             (assert (eql (file-position f) 6))
+             (assert (eql (pop text) (read-char f)))
+             (assert (eql (file-position f) 9))
+             (assert (eql (file-length f) 9))))
+      (ignore-errors (delete-file name)))))
+
 ;;; success
