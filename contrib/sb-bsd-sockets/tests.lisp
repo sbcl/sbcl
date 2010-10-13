@@ -20,6 +20,10 @@
   (integerp (get-protocol-by-name "udp"))
   t)
 
+;;; See https://bugs.launchpad.net/sbcl/+bug/659857
+;;; Apparently getprotobyname_r on FreeBSD says -1 and EINTR
+;;; for unknown protocols...
+#-(and freebsd sb-thread)
 (deftest get-protocol-by-name/error
   (handler-case (get-protocol-by-name "nonexistent-protocol")
     (unknown-protocol ()
