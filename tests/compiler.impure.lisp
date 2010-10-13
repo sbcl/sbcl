@@ -2018,4 +2018,27 @@
                (length (clear-derived-types-on-set-fdefn-1)))))
     (assert (= 6 (clear-derived-types-on-set-fdefn-2)))))
 
+(test-util:with-test (:name :bug-655126)
+  (let ((*evaluator-mode* :compile)
+        (*derive-function-types* t))
+    (eval `(defun bug-655126 (x) x))
+    (assert (eq :style-warning
+                (handler-case
+                    (eval `(defun bug-655126-2 ()
+                             (bug-655126)))
+                  (style-warning ()
+                    :style-warning))))
+    (assert (eq 'bug-655126
+                (handler-case
+                    (eval `(defun bug-655126 (x y)
+                             (cons x y)))
+                  ((and style-warning (not sb-kernel:redefinition-warning)) ()
+                    :oops))))
+    (assert (eq :style-warning
+                (handler-case
+                    (eval `(defun bug-655126 (x)
+                             (bug-655126 x y)))
+                  ((and style-warning (not sb-kernel:redefinition-warning)) ()
+                    :style-warning))))))
+
 ;;; success

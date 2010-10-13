@@ -1015,7 +1015,7 @@
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))
        (if (and name (legal-fun-name-p name))
-           (let ((defined-fun-res (get-defined-fun name))
+           (let ((defined-fun-res (get-defined-fun name (second lambda-expression)))
                  (res (ir1-convert-lambda lambda-expression
                                           :maybe-add-debug-catch t
                                           :source-name name)))
@@ -1073,10 +1073,37 @@
       (setf (functional-inline-expanded clambda) t)
       clambda)))
 
+;;; Given a lambda-list, return a FUN-TYPE object representing the signature:
+;;; return type is *, and each individual arguments type is T -- but we get
+;;; the argument counts and keywords.
+(defun ftype-from-lambda-list (lambda-list)
+  (multiple-value-bind (req opt restp rest-name keyp key-list allowp morep)
+      (parse-lambda-list lambda-list)
+    (declare (ignore rest-name))
+    (flet ((t (list)
+             (mapcar (constantly t) list)))
+      (let ((reqs (t req))
+            (opts (when opt (cons '&optional (t opt))))
+            ;; When it comes to building a type, &REST means pretty much the
+            ;; same thing as &MORE.
+            (rest (when (or morep restp) (list '&rest t)))
+            (keys (when keyp
+                    (cons '&key (mapcar (lambda (spec)
+                                          (let ((key/var (if (consp spec)
+                                                             (car spec)
+                                                             spec)))
+                                            (list (if (consp key/var)
+                                                      (car key/var)
+                                                      (keywordicate key/var))
+                                                  t)))
+                                        key-list))))
+            (allow (when allowp (list '&allow-other-keys))))
+        (specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
+
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the
 ;;; previous references.
-(defun get-defined-fun (name)
+(defun get-defined-fun (name &optional (lambda-list nil lp))
   (proclaim-as-fun-name name)
   (when (boundp '*free-funs*)
     (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))
@@ -1087,15 +1114,20 @@
                     (res (make-defined-fun
                           :%source-name name
                           :where-from (if (eq where-from :declared)
-                                          :declared :defined)
-                          :type (leaf-type found))))
+                                          :declared
+                                          :defined)
+                          :type (if (eq :declared where-from)
+                                    (leaf-type found)
+                                    (if lp
+                                        (ftype-from-lambda-list lambda-list)
+                                        (specifier-type 'function))))))
                (substitute-leaf res found)
                (setf (gethash name *free-funs*) res)))
             ;; If *FREE-FUNS* has a previously converted definition
             ;; for this name, then blow it away and try again.
             ((defined-fun-functionals found)
              (remhash name *free-funs*)
-             (get-defined-fun name))
+             (get-defined-fun name lambda-list))
             (t found)))))
 
 ;;; Check a new global function definition for consistency with
@@ -1184,7 +1216,9 @@
 (defun %compiler-defun (name lambda-with-lexenv compile-toplevel)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
-      (setf defined-fun (get-defined-fun name))
+      (setf defined-fun (if lambda-with-lexenv
+                            (get-defined-fun name (fifth lambda-with-lexenv))
+                            (get-defined-fun name)))
       (when (boundp '*lexenv*)
         (remhash name *free-funs*)
         (aver (fasl-output-p *compile-object*))

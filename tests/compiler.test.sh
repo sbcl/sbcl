@@ -26,6 +26,15 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+# This should fail (but right now we just get a style-warning), as
+# type inference should show that the call to FOO has a wrong number
+# of args.
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x) (or x (foo x x)))
+EOF
+expect_condition_during_compile style-warning $tmpfilename
+
 # This should fail, as we define a function multiply in the same file
 # (CLHS 3.2.2.3).
 cat > $tmpfilename <<EOF
