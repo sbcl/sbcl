@@ -211,7 +211,8 @@ waiting."
              (loop for to-msec = (if (and to-sec to-usec)
                                      (+ (* 1000 to-sec) (truncate to-usec 1000))
                                      -1)
-                   when (sb!unix:unix-simple-poll fd direction to-msec)
+                   when (or #!+win32 (eq direction :output)
+                            (sb!unix:unix-simple-poll fd direction to-msec))
                    do (return-from wait-until-fd-usable t)
                    else
                    do (when to-sec (maybe-update-timeout))))))))
