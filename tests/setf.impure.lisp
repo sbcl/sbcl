@@ -100,4 +100,11 @@
     (assert (equal `(funcall #'(setf foo) ,@stores 1 2 3) set))
     (assert (equal '(foo 1 2 3) get))))
 
+(with-test (:name :update-fn-should-be-a-symbol-in-defsetf)
+  (assert (eq :error
+            (handler-case
+                (eval '(defsetf access-fn 5))
+              (error ()
+                :error)))))
+
 ;;; success

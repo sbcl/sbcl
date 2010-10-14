@@ -393,7 +393,7 @@ GET-SETF-EXPANSION directly."
   #!+sb-doc
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
-  (cond ((not (listp (car rest)))
+  (cond ((and (not (listp (car rest))) (symbolp (car rest)))
          `(eval-when (:load-toplevel :compile-toplevel :execute)
             (assign-setf-macro ',access-fn
                                nil
