@@ -322,8 +322,8 @@
           (dest (lvar-dest lvar)))
       (substitute-lvar internal-lvar lvar)
       (let ((cast (insert-cast-before dest lvar type policy)))
-        (use-lvar cast internal-lvar))))
-  (values))
+        (use-lvar cast internal-lvar)
+        t))))
 
 
 ;;;; IR1-OPTIMIZE
@@ -801,24 +801,35 @@
        (dolist (arg args)
          (when arg
            (setf (lvar-reoptimize arg) nil)))
-       (when info
-         (check-important-result node info)
-         (let ((fun (fun-info-destroyed-constant-args info)))
-           (when fun
-             (let ((destroyed-constant-args (funcall fun args)))
-               (when destroyed-constant-args
-                 (let ((*compiler-error-context* node))
-                   (warn 'constant-modified
-                         :fun-name (lvar-fun-name
-                                    (basic-combination-fun node)))
-                   (setf (basic-combination-kind node) :error)
-                   (return-from ir1-optimize-combination))))))
-         (let ((fun (fun-info-derive-type info)))
-           (when fun
-             (let ((res (funcall fun node)))
-               (when res
-                 (derive-node-type node (coerce-to-values res))
-                 (maybe-terminate-block node nil)))))))
+       (cond (info
+              (check-important-result node info)
+              (let ((fun (fun-info-destroyed-constant-args info)))
+                (when fun
+                  (let ((destroyed-constant-args (funcall fun args)))
+                    (when destroyed-constant-args
+                      (let ((*compiler-error-context* node))
+                        (warn 'constant-modified
+                              :fun-name (lvar-fun-name
+                                         (basic-combination-fun node)))
+                        (setf (basic-combination-kind node) :error)
+                        (return-from ir1-optimize-combination))))))
+              (let ((fun (fun-info-derive-type info)))
+                (when fun
+                  (let ((res (funcall fun node)))
+                    (when res
+                      (derive-node-type node (coerce-to-values res))
+                      (maybe-terminate-block node nil))))))
+             (t
+              ;; Check against the DEFINED-TYPE unless TYPE is already good.
+              (let* ((fun (basic-combination-fun node))
+                     (uses (lvar-uses fun))
+                     (leaf (when (ref-p uses) (ref-leaf uses))))
+                (multiple-value-bind (type defined-type)
+                    (if (global-var-p leaf)
+                        (values (leaf-type leaf) (leaf-defined-type leaf))
+                        (values nil nil))
+                  (when (and (not (fun-type-p type)) (fun-type-p defined-type))
+                    (validate-call-type node type leaf)))))))
       (:known
        (aver info)
        (dolist (arg args)
@@ -1041,50 +1052,46 @@
 ;;; syntax check, arg/result type processing, but still call
 ;;; RECOGNIZE-KNOWN-CALL, since the call might be to a known lambda,
 ;;; and that checking is done by local call analysis.
-(defun validate-call-type (call type defined-type ir1-converting-not-optimizing-p)
+(defun validate-call-type (call type fun &optional ir1-converting-not-optimizing-p)
   (declare (type combination call) (type ctype type))
-  (cond ((not (fun-type-p type))
-         (aver (multiple-value-bind (val win)
-                   (csubtypep type (specifier-type 'function))
-                 (or val (not win))))
-         ;; In the commonish case where the function has been defined
-         ;; in another file, we only get FUNCTION for the type; but we
-         ;; can check whether the current call is valid for the
-         ;; existing definition, even if only to STYLE-WARN about it.
-         (when defined-type
-           (valid-fun-use call defined-type
+  (let* ((where (when fun (leaf-where-from fun)))
+         (same-file-p (eq :defined-here where)))
+    (cond ((not (fun-type-p type))
+           (aver (multiple-value-bind (val win)
+                     (csubtypep type (specifier-type 'function))
+                   (or val (not win))))
+           ;; Using the defined-type too early is a bit of a waste: during
+           ;; conversion we cannot use the untrusted ASSERT-CALL-TYPE, etc.
+           (when (and fun (not ir1-converting-not-optimizing-p))
+             (let ((defined-type (leaf-defined-type fun)))
+               (when (and (fun-type-p defined-type)
+                          (neq fun (combination-type-validated-for-leaf call)))
+                 ;; Don't validate multiple times against the same leaf --
+                 ;; it doesn't add any information, but may generate the same warning
+                 ;; multiple times.
+                 (setf (combination-type-validated-for-leaf call) fun)
+                 (when (and (valid-fun-use call defined-type
+                                           :argument-test #'always-subtypep
+                                           :result-test nil
+                                           :lossage-fun (if same-file-p
+                                                            #'compiler-warn
+                                                            #'compiler-style-warn)
+                                           :unwinnage-fun #'compiler-notify)
+                            same-file-p)
+                   (assert-call-type call defined-type nil)
+                   (maybe-terminate-block call ir1-converting-not-optimizing-p)))))
+           (recognize-known-call call ir1-converting-not-optimizing-p))
+          ((valid-fun-use call type
                           :argument-test #'always-subtypep
                           :result-test nil
-                          :lossage-fun #'compiler-style-warn
-                          :unwinnage-fun #'compiler-notify))
-         (recognize-known-call call ir1-converting-not-optimizing-p))
-        ((valid-fun-use call type
-                        :argument-test #'always-subtypep
-                        :result-test nil
-                        ;; KLUDGE: Common Lisp is such a dynamic
-                        ;; language that all we can do here in
-                        ;; general is issue a STYLE-WARNING. It
-                        ;; would be nice to issue a full WARNING
-                        ;; in the special case of of type
-                        ;; mismatches within a compilation unit
-                        ;; (as in section 3.2.2.3 of the spec)
-                        ;; but at least as of sbcl-0.6.11, we
-                        ;; don't keep track of whether the
-                        ;; mismatched data came from the same
-                        ;; compilation unit, so we can't do that.
-                        ;; -- WHN 2001-02-11
-                        ;;
-                        ;; FIXME: Actually, I think we could
-                        ;; issue a full WARNING if the call
-                        ;; violates a DECLAIM FTYPE.
-                        :lossage-fun #'compiler-style-warn
-                        :unwinnage-fun #'compiler-notify)
-         (assert-call-type call type)
-         (maybe-terminate-block call ir1-converting-not-optimizing-p)
-         (recognize-known-call call ir1-converting-not-optimizing-p))
-        (t
-         (setf (combination-kind call) :error)
-         (values nil nil))))
+                          :lossage-fun #'compiler-warn
+                          :unwinnage-fun #'compiler-notify)
+           (assert-call-type call type)
+           (maybe-terminate-block call ir1-converting-not-optimizing-p)
+           (recognize-known-call call ir1-converting-not-optimizing-p))
+          (t
+           (setf (combination-kind call) :error)
+           (values nil nil)))))
 
 ;;; This is called by IR1-OPTIMIZE when the function for a call has
 ;;; changed. If the call is local, we try to LET-convert it, and
@@ -1106,7 +1113,9 @@
            (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
-           (validate-call-type call (lvar-type fun-lvar) nil nil)
+           (let* ((uses (lvar-uses fun-lvar))
+                  (leaf (when (ref-p uses) (ref-leaf uses))))
+             (validate-call-type call (lvar-type fun-lvar) leaf))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))

@@ -1115,7 +1115,7 @@
                           :%source-name name
                           :where-from (if (eq where-from :declared)
                                           :declared
-                                          :defined)
+                                          :defined-here)
                           :type (if (eq :declared where-from)
                                     (leaf-type found)
                                     (if lp
@@ -1240,8 +1240,7 @@
     ;; old CMU CL comment:
     ;;   If there is a type from a previous definition, blast it,
     ;;   since it is obsolete.
-    (when (and defined-fun
-               (eq (leaf-where-from defined-fun) :defined))
+    (when (and defined-fun (neq :declared (leaf-where-from defined-fun)))
       (setf (leaf-type defined-fun)
             ;; FIXME: If this is a block compilation thing, shouldn't
             ;; we be setting the type to the full derived type for the

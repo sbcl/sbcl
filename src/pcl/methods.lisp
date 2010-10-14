@@ -616,11 +616,11 @@
             ;; 7.6.4 point 5 probably entails that if any method says
             ;; &allow-other-keys then the gf should be construed to
             ;; accept any key.
-            (let ((allowp (or gf.allowp
-                              (find '&allow-other-keys methods
-                                    :test #'find
-                                    :key #'method-lambda-list))))
-              (setf (info :function :type name)
+            (let* ((allowp (or gf.allowp
+                               (find '&allow-other-keys methods
+                                     :test #'find
+                                     :key #'method-lambda-list)))
+                   (ftype
                     (specifier-type
                      `(function
                        (,@(mapcar tfun gf.required)
@@ -644,10 +644,11 @@
                               `(&key))
                           ,@(when allowp
                               `(&allow-other-keys)))
-                       *))
+                       *))))
+              (setf (info :function :type name) ftype
                     (info :function :where-from name) :defined-method
-                    (gf-info-needs-update gf) nil))))))
-    (values)))
+                    (gf-info-needs-update gf) nil)
+              ftype)))))))
 
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types

@@ -88,10 +88,16 @@
         (eq (info :function :inlinep name) :notinline))))
 
 ;; This will get redefined in PCL boot.
-(declaim (notinline update-info-for-gf))
+(declaim (notinline maybe-update-info-for-gf))
 (defun maybe-update-info-for-gf (name)
-  (declare (ignorable name))
-  (values))
+  (declare (ignore name))
+  nil)
+
+(defun maybe-defined-here (name where)
+  (if (and (eq :defined where)
+           (member name *fun-names-in-this-file* :test #'equal))
+      :defined-here
+      where))
 
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
@@ -113,24 +119,23 @@
                ;; complain about undefined functions.
                (not latep))
       (note-undefined-reference name :function))
-    (make-global-var
-     :kind :global-function
-     :%source-name name
-     :type (if (or (eq where :declared)
-                   (and (not latep)
-                        (or *derive-function-types*
-                            (eq where :defined-method)
-                            (and (not (fun-lexically-notinline-p name))
-                                 (member name *fun-names-in-this-file*
-                                         :test #'equal)))))
-               (progn
-                 (maybe-update-info-for-gf name)
-                 (info :function :type name))
-               (specifier-type 'function))
-     :defined-type (if (eq where :defined)
-                       (info :function :type name)
-                       *universal-type*)
-     :where-from where)))
+    (let ((ftype (info :function :type name))
+          (notinline (fun-lexically-notinline-p name)))
+      (make-global-var
+       :kind :global-function
+       :%source-name name
+       :type (if (or (eq where :declared)
+                     (and (not latep)
+                          (not notinline)
+                          *derive-function-types*))
+                 ftype
+                 (specifier-type 'function))
+       :defined-type (if (and (not latep) (not notinline))
+                         (or (maybe-update-info-for-gf name) ftype)
+                         (specifier-type 'function))
+       :where-from (if notinline
+                       where
+                       (maybe-defined-here name where))))))
 
 ;;; Have some DEFINED-FUN-FUNCTIONALS of a *FREE-FUNS* entry become invalid?
 ;;; Drop 'em.
@@ -210,7 +215,9 @@
                         :%source-name name
                         :inline-expansion expansion
                         :inlinep inlinep
-                        :where-from where
+                        :where-from (if (eq inlinep :notinline)
+                                        where
+                                        (maybe-defined-here name where))
                         :type (if (and (eq inlinep :notinline)
                                        (neq where :declared))
                                   (specifier-type 'function)
@@ -1076,9 +1083,8 @@
            (type leaf var))
   (let* ((node (ir1-convert-combination start next result form var))
          (fun-lvar (basic-combination-fun node))
-         (type (leaf-type var))
-         (defined-type (leaf-defined-type var)))
-    (when (validate-call-type node type defined-type t)
+         (type (leaf-type var)))
+    (when (validate-call-type node type var t)
       (setf (lvar-%derived-type fun-lvar)
             (make-single-value-type type))
       (setf (lvar-reoptimize fun-lvar) nil)))

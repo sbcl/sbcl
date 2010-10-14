@@ -837,13 +837,27 @@
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
-(defun assert-call-type (call type)
+(defun assert-call-type (call type &optional (trusted t))
   (declare (type combination call) (type fun-type type))
-  (derive-node-type call (fun-type-returns type))
-  (let ((policy (lexenv-policy (node-lexenv call))))
+  (let ((policy (lexenv-policy (node-lexenv call)))
+        (returns (fun-type-returns type)))
+    (if trusted
+        (derive-node-type call returns)
+        (let ((lvar (node-lvar call)))
+          ;; If the value is used in a non-tail position, and
+          ;; the lvar is a single-use, assert the type. Multiple use
+          ;; sites need to be elided because the assertion has to apply
+          ;; to all uses. Tail positions are elided because the assertion
+          ;; would lose cause us not the be in a tail-position anymore.
+          (when (and lvar
+                     (not (return-p (lvar-dest lvar)))
+                     (lvar-has-single-use-p lvar))
+            (when (assert-lvar-type lvar returns policy)
+              (reoptimize-lvar lvar)))))
     (map-combination-args-and-types
      (lambda (arg type)
-       (assert-lvar-type arg type policy))
+       (when (assert-lvar-type arg type policy)
+         (unless trusted (reoptimize-lvar arg))))
      call))
   (values))
 

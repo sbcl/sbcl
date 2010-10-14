@@ -619,16 +619,13 @@
   ;; the type which values of this leaf have last been defined to have
   ;; (but maybe won't have in future, in case of redefinition)
   (defined-type *universal-type* :type ctype)
-  ;; where the TYPE information came from:
+  ;; where the TYPE information came from (in order, from strongest to weakest):
   ;;  :DECLARED, from a declaration.
-  ;;  :ASSUMED, from uses of the object.
-  ;;  :DEFINED, from examination of the definition.
+  ;;  :DEFINED-HERE, from examination of the definition in the same file.
+  ;;  :DEFINED, from examination of the definition elsewhere.
   ;;  :DEFINED-METHOD, implicit, piecemeal declarations from CLOS.
-  ;; FIXME: This should be a named type. (LEAF-WHERE-FROM? Or
-  ;; perhaps just WHERE-FROM, since it's not just used in LEAF,
-  ;; but also in various DEFINE-INFO-TYPEs in globaldb.lisp,
-  ;; and very likely elsewhere too.)
-  (where-from :assumed :type (member :declared :assumed :defined :defined-method))
+  ;;  :ASSUMED, from uses of the object.
+  (where-from :assumed :type (member :declared :assumed :defined-here :defined :defined-method))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
   ;; true if there was ever a REF or SET node for this leaf. This may
@@ -695,6 +692,7 @@
   %source-name
   #!+sb-show id
   (type :test (not (eq type *universal-type*)))
+  (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   kind)
 
@@ -1233,6 +1231,8 @@
   (kind :full :type (member :local :full :error :known))
   ;; if a call to a known global function, contains the FUN-INFO.
   (fun-info nil :type (or fun-info null))
+  ;; Untrusted type we have asserted for this combination.
+  (type-validated-for-leaf nil)
   ;; some kind of information attached to this node by the back end
   (info nil)
   (step-info))
