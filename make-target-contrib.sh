@@ -57,6 +57,10 @@ find contrib/ \( -name '*.fasl' -o \
 
 find output -name 'building-contrib.*' -print | xargs rm -f
 
+# Ignore all source registries.
+CL_SOURCE_REGISTRY='(:source-registry :ignore-inherited-configuration)'
+export CL_SOURCE_REGISTRY
+
 for i in contrib/*; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `

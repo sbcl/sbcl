@@ -65,6 +65,8 @@ changes relative to sbcl-1.0.43:
   * bug fix: derived types of functions in the same file were implicitly
     trusted, leading to potential heap corruption when those function were
     defined incompatibly. (lp#657499)
+  * bug fix: existing ASDF source registries are ignored when building
+    contribs (lp#659105)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
