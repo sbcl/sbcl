@@ -67,6 +67,10 @@ changes relative to sbcl-1.0.43:
     defined incompatibly. (lp#657499)
   * bug fix: existing ASDF source registries are ignored when building
     contribs (lp#659105)
+  * bug fix: short-form DEFSETF checks that the second argument is a symbol
+    (lp#655824, thanks to Roman Marynchak)
+  * bug fix: (SETF MACRO-FUNCTION) clobbered macro-definitions before
+    package-lock violation was detected. (lp#660752)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

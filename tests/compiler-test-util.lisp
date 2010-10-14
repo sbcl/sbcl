@@ -95,7 +95,7 @@
   `(check-consing t ',form (lambda () ,form) ,times))
 
 (defun file-compile (toplevel-forms &key load)
-  (let* ((lisp "compile-impure-tmp.lisp")
+  (let* ((lisp (merge-pathnames "file-compile-tmp.lisp"))
          (fasl (compile-file-pathname lisp)))
     (unwind-protect
          (progn

@@ -162,19 +162,20 @@ only."
            symbol environment))
   (when (eq (info :function :kind symbol) :special-form)
     (error "~S names a special form." symbol))
-  (setf (info :function :kind symbol) :macro)
-  (setf (info :function :macro-function symbol) function)
-  ;; This is a nice thing to have in the target SBCL, but in the
-  ;; cross-compilation host it's not nice to mess with
-  ;; (SYMBOL-FUNCTION FOO) where FOO might be a symbol in the
-  ;; cross-compilation host's COMMON-LISP package.
-  #-sb-xc-host
-  (setf (symbol-function symbol)
-        (lambda (&rest args)
-          (declare (ignore args))
-          ;; (ANSI specification of FUNCALL says that this should be
-          ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.)
-          (error 'undefined-function :name symbol)))
+  (with-single-package-locked-error (:symbol symbol "setting the macro-function of ~S")
+    (setf (info :function :kind symbol) :macro)
+    (setf (info :function :macro-function symbol) function)
+    ;; This is a nice thing to have in the target SBCL, but in the
+    ;; cross-compilation host it's not nice to mess with
+    ;; (SYMBOL-FUNCTION FOO) where FOO might be a symbol in the
+    ;; cross-compilation host's COMMON-LISP package.
+    #-sb-xc-host
+    (setf (symbol-function symbol)
+          (lambda (&rest args)
+            (declare (ignore args))
+            ;; (ANSI specification of FUNCALL says that this should be
+            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.)
+            (error 'undefined-function :name symbol))))
   function)
 
 (defun fun-locally-defined-p (name env)

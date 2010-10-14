@@ -14,6 +14,7 @@
 (in-package :cl-user)
 
 (load "assertoid.lisp")
+(load "compiler-test-util.lisp")
 (use-package "ASSERTOID")
 
 ;;;; Our little labrats and a few utilities
@@ -503,5 +504,35 @@
   (assert (raises-error? (eval `(defmacro test:function (x) x))
                          sb-ext:package-lock-violation))
   (assert (eq 'test:function (eval `(test:function)))))
+
+(defpackage :macro-killing-macro-1
+  (:use :cl)
+  (:lock t)
+  (:export #:to-die-for))
+
+(defpackage :macro-killing-macro-2
+  (:use :cl :macro-killing-macro-1))
+
+(ctu:file-compile
+ `((in-package :macro-killing-macro-1)
+   (defmacro to-die-for ()
+     :original))
+ :load t)
+
+(ctu:file-compile
+ `((in-package :macro-killing-macro-2)
+   (defmacro to-die-for ()
+     :replacement)))
+
+(with-test (:name :defmacro-killing-macro)
+  (assert (eq :original (macroexpand '(macro-killing-macro-1:to-die-for)))))
+
+(ctu:file-compile
+ `((in-package :macro-killing-macro-2)
+   (eval-when (:compile-toplevel)
+     (setf (macro-function 'to-die-for) (constantly :replacement2)))))
+
+(with-test (:name :setf-macro-function-killing-macro)
+  (assert (eq :original (macroexpand '(macro-killing-macro-1:to-die-for)))))
 
 ;;; WOOT! Done.
