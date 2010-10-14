@@ -1408,7 +1408,7 @@
 (defknown %typep (t (or type-specifier ctype)) boolean
   (movable flushable explicit-check))
 (defknown %instance-typep (t (or type-specifier ctype)) boolean
-  (movable flushable explicit-check))
+  (movable flushable explicit-check always-translatable))
 
 (defknown %cleanup-point () t)
 (defknown %special-bind (t t) t)
