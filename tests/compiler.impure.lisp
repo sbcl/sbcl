@@ -1003,33 +1003,18 @@
     (assert (= 0 (count-full-calls "FOO-MAYBE-INLINE" fun)))
     (assert (= 1 (count-full-calls "QUUX-MARKER" fun)))))
 
-(defun file-compile (toplevel-forms &key load)
-  (let* ((lisp "compile-impure-tmp.lisp")
-         (fasl (compile-file-pathname lisp)))
-    (unwind-protect
-         (progn
-           (with-open-file (f lisp :direction :output)
-             (dolist (form toplevel-forms)
-               (prin1 form f)))
-           (multiple-value-bind (fasl warn fail) (compile-file lisp)
-             (when load
-               (load fasl))
-             (values warn fail)))
-      (ignore-errors (delete-file lisp))
-      (ignore-errors (delete-file fasl)))))
-
 (with-test (:name :bug-405)
   ;; These used to break with a TYPE-ERROR
   ;;     The value NIL is not of type SB-C::PHYSENV.
   ;; in MERGE-LETS.
-  (file-compile
+  (ctu:file-compile
    '((LET (outer-let-var)
        (lambda ()
          (print outer-let-var)
          (MULTIPLE-VALUE-CALL 'some-function
            (MULTIPLE-VALUE-CALL (LAMBDA (a) 'foo)
              1))))))
-  (file-compile
+  (ctu:file-compile
    '((declaim (optimize (debug 3)))
      (defstruct bug-405-foo bar)
      (let ()

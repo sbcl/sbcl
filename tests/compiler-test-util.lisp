@@ -19,7 +19,8 @@
            #:compiler-derived-type
            #:find-value-cell-values
            #:find-code-constants
-           #:find-named-callees))
+           #:find-named-callees
+           #:file-compile))
 
 (cl:in-package :ctu)
 
@@ -92,3 +93,18 @@
 
 (defmacro assert-consing (form &optional (times '+times+))
   `(check-consing t ',form (lambda () ,form) ,times))
+
+(defun file-compile (toplevel-forms &key load)
+  (let* ((lisp "compile-impure-tmp.lisp")
+         (fasl (compile-file-pathname lisp)))
+    (unwind-protect
+         (progn
+           (with-open-file (f lisp :direction :output)
+             (dolist (form toplevel-forms)
+               (prin1 form f)))
+           (multiple-value-bind (fasl warn fail) (compile-file lisp)
+             (when load
+               (load fasl))
+             (values warn fail)))
+      (ignore-errors (delete-file lisp))
+      (ignore-errors (delete-file fasl)))))
