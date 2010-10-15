@@ -444,19 +444,25 @@ with #\@. Optionally downcase the result."
 
 ;;; line markups
 
-(defvar *not-symbols* '("ANSI" "CLHS"))
+(defvar *not-symbols* '("ANSI" "CLHS" "UNIX"))
 
 (defun locate-symbols (line)
   "Return a list of index pairs of symbol-like parts of LINE."
   ;; This would be a good application for a regex ...
   (let (result)
     (flet ((grab (start end)
-             (unless (member (subseq line start end) '("ANSI" "CLHS"))
-               (push (list start end) result))))
+             (unless (member (subseq line start end) *not-symbols*)
+               (push (list start end) result)))
+           (got-symbol-p (start)
+             (let ((end (when (< start (length line))
+                          (position #\space line :start start))))
+               (when end
+                 (every (lambda (char) (find char *symbol-characters*))
+                        (subseq line start end))))))
       (do ((begin nil)
            (maybe-begin t)
            (i 0 (1+ i)))
-          ((= i (length line))
+          ((>= i (length line))
            ;; symbol at end of line
            (when (and begin (or (> i (1+ begin))
                                 (not (member (char line begin) '(#\A #\I)))))
@@ -479,6 +485,16 @@ with #\@. Optionally downcase the result."
           ((find (char line i) *symbol-delimiters*)
            ;; potential symbol begin after this position
            (setf maybe-begin t))
+          ((and (eql #\( (char line i)) (got-symbol-p (1+ i)))
+           ;; a type designator, or a function call as part of the text?
+           (multiple-value-bind (exp end)
+               (let ((*package* (find-package :cl-user)))
+                 (ignore-errors (read-from-string line nil nil :start i)))
+             (when exp
+               (grab i end)
+               (setf begin nil
+                     maybe-begin nil
+                     i end))))
           (t
            ;; Not reading a symbol, not at potential start of symbol
            (setf maybe-begin nil)))))))
