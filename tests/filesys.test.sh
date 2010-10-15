@@ -257,5 +257,46 @@ test -d foo?bar
 check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 2" $? \
     0 "(directory exists)"
 
+# DELETE-DIRECTORY
+use_test_subdirectory
+mkdir    dont_delete_me
+touch    me_neither
+mkdir    simple_test_subdir1
+mkdir    simple_test_subdir2
+mkdir -p deep/1/2/
+touch    deep/a
+touch    deep/b
+touch    deep/1/c
+touch    deep/1/d
+touch    deep/1/2/e
+touch    deep/1/2/f
+ln -s    `pwd`/dont_delete_me deep/linky
+ln -s    `pwd`/me_neither deep/1/another_linky
+
+run_sbcl --eval '(sb-ext:delete-directory "simple_test_subdir1")' \
+         --eval '(sb-ext:delete-directory "simple_test_subdir2/")' \
+         --eval '(sb-ext:delete-directory "deep" :recursive t)' \
+         --eval '(sb-ext:quit)'
+
+test -e simple_test_subdir1
+check_status_maybe_lose "delete-directory 1" $? \
+  1 "deleted"
+
+test -e simple_test_subdir2
+check_status_maybe_lose "delete-directory 2" $? \
+  1 "deleted"
+
+test -e deep
+check_status_maybe_lose "delete-directory 3" $? \
+  1 "deleted"
+
+test -e dont_delete_me
+check_status_maybe_lose "delete-directory 4" $? \
+  0 "didn't follow link"
+
+test -e me_neither
+check_status_maybe_lose "delete-directory 5" $? \
+  0 "didn't follow link"
+
 # success convention for script
 exit $EXIT_TEST_WIN

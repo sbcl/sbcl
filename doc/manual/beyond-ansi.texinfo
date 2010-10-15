@@ -408,6 +408,7 @@ arguments to @code{make-hash-table}.
 @section Miscellaneous Extensions
 
 @include fun-sb-ext-array-storage-vector.texinfo
+@include fun-sb-ext-delete-directory.texinfo
 @include fun-sb-ext-get-time-of-day.texinfo
 @include fun-sb-ext-seed-random-state.texinfo
 

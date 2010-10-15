@@ -762,6 +762,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "SEED-RANDOM-STATE"
                "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
                "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
+               "DELETE-DIRECTORY"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"

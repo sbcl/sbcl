@@ -14,6 +14,7 @@ changes relative to sbcl-1.0.43:
   * enhancement: the system detects known type-erros in calls better,
     signalling a full warning about violated proclaimed FTYPEs and violations
     of derived FTYPEs within the same file, including self-calls.
+  * enhancement: new function: SB-EXT:DELETE-DIRECTORY is now provided.
   * optimization: constant-folding exploits numeric and character types, in
     addition member types.
   * optimization: numeric, character and member types that are inhabited by
