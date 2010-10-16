@@ -25,17 +25,22 @@
 (defmethod documentation ((x function) (doc-type (eql 'function)))
   (fun-doc x))
 
-(defmethod documentation ((x list) (doc-type (eql 'function)))
-  (when (and (legal-fun-name-p x) (fboundp x))
-    (fun-doc (fdefinition x))))
-
 (defmethod documentation ((x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
     (documentation it t)))
 
+(defmethod documentation ((x list) (doc-type (eql 'function)))
+  (when (legal-fun-name-p x)
+    (or (random-documentation x 'function)
+        (when (fboundp x)
+          (fun-doc (fdefinition x))))))
+
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
-  (when (and (legal-fun-name-p x) (fboundp x))
-    (fun-doc (or (macro-function x) (fdefinition x)))))
+  (when (legal-fun-name-p x)
+    (or (random-documentation x 'function)
+        ;; Nothing under the name, check the function object.
+        (when (fboundp x)
+          (fun-doc (or (macro-function x) (fdefinition x)))))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
@@ -54,17 +59,16 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (when (and (legal-fun-name-p x) (fboundp x))
-    (setf (documentation (fdefinition x) t) new-value)))
+  (when (legal-fun-name-p x)
+    (setf (random-documentation x 'function) new-value)))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
     (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
-  (when (and (legal-fun-name-p x) (fboundp x))
-    (setf (documentation (or (macro-function x) (symbol-function x)) t)
-          new-value)))
+  (when (legal-fun-name-p x)
+    (setf (random-documentation x 'function) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
@@ -235,6 +239,22 @@
 ;;; set the documentation for the machinery for setting documentation.
 #+sb-doc
 (setf (documentation 'documentation 'function)
-      "Return the documentation string of Doc-Type for X, or NIL if
-  none exists. System doc-types are VARIABLE, FUNCTION, STRUCTURE, TYPE,
-  SETF, and T.")
+      "Return the documentation string of Doc-Type for X, or NIL if none
+exists. System doc-types are VARIABLE, FUNCTION, STRUCTURE, TYPE, SETF, and T.
+
+Function documentation is stored separately for function names and objects:
+DEFUN, LAMBDA, &co create function objects with the specified documentation
+strings.
+
+ \(SETF (DOCUMENTATION NAME 'FUNCTION) STRING)
+
+sets the documentation string stored under the specified name, and
+
+ \(SETF (DOCUMENTATION FUNC T) STRING)
+
+sets the documentation string stored in the function object.
+
+ \(DOCUMENTATION NAME 'FUNCTION)
+
+returns the documentation stored under the function name if any, and
+falls back on the documentation in the function object if necessary.")

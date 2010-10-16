@@ -232,7 +232,12 @@
   (assert (string= (documentation #'docfoo t) "bar"))
   (assert (string= (setf (documentation 'docfoo 'function) "baz") "baz"))
   (assert (string= (documentation 'docfoo 'function) "baz"))
-  (assert (string= (documentation #'docfoo t) "baz")))
+  (assert (string= (documentation #'docfoo t) "bar"))
+  (assert (string= (setf (documentation #'docfoo t) "zot") "zot"))
+  (assert (string= (documentation #'docfoo t) "zot"))
+  (assert (string= (documentation 'docfoo 'function) "baz"))
+  (assert (not (setf (documentation 'docfoo 'function) nil)))
+  (assert (string= (documentation 'docfoo 'function) "zot")))
 
 #+sb-doc
 (with-test (:name (documentation built-in-macro))
