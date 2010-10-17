@@ -1722,7 +1722,7 @@ bootstrapping.
 
 (defun ensure-generic-function (fun-name
                                 &rest all-keys
-                                &key environment source-location
+                                &key environment definition-source
                                 &allow-other-keys)
   (declare (ignore environment))
   (let ((existing (and (fboundp fun-name)
@@ -2053,7 +2053,7 @@ bootstrapping.
                                             &key (lambda-list nil
                                                               lambda-list-p)
                                             argument-precedence-order
-                                            source-location
+                                            definition-source
                                             documentation
                                             &allow-other-keys)
   (declare (ignore keys))
@@ -2064,7 +2064,7 @@ bootstrapping.
         ((assoc spec *!generic-function-fixups* :test #'equal)
          (if existing
              (make-early-gf spec lambda-list lambda-list-p existing
-                            argument-precedence-order source-location
+                            argument-precedence-order definition-source
                             documentation)
              (bug "The function ~S is not already defined." spec)))
         (existing
@@ -2073,7 +2073,7 @@ bootstrapping.
         (t
          (pushnew spec *!early-generic-functions* :test #'equal)
          (make-early-gf spec lambda-list lambda-list-p nil
-                        argument-precedence-order source-location
+                        argument-precedence-order definition-source
                         documentation))))
 
 (defun make-early-gf (spec &optional lambda-list lambda-list-p

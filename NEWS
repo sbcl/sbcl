@@ -74,6 +74,8 @@ changes relative to sbcl-1.0.43:
     package-lock violation was detected. (lp#660752)
   * bug fix: the system can store different docstrings for a single function
     under different names. (lp#661631, regression from 1.0.29.24)
+  * bug fix: source-locations of DEFGENERIC forms weren't getting recorded
+    properly. (lp#384801)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
