@@ -795,10 +795,7 @@
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
-  (let ((sap
-         ;; FIXME: What is this for? This cannot be safe!
-         (sb!sys:vector-sap (coerce #() '(vector (unsigned-byte 8)))))
-        (alignment *disassem-inst-alignment-bytes*)
+  (let ((alignment *disassem-inst-alignment-bytes*)
         (arg-column
          (+ (or *disassem-opcode-column-width* 0)
             *disassem-location-column-width*
@@ -808,8 +805,7 @@
     (when (> alignment 1)
       (push #'alignment-hook fun-hooks))
 
-    (%make-dstate :segment-sap sap
-                  :fun-hooks fun-hooks
+    (%make-dstate :fun-hooks fun-hooks
                   :argument-column arg-column
                   :alignment alignment
                   :byte-order sb!c:*backend-byte-order*)))

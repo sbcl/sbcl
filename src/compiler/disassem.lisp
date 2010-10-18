@@ -1596,7 +1596,7 @@
   ;; offset of next position
   (next-offs 0 :type offset)
   ;; a sap pointing to our segment
-  (segment-sap (missing-arg) :type sb!sys:system-area-pointer)
+  (segment-sap nil :type (or null sb!sys:system-area-pointer))
   ;; the current segment
   (segment nil :type (or null segment))
   ;; what to align to in most cases
