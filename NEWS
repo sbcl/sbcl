@@ -76,6 +76,9 @@ changes relative to sbcl-1.0.43:
     under different names. (lp#661631, regression from 1.0.29.24)
   * bug fix: source-locations of DEFGENERIC forms weren't getting recorded
     properly. (lp#384801)
+  * bug fix: (COERCE X '(SIMPLE-VECTOR 5)) and similar coercions to vectors
+    of specified length could confuse the type derivation in unsafe code.
+    (lp#655872)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

@@ -3956,7 +3956,7 @@
                            :format-arguments
                            (list nargs 'cerror y x (max max1 max2))))))))))))))
 
-(defoptimizer (coerce derive-type) ((value type))
+(defoptimizer (coerce derive-type) ((value type) node)
   (cond
     ((constant-lvar-p type)
      ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
@@ -4001,7 +4001,17 @@
              (type-union result-typeoid
                          (type-intersection (lvar-type value)
                                             (specifier-type 'rational))))))
-         (t result-typeoid))))
+         ((and (policy node (zerop safety))
+               (csubtypep result-typeoid (specifier-type '(array * (*)))))
+          ;; At zero safety the deftransform for COERCE can elide dimension
+          ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
+          ;; need to simplify the type to drop the dimension information.
+          (let ((vtype (simplify-vector-type result-typeoid)))
+            (if vtype
+                (specifier-type vtype)
+                result-typeoid)))
+         (t
+          result-typeoid))))
     (t
      ;; OK, the result-type argument isn't constant.  However, there
      ;; are common uses where we can still do better than just

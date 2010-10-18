@@ -3599,3 +3599,24 @@
                              (declare (type (integer 0 0) x))
                              (ash x 100)))))
     (assert (zerop (funcall fun 0)))))
+
+(with-test (:name :bug-655872)
+  (let ((f (compile nil `(lambda (x)
+                           (declare (optimize (safety 3)))
+                           (aref (locally (declare (optimize (safety 0)))
+                                   (coerce x '(simple-vector 128)))
+                                 60))))
+        (long (make-array 100 :element-type 'fixnum)))
+    (dotimes (i 100)
+      (setf (aref long i) i))
+    ;; 1. COERCE doesn't check the length in unsafe code.
+    (assert (eql 60 (funcall f long)))
+    ;; 2. The compiler doesn't trust the length from COERCE
+    (assert (eq :caught
+                (handler-case
+                    (funcall f (list 1 2 3))
+                  (sb-int:invalid-array-index-error (e)
+                    (assert (eql 60 (type-error-datum e)))
+                    (assert (equal '(integer 0 (3)) (type-error-expected-type e)))
+                    :caught))))))
+
