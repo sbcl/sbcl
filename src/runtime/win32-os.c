@@ -549,6 +549,7 @@ void scratch(void)
     Sleep(0);
     WriteFile(0, 0, 0, 0, 0);
     _get_osfhandle(0);
+    _rmdir(0);
     _pipe(0,0,0);
     access(0,0);
     close(0);
