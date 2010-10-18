@@ -61,12 +61,14 @@
                            time)
     (loop until finishedp)))
 
+#-win32
 (with-test (:name (:timer :deferrables-blocked))
   (make-and-schedule-and-wait (lambda ()
                                 (check-deferrables-blocked-or-lose 0))
                               (random 0.1))
   (check-deferrables-unblocked-or-lose 0))
 
+#-win32
 (with-test (:name (:timer :deferrables-unblocked))
   (make-and-schedule-and-wait (lambda ()
                                 (sb-sys:with-interrupts
@@ -88,6 +90,7 @@
   `(handler-case (progn (progn ,@body) nil)
     (sb-ext:timeout () t)))
 
+#-win32
 (with-test (:name (:timer :relative)
             :fails-on '(and :sparc :linux))
   (let* ((has-run-p nil)
@@ -100,6 +103,7 @@
     (assert has-run-p)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
+#-win32
 (with-test (:name (:timer :absolute)
             :fails-on '(and :sparc :linux))
   (let* ((has-run-p nil)
@@ -130,6 +134,7 @@
                  :thread t)))
     (schedule-timer timer 0.1)))
 
+#-win32
 (with-test (:name (:timer :repeat-and-unschedule)
             :fails-on '(and :sparc :linux))
   (let* ((run-count 0)
@@ -145,6 +150,7 @@
     (assert (not (timer-scheduled-p timer)))
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
+#-win32
 (with-test (:name (:timer :reschedule))
   (let* ((has-run-p nil)
          (timer (make-timer (lambda ()
@@ -155,6 +161,7 @@
     (assert has-run-p)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
+#-win32
 (with-test (:name (:timer :stress))
   (let ((time (1+ (get-universal-time))))
     (loop repeat 200 do
@@ -162,6 +169,7 @@
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
+#-win32
 (with-test (:name (:timer :stress2))
   (let ((time (1+ (get-universal-time)))
         (n 0))
@@ -171,22 +179,26 @@
     (sleep 2)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
+#-win32
 (with-test (:name (:with-timeout :timeout))
   (assert (raises-timeout-p
            (sb-ext:with-timeout 0.2
              (sleep 1)))))
 
+#-win32
 (with-test (:name (:with-timeout :fall-through))
   (assert (not (raises-timeout-p
                 (sb-ext:with-timeout 0.3
                   (sleep 0.1))))))
 
+#-win32
 (with-test (:name (:with-timeout :nested-timeout-smaller))
   (assert(raises-timeout-p
           (sb-ext:with-timeout 10
             (sb-ext:with-timeout 0.5
               (sleep 2))))))
 
+#-win32
 (with-test (:name (:with-timeout :nested-timeout-bigger))
   (assert(raises-timeout-p
           (sb-ext:with-timeout 0.5
@@ -279,6 +291,7 @@
 ;;;;
 ;;;; Used to have problems in genereal, see comment on (:TIMER
 ;;;; :PARALLEL-UNSCHEDULE).
+#-win32
 (with-test (:name (:timer :schedule-stress))
   (flet ((test ()
          (let* ((slow-timers
