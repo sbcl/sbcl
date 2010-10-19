@@ -2684,6 +2684,16 @@
     (assert (eq 'list type))
     (assert derivedp)))
 
+(with-test (:name :rest-list-type-derivation3)
+  (multiple-value-bind (type derivedp)
+      (funcall (funcall (compile nil `(lambda ()
+                                        (lambda (&optional x &rest args)
+                                          (unless x (error "oops"))
+                                          (ctu:compiler-derived-type args)))))
+               t)
+    (assert (eq 'list type))
+    (assert derivedp)))
+
 (with-test (:name :base-char-typep-elimination)
   (assert (eq (funcall (lambda (ch)
                          (declare (type base-char ch) (optimize (speed 3) (safety 0)))
@@ -3620,3 +3630,17 @@
                     (assert (equal '(integer 0 (3)) (type-error-expected-type e)))
                     :caught))))))
 
+(with-test (:name :bug-655203-regression)
+  (let ((fun (compile nil
+                      `(LAMBDA (VARIABLE)
+                         (LET ((CONTINUATION
+                                (LAMBDA
+                                    (&OPTIONAL DUMMY &REST OTHER)
+                                  (DECLARE (IGNORE OTHER))
+                                  (PRIN1 DUMMY)
+                                  (PRIN1 VARIABLE))))
+                           (FUNCALL CONTINUATION (LIST 1 2)))))))
+    ;; This used to signal a bogus type-error.
+    (assert (equal (with-output-to-string (*standard-output*)
+                     (funcall fun t))
+                   "(1 2)T"))))

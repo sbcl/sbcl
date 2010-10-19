@@ -1735,6 +1735,11 @@
 ;;; If the function has an entry-fun, then we don't do anything: since
 ;;; it has a XEP we would not discover anything.
 ;;;
+;;; If the function is an optional-entry-point, we will just make sure
+;;; &REST lists are known to be lists. Doing the regular rigamarole
+;;; can erronously propagate too strict types into refs: see
+;;; BUG-655203-REGRESSION in tests/compiler.pure.lisp.
+;;;
 ;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
 ;;; corresponding to changed arguments in CALL, since the only use in
 ;;; IR1 optimization of the REOPTIMIZE flag for local call args is
@@ -1742,34 +1747,41 @@
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
   (unless (functional-entry-fun fun)
-    (let* ((vars (lambda-vars fun))
-           (union (mapcar (lambda (arg var)
-                            (when (and arg
-                                       (lvar-reoptimize arg)
-                                       (null (basic-var-sets var)))
-                              (lvar-type arg)))
-                          (basic-combination-args call)
-                          vars))
-           (this-ref (lvar-use (basic-combination-fun call))))
+    (if (lambda-optional-dispatch fun)
+        ;; We can still make sure &REST is known to be a list.
+        (loop for var in (lambda-vars fun)
+              do (let ((info (lambda-var-arg-info var)))
+                   (when (and info (eq :rest (arg-info-kind info)))
+                     (propagate-to-refs var (specifier-type 'list)))))
+        ;; The normal case.
+        (let* ((vars (lambda-vars fun))
+               (union (mapcar (lambda (arg var)
+                                (when (and arg
+                                           (lvar-reoptimize arg)
+                                           (null (basic-var-sets var)))
+                                  (lvar-type arg)))
+                              (basic-combination-args call)
+                              vars))
+               (this-ref (lvar-use (basic-combination-fun call))))
 
-      (dolist (arg (basic-combination-args call))
-        (when arg
-          (setf (lvar-reoptimize arg) nil)))
+          (dolist (arg (basic-combination-args call))
+            (when arg
+              (setf (lvar-reoptimize arg) nil)))
 
-      (dolist (ref (leaf-refs fun))
-        (let ((dest (node-dest ref)))
-          (unless (or (eq ref this-ref) (not dest))
-            (setq union
-                  (mapcar (lambda (this-arg old)
-                            (when old
-                              (setf (lvar-reoptimize this-arg) nil)
-                              (type-union (lvar-type this-arg) old)))
-                          (basic-combination-args dest)
-                          union)))))
+          (dolist (ref (leaf-refs fun))
+            (let ((dest (node-dest ref)))
+              (unless (or (eq ref this-ref) (not dest))
+                (setq union
+                      (mapcar (lambda (this-arg old)
+                                (when old
+                                  (setf (lvar-reoptimize this-arg) nil)
+                                  (type-union (lvar-type this-arg) old)))
+                              (basic-combination-args dest)
+                              union)))))
 
-      (loop for var in vars
-            and type in union
-            when type do (propagate-to-refs var type))))
+          (loop for var in vars
+                and type in union
+                when type do (propagate-to-refs var type)))))
 
   (values))
 
