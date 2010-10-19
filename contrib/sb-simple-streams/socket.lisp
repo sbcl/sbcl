@@ -76,7 +76,8 @@
                            (lambda ()
                              (sb-unix:unix-close fd)
                              (format *debug-io*
-                                     "~&;;; ** closed socket (fd ~D)~%" fd)))
+                                     "~&;;; ** closed socket (fd ~D)~%" fd))
+                           :dont-save t)
           ;; this should be done with (setf stream-external-format)
           (let ((efmt (getf options :external-format :default)))
             (compose-encapsulating-streams stream efmt)

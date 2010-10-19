@@ -59,7 +59,8 @@ directly instantiated.")))
       (setf (slot-value socket 'file-descriptor) fd
             (slot-value socket 'protocol) proto-num
             (slot-value socket 'type) type)
-      (sb-ext:finalize socket (lambda () (sockint::close fd)))))
+      (sb-ext:finalize socket (lambda () (sockint::close fd))
+                       :dont-save t)))
 
 
 
@@ -117,7 +118,8 @@ values"))
                               :type (socket-type socket)
                               :protocol (socket-protocol socket)
                               :descriptor fd)))
-                    (sb-ext:finalize s (lambda () (sockint::close fd))))
+                    (sb-ext:finalize s (lambda () (sockint::close fd))
+                                     :dont-save t))
                   (multiple-value-list (bits-of-sockaddr socket sockaddr))))))))
 
 (defgeneric socket-connect (socket &rest address)

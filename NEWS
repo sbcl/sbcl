@@ -35,7 +35,7 @@ changes relative to sbcl-1.0.43:
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
     (lp#646796)
-  * bug fix: interrupts arriving due to CL:OPEN caused an error.
+  * bug fix: interrupts arriving during CL:OPEN caused an error.
   * bug fix: overeager character buffering could cause input to block
     spuriously when reading from a pipe (lp#643686)
   * bug fix: more efficient timer expiry should avoid starvation on systems
@@ -84,6 +84,9 @@ changes relative to sbcl-1.0.43:
   * bug fix: SB-POSIX:FORK now signals an error if an attempt to
     fork with multiple Lisp threads running is made on every platform,
     not just Darwin. (lp#451111)
+  * bug fix: SB-BSD-SOCKETS and SB-SIMPLE-STREAMS could leave stale finalizers
+    around when core was saved, which could cause undefined behaviour when the
+    core was reified.
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

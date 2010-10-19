@@ -80,7 +80,8 @@
                      (format *terminal-io* "~&;;; ** closed ~S (fd ~D)~%"
                              namestring fd)
                      (when original
-                       (revert-file namestring original))))
+                       (revert-file namestring original)))
+                   :dont-save t)
                  stream)))))))
 
 (defmethod device-open ((stream file-simple-stream) options)
@@ -244,7 +245,8 @@
             (sb-ext:finalize stream
               (lambda ()
                 (sb-posix:munmap buffer size)
-                (format *terminal-io* "~&;;; ** unmapped ~S" buffer))))))
+                (format *terminal-io* "~&;;; ** unmapped ~S" buffer))
+              :dont-save t))))
       stream)))
 
 
