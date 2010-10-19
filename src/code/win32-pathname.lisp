@@ -159,7 +159,7 @@
   ;; FIXME: same as UNPARSE-UNIX-HOST.  That's probably not good.
   "")
 
-(defun unparse-win32-device (pathname)
+(defun unparse-win32-device (pathname &optional native)
   (declare (type pathname pathname))
   (let ((device (pathname-device pathname))
         (directory (pathname-directory pathname)))
@@ -170,36 +170,9 @@
           ((and (consp directory) (eq :relative (car directory)))
            (error "No printed representation for a relative UNC pathname."))
           (t
-           (concatenate 'simple-string "\\\\" device)))))
-
-(defun unparse-win32-directory-list (directory)
-  (declare (type list directory))
-  (collect ((pieces))
-    (when directory
-      (ecase (pop directory)
-        (:absolute
-         (pieces "\\"))
-        (:relative
-         ;; nothing special
-         ))
-      (dolist (dir directory)
-        (typecase dir
-          ((member :up)
-           (pieces "..\\"))
-          ((member :back)
-           (error ":BACK cannot be represented in namestrings."))
-          ((member :wild-inferiors)
-           (pieces "**\\"))
-          ((or simple-string pattern (member :wild))
-           (pieces (unparse-physical-piece dir))
-           (pieces "\\"))
-          (t
-           (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-string (pieces))))
-
-(defun unparse-win32-directory (pathname)
-  (declare (type pathname pathname))
-  (unparse-win32-directory-list (%pathname-directory pathname)))
+           (if native
+               (concatenate 'simple-string "\\\\" device)
+               (concatenate 'simple-string "//" device))))))
 
 (defun unparse-win32-file (pathname)
   (declare (type pathname pathname))
@@ -234,7 +207,7 @@
   (declare (type pathname pathname))
   (concatenate 'simple-string
                (unparse-win32-device pathname)
-               (unparse-win32-directory pathname)
+               (unparse-physical-directory pathname)
                (unparse-win32-file pathname)))
 
 (defun unparse-native-win32-namestring (pathname as-file)
@@ -252,7 +225,7 @@
     (coerce
      (with-output-to-string (s)
        (when device
-         (write-string (unparse-win32-device pathname) s))
+         (write-string (unparse-win32-device pathname t) s))
        (when directory
          (ecase (car directory)
            (:absolute (write-char #\\ s))
@@ -311,7 +284,7 @@
                      pathname-directory)
                     (t
                      (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
-        (strings (unparse-unix-directory-list result-directory)))
+        (strings (unparse-physical-directory-list result-directory)))
       (let* ((pathname-type (%pathname-type pathname))
              (type-needed (and pathname-type
                                (not (eq pathname-type :unspecific))))

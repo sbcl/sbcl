@@ -132,35 +132,6 @@
   ;; 2002-05-09
   "")
 
-(defun unparse-unix-directory-list (directory)
-  (declare (type list directory))
-  (collect ((pieces))
-    (when directory
-      (ecase (pop directory)
-        (:absolute
-         (pieces "/"))
-        (:relative
-         ;; nothing special
-         ))
-      (dolist (dir directory)
-        (typecase dir
-          ((member :up)
-           (pieces "../"))
-          ((member :back)
-           (error ":BACK cannot be represented in namestrings."))
-          ((member :wild-inferiors)
-           (pieces "**/"))
-          ((or simple-string pattern (member :wild))
-           (pieces (unparse-physical-piece dir))
-           (pieces "/"))
-          (t
-           (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-string (pieces))))
-
-(defun unparse-unix-directory (pathname)
-  (declare (type pathname pathname))
-  (unparse-unix-directory-list (%pathname-directory pathname)))
-
 (defun unparse-unix-file (pathname)
   (declare (type pathname pathname))
   (collect ((strings))
@@ -195,7 +166,7 @@
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
   (concatenate 'simple-string
-               (unparse-unix-directory pathname)
+               (unparse-physical-directory pathname)
                (unparse-unix-file pathname)))
 
 (defun unparse-native-unix-namestring (pathname as-file)
@@ -268,7 +239,7 @@
                      pathname-directory)
                     (t
                      (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
-        (strings (unparse-unix-directory-list result-directory)))
+        (strings (unparse-physical-directory-list result-directory)))
       (let* ((pathname-type (%pathname-type pathname))
              (type-needed (and pathname-type
                                (not (eq pathname-type :unspecific))))

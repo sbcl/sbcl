@@ -486,7 +486,7 @@
 		 for name in components
 		 appending (loop for type in components
 				 as pathname = (make-pathname
-						#+win32 "C"
+						#+win32 :device #+win32 "C"
 						:directory '(:absolute "tmp")
 						:name name :type type)
 				 collect (ignore-errors

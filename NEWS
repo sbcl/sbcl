@@ -23,6 +23,14 @@ changes relative to sbcl-1.0.43:
     Branches are simplified before performing if/if-conversion, and simple
     equivalent branches (that only read the same constant or variable) are
     merged.
+  * improvements to the Windows port:
+    ** change: canonical unparsing form for pathname namestrings now uses / as
+       directory separator. NATIVE-NAMESTRING still uses \ as the separator.
+    ** bug fix: stackoverwriting due to incorrect usage of PeekConsoleInput
+       on Windows. (thanks to Kalyanov Dmitry)
+    ** bug fix: build now works on cygwin with GCC 4.x installed. (thanks to
+       Kalyanov Dmitry)
+    ** bug fix: run-sbcl.sh now works on Cygwin. (thanks to Kalyanov Dmitry)
   * bug fix: compiler failed to derive the result-type of MAKE-ARRAY as
     (AND VECTOR (NOT SIMPLE-ARRAY)) when appropriate. (lp#309130)
   * bug fix: (THE (VALUES ...)) in LOAD-TIME-VALUE caused a compiler-error.
@@ -32,12 +40,6 @@ changes relative to sbcl-1.0.43:
     spuriously when reading from a pipe (lp#643686)
   * bug fix: more efficient timer expiry should avoid starvation on systems
     where number of SIGALRMs per second is restricted. (lp#375515)
-  * improvements to the Windows port:
-    ** bug fix: stackoverwriting due to incorrect usage of PeekConsoleInput
-       on Windows. (thanks to Kalyanov Dmitry)
-    ** bug fix: build now works on cygwin with GCC 4.x installed. (thanks to
-       Kalyanov Dmitry)
-    ** bug fix: run-sbcl.sh now works on Cygwin. (thanks to Kalyanov Dmitry)
   * bug fix: non-unicode builds no longer fail (broken since 1.0.36.15).
   * bug fix: compile-times no longer scale linearly with the size of
     quoted lists in source-code. (lp#654289)

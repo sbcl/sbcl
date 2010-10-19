@@ -32,8 +32,7 @@
   ;; We know a little bit about the structure of this result;
   ;; let's test to make sure that this test file is in it.
   (assert (find-if (lambda (pathname)
-                     (search #-win32 "tests/filesys.pure.lisp"
-                             #+win32 "tests\\filesys.pure.lisp"
+                     (search "tests/filesys.pure.lisp"
                              (namestring pathname)))
                    dir)))
 ;;; In sbcl-0.9.7 DIRECTORY failed on pathnames with character-set
