@@ -1752,7 +1752,7 @@
         (loop for var in (lambda-vars fun)
               do (let ((info (lambda-var-arg-info var)))
                    (when (and info (eq :rest (arg-info-kind info)))
-                     (propagate-to-refs var (specifier-type 'list)))))
+                     (propagate-from-sets var (specifier-type 'list)))))
         ;; The normal case.
         (let* ((vars (lambda-vars fun))
                (union (mapcar (lambda (arg var)

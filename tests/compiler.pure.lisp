@@ -2694,6 +2694,17 @@
     (assert (eq 'list type))
     (assert derivedp)))
 
+(with-test (:name :rest-list-type-derivation4)
+  (multiple-value-bind (type derivedp)
+      (funcall (funcall (compile nil `(lambda ()
+                                        (lambda (&optional x &rest args)
+                                          (declare (type (or null integer) x))
+                                          (when x (setf args x))
+                                          (ctu:compiler-derived-type args)))))
+               42)
+    (assert (equal '(or cons null integer) type))
+    (assert derivedp)))
+
 (with-test (:name :base-char-typep-elimination)
   (assert (eq (funcall (lambda (ch)
                          (declare (type base-char ch) (optimize (speed 3) (safety 0)))
