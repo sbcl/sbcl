@@ -283,27 +283,27 @@
 
 
 
+  ;; FIXME this is a lie, of course this can fail, but there's no
+  ;; error handling here yet!
   #+mach-exception-handler
-  (progn
-    ;; FIXME this is a lie, of course this can fail, but there's no
-    ;; error handling here yet!
-    (define-call "setup_mach_exceptions" void never-fails)
-    (define-call ("posix_fork" :c-name "fork") pid-t minusp)
-    (defun fork ()
-      (tagbody
-         (sb-thread::with-all-threads-lock
-           (when (cdr sb-thread::*all-threads*)
-             (go :error))
-           (let ((pid (posix-fork)))
-             (when (= pid 0)
-               (setup-mach-exceptions))
-             (return-from fork pid)))
-       :error
-         (error "Cannot fork with multiple threads running.")))
-    (export 'fork :sb-posix))
-
-  #-mach-exception-handler
-  (define-call "fork" pid-t minusp)
+  (define-call "setup_mach_exceptions" void never-fails)
+  (define-call ("posix_fork" :c-name "fork") pid-t minusp)
+  (defun fork ()
+    "Forks the current process, returning 0 in the new process and the PID of
+the child process in the parent. Forking while multiple threads are running is
+not supported."
+    (tagbody
+       (sb-thread::with-all-threads-lock
+         (when (cdr sb-thread::*all-threads*)
+           (go :error))
+         (let ((pid (posix-fork)))
+           #+mach-exception-handler
+           (when (= pid 0)
+             (setup-mach-exceptions))
+           (return-from fork pid)))
+     :error
+       (error "Cannot fork with multiple threads running.")))
+  (export 'fork :sb-posix)
 
   (define-call "getpgid" pid-t minusp (pid pid-t))
   (define-call "getppid" pid-t never-fails)

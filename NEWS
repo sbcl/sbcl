@@ -81,6 +81,9 @@ changes relative to sbcl-1.0.43:
   * bug fix: (COERCE X '(SIMPLE-VECTOR 5)) and similar coercions to vectors
     of specified length could confuse the type derivation in unsafe code.
     (lp#655872)
+  * bug fix: SB-POSIX:FORK now signals an error if an attempt to
+    fork with multiple Lisp threads running is made on every platform,
+    not just Darwin. (lp#451111)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
