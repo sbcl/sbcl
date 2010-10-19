@@ -1161,7 +1161,6 @@ code to be loaded.
 
 (defun loop-get-collection-info (collector class default-type)
   (let ((form (loop-get-form))
-        (dtype (or (loop-optional-type) default-type))
         (name (when (loop-tequal (car *loop-source-code*) 'into)
                 (loop-pop-source)
                 (loop-pop-source))))
@@ -1169,7 +1168,8 @@ code to be loaded.
       (loop-error "The value accumulation recipient name, ~S, is not a symbol." name))
     (unless name
       (loop-disallow-aggregate-booleans))
-    (let ((cruft (find (the symbol name) *loop-collection-cruft*
+    (let ((dtype (or (loop-optional-type) default-type))
+          (cruft (find (the symbol name) *loop-collection-cruft*
                        :key #'loop-collector-name)))
       (cond ((not cruft)
              (when (and name (loop-var-p name))

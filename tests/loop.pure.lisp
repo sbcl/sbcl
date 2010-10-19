@@ -268,3 +268,8 @@
     (assert (null warnings-p))
     (assert (null failure-p))
     (assert (equal '(t t) (funcall function)))))
+
+(with-test (:name :bug-654220-regression)
+  (assert (= 32640 (loop for i to 255
+                         sum i into sum of-type fixnum
+                         finally (return sum)))))
