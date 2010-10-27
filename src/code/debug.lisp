@@ -152,6 +152,11 @@ Other commands:
     useful when the debugger was invoked to handle an error in
     deeply nested input syntax, and now the reader is confused.)")
 
+(defmacro with-debug-io-syntax (() &body body)
+  (let ((thunk (gensym "THUNK")))
+    `(dx-flet ((,thunk ()
+                       ,@body))
+       (funcall-with-debug-io-syntax #',thunk))))
 
 ;;; If LOC is an unknown location, then try to find the block start
 ;;; location. Used by source printing to some information instead of
@@ -328,15 +333,16 @@ METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
 corresponding to method functions are printed. Possible values
 are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
 information."
-  (fresh-line stream)
-  (when print-thread
-    (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
-  (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
-                                     *suppress-print-errors*
-                                     'serious-condition))
-        (*print-circle* t)
-        (n start))
-    (handler-bind ((print-not-readable #'print-unreadably))
+  (with-debug-io-syntax ()
+    (fresh-line stream)
+    (when print-thread
+      (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
+    (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
+                                       *suppress-print-errors*
+                                       'serious-condition))
+          (*print-circle* t)
+          (n start))
+      (handler-bind ((print-not-readable #'print-unreadably))
         (map-backtrace (lambda (frame)
                          (print-frame-call frame stream
                                            :number n
@@ -346,8 +352,8 @@ information."
                        :from (backtrace-start-frame from)
                        :start start
                        :count count)))
-  (fresh-line stream)
-  (values))
+    (fresh-line stream)
+    (values)))
 
 (defun list-backtrace (&key
                        (count *backtrace-frame-count*)
@@ -829,8 +835,8 @@ the current thread are replaced with dummy objects which can safely escape."
                  (package-name *package*))
       (setf *package* (find-package :cl-user))
       (format *error-output*
-              "The value of ~S was not an undeleted PACKAGE. It has been
-reset to ~S."
+              "The value of ~S was not an undeleted PACKAGE. It has been ~
+               reset to ~S."
               '*package* *package*))
 
     ;; Before we start our own output, finish any pending output.
