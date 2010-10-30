@@ -668,6 +668,9 @@
               (with-open-file (f fifo :direction :input :external-format format)
                 (assert (equal "foobar" (read-line f)))))
          (when proc
+           (ignore-errors
+             (close (process-input proc) :abort t)
+             (process-wait proc))
            (ignore-errors (process-close proc))
            (setf proc nil))
          (when fifo
