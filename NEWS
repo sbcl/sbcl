@@ -89,6 +89,8 @@ changes relative to sbcl-1.0.43:
     core was reified. 
   * bug fix: Allow UNTRACE of functions that are no longer defined
     (lp#667657, thanks to Attila Lendvai)
+  * bug fix: MAKE-ARRAY calls with invalid keyword argument lists now signal a
+    compile-time warning (lp#664373, thanks to Stas Boukarev)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event

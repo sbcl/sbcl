@@ -277,3 +277,9 @@
                              (eql 6 (type-error-datum e)))
                     :good))))))
 
+(with-test (:name :odd-keys-for-make-array)
+  (assert (eq :good
+              (handler-case
+                  (compile nil '(lambda (m) (make-array m 1)))
+                (simple-warning () :good)))))
+

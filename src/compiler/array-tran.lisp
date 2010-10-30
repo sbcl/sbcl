@@ -337,8 +337,9 @@
 ;;; can pick them apart in the DEFTRANSFORMS, and transform '(3) style
 ;;; dimensions to integer args directly.
 (define-source-transform make-array (dimensions &rest keyargs &environment env)
-  (if (and (fun-lexically-notinline-p 'list)
-           (fun-lexically-notinline-p 'vector))
+  (if (or (and (fun-lexically-notinline-p 'list)
+               (fun-lexically-notinline-p 'vector))
+          (oddp (length keyargs)))
       (values nil t)
       (multiple-value-bind (new-dimensions rank)
           (flet ((constant-dims (dimensions)
