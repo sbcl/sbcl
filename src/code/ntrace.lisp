@@ -124,9 +124,13 @@
                 (error "can't trace special form ~S" x))
                ((macro-function x))
                (t
-                (values (fdefinition x) t))))
+                (values (when (fboundp x)
+                          (fdefinition x))
+                        t))))
         (function x)
-        (t (values (fdefinition x) t)))
+        (t (values (when (fboundp x)
+                     (fdefinition x))
+                   t)))
     (typecase res
       (closure
        (values (sb-kernel:%closure-fun res)
@@ -647,7 +651,8 @@ are evaluated in the null environment."
          (info (gethash fun *traced-funs*)))
     (cond
      ((not info)
-      (warn "Function is not TRACEd: ~S" function-or-name))
+      (when fun
+        (warn "Function is not TRACEd: ~S" function-or-name)))
      (t
       (cond
        ((trace-info-encapsulated info)

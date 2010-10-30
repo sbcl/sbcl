@@ -86,7 +86,9 @@ changes relative to sbcl-1.0.43:
     not just Darwin. (lp#451111)
   * bug fix: SB-BSD-SOCKETS and SB-SIMPLE-STREAMS could leave stale finalizers
     around when core was saved, which could cause undefined behaviour when the
-    core was reified.
+    core was reified. 
+  * bug fix: Allow UNTRACE of functions that are no longer defined
+    (lp#667657, thanks to Attila Lendvai)
 
 changes in sbcl-1.0.43 relative to sbcl-1.0.42:
   * incompatible change: FD-STREAMS no longer participate in the serve-event
