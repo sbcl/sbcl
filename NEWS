@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.43:
+changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * enhancement: RUN-PROGRAM accepts :EXTERNAL-FORMAT argument to select the
     external-format for its :INPUT, :OUTPUT, AND :ERROR :STREAMs.
   * enhancement: ALLOCATION-INFORMATION also provides the page the object
