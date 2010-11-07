@@ -761,11 +761,11 @@
                  for var in (lambda-vars fun)
                  and val in (combination-args call)
                  when (and val (lambda-var-constraints var))
-                 do (let* ((type (lvar-type val))
-                           (con (find-or-create-constraint 'typep var type
-                                                           nil)))
-                      (conset-adjoin con gen))
-                 (maybe-add-eql-var-var-constraint var val gen)))))
+                 do (let ((type (lvar-type val)))
+                      (unless (eq type *universal-type*)
+                        (let ((con (find-or-create-constraint 'typep var type nil)))
+                          (conset-adjoin con gen))))
+                    (maybe-add-eql-var-var-constraint var val gen)))))
       (ref
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
@@ -778,17 +778,19 @@
          (let ((var (ok-lvar-lambda-var lvar gen)))
            (when var
              (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
-               (do-eql-vars (var (var gen))
-                 (let ((con (find-or-create-constraint 'typep var atype nil)))
-                   (conset-adjoin con gen))))))))
+               (unless (eq atype *universal-type*)
+                 (do-eql-vars (var (var gen))
+                   (let ((con (find-or-create-constraint 'typep var atype nil)))
+                     (conset-adjoin con gen)))))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
                   (cons (lambda-var-constraints var) :exit-if-null))
          (conset-difference gen cons)
-         (let* ((type (single-value-type (node-derived-type node)))
-                (con (find-or-create-constraint 'typep var type nil)))
-           (conset-adjoin con gen))
+         (let ((type (single-value-type (node-derived-type node))))
+           (unless (eq type *universal-type*)
+             (let ((con (find-or-create-constraint 'typep var type nil)))
+               (conset-adjoin con gen))))
          (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
   gen)
 
