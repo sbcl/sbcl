@@ -1086,6 +1086,13 @@
 ;;; Only handle the simple result type cases. If somebody does (CONCATENATE
 ;;; '(STRING 6) ...) their code won't be optimized, but nobody does that in
 ;;; practice.
+;;;
+;;; Limit full open coding based on length of constant sequences. Default
+;;; value is chosen so that other parts of to compiler (constraint propagation
+;;; mainly) won't go nonlinear too badly. It's not an exact number -- but
+;;; in the right ballpark.
+(defvar *concatenate-open-code-limit* 129)
+
 (deftransform concatenate ((result-type &rest lvars)
                            ((constant-arg
                              (member string simple-string base-string simple-base-string))
@@ -1130,13 +1137,19 @@
                          (muffle-conditions compiler-note))
                 ,@(loop for value in lvar-values
                         for var in vars
-                        collect (if (stringp value)
+                        collect (if (and (stringp value)
+                                         (< (length value) *concatenate-open-code-limit*))
                                     ;; Fold the array reads for constant arguments
                                     `(progn
                                        ,@(loop for c across value
-                                               collect `(setf (aref .string.
-                                                                    .pos.) ,c)
-                                               collect `(incf .pos.)))
+                                               for i from 0
+                                               collect
+                                               ;; Without truly-the we get massive numbers
+                                               ;; of pointless error traps.
+                                                  `(setf (aref .string.
+                                                               (truly-the index (+ .pos. ,i)))
+                                                         ,c))
+                                       (incf .pos. ,(length value)))
                                     `(sb!impl::string-dispatch
                                          (#!+sb-unicode
                                           (simple-array character (*))

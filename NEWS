@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.44:
+  * bug fix: when SPEED > SPACE compiling CONCATENATE 'STRING with constant
+    long string arguments slowed the compiler down to a crawl.
+
 changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * enhancement: RUN-PROGRAM accepts :EXTERNAL-FORMAT argument to select the
     external-format for its :INPUT, :OUTPUT, AND :ERROR :STREAMs.
