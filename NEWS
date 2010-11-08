@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.44:
+  * bug fix: backtracing function with &REST arguments now shows the full
+    argument list. (lp#310173)
+  * bug fix: return types for functions with complex lambda-lists are now
+    derived properly (lp#384892)
   * bug fix: when SPEED > SPACE compiling CONCATENATE 'STRING with constant
     long string arguments slowed the compiler down to a crawl.
 

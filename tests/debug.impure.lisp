@@ -386,6 +386,33 @@
                (clos-emf-named-test nil))))
     '(((sb-pcl::emf clos-emf-named-test) ? ? nil)))))
 
+(with-test (:name :bug-310173)
+  (flet ((make-fun (n)
+           (let* ((names '(a b))
+                  (req (loop repeat n collect (pop names))))
+             (compile nil
+                      `(lambda (,@req &rest rest)
+                         (let ((* *)) ; no tail-call
+                           (apply '/ ,@req rest)))))))
+    (assert
+     (verify-backtrace (lambda ()
+                         (funcall (make-fun 0) 10 11 0))
+                       '((sb-kernel:two-arg-/ 10/11 0)
+                         (/ 10 11 0)
+                         ((lambda (&rest rest)) 10 11 0))))
+    (assert
+     (verify-backtrace (lambda ()
+                         (funcall (make-fun 1) 10 11 0))
+                       '((sb-kernel:two-arg-/ 10/11 0)
+                         (/ 10 11 0)
+                         ((lambda (a &rest rest)) 10 11 0))))
+    (assert
+     (verify-backtrace (lambda ()
+                         (funcall (make-fun 2) 10 11 0))
+                       '((sb-kernel:two-arg-/ 10/11 0)
+                         (/ 10 11 0)
+                         ((lambda (a b &rest rest)) 10 11 0))))))
+
 ;;;; test TRACE
 
 (defun trace-this ()

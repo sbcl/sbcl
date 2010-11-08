@@ -2706,9 +2706,10 @@
     (assert derivedp)))
 
 (with-test (:name :base-char-typep-elimination)
-  (assert (eq (funcall (lambda (ch)
-                         (declare (type base-char ch) (optimize (speed 3) (safety 0)))
-                         (typep ch 'base-char))
+  (assert (eq (funcall (compile nil
+                                `(lambda (ch)
+                                   (declare (type base-char ch) (optimize (speed 3) (safety 0)))
+                                   (typep ch 'base-char)))
                        t)
               t)))
 
@@ -3681,3 +3682,14 @@
            (short-avg (/ (+ d0 d1 d2) 3)))
       (assert (and f1 f2 f3))
       (assert (< d3 (* 10 short-avg))))))
+
+(with-test (:name :bug-384892)
+  (assert (equal
+           '(function (fixnum fixnum &key (:k1 (member nil t)))
+             (values (member t) &optional))
+           (sb-kernel:%simple-fun-type
+            (compile nil `(lambda (x y &key k1)
+                            (declare (fixnum x y))
+                            (declare (boolean k1))
+                            (declare (ignore x y k1))
+                            t))))))

@@ -1097,28 +1097,39 @@ Examples:
          (source-name (or name '.anonymous.)))
     (setf (component-name component) (debug-name 'initial-component debug-name-tail)
           (component-kind component) :initial)
-    (let* ((locall-fun (let ((*allow-instrumenting* t))
-                         (funcall #'ir1-convert-lambdalike
-                                  lambda-expression
-                                  :source-name source-name)))
-           ;; Convert the XEP using the policy of the real
-           ;; function. Otherwise the wrong policy will be used for
-           ;; deciding whether to type-check the parameters of the
-           ;; real function (via CONVERT-CALL / PROPAGATE-TO-ARGS).
-           ;; -- JES, 2007-02-27
-           (*lexenv* (make-lexenv :policy (lexenv-policy
-                                           (functional-lexenv locall-fun))))
-           (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
+    (let* ((fun (let ((*allow-instrumenting* t))
+                  (funcall #'ir1-convert-lambdalike
+                           lambda-expression
+                           :source-name source-name)))
+           ;; Convert the XEP using the policy of the real function. Otherwise
+           ;; the wrong policy will be used for deciding whether to type-check
+           ;; the parameters of the real function (via CONVERT-CALL /
+           ;; PROPAGATE-TO-ARGS). -- JES, 2007-02-27
+           (*lexenv* (make-lexenv :policy (lexenv-policy (functional-lexenv fun))))
+           (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
                                     :source-name source-name
                                     :debug-name (debug-name 'tl-xep debug-name-tail)
                                     :system-lambda t)))
       (when name
-        (assert-global-function-definition-type name locall-fun))
-      (setf (functional-entry-fun fun) locall-fun
-            (functional-kind fun) :external
-            (functional-has-external-references-p locall-fun) t
-            (functional-has-external-references-p fun) t)
-      fun)))
+        (assert-global-function-definition-type name fun))
+      (setf (functional-kind xep) :external
+            (functional-entry-fun xep) fun
+            (functional-entry-fun fun) xep
+            (component-reanalyze component) t
+            (functional-has-external-references-p xep) t)
+      (reoptimize-component component :maybe)
+      (locall-analyze-xep-entry-point fun)
+      ;; Any leftover REFs to FUN outside local calls get replaced with the
+      ;; XEP.
+      (substitute-leaf-if (lambda (ref)
+                            (let* ((lvar (ref-lvar ref))
+                                   (dest (when lvar (lvar-dest lvar)))
+                                   (kind (when (basic-combination-p dest)
+                                           (basic-combination-kind dest))))
+                              (neq :local kind)))
+                          xep
+                          fun)
+      xep)))
 
 ;;; Compile LAMBDA-EXPRESSION into *COMPILE-OBJECT*, returning a
 ;;; description of the result.

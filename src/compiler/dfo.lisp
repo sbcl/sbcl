@@ -190,7 +190,10 @@
              (home-kind (functional-kind home))
              (home-externally-visible-p
               (or (eq home-kind :toplevel)
-                  (functional-has-external-references-p home))))
+                  (functional-has-external-references-p home)
+                  (let ((entry (functional-entry-fun home)))
+                    (and entry
+                         (functional-has-external-references-p entry))))))
         (unless (or (and home-externally-visible-p
                          (eq (functional-kind fun) :external))
                     (eq home-kind :deleted))

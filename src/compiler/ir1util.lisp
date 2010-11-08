@@ -1305,7 +1305,8 @@
                  (aver (null (functional-entry-fun leaf)))
                  (delete-lambda leaf))
                 (:external
-                 (delete-lambda leaf))
+                 (unless (functional-has-external-references-p leaf)
+                   (delete-lambda leaf)))
                 ((:deleted :zombie :optional))))
              (optional-dispatch
               (unless (eq (functional-kind leaf) :deleted)

@@ -378,12 +378,10 @@
 
 (deftest function-type.2
     (values (type-equal (function-type 'sun) (function-type #'sun))
-            ;; Does not currently work due to Bug #384892. (1.0.31.26)
-            #+nil
             (type-equal (function-type #'sun)
                         '(function (fixnum fixnum &key (:k1 (member nil t)))
                           (values (member t) &optional))))
-  t #+nil t)
+  t t)
 
 ;; Local functions
 
@@ -516,7 +514,7 @@
                         '(function ((member nil t)
                                     fixnum fixnum
                                     &key (:k1 (member nil t)))
-                          *)))
+                          (values (member nil t) &optional))))
   t t)
 
 ;; Misc

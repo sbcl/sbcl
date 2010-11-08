@@ -209,25 +209,29 @@
   (declare (type functional fun))
   (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
-    (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
+    (let ((xep (ir1-convert-lambda (make-xep-lambda-expression fun)
                                    :debug-name (debug-name
                                                 'xep (leaf-debug-name fun))
                                    :system-lambda t)))
-      (setf (functional-kind res) :external
-            (leaf-ever-used res) t
-            (functional-entry-fun res) fun
-            (functional-entry-fun fun) res
+      (setf (functional-kind xep) :external
+            (leaf-ever-used xep) t
+            (functional-entry-fun xep) fun
+            (functional-entry-fun fun) xep
             (component-reanalyze *current-component*) t)
       (reoptimize-component *current-component* :maybe)
-      (etypecase fun
-        (clambda
-         (locall-analyze-fun-1 fun))
-        (optional-dispatch
-         (dolist (ep (optional-dispatch-entry-points fun))
-           (locall-analyze-fun-1 (force ep)))
-         (when (optional-dispatch-more-entry fun)
-           (locall-analyze-fun-1 (optional-dispatch-more-entry fun)))))
-      res)))
+      (locall-analyze-xep-entry-point fun)
+      xep)))
+
+(defun locall-analyze-xep-entry-point (fun)
+  (declare (type functional fun))
+  (etypecase fun
+    (clambda
+     (locall-analyze-fun-1 fun))
+    (optional-dispatch
+     (dolist (ep (optional-dispatch-entry-points fun))
+       (locall-analyze-fun-1 (force ep)))
+     (when (optional-dispatch-more-entry fun)
+       (locall-analyze-fun-1 (optional-dispatch-more-entry fun))))))
 
 ;;; Notice a REF that is not in a local-call context. If the REF is
 ;;; already to an XEP, then do nothing, otherwise change it to the
