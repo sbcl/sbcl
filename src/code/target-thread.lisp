@@ -559,11 +559,32 @@ IF-NOT-OWNER is :FORCE)."
 
 (defun condition-wait (queue mutex)
   #!+sb-doc
-  "Atomically release MUTEX and enqueue ourselves on QUEUE.  Another
-thread may subsequently notify us using CONDITION-NOTIFY, at which
-time we reacquire MUTEX and return to the caller.
+  "Atomically release MUTEX and enqueue ourselves on QUEUE. Another thread may
+subsequently notify us using CONDITION-NOTIFY, at which time we reacquire
+MUTEX and return to the caller.
 
-Note that if CONDITION-WAIT unwinds (due to eg. a timeout) instead of
+Important: CONDITION-WAIT may return without CONDITION-NOTIFY having occurred.
+The correct way to write code that uses CONDITION-WAIT is to loop around the
+call, checking the the associated data:
+
+  (defvar *data* nil)
+  (defvar *queue* (make-waitqueue))
+  (defvar *lock* (make-mutex))
+
+  ;; Consumer
+  (defun pop-data ()
+    (with-mutex (*lock*)
+      (loop until *data*
+            do (condition-wait *queue* *lock*))
+      (pop *data*)))
+
+  ;; Producer
+  (defun push-data (data)
+    (with-mutex (*lock*)
+      (push data *data*)
+      (condition-notify *queue*)))
+
+Also note that if CONDITION-WAIT unwinds (due to eg. a timeout) instead of
 returning normally, it may do so without holding the mutex."
   #!-sb-thread (declare (ignore queue))
   (assert mutex)
