@@ -648,20 +648,27 @@ are evaluated in the null environment."
 ;;; Untrace one function.
 (defun untrace-1 (function-or-name)
   (let* ((fun (trace-fdefinition function-or-name))
-         (info (gethash fun *traced-funs*)))
+         (info (when fun (gethash fun *traced-funs*))))
     (cond
-     ((not info)
-      (when fun
-        (warn "Function is not TRACEd: ~S" function-or-name)))
-     (t
-      (cond
-       ((trace-info-encapsulated info)
-        (unencapsulate (trace-info-what info) 'trace))
-       (t
-        (sb-di:delete-breakpoint (trace-info-start-breakpoint info))
-        (sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
-      (setf (trace-info-untraced info) t)
-      (remhash fun *traced-funs*)))))
+      ((and fun (not info))
+       (warn "Function is not TRACEd: ~S" function-or-name))
+      ((not fun)
+       ;; Someone has FMAKUNBOUND it.
+       (let ((table *traced-funs*))
+         (with-locked-hash-table (table)
+           (maphash (lambda (fun info)
+                      (when (equal function-or-name (trace-info-what info))
+                        (remhash fun table)))
+                    table))))
+      (t
+       (cond
+         ((trace-info-encapsulated info)
+          (unencapsulate (trace-info-what info) 'trace))
+         (t
+          (sb-di:delete-breakpoint (trace-info-start-breakpoint info))
+          (sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
+       (setf (trace-info-untraced info) t)
+       (remhash fun *traced-funs*)))))
 
 ;;; Untrace all traced functions.
 (defun untrace-all ()

@@ -455,6 +455,15 @@
     (assert (search "returned 1" out))
     (assert (search "returned 120" out))))
 
+(defun trace-and-fmakunbound-this (x)
+  x)
+
+(with-test (:name :bug-667657)
+  (trace trace-and-fmakunbound-this)
+  (fmakunbound 'trace-and-fmakunbound-this)
+  (untrace)
+  (assert (not (trace))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (load (compile-file "bug-414.lisp"))
