@@ -132,10 +132,17 @@
          (res (first locs)))
     (etypecase leaf
       (lambda-var
-       (let ((tn (find-in-physenv leaf (node-physenv node))))
-         (if (lambda-var-indirect leaf)
-             (vop value-cell-ref node block tn res)
-             (emit-move node block tn res))))
+       (let ((tn (find-in-physenv leaf (node-physenv node)))
+             (indirect (lambda-var-indirect leaf))
+             (explicit (lambda-var-explicit-value-cell leaf)))
+         (cond
+          ((and indirect explicit)
+           (vop value-cell-ref node block tn res))
+          ((and indirect
+                (not (eq (node-physenv node)
+                         (lambda-physenv (lambda-var-home leaf)))))
+           (vop ancestor-frame-ref node block tn (leaf-info leaf) res))
+          (t (emit-move node block tn res)))))
       (constant
        (emit-move node block (constant-tn leaf) res))
       (functional
@@ -239,6 +246,21 @@
              (emit-move ref ir2-block entry res)))))
   (values))
 
+(defun closure-initial-value (what this-env current-fp)
+  (declare (type (or nlx-info lambda-var clambda) what)
+           (type physenv this-env)
+           (type (or tn null) current-fp))
+  ;; If we have an indirect LAMBDA-VAR that does not require an
+  ;; EXPLICIT-VALUE-CELL, and is from this environment (not from being
+  ;; closed over), we need to store the current frame pointer.
+  (if (and (lambda-var-p what)
+           (lambda-var-indirect what)
+           (not (lambda-var-explicit-value-cell what))
+           (eq (lambda-physenv (lambda-var-home what))
+               this-env))
+    current-fp
+    (find-in-physenv what this-env)))
+
 (defoptimizer (%allocate-closures ltn-annotate) ((leaves) node ltn-policy)
   ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
   (when (lvar-dynamic-extent leaves)
@@ -280,11 +302,16 @@
                     ;; putting of all closures after all creations
                     ;; (though it may require more registers).
                     (if (lambda-p what)
-                        (delayed (list tn (find-in-physenv what this-env) n))
-                        (vop closure-init call 2block
-                             tn
-                             (find-in-physenv what this-env)
-                             n)))))))
+                      (delayed (list tn (find-in-physenv what this-env) n))
+                      (let ((initial-value (closure-initial-value
+                                            what this-env nil)))
+                        (if initial-value
+                          (vop closure-init call 2block
+                               tn initial-value n)
+                          ;; An initial-value of NIL means to stash
+                          ;; the frame pointer... which requires a
+                          ;; different VOP.
+                          (vop closure-init-from-fp call 2block tn n)))))))))
       (loop for (tn what n) in (delayed)
             do (vop closure-init call 2block
                     tn what n))))
@@ -306,10 +333,17 @@
     (etypecase leaf
       (lambda-var
        (when (leaf-refs leaf)
-         (let ((tn (find-in-physenv leaf (node-physenv node))))
-           (if (lambda-var-indirect leaf)
-               (vop value-cell-set node block tn val)
-               (emit-move node block val tn)))))
+         (let ((tn (find-in-physenv leaf (node-physenv node)))
+               (indirect (lambda-var-indirect leaf))
+               (explicit (lambda-var-explicit-value-cell leaf)))
+           (cond
+            ((and indirect explicit)
+             (vop value-cell-set node block tn val))
+            ((and indirect
+                  (not (eq (node-physenv node)
+                           (lambda-physenv (lambda-var-home leaf)))))
+             (vop ancestor-frame-set node block tn val (leaf-info leaf)))
+            (t (emit-move node block val tn))))))
       (global-var
        (aver (symbolp (leaf-source-name leaf)))
        (ecase (global-var-kind leaf)
@@ -737,7 +771,8 @@
           (when arg
             (let ((src (lvar-tn node block arg))
                   (dest (leaf-info var)))
-              (if (lambda-var-indirect var)
+              (if (and (lambda-var-indirect var)
+                       (lambda-var-explicit-value-cell var))
                   (emit-make-value-cell node block src dest)
                   (emit-move node block src dest)))))
         (lambda-vars fun) (basic-combination-args node))
@@ -769,7 +804,8 @@
               (loc (leaf-info var)))
           (when actual
             (cond
-             ((lambda-var-indirect var)
+             ((and (lambda-var-indirect var)
+                   (lambda-var-explicit-value-cell var))
               (let ((temp
                      (make-normal-tn *backend-t-primitive-type*)))
                 (emit-make-value-cell node block actual temp)
@@ -786,7 +822,7 @@
         (let ((this-1env (node-physenv node))
               (called-env (physenv-info (lambda-physenv fun))))
           (dolist (thing (ir2-physenv-closure called-env))
-            (temps (find-in-physenv (car thing) this-1env))
+            (temps (closure-initial-value (car thing) this-1env old-fp))
             (locs (cdr thing)))
           (temps old-fp)
           (locs (ir2-physenv-old-fp called-env))))
@@ -1162,7 +1198,8 @@
           (when (leaf-refs arg)
             (let ((pass (standard-arg-location n))
                   (home (leaf-info arg)))
-              (if (lambda-var-indirect arg)
+              (if (and (lambda-var-indirect arg)
+                       (lambda-var-explicit-value-cell arg))
                   (emit-make-value-cell node block pass home)
                   (emit-move node block pass home))))
           (incf n))))
@@ -1301,7 +1338,8 @@
     (mapc (lambda (src var)
             (when (leaf-refs var)
               (let ((dest (leaf-info var)))
-                (if (lambda-var-indirect var)
+                (if (and (lambda-var-indirect var)
+                         (lambda-var-explicit-value-cell var))
                     (emit-make-value-cell node block src dest)
                     (emit-move node block src dest)))))
           (lvar-tns node block lvar

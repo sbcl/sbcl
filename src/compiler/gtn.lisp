@@ -43,13 +43,24 @@
       (let* ((type (if (lambda-var-indirect var)
                        *backend-t-primitive-type*
                        (primitive-type (leaf-type var))))
-             (temp (make-normal-tn type))
+             (res (make-normal-tn type))
              (node (lambda-bind fun))
-             (res (if (or (and let-p (policy node (< debug 3)))
-                          (policy node (zerop debug))
-                          (policy node (= speed 3)))
-                      temp
-                      (physenv-debug-live-tn temp (lambda-physenv fun)))))
+             (debug-variable-p (not (or (and let-p (policy node (< debug 3)))
+                                        (policy node (zerop debug))
+                                        (policy node (= speed 3))))))
+        (cond
+         ((and (lambda-var-indirect var)
+               (not (lambda-var-explicit-value-cell var)))
+          ;; Force closed-over indirect LAMBDA-VARs without explicit
+          ;; VALUE-CELLs to the stack, and make sure that they are
+          ;; live over the dynamic contour of the physenv.
+          (setf (tn-sc res) (svref *backend-sc-numbers*
+                                   sb!vm:control-stack-sc-number))
+          (physenv-live-tn res (lambda-physenv fun)))
+
+         (debug-variable-p
+          (physenv-debug-live-tn res (lambda-physenv fun))))
+
         (setf (tn-leaf res) var)
         (setf (leaf-info var) res))))
   (values))
