@@ -1,11 +1,18 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.44:
+  * optimization: mutated closed-over variables that are only accessed by
+    DYNAMIC-EXTENT closures (currently only FLET and LABELS functions
+    declared to be DYNAMIC-EXTENT) are stored directly in their containing
+    stack frame, rather than allocating a VALUE-CELL (lp#586103).
+  * optimization: UNWIND-PROTECT cleanup functions are now declared
+    DYNAMIC-EXTENT.
   * bug fix: backtracing function with &REST arguments now shows the full
     argument list. (lp#310173)
   * bug fix: return types for functions with complex lambda-lists are now
     derived properly (lp#384892)
   * bug fix: when SPEED > SPACE compiling CONCATENATE 'STRING with constant
     long string arguments slowed the compiler down to a crawl.
+  * bug fix: closure VALUE-CELLs are no longer stack-allocated (lp#308934).
 
 changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * enhancement: RUN-PROGRAM accepts :EXTERNAL-FORMAT argument to select the
