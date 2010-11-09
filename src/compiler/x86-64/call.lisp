@@ -119,6 +119,26 @@
   (:generator 1
     nil))
 
+;;; Accessing a slot from an earlier stack frame is definite hackery.
+(define-vop (ancestor-frame-ref)
+  (:args (frame-pointer :scs (descriptor-reg))
+         (variable-home-tn :load-if nil))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:policy :fast-safe)
+  (:generator 4
+    (aver (sc-is variable-home-tn control-stack))
+    (loadw value frame-pointer
+           (frame-word-offset (tn-offset variable-home-tn)))))
+(define-vop (ancestor-frame-set)
+  (:args (frame-pointer :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
+  (:results (variable-home-tn :load-if nil))
+  (:policy :fast-safe)
+  (:generator 4
+    (aver (sc-is variable-home-tn control-stack))
+    (storew value frame-pointer
+            (frame-word-offset (tn-offset variable-home-tn)))))
+
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)
