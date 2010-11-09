@@ -56,14 +56,7 @@
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
-  (let* ((leaf (tn-leaf res))
-         (dx (when leaf (leaf-dynamic-extent leaf))))
-    (when (and dx (neq :truly dx) (leaf-has-source-name-p leaf))
-      (compiler-notify "cannot stack allocate value cell for ~S" (leaf-source-name leaf)))
-    (vop make-value-cell node block value
-         ;; FIXME: See bug 419
-         (eq :truly dx)
-         res)))
+  (vop make-value-cell node block value nil res))
 
 ;;;; leaf reference
 
