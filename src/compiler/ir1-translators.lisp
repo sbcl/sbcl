@@ -1083,6 +1083,7 @@ due to normal completion or a non-local exit such as THROW)."
         ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
         ;; and something can be done to make %ESCAPE-FUN have
         ;; dynamic extent too.
+        (declare (dynamic-extent #',cleanup-fun))
         (block ,drop-thru-tag
           (multiple-value-bind (,next ,start ,count)
               (block ,exit-tag
