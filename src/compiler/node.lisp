@@ -1104,6 +1104,12 @@
   ;; true if the last reference has been deleted (and new references
   ;; should not be made)
   deleted
+  ;; This is set by physical environment analysis if, should it be an
+  ;; indirect lambda-var, an actual value cell object must be
+  ;; allocated for this variable because one or more of the closures
+  ;; that refer to it are not dynamic-extent.  Note that both
+  ;; attributes must be set for the value-cell object to be created.
+  explicit-value-cell
   )
 
 (def!struct (lambda-var (:include basic-var))
@@ -1147,6 +1153,8 @@
   `(lambda-var-attributep (lambda-var-flags ,var) indirect))
 (defmacro lambda-var-deleted (var)
   `(lambda-var-attributep (lambda-var-flags ,var) deleted))
+(defmacro lambda-var-explicit-value-cell (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
 
 ;;;; basic node types
 
