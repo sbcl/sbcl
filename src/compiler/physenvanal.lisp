@@ -41,6 +41,7 @@
   (recheck-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
+  (analyze-indirect-lambda-vars component)
 
   (dolist (fun (component-lambdas component))
     (when (null (leaf-refs fun))
@@ -207,6 +208,23 @@
                                 (flood (get-node-physenv ref))))))))))
       (flood ref-physenv)))
   (values))
+
+;;; Find LAMBDA-VARs that are marked as needing to support indirect
+;;; access (SET at some point after initial creation) that are present
+;;; in CLAMBDAs not marked as being DYNAMIC-EXTENT (meaning that the
+;;; value-cell involved must be able to survive past the extent of the
+;;; allocating frame), and mark them (the LAMBDA-VARs) as needing
+;;; explicit value-cells.  Because they are already closed-over, the
+;;; LAMBDA-VARs already appear in the closures of all of the CLAMBDAs
+;;; that need checking.
+(defun analyze-indirect-lambda-vars (component)
+  (dolist (fun (component-lambdas component))
+    (unless (leaf-dynamic-extent fun)
+      (let ((closure (physenv-closure (lambda-physenv fun))))
+        (dolist (var closure)
+          (when (and (lambda-var-p var)
+                     (lambda-var-indirect var))
+            (setf (lambda-var-explicit-value-cell var) t)))))))
 
 ;;;; non-local exit
 
