@@ -121,7 +121,11 @@ Options:
 
       Default prefix is: /usr/local
 
-  --dynamic-space-size=<size> Specify default dynamic-space size.
+  --dynamic-space-size=<size> Default dynamic-space size for target.
+
+      This specifies the default dynamic-space size for the SBCL
+      being built. If you need to control the dynamic-space size
+      of the host SBCL, use the --xc-host option.
 
       If not provided, the default is platform-specific. <size> is
       taken to be megabytes unless explicitly suffixed with Gb in
