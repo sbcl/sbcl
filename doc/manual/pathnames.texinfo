@@ -70,6 +70,24 @@ implementation-defined and so need documentation.
 @c * Other symbols and integers have implementation-defined meaning.
 @c   (19.2.2.4.6)
 
+@subsection Home Directory Specifiers
+
+SBCL accepts the keyword @code{:home} and a list of the form
+@code{(:home "username")} as a directory component immediately
+following @code{:absolute}.
+
+@code{:home} is represented in namestrings by @code{~/} and
+@code{(:home "username"} by @code{~username/} at the start of the
+namestring. Tilde-characters elsewhere in namestrings represent
+themselves.
+
+Home directory specifiers are resolved to home directory of the
+current or specified user by @code{native-namestring}, which is used
+by the implementation to translate pathnames before passing them on to
+operating system specific routines.
+
+Using @code{(:home "user")} form on Windows signals an error.
+
 @subsection The SYS Logical Pathname Host
 
 @cindex Logical pathnames

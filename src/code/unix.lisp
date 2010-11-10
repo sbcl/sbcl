@@ -446,11 +446,18 @@ corresponds to NAME, or NIL if there is none."
 ;;; Return the namestring of the home directory, being careful to
 ;;; include a trailing #\/
 #!-win32
-(defun uid-homedir (uid)
-  (or (newcharstar-string (alien-funcall (extern-alien "uid_homedir"
-                                                       (function (* char) int))
-                                         uid))
-      (error "failed to resolve home directory for Unix uid=~S" uid)))
+(progn
+  (defun uid-homedir (uid)
+    (or (newcharstar-string (alien-funcall (extern-alien "uid_homedir"
+                                                         (function (* char) int))
+                                           uid))
+        (error "failed to resolve home directory for Unix uid=~S" uid)))
+
+  (defun user-homedir (uid)
+    (or (newcharstar-string (alien-funcall (extern-alien "user_homedir"
+                                                         (function (* char) c-string))
+                                           uid))
+        (error "failed to resolve home directory for Unix uid=~S" uid))))
 
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
 ;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on

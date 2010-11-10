@@ -542,30 +542,32 @@ Experimental: interface subject to change."
                                *default-pathname-defaults*
                                :as-directory t))))
 
+(defun user-homedir-namestring (&optional username)
+  (if username
+      (sb!unix:user-homedir username)
+      (let ((env-home (posix-getenv "HOME")))
+        (if (and env-home (not (string= env-home "")))
+            env-home
+            #!-win32
+            (sb!unix:uid-homedir (sb!unix:unix-getuid))))))
+
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
   #!+sb-doc
   "Return the home directory of the user as a pathname. If the HOME
 environment variable has been specified, the directory it designates
 is returned; otherwise obtains the home directory from the operating
-system."
+system. HOST argument is ignored by SBCL."
   (declare (ignore host))
-  (let ((env-home (posix-getenv "HOME")))
-    (values
-     (parse-native-namestring
-      (if (and env-home (not (string= env-home "")))
-          env-home
-          #!-win32
-          (sb!unix:uid-homedir (sb!unix:unix-getuid))
-          #!+win32
-          ;; Needs to bypass PARSE-NATIVE-NAMESTRING & ENSURE-TRAILING-SLASH
-          ;; What?! -- RMK, 2007-12-31
-          (return-from user-homedir-pathname
-            (sb!win32::get-folder-pathname sb!win32::csidl_profile)))
-      #!-win32 sb!impl::*unix-host*
-      #!+win32 sb!impl::*win32-host*
-      *default-pathname-defaults*
-      :as-directory t))))
+  (values
+   (parse-native-namestring
+    (or (user-homedir-namestring)
+        #!+win32
+        (sb!win32::get-folder-namestring sb!win32::csidl_profile))
+    #!-win32 sb!impl::*unix-host*
+    #!+win32 sb!impl::*win32-host*
+    *default-pathname-defaults*
+    :as-directory t)))
 
 
 ;;;; DIRECTORY

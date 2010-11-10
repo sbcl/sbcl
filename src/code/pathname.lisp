@@ -141,8 +141,20 @@
     (when directory
       (ecase (pop directory)
        (:absolute
-        (pieces "/"))
-       (:relative))
+        (let ((next (pop directory)))
+          (cond ((eq :home next)
+                 (pieces "~"))
+                ((and (consp next) (eq :home (car next)))
+                 (pieces "~")
+                 (pieces (second next)))
+                ((and (plusp (length next)) (char= #\~ (char next 0)))
+                 ;; The only place we need to escape the tilde.
+                 (pieces "\\")
+                 (pieces next))
+                (next
+                 (push next directory)))
+          (pieces "/")))
+        (:relative))
       (dolist (dir directory)
         (typecase dir
          ((member :up)

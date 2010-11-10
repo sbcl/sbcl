@@ -515,17 +515,27 @@ the operating system native pathname conventions."
     ((member :unspecific) '(:relative))
     (list
      (collect ((results))
-       (results (pop directory))
-       (dolist (piece directory)
-         (cond ((member piece '(:wild :wild-inferiors :up :back))
-                (results piece))
-               ((or (simple-string-p piece) (pattern-p piece))
-                (results (maybe-diddle-case piece diddle-case)))
-               ((stringp piece)
-                (results (maybe-diddle-case (coerce piece 'simple-string)
-                                            diddle-case)))
-               (t
-                (error "~S is not allowed as a directory component." piece))))
+       (let ((root (pop directory)))
+         (if (member root '(:relative :absolute))
+             (results root)
+             (error "List of directory components must start with ~S or ~S."
+                    :absolute :relative)))
+       (when directory
+         (let ((next (pop directory)))
+           (if (or (eq :home next)
+                   (typep next '(cons (eql :home) (cons string null))))
+               (results next)
+               (push next directory)))
+         (dolist (piece directory)
+           (cond ((member piece '(:wild :wild-inferiors :up :back))
+                  (results piece))
+                 ((or (simple-string-p piece) (pattern-p piece))
+                  (results (maybe-diddle-case piece diddle-case)))
+                 ((stringp piece)
+                  (results (maybe-diddle-case (coerce piece 'simple-string)
+                                              diddle-case)))
+                 (t
+                  (error "~S is not allowed as a directory component." piece)))))
        (results)))
     (simple-string
      `(:absolute ,(maybe-diddle-case directory diddle-case)))

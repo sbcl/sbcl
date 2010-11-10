@@ -317,10 +317,9 @@ uid_username(int uid)
 }
 
 char *
-uid_homedir(uid_t uid)
+passwd_homedir(struct passwd *p)
 {
-    struct passwd *p = getpwuid(uid);
-    if(p) {
+    if (p) {
         /* Let's be careful about this, shall we? */
         size_t len = strlen(p->pw_dir);
         if (p->pw_dir[len-1] == '/') {
@@ -341,6 +340,18 @@ uid_homedir(uid_t uid)
     } else {
         return 0;
     }
+}
+
+char *
+user_homedir(char *name)
+{
+    return passwd_homedir(getpwnam(name));
+}
+
+char *
+uid_homedir(uid_t uid)
+{
+    return passwd_homedir(getpwuid(uid));
 }
 #endif /* !LISP_FEATURE_WIN32 */
 

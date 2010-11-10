@@ -568,4 +568,29 @@
       (ignore-errors (delete-file bar))
       (setf (logical-pathname-translations "SYS") translations))))
 
+(with-test (:name :tilde-expansion)
+  (assert (equal '(:absolute :home "foo") (pathname-directory "~/foo/bar.txt")))
+  (assert (equal '(:absolute (:home "jdoe") "quux") (pathname-directory "~jdoe/quux/")))
+  (assert (equal "~/foo/x" (namestring (make-pathname :directory '(:absolute :home "foo")
+                                                      :name "x"))))
+  (assert (equal (native-namestring (merge-pathnames "a/b.c" (user-homedir-pathname)))
+                 (native-namestring #p"~/a/b.c")))
+  ;; Not a directory.
+  (assert (equal (native-namestring #p"~foo") "~foo"))
+  ;; Not at the start of the first directory
+  (assert (equal (native-namestring #p"foo/~/bar")
+                 #-win32 "foo/~/bar"
+                 #+win32 "foo\\~\\bar")))
+
+;;; lp#673625
+(with-test (:name :pathname-escape-first-directory-component
+                  :fails-on :win32)
+  ;; ~ / :HOME
+  (assert (equal (pathname-directory #p"\\~/foo/") '(:relative "~" "foo")))
+  (assert (equal (native-namestring #p"\\~/foo/") "~/foo/"))
+  (assert (equal (namestring (make-pathname :directory '(:absolute "~zot")))
+                 "\\~zot/"))
+  ;; * / :WILD
+  (assert (equal (pathname-directory #p"\\*/") '(:relative "*"))))
+
 ;;;; success

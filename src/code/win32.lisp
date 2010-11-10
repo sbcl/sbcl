@@ -432,13 +432,15 @@
             err-code
             (get-last-error-message err-code))))
 
-(defun get-folder-pathname (csidl)
+(defun get-folder-namestring (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
   (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
     (syscall (("SHGetFolderPath" 20 t) int handle int handle dword (* char))
-             (parse-native-namestring
-               (concatenate 'string (cast-and-free apath) "\\"))
+             (concatenate 'string (cast-and-free apath) "\\")
              0 csidl 0 0 apath)))
+
+(defun get-folder-pathname (csidl)
+  (parse-native-namestring (get-folder-namestring csidl)))
 
 (defun sb!unix:posix-getcwd ()
   (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))

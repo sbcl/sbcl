@@ -2349,6 +2349,7 @@ no guarantees of interface stability."
                "NANOSLEEP"
                "UID-USERNAME"
                "UID-HOMEDIR"
+               "USER-HOMEDIR"
                "WITH-RESTARTED-SYSCALL"
                "SB-MKSTEMP"
 
