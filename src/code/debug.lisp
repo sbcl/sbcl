@@ -171,58 +171,243 @@ Other commands:
 
 ;;;; BACKTRACE
 
-(defun map-backtrace (thunk &key (start 0) (count most-positive-fixnum))
-  (loop
-     with result = nil
-     for index upfrom 0
-     for frame = (if *in-the-debugger*
-                     *current-frame*
-                     (sb!di:top-frame))
-               then (sb!di:frame-down frame)
-     until (null frame)
-     when (<= start index) do
-       (if (minusp (decf count))
-           (return result)
-           (setf result (funcall thunk frame)))
-     finally (return result)))
+(declaim (unsigned-byte *backtrace-frame-count*))
+(defvar *backtrace-frame-count* 1000
+  "Default number of frames to backtrace. Defaults to 1000.")
 
-(defun backtrace (&optional (count most-positive-fixnum) (stream *debug-io*))
+(declaim (type (member :minimal :normal :full) *method-frame-style*))
+(defvar *method-frame-style* :normal
+  "Determines how frames corresponding to method functions are represented in
+backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
+
+  :MINIMAL represents them as
+
+    (<gf-name> ...args...)
+
+    if all arguments are available, and only a single method is applicable to
+    the arguments -- otherwise behaves as :NORMAL.
+
+  :NORMAL represents them as
+
+    ((:method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+
+    The frame is then followed by either [fast-method] or [slow-method],
+    designating the kind of method function. (See below.)
+
+  :FULL represents them using the actual funcallable method function name:
+
+    ((sb-pcl:fast-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+
+   or
+
+    ((sb-pcl:slow-method <gf-name> [<qualifier>*] (<specializer>*)) ...args...)
+
+   In the this case arguments may include values internal to SBCL's method
+   dispatch machinery.")
+
+(define-deprecated-variable :early "1.1.4.9" *show-entry-point-details*
+  :value nil)
+
+(defun backtrace (&optional (count *backtrace-frame-count*) (stream *debug-io*))
+  "Replaced by PRINT-BACKTRACE, will eventually be deprecated."
+  (print-backtrace :count count :stream stream))
+
+(defun backtrace-as-list (&optional (count *backtrace-frame-count*))
+  "Replaced by LIST-BACKTRACE, will eventually be deprecated."
+  (list-backtrace :count count))
+
+(defun backtrace-start-frame (frame-designator)
+  (let ((here (sb!di:top-frame)))
+    (labels ((current-frame ()
+               (let ((frame here))
+                 ;; Our caller's caller.
+                 (loop repeat 2
+                       do (setf frame (or (sb!di:frame-down frame) frame)))
+                 frame))
+             (interrupted-frame ()
+               (or (nth-value 1 (find-interrupted-name-and-frame))
+                   (current-frame))))
+     (cond ((eq :current-frame frame-designator)
+            (current-frame))
+           ((eq :interrupted-frame frame-designator)
+            (interrupted-frame))
+           ((eq :debugger-frame frame-designator)
+            (if (and *in-the-debugger* *current-frame*)
+                *current-frame*
+                (interrupted-frame)))
+           ((sb!di:frame-p frame-designator)
+            frame-designator)
+           (t
+            (error "Invalid designator for initial backtrace frame: ~S"
+                   frame-designator))))))
+
+(defun map-backtrace (function &key
+                      (start 0)
+                      (from :debugger-frame)
+                      (count *backtrace-frame-count*))
   #!+sb-doc
-  "Show a listing of the call stack going down from the current frame.
-In the debugger, the current frame is indicated by the prompt. COUNT
-is how many frames to show."
+  "Calls the designated FUNCTION with each frame on the call stack.
+Returns the last value returned by FUNCTION.
+
+COUNT is the number of frames to backtrace, defaulting to
+*BACKTRACE-FRAME-COUNT*.
+
+START is the number of the frame the backtrace should start from.
+
+FROM specifies the frame relative to which the frames are numbered. Possible
+values are an explicit SB-DI:FRAME object, and the
+keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
+is :DEBUGGER-FRAME.
+
+  :CURRENT-FRAME
+    specifies the caller of MAP-BACKTRACE.
+
+  :INTERRUPTED-FRAME
+    specifies the first interrupted frame on the stack \(typically the frame
+    where the error occured, as opposed to error handling frames) if any,
+    otherwise behaving as :CURRENT-FRAME.
+
+  :DEBUGGER-FRAME
+    specifies the currently debugged frame when inside the debugger, and
+    behaves as :INTERRUPTED-FRAME outside the debugger.
+"
+  (loop with result = nil
+        for index upfrom 0
+        for frame = (backtrace-start-frame from)
+        then (sb!di:frame-down frame)
+        until (null frame)
+        when (<= start index) do
+        (if (minusp (decf count))
+            (return result)
+            (setf result (funcall function frame)))
+        finally (return result)))
+
+(defun print-backtrace (&key
+                        (stream *debug-io*)
+                        (start 0)
+                        (from :debugger-frame)
+                        (count *backtrace-frame-count*)
+                        (print-thread t)
+                        (print-frame-source nil)
+                        (method-frame-style *method-frame-style*))
+  #!+sb-doc
+  "Print a listing of the call stack to STREAM, defaulting to *DEBUG-IO*.
+
+COUNT is the number of frames to backtrace, defaulting to
+*BACKTRACE-FRAME-COUNT*.
+
+START is the number of the frame the backtrace should start from.
+
+FROM specifies the frame relative to which the frames are numbered. Possible
+values are an explicit SB-DI:FRAME object, and the
+keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
+is :DEBUGGER-FRAME.
+
+  :CURRENT-FRAME
+    specifies the caller of PRINT-BACKTRACE.
+
+  :INTERRUPTED-FRAME
+    specifies the first interrupted frame on the stack \(typically the frame
+    where the error occured, as opposed to error handling frames) if any,
+    otherwise behaving as :CURRENT-FRAME.
+
+  :DEBUGGER-FRAME
+    specifies the currently debugged frame when inside the debugger, and
+    behaves as :INTERRUPTED-FRAME outside the debugger.
+
+If PRINT-THREAD is true (default), backtrace is preceded by printing the
+thread object the backtrace is from.
+
+If PRINT-FRAME-SOURCE is true (default is false), each frame is followed by
+printing the currently executing source form in the function responsible for
+that frame, when available. Requires the function to have been compiled at
+DEBUG 2 or higher. If PRINT-FRAME-SOURCE is :ALWAYS, it also reports \"no
+source available\" for frames for which were compiled at lower debug settings.
+
+METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
+corresponding to method functions are printed. Possible values
+are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
+information."
   (fresh-line stream)
+  (when print-thread
+    (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
   (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
                                      *suppress-print-errors*
                                      'serious-condition))
-        (*print-circle* t))
+        (*print-circle* t)
+        (n start))
     (handler-bind ((print-not-readable #'print-unreadably))
         (map-backtrace (lambda (frame)
-                         (print-frame-call frame stream :number t))
+                         (print-frame-call frame stream
+                                           :number n
+                                           :method-frame-style method-frame-style
+                                           :print-frame-source print-frame-source)
+                         (incf n))
+                       :from (backtrace-start-frame from)
+                       :start start
                        :count count)))
   (fresh-line stream)
   (values))
 
-(defun backtrace-as-list (&optional (count most-positive-fixnum))
+(defun list-backtrace (&key
+                       (count *backtrace-frame-count*)
+                       (start 0)
+                       (from :debugger-frame)
+                       (method-frame-style *method-frame-style*))
   #!+sb-doc
-  "Return a list representing the current BACKTRACE.
+    "Returns a list describing the call stack. Each frame is represented
+by a sublist:
 
-Objects in the backtrace with dynamic-extent allocation by the current
-thread are represented by substitutes to avoid references to them from
-leaking outside their legal extent."
-  (let ((reversed-result (list)))
-    (map-backtrace (lambda (frame)
-                     (let ((frame-list (frame-call-as-list frame)))
-                       (if (listp (cdr frame-list))
-                           (push (mapcar #'replace-dynamic-extent-object frame-list)
-                                 reversed-result)
-                           (push frame-list reversed-result))))
-                   :count count)
-    (nreverse reversed-result)))
+  \(<name> ...args...)
 
-(defun frame-call-as-list (frame)
-  (multiple-value-bind (name args) (frame-call frame)
-    (cons name args)))
+where the name describes the function responsible for the frame. The name
+might not be bound to the actual function object. Unavailable arguments are
+represented by dummy objects that print as #<unavailable argument>. Objects
+with dynamic-extent allocation by the current thread are represented by
+substitutes to avoid references to them from leaking outside their legal
+extent.
+
+COUNT is the number of frames to backtrace, defaulting to
+*BACKTRACE-FRAME-COUNT*.
+
+START is the number of the frame the backtrace should start from.
+
+FROM specifies the frame relative to which the frames are numbered. Possible
+values are an explicit SB-DI:FRAME object, and the
+keywords :CURRENT-FRAME, :INTERRUPTED-FRAME, and :DEBUGGER-FRAME. Default
+is :DEBUGGER-FRAME.
+
+  :CURRENT-FRAME
+    specifies the caller of LIST-BACKTRACE.
+
+  :INTERRUPTED-FRAME
+    specifies the first interrupted frame on the stack \(typically the frame
+    where the error occured, as opposed to error handling frames) if any,
+    otherwise behaving as :CURRENT-FRAME.
+
+  :DEBUGGER-FRAME
+    specifies the currently debugged frame when inside the debugger, and
+    behaves as :INTERRUPTED-FRAME outside the debugger.
+
+METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
+corresponding to method functions are printed. Possible values
+are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
+information."
+  (let (rbacktrace)
+     (map-backtrace
+      (lambda (frame)
+        (push (frame-call-as-list frame :method-frame-style method-frame-style)
+              rbacktrace))
+      :count count
+      :start start
+      :from (backtrace-start-frame from))
+     (nreverse rbacktrace)))
+
+(defun frame-call-as-list (frame &key (method-frame-style *method-frame-style*))
+  (multiple-value-bind (name args info)
+      (frame-call frame :method-frame-style method-frame-style
+                        :replace-dynamic-extent-objects t)
+    (values (cons name args) info)))
 
 (defun replace-dynamic-extent-object (obj)
   (if (stack-allocated-p obj)
@@ -327,9 +512,7 @@ thread, NIL otherwise."
     (sb!di:lambda-list-unavailable ()
       (make-unprintable-object "unavailable lambda list"))))
 
-(defvar *show-entry-point-details* nil)
-
-(defun clean-xep (name args)
+(defun clean-xep (name args info)
   (values (second name)
           (if (consp args)
               (let* ((count (first args))
@@ -345,9 +528,12 @@ thread, NIL otherwise."
                                         (make-unprintable-object "unknown"))
                           collect arg)
                     real-args))
-              args)))
+              args)
+          (if (eq (car name) 'sb!c::tl-xep)
+              (cons :tl info)
+              info)))
 
-(defun clean-&more-processor (name args)
+(defun clean-&more-processor (name args info)
   (values (second name)
           (if (consp args)
               (let* ((more (last args 2))
@@ -360,36 +546,71 @@ thread, NIL otherwise."
                       (sb!c:%more-arg-values context 0 count))
                      (list
                       (make-unprintable-object "more unavailable arguments")))))
-              args)))
+              args)
+          (cons :more info)))
 
-(defun clean-debug-fun-name (name &optional args)
-  ;; FIXME: do we need to deal with
-  ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
-  ;; &AUX-BINDINGS appear in backtraces, so they are
-  ;; left alone for now. --NS 2005-02-28
+(defun clean-fast-method (name args style info)
+  (multiple-value-bind (cname cargs)
+      (ecase style
+        (:minimal
+         (let ((gf-name (second name))
+               (real-args (cddr args)))
+           (if (and (fboundp gf-name)
+                    (notany #'sb!impl::unprintable-object-p real-args)
+                    (let ((methods (compute-applicable-methods
+                                    (fdefinition gf-name) real-args)))
+                      (and methods (not (cdr methods)))))
+               (values gf-name real-args)
+               (values (cons :method (cdr name)) real-args))))
+        (:normal
+         (values (cons :method (cdr name)) (cddr args)))
+        (:full
+         (values name args)))
+    (values cname cargs (cons :fast-method info))))
+
+(defun clean-frame-call (name args method-frame-style info)
   (if (consp name)
       (case (first name)
         ((sb!c::xep sb!c::tl-xep)
-         (clean-xep name args))
+         (clean-xep name args info))
         ((sb!c::&more-processor)
-         (clean-&more-processor name args))
-        ((sb!c::hairy-arg-processor
-          sb!c::varargs-entry sb!c::&optional-processor)
-         (clean-debug-fun-name (second name) args))
+         (clean-&more-processor name args info))
+        ((sb!c::&optional-processor)
+         (clean-frame-call (second name) args method-frame-style
+                           info))
+        ((sb!pcl::fast-method)
+         (clean-fast-method name args method-frame-style info))
         (t
-         (values name args)))
-      (values name args)))
+         (values name args info)))
+      (values name args info)))
 
-(defun frame-call (frame)
-  (flet ((clean-name-and-args (name args)
-           (if (not *show-entry-point-details*)
-               (clean-debug-fun-name name args)
-               (values name args))))
-    (let ((debug-fun (sb!di:frame-debug-fun frame)))
-      (multiple-value-bind (name args)
-          (clean-name-and-args (sb!di:debug-fun-name debug-fun)
-                               (frame-args-as-list frame))
-        (values name args (sb!di:debug-fun-kind debug-fun))))))
+(defun frame-call (frame &key (method-frame-style *method-frame-style*)
+                              replace-dynamic-extent-objects)
+  "Returns as multiple values a descriptive name for the function responsible
+for FRAME, arguments that that function, and a list providing additional
+information about the frame.
+
+Unavailable arguments are represented using dummy-objects printing as
+#<unavailable argument>.
+
+METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
+corresponding to method functions are printed. Possible values
+are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
+information.
+
+If REPLACE-DYNAMIC-EXTENT-OBJECTS is true, objects allocated on the stack of
+the current thread are replaced with dummy objects which can safely escape."
+  (let* ((debug-fun (sb!di:frame-debug-fun frame))
+         (kind (sb!di:debug-fun-kind debug-fun)))
+    (multiple-value-bind (name args info)
+        (clean-frame-call (sb!di:debug-fun-name debug-fun)
+                          (frame-args-as-list frame)
+                          method-frame-style
+                          (when kind (list kind)))
+      (let ((args (if (and (consp args) replace-dynamic-extent-objects)
+                      (mapcar #'replace-dynamic-extent-object args)
+                      args)))
+        (values name args info)))))
 
 (defun ensure-printable-object (object)
   (handler-case
@@ -411,49 +632,50 @@ thread, NIL otherwise."
 ;;; zero indicates just printing the DEBUG-FUN's name, and one
 ;;; indicates displaying call-like, one-liner format with argument
 ;;; values.
-(defun print-frame-call (frame stream &key (verbosity 1) (number nil))
+(defun print-frame-call (frame stream
+                         &key print-frame-source
+                              number
+                              (method-frame-style *method-frame-style*))
   (when number
-    (format stream "~&~S: " (sb!di:frame-number frame)))
-  (if (zerop verbosity)
-      (let ((*print-readably* nil))
-        (prin1 frame stream))
-      (multiple-value-bind (name args kind) (frame-call frame)
-        (pprint-logical-block (stream nil :prefix "(" :suffix ")")
-          ;; Since we go to some trouble to make nice informative function
-          ;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
-          ;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
-          ;; For the function arguments, we can just print normally.
-          (let ((*print-length* nil)
-                (*print-level* nil))
-            (prin1 name stream))
-          ;; If we hit a &REST arg, then print as many of the values
-          ;; as possible, punting the loop over lambda-list variables
-          ;; since any other arguments will be in the &REST arg's list
-          ;; of values. Special case *PRINT-PRETTY* for eval frames:
-          ;; if *PRINT-LINES* is 1, turn off pretty-printing.
-          (let ((*print-pretty*
-                  (if (and (eql 1 *print-lines*)
-                           (member name '(eval simple-eval-in-lexenv)))
-                      nil
-                      *print-pretty*))))
+    (format stream "~&~S: " (if (integerp number)
+                                number
+                                (sb!di:frame-number frame))))
+  (multiple-value-bind (name args info)
+      (frame-call frame :method-frame-style method-frame-style)
+    (pprint-logical-block (stream nil :prefix "(" :suffix ")")
+      ;; Since we go to some trouble to make nice informative function
+      ;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
+      ;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
+      ;; For the function arguments, we can just print normally.
+      (let ((*print-length* nil)
+            (*print-level* nil)
+            (*print-pretty* nil)
+            (*print-circle* t)
+            (name (ensure-printable-object name)))
+        (write name :stream stream :escape t :pretty (equal '(lambda ()) name))
+        ;; If we hit a &REST arg, then print as many of the values as
+        ;; possible, punting the loop over lambda-list variables since any
+        ;; other arguments will be in the &REST arg's list of values.
+        (let ((args (ensure-printable-object args)))
           (if (listp args)
               (format stream "~{ ~_~S~}" args)
-              (format stream " ~S" args)))
-        (when kind
-          (format stream "[~S]" kind))))
-  (when (>= verbosity 2)
+              (format stream " ~S" args)))))
+    (when info
+      (format stream " [~{~(~A~)~^,~}]" info)))
+  (when print-frame-source
     (let ((loc (sb!di:frame-code-location frame)))
       (handler-case
-          (progn
-            ;; FIXME: Is this call really necessary here? If it is,
-            ;; then the reason for it should be unobscured.
-            (sb!di:code-location-debug-block loc)
-            (format stream "~%source: ")
-            (prin1 (code-location-source-form loc 0) stream))
-        (sb!di:debug-condition (ignore)
-          ignore)
+          (let ((source (handler-case
+                            (code-location-source-form loc 0)
+                          (error (c)
+                            (format stream "~&   error finding frame source: ~A" c)))))
+            (format stream "~%   source: ~S" source))
+        (sb!di:debug-condition ()
+          ;; This is mostly noise.
+          (when (eq :always print-frame-source)
+            (format stream "~&   no source available for frame")))
         (error (c)
-          (format stream "~&error finding source: ~A" c))))))
+          (format stream "~&   error printing frame source: ~A" c))))))
 
 ;;;; INVOKE-DEBUGGER
 
@@ -720,7 +942,8 @@ reset to ~S."
           (finish-output *error-output*)
           ;; (Where to truncate the BACKTRACE is of course arbitrary, but
           ;; it seems as though we should at least truncate it somewhere.)
-          (sb!debug:backtrace 128 *error-output*)
+          (print-backtrace :count 128 :stream *error-output*
+                           :from :interrupted-frame)
           (format
            *error-output*
            "~%unhandled condition in --disable-debugger mode, quitting~%")
@@ -863,7 +1086,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
              (setf *suppress-frame-print* nil))
             (t
              (terpri *debug-io*)
-             (print-frame-call *current-frame* *debug-io* :verbosity 2)))
+             (print-frame-call *current-frame* *debug-io* :print-frame-source t)))
       (loop
        (catch 'debug-loop-catcher
          (handler-bind ((error (lambda (condition)
@@ -1286,7 +1509,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   (show-restarts *debug-restarts* *debug-io*))
 
 (!def-debug-command "BACKTRACE" ()
-  (backtrace (read-if-available most-positive-fixnum)))
+ (print-backtrace :count (read-if-available most-positive-fixnum)))
 
 (!def-debug-command "PRINT" ()
   (print-frame-call *current-frame* *debug-io*))

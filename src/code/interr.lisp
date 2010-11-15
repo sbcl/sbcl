@@ -401,9 +401,8 @@
           (do ((frame (sb!di:top-frame) (sb!di:frame-down frame)))
               ((null frame))
             (when (and (sb!di::compiled-frame-p frame)
-                       (eq name (sb!debug::clean-debug-fun-name
-                                 (sb!di:debug-fun-name
-                                  (sb!di:frame-debug-fun frame)))))
+                       (eq name (sb!di:debug-fun-name
+                                 (sb!di:frame-debug-fun frame))))
               (let ((caller (sb!di:frame-down frame)))
                 (sb!di:flush-frames-above caller)
                 (return caller)))))

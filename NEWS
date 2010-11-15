@@ -10,8 +10,15 @@ changes relative to sbcl-1.1.4:
     resolving the situation. See manual for details. (lp#891351)
   * enhancement: make-random-state now uses CryptGenRandom as a seed on Windows.
     (Thanks to Anton Kovalenko.) (lp#1102748)
-  * bug fix: secondary CLOS dispatch functions have better debug names.
-    (lp#503081)
+  * enhancement: backtrace improvements
+    ** secondary CLOS dispatch functions have better debug names (lp#503081)
+    ** easier to read method names in backtraces. See
+       SB-DEBUG:*METHOD-FRAME-STYLE*.
+    ** SB-DEBUG:PRINT-BACKTRACE and SB-DEBUG:LIST-BACKTRACE are available as
+       forwards-compatible replacements for SB-DEBUG:BACKTRACE and
+       SB-DEBUG:BACKTRACE-AS-LIST.
+    ** SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS** has been deprecated, as the same
+       information is available in less intrusive form as frame annotations.
   * bug fix: deleting a package removes it from implementation-package
     lists of other packages.
 

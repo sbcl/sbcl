@@ -1154,9 +1154,11 @@
 ;;; - SB-C::MERGE-TAIL-CALLS (policy), since 1.0.53.74 (11/2011)    -> Late: 11/2012
 ;;; - SB-EXT:QUIT, since 1.0.56.55 (05/2012)                        -> Late: 05/2013
 ;;; - SB-UNIX:UNIX-EXIT, since 1.0.56.55 (05/2012)                  -> Late: 05/2013
+;;; - SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*, since 1.1.4.9 (02/2013)  -> Late: 02/2014
 ;;;
 ;;; LATE:
 ;;; - SB-SYS:OUTPUT-RAW-BYTES, since 1.0.8.16 (06/2007)                 -> Final: anytime
+;;;   Note: make sure CLX doesn't use it anymore!
 ;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy), since 1.0.19.7      -> Final: anytime
 ;;; - SB-C::STACK-ALLOCATE-VECTOR (policy), since 1.0.19.7              -> Final: anytime
 ;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy), since 1.0.19.7         -> Final: anytime

@@ -410,20 +410,26 @@ is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
       :reexport ("*DEBUG-PRINT-VARIABLE-ALIST*")
-      :export ("*DEBUG-BEGINNER-HELP-P*"
+      :export ("*BACKTRACE-FRAME-COUNT*"
+               "*DEBUG-BEGINNER-HELP-P*"
                "*DEBUG-CONDITION*"
                "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
                "*FLUSH-DEBUG-ERRORS*" "*IN-THE-DEBUGGER*"
-               "*SHOW-ENTRY-POINT-DETAILS*"
+               "*METHOD-FRAME-STYLE*"
                "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
                "*TRACE-FRAME*" "*TRACED-FUN-LIST*"
-               "ARG" "BACKTRACE" "BACKTRACE-AS-LIST" "INTERNAL-DEBUG" "VAR"
+               "ARG"
+               "INTERNAL-DEBUG" "VAR"
                "*PRINT-LOCATION-KIND*"
                "*ONLY-BLOCK-START-LOCATIONS*" "*STACK-TOP-HINT*"
                "*TRACE-VALUES*" "DO-DEBUG-COMMAND"
                "*TRACE-ENCAPSULATE-DEFAULT*"
                "FRAME-HAS-DEBUG-TAG-P"
-               "UNWIND-TO-FRAME-AND-CALL"))
+               "UNWIND-TO-FRAME-AND-CALL"
+               ;; Deprecated
+               "BACKTRACE" "BACKTRACE-AS-LIST" "*SHOW-ENTRY-POINT-DETAILS*"
+               ;; Replaced by
+               "PRINT-BACKTRACE" "LIST-BACKTRACE"))
 
    #s(sb-cold:package-data
       :name "SB!DI"

@@ -36,7 +36,7 @@
         (dolist (item messages)
           (princ item *terminal-io*))
         (terpri *terminal-io*)
-        (sb!debug:backtrace most-positive-fixnum *terminal-io*)
+        (sb!debug:backtrace :stream *terminal-io*)
         (force-output *terminal-io*)
         (invoke-debugger
          (coerce-to-condition "Maximum error nesting depth exceeded" nil

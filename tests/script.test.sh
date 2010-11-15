@@ -29,9 +29,9 @@ check_status_maybe_lose "--script exit status from EXIT" $? 7 "(status good)"
 echo '(error "oops")' > $tmpscript
 run_sbcl --script $tmpscript 1> $tmpout 2> $tmperr
 check_status_maybe_lose "--script exit status from ERROR" $? 1 "(error implies 1)"
-grep BACKTRACE $tmpout > /dev/null
+grep Backtrace $tmpout > /dev/null
 check_status_maybe_lose "--script backtrace not to stdout" $? 1 "(ok)"
-grep BACKTRACE $tmperr > /dev/null
+grep Backtrace $tmperr > /dev/null
 check_status_maybe_lose "--script backtrace to stderr" $? 0 "(ok)"
 
 echo 'nil'> $tmpscript

@@ -131,7 +131,7 @@ means to wait indefinitely.")
      (let ((*current-error-depth* (1+ *current-error-depth*)))
        (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
        ;; arbitrary truncation
-       #!+sb-show (sb!debug:backtrace 8)
+       #!+sb-show (sb!debug:print-backtrace :count 8)
        ,@forms)))
 
 ;;; a helper function for INFINITE-ERROR-PROTECT

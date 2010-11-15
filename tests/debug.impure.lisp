@@ -81,7 +81,7 @@
 ;;; and that it contains the frames we expect, doesn't contain any
 ;;; "bogus stack frame"s, and contains the appropriate toplevel call
 ;;; and hasn't been cut off anywhere.
-(defun verify-backtrace (test-function frame-specs &key (allow-stunted nil))
+(defun verify-backtrace (test-function frame-specs &key (allow-stunted nil) details)
   (labels ((args-equal (want real)
              (cond ((eq '&rest (car want))
                     t)
@@ -96,39 +96,66 @@
         (handler-bind
             ((error (lambda (condition)
                       ;; find the part of the backtrace we're interested in
-                      (let* ((full-backtrace (sb-debug:backtrace-as-list))
-                             (backtrace (member (caar frame-specs) full-backtrace
-                                                :key #'car
-                                                :test #'equal)))
+                      (let (full-backtrace)
+                        (sb-debug::map-backtrace
+                         (lambda (frame)
+                           (multiple-value-bind (name args info)
+                               (sb-debug::frame-call frame #+nil #+nil
+                                                           :replace-dynamic-extent-objects t)
+                             (if details
+                                 (push (list (cons name args) info) full-backtrace)
+                                 (push (cons name args) full-backtrace)))))
 
-                        (setf result condition)
+                        (setf full-backtrace (nreverse full-backtrace))
+                        (let ((backtrace (if details
+                                             (member (caaar frame-specs)
+                                                     full-backtrace
+                                                     :key #'caar
+                                                     :test #'equal)
+                                             (member (caar frame-specs)
+                                                     full-backtrace
+                                                     :key #'car
+                                                     :test #'equal))))
 
-                        (unless backtrace
-                          (format t "~&//~S not in backtrace:~%   ~S~%"
-                                  (caar frame-specs)
-                                  full-backtrace)
-                          (setf result nil))
-                        ;; check that we have all the frames we wanted
-                        (mapcar
-                         (lambda (spec frame)
-                           (unless (or (not spec)
-                                       (and (equal (car spec) (car frame))
-                                            (args-equal (cdr spec)
-                                                        (cdr frame))))
-                             (print (list :wanted spec :got frame))
-                             (setf result nil)))
-                         frame-specs
-                         backtrace)
+                          (setf result condition)
 
-                        ;; Make sure the backtrace isn't stunted in
-                        ;; any way.  (Depends on running in the main
-                        ;; thread.) FIXME: On Windows we get two
-                        ;; extra foreign frames below regular frames.
-                        (unless (find '(sb-impl::toplevel-init) backtrace
-                                      :test #'equal)
-                          (print (list :backtrace-stunted backtrace))
-                          (setf result nil))
-                        (return-from outer-handler)))))
+                          (unless backtrace
+                            (format t "~&//~S not in backtrace:~%   ~S~%"
+                                    (caar frame-specs)
+                                    full-backtrace)
+                            (setf result nil))
+                          ;; check that we have all the frames we wanted
+                          (mapcar
+                           (lambda (spec frame)
+                             (unless (or (not spec)
+                                         (if details
+                                             (handler-case
+                                                 (and (args-equal (car spec)
+                                                                  (car frame))
+                                                      (equal (cdr spec) (cdr frame)))
+                                               (error (e)
+                                                 (print (list :spec spec :frame frame))
+                                                 (error e)))
+                                             (and (equal (car spec) (car frame))
+                                                  (args-equal (cdr spec)
+                                                              (cdr frame)))))
+                               (print (list :wanted spec :got frame))
+                               (setf result nil)))
+                           frame-specs
+                           backtrace)
+
+                          ;; Make sure the backtrace isn't stunted in
+                          ;; any way.  (Depends on running in the main
+                          ;; thread.) FIXME: On Windows we get two
+                          ;; extra foreign frames below regular frames.
+                          (unless (find (if details
+                                            '((sb-impl::toplevel-init) ())
+                                            '(sb-impl::toplevel-init))
+                                        backtrace
+                                        :test #'equal)
+                            (print (list :backtrace-stunted backtrace))
+                            (setf result nil))
+                          (return-from outer-handler))))))
           (funcall test-function)))
       result)))
 
@@ -177,12 +204,13 @@
                   ;; stunted, ending at _sigtramp, when we add :TIMEOUT NIL to
                   ;; the frame we expect. If we leave it out, the backtrace is
                   ;; fine -- but the test fails. I can only boggle right now.
-            :fails-on '(or (and :x86 :linux)
-                           (and :win32 :sb-thread)))
+            :fails-on `(or (and :x86 :linux)
+                           :darwin
+                           :win32))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
-            (lambda ()
+             (lambda ()
               (sb-thread:with-mutex (m)
                 (handler-bind ((timeout (lambda (c)
                                           (error "foo"))))
@@ -292,115 +320,108 @@
 (defbt 5 (&optional (opt (oops)))
   (list opt))
 
-(defmacro with-details (bool &body body)
-  `(let ((sb-debug:*show-entry-point-details* ,bool))
-     ,@body))
-
 (defun bug-354 (x)
   (error "XEPs in backtraces: ~S" x))
 
 (with-test (:name :bug-354)
-  (with-details t
-    (assert (not (verify-backtrace (lambda () (bug-354 354))
-                                   '((bug-354 &rest)
-                                     ((sb-c::tl-xep bug-354) &rest))))))
+  (assert (not (verify-backtrace (lambda () (bug-354 354))
+                                 '((bug-354 354)
+                                   (((bug-354 &rest) (:tl :external)) 354)))))
   (assert (verify-backtrace (lambda () (bug-354 354)) '((bug-354 354)))))
 
 ;;; FIXME: This test really should be broken into smaller pieces
 (with-test (:name (:backtrace :tl-xep))
-  (with-details t
-    (assert (verify-backtrace #'namestring
-                              '(((sb-c::tl-xep namestring) 0 ?)))))
-  (with-details nil
-    (assert (verify-backtrace #'namestring
-                              '((namestring))))))
+  (assert (verify-backtrace #'namestring
+                            '(((namestring) (:tl :external)))
+                            :details t))
+  (assert (verify-backtrace #'namestring
+                            '((namestring)))))
 
 (with-test (:name (:backtrace :more-processor))
-  (with-details t
-    (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                              '(((sb-c::&more-processor bt.1.1) &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                              '(((sb-c::&more-processor bt.1.2) &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                              '(((sb-c::&more-processor bt.1.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace (lambda () (bt.1.1 :key))
-                              '((bt.1.1 :key))))
-    (assert (verify-backtrace (lambda () (bt.1.2 :key))
-                              '((bt.1.2 &rest))))
-    (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                              '((bt.1.3 &rest))))))
+  (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                            '(((bt.1.1 :key) (:more :optional)))
+                            :details t))
+  (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                            '(((bt.1.2 ?) (:more :optional)))
+                            :details t))
+  (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                            '(((bt.1.3 &rest) (:more :optional)))
+                            :details t))
+  (assert (verify-backtrace (lambda () (bt.1.1 :key))
+                            '((bt.1.1 :key))))
+  (assert (verify-backtrace (lambda () (bt.1.2 :key))
+                            '((bt.1.2 &rest))))
+  (assert (verify-backtrace (lambda () (bt.1.3 :key))
+                            '((bt.1.3 &rest)))))
 
 (with-test (:name (:backtrace :xep))
-  (with-details t
-    (assert (verify-backtrace #'bt.2.1
-                              '(((sb-c::xep bt.2.1) 0 ?))))
-    (assert (verify-backtrace #'bt.2.2
-                              '(((sb-c::xep bt.2.2) &rest))))
-    (assert (verify-backtrace #'bt.2.3
-                              '(((sb-c::xep bt.2.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.2.1
-                              '((bt.2.1))))
-    (assert (verify-backtrace #'bt.2.2
-                              '((bt.2.2 &rest))))
-    (assert (verify-backtrace #'bt.2.3
-                              '((bt.2.3 &rest))))))
+  (assert (verify-backtrace #'bt.2.1
+                            '(((bt.2.1) (:external)))
+                            :details t))
+  (assert (verify-backtrace #'bt.2.2
+                            '(((bt.2.2 &rest) (:external)))
+                            :details t))
+  (assert (verify-backtrace #'bt.2.3
+                            '(((bt.2.3 &rest) (:external)))
+                            :details t))
+  (assert (verify-backtrace #'bt.2.1
+                            '((bt.2.1))))
+  (assert (verify-backtrace #'bt.2.2
+                            '((bt.2.2 &rest))))
+  (assert (verify-backtrace #'bt.2.3
+                            '((bt.2.3 &rest)))))
 
 ;;; This test is somewhat deceptively named. Due to confusion in debug naming
 ;;; these functions used to have sb-c::varargs-entry debug names for their
 ;;; main lambda.
 (with-test (:name (:backtrace :varargs-entry))
-  (with-details t
-    (assert (verify-backtrace #'bt.3.1
-                              '((bt.3.1 :key nil))))
-    (assert (verify-backtrace #'bt.3.2
-                              '((bt.3.2 :key ?))))
-    (assert (verify-backtrace #'bt.3.3
-                              '((bt.3.3 &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.3.1
-                              '((bt.3.1 :key nil))))
-    (assert (verify-backtrace #'bt.3.2
-                              '((bt.3.2 :key ?))))
-    (assert (verify-backtrace #'bt.3.3
-                              '((bt.3.3 &rest))))))
+  (assert (verify-backtrace #'bt.3.1
+                            '((bt.3.1 :key nil))))
+  (assert (verify-backtrace #'bt.3.2
+                            '((bt.3.2 :key ?))))
+  (assert (verify-backtrace #'bt.3.3
+                            '((bt.3.3 &rest))))
+  (assert (verify-backtrace #'bt.3.1
+                            '((bt.3.1 :key nil))))
+  (assert (verify-backtrace #'bt.3.2
+                            '((bt.3.2 :key ?))))
+  (assert (verify-backtrace #'bt.3.3
+                            '((bt.3.3 &rest)))))
 
 ;;; This test is somewhat deceptively named. Due to confusion in debug naming
 ;;; these functions used to have sb-c::hairy-args-processor debug names for
 ;;; their main lambda.
 (with-test (:name (:backtrace :hairy-args-processor))
-  (with-details t
-    (assert (verify-backtrace #'bt.4.1
-                              '((bt.4.1 ?))))
-    (assert (verify-backtrace #'bt.4.2
-                              '((bt.4.2 ?))))
-    (assert (verify-backtrace #'bt.4.3
-                              '((bt.4.3 &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.4.1
-                              '((bt.4.1 ?))))
-    (assert (verify-backtrace #'bt.4.2
-                              '((bt.4.2 ?))))
-    (assert (verify-backtrace #'bt.4.3
-                              '((bt.4.3 &rest))))))
+  (assert (verify-backtrace #'bt.4.1
+                            '((bt.4.1 ?))))
+  (assert (verify-backtrace #'bt.4.2
+                            '((bt.4.2 ?))))
+  (assert (verify-backtrace #'bt.4.3
+                            '((bt.4.3 &rest))))
+  (assert (verify-backtrace #'bt.4.1
+                            '((bt.4.1 ?))))
+  (assert (verify-backtrace #'bt.4.2
+                            '((bt.4.2 ?))))
+  (assert (verify-backtrace #'bt.4.3
+                            '((bt.4.3 &rest)))))
 
 
 (with-test (:name (:backtrace :optional-processor))
-  (with-details t
-    (assert (verify-backtrace #'bt.5.1
-                              '(((sb-c::&optional-processor bt.5.1)))))
-    (assert (verify-backtrace #'bt.5.2
-                              '(((sb-c::&optional-processor bt.5.2) &rest))))
-    (assert (verify-backtrace #'bt.5.3
-                              '(((sb-c::&optional-processor bt.5.3) &rest)))))
-  (with-details nil
-    (assert (verify-backtrace #'bt.5.1
-                              '((bt.5.1))))
-    (assert (verify-backtrace #'bt.5.2
-                              '((bt.5.2 &rest))))
-    (assert (verify-backtrace #'bt.5.3
-                              '((bt.5.3 &rest))))))
+  (assert (verify-backtrace #'bt.5.1
+                            '(((bt.5.1) (:optional)))
+                            :details t))
+  (assert (verify-backtrace #'bt.5.2
+                            '(((bt.5.2 &rest) (:optional)))
+                            :details t))
+  (assert (verify-backtrace #'bt.5.3
+                            '(((bt.5.3 &rest) (:optional)))
+                            :details t))
+  (assert (verify-backtrace #'bt.5.1
+                            '((bt.5.1))))
+  (assert (verify-backtrace #'bt.5.2
+                            '((bt.5.2 &rest))))
+  (assert (verify-backtrace #'bt.5.3
+                            '((bt.5.3 &rest)))))
 
 (write-line "//compile nil")
 (defvar *compile-nil-error* (compile nil '(lambda (x) (cons (when x (error "oops")) nil))))
@@ -523,7 +544,7 @@
     (declare (dynamic-extent dx-arg))
     (flet ((dx-arg-backtrace (x)
              (declare (optimize (debug 2)))
-             (prog1 (sb-debug:backtrace-as-list 10)
+             (prog1 (sb-debug:list-backtrace :count 10)
                (assert (sb-debug::stack-allocated-p x)))))
       (declare (notinline dx-arg-backtrace))
       (assert (member-if (lambda (frame)
@@ -541,7 +562,8 @@
              ((error (lambda (e)
                        (declare (ignore e))
                        (handler-case
-                           (sb-debug:backtrace 100 (make-broadcast-stream))
+                           (sb-debug:print-backtrace :count 100
+                                                     :stream (make-broadcast-stream))
                          (error ()
                            (throw 'done :error))
                          (:no-error ()

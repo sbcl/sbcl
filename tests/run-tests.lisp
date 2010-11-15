@@ -141,7 +141,7 @@
                                 (t
                                  (format *error-output* "~&Unhandled ~a: ~a~%"
                                          (type-of condition) condition)
-                                 (sb-debug:backtrace)))
+                                 (sb-debug:print-backtrace)))
                           (invoke-restart 'skip-file))))
               ,test-code)
           (skip-file ()
@@ -174,7 +174,7 @@
           (t
            (format *error-output* "~&Unhandled ~a: ~a~%"
                    (type-of condition) condition)
-           (sb-debug:backtrace)))
+           (sb-debug:print-backtrace)))
     (invoke-restart 'skip-file)))
 
 (defun append-failures (&optional (failures *failures*))

@@ -306,12 +306,6 @@ Sometimes the compiler introduces new functions that are used to
 implement a user function, but are not directly specified in the
 source. This is mostly done for argument type and count checking.
 
-The debugger will normally show these entry point functions as if
-they were the normal main entry point, but more detail can be obtained
-by setting @code{sb-debug:*show-entry-point-details*} to true; this is
-primarily useful for debugging SBCL itself, but may help pinpoint
-problems that occur during lambda-list processing.
-
 @c FIXME: the following bits talked about block-compilation, but
 @c we don't currently support it...
 
@@ -327,13 +321,12 @@ problems that occur during lambda-list processing.
 @c frames during the execution of @code{unwind-protect} cleanup
 @c code.
 
-With recursive functions, an additional @code{:EXTERNAL} frame may
+With recursive functions, an additional @code{external} frame may
 appear before the frame representing the first call to the recursive
 function. This is a consequence of the way the compiler works: there
-is nothing odd with your program. You will also see @code{:CLEANUP}
-frames during the execution of @code{unwind-protect} cleanup code.
-The @code{:EXTERNAL} and @code{:CLEANUP} above are entry-point types,
-visible only if @code{sb-debug:*show-entry-point-details*} is true.
+is nothing odd with your program. You may also see @code{cleanup}
+frames during the execution of @code{unwind-protect} cleanup code, and
+@code{optional} for variable argument entry points.
 
 @node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up
