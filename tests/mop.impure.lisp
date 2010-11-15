@@ -15,8 +15,10 @@
 ;;;; However, this seems a good a way as any of ensuring that we have
 ;;;; no regressions.
 
+(load "test-util.lisp")
+
 (defpackage "MOP-TEST"
-  (:use "CL" "SB-MOP" "ASSERTOID"))
+  (:use "CL" "SB-MOP" "ASSERTOID" "TEST-UTIL"))
 
 (in-package "MOP-TEST")
 
@@ -526,5 +528,31 @@
 (let ((class (find-class 'has-slots-but-isnt-finalized)))
   (assert (not (sb-mop:class-finalized-p class)))
   (assert (raises-error? (sb-mop:class-slots class) sb-kernel::reference-condition)))
+
+;;; Check that MAKE-METHOD-LAMBDA which wraps the original body doesn't
+;;; break RETURN-FROM.
+(defclass wrapped-generic (standard-generic-function)
+  ()
+  (:metaclass sb-mop:funcallable-standard-class))
+
+(defmethod sb-mop:make-method-lambda ((gf wrapped-generic) method lambda env)
+  (call-next-method gf method
+                    `(lambda ,(second lambda)
+                       (flet ((default () :default))
+                         ,@(cddr lambda)))
+                    env))
+
+(defgeneric wrapped (x)
+  (:generic-function-class wrapped-generic))
+
+(defmethod wrapped ((x cons))
+  (return-from wrapped (default)))
+
+(with-test (:name :make-method-lambda-wrapping+return-from)
+  (assert (eq :default (wrapped (cons t t)))))
+
+(with-test (:name :slow-method-is-fboundp)
+  (assert (fboundp '(sb-pcl::slow-method wrapped (cons))))
+  (assert (eq :default (funcall #'(sb-pcl::slow-method wrapped (cons)) (list (cons t t)) nil))))
 
 ;;;; success

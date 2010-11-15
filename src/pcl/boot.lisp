@@ -388,6 +388,11 @@ bootstrapping.
             (class-prototype (or (generic-function-method-class gf?)
                                  (find-class 'standard-method)))))))
 
+;;; These are used to communicate the method name and lambda-list to
+;;; MAKE-METHOD-LAMBDA-INTERNAL.
+(defvar *method-name* nil)
+(defvar *method-lambda-list* nil)
+
 (defun expand-defmethod (name
                          proto-gf
                          proto-method
@@ -395,41 +400,45 @@ bootstrapping.
                          lambda-list
                          body
                          env)
-  (multiple-value-bind (method-lambda unspecialized-lambda-list specializers)
-      (add-method-declarations name qualifiers lambda-list body env)
-    (multiple-value-bind (method-function-lambda initargs)
-        (make-method-lambda proto-gf proto-method method-lambda env)
-      (let ((initargs-form (make-method-initargs-form
-                            proto-gf proto-method method-function-lambda
-                            initargs env))
-            (specializers-form (make-method-specializers-form
-                                proto-gf proto-method specializers env)))
-        `(progn
-          ;; Note: We could DECLAIM the ftype of the generic function
-          ;; here, since ANSI specifies that we create it if it does
-          ;; not exist. However, I chose not to, because I think it's
-          ;; more useful to support a style of programming where every
-          ;; generic function has an explicit DEFGENERIC and any typos
-          ;; in DEFMETHODs are warned about. Otherwise
-          ;;
-          ;;   (DEFGENERIC FOO-BAR-BLETCH (X))
-          ;;   (DEFMETHOD FOO-BAR-BLETCH ((X HASH-TABLE)) ..)
-          ;;   (DEFMETHOD FOO-BRA-BLETCH ((X SIMPLE-VECTOR)) ..)
-          ;;   (DEFMETHOD FOO-BAR-BLETCH ((X VECTOR)) ..)
-          ;;   (DEFMETHOD FOO-BAR-BLETCH ((X ARRAY)) ..)
-          ;;   (DEFMETHOD FOO-BAR-BLETCH ((X LIST)) ..)
-          ;;
-          ;; compiles without raising an error and runs without
-          ;; raising an error (since SIMPLE-VECTOR cases fall through
-          ;; to VECTOR) but still doesn't do what was intended. I hate
-          ;; that kind of bug (code which silently gives the wrong
-          ;; answer), so we don't do a DECLAIM here. -- WHN 20000229
-          ,(make-defmethod-form name qualifiers specializers-form
-                                unspecialized-lambda-list
-                                (if proto-method
-                                    (class-name (class-of proto-method))
-                                    'standard-method)
-                                initargs-form))))))
+  (multiple-value-bind (parameters unspecialized-lambda-list specializers)
+      (parse-specialized-lambda-list lambda-list)
+    (declare (ignore parameters))
+    (let ((method-lambda `(lambda ,unspecialized-lambda-list ,@body))
+          (*method-name* `(,name ,@qualifiers ,specializers))
+          (*method-lambda-list* lambda-list))
+      (multiple-value-bind (method-function-lambda initargs)
+          (make-method-lambda proto-gf proto-method method-lambda env)
+        (let ((initargs-form (make-method-initargs-form
+                              proto-gf proto-method method-function-lambda
+                              initargs env))
+              (specializers-form (make-method-specializers-form
+                                  proto-gf proto-method specializers env)))
+          `(progn
+             ;; Note: We could DECLAIM the ftype of the generic function
+             ;; here, since ANSI specifies that we create it if it does
+             ;; not exist. However, I chose not to, because I think it's
+             ;; more useful to support a style of programming where every
+             ;; generic function has an explicit DEFGENERIC and any typos
+             ;; in DEFMETHODs are warned about. Otherwise
+             ;;
+             ;;   (DEFGENERIC FOO-BAR-BLETCH (X))
+             ;;   (DEFMETHOD FOO-BAR-BLETCH ((X HASH-TABLE)) ..)
+             ;;   (DEFMETHOD FOO-BRA-BLETCH ((X SIMPLE-VECTOR)) ..)
+             ;;   (DEFMETHOD FOO-BAR-BLETCH ((X VECTOR)) ..)
+             ;;   (DEFMETHOD FOO-BAR-BLETCH ((X ARRAY)) ..)
+             ;;   (DEFMETHOD FOO-BAR-BLETCH ((X LIST)) ..)
+             ;;
+             ;; compiles without raising an error and runs without
+             ;; raising an error (since SIMPLE-VECTOR cases fall through
+             ;; to VECTOR) but still doesn't do what was intended. I hate
+             ;; that kind of bug (code which silently gives the wrong
+             ;; answer), so we don't do a DECLAIM here. -- WHN 20000229
+             ,(make-defmethod-form name qualifiers specializers-form
+                                   unspecialized-lambda-list
+                                   (if proto-method
+                                       (class-name (class-of proto-method))
+                                       'standard-method)
+                                   initargs-form)))))))
 
 (defun interned-symbol-p (x)
   (and (symbolp x) (symbol-package x)))
@@ -524,44 +533,6 @@ bootstrapping.
                                  initargs
                                  env))))
 
-(defun add-method-declarations (name qualifiers lambda-list body env)
-  (declare (ignore env))
-  (multiple-value-bind (parameters unspecialized-lambda-list specializers)
-      (parse-specialized-lambda-list lambda-list)
-    (multiple-value-bind (real-body declarations documentation)
-        (parse-body body)
-      (values `(lambda ,unspecialized-lambda-list
-                 ,@(when documentation `(,documentation))
-                 ;; (Old PCL code used a somewhat different style of
-                 ;; list for %METHOD-NAME values. Our names use
-                 ;; ,@QUALIFIERS instead of ,QUALIFIERS so that the
-                 ;; method names look more like what you see in a
-                 ;; DEFMETHOD form.)
-                 ;;
-                 ;; FIXME: As of sbcl-0.7.0.6, code elsewhere, at
-                 ;; least the code to set up named BLOCKs around the
-                 ;; bodies of methods, depends on the function's base
-                 ;; name being the first element of the %METHOD-NAME
-                 ;; list. It would be good to remove this dependency,
-                 ;; perhaps by building the BLOCK here, or by using
-                 ;; another declaration (e.g. %BLOCK-NAME), so that
-                 ;; our method debug names are free to have any format,
-                 ;; e.g. (:METHOD PRINT-OBJECT :AROUND (CLOWN T)).
-                 ;;
-                 ;; Further, as of sbcl-0.7.9.10, the code to
-                 ;; implement NO-NEXT-METHOD is coupled to the form of
-                 ;; this declaration; see the definition of
-                 ;; CALL-NO-NEXT-METHOD (and the passing of
-                 ;; METHOD-NAME-DECLARATION arguments around the
-                 ;; various CALL-NEXT-METHOD logic).
-                 (declare (%method-name (,name
-                                         ,@qualifiers
-                                         ,specializers)))
-                 (declare (%method-lambda-list ,@lambda-list))
-                 ,@declarations
-                 ,@real-body)
-              unspecialized-lambda-list specializers))))
-
 (defun real-make-method-initargs-form (proto-gf proto-method
                                        method-lambda initargs env)
   (declare (ignore proto-gf proto-method))
@@ -604,11 +575,15 @@ bootstrapping.
            method-lambda))
   (multiple-value-bind (real-body declarations documentation)
       (parse-body (cddr method-lambda))
-    (let* ((name-decl (get-declaration '%method-name declarations))
-           (sll-decl (get-declaration '%method-lambda-list declarations))
-           (method-name (when (consp name-decl) (car name-decl)))
+    ;; We have the %METHOD-NAME declaration in the place where we expect it only
+    ;; if there is are no non-standard prior MAKE-METHOD-LAMBDA methods -- or
+    ;; unless they're fantastically unintrusive.
+    (let* ((method-name *method-name*)
            (generic-function-name (when method-name (car method-name)))
-           (specialized-lambda-list (or sll-decl (cadr method-lambda)))
+           (specialized-lambda-list (or *method-lambda-list*
+                                        (ecase (car method-lambda)
+                                          (lambda (second method-lambda))
+                                          (named-lambda (third method-lambda)))))
            ;; the method-cell is a way of communicating what method a
            ;; method-function implements, for the purpose of
            ;; NO-NEXT-METHOD.  We need something that can be shared

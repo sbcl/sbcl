@@ -593,17 +593,6 @@
       (setq body (cdr body)))
     (values outer-decls inner-decls body)))
 
-;;; Pull a name out of the %METHOD-NAME declaration in the function
-;;; body given, or return NIL if no %METHOD-NAME declaration is found.
-(defun body-method-name (body)
-  (multiple-value-bind (real-body declarations documentation)
-      (parse-body body)
-    (declare (ignore real-body documentation))
-    (let ((name-decl (get-declaration '%method-name declarations)))
-      (and name-decl
-           (destructuring-bind (name) name-decl
-             name)))))
-
 ;;; Convert a lambda expression containing a SB-PCL::%METHOD-NAME
 ;;; declaration (which is a naming style internal to PCL) into an
 ;;; SB-INT:NAMED-LAMBDA expression (which is a naming style used
@@ -611,9 +600,9 @@
 ;;; no SB-PCL::%METHOD-NAME declaration, then just return the original
 ;;; lambda expression.
 (defun name-method-lambda (method-lambda)
-  (let ((method-name (body-method-name (cddr method-lambda))))
+  (let ((method-name *method-name*))
     (if method-name
-        `(named-lambda (slow-method ,method-name) ,(rest method-lambda))
+        `(named-lambda (slow-method ,@method-name) ,@(rest method-lambda))
         method-lambda)))
 
 (defun make-method-initargs-form-internal (method-lambda initargs env)
@@ -712,10 +701,10 @@
                                       lambda-list))))
         `(list*
           :function
-          (let* ((fmf (,(if (body-method-name body) 'named-lambda 'lambda)
-                        ,@(when (body-method-name body)
+          (let* ((fmf (,(if *method-name* 'named-lambda 'lambda)
+                        ,@(when *method-name*
                                 ;; function name
-                                (list (cons 'fast-method (body-method-name body))))
+                                (list `(fast-method ,@*method-name*)))
                         ;; The lambda-list of the FMF
                         (.pv. .next-method-call. ,@fmf-lambda-list)
                         ;; body of the function
