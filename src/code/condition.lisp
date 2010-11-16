@@ -1639,6 +1639,60 @@ the usual naming convention (names like *FOO*) for special variables"
                      (proclamation-mismatch-name warning)
                      (proclamation-mismatch-old warning)))))
 
+;;;; deprecation conditions
+
+(define-condition deprecation-condition ()
+  ((name :initarg :name :reader deprecated-name)
+   (replacement :initarg :replacement :reader deprecated-name-replacement)
+   (since :initarg :since :reader deprecated-since)
+   (runtime-error :initarg :runtime-error :reader deprecated-name-runtime-error)))
+
+(def!method print-object ((condition deprecation-condition) stream)
+  (let ((*package* (find-package :keyword)))
+    (if *print-escape*
+        (print-unreadable-object (condition stream :type t)
+          (format stream "~S is deprecated~@[, use ~S~]"
+                  (deprecated-name condition)
+                  (deprecated-name-replacement condition)))
+        (format stream "~@<~S has been deprecated as of SBCL ~A~
+                        ~@[, use ~S instead~].~:@>"
+                (deprecated-name condition)
+                (deprecated-since condition)
+                (deprecated-name-replacement condition)))))
+
+(define-condition early-deprecation-warning (style-warning deprecation-condition)
+  ())
+
+(def!method print-object :after ((warning early-deprecation-warning) stream)
+  (unless *print-escape*
+    (let ((*package* (find-package :keyword)))
+      (format stream "~%~@<~:@_In future SBCL versions ~S will signal a full warning ~
+                      at compile-time.~:@>"
+              (deprecated-name warning)))))
+
+(define-condition late-deprecation-warning (warning deprecation-condition)
+  ())
+
+(def!method print-object :after ((warning late-deprecation-warning) stream)
+  (unless *print-escape*
+    (when (deprecated-name-runtime-error warning)
+      (let ((*package* (find-package :keyword)))
+        (format stream "~%~@<~:@_In future SBCL versions ~S will signal a runtime error.~:@>"
+                (deprecated-name warning))))))
+
+(define-condition final-deprecation-warning (warning deprecation-condition)
+  ())
+
+(def!method print-object :after ((warning final-deprecation-warning) stream)
+  (unless *print-escape*
+    (when (deprecated-name-runtime-error warning)
+      (let ((*package* (find-package :keyword)))
+        (format stream "~%~@<~:@_An error will be signaled at runtime for ~S.~:@>"
+                (deprecated-name warning))))))
+
+(define-condition deprecation-error (error deprecation-condition)
+  ())
+
 ;;;; restart definitions
 
 (define-condition abort-failure (control-error) ()

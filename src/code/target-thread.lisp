@@ -59,17 +59,9 @@ offending thread using THREAD-ERROR-THREAD."))
 to be joined. The offending thread can be accessed using
 THREAD-ERROR-THREAD."))
 
-(defun join-thread-error-thread (condition)
+(define-deprecated-function :late "1.0.29.17" join-thread-error-thread thread-error-thread
+    (condition)
   (thread-error-thread condition))
-(define-compiler-macro join-thread-error-thread (condition)
-  (deprecation-warning 'join-thread-error-thread 'thread-error-thread)
-  `(thread-error-thread ,condition))
-
-#!+sb-doc
-(setf
- (fdocumentation 'join-thread-error-thread 'function)
- "The thread that we failed to join. Deprecated, use THREAD-ERROR-THREAD
-instead.")
 
 (define-condition interrupt-thread-error (thread-error) ()
   (:report (lambda (c s)
@@ -80,17 +72,9 @@ instead.")
    "Signalled when interrupting a thread fails because the thread has already
 exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 
-(defun interrupt-thread-error-thread (condition)
+(define-deprecated-function :late "1.0.29.17" interrupt-thread-error-thread thread-error-thread
+    (condition)
   (thread-error-thread condition))
-(define-compiler-macro interrupt-thread-error-thread (condition)
-  (deprecation-warning 'join-thread-error-thread 'thread-error-thread)
-  `(thread-error-thread ,condition))
-
-#!+sb-doc
-(setf
- (fdocumentation 'interrupt-thread-error-thread 'function)
- "The thread that was not interrupted. Deprecated, use THREAD-ERROR-THREAD
-instead.")
 
 ;;; Of the WITH-PINNED-OBJECTS in this file, not every single one is
 ;;; necessary because threads are only supported with the conservative

@@ -1007,8 +1007,10 @@
                          :source-name source-name
                          :debug-name debug-name))
     ((instance-lambda)
-     (deprecation-warning 'instance-lambda 'lambda)
-     (ir1-convert-lambda `(lambda ,@(cdr thing))
+     (deprecation-warning :final "0.9.3.32" 'instance-lambda 'lambda)
+     (ir1-convert-lambda `(lambda (&rest args)
+                            (declare (ignore args))
+                            (deprecation-error "0.9.3.32" 'instance-lambda 'lambda))
                          :source-name source-name
                          :debug-name debug-name))
     ((named-lambda)

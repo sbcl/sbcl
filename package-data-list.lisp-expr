@@ -670,6 +670,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "IMPLICIT-GENERIC-FUNCTION-NAME"
                "IMPLICIT-GENERIC-FUNCTION-WARNING"
                "INVALID-FASL"
+               "DEPRECATION-CONDITION"
 
                "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
                "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
@@ -961,6 +962,14 @@ possibly temporariliy, because it might be used internally."
 
                "*N-BYTES-FREED-OR-PURIFIED*"
 
+               ;; Deprecating stuff
+               "DEFINE-DEPRECATED-FUNCTION"
+               "EARLY-DEPRECATION-WARNING"
+               "LATE-DEPRECATION-WARNING"
+               "FINAL-DEPRECATION-WARNING"
+               "DEPRECATION-WARNING"
+               "DEPRECATION-ERROR"
+
                ;; miscellaneous non-standard but handy user-level functions..
                "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
                "ADJUST-LIST"
@@ -977,7 +986,6 @@ possibly temporariliy, because it might be used internally."
                "PSXHASH"
                "%BREAK"
                "NTH-BUT-WITH-SANE-ARG-ORDER"
-               "DEPRECATION-WARNING"
                "BIT-VECTOR-="
                "READ-EVALUATED-FORM"
                "MAKE-UNPRINTABLE-OBJECT"

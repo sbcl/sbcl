@@ -424,13 +424,9 @@ If an unsupported TYPE is requested, the function will return NIL.
     ;; FIXME there may be other structure predicate functions
     (member self (list *struct-predicate*))))
 
-(defun function-arglist (function)
-  "Deprecated alias for FUNCTION-LAMBDA-LIST."
+(sb-int:define-deprecated-function :late "1.0.24.5" function-arglist function-lambda-list
+    (function)
   (function-lambda-list function))
-
-(define-compiler-macro function-arglist (function)
-  (sb-int:deprecation-warning 'function-arglist 'function-lambda-list)
-  `(function-lambda-list ,function))
 
 (defun function-lambda-list (function)
   "Describe the lambda list for the extended function designator FUNCTION.

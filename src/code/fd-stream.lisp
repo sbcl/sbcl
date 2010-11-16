@@ -407,14 +407,10 @@
 ;;; this is not something we want to export. Nikodemus thinks the
 ;;; right thing is to support a low-level non-stream like IO layer,
 ;;; akin to java.nio.
-(defun output-raw-bytes (stream thing &optional start end)
+(declaim (inline output-raw-bytes))
+(define-deprecated-function :late "1.0.8.16" output-raw-bytes write-sequence
+    (stream thing &optional start end)
   (write-or-buffer-output stream thing (or start 0) (or end (length thing))))
-
-(define-compiler-macro output-raw-bytes (stream thing &optional start end)
-  (deprecation-warning 'output-raw-bytes)
-  (let ((x (gensym "THING")))
-    `(let ((,x ,thing))
-       (write-or-buffer-output ,stream ,x (or ,start 0) (or ,end (length ,x))))))
 
 ;;;; output routines and related noise
 
