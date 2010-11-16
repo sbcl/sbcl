@@ -43,6 +43,18 @@
   (when (source-form-has-path-p form)
     (gethash form *source-paths*)))
 
+(defun simplify-source-path-form (form)
+  (if (consp form)
+      (let ((op (car form)))
+        ;; In the compiler functions can be directly represented
+        ;; by leaves. Having leaves in the source path is pretty
+        ;; hard on the poor user, however, so replace with the
+        ;; source-name when possible.
+        (if (and (leaf-p op) (leaf-has-source-name-p op))
+            (cons (leaf-source-name op) (cdr form))
+            form))
+      form))
+
 (defun note-source-path (form &rest arguments)
   (when (source-form-has-path-p form)
     (setf (gethash form *source-paths*)
@@ -551,7 +563,8 @@
   (defun ir1-convert (start next result form)
     (ir1-error-bailout (start next result form)
       (let* ((*current-path* (or (get-source-path form)
-                                 (cons form *current-path*)))
+                                 (cons (simplify-source-path-form form)
+                                       *current-path*)))
              (start (instrument-coverage start nil form)))
         (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))

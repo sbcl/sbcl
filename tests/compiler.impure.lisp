@@ -1212,6 +1212,21 @@
                       (assert (every #'~= (apply #'concatenate 'list nodes) '(2 3 6 9)))))))
     (sb-ext:timeout ()
       (error "Hang in ORDER-UVL-SETS?"))))
+
+(declaim (inline inlined-function-in-source-path))
+(defun inlined-function-in-source-path (x)
+  (+ x x))
+
+(with-test (:name :inlined-function-in-source-path)
+  (let ((output
+         (with-output-to-string (*error-output*)
+           (compile nil `(lambda (x)
+                           (declare (optimize speed))
+                           (funcall #'inlined-function-in-source-path x))))))
+    ;; We want the name
+    (assert (search "INLINED-FUNCTION-IN-SOURCE-PATH" output))
+    ;; ...not the leaf.
+    (assert (not (search "DEFINED-FUN" output)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -17,6 +17,8 @@ changes relative to sbcl-1.0.44:
   * bug fix: closure VALUE-CELLs are no longer stack-allocated (lp#308934).
   * bug fix: non-standard MAKE-METHOD-LAMBDA methods could break RETURN-FROM
     in the DEFMETHOD body.
+  * bug fix: #<SB-C::DEFINED-FUN ...> should no longer appear in compiler
+    messages, being instead replaced with the corresponding function name.
 
 changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * enhancement: RUN-PROGRAM accepts :EXTERNAL-FORMAT argument to select the
