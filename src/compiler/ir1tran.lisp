@@ -776,69 +776,55 @@
 ;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
 ;;; errors which occur during the macroexpansion.
 (defun careful-expand-macro (fun form &optional cmacro)
-  (let (;; a hint I (WHN) wish I'd known earlier
-        (hint "(hint: For more precise location, try *BREAK-ON-SIGNALS*.)"))
-    (flet (;; Return a string to use as a prefix in error reporting,
-           ;; telling something about which form caused the problem.
-           (wherestring ()
-             (let ((*print-pretty* nil)
-                   ;; We rely on the printer to abbreviate FORM.
-                   (*print-length* 3)
-                   (*print-level* 3))
-               (format
-                nil
-                #-sb-xc-host "(in ~A of ~S)"
-                ;; longer message to avoid ambiguity "Was it the xc host
-                ;; or the cross-compiler which encountered the problem?"
-                #+sb-xc-host "(in cross-compiler ~A of ~S)"
-                (if cmacro "compiler-macroexpansion" "macroexpansion")
-                form))))
-      (handler-bind ((style-warning (lambda (c)
-                                      (compiler-style-warn
-                                       "~@<~A~:@_~A~@:_~A~:>"
-                                       (wherestring) hint c)
-                                      (muffle-warning-or-die)))
-                     ;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for
-                     ;; Debian Linux, anyway) raises a CL:WARNING
-                     ;; condition (not a CL:STYLE-WARNING) for undefined
-                     ;; symbols when converting interpreted functions,
-                     ;; causing COMPILE-FILE to think the file has a real
-                     ;; problem, causing COMPILE-FILE to return FAILURE-P
-                     ;; set (not just WARNINGS-P set). Since undefined
-                     ;; symbol warnings are often harmless forward
-                     ;; references, and since it'd be inordinately painful
-                     ;; to try to eliminate all such forward references,
-                     ;; these warnings are basically unavoidable. Thus, we
-                     ;; need to coerce the system to work through them,
-                     ;; and this code does so, by crudely suppressing all
-                     ;; warnings in cross-compilation macroexpansion. --
-                     ;; WHN 19990412
-                     #+(and cmu sb-xc-host)
-                     (warning (lambda (c)
-                                (compiler-notify
-                                 "~@<~A~:@_~
-                                  ~A~:@_~
-                                  ~@<(KLUDGE: That was a non-STYLE WARNING. ~
-                                  Ordinarily that would cause compilation to ~
-                                  fail. However, since we're running under ~
-                                  CMU CL, and since CMU CL emits non-STYLE ~
-                                  warnings for safe, hard-to-fix things (e.g. ~
-                                  references to not-yet-defined functions) ~
-                                  we're going to have to ignore it and ~
-                                  proceed anyway. Hopefully we're not ~
-                                  ignoring anything  horrible here..)~:@>~:>"
-                                 (wherestring)
-                                 c)
-                                (muffle-warning-or-die)))
-                     #-(and cmu sb-xc-host)
-                     (warning (lambda (c)
-                                (warn "~@<~A~:@_~A~@:_~A~:>"
-                                      (wherestring) hint c)
-                                (muffle-warning-or-die)))
-                     (error (lambda (c)
-                              (compiler-error "~@<~A~:@_~A~@:_~A~:>"
-                                              (wherestring) hint c))))
-        (funcall sb!xc:*macroexpand-hook* fun form *lexenv*)))))
+  (flet (;; Return a string to use as a prefix in error reporting,
+         ;; telling something about which form caused the problem.
+         (wherestring ()
+           (let (;; We rely on the printer to abbreviate FORM.
+                 (*print-length* 3)
+                 (*print-level* 3))
+             (format
+              nil
+              #-sb-xc-host "~@<~;during ~A of ~S. Use ~S to intercept:~%~:@>"
+              ;; longer message to avoid ambiguity "Was it the xc host
+              ;; or the cross-compiler which encountered the problem?"
+              #+sb-xc-host "~@<~;during cross-compiler ~A of ~S. Use ~S to intercept:~%~:@>"
+              (if cmacro "compiler-macroexpansion" "macroexpansion")
+              form
+              '*break-on-signals*))))
+    (handler-bind (;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for Debian
+                   ;; Linux, anyway) raises a CL:WARNING condition (not a
+                   ;; CL:STYLE-WARNING) for undefined symbols when converting
+                   ;; interpreted functions, causing COMPILE-FILE to think the
+                   ;; file has a real problem, causing COMPILE-FILE to return
+                   ;; FAILURE-P set (not just WARNINGS-P set). Since undefined
+                   ;; symbol warnings are often harmless forward references,
+                   ;; and since it'd be inordinately painful to try to
+                   ;; eliminate all such forward references, these warnings
+                   ;; are basically unavoidable. Thus, we need to coerce the
+                   ;; system to work through them, and this code does so, by
+                   ;; crudely suppressing all warnings in cross-compilation
+                   ;; macroexpansion. -- WHN 19990412
+                   #+(and cmu sb-xc-host)
+                   (warning (lambda (c)
+                              (compiler-notify
+                               "~@<~A~:@_~
+                                ~A~:@_~
+                                ~@<(KLUDGE: That was a non-STYLE WARNING. ~
+                                   Ordinarily that would cause compilation to ~
+                                   fail. However, since we're running under ~
+                                   CMU CL, and since CMU CL emits non-STYLE ~
+                                   warnings for safe, hard-to-fix things (e.g. ~
+                                   references to not-yet-defined functions) ~
+                                   we're going to have to ignore it and ~
+                                   proceed anyway. Hopefully we're not ~
+                                   ignoring anything  horrible here..)~:@>~:>"
+                               (wherestring)
+                               c)
+                              (muffle-warning-or-die)))
+                   (error (lambda (c)
+                            (compiler-error "~@<~A~@:_ ~A~:>"
+                                            (wherestring) c))))
+      (funcall sb!xc:*macroexpand-hook* fun form *lexenv*))))
 
 ;;;; conversion utilities
 
