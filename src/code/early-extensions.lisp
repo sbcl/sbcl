@@ -1191,6 +1191,21 @@
        (setf (compiler-macro-function ',name)
              (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
 
+(defun check-deprecated-variable (name)
+  (let ((info (info :variable :deprecated name)))
+    (when info
+      (deprecation-warning (car info) (cdr info) name nil))))
+
+(defmacro define-deprecated-variable (state since name &key (value nil valuep) replacement)
+  `(progn
+     (setf (info :variable :deprecated ',name) (cons ,state ,since))
+     ,@(when (member state '(:early :late))
+         `((defvar ,name ,@(when valuep (list value))
+             ,(let ((*package* (find-package :keyword)))
+                (format nil
+                        "~@<~S has been deprecated as of SBCL ~A~@[, use ~S instead~].~:>"
+                        name since replacement)))))))
+
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
   `(let ((it ,test))

@@ -682,6 +682,8 @@
                ;; processing our own code, though.
                #+sb-xc-host
                (warn "reading an ignored variable: ~S" name)))
+           (when (global-var-p var)
+             (check-deprecated-variable name))
            (reference-leaf start next result var name))
           (cons
            (aver (eq (car var) 'macro))

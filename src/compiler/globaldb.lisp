@@ -1000,6 +1000,12 @@
   :type-spec boolean
   :default nil)
 
+(define-info-type
+  :class :variable
+  :type :deprecated
+  :type-spec t
+  :default nil)
+
 ;;; the declared type for this variable
 (define-info-type
   :class :variable

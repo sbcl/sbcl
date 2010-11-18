@@ -1033,6 +1033,9 @@ possibly temporariliy, because it might be used internally."
 
                ;; Deprecating stuff
                "DEFINE-DEPRECATED-FUNCTION"
+               "DEFINE-DEPRECATED-VARIABLE"
+               "DEPRECATED-VARIABLE"
+               "CHECK-DEPRECATED-VARIABLE"
                "EARLY-DEPRECATION-WARNING"
                "LATE-DEPRECATION-WARNING"
                "FINAL-DEPRECATION-WARNING"

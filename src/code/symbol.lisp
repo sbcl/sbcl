@@ -23,6 +23,14 @@
   (declare (optimize (safety 1)))
   (symbol-value symbol))
 
+#-sb-xc-host
+(define-compiler-macro symbol-value (&whole form symbol &environment env)
+  (when (sb!xc:constantp symbol env)
+    (let ((name (constant-form-value symbol env)))
+      (when (symbolp name)
+        (check-deprecated-variable name))))
+  form)
+
 (defun boundp (symbol)
   #!+sb-doc
   "Return non-NIL if SYMBOL is bound to a value."
