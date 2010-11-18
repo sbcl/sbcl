@@ -772,7 +772,7 @@ has the effect of
 @end lisp
 
 where @code{...} is the component in question.
-In this case @code{...} would expand to something like 
+In this case @code{...} would expand to something like
 
 @lisp
 (find-component (find-system "foo") "mod")
@@ -795,19 +795,33 @@ For more details on what these methods do, @pxref{Operations} in
 @comment  node-name,  next,  previous,  up
 @section The defsystem grammar
 
-@example
-system-definition := ( defsystem system-designator @var{option}* )
+@c FIXME: @var typesetting not consistently used here.  We should either expand
+@c its use to everywhere, or we should kill it everywhere.
 
-option := :components component-list
+
+@example
+system-definition := ( defsystem system-designator @var{system-option}* )
+
+system-option := :defsystem-depends-on system-list
+                 | module-option
+                 | option
+
+module-option := :components component-list
+                 | :serial [ t | nil ]
+                 | :if-component-dep-fails component-dep-fail-option
+
+option :=
         | :pathname pathname-specifier
-        | :default-component-class
+        | :default-component-class class-name
         | :perform method-form
         | :explain method-form
         | :output-files method-form
         | :operation-done-p method-form
         | :depends-on ( @var{dependency-def}* )
-        | :serial [ t | nil ]
         | :in-order-to ( @var{dependency}+ )
+
+
+system-list := ( @var{simple-component-name}* )
 
 component-list := ( @var{component-def}* )
 
@@ -834,7 +848,11 @@ pathname-specifier := pathname | string | symbol
 
 method-form := (operation-name qual lambda-list @&rest body)
 qual := method qualifier
+
+component-dep-fail-option := :fail | :try-next | :ignore
 @end example
+
+
 
 @subsection Component names
 
@@ -848,6 +866,14 @@ by name in the current package and in the asdf package, if not found in
 the current package.  So a component type @code{my-component-type}, in
 the current package @code{my-system-asd} can be specified as
 @code{:my-component-type}, or @code{my-component-type}.
+
+@subsection Defsystem depends on
+
+The @code{:defsystem-depends-on} option to @code{defsystem} allows the
+programmer to specify another ASDF-defined system or set of systems that
+must be loaded @emph{before} the system definition is processed.
+Typically this is used to load an ASDF extension that is used in the
+system definition.
 
 @subsection Pathname specifiers
 @cindex pathname specifiers
@@ -918,7 +944,7 @@ Unhappily, ASDF 1 didn't properly support
 parsing component names as strings specifying paths with directories,
 and the cumbersome @code{#.(make-pathname ...)} syntax had to be used.
 
-Note that when specifying pathname objects, 
+Note that when specifying pathname objects,
 ASDF does not do any special interpretation of the pathname
 influenced by the component type, unlike the procedure for
 pathname-specifying strings.
@@ -930,7 +956,7 @@ be forced upon you if you were specifying a string.
 
 
 @subsection Warning about logical pathnames
-@cindex logical pathnames 
+@cindex logical pathnames
 
 We recommend that you not use logical pathnames
 in your asdf system definitions at this point,
@@ -1030,6 +1056,13 @@ and @code{*load-truename*} is currently unbound
 (so that a developer can evaluate a @code{defsystem} form
 from within an editor without clobbering its source location)
 @end itemize
+
+@subsection if-component-dep-fails option
+
+This option is only appropriate for module components (including
+systems), not individual source files.
+
+For more information about this option, @pxref{Pre-defined subclasses of component}.
 
 @node Other code in .asd files,  , The defsystem grammar, Defining systems with defsystem
 @section Other code in .asd files
@@ -1700,11 +1733,14 @@ to be found, for systems to be found the current directory
 (at the time that the configuration is initialized) as well as
 @code{:directory} entries for @file{$XDG_DATA_DIRS/common-lisp/systems/} and
 @code{:tree} entries for @file{$XDG_DATA_DIRS/common-lisp/source/}.
+For instance, SBCL will include directories for its contribs
+when it can find them; it will look for them where SBCL was installed,
+or at the location specified by the @code{SBCL_HOME} environment variable.
 
 @end enumerate
 
-Each of these configuration is specified as a SEXP
-in a trival domain-specific language (defined below).
+Each of these configurations is specified as an s-expression
+in a trivial domain-specific language (defined below).
 Additionally, a more shell-friendly syntax is available
 for the environment variable (defined yet below).
 
@@ -1733,14 +1769,14 @@ On Windows platforms, when not using Cygwin,
 instead of the XDG base directory specification,
 we try to use folder configuration from the registry regarding
 @code{Common AppData} and similar directories.
-However, support querying the Windows registry is limited as of ASDF 2,
+However, support for querying the Windows registry is limited as of ASDF 2,
 and on many implementations, we may fall back to always using the defaults
 without consulting the registry.
 Patches welcome.
 
 @section Backward Compatibility
 
-For backward compatibility as well as for a practical backdoor for hackers,
+For backward compatibility as well as to provide a practical backdoor for hackers,
 ASDF will first search for @code{.asd} files in the directories specified in
 @code{asdf:*central-registry*}
 before it searches in the source registry above.
@@ -1754,10 +1790,10 @@ but will take precedence over the new mechanism if you do use it.
 
 @section Configuration DSL
 
-Here is the grammar of the SEXP DSL for source-registry configuration:
+Here is the grammar of the s-expression (SEXP) DSL for source-registry configuration:
 
 @example
-;; A configuration is single SEXP starting with keyword :source-registry
+;; A configuration is a single SEXP starting with keyword :source-registry
 ;; followed by a list of directives.
 CONFIGURATION := (:source-registry DIRECTIVE ...)
 
@@ -1779,6 +1815,8 @@ DIRECTIVE :=
     (:exclude PATTERN ...) |
     ;; augment the defaults for exclusion patterns
     (:also-exclude PATTERN ...) |
+    ;; Note that the scope of a an exclude pattern specification is
+    ;; the rest of the current configuration expression or file.
 
     ;; splice the parsed contents of another config file
     (:include REGULAR-FILE-PATHNAME-DESIGNATOR) |
@@ -1822,7 +1860,6 @@ once contained:
   (:tree (:home "cl")) ;; will expand to e.g. "/home/joeluser/cl/"
   :inherit-configuration)
 @end example
-
 
 @section Configuration Directories
 
@@ -1886,6 +1923,7 @@ list of paths, where
 
 
 @section Search Algorithm
+@vindex *default-source-registry-exclusions*
 
 In case that isn't clear, the semantics of the configuration is that
 when searching for a system of a given name,
@@ -3417,7 +3455,7 @@ but that's all.
 The defsystem 4 proposal tends to look more at the external features,
 whereas this one centres on a protocol for system introspection.
 
-@section kmp's ``The Description of Large Systems'', MIT AI Memu 801
+@section kmp's ``The Description of Large Systems'', MIT AI Memo 801
 
 Available in updated-for-CL form on the web at
 @url{http://nhplace.com/kent/Papers/Large-Systems.html}
