@@ -6,6 +6,9 @@
 ;;; possible blank lines or other whitespace, and a single
 ;;; double-quoted string value alone on its own line.
 ;;;
+;;; Local additions to the version number can be effected via
+;;; branch-version.lisp-expr, which is not stored in the CVS.
+;;;
 ;;; ANSI says LISP-IMPLEMENTATION-VERSION can be NIL "if no
 ;;; appropriate and relevant result can be produced", but as long as
 ;;; we control the build, we can always assign an appropriate and
