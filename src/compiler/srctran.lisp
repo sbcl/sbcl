@@ -1127,21 +1127,26 @@
     (t
      type-list)))
 
-;;; FIXME: MAKE-CANONICAL-UNION-TYPE and CONVERT-MEMBER-TYPE probably
-;;; belong in the kernel's type logic, invoked always, instead of in
-;;; the compiler, invoked only during some type optimizations. (In
-;;; fact, as of 0.pre8.100 or so they probably are, under
-;;; MAKE-MEMBER-TYPE, so probably this code can be deleted)
-
 ;;; Take a list of types and return a canonical type specifier,
 ;;; combining any MEMBER types together. If both positive and negative
 ;;; MEMBER types are present they are converted to a float type.
 ;;; XXX This would be far simpler if the type-union methods could handle
 ;;; member/number unions.
-(defun make-canonical-union-type (type-list)
+;;;
+;;; If we're about to generate an overly complex union of numeric types, start
+;;; collapse the ranges together.
+;;;
+;;; FIXME: The MEMBER canonicalization parts of MAKE-DERIVED-UNION-TYPE and
+;;; entire CONVERT-MEMBER-TYPE probably belong in the kernel's type logic,
+;;; invoked always, instead of in the compiler, invoked only during some type
+;;; optimizations.
+(defvar *derived-numeric-union-complexity-limit* 6)
+
+(defun make-derived-union-type (type-list)
   (let ((xset (alloc-xset))
         (fp-zeroes '())
-        (misc-types '()))
+        (misc-types '())
+        (numeric-type *empty-type*))
     (dolist (type type-list)
       (cond ((member-type-p type)
              (mapc-member-type-members
@@ -1151,11 +1156,19 @@
                       (pushnew member fp-zeroes))
                     (add-to-xset member xset)))
               type))
+            ((numeric-type-p type)
+             (let ((*approximate-numeric-unions*
+                    (when (and (union-type-p numeric-type)
+                               (nthcdr *derived-numeric-union-complexity-limit*
+                                       (union-type-types numeric-type)))
+                      t)))
+               (setf numeric-type (type-union type numeric-type))))
             (t
              (push type misc-types))))
     (if (and (xset-empty-p xset) (not fp-zeroes))
-        (apply #'type-union misc-types)
-        (apply #'type-union (make-member-type :xset xset :fp-zeroes fp-zeroes) misc-types))))
+        (apply #'type-union numeric-type misc-types)
+        (apply #'type-union (make-member-type :xset xset :fp-zeroes fp-zeroes)
+               numeric-type misc-types))))
 
 ;;; Convert a member type with a single member to a numeric type.
 (defun convert-member-type (arg)
@@ -1220,7 +1233,7 @@
                   (setf results (append results result))
                   (push result results))))
           (if (rest results)
-              (make-canonical-union-type results)
+              (make-derived-union-type results)
               (first results)))))))
 
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
@@ -1293,7 +1306,7 @@
                         (setf results (append results result))
                         (push result results))))))
           (if (rest results)
-              (make-canonical-union-type results)
+              (make-derived-union-type results)
               (first results)))))))
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)

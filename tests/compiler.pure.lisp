@@ -3693,3 +3693,60 @@
                             (declare (boolean k1))
                             (declare (ignore x y k1))
                             t))))))
+
+(with-test (:name :bug-309448)
+  ;; Like all tests trying to verify that something doesn't blow up
+  ;; compile-times this is bound to be a bit brittle, but at least
+  ;; here we try to establish a decent baseline.
+  (flet ((time-it (lambda want)
+           (let* ((start (get-internal-run-time))
+                  (fun (compile nil lambda))
+                  (end (get-internal-run-time))
+                  (got (funcall fun)))
+             (unless (eql want got)
+               (error "wanted ~S, got ~S" want got))
+             (- end start))))
+    (let ((time-1/simple
+           ;; This is mostly identical as the next one, but doesn't create
+           ;; hairy unions of numeric types.
+           (time-it `(lambda ()
+                       (labels ((bar (baz bim)
+                                  (let ((n (+ baz bim)))
+                                 (* n (+ n 1) bim))))
+                      (let ((a (bar 1 1))
+                            (b (bar 1 1))
+                            (c (bar 1 1)))
+                        (- (+ a b) c))))
+                    6))
+          (time-1/hairy
+           (time-it `(lambda ()
+                       (labels ((bar (baz bim)
+                                  (let ((n (+ baz bim)))
+                                 (* n (+ n 1) bim))))
+                      (let ((a (bar 1 1))
+                            (b (bar 1 5))
+                            (c (bar 1 15)))
+                        (- (+ a b) c))))
+                    -3864)))
+      (assert (>= (* 10 (1+ time-1/simple)) time-1/hairy)))
+    (let ((time-2/simple
+           ;; This is mostly identical as the next one, but doesn't create
+           ;; hairy unions of numeric types.
+           (time-it `(lambda ()
+                       (labels ((sum-d (n)
+                                  (let ((m (truncate 999 n)))
+                                    (/ (* n m (1+ m)) 2))))
+                         (- (+ (sum-d 3)
+                               (sum-d 3))
+                            (sum-d 3))))
+                    166833))
+          (time-2/hairy
+           (time-it `(lambda ()
+                       (labels ((sum-d (n)
+                                  (let ((m (truncate 999 n)))
+                                    (/ (* n m (1+ m)) 2))))
+                         (- (+ (sum-d 3)
+                               (sum-d 5))
+                            (sum-d 15))))
+                    233168)))
+      (assert (>= (* 10 (1+ time-2/simple)) time-2/hairy)))))

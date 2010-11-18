@@ -20,6 +20,8 @@ changes relative to sbcl-1.0.44:
     in the DEFMETHOD body.
   * bug fix: #<SB-C::DEFINED-FUN ...> should no longer appear in compiler
     messages, being instead replaced with the corresponding function name.
+  * bug fix: don't derive overly complex unions of numeric types for arithmetic
+    operators. (lp#309448)
 
 changes in sbcl-1.0.44 relative to sbcl-1.0.43:
   * enhancement: RUN-PROGRAM accepts :EXTERNAL-FORMAT argument to select the

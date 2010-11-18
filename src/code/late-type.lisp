@@ -1883,10 +1883,12 @@
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 ;;;
-;;; Old comment, probably no longer applicable:
-;;;
-;;;   ### Note: we give up early to keep from dropping lots of
-;;;   information on the floor by returning overly general types.
+;;; Binding *APPROXIMATE-NUMERIC-UNIONS* to T allows merging non-adjacent
+;;; numeric types, eg (OR (INTEGER 0 12) (INTEGER 20 128)) => (INTEGER 0 128),
+;;; the compiler does this occasionally during type-derivation to avoid
+;;; creating absurdly complex unions of numeric types.
+(defvar *approximate-numeric-unions* nil)
+
 (!define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
   (cond ((csubtypep type1 type2) type2)
@@ -1902,7 +1904,8 @@
              ((and (eq class1 class2)
                    (eq format1 format2)
                    (eq complexp1 complexp2)
-                   (or (numeric-types-intersect type1 type2)
+                   (or *approximate-numeric-unions*
+                       (numeric-types-intersect type1 type2)
                        (numeric-types-adjacent type1 type2)
                        (numeric-types-adjacent type2 type1)))
               (make-numeric-type
@@ -1924,7 +1927,8 @@
                    (integerp (numeric-type-low type2))
                    (integerp (numeric-type-high type2))
                    (= (numeric-type-low type2) (numeric-type-high type2))
-                   (or (numeric-types-adjacent type1 type2)
+                   (or *approximate-numeric-unions*
+                       (numeric-types-adjacent type1 type2)
                        (numeric-types-adjacent type2 type1)))
               (make-numeric-type
                :class 'rational
@@ -1943,7 +1947,8 @@
                    (integerp (numeric-type-low type1))
                    (integerp (numeric-type-high type1))
                    (= (numeric-type-low type1) (numeric-type-high type1))
-                   (or (numeric-types-adjacent type1 type2)
+                   (or *approximate-numeric-unions*
+                       (numeric-types-adjacent type1 type2)
                        (numeric-types-adjacent type2 type1)))
               (make-numeric-type
                :class 'rational
