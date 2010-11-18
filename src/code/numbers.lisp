@@ -855,10 +855,10 @@ the first."
          ;; conversion.
          (multiple-value-bind (lo hi)
              (case '(dispatch-type y)
-               ('single-float
+               (single-float
                 (values most-negative-exactly-single-float-fixnum
                         most-positive-exactly-single-float-fixnum))
-               ('double-float
+               (double-float
                 (values most-negative-exactly-double-float-fixnum
                         most-positive-exactly-double-float-fixnum)))
            (if (<= lo y hi)
@@ -872,10 +872,10 @@ the first."
              ;; Likewise
              (multiple-value-bind (lo hi)
                  (case '(dispatch-type x)
-                   ('single-float
+                   (single-float
                     (values most-negative-exactly-single-float-fixnum
                             most-positive-exactly-single-float-fixnum))
-                   ('double-float
+                   (double-float
                     (values most-negative-exactly-double-float-fixnum
                             most-positive-exactly-double-float-fixnum)))
                (if (<= lo y hi)

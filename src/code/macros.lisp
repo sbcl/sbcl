@@ -165,7 +165,8 @@ invoked. In that case it will store into PLACE and start over."
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
-(define-condition duplicate-case-key-warning (style-warning)
+;;; Make this a full warning during SBCL build.
+(define-condition duplicate-case-key-warning (#-sb-xc-host style-warning #+sb-xc-host warning)
   ((key :initarg :key
         :reader case-warning-key)
    (case-kind :initarg :case-kind
