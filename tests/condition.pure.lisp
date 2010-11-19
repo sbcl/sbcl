@@ -13,6 +13,8 @@
 
 (cl:in-package :cl-user)
 
+(load "test-util.lisp")
+
 ;;; Until 0.7.7.21, (MAKE-CONDITION 'FILE-ERROR :PATHNAME "FOO")
 ;;; wasn't printable, because the REPORT function for FILE-ERROR
 ;;; referred to unbound slots. This was reported and fixed by Antonio
@@ -151,3 +153,13 @@
                             :format-arguments nil)
             'cerror (get-universal-time))
     (assert (= x 1))))
+
+(with-test (:name :malformed-restart-case-clause)
+  (assert (eq :ok
+              (handler-case
+                  (macroexpand `(restart-case (error "foo")
+                                  (foo :report "quux" (quux))))
+                (simple-error (e)
+                  (assert (equal '(restart-case (foo :report "quux" (quux)))
+                                 (simple-condition-format-arguments e)))
+                  :ok)))))

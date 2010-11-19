@@ -526,6 +526,9 @@ evaluated as a PROGN."
                                              key-vars keywords)
                                  ,@forms))))))
              (mapcar (lambda (clause)
+                       (unless (listp (second clause))
+                         (error "Malformed ~S clause, no lambda-list:~%  ~S"
+                                'restart-case clause))
                        (with-keyword-pairs ((report interactive test
                                                     &rest forms)
                                             (cddr clause))
