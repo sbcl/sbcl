@@ -24,7 +24,7 @@ fi
 
 for source_extension in $source_extensions; do 
     find . \( \
-            -path contrib/asdf \
+            -path contrib/asdf -o \
             -name _darcs -o \
             -name '{arch}' -o \
             -name CVS -o \
