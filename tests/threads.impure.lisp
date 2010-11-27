@@ -154,16 +154,16 @@
   (sleep 3)
   (assert (not (thread-alive-p thread))))
 
-(with-test (:name '(:join-thread :nlx :default))
+(with-test (:name (:join-thread :nlx :default))
   (let ((sym (gensym)))
     (assert (eq sym (join-thread (make-thread (lambda () (sb-ext:quit)))
                                  :default sym)))))
 
-(with-test (:name '(:join-thread :nlx :error))
+(with-test (:name (:join-thread :nlx :error))
   (raises-error? (join-thread (make-thread (lambda () (sb-ext:quit))))
                  join-thread-error))
 
-(with-test (:name '(:join-thread :multiple-values))
+(with-test (:name (:join-thread :multiple-values))
   (assert (equal '(1 2 3)
                  (multiple-value-list
                   (join-thread (make-thread (lambda () (values 1 2 3))))))))
@@ -1331,7 +1331,7 @@
   (format t "ok~%")
   (force-output))
 
-(with-test (:name '(:hash-cache :subtypep))
+(with-test (:name (:hash-cache :subtypep))
   (dotimes (i 10)
     (sb-thread:make-thread #'subtypep-hash-cache-test)))
 (format t "hash-cache tests done~%")

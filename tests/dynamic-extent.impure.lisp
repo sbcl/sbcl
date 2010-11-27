@@ -903,3 +903,13 @@
              (assert (eql x (car (aref vec 0)))))))
     (assert-no-consing (test 42))))
 
+(defun bug-681092 ()
+  (declare (optimize speed))
+  (let ((c 0))
+    (flet ((bar () c))
+      (declare (dynamic-extent #'bar))
+      (do () ((list) (bar))
+        (setf c 10)
+        (return (bar))))))
+(with-test (:name :bug-681092)
+  (assert (= 10 (bug-681092))))
