@@ -783,9 +783,15 @@
 ;;; OLD-FP. If null, then the call is to the same environment (an
 ;;; :ASSIGNMENT), so we only move the arguments, and leave the
 ;;; environment alone.
-(defun emit-psetq-moves (node block fun old-fp)
+;;;
+;;; CLOSURE-FP is for calling a closure that has "implicit" value
+;;; cells (stored in the allocating stack frame), and is the frame
+;;; pointer TN to use for values allocated in the outbound stack
+;;; frame.  This is distinct from OLD-FP for the specific case of a
+;;; tail-local-call.
+(defun emit-psetq-moves (node block fun old-fp &optional (closure-fp old-fp))
   (declare (type combination node) (type ir2-block block) (type clambda fun)
-           (type (or tn null) old-fp))
+           (type (or tn null) old-fp closure-fp))
   (let ((actuals (mapcar (lambda (x)
                            (when x
                              (lvar-tn node block x)))
@@ -815,7 +821,7 @@
         (let ((this-1env (node-physenv node))
               (called-env (physenv-info (lambda-physenv fun))))
           (dolist (thing (ir2-physenv-closure called-env))
-            (temps (closure-initial-value (car thing) this-1env old-fp))
+            (temps (closure-initial-value (car thing) this-1env closure-fp))
             (locs (cdr thing)))
           (temps old-fp)
           (locs (ir2-physenv-old-fp called-env))))
@@ -828,9 +834,16 @@
 ;;; function's passing location.
 (defun ir2-convert-tail-local-call (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
-  (let ((this-env (physenv-info (node-physenv node))))
+  (let ((this-env (physenv-info (node-physenv node)))
+        (current-fp (make-stack-pointer-tn)))
     (multiple-value-bind (temps locs)
-        (emit-psetq-moves node block fun (ir2-physenv-old-fp this-env))
+        (emit-psetq-moves node block fun
+                          (ir2-physenv-old-fp this-env) current-fp)
+
+      ;; If we're about to emit a move from CURRENT-FP then we need to
+      ;; initialize it.
+      (when (find current-fp temps)
+        (vop current-fp node block current-fp))
 
       (mapc (lambda (temp loc)
               (emit-move node block temp loc))
