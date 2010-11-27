@@ -51,7 +51,7 @@ system will be deadlocked. Since SBCL does not currently document its internal
 locks, application code can never be certain that this invariant is
 maintained."
   (with-unique-names (without-gcing-body)
-    `(flet ((,without-gcing-body ()
+    `(dx-flet ((,without-gcing-body ()
               ,@body))
        (if *gc-inhibit*
            (,without-gcing-body)

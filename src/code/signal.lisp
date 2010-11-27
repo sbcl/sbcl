@@ -102,7 +102,7 @@ WITHOUT-INTERRUPTS in:
     (lambda () (with-local-interrupts ...)))
 "
   (with-unique-names (outer-allow-with-interrupts without-interrupts-body)
-    `(flet ((,without-interrupts-body ()
+    `(dx-flet ((,without-interrupts-body ()
               (declare (disable-package-locks allow-with-interrupts
                                               with-local-interrupts))
               (macrolet
