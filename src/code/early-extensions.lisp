@@ -963,7 +963,7 @@
 ;;; If X is a symbol, see whether it is present in *FEATURES*. Also
 ;;; handle arbitrary combinations of atoms using NOT, AND, OR.
 (defun featurep (x)
-  (etypecase x
+  (typecase x
     (cons
      (case (car x)
        ((:not not)
@@ -977,7 +977,10 @@
        ((:or or) (some #'featurep (cdr x)))
        (t
         (error "unknown operator in feature expression: ~S." x))))
-    (symbol (not (null (memq x *features*))))))
+    (symbol (not (null (memq x *features*))))
+    (t
+      (error "invalid feature expression: ~S" x))))
+
 
 ;;;; utilities for two-VALUES predicates
 
