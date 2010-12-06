@@ -286,7 +286,7 @@
 
             ;; Utilities
             #:absolute-pathname-p
-	    ;; #:aif #:it
+            ;; #:aif #:it
             ;; #:appendf
             #:coerce-name
             #:directory-pathname-p
@@ -298,8 +298,8 @@
             #:merge-pathnames*
             #:pathname-directory-pathname
             #:read-file-forms
-	    ;; #:remove-keys
-	    ;; #:remove-keyword
+            ;; #:remove-keys
+            ;; #:remove-keyword
             #:resolve-symlinks
             #:split-string
             #:component-name-to-pathname-components
@@ -755,7 +755,7 @@ actually-existing directory."
   (defun* get-uid ()
     #+allegro (excl.osi:getuid)
     #+clisp (loop :for s :in '("posix:uid" "LINUX:getuid")
-	          :for f = (ignore-errors (read-from-string s))
+                  :for f = (ignore-errors (read-from-string s))
                   :when f :return (funcall f))
     #+(or cmu scl) (unix:unix-getuid)
     #+ecl #.(cl:if (cl:< ext:+ecl-version-number+ 100601)
@@ -786,7 +786,7 @@ with given pathname and if it exists return its truename."
    (pathname (unless (wild-pathname-p p)
                #.(or #+(or allegro clozure cmu ecl sbcl scl) '(probe-file p)
                #+clisp (aif (find-symbol (string :probe-pathname) :ext) `(ignore-errors (,it p)))
-	       '(ignore-errors (truename p)))))))
+               '(ignore-errors (truename p)))))))
 
 (defun* truenamize (p)
   "Resolve as much of a pathname as possible"
@@ -1321,7 +1321,7 @@ Going forward, we recommend new users should be using the source-registry.
     (let* ((registered (cdr (gethash fallback *defined-systems*)))
            (system (or registered
                        (apply 'make-instance 'system
-			      :name fallback :source-file source-file keys))))
+                              :name fallback :source-file source-file keys))))
       (unless registered
         (register-system fallback system))
       (throw 'find-system system))))
