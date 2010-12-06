@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.44:
+changes in sbcl-1.0.45 relative to sbcl-1.0.44:
   * enhancement: ~/ and ~user/ are treated specially in pathnames.
     Refer to documentation for details.
   * enhancement: ASDF has been updated to version 2.010.
