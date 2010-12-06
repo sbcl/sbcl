@@ -434,7 +434,7 @@
 ;;; This is not a WITH-TEST :FAILS-ON PPC DARWIN since there are
 ;;; suspicions that the breakpoint trace might corrupt the whole image
 ;;; on that platform.
-#-(and (or ppc x86 x86-64) darwin)
+#-(and (or ppc x86 x86-64) (or darwin sunos))
 (with-test (:name (trace :encapsulate nil)
             :fails-on '(or (and :ppc (not :linux)) :sparc :mips))
   (let ((out (with-output-to-string (*trace-output*)
