@@ -56,16 +56,6 @@
           ;; live over the dynamic contour of the physenv.
           (setf (tn-sc res) (svref *backend-sc-numbers*
                                    sb!vm:control-stack-sc-number))
-          ;; KLUDGE: In the case of a tail-local-call, the entire
-          ;; stack frame is overwritten by the physenv of the called
-          ;; function.  Unfortunately, the tail-call appears to end
-          ;; the dynamic contour of the physenv, meaning that the
-          ;; stack slot occupied by the LAMBDA-VAR may be reassigned.
-          ;; Ideally, we might make the TN physenv-live across the
-          ;; physenvs of the tail-set of the lambda, but as a stopgap
-          ;; we can make it component-live instead.
-          (component-live-tn res)
-          #+(or)
           (physenv-live-tn res (lambda-physenv fun)))
 
          (debug-variable-p

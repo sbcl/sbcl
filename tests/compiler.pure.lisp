@@ -3750,3 +3750,13 @@
                             (sum-d 15))))
                     233168)))
       (assert (>= (* 10 (1+ time-2/simple)) time-2/hairy)))))
+
+(with-test (:name :regression-1.0.44.34)
+  (compile nil '(lambda (z &rest args)
+                 (declare (dynamic-extent args))
+                 (flet ((foo (w v) (list v w)))
+                   (setq z 0)
+                   (flet ((foo ()
+                            (foo z args)))
+                     (declare (sb-int:truly-dynamic-extent #'foo))
+                     (call #'foo nil))))))
