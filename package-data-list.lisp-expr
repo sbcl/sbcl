@@ -824,6 +824,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DELETE-DIRECTORY"
                "SET-SBCL-SOURCE-LOCATION"
                "*DISASSEMBLE-ANNOTATE*"
+               "PRINT-SYMBOL-WITH-PREFIX"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"

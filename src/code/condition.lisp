@@ -697,7 +697,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-             "The function ~/sb-impl::print-symbol-with-prefix/ is undefined."
+             "The function ~/sb!ext:print-symbol-with-prefix/ is undefined."
              (cell-error-name condition)))))
 
 (define-condition special-form-function (undefined-function) ()
@@ -977,9 +977,9 @@
   ((name :initarg :name :reader implicit-generic-function-name))
   (:report
    (lambda (condition stream)
-     (let ((*package* (find-package :keyword)))
-       (format stream "~@<Implicitly creating new generic function ~S.~:@>"
-               (implicit-generic-function-name condition))))))
+     (format stream "~@<Implicitly creating new generic function ~
+                     ~/sb-impl::print-symbol-with-prefix/.~:@>"
+             (implicit-generic-function-name condition)))))
 
 (define-condition extension-failure (reference-condition simple-error)
   ())
