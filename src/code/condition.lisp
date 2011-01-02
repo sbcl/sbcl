@@ -968,9 +968,9 @@
   ((name :initarg :name :reader implicit-generic-function-name))
   (:report
    (lambda (condition stream)
-     (let ((*package* (find-package :keyword)))
-       (format stream "~@<Implicitly creating new generic function ~S.~:@>"
-               (implicit-generic-function-name condition))))))
+     (format stream "~@<Implicitly creating new generic function ~
+                     ~/sb-impl::print-symbol-with-prefix/.~:@>"
+             (implicit-generic-function-name condition)))))
 
 (define-condition extension-failure (reference-condition simple-error)
   ())
