@@ -28,9 +28,19 @@
 (define-condition unbound-slot (cell-error)
   ((instance :reader unbound-slot-instance :initarg :instance))
   (:report (lambda (condition stream)
-             (format stream "The slot ~S is unbound in the object ~S."
-                     (cell-error-name condition)
-                     (unbound-slot-instance condition)))))
+             (handler-case
+                 (format stream "~@<The slot ~/sb-ext:print-symbol-with-prefix/ ~
+                         is unbound in the object ~A.~@:>"
+                         (cell-error-name condition)
+                         (unbound-slot-instance condition))
+               (serious-condition ()
+                 ;; In case of an error try again avoiding custom PRINT-OBJECT's.
+                 (format stream "~&Error during printing.~%~@<The slot ~
+                         ~/sb-ext:print-symbol-with-prefix/ ~
+                         is unbound in an instance of ~
+                         ~/sb-ext:print-symbol-with-prefix/.~@:>"
+                         (cell-error-name condition)
+                         (type-of (unbound-slot-instance condition))))))))
 
 (defmethod wrapper-fetcher ((class standard-class))
   'std-instance-wrapper)
