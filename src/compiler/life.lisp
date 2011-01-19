@@ -418,11 +418,31 @@
         (return))))
   (values))
 
+;;; Return true if TN represents a closed-over variable with an
+;;; "implicit" value-cell.
+(defun implicit-value-cell-tn-p (tn)
+  (let ((leaf (tn-leaf tn)))
+    (and (lambda-var-p leaf)
+         (lambda-var-indirect leaf)
+         (not (lambda-var-explicit-value-cell leaf)))))
+
+;;; If BLOCK ends with a TAIL LOCAL COMBINATION, the function called.
+;;; Otherwise, NIL.
+(defun block-tail-local-call-fun (block)
+  (let ((node (block-last block)))
+    (when (and (combination-p node)
+               (eq :local (combination-kind node))
+               (combination-tail-p node))
+      (ref-leaf (lvar-uses (combination-fun node))))))
+
 ;;; Iterate over all the blocks in ENV, setting up :LIVE conflicts for
 ;;; TN. We make the TN global if it isn't already. The TN must have at
 ;;; least one reference.
-(defun setup-environment-tn-conflicts (component tn env debug-p)
-  (declare (type component component) (type tn tn) (type physenv env))
+(defun setup-environment-tn-conflicts (component tn env debug-p &optional parent-envs)
+  (declare (type component component) (type tn tn) (type physenv env) (type list parent-envs))
+  (when (member env parent-envs)
+    ;; Prevent infinite recursion due to recursive tail calls.
+    (return-from setup-environment-tn-conflicts (values)))
   (when (and debug-p
              (not (tn-global-conflicts tn))
              (tn-local tn))
@@ -437,7 +457,15 @@
                         prev))))
         (do ((b last (ir2-block-prev b)))
             ((not (eq (ir2-block-block b) block)))
-          (setup-environment-tn-conflict tn b debug-p)))))
+          (setup-environment-tn-conflict tn b debug-p)))
+      ;; If BLOCK ends with a TAIL LOCAL COMBINATION and TN is an
+      ;; "implicit value cell" then setup conflicts for the callee
+      ;; function as well.
+      (let ((fun (and (implicit-value-cell-tn-p tn)
+                      (block-tail-local-call-fun block))))
+        (when fun
+          (setup-environment-tn-conflicts component tn (lambda-physenv fun) debug-p
+                                          (list* env parent-envs))))))
   (values))
 
 ;;; Iterate over all the environment TNs, adding always-live conflicts
