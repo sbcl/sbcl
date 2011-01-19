@@ -527,7 +527,14 @@
 ;;; We leave the CURRENT-CONFLICT pointing to the conflict for BLOCK1.
 ;;; The CURRENT-CONFLICT must be initialized to the head of the
 ;;; GLOBAL-CONFLICTS for the TN between each flow analysis iteration.
-(defun propagate-live-tns (block1 block2)
+
+;;; FASTP is a KLUDGE: SBCL used to update the current-conflict only
+;;; for the read-only case, but switched at one point to always
+;;; updating it. This generally speeds up the compiler nicely, but
+;;; sometimes it causes an infinite loop in the updating machinery,
+;;; We cheat by switching of the fast path if it seems we're looping
+;;; longer then expected.
+(defun propagate-live-tns (block1 block2 fastp)
   (declare (type ir2-block block1 block2))
   (let ((live-in (ir2-block-live-in block1))
         (did-something nil))
@@ -556,10 +563,13 @@
                   (setf (svref (ir2-block-local-tns block1)
                                (global-conflicts-number current))
                         nil)
-                  (setf (global-conflicts-number current) nil))
+                  (setf (global-conflicts-number current) nil)
+                  (unless fastp
+                    (setf (tn-current-conflict tn) current)))
                  (t
                   (setf (sbit live-in (global-conflicts-number current)) 1)))
-               (setf (tn-current-conflict tn) current)
+               (when fastp
+                 (setf (tn-current-conflict tn) current))
                (return)))))
         (:write)))
     did-something))
@@ -567,7 +577,14 @@
 ;;; Do backward global flow analysis to find all TNs live at each
 ;;; block boundary.
 (defun lifetime-flow-analysis (component)
-  (loop
+  ;; KLUDGE: This is the second part of the FASTP kludge in
+  ;; propagate-live-tns: we pass fastp for ten first attempts,
+  ;; and then switch to the works-for-sure version.
+  ;;
+  ;; The upstream uses the fast version always, but sometimes
+  ;; that gets stuck in a loop...
+  (loop for i = 0 then (1+ i)
+        do
     (reset-current-conflict component)
     (let ((did-something nil))
       (do-blocks-backwards (block component)
@@ -579,13 +596,13 @@
 
           (dolist (b (block-succ block))
             (when (and (block-start b)
-                       (propagate-live-tns last (block-info b)))
+                       (propagate-live-tns last (block-info b) (< i 10)))
               (setq did-something t)))
 
           (do ((b (ir2-block-prev last) (ir2-block-prev b))
                (prev last b))
               ((not (eq (ir2-block-block b) block)))
-            (when (propagate-live-tns b prev)
+            (when (propagate-live-tns b prev (< i 10))
               (setq did-something t)))))
 
       (unless did-something (return))))
