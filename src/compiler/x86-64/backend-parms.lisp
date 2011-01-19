@@ -33,7 +33,7 @@
 ;;; compatible systems to return different values for getpagesize().
 ;;; -- JES, 2007-01-06
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf *backend-page-bytes* 4096))
+  (setf *backend-page-bytes* 32768))
 
 ;;; The size in bytes of the GENCGC pages. Should be a multiple of the
 ;;; architecture code size.
