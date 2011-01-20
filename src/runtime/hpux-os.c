@@ -30,7 +30,7 @@ size_t os_vm_page_size;
 void
 os_init(char *argv[], char *envp[])
 {
-    os_vm_page_size = getpagesize();
+    os_vm_page_size = BACKEND_PAGE_BYTES;
 }
 
 os_vm_address_t
