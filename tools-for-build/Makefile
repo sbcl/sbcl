@@ -7,11 +7,12 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
--include genesis/Makefile.features
--include Config
+include ../src/runtime/genesis/Makefile.features
+include ../src/runtime/Config
 
 CPPFLAGS:=-I../src/runtime
-LDFLAGS:=$(LDFLAGS) $(OS_LIBS)
+LDFLAGS:=$(LDFLAGS)
+LDLIBS:=$(OS_LIBS)
 
 all: grovel-headers determine-endianness where-is-mcontext \
         modify-ldt-struct-name sigaction-sa-nodefer-works-test

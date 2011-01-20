@@ -295,6 +295,7 @@ ldso_stub__ ## fct: ;                  \\
                    "unlink"
                    "utimes"
                    "wait3"
+                   "waitpid"
                    "write")
                  ;; These aren't needed on the X86 because they're microcoded into the
                  ;; FPU, so the Lisp VOPs can implement them directly without having to
