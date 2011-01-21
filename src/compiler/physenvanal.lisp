@@ -230,8 +230,16 @@
       ;; functions), or a pointer from an underlying function to its
       ;; XEP (for non-:TOPLEVEL functions with XEPs).
       (unless (or (leaf-dynamic-extent fun)
-                  (and entry-fun
-                       (leaf-dynamic-extent entry-fun)))
+                  ;; Functions without XEPs can be treated as if they
+                  ;; are DYNAMIC-EXTENT, even without being so
+                  ;; declared, as any escaping closure which /isn't/
+                  ;; DYNAMIC-EXTENT but calls one of these functions
+                  ;; will also close over the required variables, thus
+                  ;; forcing the allocation of value cells.  Since the
+                  ;; XEP is stored in the ENTRY-FUN slot, we can pick
+                  ;; off the non-XEP case here.
+                  (not entry-fun)
+                  (leaf-dynamic-extent entry-fun))
         (let ((closure (physenv-closure (lambda-physenv fun))))
           (dolist (var closure)
             (when (and (lambda-var-p var)
