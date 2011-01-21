@@ -16,8 +16,8 @@
 ;;;
 ;;; Conventionally a string like "0.6.6", with three numeric fields,
 ;;; is used for released versions, and a string like "0.6.5.xyzzy",
-;;; with something arbitrary in the fourth field, is used for CVS
+;;; with something arbitrary in the fourth field, is used fsbcl-or CVS
 ;;; checkins which aren't released. (And occasionally for internal
 ;;; versions, especially for internal versions off the main CVS
 ;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
-"1.0.45.9"
+"1.0.45.10"

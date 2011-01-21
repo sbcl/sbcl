@@ -7,8 +7,8 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-include ../src/runtime/genesis/Makefile.features
-include ../src/runtime/Config
+-include genesis/Makefile.features
+-include Config
 
 CPPFLAGS:=-I../src/runtime
 LDFLAGS:=$(LDFLAGS)
