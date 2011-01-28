@@ -712,6 +712,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; and one for controlling same at runtime
                "*MUFFLED-WARNINGS*"
 
+               ;; specification which print errors to ignore ala *break-on-signal*
+               "*SUPPRESS-PRINT-ERRORS*"
+
                ;; extended declarations..
                "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
                "MAYBE-INLINE"
