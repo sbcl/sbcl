@@ -3760,3 +3760,8 @@
                             (foo z args)))
                      (declare (sb-int:truly-dynamic-extent #'foo))
                      (call #'foo nil))))))
+
+(with-test (:name :bug-713626)
+  (let ((f (eval '(constantly 42))))
+    (handler-bind ((warning #'error))
+      (assert (= 42 (funcall (compile nil `(lambda () (funcall ,f 1 2 3)))))))))

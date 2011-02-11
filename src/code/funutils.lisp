@@ -32,10 +32,7 @@
 (defun constantly (value)
   #!+sb-doc
   "Return a function that always returns VALUE."
-  (lambda ()
-    ;; KLUDGE: This declaration is a hack to make the closure ignore
-    ;; all its arguments without consing a &REST list or anything.
-    ;; Perhaps once DYNAMIC-EXTENT is implemented we won't need to
-    ;; screw around with this kind of thing. -- WHN 2001-04-06
-    (declare (optimize (speed 3) (safety 0)))
+  (lambda (&rest arguments)
+    (declare (ignore arguments))
+    (declare (optimize (speed 3) (safety 0) (debug 0)))
     value))

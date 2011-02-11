@@ -29,13 +29,11 @@
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
 
-;;; Bind the value and make a closure that returns it.
-(define-source-transform constantly (value)
-  (with-unique-names (rest n-value)
-    `(let ((,n-value ,value))
-      (lambda (&rest ,rest)
-        (declare (ignore ,rest))
-        ,n-value))))
+
+;;; CONSTANTLY is pretty much never worth transforming, but it's good to get the type.
+(defoptimizer (constantly derive-type) ((value))
+  (specifier-type
+   `(function (&rest t) (values ,(type-specifier (lvar-type value)) &optional))))
 
 ;;; If the function has a known number of arguments, then return a
 ;;; lambda with the appropriate fixed number of args. If the
