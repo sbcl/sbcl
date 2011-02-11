@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.45:
   * bug fix: local tail calls to DYNAMIC-EXTENT functions can no longer cause
     lifetime analysis to overwrite closed-over variables (lp#681092).
+  * bug fix: encoding errors from some multibyte external formats such as EUC-JP
+    were not handled correctly (lp#713063).
 
 changes in sbcl-1.0.45 relative to sbcl-1.0.44:
   * enhancement: ~/ and ~user/ are treated specially in pathnames.

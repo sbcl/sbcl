@@ -1020,5 +1020,18 @@
        (handler-case
            (octets-to-string octets :external-format :bad-format)
          (error (e) e))))))
+
+(with-test (:name :lp713063)
+  (with-open-file (f *test-path*
+                     :direction :output
+                     :external-format '(:euc-jp :replacement #\?)
+                     :if-exists :supersede)
+    (write-string (make-string 3 :initial-element #\horizontal_bar) f))
+  (assert (equal "???"
+                 (with-open-file (f *test-path*
+                                    :direction :input
+                                    :external-format :euc-jp)
+                   (read-line f))))
+  (delete-file *test-path*))
 
 ;;;; success

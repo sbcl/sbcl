@@ -254,7 +254,9 @@
          ;; replacement character, so we hardcode the preferred
          ;; replacement here.
          #\?
-         (mb-char-len (or (,ucs-to-mb (char-code byte)) -1))
+         (block size
+           (mb-char-len (or (,ucs-to-mb (char-code byte))
+                            (return-from size 0))))
          (let ((mb (,ucs-to-mb bits)))
            (if (null mb)
                (external-format-encoding-error stream byte)
