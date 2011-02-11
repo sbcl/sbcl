@@ -252,7 +252,8 @@ case "$sbcl_os" in
         printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
-        if [ $sbcl_arch = "x86" ] || [ $sbcl_arch = "amd64" ]; then
+        printf ' :largefile' >> $ltf
+        if [ $sbcl_arch = "x86" ] || [ $sbcl_arch = "x86-64" ]; then
             printf ' :sb-lutex' >> $ltf
         fi
         link_or_copy Config.$sbcl_arch-sunos Config
