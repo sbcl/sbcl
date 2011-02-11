@@ -110,14 +110,16 @@
 
   (infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
-                                          'simple-error 'error))
-          (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+                                          'simple-error 'error)))
       (/show0 "done coercing DATUM to CONDITION")
+      (/show0 "signalling CONDITION from within ERROR")
       (let ((sb!debug:*stack-top-hint* nil))
-        (/show0 "signalling CONDITION from within ERROR")
         (signal condition))
       (/show0 "done signalling CONDITION within ERROR")
-      (invoke-debugger condition))))
+      ;; Finding the stack top hint is pretty expensive, so don't do
+      ;; it until we know we need the debugger.
+      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+        (invoke-debugger condition)))))
 
 (defun cerror (continue-string datum &rest arguments)
   (infinite-error-protect
@@ -126,12 +128,12 @@
       (let ((condition (coerce-to-condition datum
                                             arguments
                                             'simple-error
-                                            'cerror))
-            (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+                                            'cerror)))
         (with-condition-restarts condition (list (find-restart 'continue))
           (let ((sb!debug:*stack-top-hint* nil))
             (signal condition))
-          (invoke-debugger condition)))))
+          (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+            (invoke-debugger condition))))))
   nil)
 
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that

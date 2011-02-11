@@ -1,6 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
+  * optimization: ERROR and CERROR are approximately 5 times faster.
+  * optimization: optimized constructors are used for MAKE-INSTANCE of classes
+    with applicable non-standard (SETF SLOT-VALUE-USING-CLASS),
+    SLOT-BOUNDP-USING-CLASS, and INITIALIZE-INSTANCE :AROUND methods, speeding
+    up instance creation in those cases.
   * bug fix: local tail calls to DYNAMIC-EXTENT functions can no longer cause
     lifetime analysis to overwrite closed-over variables (lp#681092).
   * bug fix: encoding errors from some multibyte external formats such as EUC-JP
