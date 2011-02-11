@@ -157,6 +157,17 @@
              (sb-ext:timeout ()
                :timeout)))))))
 
+;;;; Printing waitqueues
+
+(with-test (:name :waitqueue-circle-print)
+  (let* ((*print-circle* nil)
+         (lock (sb-thread:make-mutex))
+         (wq (sb-thread:make-waitqueue)))
+    (sb-thread:with-recursive-lock (lock)
+      (sb-thread:condition-notify wq))
+    ;; Used to blow stack due to recursive structure.
+    (assert (princ-to-string wq))))
+
 ;;;; SYMBOL-VALUE-IN-THREAD
 
 (with-test (:name symbol-value-in-thread.1)

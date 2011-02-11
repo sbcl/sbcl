@@ -527,6 +527,10 @@ IF-NOT-OWNER is :FORCE)."
   #!-sb-lutex
   (token nil))
 
+(def!method print-object ((waitqueue waitqueue) stream)
+  (print-unreadable-object (waitqueue stream :type t :identity t)
+    (format stream "~@[~A~]" (waitqueue-name waitqueue))))
+
 (defun make-waitqueue (&key name)
   #!+sb-doc
   "Create a waitqueue."
