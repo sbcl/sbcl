@@ -362,10 +362,7 @@
            ;; Return the name of parameter number I of a constructor
            ;; function.
            (parameter-name (i)
-             (let ((ps #(.p0. .p1. .p2. .p3. .p4. .p5.)))
-               (if (array-in-bounds-p ps i)
-                   (aref ps i)
-                   (format-symbol *pcl-package* ".P~D." i))))
+             (format-symbol *pcl-package* ".P~D." i))
            ;; Check if CLASS-ARG is a constant symbol.  Give up if
            ;; not.
            (constant-class-p ()
@@ -504,16 +501,18 @@
           (compute-applicable-methods #'initialize-instance (list proto)))
          (si-methods
           (compute-applicable-methods #'shared-initialize (list proto t)))
-         (setf-svuc-slots-methods
+         (setf-svuc-slots
           (loop for slot in (class-slots class)
-                collect (compute-applicable-methods
-                         #'(setf slot-value-using-class)
-                         (list nil class proto slot))))
-         (sbuc-slots-methods
+                when (cdr (compute-applicable-methods
+                           #'(setf slot-value-using-class)
+                           (list nil class proto slot)))
+                collect slot))
+         (sbuc-slots
           (loop for slot in (class-slots class)
-                collect (compute-applicable-methods
-                         #'slot-boundp-using-class
-                         (list class proto slot)))))
+                when (cdr (compute-applicable-methods
+                           #'slot-boundp-using-class
+                           (list class proto slot)))
+                collect slot)))
     ;; Cannot initialize these variables earlier because the generic
     ;; functions don't exist when PCL is built.
     (when (null *the-system-si-method*)
@@ -549,15 +548,8 @@
                (not (around-or-nonstandard-primary-method-p
                      ii-methods *the-system-ii-method*))
                (not (around-or-nonstandard-primary-method-p
-                     si-methods *the-system-si-method*))
-               ;; the instance structure protocol goes through
-               ;; slot-value(-using-class) and friends (actually just
-               ;; (SETF SLOT-VALUE-USING-CLASS) and
-               ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
-               ;; applicable methods we can't shortcircuit them.
-               (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
-               (every (lambda (x) (= (length x) 1)) sbuc-slots-methods))
-          (optimizing-generator ctor ii-methods si-methods)
+                     si-methods *the-system-si-method*)))
+          (optimizing-generator ctor ii-methods si-methods setf-svuc-slots sbuc-slots)
           (fallback-generator ctor ii-methods si-methods
                               (or maybe-invalid-initargs custom-make-instance))))))
 
@@ -606,9 +598,11 @@
     (apply #'initialize-instance .instance. initargs)
     .instance.))
 
-(defun optimizing-generator (ctor ii-methods si-methods)
+(defun optimizing-generator
+    (ctor ii-methods si-methods setf-svuc-slots sbuc-slots)
   (multiple-value-bind (locations names body before-method-p)
-      (fake-initialization-emf ctor ii-methods si-methods)
+      (fake-initialization-emf ctor ii-methods si-methods
+                               setf-svuc-slots sbuc-slots)
     (let ((wrapper (class-wrapper (ctor-class ctor))))
       (values
        `(lambda ,(make-ctor-parameter-list ctor)
@@ -661,7 +655,8 @@
 ;;; Return a form that is sort of an effective method comprising all
 ;;; calls to INITIALIZE-INSTANCE and SHARED-INITIALIZE that would
 ;;; normally have taken place when calling MAKE-INSTANCE.
-(defun fake-initialization-emf (ctor ii-methods si-methods)
+(defun fake-initialization-emf
+    (ctor ii-methods si-methods setf-svuc-slots sbuc-slots)
   (multiple-value-bind (ii-around ii-before ii-primary ii-after)
       (standard-sort-methods ii-methods)
     (declare (ignore ii-primary))
@@ -670,8 +665,11 @@
       (declare (ignore si-primary))
       (aver (and (null ii-around) (null si-around)))
       (let ((initargs (ctor-initargs ctor)))
-        (multiple-value-bind (locations names bindings vars defaulting-initargs body)
-            (slot-init-forms ctor (or ii-before si-before))
+        (multiple-value-bind
+              (locations names bindings vars defaulting-initargs body)
+            (slot-init-forms ctor
+                             (or ii-before si-before)
+                             setf-svuc-slots sbuc-slots)
         (values
          locations
          names
@@ -731,14 +729,14 @@
 ;;; called, which means that 1) other code will initialize instance
 ;;; slots to +SLOT-UNBOUND+ before the before-methods are run, and
 ;;; that we have to check if these before-methods have set slots.
-(defun slot-init-forms (ctor before-method-p)
+(defun slot-init-forms (ctor before-method-p setf-svuc-slots sbuc-slots)
   (let* ((class (ctor-class ctor))
          (initargs (ctor-initargs ctor))
          (initkeys (plist-keys initargs))
          (safe-p (ctor-safe-p ctor))
+         (wrapper (class-wrapper class))
          (slot-vector
-          (make-array (layout-length (class-wrapper class))
-                      :initial-element nil))
+          (make-array (layout-length wrapper) :initial-element nil))
          (class-inits ())
          (default-inits ())
          (defaulting-initargs ())
@@ -755,33 +753,28 @@
                  ((integerp location)
                   (not (null (aref slot-vector location))))
                  (t (bug "Weird location in ~S" 'slot-init-forms))))
-             (class-init (location kind val type)
+             (class-init (location kind val type slotd)
                (aver (consp location))
                (unless (initializedp location)
-                 (push (list location kind val type) class-inits)))
-             (instance-init (location kind val type)
+                 (push (list location kind val type slotd) class-inits)))
+             (instance-init (location kind val type slotd)
                (aver (integerp location))
                (unless (initializedp location)
-                 (setf (aref slot-vector location) (list kind val type))))
+                 (setf (aref slot-vector location)
+                       (list kind val type slotd))))
              (default-init-var-name (i)
-               (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
-                 (if (array-in-bounds-p ps i)
-                     (aref ps i)
-                     (format-symbol *pcl-package* ".D~D." i))))
+               (format-symbol *pcl-package* ".D~D." i))
              (location-var-name (i)
-               (let ((ls #(.l0. .l1. .l2. .l3. .l4. .l5.)))
-                 (if (array-in-bounds-p ls i)
-                     (aref ls i)
-                     (format-symbol *pcl-package* ".L~D." i)))))
+               (format-symbol *pcl-package* ".L~D." i)))
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
             as kind = (if (constantp value) 'constant 'param)
             as locations = (initarg-locations key)
-            do (loop for (location . type) in locations
+            do (loop for (location type slotd) in locations
                      do (if (consp location)
-                            (class-init location kind value type)
-                            (instance-init location kind value type))))
+                            (class-init location kind value type slotd)
+                            (instance-init location kind value type slotd))))
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
@@ -803,10 +796,10 @@
                 (let ((init-var (default-init-var-name i)))
                   (setq init init-var)
                   (push (cons init-var initfn) default-inits)))
-              (loop for (location . type) in (initarg-locations key)
+              (loop for (location type slotd) in (initarg-locations key)
                     do (if (consp location)
-                           (class-init location kind init type)
-                           (instance-init location kind init type)))))
+                           (class-init location kind init type slotd)
+                           (instance-init location kind init type slotd)))))
       ;; Loop over all slots of the class, filling in the rest from
       ;; slot initforms.
       (loop for slotd in (class-slots class)
@@ -819,66 +812,79 @@
                           (null initfn)
                           (initializedp location))
                 (if (constantp initform)
-                    (instance-init location 'initform initform type)
-                    (instance-init location 'initform/initfn initfn type))))
+                    (instance-init location 'initform initform type slotd)
+                    (instance-init location
+                                   'initform/initfn initfn type slotd))))
       ;; Generate the forms for initializing instance and class slots.
       (let ((instance-init-forms
              (loop for slot-entry across slot-vector and i from 0
-                   as (kind value type) = slot-entry collect
-                     (ecase kind
-                       ((nil)
-                        (unless before-method-p
-                          `(setf (clos-slots-ref .slots. ,i) +slot-unbound+)))
-                       ((param var)
-                        `(setf (clos-slots-ref .slots. ,i)
-                               (with-type-checked (,type ,safe-p)
-                                   ,value)))
-                       (initfn
-                        `(setf (clos-slots-ref .slots. ,i)
-                               (with-type-checked (,type ,safe-p)
-                                 (funcall ,value))))
-                       (initform/initfn
-                        (if before-method-p
-                            `(when (eq (clos-slots-ref .slots. ,i)
-                                       +slot-unbound+)
-                               (setf (clos-slots-ref .slots. ,i)
-                                     (with-type-checked (,type ,safe-p)
-                                       (funcall ,value))))
-                            `(setf (clos-slots-ref .slots. ,i)
-                                   (with-type-checked (,type ,safe-p)
-                                     (funcall ,value)))))
-                       (initform
-                        (if before-method-p
-                            `(when (eq (clos-slots-ref .slots. ,i)
-                                       +slot-unbound+)
-                               (setf (clos-slots-ref .slots. ,i)
-                                     (with-type-checked (,type ,safe-p)
-                                       ',(constant-form-value value))))
-                            `(setf (clos-slots-ref .slots. ,i)
-                                   (with-type-checked (,type ,safe-p)
-                                     ',(constant-form-value value)))))
-                       (constant
-                        `(setf (clos-slots-ref .slots. ,i)
-                               (with-type-checked (,type ,safe-p)
-                                 ',(constant-form-value value))))))))
+                   as (kind value type slotd) = slot-entry
+                   collect
+                      (flet ((setf-form (value-form)
+                               (if (member slotd setf-svuc-slots :test #'eq)
+                                   `(setf (slot-value-using-class
+                                           ,class .instance. ,slotd)
+                                          ,value-form)
+                                   `(setf (clos-slots-ref .slots. ,i)
+                                          (with-type-checked (,type ,safe-p)
+                                            ,value-form))))
+                             (not-boundp-form ()
+                               (if (member slotd sbuc-slots :test #'eq)
+                                   `(slot-boundp-using-class
+                                     ,class .instance. ,slotd)
+                                   `(eq (clos-slots-ref .slots. ,i)
+                                        +slot-unbound+))))
+                        (ecase kind
+                          ((nil)
+                           (unless before-method-p
+                             `(setf (clos-slots-ref .slots. ,i)
+                                    +slot-unbound+)))
+                          ((param var)
+                           (setf-form value))
+                          (initfn
+                           (setf-form `(funcall ,value)))
+                          (initform/initfn
+                           (if before-method-p
+                               `(when ,(not-boundp-form)
+                                  ,(setf-form `(funcall ,value)))
+                               (setf-form `(funcall ,value))))
+                          (initform
+                           (if before-method-p
+                               `(when ,(not-boundp-form)
+                                  ,(setf-form `',(constant-form-value value)))
+                               (setf-form `',(constant-form-value value))))
+                          (constant
+                           (setf-form `',(constant-form-value value))))))))
         ;; we are not allowed to modify QUOTEd locations, so we can't
         ;; generate code like (setf (cdr ',location) arg).  Instead,
         ;; we have to do (setf (cdr .L0.) arg) and arrange for .L0. to
         ;; be bound to the location.
         (multiple-value-bind (names locations class-init-forms)
-            (loop for (location kind value type) in class-inits
-                  for i upfrom 0
-                  for name = (location-var-name i)
-                  collect name into names
-                  collect location into locations
-                  collect `(setf (cdr ,name)
-                                 (with-type-checked (,type ,safe-p)
-                                   ,(case kind
-                                          (constant `',(constant-form-value value))
-                                          ((param var) `,value)
-                                          (initfn `(funcall ,value)))))
+            (loop with names
+                  with locations
+                  with i = -1
+                  for (location kind value type slotd) in class-inits
+                  for init-form
+                     = (case kind
+                         (constant `',(constant-form-value value))
+                         ((param var) `,value)
+                         (initfn `(funcall ,value)))
+                  when (member slotd setf-svuc-slots :test #'eq)
+                  collect `(setf (slot-value-using-class
+                                  ,class .instance. ,slotd)
+                                 ,init-form)
                   into class-init-forms
-                  finally (return (values names locations class-init-forms)))
+                  else collect
+                     (let ((name (location-var-name (incf i))))
+                       (push name names)
+                       (push location locations)
+                       `(setf (cdr ,name)
+                              (with-type-checked (,type ,safe-p)
+                                ,init-form)))
+                  into class-init-forms
+                  finally (return (values (nreverse names)
+                                          (nreverse locations)
+                                          class-init-forms)))
           (multiple-value-bind (vars bindings)
               (loop for (var . initfn) in (nreverse default-inits)
                     collect var into vars
@@ -899,8 +905,9 @@
         for key in initkeys collect
           (loop for slot in slots
                 if (memq key (slot-definition-initargs slot))
-                  collect (cons (slot-definition-location slot)
-                                (slot-definition-type slot))
+                  collect (list (slot-definition-location slot)
+                                (slot-definition-type slot)
+                                slot)
                           into locations
                 else
                   collect slot into remaining-slots
