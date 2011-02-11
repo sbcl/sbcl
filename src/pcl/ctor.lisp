@@ -545,7 +545,7 @@
                                 '(:instance :class)))
                       (class-slots class))
                (not maybe-invalid-initargs)
-               (not (around-or-nonstandard-primary-method-p
+               (not (nonstandard-primary-method-p
                      ii-methods *the-system-ii-method*))
                (not (around-or-nonstandard-primary-method-p
                      si-methods *the-system-si-method*)))
@@ -562,6 +562,21 @@
                             (safe-method-qualifiers method))
         when (or (eq :around (car qualifiers))
                  (and (null qualifiers)
+                      (not primary-checked-p)
+                      (not (null standard-method))
+                      (not (eq standard-method method))))
+          return t
+        when (null qualifiers) do
+          (setq primary-checked-p t)))
+
+(defun nonstandard-primary-method-p
+    (methods &optional standard-method)
+  (loop with primary-checked-p = nil
+        for method in methods
+        as qualifiers = (if (consp method)
+                            (early-method-qualifiers method)
+                            (safe-method-qualifiers method))
+        when (or (and (null qualifiers)
                       (not primary-checked-p)
                       (not (null standard-method))
                       (not (eq standard-method method))))
@@ -600,7 +615,7 @@
 
 (defun optimizing-generator
     (ctor ii-methods si-methods setf-svuc-slots sbuc-slots)
-  (multiple-value-bind (locations names body before-method-p)
+  (multiple-value-bind (locations names body around-or-before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods
                                setf-svuc-slots sbuc-slots)
     (let ((wrapper (class-wrapper (ctor-class ctor))))
@@ -611,7 +626,7 @@
            (when (layout-invalid ,wrapper)
              (install-initial-constructor ,ctor)
              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
-           ,(wrap-in-allocate-forms ctor body before-method-p)))
+           ,(wrap-in-allocate-forms ctor body around-or-before-method-p)))
        locations
        names
        t))))
@@ -622,7 +637,7 @@
 ;;; +SLOT-UNBOUND+.  The resulting form binds the local variables
 ;;; .INSTANCE. to the instance, and .SLOTS. to the instance's slot
 ;;; vector around BODY.
-(defun wrap-in-allocate-forms (ctor body before-method-p)
+(defun wrap-in-allocate-forms (ctor body around-or-before-method-p)
   (let* ((class (ctor-class ctor))
          (wrapper (class-wrapper class))
          (allocation-function (raw-instance-allocator class))
@@ -632,7 +647,7 @@
                                                     (get-instance-hash-code)))
                (.slots. (make-array
                          ,(layout-length wrapper)
-                         ,@(when before-method-p
+                         ,@(when around-or-before-method-p
                              '(:initial-element +slot-unbound+)))))
            (setf (std-instance-wrapper .instance.) ,wrapper)
            (setf (std-instance-slots .instance.) .slots.)
@@ -649,8 +664,8 @@
 ;;; functions look like (LAMBDA (ARGS NEXT-METHODS) ...).  We could
 ;;; call fast method functions directly here, but benchmarks show that
 ;;; there's no speed to gain, so lets avoid the hair here.
-(defmacro invoke-method (method args)
-  `(funcall ,(method-function method) ,args ()))
+(defmacro invoke-method (method args &optional next-methods)
+  `(funcall ,(the function (method-function method)) ,args ,next-methods))
 
 ;;; Return a form that is sort of an effective method comprising all
 ;;; calls to INITIALIZE-INSTANCE and SHARED-INITIALIZE that would
@@ -663,34 +678,53 @@
     (multiple-value-bind (si-around si-before si-primary si-after)
         (standard-sort-methods si-methods)
       (declare (ignore si-primary))
-      (aver (and (null ii-around) (null si-around)))
+      (aver (null si-around))
       (let ((initargs (ctor-initargs ctor)))
         (multiple-value-bind
               (locations names bindings vars defaulting-initargs body)
             (slot-init-forms ctor
-                             (or ii-before si-before)
+                             (or ii-before si-before ii-around)
                              setf-svuc-slots sbuc-slots)
         (values
          locations
          names
          `(let ,bindings
            (declare (ignorable ,@vars))
-           (let (,@(when (or ii-before ii-after)
-                     `((.ii-args.
-                        (list .instance. ,@(quote-plist-keys initargs) ,@defaulting-initargs))))
-                 ,@(when (or si-before si-after)
-                     `((.si-args.
-                        (list .instance. t ,@(quote-plist-keys initargs) ,@defaulting-initargs)))))
-            ,@(loop for method in ii-before
-                    collect `(invoke-method ,method .ii-args.))
-            ,@(loop for method in si-before
-                    collect `(invoke-method ,method .si-args.))
-            ,@body
-            ,@(loop for method in si-after
-                    collect `(invoke-method ,method .si-args.))
-            ,@(loop for method in ii-after
-                    collect `(invoke-method ,method .ii-args.))))
-         (or ii-before si-before)))))))
+           (flet ((initialize-it (.ii-args. .next-methods.)
+                    ;; This has all the :BEFORE and :AFTER methods,
+                    ;; and BODY does what primary SI method would do.
+                    (declare (ignore .next-methods.))
+                    (let* ((.instance. (car .ii-args.))
+                           ,@(when (or si-before si-after)
+                                  `((.si-args.
+                                     (list* .instance. t (cdr .ii-args.))))))
+                      ,@(loop for method in ii-before
+                              collect `(invoke-method ,method .ii-args.))
+                      ,@(loop for method in si-before
+                              collect `(invoke-method ,method .si-args.))
+                      ,@body
+                      ,@(loop for method in si-after
+                              collect `(invoke-method ,method .si-args.))
+                      ,@(loop for method in ii-after
+                              collect `(invoke-method ,method .ii-args.))
+                      .instance.)))
+	     (declare (dynamic-extent #'initialize-it))
+             (let ((.ii-args.
+		    ,@(if (or ii-before ii-after ii-around si-before si-after)
+			  `((list .instance. ,@(quote-plist-keys initargs)
+				  ,@defaulting-initargs))
+			  `((list .instance.)))))
+               ,(if ii-around
+                    ;; If there are :AROUND methods, call them first -- they get
+                    ;; the normal chaining, with #'INITIALIZE-IT standing in for
+                    ;; the rest.
+                    `(let ((.next-methods.
+			    (list ,@(cdr ii-around) #'initialize-it)))
+		       (declare (dynamic-extent .next-methods.))
+                       (invoke-method ,(car ii-around) .ii-args. .next-methods.))
+                    ;; The simple case.
+                    `(initialize-it .ii-args. nil)))))
+         (or ii-before si-before ii-around)))))))
 
 ;;; Return four values from APPLICABLE-METHODS: around methods, before
 ;;; methods, the applicable primary method, and applicable after

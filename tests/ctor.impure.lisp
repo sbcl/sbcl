@@ -160,7 +160,7 @@
   ((aroundp :initform nil :reader aroundp))
   (:default-initargs :x :success1))
 
-(defmethod initialize-instance :around ((some-class some-class) &key (x :fail?))
+(defmethod shared-initialize :around ((some-class some-class) slots &key (x :fail?))
   (unless (eq x :success1)
     (error "Default initarg lossage"))
   (setf (slot-value some-class 'aroundp) t)
@@ -185,7 +185,7 @@
     ((aroundp :initform nil :reader aroundp))
     (:default-initargs :x (progn (incf *some-counter*) x))))
 
-(defmethod initialize-instance :around ((some-class some-class2) &key (x :fail2?))
+(defmethod shared-initialize :around ((some-class some-class2) slots &key (x :fail2?))
   (unless (eq x 'success2)
     (error "Default initarg lossage"))
   (setf (slot-value some-class 'aroundp) t)
