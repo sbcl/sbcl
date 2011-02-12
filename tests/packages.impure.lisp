@@ -272,6 +272,11 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
+(with-test (:name unintern.2)
+  (with-packages (("FOO" (:intern "SYM")))
+    (unintern :sym "FOO")
+    (assert (find-symbol "SYM" "FOO"))))
+
 ;;; WITH-PACKAGE-ITERATOR error signalling had problems
 (with-test (:name with-package-itarator.error)
   (assert (eq :good

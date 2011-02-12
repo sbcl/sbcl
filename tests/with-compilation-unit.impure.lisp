@@ -100,7 +100,7 @@
     (write `(defun bar () (typep 1 ',(intern "A-TYPE"))) :stream stream))
 
   (test-files (lambda ()
-                (unintern 'a-type)
+                (unintern (find-symbol "A-TYPE"))
                 (fmakunbound 'bar))))
 
 (delete-file *file-a*)

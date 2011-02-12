@@ -967,8 +967,8 @@ uninterned."
                 (remove symbol shadowing-symbols)))
 
         (multiple-value-bind (s w) (find-symbol name package)
-          (declare (ignore s))
-          (cond ((or (eq w :internal) (eq w :external))
+          (cond ((not (eq symbol s)) nil)
+                ((or (eq w :internal) (eq w :external))
                  (nuke-symbol (if (eq w :internal)
                                   (package-internal-symbols package)
                                   (package-external-symbols package))

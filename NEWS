@@ -18,6 +18,8 @@ changes relative to sbcl-1.0.45:
     mistake. (lp#667297).
   * bug fix: CONSTANTLY generated functions had bogus lambda-lists. (lp#713626)
   * bug fix: RUN-PROGRAM :PTY option was racy on OpenBSD. (lp#669485)
+  * bug fix: UNINTERN takes a symbol, not a symbol designator -- could previously
+    unintern the wrong symbol with the same name. (lp#693796)
 
 changes in sbcl-1.0.45 relative to sbcl-1.0.44:
   * enhancement: ~/ and ~user/ are treated specially in pathnames.
