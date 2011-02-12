@@ -370,11 +370,15 @@
                (float profile)))))
     (max raw-compensated 0.0)))
 
-(defun report ()
-  "Report results from profiling. The results are approximately adjusted
-for profiling overhead. The compensation may be rather inaccurate when
-bignums are involved in runtime calculation, as in a very-long-running
-Lisp process."
+(defun report (&key limit (print-no-call-list t))
+  "Report results from profiling. The results are approximately
+adjusted for profiling overhead. The compensation may be rather
+inaccurate when bignums are involved in runtime calculation, as in a
+very-long-running Lisp process.
+
+If LIMIT is set to an integer, only the top LIMIT results are
+reported. If PRINT-NO-CALL-LIST is T (the default) then a list of
+uncalled profiled functions are listed."
   (unless (boundp '*overhead*)
     (setf *overhead*
           (compute-overhead)))
@@ -399,13 +403,16 @@ Lisp process."
                                   :gc-run-time gc-run-time)
                   time-info-list))))
 
-    (setf time-info-list
-          (sort time-info-list
-                #'>=
-                :key #'time-info-seconds))
-    (print-profile-table time-info-list)
+    (let ((times
+           (sort time-info-list
+                 #'>=
+                 :key #'time-info-seconds)))
+      (print-profile-table
+       (if (and limit (> (length times) limit))
+           (subseq times 0 limit)
+           times)))
 
-    (when no-call-name-list
+    (when (and print-no-call-list no-call-name-list)
       (format *trace-output*
               "~%These functions were not called:~%~{~<~%~:; ~S~>~}~%"
               (sort no-call-name-list #'string<
