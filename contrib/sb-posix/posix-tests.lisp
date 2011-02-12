@@ -5,7 +5,7 @@
 
 (defvar *test-directory*
   (ensure-directories-exist
-   (merge-pathnames (make-pathname :directory '(:relative "test-lab"))
+   (merge-pathnames (make-pathname :directory '(:relative "test-output"))
                     (make-pathname :directory
                                    (pathname-directory *load-truename*)))))
 

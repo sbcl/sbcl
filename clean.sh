@@ -105,6 +105,12 @@ find . \( \
         -name '*.o' -o \
         -name '*.so' -o \
         -name '*.d' -o \
+        -name 'foo.c' -o \
+        -name 'test-output' -o \
+        -name 'test-lab' -o \
+        -name 'encodings.texi-temp' -o \
+        -name 'stack-alignment-offset' -o \
+        -name 'test-status.lisp-expr' -o \
         -name 'a.out' -o \
         -name 'sbcl' -o \
         -name 'sbcl.h' -o \
@@ -113,4 +119,4 @@ find . \( \
         -name 'tags' -o \
         -name 'test-passed' -o \
         -name 'ldso-stubs.S' -o \
-        -name 'local-target-features.lisp-expr' \) -print | xargs rm -f
+        -name 'local-target-features.lisp-expr' \) -print | xargs rm -fr
