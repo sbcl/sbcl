@@ -156,14 +156,15 @@ future versions."
 
 (defun make-timer (function &key name (thread sb!thread:*current-thread*))
   #!+sb-doc
-  "Create a timer object that's when scheduled runs FUNCTION. If
-THREAD is a thread then that thread is to be interrupted with
-FUNCTION. If THREAD is T then a new thread is created each timer
-FUNCTION is run. If THREAD is NIL then FUNCTION can be run in any
-thread. When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION
-and the ordering guarantees of INTERRUPT-THREAD also apply here.
-FUNCTION always runs with interrupts disabled but WITH-INTERRUPTS is
-allowed."
+  "Create a timer that runs FUNCTION when triggered.
+
+If a THREAD is supplied, FUNCTION is run in that thread. If THREAD is
+T, a new thread is created for FUNCTION each time the timer is
+triggered. If THREAD is NIL, FUNCTION is run in an unspecified thread.
+
+When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION and the
+ordering guarantees of INTERRUPT-THREAD apply. FUNCTION runs with
+interrupts disabled but WITH-INTERRUPTS is allowed."
   (%make-timer :name name :function function :thread thread))
 
 (defun timer-name (timer)
@@ -285,6 +286,8 @@ triggers."
     (setf (%timer-expire-time timer) nil
           (%timer-repeat-interval timer) nil)
     (let ((old-position (priority-queue-remove *schedule* timer)))
+      ;; Don't use cancel-function as the %timer-cancel-function
+      ;; may have changed before we got the scheduler lock.
       (when old-position
         (funcall (%timer-cancel-function timer)))
       (when (eql 0 old-position)
