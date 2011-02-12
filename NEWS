@@ -15,6 +15,7 @@ changes relative to sbcl-1.0.45:
   * bug fix: Solaris/x86-64 wasn't getting built with lutex support by
     mistake. (lp#667297).
   * bug fix: CONSTANTLY generated functions had bogus lambda-lists. (lp#713626)
+  * bug fix: RUN-PROGRAM :PTY option was racy on OpenBSD. (lp#669485)
 
 changes in sbcl-1.0.45 relative to sbcl-1.0.44:
   * enhancement: ~/ and ~user/ are treated specially in pathnames.

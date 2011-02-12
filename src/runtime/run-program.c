@@ -29,6 +29,10 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
+#ifdef LISP_FEATURE_OPENBSD
+/* FIXME: there has to be a better way to avoid ./util.h here */
+#include </usr/include/util.h>
+#endif
 
 /* borrowed from detachtty's detachtty.c, in turn borrowed from APUE
  * example code found at
@@ -54,6 +58,45 @@ int set_noecho(int fd)
     return 1;
 }
 
+#if defined(LISP_FEATURE_OPENBSD)
+
+int
+set_pty(char *pty_name)
+{
+    int fd;
+
+    if ((fd = open(pty_name, O_RDWR, 0)) == -1 ||
+        login_tty(fd) == -1)
+        return (0);
+    return (set_noecho(STDIN_FILENO));
+}
+
+#else /* !LISP_FEATURE_OPENBSD */
+
+int
+set_pty(char *pty_name)
+{
+    int fd;
+
+#if !defined(LISP_FEATURE_HPUX) && !defined(SVR4)
+    fd = open("/dev/tty", O_RDWR, 0);
+    if (fd >= 0) {
+        ioctl(fd, TIOCNOTTY, 0);
+        close(fd);
+    }
+#endif
+    if ((fd = open(pty_name, O_RDWR, 0)) == -1)
+        return (-1);
+    dup2(fd, 0);
+    set_noecho(0);
+    dup2(fd, 1);
+    dup2(fd, 2);
+    close(fd);
+    return (0);
+}
+
+#endif /* !LISP_FEATURE_OPENBSD */
+
 extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name, int wait)
@@ -69,7 +112,7 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
      * share stdin with our parent. In the latter case we claim
      * control of the terminal. */
     if (sin >= 0) {
-#if defined(LISP_FEATURE_HPUX)
+#if defined(LISP_FEATURE_HPUX) || defined(LISP_FEATURE_OPENBSD)
       setsid();
 #elif defined(LISP_FEATURE_DARWIN)
       setpgid(0, getpid());
@@ -87,21 +130,9 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     sigprocmask(SIG_SETMASK, &sset, NULL);
 
     /* If we are supposed to be part of some other pty, go for it. */
-    if (pty_name) {
-#if !defined(LISP_FEATURE_HPUX) && !defined(SVR4)
-        fd = open("/dev/tty", O_RDWR, 0);
-        if (fd >= 0) {
-            ioctl(fd, TIOCNOTTY, 0);
-            close(fd);
-        }
-#endif
-        fd = open(pty_name, O_RDWR, 0);
-        dup2(fd, 0);
-        set_noecho(0);
-        dup2(fd, 1);
-        dup2(fd, 2);
-        close(fd);
-    } else{
+    if (pty_name)
+        set_pty(pty_name);
+    else {
     /* Set up stdin, stdout, and stderr */
     if (sin >= 0)
         dup2(sin, 0);
