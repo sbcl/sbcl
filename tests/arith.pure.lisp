@@ -372,3 +372,35 @@
   (assert (raises-error? (expt 0.0 0.0) sb-int:arguments-out-of-domain-error))
   (assert (raises-error? (expt 0 0.0) sb-int:arguments-out-of-domain-error))
   (assert (eql (expt 0.0 0) 1.0)))
+
+(with-test (:name :multiple-constant-folding)
+  (let ((*random-state* (make-random-state t)))
+    (flet ((make-args ()
+             (let (args vars)
+               (loop repeat (1+ (random 12))
+                     do (if (zerop (random 2))
+                            (let ((var (gensym)))
+                              (push var args)
+                              (push var vars))
+                            (push (- (random 21) 10) args)))
+               (values args vars))))
+      (dolist (op '(+ * logior logxor logand logeqv gcd lcm - /))
+        (loop repeat 10
+              do (multiple-value-bind (args vars) (make-args)
+                   (let ((fast (compile nil `(lambda ,vars
+                                               (,op ,@args))))
+                         (slow (compile nil `(lambda ,vars
+                                               (declare (notinline ,op))
+                                               (,op ,@args)))))
+                     (loop repeat 3
+                           do (let* ((call-args (loop repeat (length vars)
+                                                      collect (- (random 21) 10)))
+                                     (fast-result (handler-case
+                                                      (apply fast call-args)
+                                                    (division-by-zero () :div0)))
+                                     (slow-result (handler-case
+                                                      (apply fast call-args)
+                                                    (division-by-zero () :div0))))
+                                (if (eql fast-result slow-result)
+                                    (print (list :ok `(,op ,@args) :=> fast-result))
+                                    (error "oops: ~S, ~S" args call-args)))))))))))

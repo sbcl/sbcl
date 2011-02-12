@@ -3754,34 +3754,57 @@
 ;;;; versions, and degenerate cases are flushed.
 
 ;;; Left-associate FIRST-ARG and MORE-ARGS using FUNCTION.
-(declaim (ftype (function (symbol t list) list) associate-args))
-(defun associate-args (function first-arg more-args)
+(declaim (ftype (sfunction (symbol t list t) list) associate-args))
+(defun associate-args (fun first-arg more-args identity)
   (let ((next (rest more-args))
         (arg (first more-args)))
     (if (null next)
-        `(,function ,first-arg ,arg)
-        (associate-args function `(,function ,first-arg ,arg) next))))
+        `(,fun ,first-arg ,(if arg arg identity))
+        (associate-args fun `(,fun ,first-arg ,arg) next identity))))
+
+;;; Reduce constants in ARGS list.
+(declaim (ftype (sfunction (symbol list t symbol) list) reduce-constants))
+(defun reduce-constants (fun args identity one-arg-result-type)
+  (let ((one-arg-constant-p (ecase one-arg-result-type
+                              (number #'numberp)
+                              (integer #'integerp)))
+        (reduced-value identity)
+        (reduced-p nil))
+    (collect ((not-constants))
+      (dolist (arg args)
+        (if (funcall one-arg-constant-p arg)
+            (setf reduced-value (funcall fun reduced-value arg)
+                  reduced-p t)
+            (not-constants arg)))
+      ;; It is tempting to drop constants reduced to identity here,
+      ;; but if X is SNaN in (* X 1), we cannot drop the 1.
+      (if (not-constants)
+          (if reduced-p
+              `(,reduced-value ,@(not-constants))
+              (not-constants))
+          `(,reduced-value)))))
 
 ;;; Do source transformations for transitive functions such as +.
 ;;; One-arg cases are replaced with the arg and zero arg cases with
-;;; the identity.  ONE-ARG-RESULT-TYPE is, if non-NIL, the type to
-;;; ensure (with THE) that the argument in one-argument calls is.
+;;; the identity. ONE-ARG-RESULT-TYPE is the type to ensure (with THE)
+;;; that the argument in one-argument calls is.
+(declaim (ftype (function (symbol list t &optional symbol list)
+                          (values t &optional (member nil t)))
+                source-transform-transitive))
 (defun source-transform-transitive (fun args identity
-                                    &optional one-arg-result-type)
-  (declare (symbol fun) (list args))
+                                    &optional (one-arg-result-type 'number)
+                                              (one-arg-prefixes '(values)))
   (case (length args)
     (0 identity)
-    (1 (if one-arg-result-type
-           `(values (the ,one-arg-result-type ,(first args)))
-           `(values ,(first args))))
+    (1 `(,@one-arg-prefixes (the ,one-arg-result-type ,(first args))))
     (2 (values nil t))
-    (t
-     (associate-args fun (first args) (rest args)))))
+    (t (let ((reduced-args (reduce-constants fun args identity one-arg-result-type)))
+         (associate-args fun (first reduced-args) (rest reduced-args) identity)))))
 
 (define-source-transform + (&rest args)
-  (source-transform-transitive '+ args 0 'number))
+  (source-transform-transitive '+ args 0))
 (define-source-transform * (&rest args)
-  (source-transform-transitive '* args 1 'number))
+  (source-transform-transitive '* args 1))
 (define-source-transform logior (&rest args)
   (source-transform-transitive 'logior args 0 'integer))
 (define-source-transform logxor (&rest args)
@@ -3790,41 +3813,30 @@
   (source-transform-transitive 'logand args -1 'integer))
 (define-source-transform logeqv (&rest args)
   (source-transform-transitive 'logeqv args -1 'integer))
-
-;;; Note: we can't use SOURCE-TRANSFORM-TRANSITIVE for GCD and LCM
-;;; because when they are given one argument, they return its absolute
-;;; value.
-
 (define-source-transform gcd (&rest args)
-  (case (length args)
-    (0 0)
-    (1 `(abs (the integer ,(first args))))
-    (2 (values nil t))
-    (t (associate-args 'gcd (first args) (rest args)))))
-
+  (source-transform-transitive 'gcd args 0 'integer '(abs)))
 (define-source-transform lcm (&rest args)
-  (case (length args)
-    (0 1)
-    (1 `(abs (the integer ,(first args))))
-    (2 (values nil t))
-    (t (associate-args 'lcm (first args) (rest args)))))
+  (source-transform-transitive 'lcm args 1 'integer '(abs)))
 
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.
-(declaim (ftype (function (symbol list t)
+(declaim (ftype (function (symbol symbol list t list &optional symbol)
                           (values list &optional (member nil t)))
                 source-transform-intransitive))
-(defun source-transform-intransitive (function args inverse)
+(defun source-transform-intransitive (fun fun* args identity one-arg-prefixes
+                                      &optional (one-arg-result-type 'number))
   (case (length args)
     ((0 2) (values nil t))
-    (1 `(,@inverse ,(first args)))
-    (t (associate-args function (first args) (rest args)))))
+    (1 `(,@one-arg-prefixes (the ,one-arg-result-type ,(first args))))
+    (t (let ((reduced-args
+              (reduce-constants fun* (rest args) identity one-arg-result-type)))
+         (associate-args fun (first args) reduced-args identity)))))
 
 (define-source-transform - (&rest args)
-  (source-transform-intransitive '- args '(%negate)))
+  (source-transform-intransitive '- '+ args 0 '(%negate)))
 (define-source-transform / (&rest args)
-  (source-transform-intransitive '/ args '(/ 1)))
+  (source-transform-intransitive '/ '* args 1 '(/ 1)))
 
 ;;;; transforming APPLY
 
