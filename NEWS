@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
+  * enhancement: SB-PROFILE:REPORT now supports :LIMIT and :PRINT-NO-CALL-LIST
+    arguments (lp#710017)
   * optimization: ERROR and CERROR are approximately 5 times faster.
   * optimization: optimized constructors are used for MAKE-INSTANCE of classes
     with applicable non-standard (SETF SLOT-VALUE-USING-CLASS),

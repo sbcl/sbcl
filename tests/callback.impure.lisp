@@ -1,4 +1,4 @@
-;;;; package lock tests with side effects
+;;;; callback tests with side effects
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
