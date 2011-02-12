@@ -708,19 +708,19 @@
                       ,@(loop for method in ii-after
                               collect `(invoke-method ,method .ii-args.))
                       .instance.)))
-	     (declare (dynamic-extent #'initialize-it))
+             (declare (dynamic-extent #'initialize-it))
              (let ((.ii-args.
-		    ,@(if (or ii-before ii-after ii-around si-before si-after)
-			  `((list .instance. ,@(quote-plist-keys initargs)
-				  ,@defaulting-initargs))
-			  `((list .instance.)))))
+                    ,@(if (or ii-before ii-after ii-around si-before si-after)
+                          `((list .instance. ,@(quote-plist-keys initargs)
+                                  ,@defaulting-initargs))
+                          `((list .instance.)))))
                ,(if ii-around
                     ;; If there are :AROUND methods, call them first -- they get
                     ;; the normal chaining, with #'INITIALIZE-IT standing in for
                     ;; the rest.
                     `(let ((.next-methods.
-			    (list ,@(cdr ii-around) #'initialize-it)))
-		       (declare (dynamic-extent .next-methods.))
+                            (list ,@(cdr ii-around) #'initialize-it)))
+                       (declare (dynamic-extent .next-methods.))
                        (invoke-method ,(car ii-around) .ii-args. .next-methods.))
                     ;; The simple case.
                     `(initialize-it .ii-args. nil)))))
