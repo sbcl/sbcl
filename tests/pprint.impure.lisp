@@ -269,5 +269,14 @@
                              (pprint-newline :mandatory s)))
                          n)))))
 
+(with-test (:name :can-restore-orig-pprint-dispatch-table)
+  (let* ((orig (pprint-dispatch 'some-symbol))
+         (alt (lambda (&rest args) (apply orig args))))
+    (set-pprint-dispatch 'symbol alt)
+    (assert (eq alt (pprint-dispatch 'some-symbol)))
+    (setf *print-pprint-dispatch* (copy-pprint-dispatch nil))
+    (assert (eq orig (pprint-dispatch 'some-symbol)))
+    (assert (not (eq alt orig)))))
+
 
 ;;; success

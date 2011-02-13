@@ -1591,5 +1591,6 @@ line break."
 
   (setf *standard-pprint-dispatch-table*
         (copy-pprint-dispatch *initial-pprint-dispatch-table*))
-  (setf *print-pprint-dispatch* *initial-pprint-dispatch-table*)
+  (setf *print-pprint-dispatch*
+        (copy-pprint-dispatch *initial-pprint-dispatch-table*))
   (setf *print-pretty* t))
