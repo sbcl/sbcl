@@ -33,6 +33,8 @@ changes relative to sbcl-1.0.50:
     type information associated with the VALUES form.
   * bug fix: broken warnings/errors for type-errors involving LOAD-TIME-VALUE
     forms. (lp#823014)
+  * bug fix: OPEN :IF-EXISTS :APPEND now returns correct FILE-POSITION before
+    first write (lp#561642).
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove

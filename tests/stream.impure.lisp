@@ -707,4 +707,29 @@
              (assert (eql (file-length f) 9))))
       (ignore-errors (delete-file name)))))
 
+(with-test (:name :bug-561642)
+  (let ((p "bug-561642-test.tmp"))
+    (unwind-protect
+         (progn
+           (with-open-file (f p
+                              :if-exists :supersede
+                              :if-does-not-exist :create
+                              :direction :output)
+             (write-line "FOOBAR" f))
+           (with-open-file (f p
+                              :if-exists :append
+                              :direction :output)
+             (let ((p0 (file-position f))
+                   (p1 (progn
+                         (write-char #\newline f)
+                         (file-position f)))
+                   (p2 (progn
+                         (write-char #\newline f)
+                         (finish-output f)
+                         (file-position f))))
+               (assert (eql 7 p0))
+               (assert (eql 8 p1))
+               (assert (eql 9 p2)))))
+      (ignore-errors (delete-file p)))))
+
 ;;; success

@@ -276,6 +276,7 @@ corresponds to NAME, or NIL if there is none."
   (void-syscall ("access" c-string int) path mode))
 
 ;;; values for the second argument to UNIX-LSEEK
+;;; Note that nowadays these are called SEEK_SET, SEEK_CUR, and SEEK_END
 (defconstant l_set 0) ; to set the file pointer
 (defconstant l_incr 1) ; to increment the file pointer
 (defconstant l_xtnd 2) ; to extend the file size

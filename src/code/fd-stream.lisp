@@ -2424,6 +2424,10 @@
             (cond ((numberp fd)
                    (case direction
                      ((:input :output :io)
+                      ;; For O_APPEND opened files, lseek returns 0 until first write.
+                      ;; So we jump ahead here.
+                      (when (eq if-exists :append)
+                        (sb!unix:unix-lseek fd 0 sb!unix:l_xtnd))
                       (make-fd-stream fd
                                       :input input
                                       :output output
