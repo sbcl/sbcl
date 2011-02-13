@@ -5,6 +5,9 @@ changes relative to sbcl-1.0.45:
     arguments (lp#710017)
   * enhancement: forward referenced functions no longer cause STYLE-WARNINGS
     when running under --script. (lp#677779)
+  * enhancement: SB-PCL:+SLOT-UNBOUND+ is exported, making it possible to
+    distinguish unbound instance slots when using STANDARD-INSTANCE-ACCESS
+    &co. (lp#718039)
   * optimization: ERROR and CERROR are approximately 5 times faster.
   * optimization: optimized constructors are used for MAKE-INSTANCE of classes
     with applicable non-standard (SETF SLOT-VALUE-USING-CLASS),

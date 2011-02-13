@@ -173,17 +173,20 @@
 ;;; this an interned symbol. That means that the fast check to see
 ;;; whether a slot is unbound is to say (EQ <val> '..SLOT-UNBOUND..).
 ;;; That is considerably faster than looking at the value of a special
-;;; variable. Be careful, there are places in the code which actually
-;;; use ..SLOT-UNBOUND.. rather than this variable. So much for
-;;; modularity..
+;;; variable.
 ;;;
-;;; FIXME: Now that we're tightly integrated into SBCL, we could use
-;;; the SBCL built-in unbound value token instead. Perhaps if we did
-;;; so it would be a good idea to define collections of CLOS slots as
-;;; a new type of heap object, instead of using bare SIMPLE-VECTOR, in
-;;; order to avoid problems (in the debugger if nowhere else) with
-;;; SIMPLE-VECTORs some of whose elements are unbound tokens.
-(defconstant +slot-unbound+ '..slot-unbound..)
+;;; It seems only reasonable to also export this for users, since
+;;; otherwise dealing with STANDARD-INSTANCE-ACCESS becomes harder
+;;; -- and slower -- than it needs to be.
+(defconstant +slot-unbound+ '..slot-unbound..
+  "SBCL specific extentions to MOP: if this value is read from an
+instance using STANDARD-INSTANCE-ACCESS, the slot is unbound.
+Similarly, an :INSTANCE allocated slot can be made unbound by
+assigning this to it using (SETF STANDARD-INSTANCE-ACCESS).
+
+Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
+of any particular type, but it is guaranteed to be suitable for EQ
+comparison.")
 
 (defmacro %allocate-static-slot-storage--class (no-of-slots)
   `(make-array ,no-of-slots :initial-element +slot-unbound+))

@@ -69,6 +69,8 @@ Extensions}.
 @comment  node-name,  next,  previous,  up
 @section Metaobject Protocol
 
+@subsection AMOP Compatibility of Metaobject Protocol
+
 SBCL supports a metaobject protocol which is intended to be compatible
 with AMOP; present exceptions to this (as distinct from current bugs)
 are:
@@ -217,6 +219,8 @@ states that any class found by @code{find-class}, no matter what its
 
 @end itemize
 
+@subsection Metaobject Protocol Extensions
+
 In addition, SBCL supports extensions to the Metaobject protocol from
 AMOP; at present, they are:
 
@@ -255,6 +259,15 @@ argument, the generic function associated with a method with the given
 specializer.  The system-provided methods on those methods convert
 between classes and proper names and between lists of the form
 @code{(eql @var{x})} and interned eql specializer objects.
+
+@item
+@vindex @sbpcl{+slot-unbound+}
+@findex @sbmop{standard-instance-access}
+@findex @sbmop{funcallable-standard-instance-access}
+distinguising unbound instance allocated slots from bound ones when
+using @code{standard-instance-access} and
+@code{funcallable-standard-instance-access} is possible by comparison
+to the constant @code{+slot-unbound+}.
 
 @end itemize
 
