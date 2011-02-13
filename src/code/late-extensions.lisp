@@ -344,3 +344,16 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
   (sb!c:with-source-location (source-location)
     (setf (info :source-location :variable name) source-location))
   name)
+
+;;; Needs WITH-COMPILATION-UNIT, hence not in toplevel.lisp.
+(defun load-script (pathname)
+  ;; WITH-COMPILATION-UNIT to avoid style-warnings for
+  ;; forward-referenced functions in scripts. Needs to be around
+  ;; HANDLING-END-OF-THE-WORLD so that we don't unwind from it, which
+  ;; would cause a bogus complaint about a fatal error...
+  (sb!xc:with-compilation-unit ()
+    (handling-end-of-the-world
+      (with-open-file (f pathname :element-type :default)
+        (sb!fasl::maybe-skip-shebang-line f)
+        (load f :verbose nil :print nil))
+      (quit))))

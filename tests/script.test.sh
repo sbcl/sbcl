@@ -31,6 +31,12 @@ echo 'nil'> $tmpscript
 run_sbcl --script $tmpscript
 check_status_maybe_lose "--script exit status from normal exit" $? 0 "(everything ok)"
 
+echo '(setf *error-output* *standard-output*) (defun foo () (bar)) (defun bar () 11) (quit :unix-status (foo))'> $tmpscript
+out=`run_sbcl --script $tmpscript`
+check_status_maybe_lose "--script exit status from normal exit" $? 11 "(everything ok)"
+test -z "$out"
+check_status_maybe_lose "--script forward-referenced functions" $? 0 "(everything ok)"
+
 rm -f $tmpscript
 
 exit $EXIT_TEST_WIN
