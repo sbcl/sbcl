@@ -15,6 +15,8 @@ changes relative to sbcl-1.0.45:
     up instance creation in those cases.
   * optimization: arithmetic operations with multiple constant arguments in now
     have them reduced at compile-time. (lp#676414)
+  * optimization: determining current character position on string-streams for
+    pretty-printing was overly slow.
   * bug fix: local tail calls to DYNAMIC-EXTENT functions can no longer cause
     lifetime analysis to overwrite closed-over variables (lp#681092).
   * bug fix: encoding errors from some multibyte external formats such as EUC-JP
