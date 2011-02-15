@@ -159,6 +159,7 @@
 
 ;;;; Printing waitqueues
 
+#+sb-thread
 (with-test (:name :waitqueue-circle-print)
   (let* ((*print-circle* nil)
          (lock (sb-thread:make-mutex))
