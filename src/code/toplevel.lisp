@@ -292,6 +292,14 @@ any non-negative real number."
       (dolist (option options)
         (process-1 option)))))
 
+(defun process-script (script)
+  (let ((pathname (native-pathname script)))
+    (handling-end-of-the-world
+      (with-open-file (f pathname :element-type :default)
+        (sb!fasl::maybe-skip-shebang-line f)
+        (load f :verbose nil :print nil)
+        (quit)))))
+
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
 ;; go into the Lisp debugger would get into various annoying issues of
@@ -438,7 +446,7 @@ any non-negative real number."
               (process-init-file userinit :user))
             (process-eval/load-options (nreverse reversed-options))
             (when script
-              (load-script (native-pathname script))
+              (process-script script)
               (bug "PROCESS-SCRIPT returned")))
         (abort ()
           :report (lambda (s)

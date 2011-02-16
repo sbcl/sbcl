@@ -3,8 +3,6 @@ changes relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
   * enhancement: SB-PROFILE:REPORT now supports :LIMIT and :PRINT-NO-CALL-LIST
     arguments (lp#710017)
-  * enhancement: forward referenced functions no longer cause STYLE-WARNINGS
-    when running under --script. (lp#677779)
   * enhancement: SB-PCL:+SLOT-UNBOUND+ is exported, making it possible to
     distinguish unbound instance slots when using STANDARD-INSTANCE-ACCESS
     &co. (lp#718039)
