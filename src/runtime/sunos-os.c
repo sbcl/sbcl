@@ -26,91 +26,28 @@
 #include "gencgc-internal.h"
 #endif
 
-#if defined LISP_FEATURE_SPARC
-#define OS_VM_DEFAULT_PAGESIZE 8192
-#elif defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
-#define OS_VM_DEFAULT_PAGESIZE 4096
-#else
-#error "Don't know OS_VM_DEFAULT_PAGESIZE"
-#endif
-
-long os_vm_page_size=(-1);
-static long os_real_page_size=(-1);
-
-static os_vm_size_t real_page_size_difference=0;
-
-/* So, this sucks. Versions of Solaris prior to 8 (SunOS releases
-   earlier than 5.8) do not support MAP_ANON passed as a flag to
-   mmap(). However, we would like SBCL compiled on SunOS 5.7 but
-   running on 5.8 to use MAP_ANON, but because of C's lack of
-   introspection at runtime, we can't grab the right value because
-   it's stuffed in a header file somewhere. We can, however, hardcode
-   it, and test at runtime for whether to use it... -- CSR, 2002-05-06
-
-   And, in fact, it sucks slightly more, as if you don't use MAP_ANON
-   you need to have /dev/zero open and pass the file descriptor to
-   mmap().  So overall, this counts as a KLUDGE. -- CSR, 2002-05-20 */
-int KLUDGE_MAYBE_MAP_ANON = 0x0;
-int kludge_mmap_fd = -1; /* default for MAP_ANON */
+os_vm_size_t os_vm_page_size=0;
 
 void
 os_init(char *argv[], char *envp[])
 {
-    struct utsname name;
-    int major_version;
-    int minor_version;
-
-    uname(&name);
-    major_version = atoi(name.release);
-    if (major_version != 5) {
-        lose("sunos major version=%d (which isn't 5!)\n", major_version);
-    }
-    minor_version = atoi(name.release+2);
-    if ((minor_version < 8)) {
-        kludge_mmap_fd = open("/dev/zero",O_RDONLY);
-        if (kludge_mmap_fd < 0) {
-            perror("open");
-            lose("Error in open(..)\n");
-        }
-    } else if (minor_version > 11) {
-        FSHOW((stderr, "os_init: Solaris version greater than 11?\nUnknown MAP_ANON behaviour.\n"));
-        lose("Unknown mmap() interaction with MAP_ANON\n");
-    } else {
-        /* Versions 8-11*/
-        KLUDGE_MAYBE_MAP_ANON = 0x100;
-    }
-
-    /* I do not understand this at all. FIXME. */
-    os_vm_page_size = os_real_page_size = sysconf(_SC_PAGESIZE);
-
-    if(os_vm_page_size>OS_VM_DEFAULT_PAGESIZE){
-        fprintf(stderr,"os_init: Pagesize too large (%d > %d)\n",
-                os_vm_page_size,OS_VM_DEFAULT_PAGESIZE);
-        exit(1);
-    } else {
-        /*
-         * we do this because there are apparently dependencies on
-         * the pagesize being OS_VM_DEFAULT_PAGESIZE somewhere...
-         * but since the OS doesn't know we're using this restriction,
-         * we have to grovel around a bit to enforce it, thus anything
-         * that uses real_page_size_difference.
-         */
-        /* FIXME: Is this still true? */
-        real_page_size_difference=OS_VM_DEFAULT_PAGESIZE-os_vm_page_size;
-        os_vm_page_size=OS_VM_DEFAULT_PAGESIZE;
-    }
+    /*
+     * historically, this used sysconf to select the runtime page size
+     * per recent changes on other arches and discussion on sbcl-devel,
+     * however, this is not necessary -- the VM page size need not match
+     * the OS page size (and the default backend page size has been
+     * ramped up accordingly for efficiency reasons).
+     */
+    os_vm_page_size = BACKEND_PAGE_BYTES;
 }
 
 os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len)
 {
-    int flags = MAP_PRIVATE | MAP_NORESERVE | KLUDGE_MAYBE_MAP_ANON;
+    int flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANON;
     if (addr)
         flags |= MAP_FIXED;
 
-    addr = mmap(addr, len,
-                OS_VM_PROT_ALL,
-                flags,
-                kludge_mmap_fd, 0);
+    addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
 
     if (addr == MAP_FAILED) {
         perror("mmap");
