@@ -4487,6 +4487,10 @@ gc_init(void)
     page_table_pages = dynamic_space_size/PAGE_BYTES;
     gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
 
+    /* The page_table must be allocated using "calloc" to initialize
+     * the page structures correctly. There used to be a separate
+     * initialization loop (now commented out; see below) but that was
+     * unnecessary and did hurt startup time. */
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
@@ -4502,14 +4506,38 @@ gc_init(void)
 
     heap_base = (void*)DYNAMIC_SPACE_START;
 
-    /* Initialize each page structure. */
-    for (i = 0; i < page_table_pages; i++) {
-        /* Initialize all pages as free. */
-        page_table[i].allocated = FREE_PAGE_FLAG;
-        page_table[i].bytes_used = 0;
-
-        /* Pages are not write-protected at startup. */
-        page_table[i].write_protected = 0;
+    /* The page structures are initialized implicitly when page_table
+     * is allocated with "calloc" above. Formerly we had the following
+     * explicit initialization here (comments converted to C99 style
+     * for readability as C's block comments don't nest):
+     *
+     * // Initialize each page structure.
+     * for (i = 0; i < page_table_pages; i++) {
+     *     // Initialize all pages as free.
+     *     page_table[i].allocated = FREE_PAGE_FLAG;
+     *     page_table[i].bytes_used = 0;
+     *
+     *     // Pages are not write-protected at startup.
+     *     page_table[i].write_protected = 0;
+     * }
+     *
+     * Without this loop the image starts up much faster when dynamic
+     * space is large -- which it is on 64-bit platforms already by
+     * default -- and when "calloc" for large arrays is implemented
+     * using copy-on-write of a page of zeroes -- which it is at least
+     * on Linux. In this case the pages that page_table_pages is stored
+     * in are mapped and cleared not before the corresponding part of
+     * dynamic space is used. For example, this saves clearing 16 MB of
+     * memory at startup if the page size is 4 KB and the size of
+     * dynamic space is 4 GB.
+     * FREE_PAGE_FLAG must be 0 for this to work correctly which is
+     * asserted below: */
+    {
+      /* Compile time assertion: If triggered, declares an array
+       * of dimension -1 forcing a syntax error. The intent of the
+       * assignment is to avoid an "unused variable" warning. */
+      char assert_free_page_flag_0[(FREE_PAGE_FLAG) ? -1 : 1];
+      assert_free_page_flag_0[0] = assert_free_page_flag_0[0];
     }
 
     bytes_allocated = 0;
