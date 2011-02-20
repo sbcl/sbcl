@@ -297,7 +297,10 @@ any non-negative real number."
     (handling-end-of-the-world
       (with-open-file (f pathname :element-type :default)
         (sb!fasl::maybe-skip-shebang-line f)
-        (load f :verbose nil :print nil)
+        ;; Scripts don't need to be stylish or fast, but silence is usually a
+        ;; desirable quality...
+        (handler-bind (((or style-warning compiler-note) #'muffle-warning))
+          (load f :verbose nil :print nil))
         (quit)))))
 
 ;; Errors while processing the command line cause the system to QUIT,
