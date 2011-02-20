@@ -1571,9 +1571,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 
 ;;; FIXME: need to support (VECTOR NIL), ideally without destroying all hope
 ;;; of efficiency.
+(declaim (inline vector-with-fill-pointer))
+(defun vector-with-fill-pointer-p (x)
+  (and (vectorp x)
+       (array-has-fill-pointer-p x)))
+
 (deftype string-with-fill-pointer ()
-  '(and (or (vector character) (vector base-char))
-        (satisfies array-has-fill-pointer-p)))
+  `(and (or (vector character) (vector base-char))
+        (satisfies vector-with-fill-pointer-p)))
 
 (defstruct (fill-pointer-output-stream
             (:include ansi-stream
