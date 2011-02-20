@@ -501,4 +501,12 @@
                             (write-to-string *print-length* :length nil))))))
     (assert (equal "42" (funcall test)))))
 
+(with-test (:name (:format :compile-literal-dest-string))
+  (assert (eq :warned
+              (handler-case
+                  (compile nil
+                           `(lambda (x) (format "~A" x)))
+                ((and warning (not style-warning)) ()
+                  :warned)))))
+
 ;;; success
