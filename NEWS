@@ -2,6 +2,7 @@
 changes relative to sbcl-1.0.46:
   * enhancement: --script muffles style-warnings and compiler notes. (lp#677779)
   * enhancement: redefinition warnings for macros from different files. (lp#434657)
+  * enhancement: better MACHINE-VERSION on Darwin x86 and x86-64. (lp#668332)
   * bug fix: SB-DEBUG:BACKTRACE-AS-LIST guards against potentially leaking
     stack-allocated values out of their dynamic-extent. (lp#310175)
   * bug fix: attempts to use SB-SPROF for wallclock profiling on threaded

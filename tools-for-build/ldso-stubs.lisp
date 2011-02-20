@@ -332,6 +332,8 @@ ldso_stub__ ## fct: ;                  \\
                    "dlsym")
                  #!+bsd
                  '("sysctl")
+                 #!+darwin
+                 '("sysctlbyname")
                  #!+os-provides-dladdr
                  '("dladdr")
                  #!-sunos ;; !defined(SVR4)

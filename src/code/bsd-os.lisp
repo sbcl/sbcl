@@ -20,6 +20,14 @@
   (newp (* t))
   (newlen sb!unix:size-t))
 
+#!+darwin
+(define-alien-routine ("sysctlbyname" %sysctlbyname) int
+  (name c-string)
+  (oldp (* t))
+  (oldlenp (* sb!unix:size-t))
+  (newp (* t))
+  (newlen sb!unix:size-t))
+
 (defun sysctl (type &rest name)
   #!+sb-doc
   "Retrieves an integer or string value with the given name."
@@ -45,6 +53,25 @@
                                   result (addr result-len) nil 0))
                  (free-alien result)
                  (sb!unix::newcharstar-string result)))))))))
+
+#!+darwin
+(defun sysctlbyname (type name)
+  #!+sb-doc
+  "Retrieves an integer or string value with the given name."
+  (with-alien ((result-len sb!unix:size-t))
+    (ecase type
+      (:int
+       (with-alien ((result int))
+         (setf result-len (alien-size int :bytes))
+         (unless (minusp (%sysctlbyname name (addr result)
+                                        (addr result-len) nil 0))
+           result)))
+      (:str
+       (unless (minusp (%sysctlbyname name nil (addr result-len) nil 0))
+         (with-alien ((result (* char) (make-alien char result-len)))
+           (if (minusp (%sysctlbyname name result (addr result-len) nil 0))
+               (free-alien result)
+               (sb!unix::newcharstar-string result))))))))
 
 (defun software-type ()
   #!+sb-doc
@@ -76,7 +103,5 @@
 
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
-  ;; FIXME: on Darwin we would prefer machdep.cpu.brand_string -- but I can't
-  ;; seem to grab it using sysctl() -- but the shell tool finds it. When
-  ;; someone has the time, check out how Darwin shell sysctl does it.
-  (sysctl :str ctl-hw hw-model))
+  (or #!+darwin (sysctlbyname :str "machdep.cpu.brand_string")
+      (sysctl :str ctl-hw hw-model)))
