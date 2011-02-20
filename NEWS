@@ -10,6 +10,8 @@ changes relative to sbcl-1.0.46:
     x86-64 builds caused a type-error.
   * bug fix: calling COMPILE with something else than a lambda-expression as the
     second argument reports a more sensible error. (lp#718905)
+  * bug fix: invalid combinations of :PREDICATE and :TYPE options in DEFSTRUCT
+    are detected. (lp#520607)
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

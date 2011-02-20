@@ -615,11 +615,14 @@
 (defun parse-defstruct-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
     (aver name) ; A null name doesn't seem to make sense here.
-    (let ((dd (make-defstruct-description name)))
+    (let ((dd (make-defstruct-description name))
+          (predicate-named-p nil))
       (dolist (option options)
         (cond ((eq option :named)
                (setf (dd-named dd) t))
               ((consp option)
+               (when (and (eq (car option) :predicate) (second option))
+                 (setf predicate-named-p t))
                (parse-1-dd-option option dd))
               ((member option '(:conc-name :constructor :copier :predicate))
                (parse-1-dd-option (list option) dd))
@@ -639,6 +642,9 @@
            ;; make that messy, alas.)
            (incf (dd-length dd))))
         (t
+         ;; In case we are here, :TYPE is specified.
+         (when (and predicate-named-p (not (dd-named dd)))
+           (error ":PREDICATE cannot be used with :TYPE unless :NAMED is also specified."))
          (require-no-print-options-so-far dd)
          (when (dd-named dd)
            (incf (dd-length dd)))

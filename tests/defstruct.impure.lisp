@@ -1071,3 +1071,15 @@ redefinition."
     (handler-bind ((style-warning #'error))
       (eval `(defstruct (bug-528807 (:constructor make-528807 (&aux x)))
                (x nil :type fixnum))))))
+
+(with-test (:name :bug-520607)
+  (assert
+    (raises-error?
+      (eval '(defstruct (typed-struct (:type list) (:predicate typed-struct-p))
+              (a 42 :type fixnum)))))
+  ;; NIL is ok, though.
+  (eval '(defstruct (typed-struct (:type list) (:predicate nil))
+          (a 42 :type fixnum)))
+  ;; So's empty.
+  (eval '(defstruct (typed-struct2 (:type list) (:predicate))
+          (a 42 :type fixnum))))
