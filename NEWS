@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.45:
+changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
   * enhancement: SB-PROFILE:REPORT now supports :LIMIT and :PRINT-NO-CALL-LIST
     arguments (lp#710017)
