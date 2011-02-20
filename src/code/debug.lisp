@@ -198,16 +198,42 @@ is how many frames to show."
   (values))
 
 (defun backtrace-as-list (&optional (count most-positive-fixnum))
-  #!+sb-doc "Return a list representing the current BACKTRACE."
+  #!+sb-doc
+  "Return a list representing the current BACKTRACE.
+
+Objects in the backtrace with dynamic-extent allocation by the current
+thread are represented by substitutes to avoid references to them from
+leaking outside their legal extent."
   (let ((reversed-result (list)))
     (map-backtrace (lambda (frame)
-                     (push (frame-call-as-list frame) reversed-result))
+                     (let ((frame-list (frame-call-as-list frame)))
+                       (if (listp (cdr frame-list))
+                           (push (mapcar #'replace-dynamic-extent-object frame-list)
+                                 reversed-result)
+                           (push frame-list reversed-result))))
                    :count count)
     (nreverse reversed-result)))
 
 (defun frame-call-as-list (frame)
   (multiple-value-bind (name args) (frame-call frame)
     (cons name args)))
+
+(defun replace-dynamic-extent-object (obj)
+  (if (stack-allocated-p obj)
+      (make-unprintable-object
+       (handler-case
+           (format nil "dynamic-extent: ~S" obj)
+         (error ()
+           "error printing dynamic-extent object")))
+      obj))
+
+(defun stack-allocated-p (obj)
+  "Returns T if OBJ is allocated on the stack of the current
+thread, NIL otherwise."
+  (with-pinned-objects (obj)
+    (let ((sap (int-sap (get-lisp-obj-address obj))))
+      (when (sb!vm:control-stack-pointer-valid-p sap nil)
+        t))))
 
 ;;;; frame printing
 

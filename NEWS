@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.46:
+  * bug fix: SB-DEBUG:BACKTRACE-AS-LIST guards against potentially leaking
+    stack-allocated values out of their dynamic-extent. (lp#310175)
+
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
   * enhancement: SB-PROFILE:REPORT now supports :LIMIT and :PRINT-NO-CALL-LIST

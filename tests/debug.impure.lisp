@@ -469,6 +469,20 @@
     (load (compile-file "bug-414.lisp"))
     (disassemble 'bug-414)))
 
+(with-test (:name :bug-310175)
+  (let ((dx-arg (cons t t)))
+    (declare (dynamic-extent dx-arg))
+    (flet ((dx-arg-backtrace (x)
+             (declare (optimize (debug 2)))
+             (prog1 (sb-debug:backtrace-as-list 10)
+               (assert (sb-debug::stack-allocated-p x)))))
+      (declare (notinline dx-arg-backtrace))
+      (assert (member-if (lambda (frame)
+                           (and (consp frame)
+                                (equal '(flet dx-arg-backtrace) (car frame))
+                                (notany #'sb-debug::stack-allocated-p (cdr frame))))
+                         (dx-arg-backtrace dx-arg))))))
+
 ;;;; test infinite error protection
 
 (defmacro nest-errors (n-levels error-form)
