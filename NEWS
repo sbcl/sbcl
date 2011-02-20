@@ -7,6 +7,8 @@ changes relative to sbcl-1.0.46:
     stack-allocated values out of their dynamic-extent. (lp#310175)
   * bug fix: attempts to use SB-SPROF for wallclock profiling on threaded
     x86-64 builds caused a type-error.
+  * bug fix: calling COMPILE with something else than a lambda-expression as the
+    second argument reports a more sensible error. (lp#718905)
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

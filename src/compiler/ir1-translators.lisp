@@ -473,14 +473,17 @@ Return VALUE without evaluating it."
 
 ;;;; FUNCTION and NAMED-LAMBDA
 (defun name-lambdalike (thing)
-  (ecase (car thing)
+  (case (car thing)
     ((named-lambda)
      (or (second thing)
          `(lambda ,(third thing))))
     ((lambda instance-lambda)
      `(lambda ,(second thing)))
     ((lambda-with-lexenv)
-     `(lambda ,(fifth thing)))))
+     `(lambda ,(fifth thing)))
+    (otherwise
+     (compiler-error "Not a valid lambda expression:~%  ~S"
+                     thing))))
 
 (defun fun-name-leaf (thing)
   (if (consp thing)
