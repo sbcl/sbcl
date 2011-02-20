@@ -89,7 +89,10 @@
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
-         (cell (find-slot-cell wrapper slot-name))
+         (cell (or (find-slot-cell wrapper slot-name)
+                   (return-from slot-value
+                     (values (slot-missing (wrapper-class* wrapper) object slot-name
+                                           'slot-value)))))
          (location (car cell))
          (value
           (cond ((fixnump location)
@@ -98,13 +101,9 @@
                      (funcallable-standard-instance-access object location)))
                 ((consp location)
                  (cdr location))
-                ((not cell)
-                 (return-from slot-value
-                   (values (slot-missing (wrapper-class* wrapper) object slot-name
-                                         'slot-value))))
                 ((not location)
                  (return-from slot-value
-                   (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))))
+                   (funcall (slot-info-reader (cdr cell)) object)))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (if (eq +slot-unbound+ value)
@@ -122,11 +121,15 @@
 
 (defun set-slot-value (object slot-name new-value)
   (let* ((wrapper (valid-wrapper-of object))
-         (cell (find-slot-cell wrapper slot-name))
+         (cell (or (find-slot-cell wrapper slot-name)
+                   (return-from set-slot-value
+                     (values (slot-missing (wrapper-class* wrapper) object slot-name
+                                           'setf new-value)))))
          (location (car cell))
-         (type-check-function (cadr cell)))
-    (when type-check-function
-      (funcall (the function type-check-function) new-value))
+         (info (cdr cell))
+         (typecheck (slot-info-typecheck info)))
+    (when typecheck
+      (funcall typecheck new-value))
     (cond ((fixnump location)
            (if (std-instance-p object)
                (setf (standard-instance-access object location) new-value)
@@ -134,11 +137,8 @@
                      new-value)))
           ((consp location)
            (setf (cdr location) new-value))
-          ((not cell)
-           (slot-missing (wrapper-class* wrapper) object slot-name 'setf new-value))
           ((not location)
-           (setf (slot-value-using-class (wrapper-class* wrapper) object (cddr cell))
-                 new-value))
+           (funcall (slot-info-writer info) new-value object))
           (t
            (bug "Bogus slot-cell in SET-SLOT-VALUE: ~S" cell))))
   new-value)
@@ -167,7 +167,11 @@
 
 (defun slot-boundp (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
-         (cell (find-slot-cell wrapper slot-name))
+         (cell (or (find-slot-cell wrapper slot-name)
+                   (return-from slot-boundp
+                     (and (slot-missing (wrapper-class* wrapper) object slot-name
+                                        'slot-boundp)
+                          t))))
          (location (car cell))
          (value
           (cond ((fixnump location)
@@ -176,14 +180,9 @@
                      (funcallable-standard-instance-access object location)))
                 ((consp location)
                  (cdr location))
-                ((not cell)
-                 (return-from slot-boundp
-                   (and (slot-missing (wrapper-class* wrapper) object slot-name
-                                      'slot-boundp)
-                        t)))
                 ((not location)
                  (return-from slot-boundp
-                   (slot-boundp-using-class (wrapper-class* wrapper) object (cddr cell))))
+                   (funcall (slot-info-boundp (cdr cell)) object)))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (not (eq +slot-unbound+ value))))
@@ -209,7 +208,8 @@
           ((not cell)
            (slot-missing (wrapper-class* wrapper) object slot-name 'slot-makunbound))
           ((not location)
-           (slot-makunbound-using-class (wrapper-class* wrapper) object (cddr cell)))
+           (let ((class (wrapper-class* wrapper)))
+             (slot-makunbound-using-class class object (find-slot-definition class slot-name))))
           (t
            (bug "Bogus slot-cell in SLOT-MAKUNBOUND: ~S" cell))))
   object)
@@ -262,29 +262,27 @@
   ;; FIXME: Do we need this? SET-SLOT-VALUE checks for obsolete
   ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
-  (let ((location (slot-definition-location slotd))
-        (type-check-function
-         (when (safe-p class)
-           (slot-definition-type-check-function slotd))))
-    (flet ((check (new-value)
-             (when type-check-function
-               (funcall (the function type-check-function) new-value))
-             new-value))
-      (typecase location
-        (fixnum
-         (cond ((std-instance-p object)
-                (setf (clos-slots-ref (std-instance-slots object) location)
-                      (check new-value)))
-               ((fsc-instance-p object)
-                (setf (clos-slots-ref (fsc-instance-slots object) location)
-                      (check new-value)))
-                (t (bug "unrecognized instance type in ~S"
-                        '(setf slot-value-using-class)))))
-        (cons
-         (setf (cdr location) (check new-value)))
-        (t
-         (instance-structure-protocol-error
-          slotd '(setf slot-value-using-class)))))))
+  (let* ((info (slot-definition-info slotd))
+         (location (slot-definition-location slotd))
+         (typecheck (slot-info-typecheck info))
+         (new-value (if typecheck
+                        (funcall (the function typecheck) new-value)
+                        new-value)))
+    (typecase location
+      (fixnum
+       (cond ((std-instance-p object)
+              (setf (clos-slots-ref (std-instance-slots object) location)
+                    new-value))
+             ((fsc-instance-p object)
+              (setf (clos-slots-ref (fsc-instance-slots object) location)
+                    new-value))
+             (t (bug "unrecognized instance type in ~S"
+                     '(setf slot-value-using-class)))))
+      (cons
+       (setf (cdr location) new-value))
+      (t
+       (instance-structure-protocol-error
+        slotd '(setf slot-value-using-class))))))
 
 (defmethod slot-boundp-using-class
            ((class std-class)
@@ -339,8 +337,7 @@
     ((class condition-class)
      (object condition)
      (slotd condition-effective-slot-definition))
-  (let ((fun (slot-definition-reader-function slotd)))
-    (declare (type function fun))
+  (let ((fun (slot-info-reader (slot-definition-info slotd))))
     (funcall fun object)))
 
 (defmethod (setf slot-value-using-class)
@@ -348,16 +345,14 @@
      (class condition-class)
      (object condition)
      (slotd condition-effective-slot-definition))
-  (let ((fun (slot-definition-writer-function slotd)))
-    (declare (type function fun))
+  (let ((fun (slot-info-writer (slot-definition-info slotd))))
     (funcall fun new-value object)))
 
 (defmethod slot-boundp-using-class
     ((class condition-class)
      (object condition)
      (slotd condition-effective-slot-definition))
-  (let ((fun (slot-definition-boundp-function slotd)))
-    (declare (type function fun))
+  (let ((fun (slot-info-boundp (slot-definition-info slotd))))
     (funcall fun object)))
 
 (defmethod slot-makunbound-using-class ((class condition-class) object slot)
@@ -430,7 +425,7 @@
     instance
     (etypecase position
       (fixnum
-       (nth position (wrapper-instance-slots-layout (wrapper-of instance))))
+       (car (nth position (wrapper-instance-slots-layout (wrapper-of instance)))))
       (cons
        (car position))))))
 

@@ -113,8 +113,6 @@
 
 (defgeneric short-combination-operator (short-method-combination))
 
-(defgeneric slot-definition-boundp-function (effective-slot-definition))
-
 (defgeneric slot-definition-class (slot-definition))
 
 (defgeneric slot-definition-defstruct-accessor-symbol
@@ -136,13 +134,11 @@
 
 (defgeneric slot-definition-name (slot-definition))
 
-(defgeneric slot-definition-reader-function (effective-slot-definition))
+(defgeneric slot-definition-info (effective-slot-definition))
 
 (defgeneric slot-definition-readers (slot-definition))
 
 (defgeneric slot-definition-type (slot-definition))
-
-(defgeneric slot-definition-writer-function (effective-slot-definition))
 
 (defgeneric slot-definition-writers (slot-definition))
 
@@ -190,9 +186,6 @@
 (defgeneric (setf slot-definition-allocation) (new-value
                                                standard-slot-definition))
 
-(defgeneric (setf slot-definition-boundp-function)
-  (new-value effective-slot-definition))
-
 (defgeneric (setf slot-definition-class) (new-value slot-definition))
 
 (defgeneric (setf slot-definition-defstruct-accessor-symbol)
@@ -215,8 +208,7 @@
 
 (defgeneric (setf slot-definition-name) (new-value slot-definition))
 
-(defgeneric (setf slot-definition-reader-function) (new-value
-                                                    effective-slot-definition))
+(defgeneric (setf slot-definition-info) (new-value effective-slot-definition))
 
 (defgeneric (setf slot-definition-readers) (new-value slot-definition))
 

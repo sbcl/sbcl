@@ -375,7 +375,7 @@
                (defclass clos-typecheck-test ()
                  ((slot :type fixnum)))
                (setf (slot-value (make-instance 'clos-typecheck-test) 'slot) t))))
-    '(((sb-pcl::slot-typecheck clos-typecheck-test slot) t)))))
+    '(((sb-pcl::slot-typecheck fixnum) t)))))
 
 (with-test (:name :clos-emf-named)
   (assert

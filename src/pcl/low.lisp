@@ -351,6 +351,12 @@ comparison.")
                        (member (dsd-name included-slot) slot-overrides :test #'eq))
               collect slot)))))
 
+(defun uninitialized-accessor-function (type slotd)
+  (lambda (&rest args)
+    (declare (ignore args))
+    (error "~:(~A~) function~@[ for ~S ~] not yet initialized."
+           type slotd)))
+
 (defun structure-slotd-name (slotd)
   (dsd-name slotd))
 
@@ -358,13 +364,19 @@ comparison.")
   (dsd-accessor-name slotd))
 
 (defun structure-slotd-reader-function (slotd)
-  (fdefinition (dsd-accessor-name slotd)))
+  (let ((name (dsd-accessor-name slotd)))
+    (if (fboundp name)
+        (fdefinition name)
+        (uninitialized-accessor-function :reader slotd))))
 
 (defun structure-slotd-writer-function (type slotd)
   (if (dsd-read-only slotd)
       (let ((dd (find-defstruct-description type)))
         (coerce (slot-setter-lambda-form dd slotd) 'function))
-      (fdefinition `(setf ,(dsd-accessor-name slotd)))))
+      (let ((name `(setf ,(dsd-accessor-name slotd))))
+        (if (fboundp name)
+            (fdefinition name)
+            (uninitialized-accessor-function :writer slotd)))))
 
 (defun structure-slotd-type (slotd)
   (dsd-type slotd))

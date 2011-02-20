@@ -554,7 +554,6 @@
                        (warn "~@<Invalid qualifiers for ~S method combination ~
                               in method ~S:~2I~_~S.~@:>"
                              mc-name method qualifiers))))))
-
               (unless skip-dfun-update-p
                 (update-ctors 'add-method
                               :generic-function generic-function
@@ -1542,15 +1541,15 @@
 
 (defun slot-value-using-class-dfun (class object slotd)
   (declare (ignore class))
-  (function-funcall (slot-definition-reader-function slotd) object))
+  (funcall (slot-info-reader (slot-definition-info slotd)) object))
 
 (defun setf-slot-value-using-class-dfun (new-value class object slotd)
   (declare (ignore class))
-  (function-funcall (slot-definition-writer-function slotd) new-value object))
+  (funcall (slot-info-writer (slot-definition-info slotd)) new-value object))
 
 (defun slot-boundp-using-class-dfun (class object slotd)
   (declare (ignore class))
-  (function-funcall (slot-definition-boundp-function slotd) object))
+  (funcall (slot-info-boundp (slot-definition-info slotd)) object))
 
 (defun special-case-for-compute-discriminating-function-p (gf)
   (or (eq gf #'slot-value-using-class)

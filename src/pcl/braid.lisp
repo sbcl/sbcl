@@ -188,7 +188,10 @@
 
               (when (typep wrapper 'wrapper)
                 (setf (wrapper-instance-slots-layout wrapper)
-                      (mapcar #'canonical-slot-name slots))
+                      (mapcar (lambda (slotd)
+                                ;; T is the slot-definition-type.
+                                (cons (canonical-slot-name slotd) t))
+                              slots))
                 (setf (wrapper-class-slots wrapper)
                       ()))
 
@@ -367,19 +370,20 @@
       (set-val 'writers      (get-val :writers))
       (set-val 'allocation   :instance)
       (set-val '%type        (or (get-val :type) t))
-      (set-val '%type-check-function (get-val 'type-check-function))
       (set-val '%documentation (or (get-val :documentation) ""))
       (set-val '%class   class)
       (when effective-p
         (set-val 'location index)
-        (let ((fsc-p nil))
-          (set-val 'reader-function (make-optimized-std-reader-method-function
-                                     fsc-p nil slot-name index))
-          (set-val 'writer-function (make-optimized-std-writer-method-function
-                                     fsc-p nil slot-name index))
-          (set-val 'boundp-function (make-optimized-std-boundp-method-function
-                                     fsc-p nil slot-name index)))
-        (set-val 'accessor-flags 7))
+        (set-val 'accessor-flags 7)
+        (set-val
+         'info
+         (make-slot-info
+          :reader
+          (make-optimized-std-reader-method-function nil nil slot-name index)
+          :writer
+          (make-optimized-std-writer-method-function nil nil slot-name index)
+          :boundp
+          (make-optimized-std-boundp-method-function nil nil slot-name index))))
       (when (and (eq name 'standard-class)
                  (eq slot-name 'slots) effective-p)
         (setq *the-eslotd-standard-class-slots* slotd))
@@ -545,11 +549,8 @@
          (let ((accessor (structure-slotd-accessor-symbol slotd)))
            `(:name ,(structure-slotd-name slotd)
              :defstruct-accessor-symbol ,accessor
-             ,@(when (fboundp accessor)
-                 `(:internal-reader-function
-                   ,(structure-slotd-reader-function slotd)
-                   :internal-writer-function
-                   ,(structure-slotd-writer-function name slotd)))
+             :internal-reader-function ,(structure-slotd-reader-function slotd)
+             :internal-writer-function ,(structure-slotd-writer-function name slotd)
              :type ,(or (structure-slotd-type slotd) t)
              :initform ,(structure-slotd-init-form slotd)
              :initfunction ,(eval-form (structure-slotd-init-form slotd)))))

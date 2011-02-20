@@ -231,18 +231,8 @@
             ((null head))
           (unless (cdr (second head))
             (setf (second head) (car (second head)))))
-        (let* ((type-check-function
-                (if (eq type t)
-                    nil
-                    `('type-check-function
-                      (named-lambda (slot-typecheck ,class-name ,name) (value)
-                        (declare (type ,type value)
-                                 (optimize (sb-c:store-coverage-data 0)))
-                        value))))
-               (canon `(:name ',name :readers ',readers :writers ',writers
-                              :initargs ',initargs
-                              ,@type-check-function
-                              ',others)))
+        (let ((canon `(:name ',name :readers ',readers :writers ',writers
+                             :initargs ',initargs ',others)))
           (push (if (eq initform unsupplied)
                     `(list* ,@canon)
                     `(list* :initfunction ,(make-initfunction initform)
@@ -470,6 +460,9 @@
 
 (defun early-slot-definition-location (slotd)
   (!bootstrap-get-slot 'standard-effective-slot-definition slotd 'location))
+
+(defun early-slot-definition-info (slotd)
+  (!bootstrap-get-slot 'standard-effective-slot-definition slotd 'info))
 
 (defun early-accessor-method-slot-name (method)
   (!bootstrap-get-slot 'standard-accessor-method method 'slot-name))

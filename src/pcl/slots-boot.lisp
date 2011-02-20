@@ -141,10 +141,11 @@
        (writer (slot-definition-internal-writer-function slotd))
        (boundp (make-structure-slot-boundp-function slotd))))
     ((condition-class-p class)
-     (ecase name
-       (reader (slot-definition-reader-function slotd))
-       (writer (slot-definition-writer-function slotd))
-       (boundp (slot-definition-boundp-function slotd))))
+     (let ((info (slot-definition-info slotd)))
+       (ecase name
+         (reader (slot-info-reader info))
+         (writer (slot-info-writer info))
+         (boundp (slot-info-boundp info)))))
     (t
      (let* ((fsc-p (cond ((standard-class-p class) nil)
                          ((funcallable-standard-class-p class) t)
@@ -204,52 +205,71 @@
         (instance-structure-protocol-error slotd 'slot-value-using-class))))
    `(reader ,slot-name)))
 
-(defun make-optimized-std-writer-method-function
-    (fsc-p slotd slot-name location)
+(defun make-optimized-std-writer-method-function (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
-  (let* ((safe-p (and slotd
-                      (slot-definition-class slotd)
-                      (safe-p (slot-definition-class slotd))))
+  ;; The (WHEN SLOTD ...) gunk is for building early slot definitions.
+  (let* ((class (when slotd (slot-definition-class slotd)))
+         (safe-p (when slotd (safe-p class)))
+         (orig-wrapper (when safe-p (class-wrapper class)))
+         (info (when safe-p (slot-definition-info slotd)))
          (writer-fun (etypecase location
+                       ;; In SAFE-P case the typechecking already validated the instance.
                        (fixnum
                         (if fsc-p
-                            (lambda (nv instance)
-                              (check-obsolete-instance instance)
-                              (setf (clos-slots-ref (fsc-instance-slots instance)
-                                                    location)
-                                    nv))
-                            (lambda (nv instance)
-                              (check-obsolete-instance instance)
-                              (setf (clos-slots-ref (std-instance-slots instance)
-                                                    location)
-                                    nv))))
+                            (if safe-p
+                                (lambda (nv instance)
+                                  (setf (clos-slots-ref (fsc-instance-slots instance)
+                                                        location)
+                                        nv))
+                                (lambda (nv instance)
+                                  (check-obsolete-instance instance)
+                                  (setf (clos-slots-ref (fsc-instance-slots instance)
+                                                        location)
+                                        nv)))
+                            (if safe-p
+                                (lambda (nv instance)
+                                  (setf (clos-slots-ref (std-instance-slots instance)
+                                                        location)
+                                        nv))
+                                (lambda (nv instance)
+                                  (check-obsolete-instance instance)
+                                  (setf (clos-slots-ref (std-instance-slots instance)
+                                                        location)
+                                        nv)))))
                        (cons
-                        (lambda (nv instance)
-                          (check-obsolete-instance instance)
-                          (setf (cdr location) nv)))
+                        (if safe-p
+                            (lambda (nv instance)
+                              (setf (cdr location) nv))
+                            (lambda (nv instance)
+                              (check-obsolete-instance instance)
+                              (setf (cdr location) nv))))
                        (null
                         (lambda (nv instance)
                           (declare (ignore nv instance))
                           (instance-structure-protocol-error
                            slotd
                            '(setf slot-value-using-class))))))
-         (checking-fun (lambda (new-value instance)
-                         ;; If we have a TYPE-CHECK-FUNCTION, call it.
-                         (let* (;; Note that the class of INSTANCE here is not
-                                ;; neccessarily the SLOT-DEFINITION-CLASS of
-                                ;; the SLOTD passed to M-O-S-W-M-F, since it's
-                                ;; e.g. possible for a subclass to define a
-                                ;; slot of the same name but with no accessors.
-                                ;; So we need to fetch the right type check function
-                                ;; from the wrapper instead of just closing over it.
-                                (wrapper (valid-wrapper-of instance))
-                                (type-check-function
-                                 (cadr (find-slot-cell wrapper slot-name))))
-                           (declare (type (or function null) type-check-function))
-                           (when type-check-function
-                             (funcall type-check-function new-value)))
-                         ;; Then call the real writer.
-                         (funcall writer-fun new-value instance))))
+         (checking-fun (when safe-p
+                         (lambda (new-value instance)
+                           ;; If we have a TYPE-CHECK-FUNCTION, call it.
+                           (let* (;; Note that the class of INSTANCE here is not
+                                  ;; neccessarily the SLOT-DEFINITION-CLASS of
+                                  ;; the SLOTD passed to M-O-S-W-M-F, since it's
+                                  ;; e.g. possible for a subclass to define a
+                                  ;; slot of the same name but with no
+                                  ;; accessors. So we may need to fetch the
+                                  ;; right SLOT-INFO from the wrapper instead of
+                                  ;; just closing over it.
+                                  (wrapper (valid-wrapper-of instance))
+                                  (typecheck
+                                   (slot-info-typecheck
+                                    (if (eq wrapper orig-wrapper)
+                                        info
+                                        (cdr (find-slot-cell wrapper slot-name))))))
+                             (when typecheck
+                               (funcall typecheck new-value)))
+                           ;; Then call the real writer.
+                           (funcall writer-fun new-value instance)))))
     (set-fun-name (if safe-p
                       checking-fun
                       writer-fun)
@@ -309,25 +329,23 @@
                 (slot-definition-internal-writer-function slotd)))
        (boundp (make-optimized-structure-slot-boundp-using-class-method-function))))
     ((condition-class-p class)
-     (ecase name
-       (reader
-        (let ((fun (slot-definition-reader-function slotd)))
-          (declare (type function fun))
-          (lambda (class object slotd)
-            (declare (ignore class slotd))
-            (funcall fun object))))
-       (writer
-        (let ((fun (slot-definition-writer-function slotd)))
-          (declare (type function fun))
-          (lambda (new-value class object slotd)
-            (declare (ignore class slotd))
-            (funcall fun new-value object))))
-       (boundp
-        (let ((fun (slot-definition-boundp-function slotd)))
-          (declare (type function fun))
-          (lambda (class object slotd)
-            (declare (ignore class slotd))
-            (funcall fun object))))))
+     (let ((info (slot-definition-info slotd)))
+       (ecase name
+         (reader
+          (let ((fun (slot-info-reader info)))
+            (lambda (class object slotd)
+              (declare (ignore class slotd))
+              (funcall fun object))))
+         (writer
+          (let ((fun (slot-info-writer info)))
+            (lambda (new-value class object slotd)
+              (declare (ignore class slotd))
+              (funcall fun new-value object))))
+         (boundp
+          (let ((fun (slot-info-boundp info)))
+            (lambda (class object slotd)
+              (declare (ignore class slotd))
+              (funcall fun object)))))))
     (t
      (let* ((fsc-p (cond ((standard-class-p class) nil)
                          ((funcallable-standard-class-p class) t)
@@ -381,12 +399,11 @@
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slotd)
   (declare #.*optimize-speed*)
-  (let ((location (slot-definition-location slotd))
-        (type-check-function
-         (when (and slotd
-                    (slot-definition-class slotd)
-                    (safe-p (slot-definition-class slotd)))
-           (slot-definition-type-check-function slotd))))
+  (let* ((location (slot-definition-location slotd))
+         (class (slot-definition-class slotd))
+         (typecheck
+          (when (safe-p class)
+            (slot-info-typecheck (slot-definition-info slotd)))))
     (macrolet ((make-mf-lambda (&body body)
                  `(lambda (nv class instance slotd)
                     (declare (ignore class slotd))
@@ -396,9 +413,9 @@
                  ;; Having separate lambdas for the NULL / not-NULL cases of
                  ;; TYPE-CHECK-FUNCTION is done to avoid runtime overhead
                  ;; for CLOS typechecking when it's not in use.
-                 `(if type-check-function
+                 `(if typecheck
                       (make-mf-lambda
-                       (funcall (the function type-check-function) nv)
+                       (funcall (the function typecheck) nv)
                        ,@body)
                       (make-mf-lambda
                        ,@body))))
@@ -459,69 +476,98 @@
                  (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
 
+(defun maybe-class (class-or-name)
+  (when (eq **boot-state** 'complete)
+    (if (typep class-or-name 'class)
+        class-or-name
+        (find-class class-or-name nil))))
+
 (defun make-std-reader-method-function (class-or-name slot-name)
   (declare (ignore class-or-name))
-  (let* ((initargs (copy-tree
-                    (make-method-function
-                     (lambda (instance)
-                       (pv-binding1 ((bug "Please report this")
-                                     (instance) (instance-slots))
-                         (instance-read-internal
-                          .pv. instance-slots 0
-                          (slot-value instance slot-name))))))))
-    (setf (getf (getf initargs 'plist) :slot-name-lists)
-          (list (list nil slot-name)))
-    initargs))
+  (ecase (slot-access-strategy (maybe-class class-or-name) slot-name 'reader t)
+    (:standard
+     (let* ((initargs (copy-tree
+                       (make-method-function
+                        (lambda (instance)
+                          (pv-binding1 ((bug "Please report this")
+                                        (instance) (instance-slots))
+                            (instance-read-standard
+                             .pv. instance-slots 0
+                             (slot-value instance slot-name))))))))
+       (setf (getf (getf initargs 'plist) :slot-name-lists)
+             (list (list nil slot-name)))
+       initargs))
+    ((:custom :accessor)
+     (let* ((initargs (copy-tree
+                       (make-method-function
+                        (lambda (instance)
+                          (pv-binding1 ((bug "Please report this")
+                                        (instance) nil)
+                            (instance-read-custom .pv. 0 instance)))))))
+       (setf (getf (getf initargs 'plist) :slot-name-lists)
+             (list (list nil slot-name)))
+       initargs))))
 
 (defun make-std-writer-method-function (class-or-name slot-name)
-  (let* ((class (when (eq **boot-state** 'complete)
-                  (if (typep class-or-name 'class)
-                      class-or-name
-                      (find-class class-or-name nil))))
-         (safe-p (and class
-                      (safe-p class)))
-         (check-fun (lambda (new-value instance)
-                      (let* ((class (class-of instance))
-                             (slotd (find-slot-definition class slot-name))
-                             (type-check-function
-                              (when slotd
-                                (slot-definition-type-check-function slotd))))
-                        (when type-check-function
-                          (funcall type-check-function new-value)))))
-         (initargs (copy-tree
-                    (if safe-p
-                        (make-method-function
-                         (lambda (nv instance)
-                           (funcall check-fun nv instance)
-                           (pv-binding1 ((bug "Please report this")
-                                         (instance) (instance-slots))
-                             (instance-write-internal
-                              .pv. instance-slots 0 nv
-                              (setf (slot-value instance slot-name) nv)))))
-                        (make-method-function
-                         (lambda (nv instance)
-                           (pv-binding1 ((bug "Please report this")
-                                         (instance) (instance-slots))
-                             (instance-write-internal
-                              .pv. instance-slots 0 nv
-                              (setf (slot-value instance slot-name) nv)))))))))
-    (setf (getf (getf initargs 'plist) :slot-name-lists)
-          (list nil (list nil slot-name)))
-    initargs))
+  (let ((class (maybe-class class-or-name)))
+    (ecase (slot-access-strategy class slot-name 'writer t)
+      (:standard
+       (let ((initargs (copy-tree
+                        (if (and class (safe-p class))
+                            (make-method-function
+                             (lambda (nv instance)
+                               (pv-binding1 ((bug "Please report this")
+                                             (instance) (instance-slots))
+                                 (instance-write-standard
+                                  .pv. instance-slots 0 nv
+                                  (setf (slot-value instance slot-name) .good-new-value.)
+                                  nil t))))
+                            (make-method-function
+                             (lambda (nv instance)
+                               (pv-binding1 ((bug "Please report this")
+                                             (instance) (instance-slots))
+                                 (instance-write-standard
+                                  .pv. instance-slots 0 nv
+                                  (setf (slot-value instance slot-name) .good-new-value.)))))))))
+         (setf (getf (getf initargs 'plist) :slot-name-lists)
+               (list nil (list nil slot-name)))
+         initargs))
+     ((:custom :accessor)
+      (let ((initargs (copy-tree
+                       (make-method-function
+                        (lambda (nv instance)
+                          (pv-binding1 ((bug "Please report this")
+                                        (instance) nil)
+                            (instance-write-custom .pv. 0 instance nv)))))))
+        (setf (getf (getf initargs 'plist) :slot-name-lists)
+              (list nil (list nil slot-name)))
+        initargs)))))
 
 (defun make-std-boundp-method-function (class-or-name slot-name)
   (declare (ignore class-or-name))
-  (let* ((initargs (copy-tree
-                    (make-method-function
-                     (lambda (instance)
-                       (pv-binding1 ((bug "Please report this")
-                                     (instance) (instance-slots))
-                          (instance-boundp-internal
-                           .pv. instance-slots 0
-                           (slot-boundp instance slot-name))))))))
-    (setf (getf (getf initargs 'plist) :slot-name-lists)
-          (list (list nil slot-name)))
-    initargs))
+  (ecase (slot-access-strategy (maybe-class class-or-name) slot-name 'boundp t)
+    (:standard
+     (let ((initargs (copy-tree
+                      (make-method-function
+                       (lambda (instance)
+                         (pv-binding1 ((bug "Please report this")
+                                       (instance) (instance-slots))
+                           (instance-boundp-standard
+                            .pv. instance-slots 0
+                            (slot-boundp instance slot-name))))))))
+       (setf (getf (getf initargs 'plist) :slot-name-lists)
+             (list (list nil slot-name)))
+       initargs))
+    ((:custom :accessor)
+     (let ((initargs (copy-tree
+                      (make-method-function
+                       (lambda (instance)
+                         (pv-binding1 ((bug "Please report this")
+                                       (instance) nil)
+                           (instance-boundp-custom .pv. 0 instance)))))))
+       (setf (getf (getf initargs 'plist) :slot-name-lists)
+             (list (list nil slot-name)))
+       initargs))))
 
 ;;;; FINDING SLOT DEFINITIONS
 ;;;
@@ -565,10 +611,19 @@
 ;;;   generic instead of checking versus STANDARD-CLASS and
 ;;;   FUNCALLABLE-STANDARD-CLASS.
 
-(defun find-slot-definition (class slot-name)
-  (dolist (slotd (class-slots class))
+(defun find-slot-definition (class slot-name &optional errorp)
+  (unless (class-finalized-p class)
+    (or (try-finalize-inheritance class)
+        (if errorp
+            (error "Cannot look up slot-definition for ~S in ~S (too early to finalize.)"
+                   slot-name class)
+            (return-from find-slot-definition (values nil nil)))))
+  (dolist (slotd (class-slots class)
+           (if errorp
+               (error "No slot called ~S in ~S." slot-name class)
+               (values nil t)))
     (when (eq slot-name (slot-definition-name slotd))
-      (return slotd))))
+      (return (values slotd t)))))
 
 (defun find-slot-cell (wrapper slot-name)
   (declare (symbol slot-name))
@@ -585,32 +640,27 @@
 
 (defun make-slot-table (class slots &optional bootstrap)
   (let* ((n (+ (length slots) 2))
-         (vector (make-array n :initial-element nil))
-         (save-slot-location-p
-          (or bootstrap
-              (when (eq 'complete **boot-state**)
-                (let ((metaclass (class-of class)))
-                  (or (eq metaclass *the-class-standard-class*)
-                      (eq metaclass *the-class-funcallable-standard-class*))))))
-         (save-type-check-function-p
-          (unless bootstrap
-            (and (eq 'complete **boot-state**) (safe-p class)))))
+         (vector (make-array n :initial-element nil)))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
              (let ((index (rem (sxhash name) n)))
                (setf (svref vector index)
-                     (list* name (list* (when save-slot-location-p
-                                          (if bootstrap
-                                              (early-slot-definition-location slot)
-                                              (slot-definition-location slot)))
-                                        (when save-type-check-function-p
-                                          (slot-definition-type-check-function slot))
-                                        slot)
+                     (list* name
+                            (cons (when (or bootstrap
+                                            (and (standard-class-p class)
+                                                 (slot-accessor-std-p slot 'all)))
+                                    (if bootstrap
+                                        (early-slot-definition-location slot)
+                                        (slot-definition-location slot)))
+                                  (the slot-info
+                                    (if bootstrap
+                                        (early-slot-definition-info slot)
+                                        (slot-definition-info slot))))
                             (svref vector index))))))
       (if (eq 'complete **boot-state**)
-         (dolist (slot slots)
-           (add-to-vector (slot-definition-name slot) slot))
-         (dolist (slot slots)
-           (add-to-vector (early-slot-definition-name slot) slot))))
+          (dolist (slot slots)
+            (add-to-vector (slot-definition-name slot) slot))
+          (dolist (slot slots)
+            (add-to-vector (early-slot-definition-name slot) slot))))
     vector))

@@ -24,18 +24,20 @@
 (in-package "SB-PCL")
 
 (defmethod slot-accessor-function ((slotd effective-slot-definition) type)
-  (ecase type
-    (reader (slot-definition-reader-function slotd))
-    (writer (slot-definition-writer-function slotd))
-    (boundp (slot-definition-boundp-function slotd))))
+  (let ((info (slot-definition-info slotd)))
+    (ecase type
+      (reader (slot-info-reader info))
+      (writer (slot-info-writer info))
+      (boundp (slot-info-boundp info)))))
 
 (defmethod (setf slot-accessor-function) (function
                                           (slotd effective-slot-definition)
                                           type)
-  (ecase type
-    (reader (setf (slot-definition-reader-function slotd) function))
-    (writer (setf (slot-definition-writer-function slotd) function))
-    (boundp (setf (slot-definition-boundp-function slotd) function))))
+  (let ((info (slot-definition-info slotd)))
+    (ecase type
+      (reader (setf (slot-info-reader info) function))
+      (writer (setf (slot-info-writer info) function))
+      (boundp (setf (slot-info-boundp info) function)))))
 
 (defconstant +slotd-reader-function-std-p+ 1)
 (defconstant +slotd-writer-function-std-p+ 2)
@@ -93,20 +95,20 @@
                 (null (cdr methods))))
         (setf (slot-accessor-function slotd type)
               (lambda (&rest args)
+                (declare (dynamic-extent args))
                 ;; FIXME: a tiny amount of wasted SLOT-ACCESSOR-STD-P
                 ;; work here (see KLUDGE comment above).
                 (let ((fun (compute-slot-accessor-info slotd type gf)))
                   (apply fun args))))))))
 
 (defmethod finalize-internal-slot-functions ((slotd effective-slot-definition))
-  (let* ((name (slot-value slotd 'name)))
-    (dolist (type '(reader writer boundp))
-      (let* ((gf-name (ecase type
-                              (reader 'slot-value-using-class)
-                              (writer '(setf slot-value-using-class))
-                              (boundp 'slot-boundp-using-class)))
-             (gf (gdefinition gf-name)))
-        (compute-slot-accessor-info slotd type gf)))))
+  (dolist (type '(reader writer boundp))
+    (let* ((gf-name (ecase type
+                      (reader 'slot-value-using-class)
+                      (writer '(setf slot-value-using-class))
+                      (boundp 'slot-boundp-using-class)))
+           (gf (gdefinition gf-name)))
+      (compute-slot-accessor-info slotd type gf))))
 
 ;;; CMUCL (Gerd PCL 2003-04-25) comment:
 ;;;
@@ -419,13 +421,15 @@
                     (t *the-class-standard-class*))
               (nreverse reversed-plist)))))
 
+;;; This is used to call initfunctions of :allocation :class slots.
 (defun call-initfun (fun slotd safe)
   (declare (function fun))
   (let ((value (funcall fun)))
     (when safe
-      (let ((typecheck (slot-definition-type-check-function slotd)))
-        (when typecheck
-          (funcall (the function typecheck) value))))
+      (let ((type (slot-definition-type slotd)))
+        (unless (or (eq t type)
+                    (typep value type))
+          (error 'type-error :expected-type type :datum value))))
     value))
 
 (defmethod shared-initialize :after
@@ -535,7 +539,7 @@
 (defmethod reinitialize-instance :before ((class slot-class) &key direct-superclasses)
   (dolist (old-super (set-difference (class-direct-superclasses class) direct-superclasses))
     (remove-direct-subclass old-super class))
-  (remove-slot-accessors    class (class-direct-slots class)))
+  (remove-slot-accessors class (class-direct-slots class)))
 
 (defmethod reinitialize-instance :after ((class slot-class)
                                          &rest initargs
@@ -610,18 +614,19 @@
 
 (defmethod compute-effective-slot-definition
     ((class condition-class) slot-name dslotds)
-  (let ((slotd (call-next-method)))
-    (setf (slot-definition-reader-function slotd)
+  (let* ((slotd (call-next-method))
+         (info (slot-definition-info slotd)))
+    (setf (slot-info-reader info)
           (lambda (x)
             (handler-case (condition-reader-function x slot-name)
               ;; FIXME: FIND-SLOT-DEFAULT throws an error if the slot
               ;; is unbound; maybe it should be a CELL-ERROR of some
               ;; sort?
               (error () (values (slot-unbound class x slot-name))))))
-    (setf (slot-definition-writer-function slotd)
+    (setf (slot-info-writer info)
           (lambda (v x)
             (condition-writer-function x v slot-name)))
-    (setf (slot-definition-boundp-function slotd)
+    (setf (slot-info-boundp info)
           (lambda (x)
             (multiple-value-bind (v c)
                 (ignore-errors (condition-reader-function x slot-name))
@@ -921,7 +926,9 @@
 
     ;; If there is a change in the shape of the instances then the
     ;; old class is now obsolete.
-    (let* ((nlayout (mapcar #'slot-definition-name
+    (let* ((nlayout (mapcar (lambda (slotd)
+                              (cons (slot-definition-name slotd)
+                                    (slot-definition-type slotd)))
                             (sort instance-slots #'<
                                   :key #'slot-definition-location)))
            (nslots (length nlayout))
@@ -1123,10 +1130,10 @@
     eslotds))
 
 (defmethod compute-effective-slot-definition ((class slot-class) name dslotds)
-  (declare (ignore name))
   (let* ((initargs (compute-effective-slot-definition-initargs class dslotds))
-         (class (apply #'effective-slot-definition-class class initargs)))
-    (apply #'make-instance class initargs)))
+         (class (apply #'effective-slot-definition-class class initargs))
+         (slotd (apply #'make-instance class initargs)))
+    slotd))
 
 (defmethod effective-slot-definition-class ((class std-class) &rest initargs)
   (declare (ignore initargs))
@@ -1145,7 +1152,6 @@
          (allocation nil)
          (allocation-class nil)
          (type t)
-         (type-check-function nil)
          (documentation nil)
          (documentationp nil)
          (namep  nil)
@@ -1171,16 +1177,6 @@
                 allocation-class (slot-definition-class slotd)
                 allocp t))
         (setq initargs (append (slot-definition-initargs slotd) initargs))
-        (let ((fun (slot-definition-type-check-function slotd)))
-          (when fun
-            (setf type-check-function
-                  (if type-check-function
-                      (let ((old-function type-check-function))
-                        (declare (function old-function fun))
-                        (lambda (value)
-                          (funcall old-function value)
-                          (funcall fun value)))
-                      fun))))
         (let ((slotd-type (slot-definition-type slotd)))
           (setq type (cond
                        ((eq type t) slotd-type)
@@ -1197,15 +1193,14 @@
           :allocation allocation
           :allocation-class allocation-class
           :type type
-          'type-check-function type-check-function
           :class class
           :documentation documentation)))
 
 (defmethod compute-effective-slot-definition-initargs :around
     ((class structure-class) direct-slotds)
-  (let ((slotd (car direct-slotds)))
-    (list* :defstruct-accessor-symbol
-           (slot-definition-defstruct-accessor-symbol slotd)
+  (let* ((slotd (car direct-slotds))
+         (accessor (slot-definition-defstruct-accessor-symbol slotd)))
+    (list* :defstruct-accessor-symbol accessor
            :internal-reader-function
            (slot-definition-internal-reader-function slotd)
            :internal-writer-function
@@ -1442,43 +1437,55 @@
              (oclass-slots (wrapper-class-slots owrapper))
              (added ())
              (discarded ())
-             (plist ()))
+             (plist ())
+             (safe (safe-p class)))
 
-        ;; local  --> local     transfer value
+        ;; local  --> local     transfer value, check type
         ;; local  --> shared    discard value, discard slot
         ;; local  -->  --       discard slot
-        ;; shared --> local     transfer value
+        ;; shared --> local     transfer value, check type
         ;; shared --> shared    -- (cf SHARED-INITIALIZE :AFTER STD-CLASS)
         ;; shared -->  --       discard value
         ;;  --    --> local     add slot
         ;;  --    --> shared    --
 
-        ;; Go through all the old local slots.
-        (let ((opos 0))
-          (dolist (name olayout)
-            (let ((npos (posq name nlayout)))
-              (if npos
-                  (setf (clos-slots-ref nslots npos)
-                        (clos-slots-ref oslots opos))
-                  (progn
-                    (push name discarded)
-                    (unless (eq (clos-slots-ref oslots opos) +slot-unbound+)
-                      (setf (getf plist name) (clos-slots-ref oslots opos))))))
-            (incf opos)))
+        (flet ((set-value (value npos &optional (otype t))
+                 (when safe
+                   (let ((ntype (cdr (nth npos nlayout))))
+                     (unless (equal ntype otype)
+                       (assert (typep value ntype) (value)
+                               "~@<Error updating obsolete instance. Current value in slot ~
+                                ~S of an instance of ~S is ~S, which does not match the new ~
+                                slot type ~S.~:@>"
+                               (car (nth npos nlayout)) class value ntype))))
+                 (setf (clos-slots-ref nslots npos) value)))
+          ;; Go through all the old local slots.
+          (let ((opos 0))
+            (dolist (spec olayout)
+              (destructuring-bind (name . otype) spec
+                (let ((npos (position name nlayout :key #'car)))
+                  (if npos
+                      (set-value (clos-slots-ref oslots opos) npos otype)
+                      (progn
+                        (push name discarded)
+                        (unless (eq (clos-slots-ref oslots opos) +slot-unbound+)
+                          (setf (getf plist name) (clos-slots-ref oslots opos)))))))
+              (incf opos)))
 
-        ;; Go through all the old shared slots.
-        (dolist (oclass-slot-and-val oclass-slots)
-          (let ((name (car oclass-slot-and-val))
-                (val (cdr oclass-slot-and-val)))
-            (let ((npos (posq name nlayout)))
-              (when npos
-                (setf (clos-slots-ref nslots npos) val)))))
+          ;; Go through all the old shared slots.
+          (dolist (oclass-slot-and-val oclass-slots)
+            (let ((name (car oclass-slot-and-val))
+                  (val (cdr oclass-slot-and-val)))
+              (let ((npos (position name nlayout :key #'car)))
+                (when npos
+                  (set-value val npos))))))
 
         ;; Go through all the new local slots to compute the added slots.
-        (dolist (nlocal nlayout)
-          (unless (or (memq nlocal olayout)
-                      (assq nlocal oclass-slots))
-            (push nlocal added)))
+        (dolist (spec nlayout)
+          (let ((name (car spec)))
+            (unless (or (member name olayout :key #'car)
+                        (assq name oclass-slots))
+              (push name added))))
 
         (%swap-wrappers-and-slots instance copy)
 
@@ -1497,25 +1504,37 @@
          (new-layout (wrapper-instance-slots-layout new-wrapper))
          (old-slots (get-slots instance))
          (new-slots (get-slots copy))
-         (old-class-slots (wrapper-class-slots old-wrapper)))
+         (old-class-slots (wrapper-class-slots old-wrapper))
+         (safe (safe-p new-class)))
 
-    ;; "The values of local slots specified by both the class CTO and
-    ;; CFROM are retained. If such a local slot was unbound, it
-    ;; remains unbound."
-    (let ((new-position 0))
-      (dolist (new-slot new-layout)
-        (let ((old-position (posq new-slot old-layout)))
-          (when old-position
-            (setf (clos-slots-ref new-slots new-position)
-                  (clos-slots-ref old-slots old-position))))
-        (incf new-position)))
+    (flet ((set-value (value pos)
+             (when safe
+               (let ((spec (nth pos new-layout)))
+                 (assert (typep value (cdr spec)) (value)
+                         "~@<Error changing class. Current value in slot ~S ~
+                        of an instance of ~S is ~S, which does not match the new ~
+                        slot type ~S in class ~S.~:@>"
+                         (car spec) old-class value
+                         (cdr spec) new-class)))
+             (setf (clos-slots-ref new-slots pos) value)))
+      ;; "The values of local slots specified by both the class CTO and
+      ;; CFROM are retained. If such a local slot was unbound, it
+      ;; remains unbound."
+      (let ((new-position 0))
+        (dolist (new-slot new-layout)
+          (let* ((name (car new-slot))
+                 (old-position (position name old-layout :key #'car)))
+            (when old-position
+              (set-value (clos-slots-ref old-slots old-position)
+                         new-position)))
+          (incf new-position)))
 
-    ;; "The values of slots specified as shared in the class CFROM and
-    ;; as local in the class CTO are retained."
-    (dolist (slot-and-val old-class-slots)
-      (let ((position (posq (car slot-and-val) new-layout)))
-        (when position
-          (setf (clos-slots-ref new-slots position) (cdr slot-and-val)))))
+      ;; "The values of slots specified as shared in the class CFROM and
+      ;; as local in the class CTO are retained."
+      (dolist (slot-and-val old-class-slots)
+        (let ((position (position (car slot-and-val) new-layout :key #'car)))
+          (when position
+            (set-value (cdr slot-and-val) position)))))
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.

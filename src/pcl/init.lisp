@@ -60,6 +60,38 @@
   (apply #'shared-initialize instance nil initargs)
   instance)
 
+(defglobal **typecheck-cache** (make-hash-table :test #'equal))
+
+(defun generate-slotd-typecheck (slotd)
+  (let ((type (slot-definition-type slotd)))
+    (values
+     (when (and (neq t type) (safe-p (slot-definition-class slotd)))
+       (with-locked-hash-table (**typecheck-cache**)
+         (or (gethash type **typecheck-cache**)
+             (setf (gethash type **typecheck-cache**)
+                   (handler-bind (((or style-warning compiler-note)
+                                   #'muffle-warning))
+                     (funcall (compile
+                               nil
+                               `(lambda ()
+                                  (declare (optimize (sb-c:store-coverage-data 0)
+                                                     (sb-c::type-check 3)
+                                                     (sb-c::verify-arg-count 0)))
+                                  (named-lambda (slot-typecheck ,type) (value)
+                                    (the ,type value))))))))))
+     type)))
+
+(defmethod initialize-instance :after ((slotd effective-slot-definition) &key)
+  (setf (slot-definition-info slotd)
+        (multiple-value-bind (typecheck type) (generate-slotd-typecheck slotd)
+          (make-slot-info :slotd slotd
+                          :typecheck typecheck))))
+
+;;; FIXME: Do we need (SETF SLOT-DEFINITION-TYPE) at all?
+(defmethod (setf slot-definition-type) :after (new-type (slotd effective-slot-definition))
+  (multiple-value-bind (typecheck type) (generate-slotd-typecheck slotd)
+    (setf (slot-info-typecheck (slot-definition-info slotd)) typecheck)))
+
 (defmethod update-instance-for-different-class
     ((previous standard-object) (current standard-object) &rest initargs)
   ;; First we must compute the newly added slots. The spec defines

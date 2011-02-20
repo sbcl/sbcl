@@ -453,9 +453,6 @@
     :initarg :initargs
     :accessor slot-definition-initargs)
    (%type :initform t :initarg :type :accessor slot-definition-type)
-   (%type-check-function :initform nil
-                         :initarg type-check-function
-                         :accessor slot-definition-type-check-function)
    (%documentation
     :initform nil :initarg :documentation
     ;; KLUDGE: we need a reader for bootstrapping purposes, in
@@ -501,14 +498,29 @@
   ())
 
 (defclass effective-slot-definition (slot-definition)
-  ((reader-function ; (lambda (object) ...)
-    :accessor slot-definition-reader-function)
-   (writer-function ; (lambda (new-value object) ...)
-    :accessor slot-definition-writer-function)
-   (boundp-function ; (lambda (object) ...)
-    :accessor slot-definition-boundp-function)
-   (accessor-flags
-    :initform 0)))
+  ((accessor-flags
+    :initform 0)
+   (info
+    :accessor slot-definition-info)))
+
+;;; We use a structure here, because fast slot-accesses to this information
+;;; are critical to making SLOT-VALUE-USING-CLASS &co fast: places that need
+;;; these functions can access the SLOT-INFO directly, avoiding the overhead
+;;; of accessing a standard-instance.
+(defstruct (slot-info (:constructor make-slot-info
+                                    (&key slotd
+                                          typecheck
+                                          (type t)
+                                          (reader
+                                           (uninitialized-accessor-function :reader slotd))
+                                          (writer
+                                           (uninitialized-accessor-function :writer slotd))
+                                          (boundp
+                                           (uninitialized-accessor-function :boundp slotd)))))
+  (typecheck nil :type (or null function))
+  (reader (missing-arg) :type function)
+  (writer (missing-arg) :type function)
+  (boundp (missing-arg) :type function))
 
 (defclass standard-direct-slot-definition (standard-slot-definition
                                            direct-slot-definition)
