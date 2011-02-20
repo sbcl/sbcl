@@ -1346,42 +1346,41 @@ handled by any other handler, it will be muffled.")
 ;; redefinitions, but other redefinitions could be done later
 ;; (e.g. methods).
 (define-condition redefinition-warning (style-warning)
-  ())
+  ((name
+    :initarg :name
+    :reader redefinition-warning-name)
+   (new-location
+    :initarg :new-location
+    :reader redefinition-warning-new-location)))
 
 (define-condition function-redefinition-warning (redefinition-warning)
-  ((name :initarg :name :reader function-redefinition-warning-name)
-   (old :initarg :old :reader function-redefinition-warning-old-fdefinition)
-   ;; For DEFGENERIC and perhaps others, the redefinition
-   ;; destructively modifies the original, rather than storing a new
-   ;; object, so there's no NEW here, but only in subclasses.
-   ))
+  ((new-function
+    :initarg :new-function
+    :reader function-redefinition-warning-new-function)))
 
 (define-condition redefinition-with-defun (function-redefinition-warning)
-  ((new :initarg :new :reader redefinition-with-defun-new-fdefinition)
-   ;; KLUDGE: it would be nice to fix the unreasonably late
-   ;; back-patching of DEBUG-SOURCEs in the DEBUG-INFO during
-   ;; fasloading and just use the new fdefinition, but for the moment
-   ;; we'll compare the SOURCE-LOCATION created during DEFUN with the
-   ;; previous DEBUG-SOURCE.
-   (new-location :initarg :new-location
-              :reader redefinition-with-defun-new-location))
+  ()
   (:report (lambda (warning stream)
              (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
                              in DEFUN"
-                     (function-redefinition-warning-name warning)))))
+                     (redefinition-warning-name warning)))))
 
-(define-condition redefinition-with-defgeneric (function-redefinition-warning)
-  ((new-location :initarg :new-location
-                 :reader redefinition-with-defgeneric-new-location))
+(define-condition redefinition-with-defmacro (function-redefinition-warning)
+  ()
+  (:report (lambda (warning stream)
+             (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+                             in DEFMACRO"
+                     (redefinition-warning-name warning)))))
+
+(define-condition redefinition-with-defgeneric (redefinition-warning)
+  ()
   (:report (lambda (warning stream)
              (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
                              in DEFGENERIC"
-                     (function-redefinition-warning-name warning)))))
+                     (redefinition-warning-name warning)))))
 
 (define-condition redefinition-with-defmethod (redefinition-warning)
-  ((gf :initarg :generic-function
-       :reader redefinition-with-defmethod-generic-function)
-   (qualifiers :initarg :qualifiers
+  ((qualifiers :initarg :qualifiers
                :reader redefinition-with-defmethod-qualifiers)
    (specializers :initarg :specializers
                  :reader redefinition-with-defmethod-specializers)
@@ -1391,135 +1390,103 @@ handled by any other handler, it will be muffled.")
                :reader redefinition-with-defmethod-old-method))
   (:report (lambda (warning stream)
              (format stream "redefining ~S~{ ~S~} ~S in DEFMETHOD"
-                     (redefinition-with-defmethod-generic-function warning)
+                     (redefinition-warning-name warning)
                      (redefinition-with-defmethod-qualifiers warning)
                      (redefinition-with-defmethod-specializers warning)))))
 
-;; FIXME: see the FIXMEs in defmacro.lisp, then maybe instantiate this.
-(define-condition redefinition-with-defmacro (function-redefinition-warning)
-  ())
+;;;; Deciding which redefinitions are "interesting".
 
-;; Here are a few predicates for what people might find interesting
-;; about redefinitions.
+(defun function-file-namestring (function)
+  #!+sb-eval
+  (when (typep function 'sb!eval:interpreted-function)
+    (return-from function-file-namestring
+      (sb!c:definition-source-location-namestring
+          (sb!eval:interpreted-function-source-location function))))
+  (let* ((fun (sb!kernel:%fun-fun function))
+         (code (sb!kernel:fun-code-header fun))
+         (debug-info (sb!kernel:%code-debug-info code))
+         (debug-source (when debug-info
+                         (sb!c::debug-info-source debug-info)))
+         (namestring (when debug-source
+                       (sb!c::debug-source-namestring debug-source))))
+    namestring))
 
-;; DEFUN can replace a generic function with an ordinary function.
-;; (Attempting to replace an ordinary function with a generic one
-;; causes an error, though.)
-(defun redefinition-replaces-generic-function-p (warning)
-  (and (typep warning 'redefinition-with-defun)
-       (typep (function-redefinition-warning-old-fdefinition warning)
-              'generic-function)))
+(defun interesting-function-redefinition-warning-p (warning old)
+  (let ((new (function-redefinition-warning-new-function warning))
+        (source-location (redefinition-warning-new-location warning)))
+    (or
+     ;; Compiled->Interpreted is interesting.
+     (and (typep old 'compiled-function)
+          (typep new '(not compiled-function)))
+     ;; FIN->Regular is interesting.
+     (and (typep old 'funcallable-instance)
+          (typep new '(not funcallable-instance)))
+     ;; Different file or unknown location is interesting.
+     (let* ((old-namestring (function-file-namestring old))
+            (new-namestring
+             (or (function-file-namestring new)
+                 (when source-location
+                   (sb!c::definition-source-location-namestring source-location)))))
+       (and (or (not old-namestring)
+                (not new-namestring)
+                (not (string= old-namestring new-namestring))))))))
 
-(defun redefinition-replaces-compiled-function-with-interpreted-p (warning)
-  (and (typep warning 'redefinition-with-defun)
-       (compiled-function-p
-        (function-redefinition-warning-old-fdefinition warning))
-       (not (compiled-function-p
-             (redefinition-with-defun-new-fdefinition warning)))))
-
-;; Most people seem to agree that re-running a DEFUN in a file is
-;; completely uninteresting.
 (defun uninteresting-ordinary-function-redefinition-p (warning)
-  ;; OAOO violation: this duplicates code in SB-INTROSPECT.
-  ;; Additionally, there are some functions that aren't
-  ;; funcallable-instances for which finding the source location is
-  ;; complicated (e.g. DEFSTRUCT-defined predicates and accessors),
-  ;; but I don't think they're defined with %DEFUN, so the warning
-  ;; isn't raised.
-  (flet ((fdefinition-file-namestring (fdefn)
-           #!+sb-eval
-           (when (typep fdefn 'sb!eval:interpreted-function)
-             (return-from fdefinition-file-namestring
-               (sb!c:definition-source-location-namestring
-                   (sb!eval:interpreted-function-source-location fdefn))))
-           ;; All the following accesses are guarded with conditionals
-           ;; because it's not clear whether any of the slots we're
-           ;; chasing down are guaranteed to be filled in.
-           (let* ((fdefn
-                   ;; KLUDGE: although this looks like it only works
-                   ;; for %SIMPLE-FUNs, in fact there's a pun such
-                   ;; that %SIMPLE-FUN-SELF returns the simple-fun
-                   ;; object for closures and
-                   ;; funcallable-instances. -- CSR, circa 2005
-                   (sb!kernel:%simple-fun-self fdefn))
-                  (code (if fdefn (sb!kernel:fun-code-header fdefn)))
-                  (debug-info (if code (sb!kernel:%code-debug-info code)))
-                  (debug-source (if debug-info
-                                    (sb!c::debug-info-source debug-info)))
-                  (namestring (if debug-source
-                                  (sb!c::debug-source-namestring debug-source))))
-             namestring)))
-    (and
-     ;; There's garbage in various places when the first DEFUN runs in
-     ;; cold-init.
-     sb!kernel::*cold-init-complete-p*
-     (typep warning 'redefinition-with-defun)
-     (let ((old-fdefn
-            (function-redefinition-warning-old-fdefinition warning))
-           (new-fdefn
-            (redefinition-with-defun-new-fdefinition warning)))
-       ;; Replacing a compiled function with a compiled function is
-       ;; clearly uninteresting, and we'll say arbitrarily that
-       ;; replacing an interpreted function with an interpreted
-       ;; function is uninteresting, too, but leave out the
-       ;; compiled-to-interpreted case.
-       (when (or (typep
-                  old-fdefn
-                  '(or #!+sb-eval sb!eval:interpreted-function))
-                 (and (typep old-fdefn
-                             '(and compiled-function
-                               (not funcallable-instance)))
-                      ;; Since this is a REDEFINITION-WITH-DEFUN,
-                      ;; NEW-FDEFN can't be a FUNCALLABLE-INSTANCE.
-                      (typep new-fdefn 'compiled-function)))
-         (let* ((old-namestring (fdefinition-file-namestring old-fdefn))
-                (new-namestring
-                 (or (fdefinition-file-namestring new-fdefn)
-                     (let ((srcloc
-                            (redefinition-with-defun-new-location warning)))
-                       (if srcloc
-                            (sb!c::definition-source-location-namestring
-                                srcloc))))))
-           (and old-namestring
-                new-namestring
-                (equal old-namestring new-namestring))))))))
+  (and
+   ;; There's garbage in various places when the first DEFUN runs in
+   ;; cold-init.
+   sb!kernel::*cold-init-complete-p*
+   (typep warning 'redefinition-with-defun)
+   ;; Shared logic.
+   (let ((name (redefinition-warning-name warning)))
+     (not (interesting-function-redefinition-warning-p
+           warning (or (fdefinition name) (macro-function name)))))))
+
+(defun uninteresting-macro-redefinition-p (warning)
+  (and
+   (typep warning 'redefinition-with-defmacro)
+   ;; Shared logic.
+   (let ((name (redefinition-warning-name warning)))
+     (not (interesting-function-redefinition-warning-p
+           warning (or (macro-function name) (fdefinition name)))))))
 
 (defun uninteresting-generic-function-redefinition-p (warning)
-  (and (typep warning 'redefinition-with-defgeneric)
-       (let* ((old-fdefn
-               (function-redefinition-warning-old-fdefinition warning))
-              (old-location
-               (if (typep old-fdefn 'generic-function)
-                   (sb!pcl::definition-source old-fdefn)))
-              (old-namestring
-               (if old-location
-                   (sb!c:definition-source-location-namestring old-location)))
-              (new-location
-               (redefinition-with-defgeneric-new-location warning))
-              (new-namestring
-               (if new-location
-                   (sb!c:definition-source-location-namestring new-location))))
-         (and old-namestring
-              new-namestring
-              (equal old-namestring new-namestring)))))
+  (and
+   (typep warning 'redefinition-with-defgeneric)
+   ;; Can't use the shared logic above, since GF's don't get a "new"
+   ;; definition -- rather the FIN-FUNCTION is set.
+   (let* ((name (redefinition-warning-name warning))
+          (old (fdefinition name))
+          (old-location (when (typep old 'generic-function)
+                          (sb!pcl::definition-source old)))
+          (old-namestring (when old-location
+                            (sb!c:definition-source-location-namestring old-location)))
+          (new-location (redefinition-warning-new-location warning))
+          (new-namestring (when new-location
+                           (sb!c:definition-source-location-namestring new-location))))
+     (and old-namestring
+          new-namestring
+          (string= old-namestring new-namestring)))))
 
 (defun uninteresting-method-redefinition-p (warning)
-  (and (typep warning 'redefinition-with-defmethod)
-       (let* ((old-method (redefinition-with-defmethod-old-method warning))
-              (old-location (sb!pcl::definition-source old-method))
-              (old-namestring (if old-location
-                                  (sb!c:definition-source-location-namestring
-                                      old-location)))
-              (new-location (redefinition-with-defmethod-new-location warning))
-              (new-namestring (if new-location
-                                  (sb!c:definition-source-location-namestring
-                                      new-location))))
+  (and
+   (typep warning 'redefinition-with-defmethod)
+   ;; Can't use the shared logic above, since GF's don't get a "new"
+   ;; definition -- rather the FIN-FUNCTION is set.
+   (let* ((old-method (redefinition-with-defmethod-old-method warning))
+          (old-location (sb!pcl::definition-source old-method))
+          (old-namestring (when old-location
+                            (sb!c:definition-source-location-namestring old-location)))
+          (new-location (redefinition-warning-new-location warning))
+          (new-namestring (when new-location
+                            (sb!c:definition-source-location-namestring new-location))))
          (and new-namestring
               old-namestring
-              (equal new-namestring old-namestring)))))
+              (string= new-namestring old-namestring)))))
 
 (deftype uninteresting-redefinition ()
   '(or (satisfies uninteresting-ordinary-function-redefinition-p)
+       (satisfies uninteresting-macro-redefinition-p)
        (satisfies uninteresting-generic-function-redefinition-p)
        (satisfies uninteresting-method-redefinition-p)))
 

@@ -252,9 +252,10 @@ bootstrapping.
 
 (defun load-defgeneric (fun-name lambda-list source-location &rest initargs)
   (when (fboundp fun-name)
+    (warn 'sb-kernel:redefinition-with-defgeneric
+          :name fun-name
+          :new-location source-location)
     (let ((fun (fdefinition fun-name)))
-      (warn 'sb-kernel:redefinition-with-defgeneric :name fun-name
-            :old fun :new-location source-location)
       (when (generic-function-p fun)
         (loop for method in (generic-function-initial-methods fun)
               do (remove-method fun method))
@@ -1562,10 +1563,11 @@ bootstrapping.
                         (generic-function-methods gf)
                         (find-method gf qualifiers specializers nil))))
       (when method
-        (style-warn 'sb-kernel:redefinition-with-defmethod
-                    :generic-function gf-spec :old-method method
-                    :qualifiers qualifiers :specializers specializers
-                    :new-location source-location))))
+        (warn 'sb-kernel:redefinition-with-defmethod
+              :name gf-spec
+              :new-location source-location
+              :old-method method
+              :qualifiers qualifiers :specializers specializers))))
   (let ((method (apply #'add-named-method
                        gf-spec qualifiers specializers lambda-list
                        :definition-source source-location

@@ -224,9 +224,10 @@ evaluated as a PROGN."
   (sb!c:%compiler-defun name inline-lambda nil)
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
-    (style-warn 'sb!kernel::redefinition-with-defun :name name
-                :old (fdefinition name) :new def
-                :new-location source-location))
+    (warn 'sb!kernel::redefinition-with-defun
+          :name name
+          :new-function def
+          :new-location source-location))
   (setf (sb!xc:fdefinition name) def)
 
   (sb!c::note-name-defined name :function)

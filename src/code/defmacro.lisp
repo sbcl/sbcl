@@ -48,14 +48,16 @@
                       ,@local-decs
                       ,new-body))
               (debug-name (sb!c::debug-name 'macro-function name)))
-          `(eval-when (:compile-toplevel :load-toplevel :execute)
-             (sb!c::%defmacro ',name #',def ',lambda-list
-                              ,doc ',debug-name)))))))
+          `(progn
+             (eval-when (:compile-toplevel :load-toplevel :execute)
+               (sb!c::%defmacro ',name #',def ',lambda-list ,doc ',debug-name
+                                (sb!c:source-location)))))))))
 
 (macrolet
     ((def (times set-p)
        `(eval-when (,@times)
-          (defun sb!c::%defmacro (name definition lambda-list doc debug-name)
+          (defun sb!c::%defmacro (name definition lambda-list doc debug-name
+                                  source-location)
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
@@ -74,23 +76,16 @@
                    name (info :function :where-from name))
                   (undefine-fun-name name))
                 (clear-info :function :where-from name)
-
-               ;; FIXME: It would be nice to warn about DEFMACRO of an
-               ;; already-defined macro, but that's slightly hard to do
-               ;; because in common usage DEFMACRO is defined at compile
-               ;; time and then redefined at load time. We'd need to make a
-               ;; distinction between the defined-at-compile-time state and
-               ;; the defined-at-load-time state to make this work. (Trying
-               ;; to warn about duplicate DEFTYPEs runs into the same
-               ;; problem.)
-               #+nil
-               (when (sb!xc:macro-function name)
-                 ;; Someday we could check for macro arguments
-                 ;; being incompatibly redefined. Doing this right
-                 ;; will involve finding the old macro lambda-list
-                 ;; and comparing it with the new one.
-                 (style-warn "redefining ~/sb-impl::print-symbol-with-prefix/ ~
-                                 in DEFMACRO" name))
+                #-sb-xc-host
+                (when (fboundp name)
+                  ;; Someday we could check for macro arguments
+                  ;; being incompatibly redefined. Doing this right
+                  ;; will involve finding the old macro lambda-list
+                  ;; and comparing it with the new one.
+                  (warn 'sb!kernel::redefinition-with-defmacro
+                        :name name
+                        :new-function definition
+                        :new-location source-location))
                (setf (sb!xc:macro-function name) definition)
                ,(when set-p
                       `(setf (%fun-doc definition) doc
