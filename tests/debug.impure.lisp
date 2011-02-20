@@ -265,17 +265,17 @@
   (assert (verify-backtrace (lambda () (bug-354 354)) '((bug-354 354)))))
 
 ;;; FIXME: This test really should be broken into smaller pieces
-(with-test (:name (:backtrace :misc)
-            :fails-on '(and :x86 (or :sunos)))
-  (write-line "//tl-xep")
+(with-test (:name (:backtrace :tl-xep)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace #'namestring
                               '(((sb-c::tl-xep namestring) 0 ?)))))
   (with-details nil
     (assert (verify-backtrace #'namestring
-                              '((namestring)))))
+                              '((namestring))))))
 
-  ;; &MORE-PROCESSOR
+(with-test (:name (:backtrace :more-processor)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace (lambda () (bt.1.1 :key))
                               '(((sb-c::&more-processor bt.1.1) &rest))))
@@ -289,10 +289,10 @@
     (assert (verify-backtrace (lambda () (bt.1.2 :key))
                               '((bt.1.2 &rest))))
     (assert (verify-backtrace (lambda () (bt.1.3 :key))
-                              '((bt.1.3 &rest)))))
+                              '((bt.1.3 &rest))))))
 
-  ;; XEP
-  (write-line "//xep")
+(with-test (:name (:backtrace :xep)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace #'bt.2.1
                               '(((sb-c::xep bt.2.1) 0 ?))))
@@ -306,10 +306,10 @@
     (assert (verify-backtrace #'bt.2.2
                               '((bt.2.2 &rest))))
     (assert (verify-backtrace #'bt.2.3
-                              '((bt.2.3 &rest)))))
+                              '((bt.2.3 &rest))))))
 
-  ;; VARARGS-ENTRY
-  (write-line "//varargs-entry")
+(with-test (:name (:backtrace :varargs-entry)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace #'bt.3.1
                               '(((sb-c::varargs-entry bt.3.1) :key nil))))
@@ -323,10 +323,10 @@
     (assert (verify-backtrace #'bt.3.2
                               '((bt.3.2 :key ?))))
     (assert (verify-backtrace #'bt.3.3
-                              '((bt.3.3 &rest)))))
+                              '((bt.3.3 &rest))))))
 
-  ;; HAIRY-ARG-PROCESSOR
-  (write-line "//hairy-args-processor")
+(with-test (:name (:backtrace :hairy-args-processor)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace #'bt.4.1
                               '(((sb-c::hairy-arg-processor bt.4.1) ?))))
@@ -340,10 +340,11 @@
     (assert (verify-backtrace #'bt.4.2
                               '((bt.4.2 ?))))
     (assert (verify-backtrace #'bt.4.3
-                              '((bt.4.3 &rest)))))
+                              '((bt.4.3 &rest))))))
 
-  ;; &OPTIONAL-PROCESSOR
-  (write-line "//optional-processor")
+
+(with-test (:name (:backtrace :optional-processor)
+                  :fails-on '(and :x86 (or :sunos)))
   (with-details t
     (assert (verify-backtrace #'bt.5.1
                               '(((sb-c::&optional-processor bt.5.1)))))
