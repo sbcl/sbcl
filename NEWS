@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.46:
   * bug fix: SB-DEBUG:BACKTRACE-AS-LIST guards against potentially leaking
     stack-allocated values out of their dynamic-extent. (lp#310175)
+  * bug fix: attempts to use SB-SPROF for wallclock profiling on threaded
+    x86-64 builds caused a type-error.
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

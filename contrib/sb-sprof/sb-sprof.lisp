@@ -492,9 +492,10 @@ profiling")
 
 (defun profiled-threads ()
   (let ((profiled-threads *profiled-threads*))
-    (if (eq :all profiled-threads)
-        (remove *timer-thread* (sb-thread:list-all-threads))
-        profiled-threads)))
+    (remove *timer-thread*
+            (if (eq :all profiled-threads)
+                (sb-thread:list-all-threads)
+                profiled-threads))))
 
 (defun profiled-thread-p (thread)
   (let ((profiled-threads *profiled-threads*))
@@ -508,7 +509,8 @@ profiling")
   (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
   (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
 
-  (define-alien-routine pthread-kill int (signal int) (os-thread unsigned-long))
+  (declaim (inline pthread-kill))
+  (define-alien-routine pthread-kill int (os-thread unsigned-long) (signal int))
 
   ;;; A random thread will call this in response to either a timer firing,
   ;;; This in turn will distribute the notice to those threads we are
