@@ -107,13 +107,16 @@
   (handler-case
       (sb-posix:mkdir #-win32 "/" #+win32 "C:/" 0)
     (sb-posix:syscall-error (c)
-      (sb-posix:syscall-errno c)))
-  #+darwin
-  #.sb-posix:eisdir
-  #+win32
-  #.sb-posix:eacces
-  #-(or darwin win32)
-  #.sb-posix::eexist)
+      ;; The results aren't the most consistent ones across platforms. Darwin
+      ;; likes EISDIR, Windows either EACCESS or EEXIST, others EEXIST.
+      ;; ...let's just accept them all.
+      (when (member (sb-posix:syscall-errno c)
+                    (list #.sb-posix:eisdir
+                          #.sb-posix:eacces
+                          #.sb-posix::eexist)
+                    :test #'eql)
+        :ok)))
+  :ok)
 
 (define-eacces-test mkdir.error.3
   (let* ((dir (merge-pathnames
@@ -275,7 +278,7 @@
 (deftest stat.5
     (let* ((stat-1 (sb-posix:stat "/"))
            (mode-1 (sb-posix:stat-mode stat-1))
-           (stat-2 (sb-posix:stat "C:\\CONFIG.SYS"
+           (stat-2 (sb-posix:stat "C:\\pagefile.sys"
                                    stat-1))
            (mode-2 (sb-posix:stat-mode stat-2)))
       (values
