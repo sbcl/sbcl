@@ -15,6 +15,8 @@ changes relative to sbcl-1.0.46:
     second argument reports a more sensible error. (lp#718905)
   * bug fix: invalid combinations of :PREDICATE and :TYPE options in DEFSTRUCT
     are detected. (lp#520607)
+  * bug fix: constant keyword argument checking didn't take :ALLOW-OTHER-KEYS
+    into account.
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

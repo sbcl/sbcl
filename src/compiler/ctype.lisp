@@ -244,28 +244,48 @@
 ;;; complain about absence of manifest winnage.
 (declaim (ftype (function (list fixnum fun-type) (values)) check-key-args))
 (defun check-key-args (args pre-key type)
-  (do ((key (nthcdr pre-key args) (cddr key))
-       (n (1+ pre-key) (+ n 2)))
-      ((null key))
-    (declare (fixnum n))
-    (let ((k (car key)))
-      (cond
-       ((not (check-arg-type k (specifier-type 'symbol) n)))
-       ((not (constant-lvar-p k))
-        (note-unwinnage "The ~:R argument (in keyword position) is not a ~
-                         constant."
-                        n))
-       (t
-        (let* ((name (lvar-value k))
-               (info (find name (fun-type-keywords type)
-                           :key #'key-info-name)))
-          (cond ((not info)
-                 (unless (fun-type-allowp type)
-                   (note-lossage "~S is not a known argument keyword."
-                                 name)))
-                (t
-                 (check-arg-type (second key) (key-info-type info)
-                                 (1+ n)))))))))
+  (let (lossages allow-other-keys)
+    (do ((key (nthcdr pre-key args) (cddr key))
+         (n (1+ pre-key) (+ n 2)))
+        ((null key))
+      (declare (fixnum n))
+      (let ((k (first key))
+            (v (second key)))
+        (cond
+          ((not (check-arg-type k (specifier-type 'symbol) n)))
+          ((not (constant-lvar-p k))
+           (note-unwinnage "~@<The ~:R argument (in keyword position) is not ~
+                            a constant, weakening keyword argument ~
+                            checking.~:@>" n)
+           ;; An unknown key may turn out to be :ALLOW-OTHER-KEYS at runtime,
+           ;; so we cannot signal full warnings for keys that look bad.
+           (unless allow-other-keys
+             (setf allow-other-keys :maybe)))
+          (t
+           (let* ((name (lvar-value k))
+                  (info (find name (fun-type-keywords type)
+                              :key #'key-info-name)))
+             (cond ((eq name :allow-other-keys)
+                    (unless allow-other-keys
+                      (if (constant-lvar-p v)
+                          (setf allow-other-keys (if (lvar-value v)
+                                                     :yes
+                                                     :no))
+                          (setf allow-other-keys :maybe))))
+                   ((not info)
+                    (unless (fun-type-allowp type)
+                      (pushnew name lossages :test #'eq)))
+                   (t
+                    (check-arg-type (second key) (key-info-type info)
+                                    (1+ n)))))))))
+    (when (and lossages (member allow-other-keys '(nil :no)))
+      (setf lossages (nreverse lossages))
+      (if (cdr lossages)
+          (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
+                        (butlast lossages)
+                        (car (last lossages)))
+          (note-lossage "~S is not a known argument keyword."
+                        (car lossages)))))
   (values))
 
 ;;; Construct a function type from a definition.

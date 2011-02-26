@@ -3765,3 +3765,8 @@
   (let ((f (eval '(constantly 42))))
     (handler-bind ((warning #'error))
       (assert (= 42 (funcall (compile nil `(lambda () (funcall ,f 1 2 3)))))))))
+
+(with-test (:name :known-fun-allows-other-keys)
+  (handler-bind ((warning #'error))
+    (funcall (compile nil '(lambda () (directory "." :allow-other-keys t))))
+    (funcall (compile nil `(lambda () (directory "." :bar t :allow-other-keys t))))))
