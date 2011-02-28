@@ -101,6 +101,12 @@
       `(lambda ,(second thing))
       `(function ,thing)))
 
+(define-source-context named-lambda (name lambda-list &body forms)
+  (declare (ignore lambda-list forms))
+  (if (and (consp name) (eq 'eval (first name)))
+      (second name)
+      `(named-lambda ,name)))
+
 ;;; Return the first two elements of FORM if FORM is a list. Take the
 ;;; CAR of the second form if appropriate.
 (defun source-form-context (form)
@@ -296,7 +302,7 @@
                (note-message-repeats stream)
                (setq last nil)
                (pprint-logical-block (stream nil :per-line-prefix "; ")
-                 (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
+                 (format stream "in:~{~<~%    ~4:;~{ ~:S~}~>~^ =>~}" in))
                (terpri stream))
 
              (unless (and last

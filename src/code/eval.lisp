@@ -20,6 +20,8 @@
   (setf sb!eval::*eval-level* -1
         sb!eval::*eval-verbose* nil))
 
+(defvar *eval-source-context* nil)
+
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
 (defun %simple-eval (expr lexenv)
@@ -34,7 +36,7 @@
   ;; always safe. --NS
   (let* (;; why PROGN?  So that attempts to eval free declarations
          ;; signal errors rather than return NIL.  -- CSR, 2007-05-01
-         (lambda `(lambda ()
+         (lambda `(named-lambda (eval ,(sb!c::source-form-context *eval-source-context*)) ()
                     (declare (muffle-conditions compiler-note))
                     (progn ,expr)))
          (fun (sb!c:compile-in-lexenv nil lambda lexenv)))
@@ -156,6 +158,10 @@
                            (not (consp (let ((sb!c:*lexenv* lexenv))
                                          (sb!c:lexenv-find name funs)))))
                       (%coerce-name-to-fun name)
+                      ;; FIXME: This is a bit wasteful: it would be nice to call
+                      ;; COMPILE-IN-LEXENV with the lambda-form directly, but
+                      ;; getting consistent source context and muffling compiler notes
+                      ;; is easier this way.
                       (%simple-eval original-exp lexenv))))
                ((quote)
                 (unless (= n-args 1)
@@ -270,7 +276,8 @@
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
    result or results."
-  (eval-in-lexenv original-exp (make-null-lexenv)))
+  (let ((*eval-source-context* original-exp))
+    (eval-in-lexenv original-exp (make-null-lexenv))))
 
 
 ;;; miscellaneous full function definitions of things which are

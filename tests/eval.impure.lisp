@@ -256,4 +256,11 @@
     (let ((fun (eval lambda-form)))
       (assert (equal lambda-form (function-lambda-expression fun))))))
 
+(with-test (:name (eval :source-context-in-compiler))
+  (let ((noise (with-output-to-string (*error-output*)
+                 (let ((*evaluator-mode* :compile))
+                   (eval `(defun source-context-test (x) y))))))
+    (with-input-from-string (s noise)
+      (assert (equal "; in: DEFUN SOURCE-CONTEXT-TEST" (read-line s))))))
+
 ;;; success

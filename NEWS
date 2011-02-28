@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.46:
   * enhancement: redefinition warnings for macros from different files. (lp#434657)
   * enhancement: better MACHINE-VERSION on Darwin x86 and x86-64. (lp#668332)
   * enhancement: (FORMAT "foo" ...) and similar signal a compile-time warning. (lp#327223)
+  * enhancement: no more "in: LAMBDA NIL" messages from the compiler for forms
+    processed using EVAL -- now the appropriate toplevel form is reported instead.
   * optimization: SLOT-VALUE &co are faster in the presence of SLOT-VALUE-USING-CLASS
     and its compatriots.
   * optimization: core startup time is reduced by 30% on x86-64. (lp#557357)
