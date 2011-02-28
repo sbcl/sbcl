@@ -17,6 +17,9 @@ changes relative to sbcl-1.0.46:
     are detected. (lp#520607)
   * bug fix: constant keyword argument checking didn't take :ALLOW-OTHER-KEYS
     into account.
+  * bug fix: SLOT-BOUNDP information is correct during MAKE-INSTANCE in the
+    presence of (SETF SLOT-VALUE-USING-CLASS) and SLOT-BOUNDP-USING-CLASS
+    methods. (regression from 1.0.45.18)
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

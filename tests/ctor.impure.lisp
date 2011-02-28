@@ -237,5 +237,41 @@
            '(:no-applicable-method 'abc zot 1 bar 2)
            (funcall (compile nil `(lambda (c x y) (make-instance c 'zot x 'bar y)))
                     ''abc 1 2))))
+
+(defclass sneaky-class (standard-class)
+  ())
+
+(defmethod sb-mop:validate-superclass ((class sneaky-class) (super standard-class))
+  t)
+
+(defclass sneaky ()
+  ((dirty :initform nil :accessor dirty-slots)
+   (a :initarg :a :reader sneaky-a)
+   (b :initform "b" :reader sneaky-b)
+   (c :accessor sneaky-c))
+  (:metaclass sneaky-class))
+
+(defvar *supervising* nil)
+
+(defmethod (setf sb-mop:slot-value-using-class)
+    :before (value (class sneaky-class) (instance sneaky) slotd)
+  (unless *supervising*
+    (let ((name (sb-mop:slot-definition-name slotd))
+          (*supervising* t))
+      (when (slot-boundp instance 'dirty)
+        (pushnew name (dirty-slots instance))))))
+
+(with-test (:name (make-instance :setf-slot-value-using-class-hits-other-slots))
+  (let ((fun (compile nil `(lambda (a c)
+                             (let ((i (make-instance 'sneaky :a a)))
+                               (setf (sneaky-c i) c)
+                               i)))))
+    (loop repeat 3
+          do (let ((i (funcall fun "a" "c")))
+               (assert (equal '(c b a) (dirty-slots i)))
+               (assert (equal "a" (sneaky-a i)))
+               (assert (equal "b" (sneaky-b i)))
+               (assert (equal "c" (sneaky-c i)))))))
+
 
 ;;;; success

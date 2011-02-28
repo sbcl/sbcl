@@ -615,7 +615,7 @@
 
 (defun optimizing-generator
     (ctor ii-methods si-methods setf-svuc-slots sbuc-slots)
-  (multiple-value-bind (locations names body around-or-before-method-p)
+  (multiple-value-bind (locations names body early-unbound-markers-p)
       (fake-initialization-emf ctor ii-methods si-methods
                                setf-svuc-slots sbuc-slots)
     (let ((wrapper (class-wrapper (ctor-class ctor))))
@@ -626,18 +626,17 @@
            (when (layout-invalid ,wrapper)
              (install-initial-constructor ,ctor)
              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
-           ,(wrap-in-allocate-forms ctor body around-or-before-method-p)))
+           ,(wrap-in-allocate-forms ctor body early-unbound-markers-p)))
        locations
        names
        t))))
 
-;;; Return a form wrapped around BODY that allocates an instance
-;;; constructed by CTOR.  BEFORE-METHOD-P set means we have to run
-;;; before-methods, in which case we initialize instance slots to
-;;; +SLOT-UNBOUND+.  The resulting form binds the local variables
-;;; .INSTANCE. to the instance, and .SLOTS. to the instance's slot
-;;; vector around BODY.
-(defun wrap-in-allocate-forms (ctor body around-or-before-method-p)
+;;; Return a form wrapped around BODY that allocates an instance constructed
+;;; by CTOR. EARLY-UNBOUND-MARKERS-P means slots may be accessed before we
+;;; have explicitly initialized them, requiring all slots to start as
+;;; +SLOT-UNBOUND+. The resulting form binds the local variables .INSTANCE. to
+;;; the instance, and .SLOTS. to the instance's slot vector around BODY.
+(defun wrap-in-allocate-forms (ctor body early-unbound-markers-p)
   (let* ((class (ctor-class ctor))
          (wrapper (class-wrapper class))
          (allocation-function (raw-instance-allocator class))
@@ -647,8 +646,8 @@
                                                     (get-instance-hash-code)))
                (.slots. (make-array
                          ,(layout-length wrapper)
-                         ,@(when around-or-before-method-p
-                             '(:initial-element +slot-unbound+)))))
+                         ,@(when early-unbound-markers-p
+                                 '(:initial-element +slot-unbound+)))))
            (setf (std-instance-wrapper .instance.) ,wrapper)
            (setf (std-instance-slots .instance.) .slots.)
            ,body
@@ -679,11 +678,17 @@
         (standard-sort-methods si-methods)
       (declare (ignore si-primary))
       (aver (null si-around))
-      (let ((initargs (ctor-initargs ctor)))
+      (let ((initargs (ctor-initargs ctor))
+            ;; :BEFORE and :AROUND initialization methods, and SETF SVUC and
+            ;; SBUC methods can cause slots to be accessed before the we have
+            ;; touched them here, which requires the instance-vector to be
+            ;; initialized with +SLOT-UNBOUND+ to start with.
+            (early-unbound-markers-p (or ii-before si-before ii-around
+                                         setf-svuc-slots sbuc-slots)))
         (multiple-value-bind
               (locations names bindings vars defaulting-initargs body)
             (slot-init-forms ctor
-                             (or ii-before si-before ii-around)
+                             early-unbound-markers-p
                              setf-svuc-slots sbuc-slots)
         (values
          locations
@@ -724,7 +729,7 @@
                        (invoke-method ,(car ii-around) .ii-args. .next-methods.))
                     ;; The simple case.
                     `(initialize-it .ii-args. nil)))))
-         (or ii-before si-before ii-around)))))))
+         early-unbound-markers-p))))))
 
 ;;; Return four values from APPLICABLE-METHODS: around methods, before
 ;;; methods, the applicable primary method, and applicable after
@@ -755,15 +760,14 @@
          (the ,type (progn ,@body)))
       `(progn ,@body)))
 
-;;; Return as multiple values bindings for default initialization
-;;; arguments, variable names, defaulting initargs and a body for
-;;; initializing instance and class slots of an object costructed by
-;;; CTOR.  The variable .SLOTS. is assumed to bound to the instance's
-;;; slot vector.  BEFORE-METHOD-P T means before-methods will be
-;;; called, which means that 1) other code will initialize instance
-;;; slots to +SLOT-UNBOUND+ before the before-methods are run, and
-;;; that we have to check if these before-methods have set slots.
-(defun slot-init-forms (ctor before-method-p setf-svuc-slots sbuc-slots)
+;;; Return as multiple values bindings for default initialization arguments,
+;;; variable names, defaulting initargs and a body for initializing instance
+;;; and class slots of an object costructed by CTOR. The variable .SLOTS. is
+;;; assumed to bound to the instance's slot vector. EARLY-UNBOUND-MARKERS-P
+;;; means other code will initialize instance slots to +SLOT-UNBOUND+, and we
+;;; have to check if something has already set slots before we initialize
+;;; them.
+(defun slot-init-forms (ctor early-unbound-markers-p setf-svuc-slots sbuc-slots)
   (let* ((class (ctor-class ctor))
          (initargs (ctor-initargs ctor))
          (initkeys (plist-keys initargs))
@@ -870,7 +874,7 @@
                                         +slot-unbound+))))
                         (ecase kind
                           ((nil)
-                           (unless before-method-p
+                           (unless early-unbound-markers-p
                              `(setf (clos-slots-ref .slots. ,i)
                                     +slot-unbound+)))
                           ((param var)
@@ -878,12 +882,12 @@
                           (initfn
                            (setf-form `(funcall ,value)))
                           (initform/initfn
-                           (if before-method-p
+                           (if early-unbound-markers-p
                                `(when ,(not-boundp-form)
                                   ,(setf-form `(funcall ,value)))
                                (setf-form `(funcall ,value))))
                           (initform
-                           (if before-method-p
+                           (if early-unbound-markers-p
                                `(when ,(not-boundp-form)
                                   ,(setf-form `',(constant-form-value value)))
                                (setf-form `',(constant-form-value value))))
