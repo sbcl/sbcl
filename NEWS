@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.46:
   * enhancement: (FORMAT "foo" ...) and similar signal a compile-time warning. (lp#327223)
   * enhancement: no more "in: LAMBDA NIL" messages from the compiler for forms
     processed using EVAL -- now the appropriate toplevel form is reported instead.
+  * enhancement: more legible style-warnings for inappropriate IGNORE and IGNORABLE
+    declarations. (lp#726331)
   * optimization: SLOT-VALUE &co are faster in the presence of SLOT-VALUE-USING-CLASS
     and its compatriots.
   * optimization: core startup time is reduced by 30% on x86-64. (lp#557357)

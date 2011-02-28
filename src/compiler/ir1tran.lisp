@@ -1333,26 +1333,41 @@
   (dolist (name (rest spec))
     (let ((var (find-in-bindings-or-fbindings name vars fvars)))
       (cond
-       ((not var)
-        ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
-        ;; requires that this be a STYLE-WARNING, not a full WARNING.
-        (compiler-style-warn "declaring unknown variable ~S to be ignored"
-                             name))
-       ;; FIXME: This special case looks like non-ANSI weirdness.
-       ((and (consp var) (eq (car var) 'macro))
-        ;; Just ignore the IGNORE decl.
-        )
-       ((functional-p var)
-        (setf (leaf-ever-used var) t))
-       ((and (lambda-var-specvar var) (eq (first spec) 'ignore))
-        ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
-        ;; requires that this be a STYLE-WARNING, not a full WARNING.
-        (compiler-style-warn "declaring special variable ~S to be ignored"
-                             name))
-       ((eq (first spec) 'ignorable)
-        (setf (leaf-ever-used var) t))
-       (t
-        (setf (lambda-var-ignorep var) t)))))
+        ((not var)
+         ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
+         ;; requires that this be a STYLE-WARNING, not a full WARNING.
+         (multiple-value-call #'compiler-style-warn
+           "~A declaration for ~A: ~A"
+           (first spec)
+           (if (symbolp name)
+               (values
+                (case (info :variable :kind name)
+                  (:special "a special variable")
+                  (:global "a global lexical variable")
+                  (:alien "a global alien variable")
+                  (t "an unknown variable"))
+                name)
+               (values
+                (if (info :function :kind (second name))
+                    "a global function"
+                    "an unknown function")
+                (second name)))))
+        ((and (consp var) (eq (car var) 'macro))
+         ;; Just ignore the IGNORE decl: we don't currently signal style-warnings
+         ;; for unused symbol-macros, so there's no need to do anything.
+         )
+        ((functional-p var)
+         (setf (leaf-ever-used var) t))
+        ((and (lambda-var-specvar var) (eq (first spec) 'ignore))
+         ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
+         ;; requires that this be a STYLE-WARNING, not a full WARNING.
+         (compiler-style-warn "Declaring special variable ~S to be ~A"
+                              name
+                              (first spec)))
+        ((eq (first spec) 'ignorable)
+         (setf (leaf-ever-used var) t))
+        (t
+         (setf (lambda-var-ignorep var) t)))))
   (values))
 
 (defun process-dx-decl (names vars fvars kind)
