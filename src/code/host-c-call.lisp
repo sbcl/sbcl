@@ -30,9 +30,16 @@
         external-format)))
 
 (define-alien-type-method (c-string :unparse) (type)
-  (list 'c-string
-        :external-format (alien-c-string-type-external-format type)
-        :element-type (alien-c-string-type-element-type type)))
+  (let* ((external-format (alien-c-string-type-external-format type))
+         (element-type (alien-c-string-type-element-type type))
+         (tail
+          (append (unless (eq :default external-format)
+                    (list :external-format external-format))
+                  (unless (eq 'character element-type)
+                    (list :element-type element-type))) ))
+    (if tail
+        (cons 'c-string tail)
+        'c-string)))
 
 (define-alien-type-method (c-string :lisp-rep) (type)
   (declare (ignore type))
