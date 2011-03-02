@@ -599,7 +599,7 @@ implementation it is ~S." *default-package-use-list*)
        (cerror "Clobber existing package."
                "A package named ~S already exists" name)
        (setf clobber t))
-     (with-packages ()
+     (with-package-graph ()
        ;; Check for race, signal the error outside the lock.
        (when (and (not clobber) (find-package name))
          (go :restart))
