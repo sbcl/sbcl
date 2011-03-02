@@ -307,4 +307,16 @@
     (compiler-note (n)
       (error n))))
 
+(with-test (:name :bug-721087)
+  (assert (typep nil '(alien c-string)))
+  (assert (not (typep nil '(alien (c-string :not-null t)))))
+  (assert (eq :ok
+              (handler-case
+                  (posix-getenv nil)
+                (type-error (e)
+                  (when (and (null (type-error-datum e))
+                             (equal (type-error-expected-type e)
+                                    '(alien (c-string :not-null t))))
+                    :ok))))))
+
 ;;; success

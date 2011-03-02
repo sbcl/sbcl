@@ -344,7 +344,7 @@ not supported."
     "Returns the resolved target of a symbolic link as a string."
     (flet ((%readlink (path buf length)
              (alien-funcall
-              (extern-alien "readlink" (function int c-string (* t) int))
+              (extern-alien "readlink" (function int (c-string :not-null t) (* t) int))
               path buf length)))
       (with-growing-c-string (buf size)
         (let ((count (%readlink (filename pathspec) buf size)))
@@ -480,10 +480,14 @@ not supported."
               nil
               (,conv r)))))))
 
-(define-obj-call "getpwnam" login-name (function (* alien-passwd) c-string) alien-to-passwd)
-(define-obj-call "getpwuid" uid (function (* alien-passwd) uid-t) alien-to-passwd)
-(define-obj-call "getgrnam" login-name (function (* alien-group) c-string) alien-to-group)
-(define-obj-call "getgrgid" gid (function (* alien-group) gid-t) alien-to-group)
+(define-obj-call "getpwnam" login-name (function (* alien-passwd) (c-string :not-null t))
+                 alien-to-passwd)
+(define-obj-call "getpwuid" uid (function (* alien-passwd) uid-t)
+                 alien-to-passwd)
+(define-obj-call "getgrnam" login-name (function (* alien-group) (c-string :not-null t))
+                 alien-to-group)
+(define-obj-call "getgrgid" gid (function (* alien-group) gid-t)
+                 alien-to-group)
 
 
 #-win32
@@ -542,12 +546,12 @@ not supported."
 
 (define-stat-call #-win32 "stat" #+win32 "_stat"
                   pathname filename
-                  (function int c-string (* alien-stat)))
+                  (function int (c-string :not-null t) (* alien-stat)))
 
 #-win32
 (define-stat-call "lstat"
                   pathname filename
-                  (function int c-string (* alien-stat)))
+                  (function int (c-string :not-null t) (* alien-stat)))
 ;;; No symbolic links on Windows, so use stat
 #+win32
 (progn
@@ -697,7 +701,7 @@ not supported."
           result)))
   (export 'utime :sb-posix)
   (defun utime (filename &optional access-time modification-time)
-    (let ((fun (extern-alien "utime" (function int c-string
+    (let ((fun (extern-alien "utime" (function int (c-string :not-null t)
                                                (* alien-utimbuf))))
           (name (filename filename)))
       (if (not (and access-time modification-time))
@@ -719,7 +723,7 @@ not supported."
              (if (minusp value)
                  (syscall-error)
                  value)))
-      (let ((fun (extern-alien "utimes" (function int c-string
+      (let ((fun (extern-alien "utimes" (function int (c-string :not-null t)
                                                   (* (array alien-timeval 2)))))
             (name (filename filename)))
         (if (not (and access-time modification-time))
@@ -745,15 +749,18 @@ not supported."
   (export 'getenv :sb-posix))
 (defun getenv (name)
   (let ((r (alien-funcall
-            (extern-alien "getenv" (function (* char) c-string))
+            (extern-alien "getenv" (function (* char) (c-string :not-null t)))
             name)))
     (declare (type (alien (* char)) r))
     (unless (null-alien r)
       (cast r c-string))))
 #-win32
 (progn
-  (define-call "setenv" int minusp (name c-string) (value c-string) (overwrite int))
-  (define-call "unsetenv" int minusp (name c-string))
+  (define-call "setenv" int minusp
+               (name (c-string :not-null t))
+               (value (c-string :not-null t))
+               (overwrite int))
+  (define-call "unsetenv" int minusp (name (c-string :not-null t)))
   (export 'putenv :sb-posix)
   (defun putenv (string)
     (declare (string string))
@@ -773,7 +780,7 @@ not supported."
 #+win32
 (progn
   ;; Windows doesn't define a POSIX setenv, but happily their _putenv is sane.
-  (define-call* "putenv" int minusp (string c-string))
+  (define-call* "putenv" int minusp (string (c-string :not-null t)))
   (export 'setenv :sb-posix)
   (defun setenv (name value overwrite)
     (declare (string name value))
@@ -793,7 +800,7 @@ not supported."
   (export 'closelog :sb-posix)
   (defun openlog (ident options &optional (facility log-user))
     (alien-funcall (extern-alien
-                    "openlog" (function void c-string int int))
+                    "openlog" (function void (c-string :not-null t) int int))
                    ident options facility))
   (defun syslog (priority format &rest args)
     "Send a message to the syslog facility, with severity level
@@ -801,7 +808,9 @@ PRIORITY.  The message will be formatted as by CL:FORMAT (rather
 than C's printf) with format string FORMAT and arguments ARGS."
     (flet ((syslog1 (priority message)
              (alien-funcall (extern-alien
-                             "syslog" (function void int c-string c-string))
+                             "syslog" (function void int
+                                                (c-string :not-null t)
+                                                (c-string :not-null t)))
                             priority "%s" message)))
       (syslog1 priority (apply #'format nil format args))))
   (define-call "closelog" void never-fails))

@@ -8,6 +8,8 @@ changes relative to sbcl-1.0.46:
     processed using EVAL -- now the appropriate toplevel form is reported instead.
   * enhancement: more legible style-warnings for inappropriate IGNORE and IGNORABLE
     declarations. (lp#726331)
+  * enhancement: :NOT-NULL option has been added to alien C-STRING type to indicate
+    that NIL/NULL is excluded from the type.
   * optimization: SLOT-VALUE &co are faster in the presence of SLOT-VALUE-USING-CLASS
     and its compatriots.
   * optimization: core startup time is reduced by 30% on x86-64. (lp#557357)
@@ -24,6 +26,9 @@ changes relative to sbcl-1.0.46:
   * bug fix: SLOT-BOUNDP information is correct during MAKE-INSTANCE in the
     presence of (SETF SLOT-VALUE-USING-CLASS) and SLOT-BOUNDP-USING-CLASS
     methods. (regression from 1.0.45.18)
+  * bug fix: several foreign functions accepting string also accepted NIL and
+    consequently caused a memory fault at 0 now signal a type-error instead.
+    (lp#721087)
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

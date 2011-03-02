@@ -284,11 +284,13 @@ return zero values.
 
 @item
 @cindex External formats
-The foreign type specifier @code{(sb-alien:c-string &key external-format
-element-type)} is similar to @code{(* char)}, but is interpreted as a
-null-terminated string, and is automatically converted into a Lisp
-string when accessed; or if the pointer is C @code{NULL} or @code{0},
-then accessing it gives Lisp @code{nil}.
+The foreign type specifier @code{(sb-alien:c-string &key
+external-format element-type not-null)} is similar to
+@code{(* char)}, but is interpreted as a null-terminated string, and
+is automatically converted into a Lisp string when accessed; or if the
+pointer is C @code{NULL} or @code{0}, then accessing it gives Lisp
+@code{nil} unless @code{not-null} is true, in which case a type-error
+is signalled.
 
 External format conversion is automatically done when Lisp strings are
 passed to foreign code, or when foreign strings are passed to Lisp code.

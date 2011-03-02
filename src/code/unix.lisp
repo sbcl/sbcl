@@ -111,7 +111,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 (define-alien-routine ("getenv" posix-getenv) c-string
   "Return the \"value\" part of the environment string \"name=value\" which
 corresponds to NAME, or NIL if there is none."
-  (name c-string))
+  (name (c-string :not-null t)))
 
 ;;; from stdio.h
 
@@ -120,7 +120,9 @@ corresponds to NAME, or NIL if there is none."
 #!-win32
 (defun unix-rename (name1 name2)
   (declare (type unix-pathname name1 name2))
-  (void-syscall ("rename" c-string c-string) name1 name2))
+  (void-syscall ("rename" (c-string :not-null t)
+                          (c-string :not-null t))
+                name1 name2))
 
 ;;; from sys/types.h and gnu/types.h
 
