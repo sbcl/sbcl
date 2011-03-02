@@ -639,7 +639,8 @@ be a lambda expression."
              (varify-lambda-arg name
                                 (if (eq context 'let*)
                                     nil
-                                    (names)))))
+                                    (names))
+                                context)))
       (dolist (spec bindings)
         (cond ((atom spec)
                (let ((var (get-var spec)))

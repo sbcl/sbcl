@@ -24,22 +24,28 @@
 ;;; If it is losing, we punt with a COMPILER-ERROR. NAMES-SO-FAR is a
 ;;; list of names which have previously been bound. If the NAME is in
 ;;; this list, then we error out.
-(declaim (ftype (sfunction (t list) lambda-var) varify-lambda-arg))
-(defun varify-lambda-arg (name names-so-far)
+(declaim (ftype (sfunction (t list &optional t) lambda-var) varify-lambda-arg))
+(defun varify-lambda-arg (name names-so-far &optional (context "lambda list"))
   (declare (inline member))
   (unless (symbolp name)
-    (compiler-error "The lambda variable ~S is not a symbol." name))
+    (compiler-error "~S is not a symbol, and cannot be used as a variable." name))
   (when (member name names-so-far :test #'eq)
-    (compiler-error "The variable ~S occurs more than once in the lambda list."
-                    name))
+    (compiler-error "The variable ~S occurs more than once in the ~A."
+                    name
+                    context))
   (let ((kind (info :variable :kind name)))
-    (cond ((or (keywordp name) (eq kind :constant))
-           (compiler-error "The name of the lambda variable ~S is already in use to name a constant."
+    (cond ((keywordp name)
+           (compiler-error "~S is a keyword, and cannot be used as a local variable."
+                           name))
+          ((eq kind :constant)
+           (compiler-error "~@<~S names a defined constant, and cannot be used as a ~
+                            local variable.~:@>"
                            name))
           ((eq :global kind)
-           (compiler-error "The name of the lambda variable ~S is already in use to name a global variable."
-                           name)))
-    (cond ((eq kind :special)
+           (compiler-error "~@<~S names a global lexical variable, and cannot be used ~
+                            as a local variable.~:@>"
+                           name))
+          ((eq kind :special)
            (let ((specvar (find-free-var name)))
              (make-lambda-var :%source-name name
                               :type (leaf-type specvar)
