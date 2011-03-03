@@ -252,7 +252,9 @@ case "$sbcl_os" in
         printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :sunos' >> $ltf
-        printf ' :largefile' >> $ltf
+        if [ $sbcl_arch = "x86-64" ]; then
+            printf ' :largefile' >> $ltf
+        fi
         if [ $sbcl_arch = "x86" ] || [ $sbcl_arch = "x86-64" ]; then
             printf ' :sb-lutex' >> $ltf
         fi
