@@ -824,11 +824,10 @@
                              :type (format nil "~AXXXXXX"
                                            (make-string n :initial-element #\x))
                              :defaults default))
-        (let ((pathname (sb-ext:parse-native-namestring temp)))
           (unwind-protect
-               (values (integerp fd) (pathname-name pathname))
-            (delete-file temp)))))
-  t "mkstemp-1")
+               (values (integerp fd) (subseq temp 0 (position #\. temp)))
+            (delete-file temp))))
+  t "/tmp/mkstemp-1")
 
 (deftest envstuff
     (let ((name1 "ASLIFJLSDKFJKAHGSDKLJH")
