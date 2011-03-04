@@ -273,5 +273,33 @@
                (assert (equal "b" (sneaky-b i)))
                (assert (equal "c" (sneaky-c i)))))))
 
+(defclass bug-728650-base ()
+  ((value
+    :initarg :value
+    :initform nil)))
+
+(defmethod initialize-instance :after ((instance bug-728650-base) &key)
+  (with-slots (value) instance
+    (unless value
+      (error "Impossible! Value slot not initialized in ~S" instance))))
+
+(defclass bug-728650-child-1 (bug-728650-base)
+  ())
+
+(defmethod initialize-instance :around ((instance bug-728650-child-1) &rest initargs &key)
+  (apply #'call-next-method instance :value 'provided-by-child-1 initargs))
+
+(defclass bug-728650-child-2 (bug-728650-base)
+  ())
+
+(defmethod initialize-instance :around ((instance bug-728650-child-2) &rest initargs &key)
+  (let ((foo (make-instance 'bug-728650-child-1)))
+    (apply #'call-next-method instance :value foo initargs)))
+
+(with-test (:name :bug-728650)
+  (let ((child1 (slot-value (make-instance 'bug-728650-child-2) 'value)))
+    (assert (typep child1 'bug-728650-child-1))
+    (assert (eq 'provided-by-child-1 (slot-value child1 'value)))))
+
 
 ;;;; success

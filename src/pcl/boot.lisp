@@ -706,7 +706,7 @@ bootstrapping.
                          (simple-lexical-method-functions
                              (,lambda-list .method-args. .next-methods.
                                            :call-next-method-p
-                                           ,call-next-method-p
+                                           ,(when call-next-method-p t)
                                            :next-method-p-p ,next-method-p-p
                                            :setq-p ,setq-p
                                            :parameters-setqd ,parameters-setqd
@@ -723,6 +723,8 @@ bootstrapping.
                                          %parameter-binding-modified))
                                ,@walked-lambda-body))))
                       `(,@(when call-next-method-p `(method-cell ,method-cell))
+                          ,@(when (member call-next-method-p '(:simple nil))
+                                  '(simple-next-method-call t))
                           ,@(when plist `(plist ,plist))
                           ,@(when documentation `(:documentation ,documentation)))))))))))
 
@@ -1463,7 +1465,9 @@ bootstrapping.
                    ;; like :LOAD-TOPLEVEL.
                    ((not (listp form)) form)
                    ((eq (car form) 'call-next-method)
-                    (setq call-next-method-p t)
+                    (setq call-next-method-p (if (cdr form)
+                                                 t
+                                                 :simple))
                     form)
                    ((eq (car form) 'next-method-p)
                     (setq next-method-p-p t)

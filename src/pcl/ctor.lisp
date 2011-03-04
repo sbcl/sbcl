@@ -545,7 +545,7 @@
                                 '(:instance :class)))
                       (class-slots class))
                (not maybe-invalid-initargs)
-               (not (nonstandard-primary-method-p
+               (not (hairy-around-or-nonstandard-primary-method-p
                      ii-methods *the-system-ii-method*))
                (not (around-or-nonstandard-primary-method-p
                      si-methods *the-system-si-method*)))
@@ -569,14 +569,16 @@
         when (null qualifiers) do
           (setq primary-checked-p t)))
 
-(defun nonstandard-primary-method-p
+(defun hairy-around-or-nonstandard-primary-method-p
     (methods &optional standard-method)
   (loop with primary-checked-p = nil
         for method in methods
         as qualifiers = (if (consp method)
                             (early-method-qualifiers method)
                             (safe-method-qualifiers method))
-        when (or (and (null qualifiers)
+        when (or (and (eq :around (car qualifiers))
+                      (not (simple-next-method-call-p method)))
+              (and (null qualifiers)
                       (not primary-checked-p)
                       (not (null standard-method))
                       (not (eq standard-method method))))
