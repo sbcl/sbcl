@@ -67,6 +67,7 @@ mach_exception_handler(void *port)
    signal handlers run in the relevant thread directly. */
 
 mach_port_t mach_exception_handler_port_set = MACH_PORT_NULL;
+mach_port_t current_mach_task = MACH_PORT_NULL;
 
 pthread_t
 setup_mach_exception_handling_thread()
@@ -75,8 +76,10 @@ setup_mach_exception_handling_thread()
     pthread_t mach_exception_handling_thread = NULL;
     pthread_attr_t attr;
 
+    current_mach_task = mach_task_self();
+
     /* allocate a mach_port for this process */
-    ret = mach_port_allocate(mach_task_self(),
+    ret = mach_port_allocate(current_mach_task,
                              MACH_PORT_RIGHT_PORT_SET,
                              &mach_exception_handler_port_set);
 
@@ -105,7 +108,7 @@ mach_thread_init(mach_port_t thread_exception_port)
 
     FSHOW((stderr, "Allocating mach port %x\n", thread_exception_port));
 
-    ret = mach_port_allocate_name(mach_task_self(),
+    ret = mach_port_allocate_name(current_mach_task,
                                   MACH_PORT_RIGHT_RECEIVE,
                                   thread_exception_port);
     if (ret) {
@@ -113,7 +116,7 @@ mach_thread_init(mach_port_t thread_exception_port)
     }
 
     /* establish the right for the thread_exception_port to send messages */
-    ret = mach_port_insert_right(mach_task_self(),
+    ret = mach_port_insert_right(current_mach_task,
                                  thread_exception_port,
                                  thread_exception_port,
                                  MACH_MSG_TYPE_MAKE_SEND);
@@ -130,7 +133,7 @@ mach_thread_init(mach_port_t thread_exception_port)
         lose("thread_set_exception_port failed with return_code %d\n", ret);
     }
 
-    ret = mach_port_move_member(mach_task_self(),
+    ret = mach_port_move_member(current_mach_task,
                                 thread_exception_port,
                                 mach_exception_handler_port_set);
     if (ret) {
