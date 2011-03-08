@@ -471,7 +471,8 @@ catch_exception_raise(mach_port_t exception_port,
 #ifdef LISP_FEATURE_SB_THREAD
         thread_mutex_unlock(&mach_exception_lock);
 #endif
-        return KERN_SUCCESS;
+        ret = KERN_SUCCESS;
+        break;
 
     case EXC_BAD_INSTRUCTION:
 
@@ -563,14 +564,21 @@ catch_exception_raise(mach_port_t exception_port,
 #ifdef LISP_FEATURE_SB_THREAD
         thread_mutex_unlock(&mach_exception_lock);
 #endif
-        return KERN_SUCCESS;
+        ret = KERN_SUCCESS;
+        break;
 
     default:
 #ifdef LISP_FEATURE_SB_THREAD
         thread_mutex_unlock(&mach_exception_lock);
 #endif
-        return KERN_INVALID_RIGHT;
+        ret = KERN_INVALID_RIGHT;
     }
+
+    mach_port_deallocate (current_mach_task, exception_port);
+    mach_port_deallocate (current_mach_task, thread);
+    mach_port_deallocate (current_mach_task, task);
+
+    return ret;
 }
 
 #endif
