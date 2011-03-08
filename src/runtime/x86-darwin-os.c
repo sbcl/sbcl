@@ -495,6 +495,11 @@ catch_exception_raise(mach_port_t exception_port,
       siginfo.si_addr = addr;
       call_handler_on_thread(thread, &thread_state, signal, &siginfo, handler);
     }
+
+    mach_port_deallocate (current_mach_task, exception_port);
+    mach_port_deallocate (current_mach_task, thread);
+    mach_port_deallocate (current_mach_task, task);
+
     return ret;
 }
 
