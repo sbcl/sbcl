@@ -301,7 +301,7 @@ catch_exception_raise(mach_port_t exception_port,
                       exception_data_t code_vector,
                       mach_msg_type_number_t code_count)
 {
-    kern_return_t ret;
+    kern_return_t ret, dealloc_ret;
     int signal;
     siginfo_t* siginfo;
 
@@ -574,9 +574,15 @@ catch_exception_raise(mach_port_t exception_port,
         ret = KERN_INVALID_RIGHT;
     }
 
-    mach_port_deallocate (current_mach_task, exception_port);
-    mach_port_deallocate (current_mach_task, thread);
-    mach_port_deallocate (current_mach_task, task);
+    dealloc_ret = mach_port_deallocate (current_mach_task, thread);
+    if (dealloc_ret) {
+      lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
+    }
+
+    dealloc_ret = mach_port_deallocate (current_mach_task, task);
+    if (dealloc_ret) {
+      lose("mach_port_deallocate (task) failed with return_code %d\n", dealloc_ret);
+    }
 
     return ret;
 }
