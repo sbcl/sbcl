@@ -398,7 +398,7 @@ catch_exception_raise(mach_port_t exception_port,
     int signal = 0;
     void (*handler)(int, siginfo_t *, void *) = NULL;
     siginfo_t siginfo;
-    kern_return_t ret;
+    kern_return_t ret, dealloc_ret;
 
     /* Get state and info */
     state_count = x86_THREAD_STATE32_COUNT;
@@ -496,9 +496,15 @@ catch_exception_raise(mach_port_t exception_port,
       call_handler_on_thread(thread, &thread_state, signal, &siginfo, handler);
     }
 
-    mach_port_deallocate (current_mach_task, exception_port);
-    mach_port_deallocate (current_mach_task, thread);
-    mach_port_deallocate (current_mach_task, task);
+    dealloc_ret = mach_port_deallocate (current_mach_task, thread);
+    if (dealloc_ret) {
+      lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
+    }
+
+    dealloc_ret = mach_port_deallocate (current_mach_task, task);
+    if (dealloc_ret) {
+      lose("mach_port_deallocate (task) failed with return_code %d\n", dealloc_ret);
+    }
 
     return ret;
 }

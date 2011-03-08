@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.46:
+  * bug fix: fix mach port rights leaks in mach exception handling code on
+    darwin/x86 and /x86-64. (thanks to Willem Oudshoorn for motivation and the
+    initial patch)
   * enhancement: --script muffles style-warnings and compiler notes. (lp#677779)
   * enhancement: redefinition warnings for macros from different files. (lp#434657)
   * enhancement: better MACHINE-VERSION on Darwin x86 and x86-64. (lp#668332)
