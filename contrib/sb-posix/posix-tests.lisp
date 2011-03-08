@@ -171,15 +171,19 @@
   (handler-case
       (sb-posix:rmdir #-win32 "/" #+win32 "C:/")
     (sb-posix:syscall-error (c)
-      (sb-posix:syscall-errno c)))
-  #+darwin
-  #.sb-posix:eisdir
-  #+win32
-  #.sb-posix::eacces
-  #+sunos
-  #.sb-posix::einval
-  #-(or darwin win32 sunos)
-  #.sb-posix::ebusy)
+      (typep
+       (sb-posix:syscall-errno c)
+       '(member
+         #+darwin
+         #.sb-posix:eisdir
+         #+win32
+         #.sb-posix::eacces
+         #+win32
+         #.sb-posix::enotempty
+         #+sunos
+         #.sb-posix::einval
+         #-(or darwin win32 sunos)
+         #.sb-posix::ebusy)))) t)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
