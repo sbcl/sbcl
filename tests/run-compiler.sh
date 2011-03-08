@@ -12,6 +12,10 @@ case "$platform" in
     Darwin-X86-64) args="-arch x86_64" ;;
 esac
 
+case "$platform" in
+    Darwin-X86) args="-arch i386" ;;
+esac
+
 while [ $# -gt 0 ]; do
     arg="$1"
     new=
