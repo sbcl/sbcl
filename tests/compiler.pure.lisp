@@ -3770,3 +3770,20 @@
   (handler-bind ((warning #'error))
     (funcall (compile nil '(lambda () (directory "." :allow-other-keys t))))
     (funcall (compile nil `(lambda () (directory "." :bar t :allow-other-keys t))))))
+
+(with-test (:name :bug-551227)
+  ;; This function causes constraint analysis to perform a
+  ;; ref-substitution that alters the A referred to in (G A) at in the
+  ;; consequent of the IF to refer to be NUMBER, from the
+  ;; LET-converted inline-expansion of MOD.  This leads to attempting
+  ;; to CLOSE-OVER a variable that simply isn't in scope when it is
+  ;; referenced.
+  (compile nil '(lambda (a)
+                  (if (let ((s a))
+                        (block :block
+                          (map nil
+                               (lambda (e)
+                                 (return-from :block
+                                   (f (mod a e))))
+                               s)))
+                      (g a)))))

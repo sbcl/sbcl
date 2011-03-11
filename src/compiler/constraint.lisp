@@ -604,6 +604,24 @@
           (modified-numeric-type x :low new-bound)
           (modified-numeric-type x :high new-bound)))))
 
+;;; Return true if LEAF is "visible" from NODE.
+(defun leaf-visible-from-node-p (leaf node)
+  (cond
+   ((lambda-var-p leaf)
+    ;; A LAMBDA-VAR is visible iif it is homed in a CLAMBDA that is an
+    ;; ancestor for NODE.
+    (let ((leaf-lambda (lambda-var-home leaf)))
+      (loop for lambda = (node-home-lambda node)
+            then (lambda-parent lambda)
+            while lambda
+            when (eq lambda leaf-lambda)
+            return t)))
+   ;; FIXME: Check on FUNCTIONALs (CLAMBDAs and OPTIONAL-DISPATCHes),
+   ;; not just LAMBDA-VARs.
+   (t
+    ;; Assume everything else is globally visible.
+    t)))
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
@@ -659,7 +677,9 @@
                               (and (leaf-refs other) ; protect from
                                         ; deleted vars
                                    (csubtypep other-type leaf-type)
-                                   (not (type= other-type leaf-type))))
+                                   (not (type= other-type leaf-type))
+                                   ;; Don't change to a LEAF not visible here.
+                                   (leaf-visible-from-node-p other ref)))
                           (change-ref-leaf ref other)
                           (when (constant-p other) (return)))
                          (t

@@ -34,6 +34,10 @@ changes relative to sbcl-1.0.46:
   * bug fix: several foreign functions accepting string also accepted NIL and
     consequently caused a memory fault at 0 now signal a type-error instead.
     (lp#721087)
+  * bug fix: under rare circumstances, constraint propagation could rewrite a
+    variable reference to refer to a variable not in scope, causing an error
+    during physical environment analysis when attempting to close over the
+    variable. (lp#551227)
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.
