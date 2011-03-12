@@ -2759,7 +2759,7 @@
                           (eval '(,lambda ,@args))))))))
   (sb-vm::with-float-traps-masked
       (:divide-by-zero :overflow :inexact :invalid)
-    (let ((sb-ext:*evaluator-mode* :interpret))
+    (let (#+sb-eval (sb-ext:*evaluator-mode* :interpret))
       (declare (sb-ext:muffle-conditions style-warning))
       (test-comparison eql t t nil)
       (test-comparison eql t t t)

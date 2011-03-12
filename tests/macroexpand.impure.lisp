@@ -45,6 +45,7 @@
     (assert flag)
     (assert expanded-p)))
 
+#+sb-eval
 (let ((sb-ext::*evaluator-mode* :interpret))
   (let* ((expanded-p nil)
          (*macroexpand-hook* #'(lambda (fn form env)

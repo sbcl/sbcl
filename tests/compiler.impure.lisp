@@ -1708,6 +1708,7 @@
                            (list &whole x)))
               (program-error ()
                 :ok))))
+#+sb-eval
 (assert (eq :ok
             (handler-case
                 (let ((*evaluator-mode* :interpret))
@@ -1726,7 +1727,7 @@
                  (defmacro macro-no-env ()
                    :foo))))
 
-(dolist (*evaluator-mode* '(:interpret :compile))
+(dolist (*evaluator-mode* '(#+sb-eval :interpret :compile))
   (disassemble (eval '(defun disassemble-source-form-bug (x y z)
                        (declare (optimize debug))
                        (list x y z)))))
