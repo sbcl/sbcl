@@ -13,6 +13,8 @@ changes relative to sbcl-1.0.46:
     declarations. (lp#726331)
   * enhancement: :NOT-NULL option has been added to alien C-STRING type to indicate
     that NIL/NULL is excluded from the type.
+  * enhancement: SB-INTROSPECT:MAP-ROOT allows mapping over pointers contained in
+    arbitrary objects.
   * optimization: SLOT-VALUE &co are faster in the presence of SLOT-VALUE-USING-CLASS
     and its compatriots.
   * optimization: core startup time is reduced by 30% on x86-64. (lp#557357)
