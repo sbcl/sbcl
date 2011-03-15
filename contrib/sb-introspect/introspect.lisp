@@ -900,8 +900,8 @@ Experimental: interface subject to change."
                (funcall fun part))))
       (etypecase object
         ((or bignum float sb-sys:system-area-pointer fixnum))
-        (weak-pointer
-         (call (weak-pointer-value object)))
+        (sb-ext:weak-pointer
+         (call (sb-ext:weak-pointer-value object)))
         (cons
          (call (car object))
          (call (cdr object))
@@ -958,11 +958,15 @@ Experimental: interface subject to change."
                do (call (sb-kernel:%funcallable-instance-info object i))))
         (symbol
          (when (boundp object)
-           (let ((global (ignore-errors (symbol-global-value object)))
-                 (local (symbol-value object)))
-             (call global)
-             (unless (eq local global)
-               (call local))))
+           (let ((local (symbol-value object)))
+             (handler-case
+                 ;; Possibly bound only in the current thread -- and we don't
+                 ;; have GLOBAL-BOUNDP.
+                 (let ((global (sb-ext:symbol-global-value object)))
+                   (unless (eq local global)
+                     (call global)))
+               (unbound-variable ()
+                 nil))))
          (when (and ext (ignore-errors (fboundp object)))
            (call (fdefinition object))
            (let ((class (find-class object nil)))
@@ -975,7 +979,7 @@ Experimental: interface subject to change."
          (case (sb-kernel:widetag-of object)
            (#.sb-vm::value-cell-header-widetag
             (call (sb-kernel::value-cell-ref object)))
-           #+sb-lutex
+           #+(and sb-lutex sb-thread)
            (#.sb-vm::lutex-widetag)
            (t
             (warn "~&MAP-ROOT: Unknown widetag ~S: ~S~%"
