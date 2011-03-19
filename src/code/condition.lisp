@@ -1014,22 +1014,26 @@
 #!+sb-package-locks
 (progn
 
-(define-condition package-lock-violation (reference-condition package-error)
-  ((format-control :initform nil :initarg :format-control
-                   :reader package-error-format-control)
-   (format-arguments :initform nil :initarg :format-arguments
-                     :reader package-error-format-arguments))
+(define-condition package-lock-violation (package-error
+                                          reference-condition
+                                          simple-condition)
+  ((current-package :initform *package*
+                    :reader package-lock-violation-in-package))
   (:report
    (lambda (condition stream)
-     (let ((control (package-error-format-control condition)))
+     (let ((control (simple-condition-format-control condition))
+           (error-package (package-name (package-error-package condition)))
+           (current-package (package-name (package-lock-violation-in-package condition))))
        (if control
            (apply #'format stream
-                  (format nil "~~@<Lock on package ~A violated when ~A.~~:@>"
-                          (package-name (package-error-package condition))
-                          control)
-                  (package-error-format-arguments condition))
-           (format stream "~@<Lock on package ~A violated.~:@>"
-                   (package-name (package-error-package condition)))))))
+                  (format nil "~~@<Lock on package ~A violated when ~A while in package ~A.~~:@>"
+                          error-package
+                          control
+                          current-package)
+                  (simple-condition-format-arguments condition))
+           (format stream "~@<Lock on package ~A violated while in package ~A.~:@>"
+                   error-package
+                   current-package)))))
   ;; no :default-initargs -- reference-stuff provided by the
   ;; signalling form in target-package.lisp
   #!+sb-doc
