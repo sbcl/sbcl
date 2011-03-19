@@ -171,9 +171,11 @@
 ;;; The current code doesn't seem to quite match that.
 (def!method print-object ((x condition) stream)
   (if *print-escape*
-      (if (and (typep x 'simple-condition) (slot-boundp x 'format-control))
+      (if (and (typep x 'simple-condition) (slot-value x 'format-control))
           (print-unreadable-object (x stream :type t :identity t)
-            (format stream "~S" (simple-condition-format-control x)))
+            (write (simple-condition-format-control x)
+                   :stream stream
+                   :lines 1))
           (print-unreadable-object (x stream :type t :identity t)))
       ;; KLUDGE: A comment from CMU CL here said
       ;;   7/13/98 BUG? CPL is not sorted and results here depend on order of
@@ -589,18 +591,21 @@
 (define-condition style-warning (warning) ())
 
 (defun simple-condition-printer (condition stream)
-  (apply #'format
-         stream
-         (simple-condition-format-control condition)
-         (simple-condition-format-arguments condition)))
+  (let ((control (simple-condition-format-control condition)))
+    (if control
+        (apply #'format stream
+               control
+               (simple-condition-format-arguments condition))
+        (error "No format-control for ~S" condition))))
 
 (define-condition simple-condition ()
   ((format-control :reader simple-condition-format-control
                    :initarg :format-control
+                   :initform nil
                    :type format-control)
    (format-arguments :reader simple-condition-format-arguments
                      :initarg :format-arguments
-                     :initform '()
+                     :initform nil
                      :type list))
   (:report simple-condition-printer))
 

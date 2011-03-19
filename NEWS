@@ -40,6 +40,7 @@ changes relative to sbcl-1.0.46:
     variable reference to refer to a variable not in scope, causing an error
     during physical environment analysis when attempting to close over the
     variable. (lp#551227)
+  * bug fix: SIMPLE-CONDITION :FORMAT-CONTROL defaults to NIL.
 
 changes in sbcl-1.0.46 relative to sbcl-1.0.45:
   * enhancement: largefile support on Solaris.

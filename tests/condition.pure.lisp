@@ -163,3 +163,19 @@
                   (assert (equal '(restart-case (foo :report "quux" (quux)))
                                  (simple-condition-format-arguments e)))
                   :ok)))))
+
+(with-test (:name :simple-condition-without-args)
+  (let ((sc (make-condition 'simple-condition)))
+    (assert (not (simple-condition-format-control sc)))
+    (assert (not (simple-condition-format-arguments sc)))
+    (assert (stringp (prin1-to-string sc)))
+    (assert
+     (eq :ok
+         (handler-case
+             (princ-to-string sc)
+           (simple-error (c)
+             (when (and (equal "No format-control for ~S"
+                               (simple-condition-format-control c))
+                        (eq sc (car
+                                (simple-condition-format-arguments c))))
+               :ok)))))))

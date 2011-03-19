@@ -1277,7 +1277,7 @@
 (defknown method-combination-error (format-control &rest t) *)
 (defknown signal (t &rest t) null)
 (defknown simple-condition-format-control (condition)
-  format-control)
+  (or null format-control))
 (defknown simple-condition-format-arguments (condition)
   list)
 (defknown warn (t &rest t) null)
