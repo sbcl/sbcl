@@ -592,13 +592,10 @@
 
 (defvar *eql-specializer-table* (make-hash-table :test 'eql))
 
-(defvar *eql-specializer-table-lock*
-  (sb-thread::make-spinlock :name "EQL-specializer table lock"))
-
 (defun intern-eql-specializer (object)
   ;; Need to lock, so that two threads don't get non-EQ specializers
   ;; for an EQL object.
-  (sb-thread::with-spinlock (*eql-specializer-table-lock*)
+  (with-locked-hash-table (*eql-specializer-table*)
     (or (gethash object *eql-specializer-table*)
         (setf (gethash object *eql-specializer-table*)
               (make-instance 'eql-specializer :object object)))))
