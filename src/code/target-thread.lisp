@@ -1196,7 +1196,24 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
                      (setf (sap-ref-word (%thread-sap thread) offset)
                            (get-lisp-obj-address value))
                      (values value :ok))))
-            (values nil :thread-dead))))))
+            (values nil :thread-dead)))))
+
+  (define-alien-variable tls-index-start unsigned-int)
+
+  ;; Get values from the TLS.
+  (defun %thread-local-values (thread)
+    (without-gcing
+      (when (thread-alive-p thread)
+        (let ((sap (%thread-sap thread)))
+          (loop for index from tls-index-start below
+                   (symbol-value 'sb!vm::*free-tls-index*)
+                for value = (sap-ref-word sap (* sb!vm:n-word-bytes index))
+                for obj = (sb!kernel:make-lisp-obj value nil)
+                unless (or (typep obj '(or boolean fixnum character))
+                           (member value
+                                   '(#.sb!vm:no-tls-value-marker-widetag
+                                     #.sb!vm:unbound-marker-widetag)))
+                collect obj))))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T

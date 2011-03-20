@@ -871,33 +871,39 @@ Experimental: interface subject to change."
                      (values :stack sb-thread::*current-thread*))))
                :foreign)))))
 
-(defun map-root (function object &key simple ext)
-  "Call FUNCTION with all non-immediate objects pointed to by OBJECT. Returns
-OBJECT.
+(defun map-root (function object &key simple (ext t))
+  "Call FUNCTION with all non-immediate objects pointed to by OBJECT.
+Returns OBJECT.
 
-If SIMPLE is true, elides those pointers that are not notionally part of
-certain built-in objects, but backpointers to a conceptual parent: eg. elides
-the pointer from a SYMBOL to the corresponding PACKAGE.
+If SIMPLE is true (default is NIL), elides those pointers that are not
+notionally part of certain built-in objects, but backpointers to a
+conceptual parent: eg. elides the pointer from a SYMBOL to the
+corresponding PACKAGE.
 
-If EXT is true, includes some pointers that are not actually contained in the
-object, but in well-known indirect containers. For example, symbols in SBCL do
-not directly point to their SYMBOL-FUNCTION or class by the same name, but
-when :EXT T is used MAP-ROOT will also walk the function and class (if any)
-associated with the symbol.
+If EXT is true (default is T), includes some pointers that are not
+actually contained in the object, but found in certain well-known
+indirect containers: FDEFINITIONs, EQL specializers, classes, and
+thread-local symbol values in other threads fall into this category.
 
-NOTE: calling MAP-ROOT with a THREAD does not currently map over conservative
-roots from the thread stack & interrupt contexts, nor over thread-local symbol
-bindings.
+NOTE: calling MAP-ROOT with a THREAD does not currently map over
+conservative roots from the thread stack & interrupt contexts.
 
 Experimental: interface subject to change."
-  (let ((fun (coerce function 'function)))
+  (let ((fun (coerce function 'function))
+        (seen (sb-int:alloc-xset)))
     (flet ((call (part)
-             (when (member (sb-kernel:lowtag-of part)
-                           `(,sb-vm:instance-pointer-lowtag
-                             ,sb-vm:list-pointer-lowtag
-                             ,sb-vm:fun-pointer-lowtag
-                             ,sb-vm:other-pointer-lowtag))
+             (when (and (member (sb-kernel:lowtag-of part)
+                                `(,sb-vm:instance-pointer-lowtag
+                                  ,sb-vm:list-pointer-lowtag
+                                  ,sb-vm:fun-pointer-lowtag
+                                  ,sb-vm:other-pointer-lowtag))
+                        (not (sb-int:xset-member-p part seen)))
+               (sb-int:add-to-xset part seen)
                (funcall fun part))))
+      (when ext
+        (let ((table sb-pcl::*eql-specializer-table*))
+          (call (sb-ext:with-locked-hash-table (table)
+                  (gethash object table)))))
       (etypecase object
         ((or bignum float sb-sys:system-area-pointer fixnum))
         (sb-ext:weak-pointer
@@ -920,7 +926,10 @@ Experimental: interface subject to change."
                                 (sb-kernel:%instance-layout object))
                                0)))
            (dotimes (i (- len nuntagged))
-             (call (sb-kernel:%instance-ref object i)))))
+             (call (sb-kernel:%instance-ref object i))))
+         (when (typep object 'sb-thread:thread)
+           (dolist (value (sb-thread::%thread-local-values object))
+             (call value))))
         (array
          (if (simple-vector-p object)
              (dotimes (i (length object))
@@ -957,18 +966,16 @@ Experimental: interface subject to change."
                                      sb-vm::funcallable-instance-info-offset)
                do (call (sb-kernel:%funcallable-instance-info object i))))
         (symbol
-         (when (boundp object)
-           (let ((local (symbol-value object)))
-             (handler-case
-                 ;; Possibly bound only in the current thread -- and we don't
-                 ;; have GLOBAL-BOUNDP.
-                 (let ((global (sb-ext:symbol-global-value object)))
-                   (unless (eq local global)
-                     (call global)))
-               (unbound-variable ()
-                 nil))))
+         (when ext
+           (dolist (thread (sb-thread:list-all-threads))
+             (call (sb-thread:symbol-value-in-thread object thread nil))))
+         (handler-case
+             ;; We don't have GLOBAL-BOUNDP, and there's no ERRORP arg.
+             (call (sb-ext:symbol-global-value object))
+           (unbound-variable ()))
          (when (and ext (ignore-errors (fboundp object)))
            (call (fdefinition object))
+           (call (macro-function object))
            (let ((class (find-class object nil)))
              (when class (call class))))
          (call (symbol-plist object))
