@@ -2238,8 +2238,12 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
          * header. */
         switch (widetag_of(*start_addr)) {
         case CODE_HEADER_WIDETAG:
-            /* This case is probably caught above. */
-            break;
+          /* Make sure we actually point to a function in the code object,
+           * as opposed to a random point there. */
+          if (SIMPLE_FUN_HEADER_WIDETAG==widetag_of(*(pointer-FUN_POINTER_LOWTAG)))
+            return 1;
+          else
+            return 0;
         case CLOSURE_HEADER_WIDETAG:
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
             if ((unsigned long)pointer !=
