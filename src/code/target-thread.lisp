@@ -1200,20 +1200,22 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 
   (define-alien-variable tls-index-start unsigned-int)
 
-  ;; Get values from the TLS.
-  (defun %thread-local-values (thread)
+  ;; Get values from the TLS area of the current thread.
+  (defun %thread-local-references ()
     (without-gcing
-      (when (thread-alive-p thread)
-        (let ((sap (%thread-sap thread)))
-          (loop for index from tls-index-start below
-                   (symbol-value 'sb!vm::*free-tls-index*)
-                for value = (sap-ref-word sap (* sb!vm:n-word-bytes index))
-                for obj = (sb!kernel:make-lisp-obj value nil)
-                unless (or (typep obj '(or boolean fixnum character))
-                           (member value
-                                   '(#.sb!vm:no-tls-value-marker-widetag
-                                     #.sb!vm:unbound-marker-widetag)))
-                collect obj))))))
+      (let ((sap (%thread-sap *current-thread*)))
+        (loop for index from tls-index-start
+                below (symbol-value 'sb!vm::*free-tls-index*)
+              for value = (sap-ref-word sap (* sb!vm:n-word-bytes index))
+              for (obj ok) = (multiple-value-list (sb!kernel:make-lisp-obj value nil))
+              unless (or (not ok)
+                         (typep obj '(or fixnum character))
+                         (member value
+                                 '(#.sb!vm:no-tls-value-marker-widetag
+                                   #.sb!vm:unbound-marker-widetag))
+                         (member obj seen :test #'eq))
+                collect obj into seen
+              finally (return seen))))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T

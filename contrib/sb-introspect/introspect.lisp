@@ -886,7 +886,7 @@ indirect containers: FDEFINITIONs, EQL specializers, classes, and
 thread-local symbol values in other threads fall into this category.
 
 NOTE: calling MAP-ROOT with a THREAD does not currently map over
-conservative roots from the thread stack & interrupt contexts.
+conservative roots from the thread registers and interrupt contexts.
 
 Experimental: interface subject to change."
   (let ((fun (coerce function 'function))
@@ -928,8 +928,27 @@ Experimental: interface subject to change."
            (dotimes (i (- len nuntagged))
              (call (sb-kernel:%instance-ref object i))))
          (when (typep object 'sb-thread:thread)
-           (dolist (value (sb-thread::%thread-local-values object))
-             (call value))))
+           (cond ((eq object sb-thread:*current-thread*)
+                  (dolist (value (sb-thread::%thread-local-references))
+                    (call value))
+                  (sb-vm::map-stack-references #'call))
+                 (t
+                  ;; KLUDGE: INTERRUPT-THREAD is Not Nice (tm), but
+                  ;; the alternative would be stopping the world...
+                  #+sb-thread
+                  (let ((sem (sb-thread:make-semaphore))
+                        (refs nil))
+                    (handler-case
+                        (progn
+                          (sb-thread:interrupt-thread
+                           object
+                           (lambda ()
+                             (setf refs (sb-thread::%thread-local-references))
+                             (sb-vm::map-stack-references (lambda (x) (push x refs)))
+                             (sb-thread:signal-semaphore sem)))
+                          (sb-thread:wait-on-semaphore sem))
+                      (sb-thread:interrupt-thread-error ()))
+                    (mapc #'call refs))))))
         (array
          (if (simple-vector-p object)
              (dotimes (i (length object))

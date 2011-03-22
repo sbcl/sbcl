@@ -784,6 +784,26 @@
        space)
       res)))
 
+;;; Calls FUNCTION with all object that have (possibly conservative)
+;;; references to them on current stack.
+(defun map-stack-references (function)
+  (let ((end
+         (sb!di::descriptor-sap
+          #!+stack-grows-downward-not-upward *control-stack-end*
+          #!-stack-grows-downward-not-upward *control-stack-start*))
+        (sp (current-sp))
+        (seen nil))
+    (loop until #!+stack-grows-downward-not-upward (sap> sp end)
+                #!-stack-grows-downward-not-upward (sap< sp end)
+          do (multiple-value-bind (obj ok) (make-lisp-obj (sap-ref-word sp 0) nil)
+               (when (and ok (typep obj '(not (or fixnum character))))
+                 (unless (member obj seen :test #'eq)
+                   (funcall function obj)
+                   (push obj seen))))
+             (setf sp
+                   #!+stack-grows-downward-not-upward (sap+ sp n-word-bytes)
+                   #!-stack-grows-downward-not-upward (sap- sp n-word-bytes)))))
+
 (defun map-referencing-objects (fun space object)
   (declare (type spaces space) (inline map-allocated-objects))
   (unless *ignore-after*
