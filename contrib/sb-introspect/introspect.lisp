@@ -927,6 +927,7 @@ Experimental: interface subject to change."
                                0)))
            (dotimes (i (- len nuntagged))
              (call (sb-kernel:%instance-ref object i))))
+         #+sb-thread
          (when (typep object 'sb-thread:thread)
            (cond ((eq object sb-thread:*current-thread*)
                   (dolist (value (sb-thread::%thread-local-references))
