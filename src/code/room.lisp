@@ -802,7 +802,7 @@
                    (push obj seen))))
              (setf sp
                    #!+stack-grows-downward-not-upward (sap+ sp n-word-bytes)
-                   #!-stack-grows-downward-not-upward (sap- sp n-word-bytes)))))
+                   #!-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
 
 (defun map-referencing-objects (fun space object)
   (declare (type spaces space) (inline map-allocated-objects))
