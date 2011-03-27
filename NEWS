@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.46:
+changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on
     darwin/x86 and /x86-64. (thanks to Willem Oudshoorn for motivation and the
     initial patch)
