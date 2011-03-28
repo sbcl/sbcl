@@ -337,7 +337,8 @@ main(int argc, char *argv[], char *envp[])
             core = (runtime_path ? runtime_path :
                     copied_string(saved_runtime_path));
         } else {
-            free(runtime_path);
+            if (runtime_path)
+                free(runtime_path);
         }
     }
 

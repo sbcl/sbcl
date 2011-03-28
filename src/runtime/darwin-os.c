@@ -36,8 +36,6 @@ os_get_runtime_executable_path(int external)
 
     if (_NSGetExecutablePath(path, &size) == -1)
         return NULL;
-    else
-        path[size] = '\0';
 
     return copied_string(path);
 }
