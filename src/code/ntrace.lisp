@@ -450,7 +450,7 @@
             (trace-1 mf info)
             (when (typep mf 'sb-pcl::%method-function)
               (trace-1 (sb-pcl::%method-function-fast-function mf) info)))))
-      
+
       function-or-name)))
 
 ;;;; the TRACE macro

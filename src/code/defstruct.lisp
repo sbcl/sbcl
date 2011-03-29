@@ -1369,99 +1369,117 @@
 ;;;     SIMPLE-VECTOR.)
 ;;;   * STRUCTURE structures can have raw slots that must also be
 ;;;     allocated and indirectly referenced.
-(defun create-vector-constructor (dd cons-name arglist vars types values)
+(defun create-vector-constructor (dd cons-name arglist ftype-arglist decls values)
   (let ((temp (gensym))
-        (etype (dd-element-type dd)))
-    `(defun ,cons-name ,arglist
-       (declare ,@(mapcar (lambda (var type) `(type (and ,type ,etype) ,var))
-                          vars types))
-       (let ((,temp (make-array ,(dd-length dd)
-                                :element-type ',(dd-element-type dd))))
-         ,@(mapcar (lambda (x)
-                     `(setf (aref ,temp ,(cdr x))  ',(car x)))
-                   (find-name-indices dd))
-         ,@(mapcar (lambda (dsd value)
-                     (unless (eq value '.do-not-initialize-slot.)
-                         `(setf (aref ,temp ,(dsd-index dsd)) ,value)))
-                   (dd-slots dd) values)
-         ,temp))))
-(defun create-list-constructor (dd cons-name arglist vars types values)
+        (etype (dd-element-type dd))
+        (len (dd-length dd)))
+    (values
+     `(defun ,cons-name ,arglist
+        ,@(when decls `((declare ,@decls)))
+        (let ((,temp (make-array ,len :element-type ',etype)))
+          ,@(mapcar (lambda (x)
+                      `(setf (aref ,temp ,(cdr x))  ',(car x)))
+                    (find-name-indices dd))
+          ,@(mapcar (lambda (dsd value)
+                      (unless (eq value '.do-not-initialize-slot.)
+                        `(setf (aref ,temp ,(dsd-index dsd)) ,value)))
+                    (dd-slots dd) values)
+          ,temp))
+     `(sfunction ,ftype-arglist (simple-array ,etype (,len))))))
+(defun create-list-constructor (dd cons-name arglist ftype-arglist decls values)
   (let ((vals (make-list (dd-length dd) :initial-element nil)))
     (dolist (x (find-name-indices dd))
       (setf (elt vals (cdr x)) `',(car x)))
     (loop for dsd in (dd-slots dd) and val in values do
       (setf (elt vals (dsd-index dsd))
             (if (eq val '.do-not-initialize-slot.) 0 val)))
-    `(defun ,cons-name ,arglist
-       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
-       (list ,@vals))))
-(defun create-structure-constructor (dd cons-name arglist vars types values)
-  ;; The difference between the two implementations here is that on all
-  ;; platforms we don't have the appropriate RAW-INSTANCE-INIT VOPS, which
-  ;; must be able to deal with immediate values as well -- unlike
-  ;; RAW-INSTANCE-SET VOPs, which never end up seeing immediate values. With
-  ;; some additional cleverness we might manage without them and just a single
-  ;; implementation here, though -- figure out a way to ensure that on those
-  ;; platforms we always still get a non-immediate TN in every case...
-  ;;
-  ;; Until someone does that, this means that instances with raw slots can be
-  ;; DX allocated only on platforms with those additional VOPs.
-  #!+raw-instance-init-vops
-  (let* ((slot-values nil)
-         (slot-specs
-          (mapcan (lambda (dsd value)
-                    (unless (eq value '.do-not-initialize-slot.)
-                      (push value slot-values)
-                      (list (list* :slot (dsd-raw-type dsd) (dsd-index dsd)))))
-                  (dd-slots dd)
-                  values)))
-    `(defun ,cons-name ,arglist
-       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
-       (%make-structure-instance-macro ,dd ',slot-specs ,@(reverse slot-values))))
-  #!-raw-instance-init-vops
-  (let ((instance (gensym "INSTANCE")) slot-values slot-specs raw-slots raw-values)
-    (mapc (lambda (dsd value)
-            (unless (eq value '.do-not-initialize-slot.)
-              (let ((raw-type (dsd-raw-type dsd)))
-                (cond ((eq t raw-type)
+    (values
+     `(defun ,cons-name ,arglist
+        ,@(when decls `((declare ,@decls)))
+        (list ,@vals))
+     `(sfunction ,ftype-arglist list))))
+(defun create-structure-constructor (dd cons-name arglist ftype-arglist decls values)
+  (values
+   ;; The difference between the two implementations here is that on all
+   ;; platforms we don't have the appropriate RAW-INSTANCE-INIT VOPS, which
+   ;; must be able to deal with immediate values as well -- unlike
+   ;; RAW-INSTANCE-SET VOPs, which never end up seeing immediate values. With
+   ;; some additional cleverness we might manage without them and just a single
+   ;; implementation here, though -- figure out a way to ensure that on those
+   ;; platforms we always still get a non-immediate TN in every case...
+   ;;
+   ;; Until someone does that, this means that instances with raw slots can be
+   ;; DX allocated only on platforms with those additional VOPs.
+   #!+raw-instance-init-vops
+   (let* ((slot-values nil)
+          (slot-specs
+           (mapcan (lambda (dsd value)
+                     (unless (eq value '.do-not-initialize-slot.)
                        (push value slot-values)
-                       (push (list* :slot raw-type (dsd-index dsd)) slot-specs))
-                      (t
-                       (push value raw-values)
-                       (push dsd raw-slots))))))
-          (dd-slots dd)
-          values)
-    `(defun ,cons-name ,arglist
-       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
-       ,(if raw-slots
-            `(let ((,instance (%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))
-              ,@(mapcar (lambda (dsd value)
-                          ;; (Note that we can't in general use the
-                          ;; ordinary named slot setter function here
-                          ;; because the slot might be :READ-ONLY, so we
-                          ;; whip up new LAMBDA representations of slot
-                          ;; setters for the occasion.)
-                          `(,(slot-setter-lambda-form dd dsd) ,value ,instance))
-                        raw-slots
-                        raw-values)
-              ,instance)
-            `(%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))))
+                       (list (list* :slot (dsd-raw-type dsd) (dsd-index dsd)))))
+                   (dd-slots dd)
+                   values)))
+     `(defun ,cons-name ,arglist
+        ,@(when decls `((declare ,@decls)))
+        (%make-structure-instance-macro ,dd ',slot-specs ,@(reverse slot-values))))
+   #!-raw-instance-init-vops
+   (let ((instance (gensym "INSTANCE")) slot-values slot-specs raw-slots raw-values)
+     (mapc (lambda (dsd value)
+             (unless (eq value '.do-not-initialize-slot.)
+               (let ((raw-type (dsd-raw-type dsd)))
+                 (cond ((eq t raw-type)
+                        (push value slot-values)
+                        (push (list* :slot raw-type (dsd-index dsd)) slot-specs))
+                       (t
+                        (push value raw-values)
+                        (push dsd raw-slots))))))
+           (dd-slots dd)
+           values)
+     `(defun ,cons-name ,arglist
+        ,@(when decls`((declare ,@decls)))
+        ,(if raw-slots
+             `(let ((,instance (%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))
+                ,@(mapcar (lambda (dsd value)
+                            ;; (Note that we can't in general use the
+                            ;; ordinary named slot setter function here
+                            ;; because the slot might be :READ-ONLY, so we
+                            ;; whip up new LAMBDA representations of slot
+                            ;; setters for the occasion.)
+                            `(,(slot-setter-lambda-form dd dsd) ,value ,instance))
+                          raw-slots
+                          raw-values)
+                ,instance)
+             `(%make-structure-instance-macro ,dd ',slot-specs ,@slot-values))))
+   `(sfunction ,ftype-arglist ,(dd-name dd))))
 
 ;;; Create a default (non-BOA) keyword constructor.
 (defun create-keyword-constructor (defstruct creator)
   (declare (type function creator))
   (collect ((arglist (list '&key))
-            (types)
-            (vals))
-    (dolist (slot (dd-slots defstruct))
-      (let ((dum (sb!xc:gensym "DUM"))
-            (name (dsd-name slot)))
-        (arglist `((,(keywordicate name) ,dum) ,(dsd-default slot)))
-        (types (dsd-type slot))
-        (vals dum)))
+            (vals)
+            (decls)
+            (ftype-args))
+    (let ((int-type (if (eq 'vector (dd-type defstruct))
+                        (dd-element-type defstruct)
+                        t)))
+      (dolist (slot (dd-slots defstruct))
+        (let* ((dum (sb!xc:gensym "DUM"))
+               (name (dsd-name slot))
+               (keyword (keywordicate name))
+               ;; Canonicalize the type for a prettier macro-expansion
+               (type (type-specifier
+                      (specifier-type `(and ,int-type ,(dsd-type slot))))))
+          (arglist `((,keyword ,dum) ,(dsd-default slot)))
+          (vals dum)
+          ;; KLUDGE: we need a separate type declaration for for
+          ;; keyword arguments, since default values bypass the
+          ;; checking provided by the FTYPE.
+          (unless (eq t type)
+            (decls `(type ,type ,dum)))
+          (ftype-args `(,keyword ,type)))))
     (funcall creator
              defstruct (dd-default-constructor defstruct)
-             (arglist) (vals) (types) (vals))))
+             (arglist) `(&key ,@(ftype-args)) (decls) (vals))))
 
 ;;; Given a structure and a BOA constructor spec, call CREATOR with
 ;;; the appropriate args to make a constructor.
@@ -1471,86 +1489,109 @@
       (parse-lambda-list (second boa))
     (collect ((arglist)
               (vars)
-              (types)
-              (skipped-vars))
-      (labels ((get-slot (name)
-                 (let ((res (find name (dd-slots defstruct)
-                                  :test #'string=
-                                  :key #'dsd-name)))
-                   (if res
-                       (values (dsd-type res) (dsd-default res))
-                       (values t nil))))
-               (do-default (arg)
-                 (multiple-value-bind (type default) (get-slot arg)
-                   (arglist `(,arg ,default))
-                   (vars arg)
-                   (types type))))
-        (dolist (arg req)
-          (arglist arg)
-          (vars arg)
-          (types (get-slot arg)))
+              (skipped-vars)
+              (ftype-args)
+              (decls))
+      (let ((int-type (if (eq 'vector (dd-type defstruct))
+                          (dd-element-type defstruct)
+                          t)))
+        (labels ((get-slot (name)
+                   (let* ((res (find name (dd-slots defstruct)
+                                    :test #'string=
+                                    :key #'dsd-name))
+                          (type (type-specifier
+                                 (specifier-type
+                                  `(and ,int-type ,(if res
+                                                       (dsd-type res)
+                                                       t))))))
+                     (values type (when res (dsd-default res)))))
+                 (do-default (arg &optional keyp)
+                   (multiple-value-bind (type default) (get-slot arg)
+                     (arglist `(,arg ,default))
+                     (vars arg)
+                     (if keyp
+                         (arg-type type (keywordicate arg) arg)
+                         (arg-type type))))
+                 (arg-type (type &optional key var)
+                   (cond (key
+                          ;; KLUDGE: see comment in CREATE-KEYWORD-CONSTRUCTOR.
+                          (unless (eq t type)
+                            (decls `(type ,type ,var)))
+                          (ftype-args `(,key ,type)))
+                         (t
+                          (ftype-args type)))))
+          (dolist (arg req)
+            (arglist arg)
+            (vars arg)
+            (arg-type (get-slot arg)))
 
-        (when opt
-          (arglist '&optional)
-          (dolist (arg opt)
-            (cond ((consp arg)
-                   (destructuring-bind
-                         ;; FIXME: this shares some logic (though not
-                         ;; code) with the &key case below (and it
-                         ;; looks confusing) -- factor out the logic
-                         ;; if possible. - CSR, 2002-04-19
-                         (name
-                          &optional
-                          (def (nth-value 1 (get-slot name)))
-                          (supplied-test nil supplied-test-p))
-                       arg
-                     (arglist `(,name ,def ,@(if supplied-test-p `(,supplied-test) nil)))
-                     (vars name)
-                     (types (get-slot name))))
-                  (t
-                   (do-default arg)))))
+          (when opt
+            (arglist '&optional)
+            (ftype-args '&optional)
+            (dolist (arg opt)
+              (cond ((consp arg)
+                     (destructuring-bind
+                           ;; FIXME: this shares some logic (though not
+                           ;; code) with the &key case below (and it
+                           ;; looks confusing) -- factor out the logic
+                           ;; if possible. - CSR, 2002-04-19
+                           (name
+                            &optional
+                            (def (nth-value 1 (get-slot name)))
+                            (supplied-test nil supplied-test-p))
+                         arg
+                       (arglist `(,name ,def ,@(if supplied-test-p `(,supplied-test) nil)))
+                       (vars name)
+                       (arg-type (get-slot name))))
+                    (t
+                     (do-default arg)))))
 
-        (when restp
-          (arglist '&rest rest)
-          (vars rest)
-          (types 'list))
+          (when restp
+            (arglist '&rest rest)
+            (vars rest)
+            (ftype-args '&rest)
+            (arg-type t)
+            (decls `(type list ,rest)))
 
-        (when keyp
-          (arglist '&key)
-          (dolist (key keys)
-            (if (consp key)
-                (destructuring-bind (wot
-                                     &optional
-                                     (def nil def-p)
-                                     (supplied-test nil supplied-test-p))
-                    key
-                  (let ((name (if (consp wot)
-                                  (destructuring-bind (key var) wot
-                                    (declare (ignore key))
-                                    var)
-                                  wot)))
-                    (multiple-value-bind (type slot-def)
-                        (get-slot name)
-                      (arglist `(,wot ,(if def-p def slot-def)
-                                 ,@(if supplied-test-p `(,supplied-test) nil)))
-                      (vars name)
-                      (types type))))
-                (do-default key))))
+          (when keyp
+            (arglist '&key)
+            (ftype-args '&key)
+            (dolist (key keys)
+              (if (consp key)
+                  (destructuring-bind (wot
+                                       &optional
+                                       (def nil def-p)
+                                       (supplied-test nil supplied-test-p))
+                      key
+                    (multiple-value-bind (key name)
+                        (if (consp wot)
+                            (destructuring-bind (key var) wot
+                              (values key var))
+                            (values (keywordicate wot) wot))
+                      (multiple-value-bind (type slot-def)
+                          (get-slot name)
+                        (arglist `(,wot ,(if def-p def slot-def)
+                                        ,@(if supplied-test-p `(,supplied-test) nil)))
+                        (vars name)
+                        (arg-type type key name))))
+                  (do-default key t))))
 
-        (when allowp (arglist '&allow-other-keys))
+          (when allowp
+            (arglist '&allow-other-keys)
+            (ftype-args '&allow-other-keys))
 
-        (when auxp
-          (arglist '&aux)
-          (dolist (arg aux)
-            (if (proper-list-of-length-p arg 2)
-                (let ((var (first arg)))
-                  (arglist arg)
-                  (vars var)
-                  (types (get-slot var)))
-                (skipped-vars (if (consp arg) (first arg) arg))))))
+          (when auxp
+            (arglist '&aux)
+            (dolist (arg aux)
+              (if (proper-list-of-length-p arg 2)
+                  (let ((var (first arg)))
+                    (arglist arg)
+                    (vars var)
+                    (decls `(type ,(get-slot var) ,var)))
+                  (skipped-vars (if (consp arg) (first arg) arg)))))))
 
       (funcall creator defstruct (first boa)
-               (arglist) (vars) (types)
+               (arglist) (ftype-args) (decls)
                (loop for slot in (dd-slots defstruct)
                      for name = (dsd-name slot)
                      collect (cond ((find name (skipped-vars) :test #'string=)
@@ -1588,26 +1629,22 @@
     (unless (or defaults boas)
       (push (symbolicate "MAKE-" (dd-name defstruct)) defaults))
 
-    (collect ((res) (names))
+    (collect ((res))
       (when defaults
         (let ((cname (first defaults)))
           (setf (dd-default-constructor defstruct) cname)
-          (res (create-keyword-constructor defstruct creator))
-          (names cname)
+          (multiple-value-bind (cons ftype)
+              (create-keyword-constructor defstruct creator)
+            (res `(declaim (ftype ,ftype ,@defaults)))
+            (res cons))
           (dolist (other-name (rest defaults))
-            (res `(setf (fdefinition ',other-name) (fdefinition ',cname)))
-            (names other-name))))
+            (res `(setf (fdefinition ',other-name) (fdefinition ',cname))))))
 
       (dolist (boa boas)
-        (res (create-boa-constructor defstruct boa creator))
-        (names (first boa)))
-
-      (res `(declaim (ftype
-                      (sfunction *
-                                 ,(if (eq (dd-type defstruct) 'structure)
-                                      (dd-name defstruct)
-                                      '*))
-                      ,@(names))))
+        (multiple-value-bind (cons ftype)
+            (create-boa-constructor defstruct boa creator)
+          (res `(declaim (ftype ,ftype ,(first boa))))
+          (res cons)))
 
       (res))))
 
