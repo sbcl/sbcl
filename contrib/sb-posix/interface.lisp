@@ -8,7 +8,11 @@
       (export ',name :sb-posix)
       (defclass ,name ,superclasses
         ,(loop for slotd in slots
-               collect (ldiff slotd (member :array-length slotd)))
+               ;; KLUDGE: Splice out :ARRAY-LENGTH options (they're
+               ;; for the conversion functions, not for DEFCLASS).
+               for array-length-option = (member :array-length slotd)
+               collect (append (ldiff slotd array-length-option)
+                               (cddr array-length-option)))
         ,@options)
       (declaim (inline ,to-alien ,to-protocol))
       (declaim (inline ,to-protocol ,to-alien))
@@ -601,7 +605,7 @@ not supported."
    (lflag :initarg :lflag :accessor sb-posix:termios-lflag
           :documentation "Local modes.")
    (cc :initarg :cc :accessor sb-posix:termios-cc :array-length nccs
-       :documentation "Control characters"))
+       :documentation "Control characters."))
   (:documentation "Instances of this class represent I/O
                    characteristics of the terminal."))
 
