@@ -222,9 +222,20 @@
             (warn "Unable to memory-map entire file.")
             (setf size (1- most-positive-fixnum)))
           (let ((buffer
+                 #-win32
                  (handler-case
-                  (sb-posix:mmap nil size prot sb-posix::MAP-SHARED fd 0)
-                  (sb-posix:syscall-error nil))))
+                     (sb-posix:mmap nil size prot sb-posix::MAP-SHARED fd 0)
+                   (sb-posix:syscall-error nil))
+                 #+win32
+                 (let ((mapping
+                        (sb-win32:create-file-mapping
+                         (sb-win32:get-osfhandle fd) nil 2 0 size nil)))
+                   (typecase mapping
+                     ((integer -1 0) nil)
+                     (t (let ((sap (prog1 (sb-win32:map-view-of-file
+                                           mapping 4 0 0 size)
+                                     (sb-win32:close-handle mapping))))
+                          (and (not (zerop (sb-sys:sap-int sap))) sap)))))))
             (when (null buffer)
               (sb-unix:unix-close fd)
               (sb-ext:cancel-finalization stream)
@@ -244,7 +255,8 @@
                (melding-stream stream) efmt 'mapped))
             (sb-ext:finalize stream
               (lambda ()
-                (sb-posix:munmap buffer size)
+                #+win32 (sb-win32:unmap-view-of-file buffer)
+                #-win32 (sb-posix:munmap buffer size)
                 (format *terminal-io* "~&;;; ** unmapped ~S" buffer))
               :dont-save t))))
       stream)))
@@ -253,7 +265,8 @@
 (defmethod device-close ((stream mapped-file-simple-stream) abort)
   (with-stream-class (mapped-file-simple-stream stream)
     (when (sm buffer stream)
-      (sb-posix:munmap (sm buffer stream) (sm buf-len stream))
+      #+win32 (sb-win32:unmap-view-of-file (sm buffer stream))
+      #-win32 (sb-posix:munmap (sm buffer stream) (sm buf-len stream))
       (setf (sm buffer stream) nil))
     (sb-unix:unix-close (or (sm input-handle stream) (sm output-handle stream))))
   t)
