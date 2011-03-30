@@ -505,6 +505,24 @@
         kid-status))
   42)
 
+(deftest read.1
+    (progn
+      (with-open-file (ouf (merge-pathnames "read-test.txt" *test-directory*)
+                           :direction :output
+                           :if-exists :supersede
+                           :if-does-not-exist :create)
+        (write-string "foo" ouf))
+      (let ((fd (sb-posix:open (merge-pathnames "read-test.txt" *test-directory*) sb-posix:o-rdonly)))
+        (unwind-protect
+             (let ((buf (make-array 10 :element-type '(unsigned-byte 8))))
+               (values
+                (sb-posix:read fd (sb-sys:vector-sap buf) 10)
+                (code-char (aref buf 0))
+                (code-char (aref buf 1))
+                (code-char (aref buf 2))))
+          (sb-posix:close fd))))
+  3 #\f #\o #\o)
+
 (deftest opendir.1
   (let ((dir (sb-posix:opendir "/")))
     (unwind-protect (sb-alien:null-alien dir)
@@ -545,6 +563,23 @@
                         #'string<))
         (sb-posix:closedir dir)))
   t)
+
+
+(deftest write.1
+    (progn
+      (let ((fd (sb-posix:open (merge-pathnames "write-test.txt" *test-directory*)
+                               (logior sb-posix:o-creat sb-posix:o-wronly)
+                               (logior sb-posix:s-irusr sb-posix:s-iwusr)))
+            (retval nil))
+        (unwind-protect
+             (let ((buf (coerce "foo" 'simple-base-string)))
+               (setf retval (sb-posix:write fd (sb-sys:vector-sap buf) 3)))
+          (sb-posix:close fd))
+
+        (with-open-file (inf (merge-pathnames "write-test.txt" *test-directory*)
+                             :direction :input)
+          (values retval (read-line inf)))))
+  3 "foo")
 
 #-win32
 (deftest pwent.1
