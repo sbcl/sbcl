@@ -524,6 +524,8 @@ not supported."
                          bytes.  For symbolic links, the length
                          in bytes of the filename contained in
                          the symbolic link.")
+   (rdev :initarg :rdev :reader stat-rdev
+          :documentation "For devices the device number.")
    (atime :initarg :atime :reader stat-atime
           :documentation "Time of last access.")
    (mtime :initarg :mtime :reader stat-mtime

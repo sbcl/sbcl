@@ -17,6 +17,7 @@
            #:group-name #:group-gid #:group-passwd
            #:stat-mode #:stat-ino #:stat-dev #:stat-nlink #:stat-uid
            #:stat-gid #:stat-size #:stat-atime #:stat-mtime #:stat-ctime
+           #:stat-rdev
            #:termios-iflag #:termios-oflag #:termios-cflag
            #:termios-lflag #:termios-cc #:timeval-sec #:timeval-usec
            #:flock-type #:flock-whence #:flock-start #:flock-len

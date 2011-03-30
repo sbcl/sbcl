@@ -317,6 +317,8 @@
               ((unsigned 32) dev "dev_t" "st_dev")
               (nlink-t nlink "nlink_t" "st_nlink")
               (uid-t uid "uid_t" "st_uid")
+              #-mips
+              (dev-t rdev "dev_t" "st_rdev")
               (gid-t gid "gid_t" "st_gid")
               (off-t size "off_t" "st_size")
               (time-t atime "time_t" "st_atime")
