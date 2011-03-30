@@ -1384,29 +1384,31 @@ the first."
            ((fixnum bignum)
             (bignum-gcd (make-small-bignum u) v))))))
 
-;;; From discussion on comp.lang.lisp and Akira Kurihara.
+;;;; from Robert Smith
 (defun isqrt (n)
   #!+sb-doc
   "Return the root of the nearest integer less than n which is a perfect
    square."
-  (declare (type unsigned-byte n) (values unsigned-byte))
-  ;; Theoretically (> n 7), i.e., n-len-quarter > 0.
-  (if (and (fixnump n) (<= n 24))
-      (cond ((> n 15) 4)
-            ((> n  8) 3)
-            ((> n  3) 2)
-            ((> n  0) 1)
-            (t 0))
-      (let* ((n-len-quarter (ash (integer-length n) -2))
-             (n-half (ash n (- (ash n-len-quarter 1))))
-             (n-half-isqrt (isqrt n-half))
-             (init-value (ash (1+ n-half-isqrt) n-len-quarter)))
-        (loop
-          (let ((iterated-value
-                 (ash (+ init-value (truncate n init-value)) -1)))
-            (unless (< iterated-value init-value)
-              (return init-value))
-            (setq init-value iterated-value))))))
+  (declare (type unsigned-byte n))
+  (cond
+    ((> n 24)
+     (let* ((n-fourth-size (ash (1- (integer-length n)) -2))
+            (n-significant-half (ash n (- (ash n-fourth-size 1))))
+            (n-significant-half-isqrt (isqrt-fast n-significant-half))
+            (zeroth-iteration (ash n-significant-half-isqrt n-fourth-size))
+            (qr (multiple-value-list (floor n zeroth-iteration)))
+            (first-iteration (ash (+ zeroth-iteration (first qr)) -1)))
+       (cond ((oddp (first qr))
+              first-iteration)
+             ((> (expt (- first-iteration zeroth-iteration) 2) (second qr))
+              (1- first-iteration))
+             (t
+              first-iteration))))
+    ((> n 15) 4)
+    ((> n  8) 3)
+    ((> n  3) 2)
+    ((> n  0) 1)
+    ((= n  0) 0)))
 
 ;;;; miscellaneous number predicates
 
