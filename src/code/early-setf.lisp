@@ -241,16 +241,12 @@ GET-SETF-EXPANSION directly."
   of the list and returns it."
   (multiple-value-bind (dummies vals newval setter getter)
       (get-setf-method place env)
-    (do* ((d dummies (cdr d))
-          (v vals (cdr v))
-          (let-list nil))
-         ((null d)
-          (push (list (car newval) getter) let-list)
-          `(let* ,(nreverse let-list)
-             (prog1 (car ,(car newval))
-               (setq ,(car newval) (cdr ,(car newval)))
-               ,setter)))
-      (push (list (car d) (car v)) let-list))))
+    (let ((list-head (gensym)))
+      `(let* (,@(mapcar #'list dummies vals)
+              (,list-head ,getter)
+              (,(car newval) (cdr ,list-head)))
+         ,setter
+         (car ,list-head)))))
 
 (defmacro-mundanely remf (place indicator &environment env)
   #!+sb-doc
@@ -260,30 +256,25 @@ GET-SETF-EXPANSION directly."
   property was present, NIL if not."
   (multiple-value-bind (dummies vals newval setter getter)
       (get-setf-method place env)
-    (do* ((d dummies (cdr d))
-          (v vals (cdr v))
-          (let-list nil)
-          (ind-temp (gensym))
+    (let ((ind-temp (gensym))
           (local1 (gensym))
           (local2 (gensym)))
-         ((null d)
-          ;; See ANSI 5.1.3 for why we do out-of-order evaluation
-          (push (list ind-temp indicator) let-list)
-          (push (list (car newval) getter) let-list)
-          `(let* ,(nreverse let-list)
-             (do ((,local1 ,(car newval) (cddr ,local1))
-                  (,local2 nil ,local1))
-                 ((atom ,local1) nil)
-               (cond ((atom (cdr ,local1))
-                      (error "Odd-length property list in REMF."))
-                     ((eq (car ,local1) ,ind-temp)
-                      (cond (,local2
-                             (rplacd (cdr ,local2) (cddr ,local1))
-                             (return t))
-                            (t (setq ,(car newval) (cddr ,(car newval)))
-                               ,setter
-                               (return t))))))))
-      (push (list (car d) (car v)) let-list))))
+      `(let* (,@(mapcar #'list dummies vals)
+              ;; See ANSI 5.1.3 for why we do out-of-order evaluation
+              (,ind-temp ,indicator)
+              (,(car newval) ,getter))
+         (do ((,local1 ,(car newval) (cddr ,local1))
+              (,local2 nil ,local1))
+             ((atom ,local1) nil)
+             (cond ((atom (cdr ,local1))
+                    (error "Odd-length property list in REMF."))
+                   ((eq (car ,local1) ,ind-temp)
+                    (cond (,local2
+                           (rplacd (cdr ,local2) (cddr ,local1))
+                           (return t))
+                          (t (setq ,(car newval) (cddr ,(car newval)))
+                             ,setter
+                             (return t))))))))))
 
 ;;; we can't use DEFINE-MODIFY-MACRO because of ANSI 5.1.3
 (defmacro-mundanely incf (place &optional (delta 1) &environment env)
@@ -347,17 +338,13 @@ GET-SETF-EXPANSION directly."
        ,doc-string
        (multiple-value-bind (dummies vals newval setter getter)
            (get-setf-method ,reference ,env)
-         (do ((d dummies (cdr d))
-              (v vals (cdr v))
-              (let-list nil (cons (list (car d) (car v)) let-list)))
-             ((null d)
-              (push (list (car newval)
-                          ,(if rest-arg
-                             `(list* ',function getter ,@other-args ,rest-arg)
-                             `(list ',function getter ,@other-args)))
-                    let-list)
-              `(let* ,(nreverse let-list)
-                 ,setter)))))))
+         (let ()
+             `(let* (,@(mapcar #'list dummies vals)
+                     (,(car newval)
+                      ,,(if rest-arg
+                          `(list* ',function getter ,@other-args ,rest-arg)
+                          `(list ',function getter ,@other-args))))
+                ,setter))))))
 
 ;;;; DEFSETF
 
