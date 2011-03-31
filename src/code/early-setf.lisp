@@ -212,11 +212,12 @@ GET-SETF-EXPANSION directly."
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((g (gensym)))
       `(let* ((,g ,obj)
               ,@(mapcar #'list dummies vals)
-              (,(car newval) (cons ,g ,getter)))
+              (,(car newval) (cons ,g ,getter))
+              ,@(cdr newval))
          ,setter))))
 
 (defmacro-mundanely pushnew (obj place &rest keys
@@ -228,11 +229,12 @@ GET-SETF-EXPANSION directly."
   is used for the comparison."
   (declare (ignore key test test-not))
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((g (gensym)))
       `(let* ((,g ,obj)
               ,@(mapcar #'list dummies vals)
-              (,(car newval) (adjoin ,g ,getter ,@keys)))
+              (,(car newval) (adjoin ,g ,getter ,@keys))
+              ,@(cdr newval))
          ,setter))))
 
 (defmacro-mundanely pop (place &environment env)
@@ -240,11 +242,12 @@ GET-SETF-EXPANSION directly."
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((list-head (gensym)))
       `(let* (,@(mapcar #'list dummies vals)
               (,list-head ,getter)
-              (,(car newval) (cdr ,list-head)))
+              (,(car newval) (cdr ,list-head))
+              ,@(cdr newval))
          ,setter
          (car ,list-head)))))
 
@@ -255,14 +258,15 @@ GET-SETF-EXPANSION directly."
   remove the property specified by the indicator. Returns T if such a
   property was present, NIL if not."
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((ind-temp (gensym))
           (local1 (gensym))
           (local2 (gensym)))
       `(let* (,@(mapcar #'list dummies vals)
               ;; See ANSI 5.1.3 for why we do out-of-order evaluation
               (,ind-temp ,indicator)
-              (,(car newval) ,getter))
+              (,(car newval) ,getter)
+              ,@(cdr newval))
          (do ((,local1 ,(car newval) (cddr ,local1))
               (,local2 nil ,local1))
              ((atom ,local1) nil)
@@ -282,11 +286,12 @@ GET-SETF-EXPANSION directly."
   "The first argument is some location holding a number. This number is
   incremented by the second argument, DELTA, which defaults to 1."
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((d (gensym)))
       `(let* (,@(mapcar #'list dummies vals)
               (,d ,delta)
-              (,(car newval) (+ ,getter ,d)))
+              (,(car newval) (+ ,getter ,d))
+              ,@(cdr newval))
          ,setter))))
 
 (defmacro-mundanely decf (place &optional (delta 1) &environment env)
@@ -294,11 +299,12 @@ GET-SETF-EXPANSION directly."
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."
   (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
+      (sb!xc:get-setf-expansion place env)
     (let ((d (gensym)))
       `(let* (,@(mapcar #'list dummies vals)
               (,d ,delta)
-              (,(car newval) (- ,getter ,d)))
+              (,(car newval) (- ,getter ,d))
+              ,@(cdr newval))
          ,setter))))
 
 ;;;; DEFINE-MODIFY-MACRO stuff
@@ -337,13 +343,14 @@ GET-SETF-EXPANSION directly."
          ,name (,reference ,@lambda-list &environment ,env)
        ,doc-string
        (multiple-value-bind (dummies vals newval setter getter)
-           (get-setf-method ,reference ,env)
+           (sb!xc:get-setf-expansion ,reference ,env)
          (let ()
              `(let* (,@(mapcar #'list dummies vals)
                      (,(car newval)
                       ,,(if rest-arg
                           `(list* ',function getter ,@other-args ,rest-arg)
-                          `(list ',function getter ,@other-args))))
+                          `(list ',function getter ,@other-args)))
+                     ,@(cdr newval))
                 ,setter))))))
 
 ;;;; DEFSETF

@@ -5,6 +5,10 @@ changes relative to sbcl-1.0.52:
     (signed-byte 63)) to 3 (fixnum = (signed-byte 61)) at build-time.
   * minor(?) incompatible(?) change: The default fixnum width on 64-bit
     targets is now 63 bits (up from 61).
+  * bug fix: PUSH, PUSHNEW, POP, REMF, INCF, DECF, and DEFINE-MODIFY-MACRO
+    now arrange for non-primary values of multiple-valued places to be set
+    to NIL, instead of signalling an error (per a careful reading of CLHS
+    5.1.2.3).
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.
