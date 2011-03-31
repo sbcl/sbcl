@@ -114,10 +114,6 @@
 (defknown makunbound (symbol) symbol)
 (defknown fmakunbound ((or symbol cons)) (or symbol cons)
   (unsafe explicit-check))
-(defknown (get-setf-method get-setf-method-multiple-value)
-  ((or list symbol) &optional lexenv-designator)
-  (values list list list form form)
-  (flushable))
 (defknown apply (callable t &rest t) *) ; ### Last arg must be List...
 (defknown funcall (callable &rest t) *)
 

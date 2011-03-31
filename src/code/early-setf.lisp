@@ -70,25 +70,6 @@
           (t
            (expand-or-get-setf-inverse form environment)))))
 
-;;; GET-SETF-METHOD existed in pre-ANSI Common Lisp, and various code inherited
-;;; from CMU CL uses it repeatedly, so rather than rewrite a lot of code to not
-;;; use it, we just define it in terms of ANSI's GET-SETF-EXPANSION (or
-;;; actually, the cross-compiler version of that, i.e.
-;;; SB!XC:GET-SETF-EXPANSION).
-(declaim (ftype (function (t &optional (or null sb!c::lexenv))) get-setf-method))
-(defun get-setf-method (form &optional environment)
-  #!+sb-doc
-  "This is a specialized-for-one-value version of GET-SETF-EXPANSION (and
-a relic from pre-ANSI Common Lisp). Portable ANSI code should use
-GET-SETF-EXPANSION directly."
-  (multiple-value-bind (temps value-forms store-vars store-form access-form)
-      (sb!xc:get-setf-expansion form environment)
-    (when (cdr store-vars)
-      (error "GET-SETF-METHOD used for a form with multiple store ~
-              variables:~%  ~S"
-             form))
-    (values temps value-forms store-vars store-form access-form)))
-
 ;;; If a macro, expand one level and try again. If not, go for the
 ;;; SETF function.
 (declaim (ftype (function (t (or null sb!c::lexenv)))
