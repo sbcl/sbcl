@@ -338,7 +338,8 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
-  (defun assign-setf-macro (name expander inverse doc)
+  (defun assign-setf-macro (name expander expander-lambda-list inverse doc)
+    #+sb-xc-host (declare (ignore expander-lambda-list))
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
     (cond ((gethash name sb!c:*setf-assumed-fboundp*)
@@ -354,6 +355,9 @@
            (style-warn "defining setf macro for ~S when ~S is fbound"
                        name `(setf ,name))))
     (remhash name sb!c:*setf-assumed-fboundp*)
+    #-sb-xc-host
+    (when expander
+      (setf (%fun-lambda-list expander) expander-lambda-list))
     ;; FIXME: It's probably possible to join these checks into one form which
     ;; is appropriate both on the cross-compilation host and on the target.
     (when (or inverse (info :setf :inverse name))
@@ -371,6 +375,7 @@
   (cond ((and (not (listp (car rest))) (symbolp (car rest)))
          `(eval-when (:load-toplevel :compile-toplevel :execute)
             (assign-setf-macro ',access-fn
+                               nil
                                nil
                                ',(car rest)
                                 ,(when (and (car rest) (stringp (cadr rest)))
@@ -393,6 +398,7 @@
                      (%defsetf ,access-form ,(length store-variables)
                                (lambda (,whole)
                                  ,body)))
+                   ',lambda-list
                    nil
                    ',doc))))))
         (t
@@ -443,6 +449,7 @@
                             (lambda (,whole ,environment)
                               ,@local-decs
                               ,body)
+                            ',lambda-list
                             nil
                             ',doc)))))
 
