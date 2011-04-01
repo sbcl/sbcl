@@ -635,7 +635,9 @@
                  (format stream "~&~A has a complex setf-expansion:"
                          name)
                  (pprint-indent :block 2 stream)
-                 (describe-documentation name2 'setf stream t))
+                 (describe-lambda-list (%fun-lambda-list expander) stream)
+                 (describe-documentation name2 'setf stream t)
+                 (describe-function-source expander stream))
                (terpri stream)))))
     (when (symbolp name)
       (describe-function `(setf ,name) nil stream))))
