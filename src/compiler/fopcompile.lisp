@@ -172,7 +172,7 @@
 (defun lambda-form-p (form)
   (and (consp form)
        (member (car form)
-               '(lambda named-lambda instance-lambda lambda-with-lexenv))))
+               '(lambda named-lambda lambda-with-lexenv))))
 
 ;;; Check that a literal form is fopcompilable. It would not for example
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.

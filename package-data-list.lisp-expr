@@ -1818,7 +1818,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "BASIC-STRUCTURE-CLASSOID"
                "REGISTER-LAYOUT"
                "FUNCALLABLE-INSTANCE" "RANDOM-FIXNUM-MAX"
-               "MAKE-STATIC-CLASSOID" "INSTANCE-LAMBDA"
+               "MAKE-STATIC-CLASSOID"
                "%MAKE-SYMBOL"
                "%FUNCALLABLE-INSTANCE-FUNCTION" "SYMBOL-HASH"
 

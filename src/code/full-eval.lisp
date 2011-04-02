@@ -544,10 +544,8 @@
 
 ;;; Return true if EXP is a lambda form.
 (defun lambdap (exp)
-  (case (car exp) ((lambda
-                    sb!int:named-lambda
-                    sb!kernel:instance-lambda)
-                   t)))
+  (case (car exp)
+    ((lambda sb!int:named-lambda) t)))
 
 ;;; Split off the declarations (and the docstring, if
 ;;; DOC-STRING-ALLOWED is true) from the actual forms of BODY.
@@ -577,7 +575,7 @@
 ;;; in the environment ENV.
 (defun eval-lambda (exp env)
   (case (car exp)
-    ((lambda sb!kernel:instance-lambda)
+    ((lambda)
      (multiple-value-bind (body documentation declarations)
          (parse-lambda-headers (cddr exp) :doc-string-allowed t)
        (make-interpreted-function :lambda-list (second exp)

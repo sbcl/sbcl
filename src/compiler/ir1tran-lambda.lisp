@@ -1012,13 +1012,6 @@
                          :maybe-add-debug-catch t
                          :source-name source-name
                          :debug-name debug-name))
-    ((instance-lambda)
-     (deprecation-warning :final "0.9.3.32" 'instance-lambda 'lambda)
-     (ir1-convert-lambda `(lambda (&rest args)
-                            (declare (ignore args))
-                            (deprecation-error "0.9.3.32" 'instance-lambda 'lambda))
-                         :source-name source-name
-                         :debug-name debug-name))
     ((named-lambda)
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))

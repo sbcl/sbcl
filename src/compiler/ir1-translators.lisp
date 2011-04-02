@@ -477,7 +477,7 @@ Return VALUE without evaluating it."
     ((named-lambda)
      (or (second thing)
          `(lambda ,(third thing))))
-    ((lambda instance-lambda)
+    ((lambda)
      `(lambda ,(second thing)))
     ((lambda-with-lexenv)
      `(lambda ,(fifth thing)))
@@ -489,7 +489,7 @@ Return VALUE without evaluating it."
   (if (consp thing)
       (cond
         ((member (car thing)
-                 '(lambda named-lambda instance-lambda lambda-with-lexenv))
+                 '(lambda named-lambda lambda-with-lexenv))
          (values (ir1-convert-lambdalike
                   thing
                   :debug-name (name-lambdalike thing))

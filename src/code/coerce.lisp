@@ -80,8 +80,6 @@
         ;; FIXME: If we go to a compiler-only implementation, this can
         ;; become COMPILE instead of EVAL, which seems nicer to me.
         (eval `(function ,object)))
-       ((instance-lambda)
-        (deprecation-error "0.9.3.32" 'instance-lambda 'lambda))
        (t
         (error 'simple-type-error
                :datum object
