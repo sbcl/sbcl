@@ -3,6 +3,8 @@ changes relative to sbcl-1.0.47:
   * enhancement: read() and write() have been added to SB-POSIX.
   * enhancement: types of DEFSTRUCT constructors are proclaimed more
     accurately, allowing better typechecking of call-sites.
+  * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five
+    years, is now no longer supported.
   * optimization: slightly faster ISQRT. (lp#713343)
   * bug fix: TRACE behaves better when attempting to trace undefined
     functions. (lp#740717)
