@@ -40,7 +40,7 @@ cat > $tmpfilename <<EOF
 EOF
 run_sbcl --disable-debugger --load $tmpfilename > $tmpfilename.out
 check_status_maybe_lose bivalent-standard-output $?
-test_output=$(cat $tmpfilename.out)
+test_output=`cat $tmpfilename.out`
 rm -f $tmpfilename.out
 if [ 'Bivalent *STANDARD-OUTPUT*' != "$test_output" ]; then
     echo "bad test output: '$test_output'"
@@ -56,7 +56,7 @@ cat > $tmpfilename <<EOF
 EOF
 run_sbcl --disable-debugger --load $tmpfilename 2> $tmpfilename.out
 check_status_maybe_lose bivalent-error-output $?
-test_output=$(cat $tmpfilename.out)
+test_output=`cat $tmpfilename.out`
 rm -f $tmpfilename.out
 if [ 'Bivalent *ERROR-OUTPUT*' != "$test_output" ]; then
     echo "bad test output: '$test_output'"

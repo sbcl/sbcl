@@ -2,14 +2,15 @@
 
 platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
-case "$platform" in
-    SunOS-*) CC=gcc ;;
-    *) CC=cc ;;
-esac
+if [ -z "$CC" ]
+then
+    CC=cc
+fi
 
 args=
 case "$platform" in
     Darwin-X86-64) args="-arch x86_64" ;;
+    SunOS-X86-64)  args=-m64 ;;
 esac
 
 case "$platform" in

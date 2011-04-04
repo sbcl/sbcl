@@ -278,23 +278,23 @@ run_sbcl --eval '(sb-ext:delete-directory "simple_test_subdir1")' \
          --eval '(sb-ext:delete-directory "deep" :recursive t)' \
          --eval '(sb-ext:quit)'
 
-test -e simple_test_subdir1
+test -d simple_test_subdir1
 check_status_maybe_lose "delete-directory 1" $? \
   1 "deleted"
 
-test -e simple_test_subdir2
+test -d simple_test_subdir2
 check_status_maybe_lose "delete-directory 2" $? \
   1 "deleted"
 
-test -e deep
+test -d deep
 check_status_maybe_lose "delete-directory 3" $? \
   1 "deleted"
 
-test -e dont_delete_me
+test -d dont_delete_me
 check_status_maybe_lose "delete-directory 4" $? \
   0 "didn't follow link"
 
-test -e me_neither
+test -f me_neither
 check_status_maybe_lose "delete-directory 5" $? \
   0 "didn't follow link"
 

@@ -447,7 +447,7 @@
 
 #-(and (or ppc x86 x86-64) darwin)
 (with-test (:name (trace-recursive :encapsulate nil)
-            :fails-on '(or (and :ppc (not :linux)) :sparc :mips))
+            :fails-on '(or (and :ppc (not :linux)) :sparc :mips :sunos))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-fact :encapsulate nil)
                (assert (= 120 (trace-fact 5)))
