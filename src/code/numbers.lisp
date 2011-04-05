@@ -1394,7 +1394,7 @@ the first."
     ((> n 24)
      (let* ((n-fourth-size (ash (1- (integer-length n)) -2))
             (n-significant-half (ash n (- (ash n-fourth-size 1))))
-            (n-significant-half-isqrt (isqrt-fast n-significant-half))
+            (n-significant-half-isqrt (isqrt n-significant-half))
             (zeroth-iteration (ash n-significant-half-isqrt n-fourth-size))
             (qr (multiple-value-list (floor n zeroth-iteration)))
             (first-iteration (ash (+ zeroth-iteration (first qr)) -1)))
