@@ -3791,3 +3791,25 @@
                                    (f (mod a e))))
                                s)))
                       (g a)))))
+
+;;; This doesn't test LVAR-FUN-IS directly, but captures it
+;;; pretty accurately anyways.
+(with-test (:name :lvar-fun-is)
+  (dolist (fun (list
+                (lambda (x) (member x x :test #'eq))
+                (lambda (x) (member x x :test 'eq))
+                (lambda (x) (member x x :test #.#'eq))))
+    (assert (equal (list #'sb-kernel:%member-eq)
+                   (ctu:find-named-callees fun))))
+  (dolist (fun (list
+                (lambda (x)
+                  (declare (notinline eq))
+                  (member x x :test #'eq))
+                (lambda (x)
+                  (declare (notinline eq))
+                  (member x x :test 'eq))
+                (lambda (x)
+                  (declare (notinline eq))
+                  (member x x :test #.#'eq))))
+    (assert (member #'sb-kernel:%member-test
+                    (ctu:find-named-callees fun)))))

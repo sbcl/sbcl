@@ -2210,17 +2210,35 @@ is :ANY, the function name is not checked."
                (setf (block-reoptimize (node-block node)) t)
                (reoptimize-component (node-component node) :maybe)))))))
 
-;;; Return true if LVAR's only use is a non-NOTINLINE reference to a
-;;; global function with one of the specified NAMES.
+;;; Return true if LVAR's only use is a reference to a global function
+;;; designator with one of the specified NAMES, that hasn't been
+;;; declared NOTINLINE.
 (defun lvar-fun-is (lvar names)
   (declare (type lvar lvar) (list names))
   (let ((use (lvar-uses lvar)))
     (and (ref-p use)
-         (let ((leaf (ref-leaf use)))
-           (and (global-var-p leaf)
-                (eq (global-var-kind leaf) :global-function)
-                (not (null (member (leaf-source-name leaf) names
-                                   :test #'equal))))))))
+         (let* ((*lexenv* (node-lexenv use))
+                (leaf (ref-leaf use))
+                (name
+                 (cond ((global-var-p leaf)
+                        ;; Case 1: #'NAME
+                        (and (eq (global-var-kind leaf) :global-function)
+                             (car (member (leaf-source-name leaf) names
+                                          :test #'equal))))
+                       ((constant-p leaf)
+                        (let ((value (constant-value leaf)))
+                          (car (if (functionp value)
+                                   ;; Case 2: #.#'NAME
+                                   (member value names
+                                           :key (lambda (name)
+                                                  (and (fboundp name)
+                                                       (fdefinition name)))
+                                           :test #'eq)
+                                   ;; Case 3: 'NAME
+                                   (member value names
+                                           :test #'equal))))))))
+           (and name
+                (not (fun-lexically-notinline-p name)))))))
 
 ;;; Return true if LVAR's only use is a call to one of the named functions
 ;;; (or any function if none are specified) with the specified number of
