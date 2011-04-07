@@ -3600,6 +3600,7 @@
   ;; Test that compile-times don't explode when quoted constants
   ;; get big.
   (labels ((time-n (n)
+             (gc :full t) ; Let's not confuse the issue with GC            
              (let* ((tree (make-tree (expt 10 n) nil))
                     (t0 (get-internal-run-time))
                     (f (compile nil `(lambda (x) (eq x (quote ,tree)))))
@@ -3614,7 +3615,10 @@
            (max-small (reduce #'max times :end 3))
            (max-big (reduce #'max times :start 3)))
       ;; This way is hopefully fairly CPU-performance insensitive.
-      (assert (> (* (+ 2 max-small) 2) max-big)))))
+      (unless (> (+ (truncate internal-time-units-per-second 10)
+                    (* 2 max-small))
+                 max-big)
+        (error "Bad scaling or test? ~S" times)))))
 
 (with-test (:name :bug-309063)
   (let ((fun (compile nil `(lambda (x)
