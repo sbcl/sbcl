@@ -3813,3 +3813,16 @@
                   (member x x :test #.#'eq))))
     (assert (member #'sb-kernel:%member-test
                     (ctu:find-named-callees fun)))))
+
+(with-test (:name :delete-to-delq-opt)
+  (dolist (fun (list (lambda (x y)
+                       (declare (list y))
+                       (delete x y :test #'eq))
+                     (lambda (x y)
+                       (declare (fixnum x) (list y))
+                       (delete x y))
+                     (lambda (x y)
+                       (declare (symbol x) (list y))
+                       (delete x y :test #'eql))))
+    (assert (equal (list #'sb-int:delq)
+                   (ctu:find-named-callees fun)))))

@@ -482,21 +482,11 @@
 ;;; almost as fast as MEMQ.
 (deftransform delete ((item list &key test) (t list &rest t) *)
   "convert to EQ test"
-  ;; FIXME: The scope of this transformation could be
-  ;; widened somewhat, letting it work whenever the test is
-  ;; 'EQL and we know from the type of ITEM that it #'EQ
-  ;; works like #'EQL on it. (E.g. types FIXNUM, CHARACTER,
-  ;; and SYMBOL.)
-  ;;   If TEST is EQ, apply transform, else
-  ;;   if test is not EQL, then give up on transform, else
-  ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
-  ;;   transform, else give up on transform.
-  (cond (test
-         (unless (lvar-fun-is test '(eq))
-           (give-up-ir1-transform)))
-        ((types-equal-or-intersect (lvar-type item)
-                                   (specifier-type 'number))
-         (give-up-ir1-transform "Item might be a number.")))
+  (let ((type (lvar-type item)))
+    (unless (or (and test (lvar-fun-is test '(eq)))
+                (and (eq-comparable-type-p type)
+                     (or (not test) (lvar-fun-is test '(eql)))))
+      (give-up-ir1-transform)))
   `(delq item list))
 
 (deftransform delete-if ((pred list) (t list))
