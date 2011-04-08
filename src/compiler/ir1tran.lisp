@@ -758,10 +758,7 @@
         (t
          ;; implicitly (LAMBDA ..) because the LAMBDA expression is
          ;; the CAR of an executed form.
-         (ir1-convert-combination
-          start next result form
-          (ir1-convert-lambda op
-                              :debug-name (debug-name 'inline-lambda op))))))
+         (ir1-convert start next result `(%funcall ,@form)))))
 
 ;;; Convert anything that looks like a global function call.
 (defun ir1-convert-global-functoid (start next result form fun)

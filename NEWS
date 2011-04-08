@@ -11,6 +11,8 @@ changes relative to sbcl-1.0.47:
     functions. (lp#740717)
   * bug fix: missed optimizations for (FUNCALL (LAMBDA ...) ...) in
     comparison to (FUNCALL #'(LAMBDA ...) ...).
+  * bug fix: ((LAMBDA ...) ...) forms with invalid argument counts
+    resulted in a compile-time error. (lp#720382)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

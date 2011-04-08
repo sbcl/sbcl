@@ -3800,6 +3800,17 @@
                         (+ x (funcall (lambda (z) z) y))))
             :type 'function))))
 
+(with-test (:name :bug-720382)
+  (let ((w 0))
+    (let ((f
+           (handler-bind (((and warning (not style-warning))
+                           (lambda (c) (incf w))))
+             (compile nil `(lambda (b) ((lambda () b) 1))))))
+      (assert (= w 1))
+      (assert (eq :error
+                  (handler-case (funcall f 0)
+                    (error () :error)))))))
+
 ;;; This doesn't test LVAR-FUN-IS directly, but captures it
 ;;; pretty accurately anyways.
 (with-test (:name :lvar-fun-is)
