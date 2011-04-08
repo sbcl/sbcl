@@ -3811,6 +3811,20 @@
                   (handler-case (funcall f 0)
                     (error () :error)))))))
 
+(with-test (:name :multiple-args-to-function)
+  (let ((form `(flet ((foo (&optional (x 13)) x))
+                 (funcall (function foo 42))))
+        (*evaluator-mode* :interpret))
+    (assert (eq :error
+                (handler-case (eval form)
+                  (error () :error))))
+    (multiple-value-bind (fun warn fail)
+        (compile nil `(lambda () ,form))
+      (assert (and warn fail))
+          (assert (eq :error
+                      (handler-case (funcall fun)
+                        (error () :error)))))))
+
 ;;; This doesn't test LVAR-FUN-IS directly, but captures it
 ;;; pretty accurately anyways.
 (with-test (:name :lvar-fun-is)

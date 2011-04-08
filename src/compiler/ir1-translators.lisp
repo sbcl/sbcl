@@ -595,11 +595,15 @@ be a lambda expression."
   (let* ((function (sb!xc:macroexpand function *lexenv*))
          (op (when (consp function) (car function))))
     (cond ((eq op 'function)
-           (with-fun-name-leaf (leaf (second function) start)
-             (ir1-convert start next result `(,leaf ,@args))))
+           (compiler-destructuring-bind (thing) (cdr function)
+               function
+             (with-fun-name-leaf (leaf thing start)
+               (ir1-convert start next result `(,leaf ,@args)))))
           ((eq op 'global-function)
-           (with-fun-name-leaf (leaf (second function) start :global-function t)
-             (ir1-convert start next result `(,leaf ,@args))))
+           (compiler-destructuring-bind (thing) (cdr function)
+               global-function
+             (with-fun-name-leaf (leaf thing start :global-function t)
+               (ir1-convert start next result `(,leaf ,@args)))))
           (t
            (let ((ctran (make-ctran))
                  (fun-lvar (make-lvar)))

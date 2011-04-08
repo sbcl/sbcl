@@ -9,10 +9,12 @@ changes relative to sbcl-1.0.47:
   * optimization: slightly faster ISQRT. (lp#713343)
   * bug fix: TRACE behaves better when attempting to trace undefined
     functions. (lp#740717)
-  * bug fix: missed optimizations for (FUNCALL (LAMBDA ...) ...) in
-    comparison to (FUNCALL #'(LAMBDA ...) ...).
-  * bug fix: ((LAMBDA ...) ...) forms with invalid argument counts
-    resulted in a compile-time error. (lp#720382)
+  * bug fix: missed optimizations for (FUNCALL (LAMBDA ...) ...) in comparison
+    to (FUNCALL #'(LAMBDA ...) ...).
+  * bug fix: ((LAMBDA ...) ...) forms with invalid argument counts resulted in
+    a compile-time error. (lp#720382)
+  * bug fix: forms such as (FUNCALL (FUNCTION NAME OOPS) ...) were compiled
+    without complaints.
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

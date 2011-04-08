@@ -983,3 +983,19 @@ specify bindings for printer control variables.")
         (nreverse (mapcar #'car *compiler-print-variable-alist*))
         (nreverse (mapcar #'cdr *compiler-print-variable-alist*))
       ,@forms)))
+
+;;; Like DESTRUCTURING-BIND, but generates a COMPILER-ERROR on failure
+(defmacro compiler-destructuring-bind (lambda-list thing context
+                                       &body body)
+  (let ((whole-name (gensym "WHOLE")))
+    (multiple-value-bind (body local-decls)
+        (parse-defmacro lambda-list whole-name body nil
+                        context
+                        :anonymousp t
+                        :doc-string-allowed nil
+                        :wrap-block nil
+                        :error-fun 'compiler-error)
+      `(let ((,whole-name ,thing))
+         (declare (type list ,whole-name))
+         ,@local-decls
+         ,body))))
