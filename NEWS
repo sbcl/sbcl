@@ -15,6 +15,7 @@ changes relative to sbcl-1.0.47:
     a compile-time error. (lp#720382)
   * bug fix: forms such as (FUNCALL (FUNCTION NAME OOPS) ...) were compiled
     without complaints.
+  * bug fix: less verbose source forms for functions from EVAL. (lp#747485)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

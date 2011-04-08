@@ -22,6 +22,32 @@
 
 (defvar *eval-source-context* nil)
 
+(defun make-eval-lambda (expr)
+  `(named-lambda
+       ;; This name is used to communicate the original context
+       ;; for the compiler, and identifies the lambda for use of
+       ;; EVAL-LAMBDA-SOURCE-LAMBDA below.
+       (eval ,(sb!c::source-form-context *eval-source-context*)) ()
+     (declare (muffle-conditions compiler-note))
+     ;; why PROGN?  So that attempts to eval free declarations
+     ;; signal errors rather than return NIL.  -- CSR, 2007-05-01
+     (progn ,expr)))
+
+(defun eval-lambda-p (form)
+  (when (and (consp form) (eq 'named-lambda (first form)))
+    (let ((name (second form)))
+      (when (and (consp name) (eq 'eval (first name)))
+        t))))
+
+(defun eval-lambda-source-lambda (eval-lambda)
+  (if (eval-lambda-p eval-lambda)
+      (destructuring-bind (named-lambda name lambda-list decl (progn expr))
+          eval-lambda
+        (declare (ignore named-lambda name lambda-list decl progn))
+        (when (and (consp expr) (member (car expr) '(lambda named-lambda)))
+          expr))
+      eval-lambda))
+
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to #'COMPILE.
 (defun %simple-eval (expr lexenv)
@@ -34,11 +60,7 @@
   ;;
   ;; As of 1.0.21.6 we muffle compiler notes lexically here, which seems
   ;; always safe. --NS
-  (let* (;; why PROGN?  So that attempts to eval free declarations
-         ;; signal errors rather than return NIL.  -- CSR, 2007-05-01
-         (lambda `(named-lambda (eval ,(sb!c::source-form-context *eval-source-context*)) ()
-                    (declare (muffle-conditions compiler-note))
-                    (progn ,expr)))
+  (let* ((lambda (make-eval-lambda expr))
          (fun (sb!c:compile-in-lexenv nil lambda lexenv)))
     (funcall fun)))
 
