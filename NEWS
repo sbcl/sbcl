@@ -9,6 +9,8 @@ changes relative to sbcl-1.0.47:
   * optimization: slightly faster ISQRT. (lp#713343)
   * bug fix: TRACE behaves better when attempting to trace undefined
     functions. (lp#740717)
+  * bug fix: missed optimizations for (FUNCALL (LAMBDA ...) ...) in
+    comparison to (FUNCALL #'(LAMBDA ...) ...).
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

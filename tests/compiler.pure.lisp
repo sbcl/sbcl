@@ -3792,6 +3792,14 @@
                                s)))
                       (g a)))))
 
+(with-test (:name :funcall-lambda-inlined)
+  (assert (not
+           (ctu:find-code-constants
+            (compile nil
+                     `(lambda (x y)
+                        (+ x (funcall (lambda (z) z) y))))
+            :type 'function))))
+
 ;;; This doesn't test LVAR-FUN-IS directly, but captures it
 ;;; pretty accurately anyways.
 (with-test (:name :lvar-fun-is)
