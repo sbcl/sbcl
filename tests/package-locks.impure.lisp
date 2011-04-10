@@ -535,4 +535,19 @@
          (setf (macro-function 'to-die-for) (constantly :replacement2))))))
   (assert (eq :original (macroexpand '(macro-killing-macro-1:to-die-for)))))
 
+(with-test (:name :compile-time-defun-package-locked)
+  ;; Make sure compile-time side-effects of DEFUN are protected against.
+  (let ((inline-lambda (function-lambda-expression #'fill-pointer)))
+    ;; Make sure it's actually inlined...
+    (assert inline-lambda)
+    (assert (eq :ok
+                (handler-case
+                    (ctu:file-compile `((defun fill-pointer (x) x)))
+                  (sb-ext:symbol-package-locked-error (e)
+                    (when (eq 'fill-pointer
+                              (sb-ext:package-locked-error-symbol e))
+                      :ok)))))
+    (assert (equal inline-lambda
+                   (function-lambda-expression #'fill-pointer)))))
+
 ;;; WOOT! Done.

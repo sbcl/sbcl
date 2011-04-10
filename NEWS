@@ -20,6 +20,8 @@ changes relative to sbcl-1.0.47:
   * bug fix: less verbose source forms for functions from EVAL. (lp#747485)
   * bug fix: sense of SLOT-BOUNDP-USING-CLASS was inverted in a MAKE-INSTANCE
     optimization. (regression from 1.0.45.18/1.0.46.15)
+  * bug fix: package locks did not protects against compile-time side-effects
+    of DEFUN. (lp#675584)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

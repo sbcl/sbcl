@@ -229,6 +229,11 @@ evaluated as a PROGN."
           :new-function def
           :new-location source-location))
   (setf (sb!xc:fdefinition name) def)
+  ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
+  ;; also checks package locks. By doing this here we let (SETF
+  ;; FDEFINITION) do the load-time package lock checking before
+  ;; we frob any existing inline expansions.
+  (sb!c::%set-inline-expansion name nil inline-lambda)
 
   (sb!c::note-name-defined name :function)
 

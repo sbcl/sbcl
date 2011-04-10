@@ -1210,33 +1210,38 @@
       (substitute-leaf fun var))
     fun))
 
+(defun %set-inline-expansion (name defined-fun inline-lambda)
+  (cond (inline-lambda
+         (setf (info :function :inline-expansion-designator name)
+               inline-lambda)
+         (when defined-fun
+           (setf (defined-fun-inline-expansion defined-fun)
+                 inline-lambda)))
+        (t
+         (clear-info :function :inline-expansion-designator name))))
+
 ;;; the even-at-compile-time part of DEFUN
 ;;;
-;;; The INLINE-EXPANSION is a LAMBDA-WITH-LEXENV, or NIL if there is
-;;; no inline expansion.
-(defun %compiler-defun (name lambda-with-lexenv compile-toplevel)
+;;; The INLINE-LAMBDA is a LAMBDA-WITH-LEXENV, or NIL if there is no
+;;; inline expansion.
+(defun %compiler-defun (name inline-lambda compile-toplevel)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
-      (setf defined-fun (if lambda-with-lexenv
-                            (get-defined-fun name (fifth lambda-with-lexenv))
-                            (get-defined-fun name)))
+      (with-single-package-locked-error
+          (:symbol name "defining ~S as a function")
+        (setf defined-fun
+              (if inline-lambda
+                  (get-defined-fun name (fifth inline-lambda))
+                  (get-defined-fun name))))
       (when (boundp '*lexenv*)
         (remhash name *free-funs*)
         (aver (fasl-output-p *compile-object*))
         (if (member name *fun-names-in-this-file* :test #'equal)
             (warn 'duplicate-definition :name name)
-            (push name *fun-names-in-this-file*))))
+            (push name *fun-names-in-this-file*)))
+      (%set-inline-expansion name defined-fun inline-lambda))
 
     (become-defined-fun-name name)
-
-    (cond (lambda-with-lexenv
-           (setf (info :function :inline-expansion-designator name)
-                 lambda-with-lexenv)
-           (when defined-fun
-             (setf (defined-fun-inline-expansion defined-fun)
-                   lambda-with-lexenv)))
-          (t
-           (clear-info :function :inline-expansion-designator name)))
 
     ;; old CMU CL comment:
     ;;   If there is a type from a previous definition, blast it,
