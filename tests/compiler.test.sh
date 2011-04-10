@@ -460,7 +460,7 @@ cat > $tmpfilename <<EOF
 (eval-when (:compile-toplevel)
   (error "ERROR within EVAL-WHEN."))
 EOF
-expect_condition_during_compile sb-c:compiler-error $tmpfilename
+expect_condition_during_compile simple-error $tmpfilename
 
 cat > $tmpfilename <<EOF
 (defun slot-name-incf (s)

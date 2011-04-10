@@ -1266,10 +1266,7 @@ Examples:
 ;;; compilation. Normally just evaluate in the appropriate
 ;;; environment, but also compile if outputting a CFASL.
 (defun eval-compile-toplevel (body path)
-  (handler-case (eval-in-lexenv `(progn ,@body) *lexenv*)
-    (error (condition)
-      (compiler-error "(during compile-time-too processing)~%~A"
-                      condition)))
+  (eval-in-lexenv `(progn ,@body) *lexenv*)
   (when *compile-toplevel-object*
     (let ((*compile-object* *compile-toplevel-object*))
       (convert-and-maybe-compile `(progn ,@body) path))))

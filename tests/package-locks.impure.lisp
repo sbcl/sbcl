@@ -519,20 +519,20 @@
      :original))
  :load t)
 
-(ctu:file-compile
- `((in-package :macro-killing-macro-2)
-   (defmacro to-die-for ()
-     :replacement)))
-
 (with-test (:name :defmacro-killing-macro)
+  (ignore-errors
+    (ctu:file-compile
+     `((in-package :macro-killing-macro-2)
+       (defmacro to-die-for ()
+         :replacement))))
   (assert (eq :original (macroexpand '(macro-killing-macro-1:to-die-for)))))
 
-(ctu:file-compile
- `((in-package :macro-killing-macro-2)
-   (eval-when (:compile-toplevel)
-     (setf (macro-function 'to-die-for) (constantly :replacement2)))))
-
 (with-test (:name :setf-macro-function-killing-macro)
+  (ignore-errors
+    (ctu:file-compile
+     `((in-package :macro-killing-macro-2)
+       (eval-when (:compile-toplevel)
+         (setf (macro-function 'to-die-for) (constantly :replacement2))))))
   (assert (eq :original (macroexpand '(macro-killing-macro-1:to-die-for)))))
 
 ;;; WOOT! Done.
