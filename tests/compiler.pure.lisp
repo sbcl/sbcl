@@ -3600,7 +3600,7 @@
   ;; Test that compile-times don't explode when quoted constants
   ;; get big.
   (labels ((time-n (n)
-             (gc :full t) ; Let's not confuse the issue with GC            
+             (gc :full t) ; Let's not confuse the issue with GC
              (let* ((tree (make-tree (expt 10 n) nil))
                     (t0 (get-internal-run-time))
                     (f (compile nil `(lambda (x) (eq x (quote ,tree)))))

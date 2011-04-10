@@ -870,8 +870,8 @@
                                             ,value-form))))
                              (not-boundp-form ()
                                (if (member slotd sbuc-slots :test #'eq)
-                                   `(slot-boundp-using-class
-                                     ,class .instance. ,slotd)
+                                   `(not (slot-boundp-using-class
+                                          ,class .instance. ,slotd))
                                    `(eq (clos-slots-ref .slots. ,i)
                                         +slot-unbound+))))
                         (ecase kind

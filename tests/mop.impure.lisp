@@ -554,5 +554,30 @@
 (with-test (:name :slow-method-is-fboundp)
   (assert (fboundp '(sb-pcl::slow-method wrapped (cons))))
   (assert (eq :default (funcall #'(sb-pcl::slow-method wrapped (cons)) (list (cons t t)) nil))))
+
+;;; Check that SLOT-BOUNDP-USING-CLASS doesn't confuse MAKE-INSTANCE
+;;; optimizations.
+(defclass sbuc-mio-test-class (standard-class)
+  ())
+(defmethod validate-superclass ((class sbuc-mio-test-class)
+                                (superclass standard-class))
+  t)
+(defvar *sbuc-counter* 0)
+(defmethod slot-boundp-using-class ((class sbuc-mio-test-class)
+                                    (object t)
+                                    (slot standard-effective-slot-definition))
+  (incf *sbuc-counter*)
+  (call-next-method))
+(defclass sbuc-mio-test-object ()
+  ((slot :initform 5 :accessor a-slot))
+  (:metaclass sbuc-mio-test-class))
+(with-test (:name :sbuc-mio-test)
+  (assert (= 5 (funcall
+                (compile
+                 nil
+                 `(lambda ()
+                    (let ((object (make-instance 'sbuc-mio-test-object)))
+                      (slot-value object 'slot)))))))
+  (assert (= 1 *sbuc-counter*)))
 
 ;;;; success
