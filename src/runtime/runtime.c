@@ -394,16 +394,23 @@ main(int argc, char *argv[], char *envp[])
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --dynamic-space-size");
-                errno = 0;
-                dynamic_space_size = strtol(argv[argi++], 0, 0) << 20;
-                if (errno)
-                    lose("argument to --dynamic-space-size is not a number");
+                {
+                  char *tail;
+                  long tmp = strtol(argv[argi++], &tail, 0);
+                  if (tail[0])
+                    lose("--dynamic-space-size argument is not a number");
+                  if ((tmp <= 0) ||
+                      (tmp >= (LONG_MAX >> 20))) {
+                    lose("--dynamic-space-size argument is out of range");
+                  }
+                  dynamic_space_size = tmp << 20;
+                }
 #               ifdef MAX_DYNAMIC_SPACE_END
                 if (!((DYNAMIC_SPACE_START <
                        DYNAMIC_SPACE_START+dynamic_space_size) &&
                       (DYNAMIC_SPACE_START+dynamic_space_size <=
                        MAX_DYNAMIC_SPACE_END)))
-                    lose("specified --dynamic-space-size too large");
+                    lose("--dynamic-space-size argument is too large");
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
                 ++argi;

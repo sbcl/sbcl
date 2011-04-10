@@ -22,6 +22,8 @@ changes relative to sbcl-1.0.47:
     optimization. (regression from 1.0.45.18/1.0.46.15)
   * bug fix: package locks did not protects against compile-time side-effects
     of DEFUN. (lp#675584)
+  * bug fix: --dynamic-space-size argument is validated more carefully.
+    (lp#721457)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on
