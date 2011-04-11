@@ -24,6 +24,8 @@ changes relative to sbcl-1.0.47:
     of DEFUN. (lp#675584)
   * bug fix: --dynamic-space-size argument is validated more carefully.
     (lp#721457)
+  * bug fix: memory fault from printing a malformed simple-condition.
+    (lp#705690)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

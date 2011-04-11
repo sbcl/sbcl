@@ -179,3 +179,13 @@
                         (eq sc (car
                                 (simple-condition-format-arguments c))))
                :ok)))))))
+
+(with-test (:name :malformed-simple-condition-printing-type-error)
+  (assert (eq :type-error
+              (handler-case
+                  (princ-to-string
+                   (make-condition 'simple-error :format-control "" :format-arguments 8))
+                (type-error (e)
+                  (when (and (eq 'list (type-error-expected-type e))
+                             (eql 8 (type-error-datum e)))
+                    :type-error))))))

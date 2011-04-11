@@ -1270,16 +1270,11 @@
 
 ;;;; from the "Conditions" chapter:
 
-(defknown cell-error-name (cell-error) t)
 (defknown error (t &rest t) nil)
 (defknown cerror (format-control t &rest t) null)
 (defknown invalid-method-error (t format-control &rest t) *) ; FIXME: first arg is METHOD
 (defknown method-combination-error (format-control &rest t) *)
 (defknown signal (t &rest t) null)
-(defknown simple-condition-format-control (condition)
-  (or null format-control))
-(defknown simple-condition-format-arguments (condition)
-  list)
 (defknown warn (t &rest t) null)
 (defknown invoke-debugger (condition) nil)
 (defknown break (&optional format-control &rest t) null)
