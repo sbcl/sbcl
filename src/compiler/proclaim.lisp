@@ -231,11 +231,18 @@
                      (when (type/= ctype old-type)
                        ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
                        ;; broke late-proclaim.lisp.
-                       (style-warn
-                        "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
-                       does not match the old FTYPE proclamation:~@:_  ~S~@:>"
-                        name (type-specifier ctype) (type-specifier old-type)))))
-
+                       (if (info :function :info name)
+                           ;; Allow for tightening of known function types
+                           (unless (csubtypep ctype old-type)
+                             (cerror "Continue"
+                                     "~@<new FTYPE proclamation for known function ~S~@:_  ~S~@:_~
+                                      does not match its old FTYPE:~@:_  ~S~@:>"
+                                     name (type-specifier ctype) (type-specifier old-type)))
+                           (#+sb-xc-host warn
+                            #-sb-xc-host style-warn
+                            "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
+                             does not match the old FTYPE proclamation:~@:_  ~S~@:>"
+                            name (type-specifier ctype) (type-specifier old-type))))))
                  ;; Now references to this function shouldn't be warned
                  ;; about as undefined, since even if we haven't seen a
                  ;; definition yet, we know one is planned.

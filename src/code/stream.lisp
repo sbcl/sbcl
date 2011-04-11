@@ -1301,7 +1301,7 @@
   ;; end of the stream.
   (index-cache 0 :type index)
   ;; Requested element type
-  (element-type 'character))
+  (element-type 'character :type type-specifier))
 
 #!+sb-doc
 (setf (fdocumentation 'make-string-output-stream 'function)

@@ -23,15 +23,18 @@
 (eval-when (:compile-toplevel :execute)
 
 (sb!xc:defmacro def-math-rtn (name num-args)
-  (let ((function (symbolicate "%" (string-upcase name))))
+  (let ((function (symbolicate "%" (string-upcase name)))
+        (args (let ((sb!impl::*gentemp-counter* 0))
+                (loop repeat num-args collect (gentemp "ARG")))))
     `(progn
        (declaim (inline ,function))
-       (sb!alien:define-alien-routine (,name ,function) double-float
-         ,@(let ((results nil))
-             (dotimes (i num-args (nreverse results))
-               (push (list (intern (format nil "ARG-~D" i))
-                           'double-float)
-                     results)))))))
+       (defun ,function ,args
+         (alien-funcall
+          (extern-alien ,name
+                        (function double-float
+                                  ,@(loop repeat num-args
+                                          collect 'double-float)))
+          ,@args)))))
 
 (defun handle-reals (function var)
   `((((foreach fixnum single-float bignum ratio))

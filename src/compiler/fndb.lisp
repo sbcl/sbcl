@@ -80,7 +80,7 @@
 ;;;; classes
 
 (sb!xc:deftype name-for-class () t)
-(defknown classoid-name (classoid) name-for-class (flushable))
+(defknown classoid-name (classoid) symbol (flushable))
 (defknown find-classoid (name-for-class &optional t)
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
@@ -966,7 +966,7 @@
   (flushable unsafe))
 (defknown make-string-output-stream
     (&key (:element-type type-specifier))
-    stream
+    string-output-stream
   (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
