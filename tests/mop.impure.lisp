@@ -579,5 +579,71 @@
                     (let ((object (make-instance 'sbuc-mio-test-object)))
                       (slot-value object 'slot)))))))
   (assert (= 1 *sbuc-counter*)))
+
+;;; Redefining classes so that slot definition class changes.
+(defclass func-slot-class (standard-class)
+  ())
+
+(defmethod sb-mop:validate-superclass ((class func-slot-class) (super standard-class))
+  t)
+
+(defclass func-slot-definition ()
+  ((function :initform nil :initarg :function :reader slotd-function)))
+
+(defclass effective-func-slot-definition (sb-mop:standard-effective-slot-definition
+                                          func-slot-definition)
+  ())
+
+(defclass direct-func-slot-definition (sb-mop:standard-direct-slot-definition
+                                       func-slot-definition)
+  ())
+
+(defmethod sb-mop:slot-value-using-class ((class func-slot-class)
+                                          instance
+                                          (slotd effective-func-slot-definition))
+  (funcall (slotd-function slotd) (call-next-method)))
+
+(defvar *func-slot*)
+
+(defmethod sb-mop:effective-slot-definition-class ((class func-slot-class) &key)
+  (if *func-slot*
+      (find-class 'effective-func-slot-definition)
+      (call-next-method)))
+
+(defmethod sb-mop:direct-slot-definition-class ((class func-slot-class) &key)
+  (find-class 'direct-func-slot-definition))
+
+(defmethod sb-mop:compute-effective-slot-definition ((class func-slot-class) name dslotds)
+  (let* ((*func-slot* (some #'slotd-function dslotds))
+         (slotd (call-next-method)))
+    (when *func-slot*
+      (setf (slot-value slotd 'function) (fdefinition *func-slot*)))
+    slotd))
+
+(with-test (:name :class-redefinition-changes-custom-slot-type)
+  (eval `(defclass func-slot-object ()
+           ((foo :initarg :foo :reader foofoo))
+           (:metaclass func-slot-class)))
+  (let ((x (cons t t)))
+    (assert (eq x (foofoo (make-instance 'func-slot-object :foo x)))))
+  (eval `(defclass func-slot-object ()
+           ((foo :initarg :foo :reader foofoo :function car))
+           (:metaclass func-slot-class)))
+  (let* ((x (cons t t))
+         (y (list x)))
+    (assert (eq x (foofoo (make-instance 'func-slot-object :foo y))))))
+
+(with-test (:name :class-redefinition-changes-custom-slot-type-mio)
+  (eval `(defclass func-slot-object2 ()
+           ((foo :initarg :foo :reader foofoo))
+           (:metaclass func-slot-class)))
+  (let* ((x (cons t t))
+         (y (cons x x))
+         (o (make-instance 'func-slot-object2 :foo y)))
+    (assert (eq y (foofoo o)))
+    (eval `(defclass func-slot-object2 ()
+           ((foo :initarg :foo :reader foofoo :function car))
+           (:metaclass func-slot-class)))
+    (assert (eq x (foofoo o)))))
 
 ;;;; success

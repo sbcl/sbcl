@@ -915,6 +915,32 @@
 (defun class-can-precede-p (class1 class2)
   (member class2 (class-can-precede-list class1) :test #'eq))
 
+;;; This is called from %UPDATE-SLOTS when layout doesn't seem to change.
+;;; SLOT-INFO structures from old slotds may have been cached in permutation
+;;; vectors, but new slotds have had new ones allocated to them.
+;;;
+;;; This is non-problematic for standard slotds, because we know the structure
+;;; is compatible, but if a slot definition class changes, this can change the
+;;; way SLOT-VALUE-USING-CLASS should dispatch.
+;;;
+;;; So, compare all slotd classes, and return T if all remain the same.
+(defun slotd-classes-eq (oslotds nslotds)
+  (labels ((pop-nslotd (name)
+             (aver nslotds)
+             ;; Most of the time the first slot is right, but because the
+             ;; order of instance and non-instance slots can change without
+             ;; layout changing we cannot rely on that.
+             (let ((n (pop nslotds)))
+               (if (eq name (slot-definition-name n))
+                   n
+                   (prog1
+                       (pop-nslotd name)
+                     (push n nslotds))))))
+    (loop while oslotds
+          for o = (pop oslotds)
+          for n = (pop-nslotd (slot-definition-name o))
+          always (eq (class-of o) (class-of n)))))
+
 (defun %update-slots (class eslotds)
   (let ((instance-slots ())
         (class-slots    ()))
@@ -942,10 +968,10 @@
             (cond ((null owrapper)
                    (make-wrapper nslots class))
                   ((and (equal nlayout olayout)
-                        (not
-                         (loop for o in owrapper-class-slots
-                               for n in nwrapper-class-slots
-                               do (unless (eq (car o) (car n)) (return t)))))
+                        (loop for o in owrapper-class-slots
+                              for n in nwrapper-class-slots
+                              always (eq (car o) (car n)))
+                        (slotd-classes-eq (slot-value class 'slots) eslotds))
                    owrapper)
                   (t
                    ;; This will initialize the new wrapper to have the
