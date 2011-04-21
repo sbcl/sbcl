@@ -28,6 +28,8 @@ changes relative to sbcl-1.0.47:
     (lp#705690)
   * bug fix: redefining classes so that slot-definition classes change now
     engages the obsolete instance protocol. (lp#766271)
+  * bug fix: constant improper lists could break source coverage recording.
+    (lp#767959)
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

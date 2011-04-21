@@ -3859,3 +3859,11 @@
                        (delete x y :test #'eql))))
     (assert (equal (list #'sb-int:delq)
                    (ctu:find-named-callees fun)))))
+
+(with-test (:name :bug-767959)
+  ;; This used to signal an error.
+  (compile nil `(lambda ()
+                  (declare (optimize sb-c:store-coverage-data))
+                  (assoc
+                   nil
+                   '((:ordinary . ordinary-lambda-list))))))

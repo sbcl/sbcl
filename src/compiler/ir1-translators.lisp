@@ -75,9 +75,14 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
       nil
       (labels ((sub (form)
                  (or (get-source-path form)
-                     (and (consp form)
-                          (some #'sub form)))))
-        (or (sub form)))))
+                     (when (consp form)
+                       (unless (eq 'quote (car form))
+                         (somesub form)))))
+               (somesub (forms)
+                 (when (consp forms)
+                   (or (sub (car forms))
+                       (somesub (cdr forms))))))
+        (sub form))))
 
 ;;;; BLOCK and TAGBODY
 
