@@ -3867,3 +3867,10 @@
                   (assoc
                    nil
                    '((:ordinary . ordinary-lambda-list))))))
+
+(with-test (:name :member-on-long-constant-list)
+  ;; This used to blow stack with a sufficiently long list.
+  (let ((cycle (list t)))
+    (nconc cycle cycle)
+    (compile nil `(lambda (x)
+                    (member x ',cycle)))))

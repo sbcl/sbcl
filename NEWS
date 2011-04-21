@@ -30,6 +30,8 @@ changes relative to sbcl-1.0.47:
     engages the obsolete instance protocol. (lp#766271)
   * bug fix: constant improper lists could break source coverage recording.
     (lp#767959)
+  * bug fix: compiling calls to eg. MEMBER with massive constant list arguments
+    could exhaust stack.
 
 changes in sbcl-1.0.47 relative to sbcl-1.0.46:
   * bug fix: fix mach port rights leaks in mach exception handling code on

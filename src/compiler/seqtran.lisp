@@ -316,6 +316,8 @@
       (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
            function-name key-functions variant)))
 
+(defparameter *list-open-code-limit* 128)
+
 (defun transform-list-item-seek (name item list key test test-not node)
   (when (and test test-not)
     (abort-ir1-transform "Both ~S and ~S supplied to ~S." :test :test-not name))
@@ -376,7 +378,8 @@
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
           (cond ((and cp c-list (member name '(assoc rassoc member))
-                      (policy node (>= speed space)))
+                      (policy node (>= speed space))
+                      (not (nthcdr *list-open-code-limit* c-list)))
                  `(let ,(mapcar (lambda (fun) `(,(second fun) ,(ensure-fun fun))) funs)
                     ,(open-code c-list)))
                 ((and cp (not c-list))
@@ -431,7 +434,8 @@
                         ,(open-code (cdr tail))))))
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
-          (cond ((and cp c-list (policy node (>= speed space)))
+          (cond ((and cp c-list (policy node (>= speed space))
+                      (not (nthcdr *list-open-code-limit* c-list)))
                  `(let ((pred ,pred-expr)
                         ,@(when key `((key ,key-form))))
                     ,(open-code c-list)))
