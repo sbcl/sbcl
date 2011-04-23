@@ -155,7 +155,7 @@
     nil))
 
 
-(declaim (ftype (sfunction (symbol &optional (or null lexenv))
+(declaim (ftype (sfunction ((or symbol cons) &optional (or null lexenv))
                            (values (member nil :function :macro :special-form)
                                    boolean
                                    list))
