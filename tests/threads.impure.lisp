@@ -559,8 +559,6 @@
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
 (with-test (:name (:interrupt-thread :interrupt-consing-child))
-  #+darwin
-  (error "Hangs on Darwin.")
   (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
@@ -580,8 +578,6 @@
 
 #+(or x86 x86-64) ;; x86oid-only, see internal commentary.
 (with-test (:name (:interrupt-thread :interrupt-consing-child :again))
-  #+darwin
-  (error "Hangs on Darwin.")
   (let ((c (make-thread (lambda () (loop (alloc-stuff))))))
     ;; NB this only works on x86: other ports don't have a symbol for
     ;; pseudo-atomic atomicity
@@ -669,8 +665,6 @@
     (assert (sb-thread:join-thread thread))))
 
 (with-test (:name (:two-threads-running-gc))
-  #+darwin
-  (error "Hangs on Darwin.")
   (let (a-done b-done)
     (make-thread (lambda ()
                    (dotimes (i 100)
@@ -992,8 +986,6 @@
 (format t "~&multiple reader hash table test done~%")
 
 (with-test (:name (:hash-table-single-accessor-parallel-gc))
-  #+darwin
-  (error "Prone to hang on Darwin due to interrupt issues.")
   (let ((hash (make-hash-table))
         (*errors* nil))
     (let ((threads (list (sb-thread:make-thread
