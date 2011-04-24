@@ -322,7 +322,11 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                              (ecase (handler-direction handler)
                                (:input (sb!unix:fd-isset fd read-fds))
                                (:output (sb!unix:fd-isset fd write-fds)))))))
-                 (funcall (handler-function handler)
-                          (handler-descriptor handler)))
+                 (with-simple-restart (remove-fd-handler "Remove ~S" handler)
+                   (funcall (handler-function handler)
+                            (handler-descriptor handler))
+                   (go :next))
+                 (remove-fd-handler handler)
+                 :next)
                t))))))
 
