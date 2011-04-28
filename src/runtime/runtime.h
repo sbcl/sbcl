@@ -29,6 +29,12 @@
 #define thread_mutex_unlock(l) 0
 #endif
 
+#if defined(LISP_FEATURE_SB_SAFEPOINT)
+void map_gc_page();
+void unmap_gc_page();
+int check_pending_interrupts();
+#endif
+
 /* Block blockable interrupts for each SHOW, if not 0. */
 #define QSHOW_SIGNAL_SAFE 1
 /* Enable extra-verbose low-level debugging output for signals? (You
@@ -258,5 +264,9 @@ other_immediate_lowtag_p(lispobj header)
 
 extern void *successful_malloc (size_t size);
 extern char *copied_string (char *string);
+
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_SAFEPOINT)
+# define THREADS_USING_GCSIGNAL 1
+#endif
 
 #endif /* _SBCL_RUNTIME_H_ */

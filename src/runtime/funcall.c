@@ -27,11 +27,13 @@ extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 static inline lispobj
 safe_call_into_lisp(lispobj fun, lispobj *args, int nargs)
 {
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     /* SIG_STOP_FOR_GC needs to be enabled before we can call lisp:
      * otherwise two threads racing here may deadlock: the other will
      * wait on the GC lock, and the other cannot stop the first
      * one... */
     check_gc_signals_unblocked_or_lose(0);
+#endif
     return call_into_lisp(fun, args, nargs);
 }
 

@@ -241,7 +241,7 @@ os_install_interrupt_handlers(void)
                                                  memory_fault_handler);
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
+#ifdef THREADS_USING_GCSIGNAL
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
 #endif

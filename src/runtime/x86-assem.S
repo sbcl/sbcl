@@ -51,10 +51,12 @@
 #define align_4byte	4
 #define align_8byte	8
 #define align_16byte	16
+#define align_page	4096
 #else
 #define	align_4byte	2
 #define	align_8byte	3
 #define	align_16byte	4	
+#define align_page	12
 #endif			
 
 /*
@@ -70,6 +72,92 @@
 #define TYPE(name)
 #define SIZE(name)
 #endif
+
+/* Helper macros for access to thread-locals slots for both OS types:
+ * ------------------------------------------------------------------------
+ *
+ *                          Windows TEB block
+ * ==================        __________
+ * | Win32 %FS base | ---->  |        | 0
+ * ==================        |        | 1
+ *                           z        z
+ *     TLS slots start here> |XXXXXXXX| e10 = TEB_STATIC_TLS_SLOTS_OFFSET
+ *                           |XXXXXXXX| e11
+ *                           z   ...  z
+ *                           |XXXXXXXX| e4e
+ *     TLS ends here>     ,- |XXXXXXXX| e4f = TEB_STATIC_TLS_SLOTS_OFFSET+63
+ *                       /   z        z
+ *                       |   ----------
+ *                       |
+ *                       |   big blob of SBCL-specific thread-local data
+ *                       |     |----------------------------------------|
+ *                       |     |   CONTROL, BINDING, ALIEN STACK        |
+ *                       |     z                                        z
+ * ==================    |     |----------------------------------------|
+ * | Linux %FS base | -->|     |   FFI stack pointer                    |
+ * ==================    |     |    (extra page for mprotect)           |
+ *                        \    |----------------------------------------|
+ *   (union p_t_d) ----->  \-> | struct thread {   | dynamic_values[0]  |
+ *   .                         |   ...             |               [1]  |
+ *   .                         z   ...             z               ...  z
+ *   [tls data begins]         | }                 |               ...  | <-
+ *   [declared end of p_t_d]   |----------------------------------------| . |
+ *   .                         |                                   ...  | . |
+ *   .                         |                           [TLS_SIZE-1] | <-|
+ *   [tls data actually ends]  |----------------------------------------|   |
+ *   .                         | ALTSTACK                               |   |
+ *   .                         |----------------------------------------|   |
+ *   .                         | struct nonpointer_thread_data { }      |   |
+ *   .                         ------------------------------------------   |
+ *   [blob actually ends]                                                   |
+ *                                                                         /
+ *                                                                        /
+ *                                                                       /
+ *          ______________________                                      /
+ *          | struct symbol {    |                                     /
+ *          z   ...              z                                    /
+ *          |   fixnum tls_index;  // fixnum value relative to union /
+ *          | }                  |           (< TLS_SIZE = 4096)
+ *          ---------------------|
+ */
+#ifdef LISP_FEATURE_WIN32
+# define TEB_STATIC_TLS_SLOTS_OFFSET 0xE10
+# define TEB_SBCL_THREAD_BASE_OFFSET (TEB_STATIC_TLS_SLOTS_OFFSET+(63*4))
+# define SBCL_THREAD_BASE_EA %fs:TEB_SBCL_THREAD_BASE_OFFSET
+# define MAYBE_FS(addr) addr
+# define LoadTlSymbolValueAddress(symbol,reg) ;         \
+	movl	SBCL_THREAD_BASE_EA, reg ; 		\
+	addl	(symbol+SYMBOL_TLS_INDEX_OFFSET), reg ;
+# define LoadCurrentThreadSlot(offset,reg);     \
+	movl	SBCL_THREAD_BASE_EA, reg ;      \
+	movl	offset(reg), reg ;
+#elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS)
+  /* see comment in arch_os_thread_init */
+# define SBCL_THREAD_BASE_EA %fs:THREAD_SELFPTR_OFFSET
+# define MAYBE_FS(addr) addr
+#else
+  /* perhaps there's an OS out there that actually supports %fs without
+   * jumping through hoops, so just in case, here a default definition: */
+# define SBCL_THREAD_BASE_EA $0
+# define MAYBE_FS(addr) %fs:addr
+#endif
+
+/* gas can't parse 4096LU; redefine */
+#if BACKEND_PAGE_BYTES == 4096
+# undef BACKEND_PAGE_BYTES
+# define BACKEND_PAGE_BYTES 4096
+#elif BACKEND_PAGE_BYTES == 32768
+# undef BACKEND_PAGE_BYTES
+# define BACKEND_PAGE_BYTES 32768
+#else
+# error BACKEND_PAGE_BYTES mismatch
+#endif
+
+/* OAOOM because we don't have the C headers here */
+#define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
+
+/* the CSP page sits right before the thread */
+#define THREAD_SAVED_CSP_OFFSET (-THREAD_CSP_PAGE_SIZE)
 
 /*
  * x86/darwin (as of MacOS X 10.4.5) doesn't reliably file signal
@@ -104,6 +192,58 @@
  * FIXME & OAOOM: This duplicates call-out in src/compiler/x86/c-call.lisp,
  * so if you tweak this, change that too!
  */
+/*
+ * Note on sections specific to LISP_FEATURE_SB_SAFEPOINT:
+ *
+ * The code below is essential to safepoint-based garbage collection,
+ * and several details need to be considered for correct implementation.
+ *
+ * The stack spilling approach:
+ *   On SB-SAFEPOINT platforms, the CALL-OUT vop is defined to spill all
+ *   live Lisp TNs to the stack to provide information for conservative
+ *   GC cooperatively (avoiding the need to retrieve register values
+ *   from POSIX signal contexts or Windows GetThreadContext()).
+ *
+ * Finding the SP at all:
+ *   The main remaining value needed by GC is the stack pointer (SP) at
+ *   the moment of entering the foreign function.  For this purpose, a
+ *   thread-local field for the SP is used.  Two stores to that field
+ *   are done for each C call, one to save the SP before calling out and
+ *   and one to undo that store afterwards.
+ *
+ * Stores as synchronization points:
+ *   These two stores delimit the C call: While the SP is set, our
+ *   thread is known not to run Lisp code: During GC, memory protection
+ *   ensures that no thread proceeds across stores.
+ *
+ * The return PC issue:
+ *   (Note that CALL-OUT has, in principle, two versions: Inline
+ *   assembly in the VOP -or- alternatively the out-of-line version you
+ *   are currently reading.  In reality, safepoint builds currently
+ *   lack the inline code entirely.)
+ *
+ *   Both versions need to take special care with the return PC:
+ *   - In the inline version of the code (if it existed), the two stores
+ *     would be done directly in the CALL-OUT vop.  In that theoretical
+ *     implementation, there is a time interval between return of the
+ *     actual C call and a second SP store during which the return
+ *     address might not be on the stack anymore.
+ *   - In this out-of-line version, the stores are done during
+ *     call_into_c's frame, but an equivalent problem arises: In order
+ *     to present the stack of arguments as our foreign function expects
+ *     them, call_into_c has to pop the Lisp return address into a
+ *     register first; this register has to be preserved by GENCGC
+ *     separately: our return address is not in the stack anymore.
+ *   In both case, stack scanning alone is not sufficient to pin
+ *   the return address, and we communicate it to GC explicitly
+ *   in addition to the SP.
+ *
+ * Note on look-alike accessor macros with vastly different behaviour:
+ *   THREAD_PC_AROUND_FOREIGN_CALL_OFFSET is an "ordinary" field of the
+ *   struct thread, whereas THREAD_SAVED_CSP_OFFSET is a synchronization
+ *   point on a potentially write-protected page.
+*/
+
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(call_into_c)
@@ -113,6 +253,11 @@ GNAME(call_into_c):
 	popl	%ebx
 
 /* Setup the NPX for C */
+        /* The VOP says regarding CLD: "Clear out DF: Darwin, Windows,
+         * and Solaris at least require this, and it should not hurt
+         * others either." call_into_c didn't have it, but better safe than
+         * sorry. */
+        cld
 	fstp	%st(0)
 	fstp	%st(0)
 	fstp	%st(0)
@@ -122,8 +267,25 @@ GNAME(call_into_c):
 	fstp	%st(0)
 	fstp	%st(0)
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+        /* enter safe region: store SP and return PC */
+	movl	SBCL_THREAD_BASE_EA,%edi
+	movl	%esp,MAYBE_FS(THREAD_SAVED_CSP_OFFSET(%edi))
+	movl	%ebx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
+#endif
+
+	/* foreign call, preserving ESI, EDI, and EBX */
 	call	*%eax		  # normal callout using Lisp stack
-	movl	%eax,%ecx	  # remember integer return value
+        /* return values now in eax/edx OR st(0) */
+
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+        /* leave region: clear the SP!  (Also unpin the return PC.) */
+	xorl	%ecx,%ecx
+	movl	%ecx,MAYBE_FS(THREAD_SAVED_CSP_OFFSET(%edi))
+	movl	%ecx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
+#endif
+
+        movl	%eax,%ecx	  # remember integer return value
 
 /* Check for a return FP value. */
 	fxam
@@ -163,7 +325,7 @@ Lfp_rtn_value:
 
 /* We don't need to restore eax, because the result is in st(0). */
 
-/* Return. FIXME: It would be nice to restructure this to use RET. */	
+/* Return. FIXME: It would be nice to restructure this to use RET. */
 	jmp	*%ebx
 
 	SIZE(GNAME(call_into_c))
@@ -202,6 +364,7 @@ GNAME(call_into_lisp_first_time):
 GNAME(call_into_lisp):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
+
 Lstack:
 /* Save the NPX state */
 	fwait			# Catch any pending NPX exceptions.
@@ -762,6 +925,12 @@ GNAME(fast_bzero_pointer):
          * Initially points to a basic function.  Change this variable
          * to fast_bzero_detect if OS supports SSE.  */
         .long GNAME(fast_bzero_base)
+
+	.globl GNAME(gc_safepoint_page)
+	.data
+        .align  align_page
+GNAME(gc_safepoint_page):
+        .fill BACKEND_PAGE_BYTES
 
 	.text
 	.align	align_16byte,0x90

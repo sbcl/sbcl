@@ -40,10 +40,12 @@ pa_alloc(int bytes, int page_type_flag)
     lispobj *result;
     struct thread *th = arch_os_get_current_thread();
 
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     /* SIG_STOP_FOR_GC must be unblocked: else two threads racing here
      * may deadlock: one will wait on the GC lock, and the other
      * cannot stop the first one... */
     check_gc_signals_unblocked_or_lose(0);
+#endif
 
     /* FIXME: OOAO violation: see arch_pseudo_* */
     set_pseudo_atomic_atomic(th);

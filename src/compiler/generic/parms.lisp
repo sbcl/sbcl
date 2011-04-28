@@ -85,6 +85,8 @@
     *gc-pending*
     #!-sb-thread
     *stepping*
+    #!+sb-safepoint sb!impl::*gc-safe*
+    #!+sb-safepoint sb!impl::*in-safepoint*
 
     ;; threading support
     #!+sb-thread *stop-for-gc-pending*

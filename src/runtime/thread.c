@@ -44,6 +44,10 @@
 #include "interr.h"             /* for lose() */
 #include "alloc.h"
 #include "gc-internal.h"
+#include "cpputil.h"
+#include "pseudo-atomic.h"
+#include "interrupt.h"
+#include "lispregs.h"
 
 #ifdef LISP_FEATURE_WIN32
 /*
@@ -205,13 +209,16 @@ initial_thread_trampoline(struct thread *th)
 #ifdef LISP_FEATURE_SB_THREAD
     pthread_setspecific(lisp_thread, (void *)1);
 #endif
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_PPC)
+#if defined(THREADS_USING_GCSIGNAL) && defined(LISP_FEATURE_PPC)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
     unblock_gc_signals(0,0);
 #endif
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    pthread_mutex_lock(thread_qrl(th));
+#endif
     link_thread(th);
     th->os_thread=thread_self();
 #ifndef LISP_FEATURE_WIN32
@@ -229,20 +236,6 @@ initial_thread_trampoline(struct thread *th)
     return funcall0(function);
 #endif
 }
-
-#ifdef LISP_FEATURE_SB_THREAD
-#define THREAD_STATE_LOCK_SIZE \
-    ((sizeof(os_sem_t))+(sizeof(os_sem_t))+(sizeof(os_sem_t)))
-#else
-#define THREAD_STATE_LOCK_SIZE 0
-#endif
-
-#define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
-                            ALIEN_STACK_SIZE +                               \
-                            THREAD_STATE_LOCK_SIZE +                         \
-                            dynamic_values_bytes +                           \
-                            32 * SIGSTKSZ +                                  \
-                            THREAD_ALIGNMENT_BYTES)
 
 #ifdef LISP_FEATURE_SB_THREAD
 /* THREAD POST MORTEM CLEANUP
@@ -344,7 +337,9 @@ new_thread_trampoline(struct thread *th)
 
     FSHOW((stderr,"/creating thread %lu\n", thread_self()));
     check_deferrables_blocked_or_lose(0);
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     check_gc_signals_unblocked_or_lose(0);
+#endif
     pthread_setspecific(lisp_thread, (void *)1);
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
@@ -361,12 +356,33 @@ new_thread_trampoline(struct thread *th)
      * list and we're just adding this thread to it, there is no
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
      * it is not). */
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    *th->csp_around_foreign_call = (lispobj)&function;
+    pthread_mutex_lock(thread_qrl(th));
+#endif
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     link_thread(th);
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
+    /* Kludge: Changed the order of some steps between the safepoint/
+     * non-safepoint versions of this code.  Can we unify this more?
+     */
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    WITH_GC_AT_SAFEPOINTS_ONLY() {
+        result = funcall0(function);
+        block_blockable_signals(0, 0);
+        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    }
+    lock_ret = pthread_mutex_lock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
+    unlink_thread(th);
+    lock_ret = pthread_mutex_unlock(&all_threads_lock);
+    gc_assert(lock_ret == 0);
+    pthread_mutex_unlock(thread_qrl(th));
+    set_thread_state(th,STATE_DEAD);
+#else
     result = funcall0(function);
 
     /* Block GC */
@@ -382,6 +398,7 @@ new_thread_trampoline(struct thread *th)
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
+#endif
 
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
     os_sem_destroy(th->state_sem);
@@ -449,12 +466,15 @@ create_thread_struct(lispobj initial_function) {
     aligned_spaces = (void *)((((unsigned long)(char *)spaces)
                                + THREAD_ALIGNMENT_BYTES-1)
                               &~(unsigned long)(THREAD_ALIGNMENT_BYTES-1));
-    per_thread=(union per_thread_data *)
+    void* csp_page=
         (aligned_spaces+
          thread_control_stack_size+
          BINDING_STACK_SIZE+
-         ALIEN_STACK_SIZE +
-         THREAD_STATE_LOCK_SIZE);
+         ALIEN_STACK_SIZE);
+    per_thread=(union per_thread_data *)
+        (csp_page + THREAD_CSP_PAGE_SIZE);
+    struct nonpointer_thread_data *nonpointer_data
+        = (void *) &per_thread->dynamic_values[TLS_SIZE];
 
 #ifdef LISP_FEATURE_SB_THREAD
     for(i = 0; i < (dynamic_values_bytes / sizeof(lispobj)); i++)
@@ -496,18 +516,30 @@ create_thread_struct(lispobj initial_function) {
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
+
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    th->pc_around_foreign_call = 0;
+    th->csp_around_foreign_call = csp_page;
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
+    /* Contrary to the "allocate all the spaces at once" comment above,
+     * the os_attr is allocated separately.  We cannot put it into the
+     * nonpointer data, because it's used for post_mortem and freed
+     * separately */
     th->os_attr=malloc(sizeof(pthread_attr_t));
-    th->state_sem=(os_sem_t *)((void *)th->alien_stack_start + ALIEN_STACK_SIZE);
-    th->state_not_running_sem=(os_sem_t *)
-        ((void *)th->state_sem + (sizeof(os_sem_t)));
-    th->state_not_stopped_sem=(os_sem_t *)
-        ((void *)th->state_not_running_sem + (sizeof(os_sem_t)));
+    th->nonpointer_data = nonpointer_data;
+    th->state_sem=&nonpointer_data->state_sem;
+    th->state_not_running_sem=&nonpointer_data->state_not_running_sem;
+    th->state_not_stopped_sem=&nonpointer_data->state_not_stopped_sem;
     th->state_not_running_waitcount = 0;
     th->state_not_stopped_waitcount = 0;
     os_sem_init(th->state_sem, 1);
     os_sem_init(th->state_not_running_sem, 0);
     os_sem_init(th->state_not_stopped_sem, 0);
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+    pthread_mutex_init(thread_qrl(th), NULL);
+# endif
 #endif
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
@@ -561,6 +593,10 @@ create_thread_struct(lispobj initial_function) {
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
     bind_variable(STOP_FOR_GC_PENDING,NIL,th);
+#endif
+#if defined(LISP_FEATURE_SB_SAFEPOINT)
+    bind_variable(GC_SAFE,NIL,th);
+    bind_variable(IN_SAFEPOINT,NIL,th);
 #endif
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     access_control_stack_pointer(th)=th->control_stack_start;
@@ -671,6 +707,10 @@ os_thread_t create_thread(lispobj initial_function) {
  * the usual pseudo-atomic checks (we don't want to stop a thread while
  * it's in the middle of allocation) then waits for another SIG_STOP_FOR_GC.
  */
+/*
+ * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
+ */
+#ifndef LISP_FEATURE_SB_SAFEPOINT
 
 /* To avoid deadlocks when gc stops the world all clients of each
  * mutex must enable or disable SIG_STOP_FOR_GC for the duration of
@@ -762,7 +802,9 @@ void gc_start_the_world()
 
     FSHOW_SIGNAL((stderr,"/gc_start_the_world:end\n"));
 }
-#endif
+
+#endif /* !LISP_FEATURE_SB_SAFEPOINT */
+#endif /* !LISP_FEATURE_SB_THREAD */
 
 int
 thread_yield()
@@ -798,6 +840,23 @@ kill_safely(os_thread_t os_thread, int signal)
 #ifdef LISP_FEATURE_SB_THREAD
         sigset_t oldset;
         struct thread *thread;
+        /* Frequent special case: resignalling to self.  The idea is
+         * that leave_region safepoint will acknowledge the signal, so
+         * there is no need to take locks, roll thread to safepoint
+         * etc. */
+        /* Kludge (on safepoint builds): At the moment, this isn't just
+         * an optimization; rather it masks the fact that
+         * gc_stop_the_world() grabs the all_threads mutex without
+         * releasing it, and since we're not using recursive pthread
+         * mutexes, the pthread_mutex_lock() around the all_threads loop
+         * would go wrong.  Why are we running interruptions while
+         * stopping the world though?  Test case is (:ASYNC-UNWIND
+         * :SPECIALS), especially with s/10/100/ in both loops. */
+        if (os_thread == pthread_self()) {
+            pthread_kill(os_thread, signal);
+            return 0;
+        }
+
         /* pthread_kill is not async signal safe and we don't want to be
          * interrupted while holding the lock. */
         block_deferrable_signals(0, &oldset);

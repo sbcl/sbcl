@@ -14,6 +14,7 @@
 
 extern void bind_variable(lispobj symbol, lispobj value,void *thread);
 extern void unbind(void *thread);
+extern void unbind_variable(lispobj name, void *thread);
 extern void unbind_to_here(lispobj *bsp,void *thread);
 
 #endif

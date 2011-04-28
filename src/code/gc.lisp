@@ -254,6 +254,8 @@ statistics are appended to it."
                          ;; turn is a type-error.
                          (when (plusp run-time)
                            (incf *gc-run-time* run-time))))
+                     #!+sb-safepoint
+                     (setf *stop-for-gc-pending* nil)
                      (setf *gc-pending* nil
                            new-usage (dynamic-usage))
                      #!+sb-thread

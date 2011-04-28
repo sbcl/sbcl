@@ -1272,7 +1272,10 @@
 
     (let ((lab (gen-label)))
       (setf (ir2-physenv-environment-start env) lab)
-      (vop note-environment-start node block lab)))
+      (vop note-environment-start node block lab)
+      #!+sb-safepoint
+      (unless (policy fun (>= inhibit-safepoints 2))
+        (vop sb!vm::insert-safepoint node block))))
 
   (values))
 
@@ -1805,6 +1808,22 @@
                        2block
                        #!+sb-dyncount *dynamic-counts-tn* #!-sb-dyncount nil
                        num))))
+              #!+sb-safepoint
+              (let ((first-node (block-start-node block)))
+                (unless (or (and (bind-p first-node)
+                                 (xep-p (bind-lambda first-node)))
+                            (and (valued-node-p first-node)
+                                 (node-lvar first-node)
+                                 (eq (lvar-fun-name
+                                      (node-lvar first-node))
+                                     '%nlx-entry)))
+                  (when (and (rest (block-pred block))
+                             (block-loop block)
+                             (member (loop-kind (block-loop block))
+                                     '(:natural :strange))
+                             (eq block (loop-head (block-loop block)))
+                             (policy first-node (< inhibit-safepoints 2)))
+                    (vop sb!vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
             (incf num))))))
   (values))

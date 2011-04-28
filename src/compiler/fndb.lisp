@@ -1605,6 +1605,12 @@
 (defknown sb!vm:%write-barrier () (values) ())
 (defknown sb!vm:%data-dependency-barrier () (values) ())
 
+#!+sb-safepoint
+;;; Note: This known function does not have an out-of-line definition;
+;;; and if such a definition were needed, it would not need to "call"
+;;; itself inline, but could be a no-op, because the compiler inserts a
+;;; use of the VOP in the function prologue anyway.
+(defknown sb!kernel::gc-safepoint () (values) ())
 
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t

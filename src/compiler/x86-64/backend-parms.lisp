@@ -47,3 +47,7 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (def!constant gencgc-release-granularity *backend-page-bytes*)
+
+#!+sb-safepoint
+(def!constant thread-saved-csp-offset
+    (- (/ *backend-page-bytes* n-word-bytes)))

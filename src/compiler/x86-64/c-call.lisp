@@ -257,12 +257,37 @@
          (args :more t))
   (:results (results :more t))
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
-  (:ignore results)
+  ;; For safepoint builds: Force values of non-volatiles to the stack.
+  ;; These are the callee-saved registers in the native ABI, but
+  ;; safepoint-based GC needs to see all Lisp values on the stack.  Note
+  ;; that R12-R15 are non-volatile registers, but there is no need to
+  ;; spill R12 because it is our thread-base-tn.  RDI and RSI are
+  ;; non-volatile on Windows, but argument passing registers on other
+  ;; platforms.
+  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset r13-offset) r13)
+  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset r14-offset) r14)
+  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset r15-offset) r15)
+  #!+(and sb-safepoint win32) (:temporary
+                               (:sc unsigned-reg :offset rdi-offset) rdi)
+  #!+(and sb-safepoint win32) (:temporary
+                               (:sc unsigned-reg :offset rsi-offset) rsi)
+  (:ignore results
+           #!+(and sb-safepoint win32) rdi
+           #!+(and sb-safepoint win32) rsi
+           #!+sb-safepoint r15
+           #!+sb-safepoint r13)
   (:vop-var vop)
   (:save-p t)
   (:generator 0
     ;; ABI: Direction flag must be clear on function entry. -- JES, 2006-01-20
     (inst cld)
+    #!+sb-safepoint
+    (progn
+      ;; Current PC - don't rely on function to keep it in a form that
+      ;; GC understands
+      (let ((label (gen-label)))
+        (inst lea r14 (make-fixup nil :code-object label))
+        (emit-label label)))
     ;; ABI: AL contains amount of arguments passed in XMM registers
     ;; for vararg calls.
     (move-immediate rax
@@ -270,7 +295,19 @@
                        while tn-ref
                        count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
                                  'float-registers)))
+    #!+sb-safepoint
+    (progn                              ;Store SP and PC in thread struct
+      (storew rsp-tn thread-base-tn thread-saved-csp-offset)
+      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
     (inst call function)
+    #!+sb-safepoint
+    (progn
+      ;; Zeroing out
+      (inst xor r14 r14)
+      ;; Zero PC storage place. NB. CSP-then-PC: same sequence on
+      ;; entry/exit, is actually corrent.
+      (storew r14 thread-base-tn thread-saved-csp-offset)
+      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)))
 
@@ -380,7 +417,7 @@
              (error "Too many arguments in callback")))
     (let* ((segment (make-segment))
            (rax rax-tn)
-           (rcx rcx-tn)
+           #!+(not sb-safepoint) (rcx rcx-tn)
            (rdi rdi-tn)
            (rsi rsi-tn)
            (rdx rdx-tn)
@@ -444,36 +481,58 @@
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
 
-        ;; arg0 to FUNCALL3 (function)
-        ;;
-        ;; Indirect the access to ENTER-ALIEN-CALLBACK through
-        ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
-        ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
-        ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
-        ;; to rebind the variable. -- JES, 2006-01-01
-        (inst mov rdi (+ nil-value (static-symbol-offset
-                                    'sb!alien::*enter-alien-callback*)))
-        (loadw rdi rdi symbol-value-slot other-pointer-lowtag)
-        ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-        (inst mov rsi (fixnumize index))
-        ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-        (inst mov rdx rsp)
-        ;; add room on stack for return value
-        (inst sub rsp 8)
-        ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-        (inst mov rcx rsp)
+        #!-sb-safepoint
+        (progn
+          ;; arg0 to FUNCALL3 (function)
+          ;;
+          ;; Indirect the access to ENTER-ALIEN-CALLBACK through
+          ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
+          ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
+          ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
+          ;; to rebind the variable. -- JES, 2006-01-01
+          (inst mov rdi (+ nil-value (static-symbol-offset
+                                      'sb!alien::*enter-alien-callback*)))
+          (loadw rdi rdi symbol-value-slot other-pointer-lowtag)
+          ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
+          (inst mov rsi (fixnumize index))
+          ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
+          (inst mov rdx rsp)
+          ;; add room on stack for return value
+          (inst sub rsp 8)
+          ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
+          (inst mov rcx rsp)
 
-        ;; Make new frame
-        (inst push rbp)
-        (inst mov  rbp rsp)
+          ;; Make new frame
+          (inst push rbp)
+          (inst mov  rbp rsp)
 
-        ;; Call
-        (inst mov  rax (foreign-symbol-address "funcall3"))
-        (inst call rax)
+          ;; Call
+          (inst mov  rax (foreign-symbol-address "funcall3"))
+          (inst call rax)
 
-        ;; Back! Restore frame
-        (inst mov rsp rbp)
-        (inst pop rbp)
+          ;; Back! Restore frame
+          (inst mov rsp rbp)
+          (inst pop rbp))
+
+        #!+sb-safepoint
+        (progn
+          ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
+          (inst mov rdi (fixnumize index))
+          ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
+          (inst mov rsi rsp)
+          ;; add room on stack for return value
+          (inst sub rsp 8)
+          ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
+          (inst mov rdx rsp)
+          ;; Make new frame
+          (inst push rbp)
+          (inst mov  rbp rsp)
+          ;; Call
+          (inst mov rax (foreign-symbol-address "callback_wrapper_trampoline"))
+          (inst call rax)
+          ;; Back! Restore frame
+          (inst mov rsp rbp)
+          (inst pop rbp))
 
         ;; Result now on top of stack, put it in the right register
         (cond

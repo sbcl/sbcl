@@ -435,6 +435,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     }
 #endif
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    if (!handle_safepoint_violation(context, addr))
+#endif
+
 #ifdef LISP_FEATURE_GENCGC
     if (!gencgc_handle_wp_violation(addr))
 #else
@@ -450,8 +454,10 @@ os_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
 #ifdef LISP_FEATURE_SB_THREAD
+# ifndef LISP_FEATURE_SB_SAFEPOINT
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
+# endif
 #endif
 }
 

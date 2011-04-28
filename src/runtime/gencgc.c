@@ -3423,7 +3423,41 @@ garbage_collect_generation(generation_index_t generation, int raise)
         for_each_thread(th) {
             void **ptr;
             void **esp=(void **)-1;
-#ifdef LISP_FEATURE_SB_THREAD
+            if (th->state == STATE_DEAD)
+                continue;
+# if defined(LISP_FEATURE_SB_SAFEPOINT)
+            /* Conservative collect_garbage is always invoked with a
+             * foreign C call or an interrupt handler on top of every
+             * existing thread, so the stored SP in each thread
+             * structure is valid, no matter which thread we are looking
+             * at.  For threads that were running Lisp code, the pitstop
+             * and edge functions maintain this value within the
+             * interrupt or exception handler. */
+            esp = os_get_csp(th);
+            assert_on_stack(th, esp);
+
+            /* In addition to pointers on the stack, also preserve the
+             * return PC, the only value from the context that we need
+             * in addition to the SP.  The return PC gets saved by the
+             * foreign call wrapper, and removed from the control stack
+             * into a register. */
+            preserve_pointer(th->pc_around_foreign_call);
+
+            /* And on platforms with interrupts: scavenge ctx registers. */
+
+            /* Disabled on Windows, because it does not have an explicit
+             * stack of `interrupt_contexts'.  The reported CSP has been
+             * chosen so that the current context on the stack is
+             * covered by the stack scan.  See also set_csp_from_context(). */
+#  ifndef LISP_FEATURE_WIN32
+            if (th != arch_os_get_current_thread()) {
+                long k = fixnum_value(
+                    SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+                while (k > 0)
+                    preserve_context_registers(th->interrupt_contexts[--k]);
+            }
+#  endif
+# elif defined(LISP_FEATURE_SB_THREAD)
             long i,free;
             if(th==arch_os_get_current_thread()) {
                 /* Somebody is going to burn in hell for this, but casting
@@ -3442,9 +3476,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     }
                 }
             }
-#else
+# else
             esp = (void **)((void *)&raise);
-#endif
+# endif
+            if (!esp || esp == (void*) -1)
+                lose("garbage_collect: no SP known for thread %x (OS %x)",
+                     th, th->os_thread);
             for (ptr = ((void **)th->control_stack_end)-1; ptr >= esp;  ptr--) {
                 preserve_pointer(*ptr);
             }
@@ -4170,6 +4207,9 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
              * section */
             SetSymbolValue(GC_PENDING,T,thread);
             if (SymbolValue(GC_INHIBIT,thread) == NIL) {
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+                thread_register_gc_trigger();
+#else
                 set_pseudo_atomic_interrupted(thread);
 #ifdef LISP_FEATURE_PPC
                 /* PPC calls alloc() from a trap or from pa_alloc(),
@@ -4183,12 +4223,14 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
 #else
                 maybe_save_gc_mask_and_block_deferrables(NULL);
 #endif
+#endif
             }
         }
     }
     new_obj = gc_alloc_with_region(nbytes, page_type_flag, region, 0);
 
 #ifndef LISP_FEATURE_WIN32
+    /* for sb-prof, and not supported on Windows yet */
     alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((signed long) alloc_signal <= 0) {

@@ -113,6 +113,10 @@ void arch_skip_instruction(os_context_t *context)
         case trap_FunEndBreakpoint: /* not tested */
             break;
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+        case trap_GlobalSafepoint:
+        case trap_CspSafepoint:
+#endif
         case trap_PendingInterrupt:
         case trap_Halt:
         case trap_SingleStepAround:

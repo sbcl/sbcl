@@ -123,10 +123,15 @@ struct interrupt_data {
 #endif
 };
 
+typedef lispobj (*call_into_lisp_lookalike)(
+    lispobj fun, lispobj *args, int nargs);
+
 extern boolean interrupt_handler_pending_p(void);
 extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
 extern void undo_fake_foreign_function_call(os_context_t* context);
+extern void arrange_return_to_c_function(
+    os_context_t *, call_into_lisp_lookalike, lispobj);
 extern void arrange_return_to_lisp_function(os_context_t *, lispobj);
 extern void interrupt_handle_now(int, siginfo_t*, os_context_t*);
 extern void interrupt_handle_pending(os_context_t*);
@@ -170,5 +175,10 @@ extern void lisp_memory_fault_error(os_context_t *context,
 
 extern void lower_thread_control_stack_guard_page(struct thread *th);
 extern void reset_thread_control_stack_guard_page(struct thread *th);
+
+#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_WIN32)
+void rtmin0_handler(int signal, siginfo_t *info, os_context_t *context);
+void rtmin1_handler(int signal, siginfo_t *info, os_context_t *context);
+#endif
 
 #endif

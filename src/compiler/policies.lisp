@@ -135,3 +135,16 @@ debugger.")
 (define-optimization-quality store-coverage-data
     0
   ("no" "no" "yes" "yes"))
+
+#!+sb-safepoint
+(define-optimization-quality inhibit-safepoints
+    0
+  ("no" "no" "yes" "yes")
+  "When disabled, the compiler will insert safepoints at strategic
+points (loop edges, function prologues) to ensure that potentially
+long-running code can be interrupted.
+
+When enabled, no safepoints will be inserted explicitly.  Note that
+this declaration does not prevent out-of-line function calls, which
+will encounter safepoints unless the target function has also been
+compiled with this declaration in effect.")

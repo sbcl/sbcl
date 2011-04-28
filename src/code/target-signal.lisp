@@ -99,6 +99,7 @@
     sb!alien:void
   (where sb!alien:unsigned-long)
   (old sb!alien:unsigned-long))
+#!-sb-safepoint
 (sb!alien:define-alien-routine ("unblock_gc_signals" %unblock-gc-signals)
     sb!alien:void
   (where sb!alien:unsigned-long)
@@ -107,6 +108,7 @@
 (defun unblock-deferrable-signals ()
   (%unblock-deferrable-signals 0 0))
 
+#!-sb-safepoint
 (defun unblock-gc-signals ()
   (%unblock-gc-signals 0 0))
 
@@ -228,7 +230,7 @@
   (enable-interrupt sigpipe #'sigpipe-handler)
   (enable-interrupt sigchld #'sigchld-handler)
   #!+hpux (ignore-interrupt sigxcpu)
-  (unblock-gc-signals)
+  #!-sb-safepoint (unblock-gc-signals)
   (unblock-deferrable-signals)
   (values))
 
