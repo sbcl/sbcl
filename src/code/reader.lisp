@@ -270,7 +270,8 @@ standard Lisp readtable when NIL."
   "Causes CHAR to be a macro character which invokes FUNCTION when seen
    by the reader. The NON-TERMINATINGP flag can be used to make the macro
    character non-terminating, i.e. embeddable in a symbol name."
-  (let ((designated-readtable (or rt-designator *standard-readtable*)))
+  (let ((designated-readtable (or rt-designator *standard-readtable*))
+        (function (%coerce-callable-to-fun function)))
     (assert-not-standard-readtable designated-readtable 'set-macro-character)
     (set-cat-entry char (if non-terminatingp
                             +char-attr-constituent+
