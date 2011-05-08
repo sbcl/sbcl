@@ -339,9 +339,12 @@
 
 ;;;; support for local (stack or register) aliens
 
-(deftransform make-local-alien ((info) * * :important t)
+(defun alien-info-constant-or-abort (info)
   (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+    (abort-ir1-transform "Local alien info isn't constant?")))
+
+(deftransform make-local-alien ((info) * * :important t)
+  (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info))
          (bits (alien-type-bits alien-type)))
@@ -373,10 +376,7 @@
                   (unparse-alien-type alien-type))))))))
 
 (deftransform note-local-alien-type ((info var) * * :important t)
-  ;; FIXME: This test and error occur about a zillion times. They
-  ;; could be factored into a function.
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let ((info (lvar-value info)))
     (/noshow "in DEFTRANSFORM NOTE-LOCAL-ALIEN-TYPE" info)
     (/noshow (local-alien-info-force-to-memory-p info))
@@ -391,8 +391,7 @@
   nil)
 
 (deftransform local-alien ((info var) * * :important t)
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM LOCAL-ALIEN" info alien-type)
@@ -402,14 +401,12 @@
         `(naturalize var ',alien-type))))
 
 (deftransform %local-alien-forced-to-memory-p ((info) * * :important t)
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let ((info (lvar-value info)))
     (local-alien-info-force-to-memory-p info)))
 
 (deftransform %set-local-alien ((info var value) * * :important t)
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
@@ -424,8 +421,7 @@
       *wild-type*))
 
 (deftransform %local-alien-addr ((info var) * * :important t)
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM %LOCAL-ALIEN-ADDR, creating %SAP-ALIEN")
@@ -434,8 +430,7 @@
         (error "This shouldn't happen."))))
 
 (deftransform dispose-local-alien ((info var) * * :important t)
-  (unless (constant-lvar-p info)
-    (abort-ir1-transform "Local alien info isn't constant?"))
+  (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
