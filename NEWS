@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.47:
+changes in sbcl-1.0.48 relative to sbcl-1.0.47:
   * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five
     years, is now no longer supported.
   * enhancement: read() and write() have been added to SB-POSIX.
