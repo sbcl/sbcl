@@ -256,10 +256,11 @@
     (make-debug-source
      :compiled (source-info-start-time info)
 
-     :namestring (make-file-info-namestring
-                  (if (pathnamep (file-info-name file-info))
-                      (file-info-name file-info))
-                  file-info)
+     :namestring (or *source-namestring*
+                     (make-file-info-namestring
+                      (if (pathnamep (file-info-name file-info))
+                          (file-info-name file-info))
+                      file-info))
      :created (file-info-write-date file-info)
      :source-root (file-info-source-root file-info)
      :start-positions (coerce-to-smallest-eltype

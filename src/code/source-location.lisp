@@ -16,10 +16,11 @@
   ;; Namestring of the source file that the definition was compiled from.
   ;; This is null if the definition was not compiled from a file.
   (namestring
-   (when (and (boundp '*source-info*)
-              *source-info*)
-     (make-file-info-namestring *compile-file-pathname*
-                                (sb!c:get-toplevelish-file-info *source-info*)))
+   (or *source-namestring*
+       (when (and (boundp '*source-info*)
+                  *source-info*)
+         (make-file-info-namestring *compile-file-pathname*
+                                    (sb!c:get-toplevelish-file-info *source-info*))))
    :type (or string null))
   ;; Toplevel form index
   (toplevel-form-number
