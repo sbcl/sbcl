@@ -10,4 +10,3 @@ up:
 	cp asdf-upstream/asdf.lisp asdf.lisp
 	cp asdf-upstream/doc/asdf.texinfo asdf.texinfo
 	cp asdf-upstream/README README
-	cp asdf-upstream/LICENSE LICENSE 

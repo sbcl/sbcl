@@ -35,11 +35,11 @@ for Common Lisp programs and libraries.
 You can find the latest version of this manual at
 @url{http://common-lisp.net/project/asdf/asdf.html}.
 
-ASDF Copyright @copyright{} 2001-2010 Daniel Barlow and contributors.
+ASDF Copyright @copyright{} 2001-2011 Daniel Barlow and contributors.
 
-This manual Copyright @copyright{} 2001-2010 Daniel Barlow and contributors.
+This manual Copyright @copyright{} 2001-2011 Daniel Barlow and contributors.
 
-This manual revised @copyright{} 2009-2010 Robert P. Goldman and Francois-Rene Rideau.
+This manual revised @copyright{} 2009-2011 Robert P. Goldman and Francois-Rene Rideau.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -171,9 +171,15 @@ the ASDF internals and how to extend ASDF.
 
 @emph{Nota Bene}:
 We have released ASDF 2.000 on May 31st 2010.
-It hopefully will have been it included
-in all CL maintained implementations shortly afterwards.
+Subsequent releases of ASDF 2 have since then been included
+in all actively maintained CL implementations that bundle ASDF,
+and made to work with all actively used CL implementations and a few more.
 @xref{FAQ,,``What has changed between ASDF 1 and ASDF 2?''}.
+Furthermore, it is possible to upgrade from ASDF 1 to ASDF 2 on the fly.
+For this reason, we have stopped supporting ASDF 1;
+if you are using ASDF 1 and are experiencing any kind of issues or limitations,
+we recommend you upgrade to ASDF 2
+--- and we explain how to do it. @xref{Loading ASDF}.
 
 
 @node Loading ASDF, Configuring ASDF, Introduction, Top
@@ -202,14 +208,20 @@ You can usually load this copy using Common Lisp's @code{require} function:
 (require :asdf)
 @end lisp
 
-Consult your Lisp implementation's documentation for details.
+As of the writing of this manual,
+the following implementations provide ASDF 2 this way:
+abcl allegro ccl clisp cmucl ecl sbcl xcl.
+The following implementations don't provide it yet but might in a future release:
+lispworks scl.
+The following implementations are obsolete and most probably will never bundle it:
+cormancl gcl genera mcl.
 
-Hopefully, ASDF 2 will soon be bundled with every Common Lisp implementation,
-and you can load it that way.
-If it is not, see @pxref{Loading ASDF,,Loading an otherwise installed ASDF} below.
-if you are using the latest version of your Lisp vendor's software,
-you may also send a bug report to your Lisp vendor and complain about
-their failing to provide ASDF.
+If the implementation you are using doesn't provide ASDF 2,
+see @pxref{Loading ASDF,,Loading an otherwise installed ASDF} below.
+If that implementation is still actively maintained,
+you may also send a bug report to your Lisp vendor and complain
+about their failing to provide ASDF.
+
 
 @section Checking whether ASDF is loaded
 
@@ -242,8 +254,10 @@ If it returns the keyword @code{:OLD},
 then you're using an old version of ASDF (from before 1.635).
 If it returns @code{NIL} then ASDF is not installed.
 
-If you are running a version older than 2.008,
-we recommend that you load a newer ASDF using the method below.
+If you are experiencing problems with ASDF,
+please try upgrading to the latest released version,
+using the method below,
+before you contact us and raise an issue.
 
 
 @section Upgrading ASDF
@@ -279,15 +293,39 @@ and make sure you're not using it
 for multiple mutually incompatible implementations.
 At worst, you may have to have multiple copies of the new ASDF,
 e.g. one per implementation installation, to avoid clashes.
+Note that to our knowledge all implementations that provide ASDF
+provide ASDF 2 in their latest release, so
+you may want to upgrade your implementation rather than go through that hoop.
 
 Finally, note that there are some limitations to upgrading ASDF:
 @itemize
 @item
-Any ASDF extension is invalidated, and will need to be reloaded.
+Any ASDF extension becomes invalid, and will need to be reloaded.
+This applies to e.g. CFFI-Grovel, or to hacks used by ironclad, etc.
+Starting with ASDF 2.014.8, ASDF will actually invalidate
+all previously loaded systems when it is loaded on top of
+a different ASDF version.
 @item
-It is safer if you upgrade ASDF and its extensions as a special step
+Until all implementations provide ASDF 2.015 or later,
+it is safer if you upgrade ASDF and its extensions as a special step
 at the very beginning of whatever script you are running,
 before you start using ASDF to load anything else.
+@item
+Until all implementations provide ASDF 2.015 or later,
+it is unsafe to upgrade ASDF as part of loading a system
+that depends on a more recent version of ASDF,
+since the new one might shadow the old one while the old one is running,
+and the running old one will be confused
+when extensions are loaded into the new one.
+In the meantime, we recommend that your systems should @emph{not} specify
+@code{:depends-on (:asdf)}, or @code{:depends-on ((:version :asdf "2.010"))},
+but instead that they check that a recent enough ASDF is installed,
+with such code as:
+@example
+(unless (or #+asdf2 (asdf:version-satisfies
+                     (asdf:asdf-version) *required-asdf-version*))
+  (error "FOO requires ASDF ~A or later." *required-asdf-version*))
+@end example
 @end itemize
 
 
@@ -668,7 +706,7 @@ usually be saved as @file{hello-lisp.asd}:
 
 (defsystem "hello-lisp"
   :description "hello-lisp: a sample Lisp system."
-  :version "0.2"
+  :version "0.2.1"
   :author "Joe User <joe@@example.com>"
   :licence "Public Domain"
   :components ((:file "packages")
@@ -724,6 +762,19 @@ It is possible, though almost never necessary, to override this behaviour.}.
 This is a good thing because the user can move the system sources
 without having to edit the system definition.
 
+@c FIXME: Should have cross-reference to "Version specifiers" in the
+@c defsystem grammar, but the cross-referencing is so broken by
+@c insufficient node breakdown that I have not put one in.
+@item
+Make sure you know how the @code{:version} numbers will be parsed!  They
+are parsed as period-separated lists of integers.  I.e., in the example,
+@code{0.2.1} is to be interpreted, roughly speaking, as @code{(0 2 1)}.
+In particular, version @code{0.2.1} is interpreted the same as
+@code{0.0002.1} and is strictly version-less-than version @code{0.20.1},
+even though the two are the same when interpreted as decimal fractions.
+@cindex version specifiers
+@cindex :version
+
 @end itemize
 
 @node  A more involved example, The defsystem grammar, The defsystem form, Defining systems with defsystem
@@ -735,7 +786,7 @@ slightly convoluted example:
 
 @lisp
 (defsystem "foo"
-  :version "1.0"
+  :version "1.0.0"
   :components ((:module "mod"
                             :components ((:file "bar")
                                                   (:file"baz")
@@ -853,7 +904,6 @@ component-dep-fail-option := :fail | :try-next | :ignore
 @end example
 
 
-
 @subsection Component names
 
 Component names (@code{simple-component-name})
@@ -953,6 +1003,22 @@ fulfills whatever constraints are required from that component type
 (e.g. naming a directory or a file with appropriate type);
 on the other hand, you can circumvent the file type that would otherwise
 be forced upon you if you were specifying a string.
+
+@subsection Version specifiers
+@cindex version specifiers
+@cindex :version
+
+Version specifiers are parsed as period-separated lists of integers.  I.e., in the example,
+@code{0.2.1} is to be interpreted, roughly speaking, as @code{(0 2 1)}.
+In particular, version @code{0.2.1} is interpreted the same as
+@code{0.0002.1} and is strictly version-less-than version @code{0.20.1},
+even though the two are the same when interpreted as decimal fractions.
+
+System definers are encouraged to use version identifiers of the form
+@var{x}.@var{y}.@var{z} for major version, minor version (compatible
+API) and patch level.
+
+@xref{Common attributes of components}.
 
 
 @subsection Warning about logical pathnames
@@ -1335,12 +1401,16 @@ or @code{nil} is returned if @code{error-p} is false.
 
 To find and update systems, @code{find-system} funcalls each element
 in the @code{*system-definition-search-functions*} list,
-expecting a pathname to be returned.
-The resulting pathname is loaded if either of the following conditions is true:
+expecting a pathname to be returned, or a system object,
+from which a pathname may be extracted, and that will be registered.
+The resulting pathname (if any) is loaded
+if one of the following conditions is true:
 
 @itemize
 @item
 there is no system of that name in memory
+@item
+the pathname is different from that which was previously loaded
 @item
 the file's @code{last-modified} time exceeds the @code{last-modified} time
 of the system in memory
@@ -1392,17 +1462,23 @@ to a Unix-style syntax.
 @xref{The defsystem grammar,,Pathname specifiers}.
 
 @subsubsection Version identifier
+@findex version-satisfies
+@cindex :version
 
-This optional attribute is used by the @code{test-system-version} operation.
-@xref{Predefined operations of ASDF}.
-For the default method of @code{test-system-version},
+This optional attribute is used by the generic function
+@code{version-satisfies}, which tests to see if @code{:version}
+dependencies are satisfied.
 the version should be a string of integers separated by dots,
 for example @samp{1.0.11}.
+For more information on the semantics of version specifiers, see @ref{The defsystem grammar}.
 
-@emph{Nota Bene}:
-This operation, planned for ASDF 1,
-is still not implement yet as of ASDF 2.
-Don't hold your breath.
+@c This optional attribute is intended to be used by the @code{test-system-version} operation.
+@c @xref{Predefined operations of ASDF}.
+@c @emph{Nota Bene}:
+@c This operation, planned for ASDF 1,
+@c is still not implemented yet as of ASDF 2.
+@c Don't hold your breath.
+
 
 
 @subsubsection Required features
@@ -1508,6 +1584,14 @@ But, we need to support CLISP.
 If you have the time for some CLISP hacking,
 I'm sure they'd welcome your fixes.
 @c Doesn't CLISP now support LIST method combination?
+
+See the discussion of the semantics of @code{:version} in the defsystem
+grammar.
+
+@c FIXME: Should have cross-reference to "Version specifiers" in the
+@c defsystem grammar, but the cross-referencing is so broken by
+@c insufficient node breakdown that I have not put one in.
+
 
 @subsubsection pathname
 
@@ -1643,18 +1727,16 @@ We create a subclass of
   ())
 @end lisp
 
-A hypothetical function @code{system-dependent-dirname}
+Function @code{asdf:implementation-type} (exported since 2.014.14)
 gives us the name of the subdirectory.
 All that's left is to define how to calculate the pathname
 of an @code{unportable-cl-source-file}.
 
 @lisp
 (defmethod component-pathname ((component unportable-cl-source-file))
-  (let ((pathname (call-next-method))
-        (name (string-downcase (system-dependent-dirname))))
-    (merge-pathnames*
-     (make-pathname :directory (list :relative name))
-     pathname)))
+  (merge-pathnames*
+   (coerce-pathname (format nil "~(~A~)/" (asdf:implementation-type)))
+   (call-next-method)))
 @end lisp
 
 The new component type is used in a @code{defsystem} form in this way:
@@ -1790,7 +1872,10 @@ but will take precedence over the new mechanism if you do use it.
 
 @section Configuration DSL
 
-Here is the grammar of the s-expression (SEXP) DSL for source-registry configuration:
+Here is the grammar of the s-expression (SEXP) DSL for source-registry
+configuration:
+
+@c FIXME: This is too wide for happy compilation into pdf.
 
 @example
 ;; A configuration is a single SEXP starting with keyword :source-registry
@@ -1804,6 +1889,11 @@ DIRECTIVE :=
     ;; exactly one of either of these:
     :inherit-configuration | ; splices inherited configuration (often specified last)
     :ignore-inherited-configuration | ; drop inherited configuration (specified anywhere)
+
+    ;; forward compatibility directive (since ASDF 2.011.4), useful when
+    ;; you want to use new configuration features but have to bootstrap a
+    ;; the newer required ASDF from an older release that doesn't sport said features:
+    :ignore-invalid-entries | ; drops subsequent invalid entries instead of erroring out
 
     ;; add a single directory to be scanned (no recursion)
     (:directory DIRECTORY-PATHNAME-DESIGNATOR) |
@@ -1837,12 +1927,14 @@ ABSOLUTE-COMPONENT-DESIGNATOR :=
     PATHNAME | ;; pathname (better be an absolute path, or bust)
     :HOME | ;; designates the user-homedir-pathname ~/
     :USER-CACHE | ;; designates the default location for the user cache
-    :SYSTEM-CACHE ;; designates the default location for the system cache
+    :SYSTEM-CACHE | ;; designates the default location for the system cache
+    :HERE  ;; designates the location of the configuration file
+           ;; (or *default-pathname-defaults*, if invoked interactively)
 
 RELATIVE-COMPONENT-DESIGNATOR :=
     STRING | ;; namestring (directory assumed where applicable)
     PATHNAME | ;; pathname
-    :IMPLEMENTATION | ;; a directory based on implementation, e.g. sbcl-1.0.32.30-linux-x86-64
+    :IMPLEMENTATION | ;; a directory based on implementation, e.g. sbcl-1.0.45-linux-amd64
     :IMPLEMENTATION-TYPE | ;; a directory based on lisp-implementation-type only, e.g. sbcl
     :UID | ;; current UID -- not available on Windows
     :USER ;; current USER name -- NOT IMPLEMENTED(!)
@@ -1863,7 +1955,7 @@ once contained:
 
 @section Configuration Directories
 
-Configuration directories consist in files each contains
+Configuration directories consist in files each containing
 a list of directives without any enclosing @code{(:source-registry ...)} form.
 The files will be sorted by namestring as if by @code{string<} and
 the lists of directives of these files with be concatenated in order.
@@ -1897,6 +1989,50 @@ alone in its directory with the following contents:
 (:tree "/home/fare/cl/")
 @end example
 
+@subsection The :here directive
+
+The @code{:here} directive is an absolute pathname designator that
+refers to the directory containing the configuration file currently
+being processed.
+
+The @code{:here} directive is intended to simplify the delivery of
+complex CL systems, and for easy configuration of projects shared through
+revision control systems, in accordance with our design principle that
+each participant should be able to provide all and only the information
+available to him or her.
+
+Consider a person X who has set up the source code repository for a
+complex project with a master directory @file{dir/}.  Ordinarily, one
+might simply have the user add a directive that would look something
+like this:
+@example
+   (:tree  "path/to/dir")
+@end example
+But what if X knows that there are very large subtrees
+under dir that are filled with, e.g., Java source code, image files for
+icons, etc.?  All of the asdf system definitions are contained in the
+subdirectories @file{dir/src/lisp/} and @file{dir/extlib/lisp/}, and
+these are the only directories that should be searched.
+
+In this case, X can put into @file{dir/} a file @file{asdf.conf} that
+contains the following:
+@example
+(:source-registry
+   (:tree (:here "src/lisp/"))
+   (:tree (:here "extlib/lisp"))
+   (:directory (:here "outlier/")))
+@end example
+
+Then when someone else (call her Y) checks out a copy of this
+repository, she need only add
+@example
+(:include "/path/to/my/checkout/directory/asdf.conf")
+@end example
+to one of her previously-existing asdf source location configuration
+files, or invoke @code{initialize-source-registry} with a configuration
+form containing that s-expression.  ASDF will find the .conf file that X
+has provided, and then set up source locations within the working
+directory according to X's (relative) instructions.
 
 @section Shell-friendly syntax for configuration
 
@@ -2190,10 +2326,8 @@ output files and find they need to get familiar with output-translations first.
 
 
 @section Backward Compatibility
+@cindex ASDF-BINARY-LOCATIONS compatibility
 
-@c FIXME -- I think we should provide an easy way
-@c to get behavior equivalent to A-B-L and
-@c I will propose a technique for doing this.
 
 We purposefully do NOT provide backward compatibility with earlier versions of
 @code{ASDF-Binary-Locations} (8 Sept 2009),
@@ -2221,7 +2355,7 @@ as configured by the system distributor, or by default.
 Nevertheless, if you are a fan of @code{ASDF-Binary-Locations},
 we provide a limited emulation mode:
 
-@defun asdf:enable-asdf-binary-locations-compatibility @&key centralize-lisp-binaries default-toplevel-directory include-per-user-information map-all-source-files source-to-target-mappings
+@defun enable-asdf-binary-locations-compatibility @&key centralize-lisp-binaries default-toplevel-directory include-per-user-information map-all-source-files source-to-target-mappings
 This function will initialize the new @code{asdf-output-translations} facility in a way
 that emulates the behavior of the old @code{ASDF-Binary-Locations} facility.
 Where you would previously set global variables
@@ -2264,10 +2398,15 @@ DIRECTIVE :=
     :inherit-configuration | ; splices inherited configuration (often specified last)
     :ignore-inherited-configuration | ; drop inherited configuration (specified anywhere)
 
+    ;; forward compatibility directive (since ASDF 2.011.4), useful when
+    ;; you want to use new configuration features but have to bootstrap a
+    ;; the newer required ASDF from an older release that doesn't sport said features:
+    :ignore-invalid-entries | ; drops subsequent invalid entries instead of erroring out
+
     ;; include a configuration file or directory
     (:include PATHNAME-DESIGNATOR) |
 
-    ;; enable global cache in ~/.common-lisp/cache/sbcl-1.0.35-x86-64/ or something.
+    ;; enable global cache in ~/.common-lisp/cache/sbcl-1.0.45-linux-amd64/ or something.
     :enable-user-cache |
     ;; Disable global cache. Map / to /
     :disable-cache |
@@ -2294,9 +2433,12 @@ ABSOLUTE-COMPONENT-DESIGNATOR :=
 
 RELATIVE-COMPONENT-DESIGNATOR :=
     STRING | ;; namestring, directory is assumed. If the last component, /**/*.* is added
-    PATHNAME | ;; pathname unless last component, directory is assumed.
-    :IMPLEMENTATION | ;; a directory based on implementation, e.g. sbcl-1.0.32.30-linux-x86-64
+    PATHNAME | ;; pathname; unless last component, directory is assumed.
+    :IMPLEMENTATION | ;; a directory based on implementation, e.g. sbcl-1.0.45-linux-amd64
     :IMPLEMENTATION-TYPE | ;; a directory based on lisp-implementation-type only, e.g. sbcl
+    :*/ | ;; any direct subdirectory (since ASDF 2.011.4)
+    :**/ | ;; any recursively inferior subdirectory (since ASDF 2.011.4)
+    :*.*.* | ;; any file (since ASDF 2.011.4)
     :UID | ;; current UID -- not available on Windows
     :USER ;; current USER name -- NOT IMPLEMENTED(!)
 
@@ -2332,8 +2474,26 @@ in the beginning of the directory component of the source pathname
 before it is translated.
 
 When the second designator is @code{t}, the mapping is the identity.
-When the second designator starts with @code{root},
+When the second designator starts with @code{:root},
 the mapping preserves the host and device of the original pathname.
+Notably, this allows you to map files
+to a subdirectory of the whichever directory the file is in.
+Though the syntax is not quite as easy to use as we'd like,
+you can have an (source destination) mapping entry such as follows
+in your configuration file,
+or you may use @code{enable-asdf-binary-locations-compatibility}
+with @code{:centralize-lisp-binaries nil}
+which will do the same thing internally for you:
+@verbatim
+  #.(let ((wild-subdir (make-pathname :directory '(:relative :wild-inferiors)))
+          (wild-file (make-pathname :name :wild :version :wild :type :wild)))
+     `((:root ,wild-subdir ,wild-file) ;; Or using the implicit wildcard, just :root
+       (:root ,wild-subdir :implementation ,wild-file)))
+@end verbatim
+Starting with ASDF 2.011.4, you can use the simpler:
+	@code{`(:root (:root :**/ :implementation :*.*.*))}
+
+
 
 @code{:include} statements cause the search to recurse with the path specifications
 from the file specified.
@@ -2532,7 +2692,7 @@ But so are good design ideas and elegant implementation tricks.
 
 @c @itemize
 @c @item
-@c SBCL, version 1.0 on Mac OS X for intel: @code{sbcl-1.0-darwin-x86}
+@c SBCL, version 1.0.45 on Mac OS X for Intel: @code{sbcl-1.0.45-darwin-x86}
 
 @c @item
 @c Franz Allegro, version 8.0, ANSI Common Lisp: @code{allegro-8.0a-macosx-x86}
@@ -2582,24 +2742,55 @@ The valid values for these variables are
 ASDF includes several additional features that are generally
 useful for system definition and development. These include:
 
+@defun coerce-pathname name @&key type defaults
+
+This function (available starting with ASDF 2.012.11)
+takes an argument, and portably interprets it as a pathname.
+If the argument @var{name} is a pathname or @code{nil}, it is passed through;
+if it's a symbol, it's interpreted as a string by downcasing it;
+if it's a string, it is first separated using @code{/} into substrings;
+the leading substrings denote subdirectories of a relative pathname.
+If @var{type} is @code{:directory} or the string ends with @code{/},
+the last substring is also a subdirectory;
+if @var{type} is a string, it is used as the type of the pathname, and
+the last substring is the name component of the pathname;
+if @var{type} is @code{nil}, the last substring specifies both name and type components
+of the pathname, with the last @code{.} separating them, or only the name component
+if there's no last @code{.} or if there is only one dot and it's the first character.
+The host, device and version components come from @var{defaults}, which defaults to
+@var{*default-pathname-defaults*}; but that shouldn't matter if you use @code{merge-pathnames*}.
+
+@end defun
+
+@defun merge-pathnames* @&key specified defaults
+
+This function is a replacement for @code{merge-pathnames} that uses the host and device
+from the @var{defaults} rather than the @var{specified} pathname when the latter
+is a relative pathname. This allows ASDF and its users to create and use relative pathnames
+without having to know beforehand what are the host and device
+of the absolute pathnames they are relative to.
+
+@end defun
+
 @defun system-relative-pathname system name @&key type
 
 It's often handy to locate a file relative to some system.
 The @code{system-relative-pathname} function meets this need.
-It takes two arguments: the name of a system and a relative pathname.
-It returns a pathname built from the location of the system's source file
-and the relative pathname. For example
+
+It takes two mandatory arguments @var{system} and @var{name}
+and a keyword argument @var{type}:
+@var{system} is name of a system, whereas @var{name} and optionally @var{type}
+specify a relative pathname, interpreted like a component pathname specifier
+by @code{coerce-pathname}. @xref{The defsystem grammar,,Pathname specifiers}.
+
+It returns a pathname built from the location of the system's
+source directory and the relative pathname. For example:
 
 @lisp
-> (asdf:system-relative-pathname 'cl-ppcre #p"regex.data")
+> (asdf:system-relative-pathname 'cl-ppcre "regex.data")
 #P"/repository/other/cl-ppcre/regex.data"
 @end lisp
 
-Instead of a pathname, you can provide a symbol or a string,
-and optionally a keyword argument @code{type}.
-The arguments will then be interpreted in the same way
-as pathname specifiers for components.
-@xref{The defsystem grammar,,Pathname specifiers}.
 @end defun
 
 @defun system-source-directory system-designator
@@ -2649,11 +2840,13 @@ look at the beginning of @file{asdf.lisp} to see what it does.
 @chapter Getting the latest version
 
 Decide which version you want.
-HEAD is the newest version and usually OK, whereas
-RELEASE is for cautious people
-(e.g. who already have systems using ASDF that they don't want broken),
-a slightly older version about which none of the HEAD users have complained.
-There is also a STABLE version, which is earlier than release.
+The @code{master} branch is where development happens;
+its @code{HEAD} is usually OK, including the latest fixes and portability tweaks,
+but an occasional regression may happen despite our (limited) test suite.
+
+The @code{release} branch is what cautious people should be using;
+it has usually been tested more, and releases are cut at a point
+where there isn't any known unresolved issue.
 
 You may get the ASDF source repository using git:
 @kbd{git clone git://common-lisp.net/projects/asdf/asdf.git}
@@ -2719,8 +2912,8 @@ leading to much confusion and greavance.
 ASDF 2 implements its own portable syntax for strings as pathname specifiers.
 Naming files within a system definition becomes easy and portable again.
 @xref{Miscellaneous additional functionality,asdf:system-relative-pathname},
-@code{asdf-utilities:merge-pathnames*},
-@code{asdf::merge-component-name-type}.
+@code{merge-pathnames*},
+@code{coerce-pathname}.
 
 On the other hand, there are places where systems used to accept namestrings
 where you must now use an explicit pathname object:
@@ -2921,7 +3114,7 @@ or to override its configuration.
 The new ASDF output translations are incompatible with ASDF-Binary-Locations.
 They replace A-B-L, and there is compatibility mode to emulate
 your previous A-B-L configuration.
-See @code{asdf:enable-asdf-binary-locations-compatibility} in
+See @code{enable-asdf-binary-locations-compatibility} in
 @pxref{Controlling where ASDF saves compiled files,,Backward Compatibility}.
 But thou shall not load ABL on top of ASDF 2.
 
@@ -2971,8 +3164,8 @@ and you would
 @code{(defmethod source-file-type ((component cl-source-file) (system (eql (find-system 'foo))))
   (declare (ignorable component system)) "cl")}.
 Now, the pathname for a component is eagerly computed when defining the system,
-and instead you will @code{(defclass my-cl-source-file (cl-source-file) ((type :iniform "cl")))}
-and use @code{:default-component-class my-cl-source-file} as argument to @code{defsystem},
+and instead you will @code{(defclass cl-source-file.lis (cl-source-file) ((type :initform "lis")))}
+and use @code{:default-component-class cl-source-file.lis} as argument to @code{defsystem},
 as detailed in a @pxref{FAQ,How do I create a system definition where all the source files have a .cl extension?} below.
 
 @findex source-file-type
@@ -2999,7 +3192,7 @@ In the meantime, you can load @file{asdf.lisp} directly.
 Starting with current candidate releases of ASDF 2,
 it should always be a good time to upgrade to a recent ASDF.
 You may consult with the maintainer for which specific version they recommend,
-but the latest RELEASE should be correct.
+but the latest @code{release} should be correct.
 We trust you to thoroughly test it with your implementation before you release it.
 If there are any issues with the current release,
 it's a bug that you should report upstream and that we will fix ASAP.
@@ -3247,36 +3440,71 @@ or as a name component plus optional dot-separated type component
 
 @subsection How do I create a system definition where all the source files have a .cl extension?
 
-First, create a new @code{cl-source-file} subclass that provides an
-initform for the @code{type} slot:
-
-@lisp
-(defclass my-cl-source-file (cl-source-file)
-   ((type :initform "cl")))
-@end lisp
-
-To support both ASDF 1 and ASDF 2,
-you may omit the above @code{type} slot definition and instead define:
-
-@lisp
-(defmethod source-file-type ((f my-cl-source-file) (m module))
-  (declare (ignorable f m))
-  "cl")
-@end lisp
-
-Then make your system use this subclass in preference to the standard
-one:
+Starting with ASDF 2.014.14, you may just pass
+the builtin class @code{cl-source-file.cl} as
+the @code{:default-component-class} argument to @code{defsystem}:
 
 @lisp
 (defsystem my-cl-system
-  :default-component-class my-cl-source-file
-   ....
-)
+  :default-component-class cl-source-file.cl
+  ...)
 @end lisp
 
-We assume that these definitions are loaded into a package that uses
-@code{ASDF}.
+Another builtin class @code{cl-source-file.lsp} is offered
+for files ending in @file{.lsp}.
 
+If you want to use a different extension
+for which ASDF doesn't provide builtin support,
+or want to support versions of ASDF
+earlier than 2.014.14 (but later than 2.000),
+you can define a class as follows:
+
+@lisp
+;; Prologue: make sure we're using a sane package.
+(defpackage :my-asdf-extension
+   (:use :asdf :common-lisp)
+   (:export #:cl-source-file.lis))
+(in-package :my-asdf-extension)
+
+(defclass cl-source-file.lis (cl-source-file)
+   ((type :initform "lis")))
+@end lisp
+
+Then you can use it as follows:
+@lisp
+(defsystem my-cl-system
+  :default-component-class my-asdf-extension:cl-source-file.lis
+  ...)
+@end lisp
+
+Of course, if you're in the same package, e.g. in the same file,
+you won't need to use the package qualifier before @code{cl-source-file.lis}.
+Actually, if all you're doing is defining this class
+and using it in the same file without other fancy definitions,
+you might skip package complications:
+
+@lisp
+(in-package :asdf)
+(defclass cl-source-file.lis (cl-source-file)
+   ((type :initform "lis")))
+(defsystem my-cl-system
+  :default-component-class cl-source-file.lis
+  ...)
+@end lisp
+
+It is possible to achieve the same effect
+in a way that supports both ASDF 1 and ASDF 2,
+but really, friends don't let friends use ASDF 1.
+Please upgrade to ASDF 2.
+In short, though: do same as above, but
+@emph{before} you use the class in a @code{defsystem},
+you also define the following method:
+
+@lisp
+(defmethod source-file-type ((f cl-source-file.lis) (m module))
+  (declare (ignorable f m))
+  "lis")
+@end lisp
 
 
 @node  TODO list, Inspiration, FAQ, Top
