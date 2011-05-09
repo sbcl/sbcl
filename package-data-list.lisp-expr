@@ -1143,6 +1143,7 @@ possibly temporariliy, because it might be used internally."
                "DEBUG-NAMIFY"
                "FORCE" "DELAY" "PROMISE-READY-P"
                "FIND-RESTART-OR-CONTROL-ERROR"
+               "LOAD-AS-SOURCE"
 
                ;; These could be moved back into SB!EXT if someone has
                ;; compelling reasons, but hopefully we can get by

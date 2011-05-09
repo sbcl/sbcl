@@ -245,30 +245,19 @@ any non-negative real number."
          (values "sysinit" *sysinit-pathname-function*))
         (:user
          (values "userinit" *userinit-pathname-function*)))
-    (flet ((process-stream (stream pathname)
-             (with-simple-restart (abort "Skip rest of ~A file ~S."
-                                         context (native-namestring pathname))
-               (loop
-                 (with-simple-restart
-                     (continue "Ignore error and continue processing ~A file ~S."
-                               context (native-namestring pathname))
-                   (let ((form (read stream nil stream)))
-                     (if (eq stream form)
-                         (return-from process-init-file nil)
-                         (eval form))))))))
-      (if specified-pathname
-          (with-open-file (stream (parse-native-namestring specified-pathname)
-                                  :if-does-not-exist nil)
-            (if stream
-                (process-stream stream (pathname stream))
-                (cerror "Ignore missing init file"
-                        "The specified ~A file ~A was not found."
-                        context specified-pathname)))
-          (let ((default (funcall default-function)))
-            (when default
-              (with-open-file (stream (pathname default) :if-does-not-exist nil)
-                (when stream
-                  (process-stream stream (pathname stream))))))))))
+    (if specified-pathname
+        (with-open-file (stream (parse-native-namestring specified-pathname)
+                                :if-does-not-exist nil)
+          (if stream
+              (load-as-source stream :context context)
+              (cerror "Ignore missing init file"
+                      "The specified ~A file ~A was not found."
+                      context specified-pathname)))
+        (let ((default (funcall default-function)))
+          (when default
+            (with-open-file (stream (pathname default) :if-does-not-exist nil)
+              (when stream
+                (load-as-source stream :context context))))))))
 
 (defun process-eval/load-options (options)
   (/show0 "handling --eval and --load options")

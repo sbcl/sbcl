@@ -20,6 +20,7 @@ use_test_subdirectory
 tmpcore="init-test.core"
 
 run_sbcl <<EOF
+  (require :sb-introspect)
   (defun custom-userinit-pathname ()
      "$SBCL_PWD/custom-userinit.lisp")
   (defun custom-sysinit-pathname ()
@@ -33,6 +34,11 @@ if [ $? != 0 ]; then
     exit 1
 fi
 run_sbcl_with_core "$tmpcore" --disable-debugger <<EOF
+  (assert (string= (custom-sysinit-pathname)
+                   (namestring
+                    (sb-introspect:definition-source-pathname
+                     (car (sb-introspect:find-definition-sources-by-name
+                           'sysinit-21 :function))))))
   (userinit-quit (sysinit-21))
 EOF
 check_status_maybe_lose "userinit and sysinit loading" $? 21 "(loading worked)"
