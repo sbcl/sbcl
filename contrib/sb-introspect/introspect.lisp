@@ -376,9 +376,8 @@ If an unsupported TYPE is requested, the function will return NIL.
      ;; :COMPILE-TOPLEVEL).  Until that's fixed, don't return a
      ;; DEFINITION-SOURCE with a pathname.  (When that's fixed, take
      ;; out the (not (debug-source-form ...)) test.
-     (if (and (sb-c::debug-source-namestring debug-source)
-              (not (sb-c::debug-source-form debug-source)))
-         (parse-namestring (sb-c::debug-source-namestring debug-source)))
+     (when (stringp (sb-c::debug-source-namestring debug-source))
+       (parse-namestring (sb-c::debug-source-namestring debug-source)))
      :character-offset
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))

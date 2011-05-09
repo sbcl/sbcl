@@ -28,83 +28,94 @@
         definition)))
 
 ;;; Handle the nontrivial case of CL:COMPILE.
-(defun actually-compile (name definition *lexenv*)
-  (with-compilation-values
-    (sb!xc:with-compilation-unit ()
-      ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
-      ;; few changes. Once things are stable, the shared bindings
-      ;; probably be merged back together into some shared utility
-      ;; macro, or perhaps both merged into one of the existing utility
-      ;; macros SB-C::WITH-COMPILATION-VALUES or
-      ;; CL:WITH-COMPILATION-UNIT.
-      (let* (;; FIXME: Do we need the *INFO-ENVIRONMENT* rebinding
-             ;; here? It's a literal translation of the old CMU CL
-             ;; rebinding to (OR *BACKEND-INFO-ENVIRONMENT*
-             ;; *INFO-ENVIRONMENT*), and it's not obvious whether the
-             ;; rebinding to itself is needed now that SBCL doesn't
-             ;; need *BACKEND-INFO-ENVIRONMENT*.
-             (*info-environment* *info-environment*)
-             (form (get-lambda-to-compile definition))
-             (*source-info* (make-lisp-source-info form :parent *source-info*))
-             (*toplevel-lambdas* ())
-             (*block-compile* nil)
-             (*allow-instrumenting* nil)
-             (*code-coverage-records* nil)
-             (*code-coverage-blocks* nil)
-             (*compiler-error-bailout*
-              (lambda (&optional error)
-                (declare (ignore error))
-                (compiler-mumble
-                 "~2&fatal error, aborting compilation~%")
-                (return-from actually-compile (values nil t nil))))
-             (*current-path* nil)
-             (*last-source-context* nil)
-             (*last-original-source* nil)
-             (*last-source-form* nil)
-             (*last-format-string* nil)
-             (*last-format-args* nil)
-             (*last-message-count* 0)
-             (*last-error-context* nil)
-             (*gensym-counter* 0)
-             ;; KLUDGE: This rebinding of policy is necessary so that
-             ;; forms such as LOCALLY at the REPL actually extend the
-             ;; compilation policy correctly.  However, there is an
-             ;; invariant that is potentially violated: future
-             ;; refactoring must not allow this to be done in the file
-             ;; compiler.  At the moment we're clearly alright, as we
-             ;; call %COMPILE with a core-object, not a fasl-stream,
-             ;; but caveat future maintainers. -- CSR, 2002-10-27
-             (*policy* (lexenv-policy *lexenv*))
-             ;; see above
-             (*handled-conditions* (lexenv-handled-conditions *lexenv*))
-             ;; ditto
-             (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*))
-             ;; FIXME: ANSI doesn't say anything about CL:COMPILE
-             ;; interacting with these variables, so we shouldn't. As
-             ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by
-             ;; binding these variables, so as a quick hack we do so
-             ;; too. But a proper implementation would have verbosity
-             ;; controlled by function arguments and lexical variables.
-             (*compile-verbose* nil)
-             (*compile-print* nil))
-        (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
-          (clear-stuff)
-          (find-source-paths form 0)
-          (%compile form (make-core-object)
-                    :name name
-                    :path '(original-source-start 0 0)))))))
+(defun actually-compile (name definition *lexenv* source-info tlf)
+  (let ((source-paths (when source-info *source-paths*)))
+    (with-compilation-values
+     (sb!xc:with-compilation-unit ()
+       ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
+       ;; few changes. Once things are stable, the shared bindings
+       ;; probably be merged back together into some shared utility
+       ;; macro, or perhaps both merged into one of the existing utility
+       ;; macros SB-C::WITH-COMPILATION-VALUES or
+       ;; CL:WITH-COMPILATION-UNIT.
+       (let* ((tlf (or tlf 0))
+              ;; If we have a source-info from LOAD, we will
+              ;; also have a source-paths already set up -- so drop
+              ;; the ones from WITH-COMPILATION-VALUES.
+              (*source-paths* (or source-paths *source-paths*))
+              ;; FIXME: Do we need the *INFO-ENVIRONMENT* rebinding
+              ;; here? It's a literal translation of the old CMU CL
+              ;; rebinding to (OR *BACKEND-INFO-ENVIRONMENT*
+              ;; *INFO-ENVIRONMENT*), and it's not obvious whether the
+              ;; rebinding to itself is needed now that SBCL doesn't
+              ;; need *BACKEND-INFO-ENVIRONMENT*.
+              (*info-environment* *info-environment*)
+              (form (get-lambda-to-compile definition))
+              (*source-info* (or source-info
+                                 (make-lisp-source-info
+                                  form :parent *source-info*)))
+              (*toplevel-lambdas* ())
+              (*block-compile* nil)
+              (*allow-instrumenting* nil)
+              (*code-coverage-records* nil)
+              (*code-coverage-blocks* nil)
+              (*compiler-error-bailout*
+               (lambda (&optional error)
+                 (declare (ignore error))
+                 (compiler-mumble
+                  "~2&fatal error, aborting compilation~%")
+                 (return-from actually-compile (values nil t nil))))
+              (*current-path* nil)
+              (*last-source-context* nil)
+              (*last-original-source* nil)
+              (*last-source-form* nil)
+              (*last-format-string* nil)
+              (*last-format-args* nil)
+              (*last-message-count* 0)
+              (*last-error-context* nil)
+              (*gensym-counter* 0)
+              ;; KLUDGE: This rebinding of policy is necessary so that
+              ;; forms such as LOCALLY at the REPL actually extend the
+              ;; compilation policy correctly.  However, there is an
+              ;; invariant that is potentially violated: future
+              ;; refactoring must not allow this to be done in the file
+              ;; compiler.  At the moment we're clearly alright, as we
+              ;; call %COMPILE with a core-object, not a fasl-stream,
+              ;; but caveat future maintainers. -- CSR, 2002-10-27
+              (*policy* (lexenv-policy *lexenv*))
+              ;; see above
+              (*handled-conditions* (lexenv-handled-conditions *lexenv*))
+              ;; ditto
+              (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*))
+              ;; FIXME: ANSI doesn't say anything about CL:COMPILE
+              ;; interacting with these variables, so we shouldn't. As
+              ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by
+              ;; binding these variables, so as a quick hack we do so
+              ;; too. But a proper implementation would have verbosity
+              ;; controlled by function arguments and lexical variables.
+              (*compile-verbose* nil)
+              (*compile-print* nil))
+         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+           (clear-stuff)
+           (unless source-paths
+             (find-source-paths form tlf))
+           (%compile form (make-core-object)
+                     :name name
+                     :path `(original-source-start 0 ,tlf))))))))
 
-(defun compile-in-lexenv (name definition lexenv)
+(defun compile-in-lexenv (name definition lexenv
+                          &optional source-info tlf)
   (multiple-value-bind (compiled-definition warnings-p failure-p)
       (cond
         #!+sb-eval
         ((sb!eval:interpreted-function-p definition)
          (multiple-value-bind (definition lexenv)
              (sb!eval:prepare-for-compile definition)
-           (actually-compile name definition lexenv)))
+           (actually-compile name definition lexenv source-info tlf)))
         ((compiled-function-p definition)
          (values definition nil nil))
-        (t (actually-compile name definition lexenv)))
+        (t
+         (actually-compile name definition lexenv source-info tlf)))
     (cond (name
            (if (and (symbolp name)
                     (macro-function name))

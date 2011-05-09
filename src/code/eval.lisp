@@ -22,6 +22,9 @@
 
 (defvar *eval-source-context* nil)
 
+(defvar *eval-tlf-index* nil)
+(defvar *eval-source-info* nil)
+
 (defun make-eval-lambda (expr)
   `(named-lambda
        ;; This name is used to communicate the original context
@@ -61,7 +64,8 @@
   ;; As of 1.0.21.6 we muffle compiler notes lexically here, which seems
   ;; always safe. --NS
   (let* ((lambda (make-eval-lambda expr))
-         (fun (sb!c:compile-in-lexenv nil lambda lexenv)))
+         (fun (sb!c:compile-in-lexenv
+               nil lambda lexenv *eval-source-info* *eval-tlf-index*)))
     (funcall fun)))
 
 ;;; Handle PROGN and implicit PROGN.
@@ -298,9 +302,16 @@
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
    result or results."
-  (let ((*eval-source-context* original-exp))
+  (let ((*eval-source-context* original-exp)
+        (*eval-tlf-index* nil)
+        (*eval-source-info* nil))
     (eval-in-lexenv original-exp (make-null-lexenv))))
 
+(defun eval-tlf (original-exp tlf-index &optional (lexenv (make-null-lexenv)))
+  (let ((*eval-source-context* original-exp)
+        (*eval-tlf-index* tlf-index)
+        (*eval-source-info* sb!c::*source-info*))
+    (eval-in-lexenv original-exp lexenv)))
 
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler

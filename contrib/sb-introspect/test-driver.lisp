@@ -188,6 +188,14 @@
     (not (find-definition-sources-by-name 'fboundp :type))
   t)
 
+(deftest find-source-stuff.31
+    (matchp-name :function 'cl-user::compile-time-too-fun 28)
+  t)
+
+(deftest find-source-stuff.32
+    (matchp-name :function 'cl-user::loaded-as-source-fun 3)
+  t)
+
 ;;; Check wrt. interplay of generic functions and their methods.
 
 (defgeneric xuuq (gf.a gf.b          &rest gf.rest &key gf.k-X))

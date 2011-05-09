@@ -38,12 +38,21 @@
   (with-compilation-unit (:source-plist (plist-file-source-plist com))
     (call-next-method)))
 
+(defclass source-only-file (cl-source-file)
+  ())
+
+(defmethod perform ((op compile-op) (com source-only-file)))
+
+(defmethod output-files ((op compile-op) (com source-only-file))
+  (list (component-pathname com)))
+
 (defsystem :sb-introspect-tests
   :depends-on (:sb-introspect :sb-rt)
   :components ((:file "xref-test-data")
                (:file "xref-test" :depends-on ("xref-test-data"))
                (:plist-file "test" :source-plist (:test-outer "OUT"))
-               (:file "test-driver" :depends-on ("test"))))
+               (:source-only-file "load-test")
+               (:file "test-driver" :depends-on ("test" "load-test"))))
 
 (defmethod perform ((op test-op) (com (eql (find-system :sb-introspect-tests))))
   ;; N.b. At least DEFINITION-SOURCE-PLIST.1 assumes that CWD is the

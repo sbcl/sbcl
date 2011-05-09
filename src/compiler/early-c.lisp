@@ -93,6 +93,7 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
+(defvar *eval-tlf-index*)
 (defvar *handled-conditions*)
 (defvar *disabled-package-locks*)
 (defvar *policy*)

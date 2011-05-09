@@ -708,6 +708,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; to hide it from them..
                "INTERACTIVE-EVAL"
 
+               ;; Used by LOAD and EVAL-WHEN to pass toplevel indexes
+               ;; to compiler.
+               "EVAL-TLF"
+
                ;; weak pointers and finalization
                "CANCEL-FINALIZATION"
                "FINALIZE"

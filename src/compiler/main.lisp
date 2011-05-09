@@ -1281,7 +1281,7 @@ Examples:
 ;;; compilation. Normally just evaluate in the appropriate
 ;;; environment, but also compile if outputting a CFASL.
 (defun eval-compile-toplevel (body path)
-  (eval-in-lexenv `(progn ,@body) *lexenv*)
+  (eval-tlf `(progn ,@body) (source-path-tlf-number path) *lexenv*)
   (when *compile-toplevel-object*
     (let ((*compile-object* *compile-toplevel-object*))
       (convert-and-maybe-compile `(progn ,@body) path))))
@@ -2050,6 +2050,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
   (compile name lambda))
 
 #+sb-xc-host
-(defun eval-in-lexenv (form lexenv)
-  (declare (ignore lexenv))
+(defun eval-tlf (form index &optional lexenv)
+  (declare (ignore index lexenv))
   (eval form))

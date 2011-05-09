@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.48:
+  * enhancement: functions from files loaded as source now have source
+    locations.
+  * enhancement: functions from compile-time-too evaluation now have source
+    locations.
   * enhancement: WITH-COMPILATION-UNIT :SOURCE-NAMESTRING allows providing
     virtual source-file information, eg. overriding input-file of COMPILE-FILE
     when a temporary file is used for compilation.

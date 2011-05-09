@@ -70,3 +70,7 @@
 
 (define-setf-expander s (a b)
   (format t "~a ~a~%" a b))
+
+(eval-when (:compile-toplevel)
+  (defun compile-time-too-fun ()
+    :foo))
