@@ -65,6 +65,51 @@
     (sb-thread:join-thread writer)
     (assert (equal "OK" (read-line out)))))
 
+(defclass buffer-stream (sb-gray:fundamental-binary-input-stream sb-gray:fundamental-binary-output-stream)
+  ((buffer :initform (make-array 128
+                                :element-type '(unsigned-byte 8)
+                                :adjustable t
+                                :fill-pointer 0))
+   (mark :initform 0)))
+
+(defmethod stream-element-type ((stream buffer-stream))
+  '(unsigned-byte 8))
+
+(defmethod sb-gray:stream-read-sequence ((stream buffer-stream) seq &optional (start 0) end)
+  (let* ((buffer (slot-value stream 'buffer))
+         (end (or end (length seq)))
+         (mark (slot-value stream 'mark))
+         (fill-pointer (fill-pointer buffer))
+         (new-mark (+ mark (min fill-pointer (- end start)))))
+    (setf (slot-value stream 'mark) new-mark)
+    (replace seq buffer
+             :start1 start :end1 end
+             :start2 mark :end2 fill-pointer)
+    (min end (+ start (- fill-pointer mark)))))
+
+(defmethod sb-gray:stream-write-sequence ((stream buffer-stream) seq &optional (start 0) end)
+  (let* ((buffer (slot-value stream 'buffer))
+         (end (or end (length seq)))
+         (fill-pointer (fill-pointer buffer))
+         (new-fill (min (array-total-size buffer) (+ fill-pointer (- end start)))))
+    (setf (fill-pointer buffer) new-fill)
+    (replace buffer seq
+             :start1 fill-pointer
+             :start2 start :end2 end)
+    seq))
+
+(with-test (:name :run-program-cat-3)
+  ;; User-defined binary input and output streams.
+  (let ((in (make-instance 'buffer-stream))
+        (out (make-instance 'buffer-stream))
+        (data #(0 1 2 3 4 5 6 7 8 9 10 11 12)))
+    (write-sequence data in)
+    (let ((process (sb-ext:run-program "/bin/cat" '() :wait t :output out :input in))
+          (buf (make-array (length data))))
+      (assert (= 13 (read-sequence buf out)))
+      (assert (= 0 (read-sequence (make-array 8) out)))
+      (assert (equalp buf data)))))
+
 ;;; Test driving an external program (cat) through pipes wrapped in
 ;;; composite streams.
 

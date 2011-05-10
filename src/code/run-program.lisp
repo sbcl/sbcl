@@ -802,9 +802,38 @@ Users Manual for details about the PROCESS structure."#-win32"
 ;;; stream.
 (defun copy-descriptor-to-stream (descriptor stream cookie external-format)
   (incf (car cookie))
-  (let* (handler
+  (let* ((handler nil)
          (buf (make-array 256 :element-type '(unsigned-byte 8)))
-         (read-end 0))
+         (read-end 0)
+         (et (stream-element-type stream))
+         (copy-fun
+          (cond
+            ((member et '(character base-char))
+             (lambda ()
+               (let* ((decode-end read-end)
+                      (string (handler-case
+                                  (octets-to-string
+                                   buf :end read-end
+                                   :external-format external-format)
+                                (end-of-input-in-character (e)
+                                  (setf decode-end
+                                        (octet-decoding-error-start e))
+                                  (octets-to-string
+                                   buf :end decode-end
+                                   :external-format external-format)))))
+                 (unless (zerop (length string))
+                   (write-string string stream)
+                   (when (/= decode-end (length buf))
+                     (replace buf buf :start2 decode-end :end2 read-end))
+                   (decf read-end decode-end)))))
+            ((member et '(:default (unsigned-byte 8)) :test #'equal)
+             (lambda ()
+               (write-sequence buf stream :end read-end)
+               (setf read-end 0)))
+            (t
+             ;; FIXME.
+             (error "Don't know how to copy to stream of element-type ~S"
+                    et)))))
     (setf handler
           (sb-sys:add-fd-handler
            descriptor
@@ -856,22 +885,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                       (strerror errno)))
                     (t
                      (incf read-end count)
-                     (let* ((decode-end read-end)
-                            (string (handler-case
-                                        (octets-to-string
-                                         buf :end read-end
-                                         :external-format external-format)
-                                      (end-of-input-in-character (e)
-                                        (setf decode-end
-                                              (octet-decoding-error-start e))
-                                        (octets-to-string
-                                         buf :end decode-end
-                                         :external-format external-format)))))
-                       (unless (zerop (length string))
-                         (write-string string stream)
-                         (when (/= decode-end (length buf))
-                           (replace buf buf :start2 decode-end :end2 read-end))
-                         (decf read-end decode-end))))))))))))
+                     (funcall copy-fun))))))))))
 
 ;;; FIXME: something very like this is done in SB-POSIX to treat
 ;;; streams as file descriptor designators; maybe we can combine these
@@ -1015,19 +1029,29 @@ Users Manual for details about the PROCESS structure."#-win32"
                              child process won't hang~:>" object))
                 |#
                 (let ((fd (make-temp-fd))
-                      (newline (string #\Newline)))
-                  (loop
-                     (multiple-value-bind
-                           (line no-cr)
-                         (read-line object nil nil)
-                       (unless line
-                         (return))
-                       (let ((vector (string-to-octets line)))
-                         (sb-unix:unix-write
-                          fd vector 0 (length vector)))
-                       (if no-cr
-                           (return)
-                           (sb-unix:unix-write fd newline 0 1))))
+                      (et (stream-element-type object)))
+                  (cond ((member et '(character base-char))
+                         (loop
+                           (multiple-value-bind
+                                 (line no-cr)
+                               (read-line object nil nil)
+                             (unless line
+                               (return))
+                             (let ((vector (string-to-octets
+                                            line
+                                            :external-format external-format)))
+                               (sb-unix:unix-write
+                                fd vector 0 (length vector)))
+                             (if no-cr
+                               (return)
+                               (sb-unix:unix-write
+                                fd #.(string #\Newline) 0 1)))))
+                        ((member et '(:default (unsigned-byte 8))
+                                 :test 'equal)
+                         (loop with buf = (make-array 256 :element-type '(unsigned-byte 8))
+                               for p = (read-sequence buf object)
+                               until (zerop p)
+                               do (sb-unix:unix-write fd buf 0 p))))
                   (sb-unix:unix-lseek fd 0 sb-unix:l_set)
                   (push fd *close-in-parent*)
                   (return (values fd nil)))))
