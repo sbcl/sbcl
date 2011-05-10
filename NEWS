@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.48:
     virtual source-file information, eg. overriding input-file of COMPILE-FILE
     when a temporary file is used for compilation.
   * enhancement: ASDF has been updated to version 2.015.1.
+  * enhancement: backtraces involving frames from the default evaluator
+    are more readable.
 
 changes in sbcl-1.0.48 relative to sbcl-1.0.47:
   * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five

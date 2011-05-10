@@ -343,6 +343,12 @@ thread, NIL otherwise."
                  ;; &AUX-BINDINGS appear in backtraces, so they are
                  ;; left alone for now. --NS 2005-02-28
                  (case (first name)
+                   ((eval)
+                    ;; The name of an evaluator thunk contains
+                    ;; the source context -- but that makes for a
+                    ;; confusing frame name, since it can look like an
+                    ;; EVAL call with a bogus argument.
+                    (values '#:eval-thunk nil))
                    ((sb!c::xep sb!c::tl-xep)
                     (clean-xep name args))
                    ((sb!c::&more-processor)
@@ -397,10 +403,17 @@ thread, NIL otherwise."
           ;; If we hit a &REST arg, then print as many of the values as
           ;; possible, punting the loop over lambda-list variables since any
           ;; other arguments will be in the &REST arg's list of values.
-          (let ((args (ensure-printable-object args)))
-            (if (listp args)
-                (format stream "~{ ~_~S~}" args)
-                (format stream " ~S" args))))
+          (let ((print-args (ensure-printable-object args))
+                ;; Special case *PRINT-PRETTY* for eval frames: if
+                ;; *PRINT-LINES* is 1, turn off pretty-printing.
+                (*print-pretty*
+                 (if (and (eql 1 *print-lines*)
+                          (member name '(eval simple-eval-in-lexenv)))
+                     nil
+                     *print-pretty*)))
+            (if (listp print-args)
+                (format stream "~{ ~_~S~}" print-args)
+                (format stream " ~S" print-args))))
         (when kind
           (format stream "[~S]" kind))))
   (when (>= verbosity 2)
