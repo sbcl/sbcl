@@ -31,6 +31,40 @@
               (assert (= (read-byte in) i)))
       (process-close process))))
 
+#+sb-thread
+(with-test (:name :run-program-cat-2)
+  ;; Tests that reading from a FIFO is interruptible.
+  (let* ((process (sb-ext:run-program "/bin/cat" '()
+                                      :wait nil
+                                      :output :stream :input :stream))
+         (in (process-input process))
+         (out (process-output process))
+         (sem (sb-thread:make-semaphore))
+         (state :init)
+         (writer (sb-thread:make-thread (lambda ()
+                                          (sb-thread:wait-on-semaphore sem)
+                                          (setf state :sleep)
+                                          (sleep 2)
+                                          (setf state :write)
+                                          (write-line "OK" in)
+                                          (finish-output in))))
+         (timeout nil)
+         (got nil)
+         (unwind nil))
+    (sb-thread:signal-semaphore sem)
+    (handler-case
+        (with-timeout 0.1
+          (unwind-protect
+               (setf got (read-line out))
+            (setf unwind state)))
+      (timeout ()
+        (setf timeout t)))
+    (assert (not got))
+    (assert timeout)
+    (assert (eq unwind :sleep))
+    (sb-thread:join-thread writer)
+    (assert (equal "OK" (read-line out)))))
+
 ;;; Test driving an external program (cat) through pipes wrapped in
 ;;; composite streams.
 

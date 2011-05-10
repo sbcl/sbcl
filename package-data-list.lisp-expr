@@ -2368,6 +2368,7 @@ no guarantees of interface stability."
                "USER-HOMEDIR"
                "WITH-RESTARTED-SYSCALL"
                "SB-MKSTEMP"
+               "FD-TYPE"
 
                ;; stuff with a one-to-one mapping to Unix constructs
                "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN" "DEV-T" "DIRECT"
