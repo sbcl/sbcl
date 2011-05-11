@@ -2098,17 +2098,20 @@
         (unless (eq value-type *empty-type*)
 
           ;; FIXME: Do it in one step.
-          (filter-lvar
-           value
-           (if (cast-single-value-p cast)
-               `(list 'dummy)
-               `(multiple-value-call #'list 'dummy)))
-          (filter-lvar
-           (cast-value cast)
-           ;; FIXME: Derived type.
-           `(%compile-time-type-error 'dummy
-                                      ',(type-specifier atype)
-                                      ',(type-specifier value-type)))
+          (let ((context (cons (node-source-form cast)
+                               (lvar-source (cast-value cast)))))
+            (filter-lvar
+             value
+             (if (cast-single-value-p cast)
+                 `(list 'dummy)
+                 `(multiple-value-call #'list 'dummy)))
+            (filter-lvar
+             (cast-value cast)
+             ;; FIXME: Derived type.
+             `(%compile-time-type-error 'dummy
+                                        ',(type-specifier atype)
+                                        ',(type-specifier value-type)
+                                        ',context)))
           ;; KLUDGE: FILTER-LVAR does not work for non-returning
           ;; functions, so we declare the return type of
           ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type

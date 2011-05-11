@@ -892,26 +892,49 @@
                            (lvar-source tag)
                            (type-specifier (lvar-type tag))))))
 
-(defun %compile-time-type-error (values atype dtype)
+(defun %compile-time-type-error (values atype dtype context)
   (declare (ignore dtype))
-  (if (and (consp atype)
-           (eq (car atype) 'values))
-      (error 'values-type-error :datum values :expected-type atype)
-      (error 'type-error :datum (car values) :expected-type atype)))
+  (destructuring-bind (form . detail) context
+    (if (and (consp atype) (eq (car atype) 'values))
+        (error 'simple-type-error
+               :datum (car values)
+               :expected-type atype
+               :format-control
+               "~@<Value set ~2I~_[~{~S~^ ~}] ~I~_from ~S in ~2I~_~S ~I~_is ~
+                   not of type ~2I~_~S.~:>"
+               :format-arguments (list values
+                                       detail form
+                                       atype))
+        (error 'simple-type-error
+               :datum (car values)
+               :expected-type atype
+               :format-control "~@<Value of ~S in ~2I~_~S ~I~_is ~2I~_~S, ~
+                                ~I~_not a ~2I~_~S.~:@>"
+               :format-arguments (list detail form
+                                       (car values)
+                                       atype)))))
 
 (defoptimizer (%compile-time-type-error ir2-convert)
-    ((objects atype dtype) node block)
+    ((objects atype dtype context) node block)
   (let ((*compiler-error-context* node))
     (setf (node-source-path node)
           (cdr (node-source-path node)))
-    (destructuring-bind (values atype dtype)
+    (destructuring-bind (values atype dtype context)
         (basic-combination-args node)
       (declare (ignore values))
       (let ((atype (lvar-value atype))
-            (dtype (lvar-value dtype)))
-      (unless (eq atype nil)
-        (warn 'type-warning
-              :format-control
-              "~@<Asserted type ~S conflicts with derived type ~S.~@:>"
-              :format-arguments (list atype dtype)))))
+            (dtype (lvar-value dtype))
+            (detail (cdr (lvar-value context))))
+        (unless (eq atype nil)
+          (if (constantp detail)
+              (warn 'type-warning
+                 :format-control
+                 "~@<Constant ~2I~_~S ~Iconflicts with its asserted type ~
+                     ~2I~_~S.~@:>"
+                 :format-arguments (list (eval detail) atype))
+              (warn 'type-warning
+                 :format-control
+                 "~@<Derived type of ~S is ~2I~_~S, ~I~_conflicting with ~
+                     its asserted type ~2I~_~S.~@:>"
+                 :format-arguments (list detail dtype atype))))))
     (ir2-convert-full-call node block)))
