@@ -1,5 +1,5 @@
 ;;; -*- mode: common-lisp; Base: 10 ; Syntax: ANSI-Common-Lisp -*-
-;;; This is ASDF 2.015.1: Another System Definition Facility.
+;;; This is ASDF 2.015.2: Another System Definition Facility.
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome:
 ;;; please mail to <asdf-devel@common-lisp.net>.
@@ -104,7 +104,7 @@
          ;; "2.345.6" would be a development version in the official upstream
          ;; "2.345.0.7" would be your seventh local modification of official release 2.345
          ;; "2.345.6.7" would be your seventh local modification of development version 2.345.6
-         (asdf-version "2.015.1")
+         (asdf-version "2.015.2")
          (existing-asdf (fboundp 'find-system))
          (existing-version *asdf-version*)
          (already-there (equal asdf-version existing-version)))
@@ -1403,7 +1403,7 @@ called with an object of type asdf:system."
 (defun* search-for-system-definition (system)
   (let ((system-name (coerce-name system)))
     (some #'(lambda (x) (funcall x system-name))
-          *system-definition-search-functions*)))
+          (cons 'find-system-if-being-defined *system-definition-search-functions*))))
 
 (defvar *central-registry* nil
 "A list of 'system directory designators' ASDF uses to find systems.
@@ -1579,6 +1579,12 @@ Going forward, we recommend new users should be using the source-registry.
   ;; Bug: :version *asdf-version* won't be updated when ASDF is updated.
   (find-system-fallback name "asdf" :version *asdf-version*))
 
+(defvar *systems-being-defined* ()
+  "Systems currently being defined by defsystem")
+
+(defun* find-system-if-being-defined (name)
+  (find (coerce-name name) *systems-being-defined*
+        :test 'equal :key 'component-name))
 
 ;;;; -------------------------------------------------------------------------
 ;;;; Finding components
@@ -2479,34 +2485,6 @@ details."
         directory-pathname
         (default-directory))))
 
-(defmacro defsystem (name &body options)
-  (setf name (coerce-name name))
-  (destructuring-bind (&key (pathname nil pathname-arg-p) (class 'system)
-                            defsystem-depends-on &allow-other-keys)
-      options
-    (let ((component-options (remove-keys '(:class) options)))
-      `(progn
-         ;; system must be registered before we parse the body, otherwise
-         ;; we recur when trying to find an existing system of the same name
-         ;; to reuse options (e.g. pathname) from
-         ,@(loop :for system :in defsystem-depends-on
-             :collect `(load-system ',(coerce-name system)))
-         (let ((s (system-registered-p ',name)))
-           (cond ((and s (eq (type-of (cdr s)) ',class))
-                  (setf (car s) (get-universal-time)))
-                 (s
-                  (change-class (cdr s) ',class))
-                 (t
-                  (register-system (make-instance ',class :name ',name))))
-           (%set-system-source-file (load-pathname)
-                                    (cdr (system-registered-p ',name))))
-         (parse-component-form
-          nil (list*
-               :module (coerce-name ',name)
-               :pathname
-               ,(determine-system-pathname pathname pathname-arg-p)
-               ',component-options))))))
-
 (defun* class-for-type (parent type)
   (or (loop :for symbol :in (list
                              type
@@ -2674,6 +2652,38 @@ Returns the new tree (which probably shares structure with the old one)"
 
       (%refresh-component-inline-methods ret rest)
       ret)))
+
+(defun* do-defsystem (name &rest options
+                           &key (pathname nil pathname-arg-p) (class 'system)
+                           defsystem-depends-on &allow-other-keys)
+  ;; The system must be registered before we parse the body,
+  ;; otherwise we recur when trying to find an existing system
+  ;; of the same name to reuse options (e.g. pathname) from.
+  ;; To avoid infinite recursion in cases where you defsystem a system
+  ;; that is registered to a different location to find-system,
+  ;; we also need to remember it in a special variable *systems-being-defined*.
+  (let* ((name (coerce-name name))
+         (registered (system-registered-p name))
+         (system (cdr (or registered
+                          (register-system (make-instance 'system :name name)))))
+         (*systems-being-defined* (cons system *systems-being-defined*))
+         (component-options (remove-keys '(:class) options)))
+    (%set-system-source-file (load-pathname) system)
+    (when registered
+      (setf (car registered) (get-universal-time)))
+    (map () 'load-system defsystem-depends-on)
+    ;; We change-class (when necessary) AFTER we load the defsystem-dep's
+    ;; since the class might not be defined as part of those.
+    (unless (eq (type-of system) class)
+      (change-class system class))
+    (parse-component-form
+     nil (list*
+          :module name
+          :pathname (determine-system-pathname pathname pathname-arg-p)
+          component-options))))
+
+(defmacro defsystem (name &body options)
+  `(apply 'do-defsystem ',name ',options))
 
 ;;;; ---------------------------------------------------------------------------
 ;;;; run-shell-command

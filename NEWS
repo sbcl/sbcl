@@ -5,7 +5,7 @@ changes relative to sbcl-1.0.48:
   * enhancement: WITH-COMPILATION-UNIT :SOURCE-NAMESTRING allows providing
     virtual source-file information, eg. overriding input-file of COMPILE-FILE
     when a temporary file is used for compilation.
-  * enhancement: ASDF has been updated to version 2.015.1.
+  * enhancement: ASDF has been updated to version 2.015.2.
   * enhancement: backtraces involving frames from the default evaluator
     are more readable.
   * enhancement: RUN-PROGRAM works with user-defined binary input and output
