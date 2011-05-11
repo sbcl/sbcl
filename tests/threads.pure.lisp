@@ -330,6 +330,7 @@
         (assert (or (equal '(:deadlock :ok) res)
                     (equal '(:ok :deadlock) res)))))))
 
+#+sb-thread
 (with-test (:name deadlock-detection.2)
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
@@ -365,6 +366,7 @@
        (assert (stringp err)))
     (assert (eq :ok (sb-thread:join-thread t1)))))
 
+#+sb-thread
 (with-test (:name deadlock-detection.3)
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
@@ -379,8 +381,10 @@
                     :ok)))
               :name "T1")))
     ;; Currently we don't consider it a deadlock
-    ;; if there is a timeout in the chain.
-    (assert (eq :deadline
+    ;; if there is a timeout in the chain. No
+    ;; Timeouts on lutex builds, though.
+    (assert (eq #-sb-lutex :deadline
+                #+sb-lutex :deadlock
                 (handler-case
                     (sb-thread:with-mutex (m2)
                       (sb-thread:signal-semaphore s2)
@@ -390,5 +394,97 @@
                         (sb-thread:with-mutex (m1)
                           :ok)))
                   (sb-sys:deadline-timeout ()
-                    :deadline))))
+                    :deadline)
+                  (sb-thread:thread-deadlock ()
+                    :deadlock))))
+    (assert (eq :ok (join-thread t1)))))
+
+#+sb-thread
+(with-test (:name deadlock-detection.4)
+  (flet ((test (ma mb sa sb)
+           (lambda ()
+             (handler-case
+                 (sb-thread::with-spinlock (ma)
+                   (sb-thread:signal-semaphore sa)
+                   (sb-thread:wait-on-semaphore sb)
+                   (sb-thread::with-spinlock (mb)
+                     :ok))
+               (sb-thread:thread-deadlock (e)
+                 (princ e)
+                 :deadlock)))))
+    (let* ((m1 (sb-thread::make-spinlock :name "M1"))
+           (m2 (sb-thread::make-spinlock :name "M2"))
+           (s1 (sb-thread:make-semaphore :name "S1"))
+           (s2 (sb-thread:make-semaphore :name "S2"))
+           (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
+           (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
+      ;; One will deadlock, and the other will then complete normally
+      (let ((res (list (sb-thread:join-thread t1)
+                       (sb-thread:join-thread t2))))
+        (assert (or (equal '(:deadlock :ok) res)
+                    (equal '(:ok :deadlock) res)))))))
+
+#+sb-thread
+(with-test (:name deadlock-detection.5)
+  (let* ((m1 (sb-thread::make-spinlock :name "M1"))
+         (m2 (sb-thread::make-spinlock :name "M2"))
+         (s1 (sb-thread:make-semaphore :name "S1"))
+         (s2 (sb-thread:make-semaphore :name "S2"))
+         (t1 (sb-thread:make-thread
+              (lambda ()
+                (sb-thread::with-spinlock (m1)
+                  (sb-thread:signal-semaphore s1)
+                  (sb-thread:wait-on-semaphore s2)
+                  (sb-thread::with-spinlock (m2)
+                    :ok)))
+              :name "T1")))
+    (prog (err)
+     :retry
+       (handler-bind ((sb-thread:thread-deadlock
+                       (lambda (e)
+                         (unless err
+                           ;; Make sure we can print the condition
+                           ;; while it's active
+                           (let ((*print-circle* nil))
+                             (setf err (princ-to-string e)))
+                           (go :retry)))))
+         (when err
+           (sleep 1))
+         (assert (eq :ok (sb-thread::with-spinlock (m2)
+                           (unless err
+                             (sb-thread:signal-semaphore s2)
+                             (sb-thread:wait-on-semaphore s1)
+                             (sleep 1))
+                           (sb-thread::with-spinlock (m1)
+                             :ok)))))
+       (assert (stringp err)))
+    (assert (eq :ok (sb-thread:join-thread t1)))))
+
+#+sb-thread
+(with-test (:name deadlock-detection.7)
+  (let* ((m1 (sb-thread::make-spinlock :name "M1"))
+         (m2 (sb-thread::make-spinlock :name "M2"))
+         (s1 (sb-thread:make-semaphore :name "S1"))
+         (s2 (sb-thread:make-semaphore :name "S2"))
+         (t1 (sb-thread:make-thread
+              (lambda ()
+                (sb-thread::with-spinlock (m1)
+                  (sb-thread:signal-semaphore s1)
+                  (sb-thread:wait-on-semaphore s2)
+                  (sb-thread::with-spinlock (m2)
+                    :ok)))
+              :name "T1")))
+    (assert (eq :deadlock
+                (handler-case
+                    (sb-thread::with-spinlock (m2)
+                      (sb-thread:signal-semaphore s2)
+                      (sb-thread:wait-on-semaphore s1)
+                      (sleep 1)
+                      (sb-sys:with-deadline (:seconds 0.1)
+                        (sb-thread::with-spinlock (m1)
+                          :ok)))
+                  (sb-sys:deadline-timeout ()
+                    :deadline)
+                  (sb-thread:thread-deadlock ()
+                    :deadlock))))
     (assert (eq :ok (join-thread t1)))))

@@ -299,13 +299,16 @@ created and old ones may exit at any time."
 
 ;;;; Spinlocks
 
-(defmacro with-deadlocks ((thread lock timeout) &body forms)
+(defmacro with-deadlocks ((thread lock &optional timeout) &body forms)
+  (declare (ignorable timeout))
   (with-unique-names (prev n-thread n-lock n-timeout new)
     `(let* ((,n-thread ,thread)
             (,n-lock ,lock)
-            (,n-timeout (or ,timeout
-                            (when sb!impl::*deadline*
-                              sb!impl::*deadline-seconds*)))
+            (,n-timeout #!-sb-lutex
+                        ,(when timeout
+                           `(or ,timeout
+                                (when sb!impl::*deadline*
+                                  sb!impl::*deadline-seconds*))))
             ;; If we get interrupted while waiting for a lock, etc.
             (,prev (thread-waiting-for ,n-thread))
             (,new (if ,n-timeout
@@ -331,7 +334,7 @@ created and old ones may exit at any time."
       (when (eq old new)
         (error "Recursive lock attempt on ~S." spinlock))
       #!+sb-thread
-      (with-deadlocks (new spinlock nil)
+      (with-deadlocks (new spinlock)
         (flet ((cas ()
                  (if (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
                      (thread-yield)
