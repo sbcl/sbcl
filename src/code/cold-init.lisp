@@ -111,7 +111,7 @@
 
   ;; I'm not sure where eval is first called, so I put this first.
   (show-and-call !eval-cold-init)
-
+  (show-and-call !deadline-cold-init)
   (show-and-call thread-init-or-reinit)
   (show-and-call !typecheckfuns-cold-init)
 

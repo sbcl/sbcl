@@ -28,7 +28,8 @@ in future versions."
    :type mutex)
   (result-lock
    (make-mutex :name "thread result lock")
-   :type mutex))
+   :type mutex)
+  waiting-for)
 
 (def!struct mutex
   #!+sb-doc

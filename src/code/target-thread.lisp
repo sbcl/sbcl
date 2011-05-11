@@ -21,6 +21,15 @@
 The offending thread is initialized by the :THREAD initialization argument and
 read by the function THREAD-ERROR-THREAD."))
 
+(define-condition thread-deadlock (thread-error)
+  ((cycle :initarg :cycle :reader thread-deadlock-cycle))
+  (:report
+   (lambda (condition stream)
+     (let ((*print-circle* t))
+       (format stream "Deadlock cycle detected:~%~@<   ~@;~
+                     ~{~:@_~S~:@_~}~:@>"
+               (mapcar #'car (thread-deadlock-cycle condition)))))))
+
 #!+sb-doc
 (setf
  (fdocumentation 'thread-error-thread 'function)
@@ -101,17 +110,40 @@ arbitrary printable objects, and need not be unique.")
                      (multiple-value-list
                       (join-thread thread :default cookie))))
            (state (if (eq :running info)
-                      info
+                      (let* ((lock (thread-waiting-for thread)))
+                        (typecase lock
+                          (cons
+                           (list "waiting for:" (cdr lock)
+                                 "timeout: " (car lock)))
+                          (null
+                           (list info))
+                          (t
+                           (list "waiting for:" lock))))
                       (if (eq cookie (car info))
-                          :aborted
+                          (list :aborted)
                           :finished)))
-           (values (when (eq :finished state) info)))
+           (values (when (eq :finished state)
+                     info))
+           (*print-level* 4))
       (format stream
-              "~@[~S ~]~:[~A~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
+              "~@[~S ~]~:[~{~I~A~^~2I~_ ~}~_~;~A~:[ no values~; values: ~:*~{~S~^, ~}~]~]"
               (thread-name thread)
               (eq :finished state)
               state
               values))))
+
+(defun print-lock (lock name owner stream)
+  (let ((*print-circle* t))
+    (print-unreadable-object (lock stream :type t :identity (not name))
+      (if owner
+          (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
+          (format stream "~@[~S ~](free)" name)))))
+
+(def!method print-object ((mutex mutex) stream)
+  (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
+
+(def!method print-object ((spinlock spinlock) stream)
+  (print-lock spinlock (spinlock-name spinlock) (spinlock-value spinlock) stream))
 
 (defun thread-alive-p (thread)
   #!+sb-doc
@@ -267,6 +299,27 @@ created and old ones may exit at any time."
 
 ;;;; Spinlocks
 
+(defmacro with-deadlocks ((thread lock timeout) &body forms)
+  (with-unique-names (prev n-thread n-lock n-timeout new)
+    `(let* ((,n-thread ,thread)
+            (,n-lock ,lock)
+            (,n-timeout (or ,timeout
+                            (when sb!impl::*deadline*
+                              sb!impl::*deadline-seconds*)))
+            ;; If we get interrupted while waiting for a lock, etc.
+            (,prev (thread-waiting-for ,n-thread))
+            (,new (if ,n-timeout
+                      (cons ,n-timeout ,n-lock)
+                      ,n-lock)))
+       (declare (dynamic-extent ,new))
+       ;; No WITHOUT-INTERRUPTS, since WITH-DEADLOCKS is used
+       ;; in places where interrupts should already be disabled.
+       (unwind-protect
+            (progn
+              (setf (thread-waiting-for ,n-thread) ,new)
+              ,@forms)
+         (setf (thread-waiting-for ,n-thread) ,prev)))))
+
 (declaim (inline get-spinlock release-spinlock))
 
 ;;; Should always be called with interrupts disabled.
@@ -278,23 +331,28 @@ created and old ones may exit at any time."
       (when (eq old new)
         (error "Recursive lock attempt on ~S." spinlock))
       #!+sb-thread
-      (flet ((cas ()
-               (if (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
-                   (thread-yield)
-                   (return-from get-spinlock t))))
-        (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
-            ;; If interrupts are disabled, but we are allowed to
-            ;; enabled them, check for pending interrupts every once
-            ;; in a while. %CHECK-INTERRUPTS is taking shortcuts, make
-            ;; sure that deferrables are unblocked by doing an empty
-            ;; WITH-INTERRUPTS once.
-            (progn
-              (with-interrupts)
-              (loop
-               (loop repeat 128 do (cas)) ; 128 is arbitrary here
-               (sb!unix::%check-interrupts)))
-            (loop (cas)))))
-    t))
+      (with-deadlocks (new spinlock nil)
+        (flet ((cas ()
+                 (if (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
+                     (thread-yield)
+                     (return-from get-spinlock t))))
+          ;; Try once.
+          (cas)
+          ;; Check deadlocks
+          (with-interrupts (check-deadlock))
+          (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
+              ;; If interrupts are disabled, but we are allowed to
+              ;; enabled them, check for pending interrupts every once
+              ;; in a while. %CHECK-INTERRUPTS is taking shortcuts, make
+              ;; sure that deferrables are unblocked by doing an empty
+              ;; WITH-INTERRUPTS once.
+              (progn
+                (with-interrupts)
+                (loop
+                  (loop repeat 128 do (cas)) ; 128 is arbitrary here
+                  (sb!unix::%check-interrupts)))
+              (loop (cas)))))))
+    t)
 
 (defun release-spinlock (spinlock)
   (declare (optimize (speed 3) (safety 0)))
@@ -345,7 +403,65 @@ HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
   (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
-(defun get-mutex (mutex &optional (new-owner *current-thread*)
+;;; Signals an error if owner of LOCK is waiting on a lock whose release
+;;; depends on the current thread. Does not detect deadlocks from sempahores.
+(defun check-deadlock ()
+  (let* ((self *current-thread*)
+         (origin (thread-waiting-for self)))
+    (labels ((lock-owner (lock)
+               (etypecase lock
+                 (mutex (mutex-%owner lock))
+                 (spinlock (spinlock-value lock))))
+             (detect-deadlock (lock)
+               (let ((other-thread (lock-owner lock)))
+                 (cond ((not other-thread))
+                       ((eq self other-thread)
+                        (let* ((chain (deadlock-chain self origin))
+                               (barf
+                                (format nil
+                                        "~%WARNING: DEADLOCK CYCLE DETECTED:~%~@<   ~@;~
+                                         ~{~:@_~S~:@_~}~:@>~
+                                         ~%END OF CYCLE~%"
+                                        (mapcar #'car chain))))
+                          ;; Barf to stderr in case the system is too tied up
+                          ;; to report the error properly -- to avoid cross-talk
+                          ;; build the whole string up first.
+                          (write-string barf sb!sys:*stderr*)
+                          (finish-output sb!sys:*stderr*)
+                          (error 'thread-deadlock
+                                 :thread *current-thread*
+                                 :cycle chain)))
+                       (t
+                        (let ((other-lock (thread-waiting-for other-thread)))
+                          ;; If the thread is waiting with a timeout OTHER-LOCK
+                          ;; is a cons, and we don't consider it a deadlock -- since
+                          ;; it will time out on its own sooner or later.
+                          (when (and other-lock (not (consp other-lock)))
+                            (detect-deadlock other-lock)))))))
+             (deadlock-chain (thread lock)
+               (let* ((other-thread (lock-owner lock))
+                      (other-lock (thread-waiting-for other-thread)))
+                 (cond ((not other-thread)
+                        ;; The deadlock is gone -- maybe someone timed out?
+                        (return-from check-deadlock nil))
+                       ((consp other-lock)
+                        ;; There's a timeout -- no deadlock.
+                        (return-from check-deadlock nil))
+                       ((eq self other-thread)
+                        ;; Done
+                        (list (list thread lock)))
+                       (t
+                        (if other-lock
+                            (cons (list thread lock)
+                                  (deadlock-chain other-thread other-lock))
+                            ;; Again, the deadlock is gone?
+                            (return-from check-deadlock nil)))))))
+      ;; Timeout means there is no deadlock
+      (unless (consp origin)
+        (detect-deadlock origin)
+        t))))
+
+(defun get-mutex (mutex &optional new-owner
                                   (waitp t) (timeout nil))
   #!+sb-doc
   "Deprecated in favor of GRAB-MUTEX."
@@ -363,7 +479,7 @@ HOLDING-MUTEX-P."
   #!-sb-thread
   (setf (mutex-%owner mutex) new-owner)
   #!+sb-thread
-  (progn
+  (with-deadlocks (new-owner mutex timeout)
     ;; FIXME: Lutexes do not currently support deadlines, as at least
     ;; on Darwin pthread_foo_timedbar functions are not supported:
     ;; this means that we probably need to use the Carbon multiprocessing
@@ -378,12 +494,23 @@ HOLDING-MUTEX-P."
       (when timeout
         (error "Mutex timeouts not supported on this platform."))
       (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
-                    (if waitp
-                        (with-interrupts (%lutex-lock lutex))
-                        (%lutex-trylock lutex))))
-       (setf (mutex-%owner mutex) new-owner)
-       (barrier (:write))
-       t))
+                     (if waitp
+                         (let ((once (%lutex-trylock lutex)))
+                           (cond ((zerop once)
+                                  ;; No need to wait.
+                                  once)
+                                 (t
+                                  (with-interrupts
+                                    ;; Check for deadlocks before waiting
+                                    (check-deadlock)
+                                    (%lutex-lock lutex)))))
+                         (%lutex-trylock lutex))))
+        ;; FIXME: If %LUTEX-LOCK unwinds due to a signal, we may actually
+        ;; be holding the lock already -- and but neglect to mark ourselves
+        ;; as the owner here. This is bad.
+        (setf (mutex-%owner mutex) new-owner)
+        (barrier (:write))
+        t))
     #!-sb-lutex
     ;; This is a direct translation of the Mutex 2 algorithm from
     ;; "Futexes are Tricky" by Ulrich Drepper.
@@ -399,20 +526,22 @@ HOLDING-MUTEX-P."
                                                         +lock-taken+
                                                         +lock-contested+))))
              ;; Wait on the contested lock.
-             (loop
-              (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
-                  (decode-timeout timeout)
-                (declare (ignore stop-sec stop-usec))
-                (case (with-pinned-objects (mutex)
-                        (futex-wait (mutex-state-address mutex)
-                                    (get-lisp-obj-address +lock-contested+)
-                                    (or to-sec -1)
-                                    (or to-usec 0)))
-                  ((1) (if deadlinep
-                           (signal-deadline)
-                           (return-from get-mutex nil)))
-                  ((2))
-                  (otherwise (return))))))
+             (with-interrupts
+               (check-deadlock)
+               (loop
+                 (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
+                     (decode-timeout timeout)
+                   (declare (ignore stop-sec stop-usec))
+                   (case (with-pinned-objects (mutex)
+                           (futex-wait (mutex-state-address mutex)
+                                       (get-lisp-obj-address +lock-contested+)
+                                       (or to-sec -1)
+                                       (or to-usec 0)))
+                     ((1) (if deadlinep
+                              (signal-deadline)
+                              (return-from get-mutex nil)))
+                     ((2))
+                     (otherwise (return)))))))
            (setf old (sb!ext:compare-and-swap (mutex-state mutex)
                                               +lock-free+
                                               +lock-contested+))

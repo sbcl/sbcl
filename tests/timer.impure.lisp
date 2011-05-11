@@ -272,18 +272,19 @@
              (sleep (random 0.01))
              (loop repeat 10000
                    do (sb-ext:unschedule-timer timer))))
-      (loop repeat 5
-            do (mapcar #'sb-thread:join-thread
-                       (loop for i from 1 upto 10
-                             collect (let* ((thread (sb-thread:make-thread #'flop
-                                                                           :name (format nil "scheduler ~A" i)))
-                                            (ticker (make-limited-timer (lambda () 13)
-                                                                               1000
-                                                                               :thread (or other thread)
-                                                                               :name (format nil "ticker ~A" i))))
-                                       (setf other thread)
-                                       (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
-                                       thread)))))))
+      (sb-sys:with-deadline (:seconds 30)
+        (loop repeat 5
+              do (mapcar #'sb-thread:join-thread
+                           (loop for i from 1 upto 10
+                                 collect (let* ((thread (sb-thread:make-thread #'flop
+                                                                               :name (format nil "scheduler ~A" i)))
+                                                (ticker (make-limited-timer (lambda () 13)
+                                                                            1000
+                                                                            :thread (or other thread)
+                                                                            :name (format nil "ticker ~A" i))))
+                                           (setf other thread)
+                                           (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
+                                           thread))))))))
 
 ;;;; FIXME: OS X 10.4 doesn't like these being at all, and gives us a SIGSEGV
 ;;;; instead of using the Mach expection system! 10.5 on the other tends to

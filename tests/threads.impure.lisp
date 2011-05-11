@@ -344,11 +344,18 @@
 (with-test (:name (:grab-mutex :timeout :acquisition-fail))
   #+sb-lutex
   (error "Mutex timeout not supported here.")
-  (let ((m (make-mutex)))
+  (let ((m (make-mutex))
+        (w (make-semaphore)))
     (with-mutex (m)
-      (assert (null (join-thread (make-thread
-                                  #'(lambda ()
-                                      (grab-mutex m :timeout 0.1)))))))))
+      (let ((th (make-thread
+                 #'(lambda ()
+                     (prog1
+                         (grab-mutex m :timeout 0.1)
+                       (signal-semaphore w))))))
+        ;; Wait for it to -- otherwise the detect the deadlock chain
+        ;; from JOIN-THREAD.
+        (wait-on-semaphore w)
+        (assert (null (join-thread th)))))))
 
 (with-test (:name (:grab-mutex :timeout :acquisition-success))
   #+sb-lutex
@@ -363,16 +370,18 @@
 (with-test (:name (:grab-mutex :timeout+deadline))
   #+sb-lutex
   (error "Mutex timeout not supported here.")
-  (let ((m (make-mutex)))
+  (let ((m (make-mutex))
+        (w (make-semaphore)))
     (with-mutex (m)
-      (assert (eq (join-thread
-                   (make-thread #'(lambda ()
-                                    (sb-sys:with-deadline (:seconds 0.0)
-                                      (handler-case
-                                          (grab-mutex m :timeout 0.0)
-                                        (sb-sys:deadline-timeout ()
-                                          :deadline))))))
-                  :deadline)))))
+      (let ((th (make-thread #'(lambda ()
+                                 (sb-sys:with-deadline (:seconds 0.0)
+                                   (handler-case
+                                       (grab-mutex m :timeout 0.0)
+                                     (sb-sys:deadline-timeout ()
+                                       (signal-semaphore w)
+                                       :deadline)))))))
+        (wait-on-semaphore w)
+        (assert (eq (join-thread th) :deadline))))))
 
 (with-test (:name (:grab-mutex :waitp+deadline))
   #+sb-lutex

@@ -12,13 +12,17 @@
 
 (in-package "SB!IMPL")
 
+(!begin-collecting-cold-init-forms)
+
 ;;; Current deadline as internal time units or NIL.
-(defvar *deadline* nil)
 (declaim (type (or unsigned-byte null) *deadline*))
+(defvar *deadline*)
+(!cold-init-forms (setq *deadline* nil))
 
 ;;; The relative number of seconds the current deadline corresponds
 ;;; to. Used for continuing from TIMEOUT conditions.
-(defvar *deadline-seconds* nil)
+(defvar *deadline-seconds*)
+(!cold-init-forms (setq *deadline-seconds* nil))
 
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
@@ -171,3 +175,4 @@ it will signal a timeout condition."
                    (values to-sec to-usec stop-sec stop-usec signalp)))
                (values nil nil nil nil nil)))))))
 
+(!defun-from-collected-cold-init-forms !deadline-cold-init)
