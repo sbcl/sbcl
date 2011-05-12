@@ -250,17 +250,19 @@ standard Lisp readtable when NIL."
                           :test #'char= :key #'car)))
       (set-cat-entry to-char att to-readtable)
       (set-cmt-entry to-char mac to-readtable)
-      (when from-dpair
-        (cond
-          (to-dpair
-           (let ((table (cdr to-dpair)))
-             (clrhash table)
-             (shallow-replace/eql-hash-table table (cdr from-dpair))))
-          (t
-           (let ((pair (cons to-char (make-hash-table))))
-             (shallow-replace/eql-hash-table (cdr pair) (cdr from-dpair))
+      (cond ((and (not from-dpair) (not to-dpair)))
+            ((and (not from-dpair) to-dpair)
              (setf (dispatch-tables to-readtable)
-                   (push pair (dispatch-tables to-readtable)))))))))
+                   (remove to-dpair (dispatch-tables to-readtable))))
+            (to-dpair
+             (let ((table (cdr to-dpair)))
+               (clrhash table)
+               (shallow-replace/eql-hash-table table (cdr from-dpair))))
+            (t
+             (let ((pair (cons to-char (make-hash-table))))
+               (shallow-replace/eql-hash-table (cdr pair) (cdr from-dpair))
+               (setf (dispatch-tables to-readtable)
+                     (push pair (dispatch-tables to-readtable))))))))
   t)
 
 (defun set-macro-character (char function &optional
