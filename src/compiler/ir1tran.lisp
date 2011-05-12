@@ -654,10 +654,11 @@
 (defun ir1-convert-var (start next result name)
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
-    (if (and (global-var-p var) (not result))
-        ;; KLUDGE: If the reference is dead, convert using SYMBOL-VALUE
-        ;; which is not flushable, so that unbound dead variables signal
-        ;; an error (bug 412).
+    (if (and (global-var-p var) (not (info :variable :always-bound name)))
+        ;; KLUDGE: If the variable may be unbound, convert using SYMBOL-VALUE
+        ;; which is not flushable, so that unbound dead variables signal an
+        ;; error (bug 412, lp#722734): checking for null RESULT is not enough,
+        ;; since variables can become dead due to later optimizations.
         (ir1-convert start next result
                      (if (eq (global-var-kind var) :global)
                          `(symbol-global-value ',name)
@@ -948,12 +949,18 @@
 ;;; instrumentation for?
 (defun step-form-p (form)
   (flet ((step-symbol-p (symbol)
-           (not (member (symbol-package symbol)
-                        (load-time-value
-                         ;; KLUDGE: packages we're not interested in
-                         ;; stepping.
-                         (mapcar #'find-package '(sb!c sb!int sb!impl
-                                                  sb!kernel sb!pcl)))))))
+           (and (not (member (symbol-package symbol)
+                             (load-time-value
+                              ;; KLUDGE: packages we're not interested in
+                              ;; stepping.
+                              (mapcar #'find-package '(sb!c sb!int sb!impl
+                                                       sb!kernel sb!pcl)))))
+                ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
+                ;; we insert calls to SYMBOL-VALUE for most non-lexical
+                ;; variable references in order to avoid them being elided
+                ;; if the value is unused.
+                (or (not (member symbol '(symbol-value symbol-global-value)))
+                    (not (constantp (second form)))))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))
          (listp form)

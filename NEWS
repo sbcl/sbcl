@@ -16,6 +16,10 @@ changes relative to sbcl-1.0.48:
   * bug fix: blocking reads from FIFOs created by RUN-PROGRAM were
     uninterruptible, as well as blocking reads from socket streams created
     with for which :SERVE-EVENTS NIL. (regression from 1.0.42.43)
+  * bug fix: SET-SYNTAX-FROM-CHAR now removes dispatch-macro character syntax
+    from the to-char if the from-char is not a dispatch-macro character.
+  * bug fix: references to undefined variables in function calls that are
+    optimized away now signal a runtime error. (lp#722734)
 
 changes in sbcl-1.0.48 relative to sbcl-1.0.47:
   * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five

@@ -3874,3 +3874,11 @@
     (nconc cycle cycle)
     (compile nil `(lambda (x)
                     (member x ',cycle)))))
+
+(with-test (:name :bug-722734)
+  (assert (raises-error?
+            (funcall (compile
+                      nil
+                      '(lambda ()
+                        (eql (make-array 6)
+                         (list unbound-variable-1 unbound-variable-2))))))))
