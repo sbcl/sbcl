@@ -938,7 +938,9 @@ Users Manual for details about the PROCESS structure."#-win32"
     (cond ((eq object t)
            ;; No new descriptor is needed.
            (values -1 nil))
-          ((eq object nil)
+          ((or (eq object nil)
+               (and (typep object 'broadcast-stream)
+                    (not (broadcast-stream-streams object))))
            ;; Use /dev/null.
            (multiple-value-bind
                  (fd errno)
@@ -1051,7 +1053,10 @@ Users Manual for details about the PROCESS structure."#-win32"
                          (loop with buf = (make-array 256 :element-type '(unsigned-byte 8))
                                for p = (read-sequence buf object)
                                until (zerop p)
-                               do (sb-unix:unix-write fd buf 0 p))))
+                               do (sb-unix:unix-write fd buf 0 p)))
+                        (t
+                         (error "Don't know how to copy from stream of element-type ~S"
+                                et)))
                   (sb-unix:unix-lseek fd 0 sb-unix:l_set)
                   (push fd *close-in-parent*)
                   (return (values fd nil)))))

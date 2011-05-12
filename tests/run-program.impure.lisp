@@ -110,6 +110,19 @@
       (assert (= 0 (read-sequence (make-array 8) out)))
       (assert (equalp buf data)))))
 
+(with-test (:name :run-program-cat-4)
+  ;; Null broadcast stream as output
+  (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
+                                      :output (make-broadcast-stream)
+                                      :input :stream))
+         (in (process-input process)))
+    (unwind-protect
+         (progn
+           (write-string "foobar" in)
+           (close in)
+           (process-wait process))
+      (process-close process))))
+
 ;;; Test driving an external program (cat) through pipes wrapped in
 ;;; composite streams.
 
@@ -132,7 +145,7 @@
 (defparameter *cat-out-pipe* (make-pipe))
 (defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*))
 
-(with-test (:name :run-program-cat-2)
+(with-test (:name :run-program-cat-5)
   (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out*
                           :wait nil)))
     (dolist (test '("This is a test!"
