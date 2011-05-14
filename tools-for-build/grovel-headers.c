@@ -223,7 +223,10 @@ main(int argc, char *argv[])
     defconstant("eagain", EAGAIN);
 
     defconstant("s-ifmt",  S_IFMT);
+    defconstant("s-ififo", S_IFIFO);
+    defconstant("s-ifchr", S_IFCHR);
     defconstant("s-ifdir", S_IFDIR);
+    defconstant("s-ifblk", S_IFBLK);
     defconstant("s-ifreg", S_IFREG);
 
     DEFTYPE("ino-t",  ino_t);
