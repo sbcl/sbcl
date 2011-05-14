@@ -443,9 +443,11 @@ HOLDING-MUTEX-P."
                             (detect-deadlock other-lock)))))))
              (deadlock-chain (thread lock)
                (let* ((other-thread (lock-owner lock))
-                      (other-lock (thread-waiting-for other-thread)))
+                      (other-lock (when other-thread
+                                    (thread-waiting-for other-thread))))
                  (cond ((not other-thread)
-                        ;; The deadlock is gone -- maybe someone timed out?
+                        ;; The deadlock is gone -- maybe someone unwound
+                        ;; from the same deadlock already?
                         (return-from check-deadlock nil))
                        ((consp other-lock)
                         ;; There's a timeout -- no deadlock.

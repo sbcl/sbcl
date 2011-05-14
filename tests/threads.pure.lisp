@@ -307,28 +307,33 @@
 
 #+sb-thread
 (with-test (:name deadlock-detection.1)
-  (flet ((test (ma mb sa sb)
-           (lambda ()
-             (handler-case
-                 (sb-thread:with-mutex (ma)
-                   (sb-thread:signal-semaphore sa)
-                   (sb-thread:wait-on-semaphore sb)
-                   (sb-thread:with-mutex (mb)
-                     :ok))
-               (sb-thread:thread-deadlock (e)
-                 (princ e)
-                 :deadlock)))))
-    (let* ((m1 (sb-thread:make-mutex :name "M1"))
-           (m2 (sb-thread:make-mutex :name "M2"))
-           (s1 (sb-thread:make-semaphore :name "S1"))
-           (s2 (sb-thread:make-semaphore :name "S2"))
-           (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
-           (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
-      ;; One will deadlock, and the other will then complete normally
-      (let ((res (list (sb-thread:join-thread t1)
-                       (sb-thread:join-thread t2))))
-        (assert (or (equal '(:deadlock :ok) res)
-                    (equal '(:ok :deadlock) res)))))))
+  (loop
+    repeat 1000
+    do (flet ((test (ma mb sa sb)
+                (lambda ()
+                  (handler-case
+                      (sb-thread:with-mutex (ma)
+                        (sb-thread:signal-semaphore sa)
+                        (sb-thread:wait-on-semaphore sb)
+                        (sb-thread:with-mutex (mb)
+                          :ok))
+                    (sb-thread:thread-deadlock (e)
+                      (princ e)
+                      :deadlock)))))
+         (let* ((m1 (sb-thread:make-mutex :name "M1"))
+                (m2 (sb-thread:make-mutex :name "M2"))
+                (s1 (sb-thread:make-semaphore :name "S1"))
+                (s2 (sb-thread:make-semaphore :name "S2"))
+                (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
+                (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
+           ;; One will deadlock, and the other will then complete normally.
+           ;; ...except sometimes, when we get unlucky, and both will do
+           ;; the deadlock detection in parallel and both signal.
+           (let ((res (list (sb-thread:join-thread t1)
+                            (sb-thread:join-thread t2))))
+             (assert (or (equal '(:deadlock :ok) res)
+                         (equal '(:ok :deadlock) res)
+                         (equal '(:deadlock :deadlock) res))))))))
 
 #+sb-thread
 (with-test (:name deadlock-detection.2)
@@ -401,28 +406,33 @@
 
 #+sb-thread
 (with-test (:name deadlock-detection.4)
-  (flet ((test (ma mb sa sb)
-           (lambda ()
-             (handler-case
-                 (sb-thread::with-spinlock (ma)
-                   (sb-thread:signal-semaphore sa)
-                   (sb-thread:wait-on-semaphore sb)
-                   (sb-thread::with-spinlock (mb)
-                     :ok))
-               (sb-thread:thread-deadlock (e)
-                 (princ e)
-                 :deadlock)))))
-    (let* ((m1 (sb-thread::make-spinlock :name "M1"))
-           (m2 (sb-thread::make-spinlock :name "M2"))
-           (s1 (sb-thread:make-semaphore :name "S1"))
-           (s2 (sb-thread:make-semaphore :name "S2"))
-           (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
-           (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
-      ;; One will deadlock, and the other will then complete normally
-      (let ((res (list (sb-thread:join-thread t1)
-                       (sb-thread:join-thread t2))))
-        (assert (or (equal '(:deadlock :ok) res)
-                    (equal '(:ok :deadlock) res)))))))
+  (loop
+    repeat 1000
+    do (flet ((test (ma mb sa sb)
+                (lambda ()
+                  (handler-case
+                      (sb-thread::with-spinlock (ma)
+                        (sb-thread:signal-semaphore sa)
+                        (sb-thread:wait-on-semaphore sb)
+                        (sb-thread::with-spinlock (mb)
+                          :ok))
+                    (sb-thread:thread-deadlock (e)
+                      (princ e)
+                      :deadlock)))))
+         (let* ((m1 (sb-thread::make-spinlock :name "M1"))
+                (m2 (sb-thread::make-spinlock :name "M2"))
+                (s1 (sb-thread:make-semaphore :name "S1"))
+                (s2 (sb-thread:make-semaphore :name "S2"))
+                (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
+                (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
+           ;; One will deadlock, and the other will then complete normally
+           ;; ...except sometimes, when we get unlucky, and both will do
+           ;; the deadlock detection in parallel and both signal.
+           (let ((res (list (sb-thread:join-thread t1)
+                            (sb-thread:join-thread t2))))
+             (assert (or (equal '(:deadlock :ok) res)
+                         (equal '(:ok :deadlock) res)
+                         (equal '(:deadlock :deadlock) res))))))))
 
 #+sb-thread
 (with-test (:name deadlock-detection.5)
