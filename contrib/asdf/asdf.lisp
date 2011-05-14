@@ -1,5 +1,5 @@
 ;;; -*- mode: common-lisp; Base: 10 ; Syntax: ANSI-Common-Lisp -*-
-;;; This is ASDF 2.015.2: Another System Definition Facility.
+;;; This is ASDF 2.015.3: Another System Definition Facility.
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome:
 ;;; please mail to <asdf-devel@common-lisp.net>.
@@ -104,7 +104,7 @@
          ;; "2.345.6" would be a development version in the official upstream
          ;; "2.345.0.7" would be your seventh local modification of official release 2.345
          ;; "2.345.6.7" would be your seventh local modification of development version 2.345.6
-         (asdf-version "2.015.2")
+         (asdf-version "2.015.3")
          (existing-asdf (fboundp 'find-system))
          (existing-version *asdf-version*)
          (already-there (equal asdf-version existing-version)))
@@ -230,7 +230,7 @@
             #:inherit-source-registry #:process-source-registry-directive)
            :export
            (#:defsystem #:oos #:operate #:find-system #:run-shell-command
-            #:system-definition-pathname
+            #:system-definition-pathname #:with-system-definitions
             #:search-for-system-definition #:find-component ; miscellaneous
             #:compile-system #:load-system #:test-system #:clear-system
             #:compile-op #:load-op #:load-source-op
@@ -1514,57 +1514,75 @@ Going forward, we recommend new users should be using the source-registry.
 (defmethod find-system (name &optional (error-p t))
   (find-system (coerce-name name) error-p))
 
-(defun load-sysdef (name pathname)
+(defvar *systems-being-defined* nil
+  "A hash-table of systems currently being defined keyed by name, or NIL")
+
+(defun* find-system-if-being-defined (name)
+  (when *systems-being-defined*
+    (gethash (coerce-name name) *systems-being-defined*)))
+
+(defun* call-with-system-definitions (thunk)
+  (if *systems-being-defined*
+      (funcall thunk)
+      (let ((*systems-being-defined* (make-hash-table :test 'equal)))
+        (funcall thunk))))
+
+(defmacro with-system-definitions (() &body body)
+  `(call-with-system-definitions #'(lambda () ,@body)))
+
+(defun* load-sysdef (name pathname)
   ;; Tries to load system definition with canonical NAME from PATHNAME.
-  (let ((package (make-temporary-package)))
-    (unwind-protect
-         (handler-bind
-             ((error #'(lambda (condition)
-                         (error 'load-system-definition-error
-                                :name name :pathname pathname
-                                :condition condition))))
-           (let ((*package* package))
-             (asdf-message (compatfmt "~&~@<; ~@;Loading system definition from ~A into ~A~@:>~%")
-                           pathname package)
-             (load pathname)))
-      (delete-package package))))
+  (with-system-definitions ()
+    (let ((package (make-temporary-package)))
+      (unwind-protect
+           (handler-bind
+               ((error #'(lambda (condition)
+                           (error 'load-system-definition-error
+                                  :name name :pathname pathname
+                                  :condition condition))))
+             (let ((*package* package))
+               (asdf-message (compatfmt "~&~@<; ~@;Loading system definition from ~A into ~A~@:>~%")
+                             pathname package)
+               (load pathname)))
+        (delete-package package)))))
 
 (defmethod find-system ((name string) &optional (error-p t))
-  (let* ((in-memory (system-registered-p name)) ; load from disk if absent or newer on disk
-         (previous (cdr in-memory))
-         (previous (and (typep previous 'system) previous))
-         (previous-time (car in-memory))
-         (found (search-for-system-definition name))
-         (found-system (and (typep found 'system) found))
-         (pathname (or (and (typep found '(or pathname string)) (pathname found))
-                       (and found-system (system-source-file found-system))
-                       (and previous (system-source-file previous)))))
-    (setf pathname (resolve-symlinks* pathname))
-    (when (and pathname (not (absolute-pathname-p pathname)))
-      (setf pathname (ensure-pathname-absolute pathname))
-      (when found-system
-        (%set-system-source-file pathname found-system)))
-    (when (and previous (not (#-cormanlisp equal #+cormanlisp equalp
-                              (system-source-file previous) pathname)))
-      (%set-system-source-file pathname previous)
-      (setf previous-time nil))
-    (when (and found-system (not previous))
-      (register-system found-system))
-    (when (and pathname
-               (or (not previous-time)
-                   ;; don't reload if it's already been loaded,
-                   ;; or its filestamp is in the future which means some clock is skewed
-                   ;; and trying to load might cause an infinite loop.
-                   (< previous-time (safe-file-write-date pathname) (get-universal-time))))
-      (load-sysdef name pathname))
-    (let ((in-memory (system-registered-p name))) ; try again after loading from disk
-      (cond
-        (in-memory
-         (when pathname
-           (setf (car in-memory) (safe-file-write-date pathname)))
-         (cdr in-memory))
-        (error-p
-         (error 'missing-component :requires name))))))
+  (with-system-definitions ()
+    (let* ((in-memory (system-registered-p name)) ; load from disk if absent or newer on disk
+           (previous (cdr in-memory))
+           (previous (and (typep previous 'system) previous))
+           (previous-time (car in-memory))
+           (found (search-for-system-definition name))
+           (found-system (and (typep found 'system) found))
+           (pathname (or (and (typep found '(or pathname string)) (pathname found))
+                         (and found-system (system-source-file found-system))
+                         (and previous (system-source-file previous)))))
+      (setf pathname (resolve-symlinks* pathname))
+      (when (and pathname (not (absolute-pathname-p pathname)))
+        (setf pathname (ensure-pathname-absolute pathname))
+        (when found-system
+          (%set-system-source-file pathname found-system)))
+      (when (and previous (not (#-cormanlisp equal #+cormanlisp equalp
+                                             (system-source-file previous) pathname)))
+        (%set-system-source-file pathname previous)
+        (setf previous-time nil))
+      (when (and found-system (not previous))
+        (register-system found-system))
+      (when (and pathname
+                 (or (not previous-time)
+                     ;; don't reload if it's already been loaded,
+                     ;; or its filestamp is in the future which means some clock is skewed
+                     ;; and trying to load might cause an infinite loop.
+                     (< previous-time (safe-file-write-date pathname) (get-universal-time))))
+        (load-sysdef name pathname))
+      (let ((in-memory (system-registered-p name))) ; try again after loading from disk
+        (cond
+          (in-memory
+           (when pathname
+             (setf (car in-memory) (safe-file-write-date pathname)))
+           (cdr in-memory))
+          (error-p
+           (error 'missing-component :requires name)))))))
 
 (defun* find-system-fallback (requested fallback &rest keys &key source-file &allow-other-keys)
   (setf fallback (coerce-name fallback)
@@ -1579,12 +1597,6 @@ Going forward, we recommend new users should be using the source-registry.
   ;; Bug: :version *asdf-version* won't be updated when ASDF is updated.
   (find-system-fallback name "asdf" :version *asdf-version*))
 
-(defvar *systems-being-defined* ()
-  "Systems currently being defined by defsystem")
-
-(defun* find-system-if-being-defined (name)
-  (find (coerce-name name) *systems-being-defined*
-        :test 'equal :key 'component-name))
 
 ;;;; -------------------------------------------------------------------------
 ;;;; Finding components
@@ -2386,31 +2398,32 @@ recursive calls to traverse.")
                     &key ((:verbose *asdf-verbose*) *asdf-verbose*) version force
                     &allow-other-keys)
   (declare (ignore force))
-  (let* ((op (apply 'make-instance operation-class
-                    :original-initargs args
-                    args))
-         (*verbose-out* (if *asdf-verbose* *standard-output* (make-broadcast-stream)))
-         (system (etypecase system
-                   (system system)
-                   ((or string symbol) (find-system system)))))
-    (unless (version-satisfies system version)
-      (error 'missing-component-of-version :requires system :version version))
-    (let ((steps (traverse op system)))
-      (when (and (not (equal '("asdf") (component-find-path system)))
-                 (find-if #'(lambda (x) (equal '("asdf")
-                                               (component-find-path (cdr x))))
-                          steps)
-                 (upgrade-asdf))
-        ;; If we needed to upgrade ASDF to achieve our goal,
-        ;; then do it specially as the first thing, then
-        ;; invalidate all existing system
-        ;; retry the whole thing with the new OPERATE function,
-        ;; which on some implementations
-        ;; has a new symbol shadowing the current one.
-        (return-from operate
-          (apply (find-symbol* 'operate :asdf) operation-class system args)))
-      (perform-plan steps)
-      (values op steps))))
+  (with-system-definitions ()
+    (let* ((op (apply 'make-instance operation-class
+                      :original-initargs args
+                      args))
+           (*verbose-out* (if *asdf-verbose* *standard-output* (make-broadcast-stream)))
+           (system (etypecase system
+                     (system system)
+                     ((or string symbol) (find-system system)))))
+      (unless (version-satisfies system version)
+        (error 'missing-component-of-version :requires system :version version))
+      (let ((steps (traverse op system)))
+        (when (and (not (equal '("asdf") (component-find-path system)))
+                   (find-if #'(lambda (x) (equal '("asdf")
+                                                 (component-find-path (cdr x))))
+                            steps)
+                   (upgrade-asdf))
+          ;; If we needed to upgrade ASDF to achieve our goal,
+          ;; then do it specially as the first thing, then
+          ;; invalidate all existing system
+          ;; retry the whole thing with the new OPERATE function,
+          ;; which on some implementations
+          ;; has a new symbol shadowing the current one.
+          (return-from operate
+            (apply (find-symbol* 'operate :asdf) operation-class system args)))
+        (perform-plan steps)
+        (values op steps)))))
 
 (defun* oos (operation-class system &rest args &key force verbose version
             &allow-other-keys)
@@ -2662,25 +2675,26 @@ Returns the new tree (which probably shares structure with the old one)"
   ;; To avoid infinite recursion in cases where you defsystem a system
   ;; that is registered to a different location to find-system,
   ;; we also need to remember it in a special variable *systems-being-defined*.
-  (let* ((name (coerce-name name))
-         (registered (system-registered-p name))
-         (system (cdr (or registered
-                          (register-system (make-instance 'system :name name)))))
-         (*systems-being-defined* (cons system *systems-being-defined*))
-         (component-options (remove-keys '(:class) options)))
-    (%set-system-source-file (load-pathname) system)
-    (when registered
-      (setf (car registered) (get-universal-time)))
-    (map () 'load-system defsystem-depends-on)
-    ;; We change-class (when necessary) AFTER we load the defsystem-dep's
-    ;; since the class might not be defined as part of those.
-    (unless (eq (type-of system) class)
-      (change-class system class))
-    (parse-component-form
-     nil (list*
-          :module name
-          :pathname (determine-system-pathname pathname pathname-arg-p)
-          component-options))))
+  (with-system-definitions ()
+    (let* ((name (coerce-name name))
+           (registered (system-registered-p name))
+           (system (cdr (or registered
+                            (register-system (make-instance 'system :name name)))))
+           (component-options (remove-keys '(:class) options)))
+      (%set-system-source-file (load-pathname) system)
+      (setf (gethash name *systems-being-defined*) system)
+      (when registered
+        (setf (car registered) (get-universal-time)))
+      (map () 'load-system defsystem-depends-on)
+      ;; We change-class (when necessary) AFTER we load the defsystem-dep's
+      ;; since the class might not be defined as part of those.
+      (unless (eq (type-of system) class)
+        (change-class system class))
+      (parse-component-form
+       nil (list*
+            :module name
+            :pathname (determine-system-pathname pathname pathname-arg-p)
+            component-options)))))
 
 (defmacro defsystem (name &body options)
   `(apply 'do-defsystem ',name ',options))
