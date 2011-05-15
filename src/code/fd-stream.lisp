@@ -2217,7 +2217,12 @@
         ((not (or input output))
          (error "File descriptor must be opened either for input or output.")))
   (let ((stream (%make-fd-stream :fd fd
-                                 :fd-type (sb!unix:fd-type fd)
+                                 :fd-type (progn
+                                            #!-win32 (sb!unix:fd-type fd)
+                                            ;; KLUDGE.
+                                            #!+win32 (if serve-events
+                                                         :unknown
+                                                         :regular))
                                  :name name
                                  :file file
                                  :original original

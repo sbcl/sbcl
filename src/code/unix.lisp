@@ -881,6 +881,7 @@ corresponds to NAME, or NIL if there is none."
              (%extract-stat-results (addr buf))
              fd (addr buf))))
 
+#!-win32
 (defun fd-type (fd)
   (declare (type unix-fd fd))
   (let ((fmt (logand
