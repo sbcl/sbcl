@@ -704,6 +704,7 @@ void brief_print(lispobj obj)
     cur_depth = 0;
     max_depth = 1;
     max_lines = 5000;
+    cur_lines = 0;
 
     print_obj("", obj);
     putchar('\n');
