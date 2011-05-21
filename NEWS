@@ -20,6 +20,9 @@ changes relative to sbcl-1.0.48:
     from the to-char if the from-char is not a dispatch-macro character.
   * bug fix: references to undefined variables in function calls that are
     optimized away now signal a runtime error. (lp#722734)
+  * bug fix: miscompilation of MULTIPLE-VALUE-CALL when asserting derived
+    types from a function defined in the same file. (regression from
+    1.0.43.57)
 
 changes in sbcl-1.0.48 relative to sbcl-1.0.47:
   * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five

@@ -545,3 +545,16 @@
               (funcall (compile nil
                                 `(lambda ()
                                    (load-time-value (values 42))))))))
+
+(defun mv-call-regression-1.0.43.57-foo (a c d x y)
+  (values a c d x y))
+(defun mv-call-regression-1.0.43.57-bar (a b c d)
+  (declare (number a b c d))
+  (values a b c d))
+(defun mv-call-regression-1.0.43.57-quux (a sxx sxy syy)
+  (multiple-value-call #'mv-call-regression-1.0.43.57-foo
+    (mv-call-regression-1.0.43.57-bar sxx sxy sxy syy)
+    a))
+(test-util:with-test (:name :mv-call-regression-1.0.43.57)
+  ;; This used to signal a bogus argument-count error.
+  (mv-call-regression-1.0.43.57-quux 1s0 10s0 1s0 10s0))
