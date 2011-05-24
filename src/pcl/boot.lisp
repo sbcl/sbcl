@@ -956,25 +956,25 @@ bootstrapping.
              (,next-methods (cdr ,next-methods)))
          (declare (ignorable .next-method. ,next-methods))
          (flet (,@(and call-next-method-p
-                       `((call-next-method
-                          (&rest cnm-args)
-                          ,@(if (safe-code-p env)
-                                `((%check-cnm-args cnm-args
-                                                   ,method-args
-                                                   ',method-cell))
-                                nil)
-                          (if .next-method.
-                              (funcall (if (std-instance-p .next-method.)
-                                           (method-function .next-method.)
-                                           .next-method.) ; for early methods
-                                       (or cnm-args ,method-args)
-                                       ,next-methods)
-                              (apply #'call-no-next-method
-                                     ',method-cell
-                                     (or cnm-args ,method-args))))))
+                    `((call-next-method (&rest cnm-args)
+                       (declare (dynamic-extent cnm-args))
+                       ,@(if (safe-code-p env)
+                             `((%check-cnm-args cnm-args
+                                                ,method-args
+                                                ',method-cell))
+                             nil)
+                       (if .next-method.
+                           (funcall (if (std-instance-p .next-method.)
+                                        (method-function .next-method.)
+                                        .next-method.) ; for early methods
+                                    (or cnm-args ,method-args)
+                                    ,next-methods)
+                           (apply #'call-no-next-method
+                                  ',method-cell
+                                  (or cnm-args ,method-args))))))
                 ,@(and next-method-p-p
-                       '((next-method-p ()
-                          (not (null .next-method.))))))
+                    '((next-method-p ()
+                       (not (null .next-method.))))))
            ,@body))))
 
 (defun call-no-next-method (method-cell &rest args)
@@ -1311,22 +1311,23 @@ bootstrapping.
         `(locally
              ,@body)
         `(flet (,@(when call-next-method-p
-                        `((call-next-method (&rest cnm-args)
-                            (declare (muffle-conditions code-deletion-note)
-                                     (optimize (sb-c:insert-step-conditions 0)))
-                           ,@(if (safe-code-p env)
-                                 `((%check-cnm-args cnm-args (list ,@args)
-                                                    ',method-cell))
-                                 nil)
-                           (fast-call-next-method-body (,args
-                                                        ,next-method-call
-                                                        ,rest-arg)
+                    `((call-next-method (&rest cnm-args)
+                        (declare (dynamic-extent cnm-args)
+                                 (muffle-conditions code-deletion-note)
+                                 (optimize (sb-c:insert-step-conditions 0)))
+                        ,@(if (safe-code-p env)
+                              `((%check-cnm-args cnm-args (list ,@args)
+                                                 ',method-cell))
+                              nil)
+                        (fast-call-next-method-body (,args
+                                                     ,next-method-call
+                                                     ,rest-arg)
                             ,method-cell
                             cnm-args))))
-                ,@(when next-method-p-p
-                        `((next-method-p ()
-                           (declare (optimize (sb-c:insert-step-conditions 0)))
-                           (not (null ,next-method-call))))))
+                  ,@(when next-method-p-p
+                      `((next-method-p ()
+                         (declare (optimize (sb-c:insert-step-conditions 0)))
+                         (not (null ,next-method-call))))))
            (let ,rebindings
              ,@(when rebindings `((declare (ignorable ,@all-params))))
              ,@body)))))
@@ -1347,17 +1348,31 @@ bootstrapping.
 ;;; preconditions.  That looks hairy and is probably not worth it,
 ;;; because this check will never be fast.
 (defun %check-cnm-args (cnm-args orig-args method-cell)
+  ;; 1. Check for no arguments.
   (when cnm-args
     (let* ((gf (method-generic-function (car method-cell)))
-           (omethods (compute-applicable-methods gf orig-args))
-           (nmethods (compute-applicable-methods gf cnm-args)))
-      (unless (equal omethods nmethods)
-        (error "~@<The set of methods ~S applicable to argument~P ~
-                ~{~S~^, ~} to call-next-method is different from ~
-                the set of methods ~S applicable to the original ~
-                method argument~P ~{~S~^, ~}.~@:>"
-               nmethods (length cnm-args) cnm-args omethods
-               (length orig-args) orig-args)))))
+           (nreq (generic-function-nreq gf)))
+      (declare (fixnum nreq))
+      ;; 2. Requirement arguments pairwise: if all are EQL, the applicable
+      ;; methods must be the same. This takes care of the relatively common
+      ;; case of twiddling with &KEY arguments without being horribly
+      ;; expensive.
+      (unless (do ((orig orig-args (cdr orig))
+                   (args cnm-args (cdr args))
+                   (n nreq (1- nreq)))
+                  ((zerop n) t)
+                (unless (and orig args (eql (car orig) (car args)))
+                  (return nil)))
+        ;; 3. Only then do the full check.
+        (let ((omethods (compute-applicable-methods gf orig-args))
+              (nmethods (compute-applicable-methods gf cnm-args)))
+          (unless (equal omethods nmethods)
+            (error "~@<The set of methods ~S applicable to argument~P ~
+                    ~{~S~^, ~} to call-next-method is different from ~
+                    the set of methods ~S applicable to the original ~
+                    method argument~P ~{~S~^, ~}.~@:>"
+                   nmethods (length cnm-args) cnm-args omethods
+                   (length orig-args) orig-args)))))))
 
 (defmacro bind-args ((lambda-list args) &body body)
   (let ((args-tail '.args-tail.)
@@ -2297,6 +2312,14 @@ bootstrapping.
       (values nreq applyp metatypes
               nkeys
               arg-info))))
+
+(defun generic-function-nreq (gf)
+  (let* ((arg-info (if (early-gf-p gf)
+                       (early-gf-arg-info gf)
+                       (safe-gf-arg-info gf)))
+         (metatypes (arg-info-metatypes arg-info)))
+    (declare (list metatypes))
+    (length metatypes)))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function
