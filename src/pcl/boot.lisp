@@ -2287,9 +2287,16 @@ bootstrapping.
         (values (arg-info-applyp arg-info)
                 metatypes
                 arg-info))
-    (values (length metatypes) applyp metatypes
-            (count-if (lambda (x) (neq x t)) metatypes)
-            arg-info)))
+    (let ((nreq 0)
+          (nkeys 0))
+      (declare (fixnum nreq nkeys))
+      (dolist (x metatypes)
+        (incf nreq)
+        (unless (eq x t)
+          (incf nkeys)))
+      (values nreq applyp metatypes
+              nkeys
+              arg-info))))
 
 (defun early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function
