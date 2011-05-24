@@ -1374,13 +1374,17 @@
          (setf (lambda-var-ignorep var) t)))))
   (values))
 
-(defun process-dx-decl (names vars fvars kind)
-  (let ((dx (cond ((eq 'truly-dynamic-extent kind)
-                   :truly)
-                  ((and (eq 'dynamic-extent kind)
-                        *stack-allocate-dynamic-extent*)
-                   t))))
-    (if dx
+(defun process-extent-decl (names vars fvars kind)
+  (let ((extent
+          (ecase kind
+            (truly-dynamic-extent
+             :always-dynamic)
+            (dynamic-extent
+             (when *stack-allocate-dynamic-extent*
+               :maybe-dynamic))
+            (indefinite-extent
+             :indefinite))))
+    (if extent
         (dolist (name names)
           (cond
             ((symbolp name)
@@ -1391,21 +1395,23 @@
                (etypecase var
                  (leaf
                   (if bound-var
-                      (setf (leaf-dynamic-extent var) dx)
+                      (if (and (leaf-extent var) (neq extent (leaf-extent var)))
+                          (warn "Multiple incompatible extent declarations for ~S?" name)
+                          (setf (leaf-extent var) extent))
                       (compiler-notify
-                       "Ignoring free DYNAMIC-EXTENT declaration: ~S" name)))
+                       "Ignoring free ~S declaration: ~S" kind name)))
                  (cons
-                  (compiler-error "DYNAMIC-EXTENT on symbol-macro: ~S" name))
+                  (compiler-error "~S on symbol-macro: ~S" kind name))
                  (heap-alien-info
-                  (compiler-error "DYNAMIC-EXTENT on alien-variable: ~S"
-                                  name))
+                  (compiler-error "~S on alien-variable: ~S" kind name))
                  (null
                   (compiler-style-warn
-                   "Unbound variable declared DYNAMIC-EXTENT: ~S" name)))))
+                   "Unbound variable declared ~S: ~S" kind name)))))
             ((and (consp name)
                   (eq (car name) 'function)
                   (null (cddr name))
-                  (valid-function-name-p (cadr name)))
+                  (valid-function-name-p (cadr name))
+                  (neq :indefinite extent))
              (let* ((fname (cadr name))
                     (bound-fun (find fname fvars
                                      :key #'leaf-source-name
@@ -1415,7 +1421,7 @@
                  (leaf
                   (if bound-fun
                       #!+stack-allocatable-closures
-                      (setf (leaf-dynamic-extent bound-fun) dx)
+                      (setf (leaf-extent bound-fun) extent)
                       #!-stack-allocatable-closures
                       (compiler-notify
                        "Ignoring DYNAMIC-EXTENT declaration on function ~S ~
@@ -1428,7 +1434,7 @@
                   (compiler-style-warn
                    "Unbound function declared DYNAMIC-EXTENT: ~S" name)))))
             (t
-             (compiler-error "DYNAMIC-EXTENT on a weird thing: ~S" name))))
+             (compiler-error "~S on a weird thing: ~S" kind name))))
         (when (policy *lexenv* (= speed 3))
           (compiler-notify "Ignoring DYNAMIC-EXTENT declarations: ~S" names)))))
 
@@ -1483,8 +1489,8 @@
                        (car types)
                        `(values ,@types)))))
           res))
-       ((dynamic-extent truly-dynamic-extent)
-        (process-dx-decl (cdr spec) vars fvars (first spec))
+       ((dynamic-extent truly-dynamic-extent indefinite-extent)
+        (process-extent-decl (cdr spec) vars fvars (first spec))
         res)
        ((disable-package-locks enable-package-locks)
         (make-lexenv

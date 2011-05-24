@@ -457,10 +457,6 @@
         (compiler-notify "could not stack allocate the result of ~S"
                          (find-original-source (node-source-path use)))))))
 
-(declaim (ftype (sfunction (node (member nil t :truly) &optional (or null component))
-                           boolean) use-good-for-dx-p))
-(declaim (ftype (sfunction (lvar (member nil t :truly) &optional (or null component))
-                           boolean) lvar-good-for-dx-p))
 (defun use-good-for-dx-p (use dx &optional component)
   ;; FIXME: Can casts point to LVARs in other components?
   ;; RECHECK-DYNAMIC-EXTENT-LVARS assumes that they can't -- that is, that the
@@ -539,8 +535,9 @@
 (defun trivial-lambda-var-ref-p (use)
   (and (ref-p use)
        (let ((var (ref-leaf use)))
-         ;; lambda-var, no SETS
-         (when (and (lambda-var-p var) (not (lambda-var-sets var)))
+         ;; lambda-var, no SETS, not explicitly indefinite-extent.
+         (when (and (lambda-var-p var) (not (lambda-var-sets var))
+                    (neq :indefinite (lambda-var-extent var)))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
              ;; bound by a system lambda, no other REFS
@@ -591,6 +588,7 @@
                               dx arg recheck-component)))
                (ref
                 (let* ((other (trivial-lambda-var-ref-lvar use)))
+                  (print (list :ref use other))
                   (unless (eq other lvar)
                     (handle-nested-dynamic-extent-lvars
                      dx other recheck-component)))))))

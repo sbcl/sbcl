@@ -13,6 +13,10 @@ changes relative to sbcl-1.0.48:
   * enhancement: more informative compile-time warnings and runtime
     errors for type-errors detected at compile-time.
   * enhancement: deadlock detection for mutexes and spinlocks.
+  * enhancement: dynamic-extent for &rest lists stack allocate only their
+    spines, not their argumets. While portable code should not rely on this,
+    particularly in combination with inlining, it should make dynamic-extent
+    easier and safer to use.
   * bug fix: blocking reads from FIFOs created by RUN-PROGRAM were
     uninterruptible, as well as blocking reads from socket streams created
     with for which :SERVE-EVENTS NIL. (regression from 1.0.42.43)

@@ -47,7 +47,7 @@
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
         for var in (lambda-vars fun)
-        for dx = (lambda-var-dynamic-extent var)
+        for dx = (leaf-dynamic-extent var)
         when (and dx arg (not (lvar-dynamic-extent arg)))
         append (handle-nested-dynamic-extent-lvars dx arg) into dx-lvars
         finally (when dx-lvars
@@ -560,14 +560,15 @@
 ;;; function that rearranges the arguments and calls the entry point.
 ;;; We analyze the new function and the entry point immediately so
 ;;; that everything gets converted during the single pass.
-(defun convert-hairy-fun-entry (ref call entry vars ignores args)
+(defun convert-hairy-fun-entry (ref call entry vars ignores args indef)
   (declare (list vars ignores args) (type ref ref) (type combination call)
            (type clambda entry))
   (let ((new-fun
          (with-ir1-environment-from-node call
            (ir1-convert-lambda
             `(lambda ,vars
-               (declare (ignorable ,@ignores))
+               (declare (ignorable ,@ignores)
+                        (indefinite-extent ,@indef))
                (%funcall ,entry ,@args))
             :debug-name (debug-name 'hairy-function-entry
                                     (lvar-fun-debug-name
@@ -698,7 +699,8 @@
 
         (convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
                                  (append temps more-temps)
-                                 (ignores) (call-args)))))
+                                 (ignores) (call-args)
+                                 more-temps))))
 
   (values))
 

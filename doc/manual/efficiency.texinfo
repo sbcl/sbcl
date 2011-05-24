@@ -73,17 +73,54 @@ lazily set up during those calls.
 @cindex @code{dynamic-extent} declaration
 @cindex declaration, @code{dynamic-extent}
 
-SBCL has limited support for performing allocation on the stack when a
-variable is declared @code{dynamic-extent}. The @code{dynamic-extent}
-declarations are not verified, but are simply trusted as long as
-@code{sb-ext:*stack-allocate-dynamic-extent*} is true.
+SBCL has fairly extensive support for performing allocation on the
+stack when a variable is declared @code{dynamic-extent}. The
+@code{dynamic-extent} declarations are not verified, but are simply
+trusted as long as @code{sb-ext:*stack-allocate-dynamic-extent*} is
+true.
+
+@include var-sb-ext-star-stack-allocate-dynamic-extent-star.texinfo
 
 If dynamic extent constraints specified in the Common Lisp standard
 are violated, the best that can happen is for the program to have
 garbage in variables and return values; more commonly, the system will
 crash.
 
-@include var-sb-ext-star-stack-allocate-dynamic-extent-star.texinfo
+In particular, it is important to realize that dynamic extend is
+contagious:
+
+@lisp
+(let* ((a (list 1 2 3))
+       (b (cons a a)))
+   (declare (dynamic-extent b))
+   ;; Unless A is accessed elsewhere as well, SBCL will consider
+   ;; it to be otherwise inaccessible -- it can only be accessed
+   ;; through B, after all -- and stack allocate it as well.
+   ;;
+   ;; Hence returning (CAR B) here is unsafe.
+   ...)
+@end lisp
+
+This allows stack allocation of complex structures. As a notable
+exception to this, SBCL does not as of 1.0.48.21 propagate
+dynamic-extentness through @code{&rest} arguments -- but another
+conforming implementation might, so portable code should not rely on
+this.
+
+@lisp
+(declaim (inline foo))
+(defun foo (fun &rest arguments)
+  (declare (dynamic-extent arguments))
+  (apply fun arguments))
+
+(defun bar (a)
+  ;; SBCL will heap allocate the result of (LIST A), and stack allocate
+  ;; only the spine of the &rest list -- so this is safe, but unportable.
+  ;;
+  ;; Another implementation, including earlier versions of SBCL might consider
+  ;; (LIST A) to be otherwise inaccessible and stack-allocate it as well!
+  (foo #'car (list a)))
+@end lisp
 
 There are many cases when @code{dynamic-extent} declarations could be
 useful. At present, SBCL implements stack allocation for
@@ -120,11 +157,9 @@ only in zero @code{safety} policies.
 @cindex @code{safety} optimization quality
 @cindex optimization quality, @code{safety}
 closures defined with @code{flet} or @code{labels}, with a bound
-@code{dynamic-extent} declaration. Closed-over variables, which are
-assigned to (either inside or outside the closure) are still allocated
-on the heap. Blocks and tags are also allocated on the heap, unless
-all non-local control transfers to them are compiled with zero
-@code{safety}.
+@code{dynamic-extent} declaration. Blocks and tags are also allocated
+on the heap, unless all non-local control transfers to them are
+compiled with zero @code{safety}.
 
 @item
 user-defined structures when the structure constructor defined using
@@ -178,10 +213,6 @@ Examples:
 Future plans include
 
 @itemize
-
-@item
-Stack allocation of assigned-to closed-over variables, where these are
-declared @code{dynamic-extent};
 
 @item
 Automatic detection of the common idiom of applying a function to some

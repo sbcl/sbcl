@@ -223,7 +223,7 @@
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
-    (or (eq dx :truly)
+    (or (eq dx :always-dynamic)
         (zerop (policy node safety))
         ;; a vector object should fit in one page -- otherwise it might go past
         ;; stack guard pages.

@@ -913,3 +913,18 @@
         (return (bar))))))
 (with-test (:name :bug-681092)
   (assert (= 10 (bug-681092))))
+
+;;;; &REST lists should stop DX propagation -- not required by ANSI,
+;;;; but required by sanity.
+
+(declaim (inline rest-stops-dx))
+(defun-with-dx rest-stops-dx (&rest args)
+  (declare (dynamic-extent args))
+  (apply #'opaque-identity args))
+
+(defun-with-dx rest-stops-dx-ok ()
+  (equal '(:foo) (rest-stops-dx (list :foo))))
+
+(with-test (:name :rest-stops-dynamic-extent)
+  (assert (rest-stops-dx-ok)))
+

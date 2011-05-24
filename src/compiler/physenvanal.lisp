@@ -401,7 +401,7 @@
                                    (cond (closure
                                           (setq dx t))
                                          (t
-                                          (setf (leaf-dynamic-extent fun) nil)))))
+                                          (setf (leaf-extent fun) nil)))))
                                (when dx
                                  (setf (lvar-dynamic-extent arg) cleanup)
                                  (real-dx-lvars arg))))))

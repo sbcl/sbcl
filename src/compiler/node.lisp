@@ -632,9 +632,14 @@
   ;; be true when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type boolean)
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (dynamic-extent nil :type (member nil t :truly))
+  (extent nil :type (member nil :maybe-dynamic :always-dynamic :indefinite))
   ;; some kind of info used by the back end
   (info nil))
+
+(defun leaf-dynamic-extent (leaf)
+  (let ((extent (leaf-extent leaf)))
+    (unless (member extent '(nil :indefinite))
+      extent)))
 
 ;;; LEAF name operations
 ;;;
