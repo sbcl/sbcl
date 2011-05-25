@@ -112,7 +112,7 @@
                                        (and (equal (car spec) (car frame))
                                             (args-equal (cdr spec)
                                                         (cdr frame))))
-                             (print (list :mismatch spec frame))
+                             (print (list :wanted spec :got frame))
                              (setf result nil)))
                          frame-specs
                          backtrace)

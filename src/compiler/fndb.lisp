@@ -1395,6 +1395,8 @@
 
 ;;;; magical compiler frobs
 
+(defknown %values-list-or-context (t t t) * (always-translatable))
+
 (defknown %unary-truncate/single-float (single-float) integer (movable foldable flushable))
 (defknown %unary-truncate/double-float (double-float) integer (movable foldable flushable))
 

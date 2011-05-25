@@ -1409,10 +1409,13 @@ register."
                               args (incf i) vars))
                        res))
                 (sb!c::more-arg
-                 ;; Just ignore the fact that the next two args are
-                 ;; the &MORE arg context and count, and act like they
-                 ;; are regular arguments.
-                 nil)
+                 ;; The next two args are the &MORE arg context and count.
+                 (push (list :more
+                             (compiled-debug-fun-lambda-list-var
+                              args (incf i) vars)
+                             (compiled-debug-fun-lambda-list-var
+                              args (incf i) vars))
+                       res))
                 (t
                  ;; &KEY arg
                  (push (list :keyword

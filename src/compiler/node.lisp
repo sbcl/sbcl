@@ -1078,6 +1078,9 @@
   ;; the default for a keyword or optional, represented as the
   ;; original Lisp code. This is set to NIL in &KEY arguments that are
   ;; defaulted using the SUPPLIED-P arg.
+  ;;
+  ;; For &REST arguments this may contain information about more context
+  ;; the rest list comes from.
   (default nil :type t)
   ;; the actual key for a &KEY argument. Note that in ANSI CL this is
   ;; not necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ...).

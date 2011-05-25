@@ -464,27 +464,36 @@
       (if (and od (eq (optional-dispatch-main-entry od) fun))
           (let ((actual-vars (lambda-vars fun))
                 (saw-optional nil))
-            (dolist (arg (optional-dispatch-arglist od))
-              (let ((info (lambda-var-arg-info arg))
-                    (actual (pop actual-vars)))
-                (cond (info
-                       (case (arg-info-kind info)
-                         (:keyword
-                          (res (arg-info-key info)))
-                         (:rest
-                          (res 'rest-arg))
-                         (:more-context
-                          (res 'more-arg))
-                         (:optional
-                          (unless saw-optional
-                            (res 'optional-args)
-                            (setq saw-optional t))))
-                       (res (debug-location-for actual var-locs))
-                       (when (arg-info-supplied-p info)
-                         (res 'supplied-p)
-                         (res (debug-location-for (pop actual-vars) var-locs))))
-                      (t
-                       (res (debug-location-for actual var-locs)))))))
+            (labels ((one-arg (arg)
+                       (let ((info (lambda-var-arg-info arg))
+                             (actual (pop actual-vars)))
+                         (cond (info
+                                (case (arg-info-kind info)
+                                  (:keyword
+                                   (res (arg-info-key info)))
+                                  (:rest
+                                   (let ((more (arg-info-default info)))
+                                     (cond ((and (consp more) (third more))
+                                            (one-arg (first (arg-info-default info)))
+                                            (one-arg (second (arg-info-default info)))
+                                            (return-from one-arg))
+                                           (more
+                                            (setf (arg-info-default info) t)))
+                                     (res 'rest-arg)))
+                                  (:more-context
+                                   (res 'more-arg))
+                                  (:optional
+                                   (unless saw-optional
+                                     (res 'optional-args)
+                                     (setq saw-optional t))))
+                                (res (debug-location-for actual var-locs))
+                                (when (arg-info-supplied-p info)
+                                  (res 'supplied-p)
+                                  (res (debug-location-for (pop actual-vars) var-locs))))
+                                (t
+                                 (res (debug-location-for actual var-locs)))))))
+              (dolist (arg (optional-dispatch-arglist od))
+                (one-arg arg))))
           (dolist (var (lambda-vars fun))
             (res (debug-location-for var var-locs)))))
 

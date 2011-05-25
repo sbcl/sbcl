@@ -17,6 +17,10 @@ changes relative to sbcl-1.0.48:
     spines, not their argumets. While portable code should not rely on this,
     particularly in combination with inlining, it should make dynamic-extent
     easier and safer to use.
+  * optimization: using a &REST argument only in APPLY or VALUES-LIST calls
+    allows the compiler to automatically elide rest-list allocation so long
+    as the call sites are in functions that the compiler knows cannot escape.
+    (lp#504575)
   * bug fix: blocking reads from FIFOs created by RUN-PROGRAM were
     uninterruptible, as well as blocking reads from socket streams created
     with for which :SERVE-EVENTS NIL. (regression from 1.0.42.43)

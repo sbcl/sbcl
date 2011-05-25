@@ -247,6 +247,7 @@ thread, NIL otherwise."
                                               optional
                                               rest
                                               keyword
+                                              more
                                               deleted)
   `(etypecase ,element
      (sb!di:debug-var
@@ -255,7 +256,8 @@ thread, NIL otherwise."
       (ecase (car ,element)
         (:optional ,@optional)
         (:rest ,@rest)
-        (:keyword ,@keyword)))
+        (:keyword ,@keyword)
+        (:more ,@more)))
      (symbol
       (aver (eq ,element :deleted))
       ,@deleted)))
@@ -301,7 +303,19 @@ thread, NIL otherwise."
                           (return-from enumerating))
                         (push (make-unprintable-object
                                "unavailable &REST argument")
-                              reversed-result)))))
+                              reversed-result)))
+              :more ((lambda-var-dispatch (second element) location
+                         nil
+                         (let ((context (sb!di:debug-var-value (second element) frame))
+                               (count (sb!di:debug-var-value (third element) frame)))
+                           (setf reversed-result
+                                 (append (reverse
+                                          (multiple-value-list
+                                           (sb!c::%more-arg-values context 0 count)))
+                                         reversed-result))
+                           (return-from enumerating))
+                         (push (make-unprintable-object "unavailable &MORE argument")
+                               reversed-result)))))
            frame))
         (nreverse reversed-result))
     (sb!di:lambda-list-unavailable ()

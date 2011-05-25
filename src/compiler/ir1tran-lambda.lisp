@@ -544,8 +544,7 @@
       (arg-vars context-temp count-temp)
 
       (when rest
-        (arg-vals `(%listify-rest-args
-                    ,n-context ,n-count)))
+        (arg-vals `(%listify-rest-args ,n-context ,n-count)))
       (when morep
         (arg-vals n-context)
         (arg-vals n-count))
@@ -561,6 +560,7 @@
               (n-key (gensym "N-KEY-"))
               (n-value-temp (gensym "N-VALUE-TEMP-"))
               (n-allowp (gensym "N-ALLOWP-"))
+              (n-lose (gensym "N-LOSE-"))
               (n-losep (gensym "N-LOSEP-"))
               (allowp (or (optional-dispatch-allowp res)
                           (policy *lexenv* (zerop safety))))
@@ -603,12 +603,13 @@
                 (tests clause)))
 
             (unless allowp
-              (temps n-allowp n-losep)
+              (temps n-allowp n-lose n-losep)
               (unless found-allow-p
                 (tests `((eq ,n-key :allow-other-keys)
                          (setq ,n-allowp ,n-value-temp))))
               (tests `(t
-                       (setq ,n-losep (list ,n-key)))))
+                       (setq ,n-lose ,n-key
+                             ,n-losep t))))
 
             (body
              `(when (oddp ,n-count)
@@ -637,7 +638,7 @@
 
             (unless allowp
               (body `(when (and ,n-losep (not ,n-allowp))
-                       (%unknown-key-arg-error (car ,n-losep))))))))
+                       (%unknown-key-arg-error ,n-lose)))))))
 
       (let ((ep (ir1-convert-lambda-body
                  `((let ,(temps)
@@ -683,7 +684,23 @@
             (bind-vals))
     (when rest
       (main-vars rest)
-      (main-vals '()))
+      (main-vals '())
+      (unless (lambda-var-ignorep rest)
+        ;; Make up two extra variables, and squirrel them away in
+        ;; ARG-INFO-DEFAULT for transforming (VALUES-LIST REST) into
+        ;; (%MORE-ARG-VALUES CONTEXT 0 COUNT) when possible.
+        (let* ((context-name (gensym "REST-CONTEXT"))
+               (context (make-lambda-var :%source-name context-name
+                                         :arg-info (make-arg-info :kind :more-context)))
+               (count-name (gensym "REST-COUNT"))
+               (count (make-lambda-var :%source-name count-name
+                                       :arg-info (make-arg-info :kind :more-count)
+                                       :type (specifier-type 'index))))
+          (setf (arg-info-default (lambda-var-arg-info rest)) (list context count)
+                (lambda-var-ever-used context) t
+                (lambda-var-ever-used count) t)
+          (setf more-context context
+                more-count count))))
     (when more-context
       (main-vars more-context)
       (main-vals nil)

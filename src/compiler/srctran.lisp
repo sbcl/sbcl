@@ -3866,10 +3866,59 @@
 (define-source-transform apply (fun arg &rest more-args)
   (let ((args (cons arg more-args)))
     `(multiple-value-call ,fun
-       ,@(mapcar (lambda (x)
-                   `(values ,x))
-                 (butlast args))
+       ,@(mapcar (lambda (x) `(values ,x)) (butlast args))
        (values-list ,(car (last args))))))
+
+;;; When &REST argument are at play, we also have extra context and count
+;;; arguments -- convert to %VALUES-LIST-OR-CONTEXT when possible, so that the
+;;; deftransform can decide what to do after everything has been converted.
+(define-source-transform values-list (list)
+  (if (symbolp list)
+      (let* ((var (lexenv-find list vars))
+             (info (when (lambda-var-p var)
+                     (lambda-var-arg-info var))))
+        (if (and info
+                 (eq :rest (arg-info-kind info))
+                 (consp (arg-info-default info)))
+            (destructuring-bind (context count &optional used) (arg-info-default info)
+              (declare (ignore used))
+              `(%values-list-or-context ,list ,context ,count))
+            (values nil t)))
+      (values nil t)))
+
+(deftransform %values-list-or-context ((list context count) * * :node node)
+  (let* ((use (lvar-use list))
+         (var (when (ref-p use) (ref-leaf use)))
+         (home (when (lambda-var-p var) (lambda-var-home var)))
+         (info (when (lambda-var-p var) (lambda-var-arg-info var))))
+    (flet ((ref-good-for-more-context-p (ref)
+             (let ((dest (principal-lvar-end (node-lvar ref))))
+               (and (combination-p dest)
+                    ;; Uses outside VALUES-LIST will require a &REST list anyways,
+                    ;; to it's no use saving effort here -- plus they might modify
+                    ;; the list destructively.
+                    (eq '%values-list-or-context (lvar-fun-name (combination-fun dest)))
+                    ;; If the home lambda is different and isn't DX, it might
+                    ;; escape -- in which case using the more context isn't safe.
+                    (let ((clambda (node-home-lambda dest)))
+                      (or (eq home clambda)
+                          (leaf-dynamic-extent clambda)))))))
+      (let ((context-ok
+              (and info
+                   (consp (arg-info-default info))
+                   (not (lambda-var-specvar var))
+                   (not (lambda-var-sets var))
+                   (every #'ref-good-for-more-context-p (lambda-var-refs var)))))
+        (cond (context-ok
+               (destructuring-bind (context count &optional used) (arg-info-default info)
+                 (declare (ignore used))
+                 (setf (arg-info-default info) (list context count t)))
+               `(%more-arg-values context 0 count))
+              (t
+               (when info
+                 (setf (arg-info-default info) t))
+               `(values-list list)))))))
+
 
 ;;;; transforming FORMAT
 ;;;;

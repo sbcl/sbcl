@@ -215,11 +215,6 @@ Future plans include
 @itemize
 
 @item
-Automatic detection of the common idiom of applying a function to some
-defaults and a @code{&rest} list, even when this is not declared
-@code{dynamic-extent};
-
-@item
 Automatic detection of the common idiom of calling quantifiers with a
 closure, even when the closure is not declared @code{dynamic-extent}.
 
