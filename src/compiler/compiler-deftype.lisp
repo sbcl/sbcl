@@ -47,11 +47,7 @@
     (setf (info :type :source-location name) source-location))
   (when doc
     (setf (fdocumentation name 'type) doc))
-  ;; ### Bootstrap hack -- we need to define types before %NOTE-TYPE-DEFINED
-  ;; is defined. (FIXME: Do we still need to do this? -- WHN 19990310)
-  (if (fboundp 'sb!c::%note-type-defined)
-      (sb!c::%note-type-defined name)
-      (warn "defining type before %NOTE-TYPE-DEFINED is defined"))
+  (sb!c::%note-type-defined name)
   name)
 
 (/show0 "compiler-deftype.lisp end of file")
