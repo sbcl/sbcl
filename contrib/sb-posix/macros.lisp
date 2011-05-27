@@ -119,7 +119,7 @@ a FILE-STREAM designating the underlying file-descriptor."
                                       ,(car x))
                                     (car x)))
                               arguments))))
-            (if (,error-predicate r) (syscall-error) r))))
+            (if (,error-predicate r) (syscall-error ',lisp-name) r))))
       `(sb-int:style-warn "Didn't find definition for ~S" ,c-name)))
 
 (defmacro define-call (name return-type error-predicate &rest arguments)

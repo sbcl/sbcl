@@ -1,6 +1,6 @@
 (defpackage :sb-posix (:use #:sb-alien #:cl)
   (:shadow close open ftruncate truncate time read write)
-  (:export #:syscall-error #:syscall-errno
+  (:export #:syscall-error #:syscall-errno #:syscall-name
 
            ;; types and type conversion
            #:file-descriptor-designator

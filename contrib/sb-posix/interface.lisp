@@ -61,14 +61,20 @@
       (find-class ',name))))
 
 (define-condition sb-posix:syscall-error (error)
-  ((errno :initarg :errno :reader sb-posix:syscall-errno))
+  ((errno :initarg :errno :reader sb-posix:syscall-errno)
+   (name :initarg :name :initform nil :reader sb-posix:syscall-name))
   (:report (lambda (c s)
              (let ((errno (sb-posix:syscall-errno c)))
-               (format s "System call error ~A (~A)"
-                       errno (sb-int:strerror errno))))))
+               (format s "Error in ~S: ~A (~A)"
+                       (sb-posix:syscall-name c)
+                       (sb-int:strerror errno)
+                       errno)))))
 
-(defun syscall-error ()
-  (error 'sb-posix:syscall-error :errno (get-errno)))
+(declaim (ftype (function (symbol) nil) syscall-error))
+(defun syscall-error (name)
+  (error 'sb-posix:syscall-error
+         :name name
+         :errno (get-errno)))
 
 (defun unsupported-error (lisp-name c-name)
   (error "~S is unsupported by SBCL on this platform due to lack of ~A()."
@@ -195,7 +201,7 @@
                                                                        (function ,result-type system-area-pointer))
                                                          (sb-alien::vector-sap arg))))
                               (when (,errorp result)
-                                (syscall-error))
+                                (syscall-error ',lisp-name))
                               ;; FIXME: We'd rather return pathnames, but other
                               ;; SB-POSIX functions like this return strings...
                               (let ((pathname (sb-ext:octets-to-string
@@ -357,7 +363,7 @@ not supported."
       (with-growing-c-string (buf size)
         (let ((count (%readlink (filename pathspec) buf size)))
           (cond ((minusp count)
-                 (syscall-error))
+                 (syscall-error 'readlink))
                 ((< 0 count size)
                  (buf count))))))))
 
@@ -375,7 +381,7 @@ not supported."
           (cond (result
                  (buf))
                 ((/= (get-errno) sb-posix:erange)
-                 (syscall-error))))))))
+                 (syscall-error 'getcwd))))))))
 
 #-win32
 (progn
@@ -389,7 +395,7 @@ not supported."
                   (extern-alien "wait" (function pid-t (* int)))
                   (sb-sys:vector-sap ptr)))))
      (if (minusp pid)
-         (syscall-error)
+         (syscall-error 'wait)
          (values pid (aref ptr 0))))))
 
 #-win32
@@ -407,7 +413,7 @@ not supported."
                                                     pid-t (* int) int))
                   pid (sb-sys:vector-sap ptr) options))))
      (if (minusp pid)
-         (syscall-error)
+         (syscall-error 'waitpid)
          (values pid (aref ptr 0)))))
  ;; waitpid macros
  (define-call "wifexited" boolean never-fails (status int))
@@ -551,7 +557,7 @@ not supported."
                     (,designator-fun ,arg)
                     a-stat)))
             (when (minusp r)
-              (syscall-error))
+              (syscall-error ',lisp-name))
             (alien-to-stat a-stat stat)))))))
 
 (define-stat-call #-win32 "stat" #+win32 "_stat"
@@ -597,7 +603,7 @@ not supported."
                (extern-alien "pipe" (function int (* int)))
                (sb-sys:vector-sap filedes2)))))
      (when (minusp r)
-       (syscall-error)))
+       (syscall-error 'pipe)))
    (values (aref filedes2 0) (aref filedes2 1))))
 
 #-win32
@@ -630,7 +636,7 @@ not supported."
                    (function int int int (* alien-termios)))
                   fd actions a-termios)))
          (when (minusp r)
-           (syscall-error)))
+           (syscall-error 'tcsetattr)))
        (values))))
  (export 'tcgetattr :sb-posix)
  (declaim (inline tcgetattr))
@@ -643,7 +649,7 @@ not supported."
                (file-descriptor fd)
                a-termios)))
        (when (minusp r)
-         (syscall-error))
+         (syscall-error 'tcgetattr))
        (setf termios (alien-to-termios a-termios termios))))
    termios)
  (define-call "tcdrain" int minusp (fd file-descriptor))
@@ -662,7 +668,7 @@ not supported."
                a-termios
                speed)))
        (when (minusp r)
-         (syscall-error))
+         (syscall-error 'cfsetispeed))
        (setf termios (alien-to-termios a-termios termios))))
    termios)
  (export 'cfsetospeed :sb-posix)
@@ -676,7 +682,7 @@ not supported."
                a-termios
                speed)))
        (when (minusp r)
-         (syscall-error))
+         (syscall-error 'cfsetospeed))
        (setf termios (alien-to-termios a-termios termios))))
    termios)
  (export 'cfgetispeed :sb-posix)
@@ -707,7 +713,7 @@ not supported."
                                                (function time-t (* time-t)))
                                  nil)))
       (if (minusp result)
-          (syscall-error)
+          (syscall-error 'time)
           result)))
   (export 'utime :sb-posix)
   (defun utime (filename &optional access-time modification-time)
@@ -721,7 +727,7 @@ not supported."
                   (slot utimbuf 'modtime) (or modification-time 0))
             (let ((result (alien-funcall fun name (alien-sap utimbuf))))
               (if (minusp result)
-                  (syscall-error)
+                  (syscall-error 'utime)
                   result))))))
   (export 'utimes :sb-posix)
   (defun utimes (filename &optional access-time modification-time)
@@ -731,7 +737,7 @@ not supported."
                (values integer (cl:truncate (* fractional 1000000)))))
            (maybe-syscall-error (value)
              (if (minusp value)
-                 (syscall-error)
+                 (syscall-error 'utimes)
                  value)))
       (let ((fun (extern-alien "utimes" (function int (c-string :not-null t)
                                                   (* (array alien-timeval 2)))))
