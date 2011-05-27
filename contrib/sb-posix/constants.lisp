@@ -210,8 +210,8 @@
 #-sunos (:errno emediumtype "EMEDIUMTYPE" nil t)
 
  ;; wait
- (:integer wnohang "WNOHANG")
- (:integer wuntraced "WUNTRACED")
+ (:integer wnohang "WNOHANG" nil t)
+ (:integer wuntraced "WUNTRACED" nil t)
 
  ;; mode_t
  (:type mode-t "mode_t")
