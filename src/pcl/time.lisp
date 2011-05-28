@@ -99,12 +99,8 @@
 
 (defun expand-all-macros (form)
   (walk-form form nil (lambda (form context env)
-                        (if (and (eq context :eval)
-                                 (consp form)
-                                 (symbolp (car form))
-                                 (not (special-form-p (car form)))
-                                 (macro-function (car form)))
-                            (values (macroexpand form env))
+                        (if (eq context :eval)
+                            (values (%macroexpand form env))
                             form))))
 
 (push (cons "Macroexpand meth-structure-slot-value"

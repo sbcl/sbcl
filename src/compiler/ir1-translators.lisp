@@ -597,7 +597,7 @@ be a lambda expression."
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
   ;; extra cast inserted for them.
-  (let* ((function (sb!xc:macroexpand function *lexenv*))
+  (let* ((function (%macroexpand function *lexenv*))
          (op (when (consp function) (car function))))
     (cond ((eq op 'function)
            (compiler-destructuring-bind (thing) (cdr function)
@@ -916,6 +916,12 @@ is unable to derive from other declared types."
 ;;; whatever you tell it. It will never generate a type check, but
 ;;; will cause a warning if the compiler can prove the assertion is
 ;;; wrong.
+;;;
+;;; For the benefit of code-walkers we also add a macro-expansion. (Using INFO
+;;; directly to get around safeguards for adding a macro-expansion for special
+;;; operator.) Because :FUNCTION :KIND remains :SPECIAL-FORM, the compiler
+;;; never uses the macro -- but manually calling its MACRO-FUNCTION or
+;;; MACROEXPANDing TRULY-THE forms does.
 (def-ir1-translator truly-the ((value-type form) start next result)
   #!+sb-doc
   "Specifies that the values returned by FORM conform to the
@@ -926,6 +932,12 @@ Consequences are undefined if any result is not of the declared type
 -- typical symptoms including memory corruptions. Use with great
 care."
   (the-in-policy value-type form '((type-check . 0)) start next result))
+
+#-sb-xc-host
+(setf (info :function :macro-function 'truly-the)
+      (lambda (whole env)
+        (declare (ignore env))
+        `(the ,@(cdr whole))))
 
 ;;;; SETQ
 

@@ -42,7 +42,7 @@
            (constant-fopcompilable-p form))
       (and (symbolp form)
            (multiple-value-bind (macroexpansion macroexpanded-p)
-               (macroexpand form *lexenv*)
+               (%macroexpand form *lexenv*)
              (if macroexpanded-p
                  (fopcompilable-p macroexpansion)
                  ;; Punt on :ALIEN variables
@@ -51,7 +51,7 @@
       (and (listp form)
            (ignore-errors (list-length form))
            (multiple-value-bind (macroexpansion macroexpanded-p)
-               (macroexpand form *lexenv*)
+               (%macroexpand form *lexenv*)
              (if macroexpanded-p
                  (fopcompilable-p macroexpansion)
                  (destructuring-bind (operator &rest args) form
@@ -244,7 +244,7 @@
          (fopcompile-constant form for-value-p))
         ((symbolp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (sb!xc:macroexpand form *lexenv*)
+             (%macroexpand form *lexenv*)
            (if macroexpanded-p
                ;; Symbol macro
                (fopcompile macroexpansion path for-value-p)
@@ -276,7 +276,7 @@
                                         for-value-p))))))))))
         ((listp form)
          (multiple-value-bind (macroexpansion macroexpanded-p)
-             (sb!xc:macroexpand form *lexenv*)
+             (%macroexpand form *lexenv*)
            (if macroexpanded-p
                (fopcompile macroexpansion path for-value-p)
                (destructuring-bind (operator &rest args) form

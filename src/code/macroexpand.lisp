@@ -88,3 +88,21 @@
                    (frob new-form t)
                    (values new-form expanded)))))
     (frob form nil)))
+
+;;; Like MACROEXPAND-1, but takes care not to expand special forms.
+(defun %macroexpand-1 (form &optional env)
+  (if (or (atom form)
+          (let ((op (car form)))
+            (not (and (symbolp op) (sb!xc:special-operator-p op)))))
+      (sb!xc:macroexpand-1 form env)
+      (values form nil)))
+
+;;; Like MACROEXPAND, but takes care not to expand special forms.
+(defun %macroexpand (form &optional env)
+  (labels ((frob (form expanded)
+             (multiple-value-bind (new-form newly-expanded-p)
+                 (%macroexpand-1 form env)
+               (if newly-expanded-p
+                   (frob new-form t)
+                   (values new-form expanded)))))
+    (frob form nil)))

@@ -141,14 +141,11 @@ only."
   (declare (symbol symbol))
   (let* ((fenv (when env (lexenv-funs env)))
          (local-def (cdr (assoc symbol fenv))))
-    (cond (local-def
-           (if (and (consp local-def) (eq (car local-def) 'macro))
-               (cdr local-def)
-               nil))
-          ((eq (info :function :kind symbol) :macro)
-           (values (info :function :macro-function symbol)))
-          (t
-           nil))))
+    (if local-def
+        (if (and (consp local-def) (eq (car local-def) 'macro))
+            (cdr local-def)
+            nil)
+        (values (info :function :macro-function symbol)))))
 
 (defun (setf sb!xc:macro-function) (function symbol &optional environment)
   (declare (symbol symbol) (type function function))

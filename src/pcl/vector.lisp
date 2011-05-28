@@ -198,7 +198,7 @@
 ;;; Check whether the binding of the named variable is modified in the
 ;;; method body.
 (defun parameter-modified-p (parameter-name env)
-  (let ((modified-variables (macroexpand '%parameter-binding-modified env)))
+  (let ((modified-variables (%macroexpand '%parameter-binding-modified env)))
     (memq parameter-name modified-variables)))
 
 (defun optimize-slot-value (form slots required-parameters env)

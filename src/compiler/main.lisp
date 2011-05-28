@@ -1014,7 +1014,7 @@ Examples:
 ;;; We only expand one level, so that we retain all the intervening
 ;;; forms in the source path.
 (defun preprocessor-macroexpand-1 (form)
-  (handler-case (sb!xc:macroexpand-1 form *lexenv*)
+  (handler-case (%macroexpand-1 form *lexenv*)
     (error (condition)
       (compiler-error "(during macroexpansion of ~A)~%~A"
                       (let ((*print-level* 2)

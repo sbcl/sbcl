@@ -492,7 +492,7 @@
                 (multiple-value-bind (newnewform macrop)
                     (walker-environment-bind
                         (new-env env :walk-form newform)
-                      (sb-xc:macroexpand-1 newform new-env))
+                      (%macroexpand-1 newform new-env))
                   (cond
                    (macrop
                     (let ((newnewnewform (walk-form-internal newnewform
@@ -654,7 +654,7 @@
               (null (get-walker-template (car form) form))
               (progn
                 (multiple-value-setq (new-form macrop)
-                                     (sb-xc:macroexpand-1 form env))
+                                     (%macroexpand-1 form env))
                 macrop))
          ;; This form was a call to a macro. Maybe it expanded
          ;; into a declare?  Recurse to find out.

@@ -142,7 +142,8 @@
 (defknown macro-function (symbol &optional lexenv-designator)
   (or function null)
   (flushable))
-(defknown (macroexpand macroexpand-1) (t &optional lexenv-designator)
+(defknown (macroexpand macroexpand-1 %macroexpand %macroexpand-1)
+    (t &optional lexenv-designator)
   (values form &optional boolean))
 
 (defknown compiler-macro-function (t &optional lexenv-designator)

@@ -73,7 +73,7 @@ invoked. In that case it will store into PLACE and start over."
   ;; variable to work around Python's blind spot in type derivation.
   ;; For more complex places getting the type derived should not
   ;; matter so much anyhow.
-  (let ((expanded (sb!xc:macroexpand place env)))
+  (let ((expanded (%macroexpand place env)))
     (if (symbolp expanded)
         `(do ()
              ((typep ,place ',type))

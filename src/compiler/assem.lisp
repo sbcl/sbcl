@@ -1201,7 +1201,7 @@
                                body)))))))))
   (def sb!int:def!macro macroexpand)
   #+sb-xc-host
-  (def sb!xc:defmacro sb!xc:macroexpand))
+  (def sb!xc:defmacro %macroexpand))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
   #!+sb-doc

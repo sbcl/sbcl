@@ -898,6 +898,10 @@ possibly temporariliy, because it might be used internally."
                ;; hash mixing operations
                "MIX" "MIXF"
 
+               ;; Macroexpansion that doesn't touch special forms
+               "%MACROEXPAND"
+               "%MACROEXPAND-1"
+
                ;; I'm not convinced that FDEFINITIONs are the ideal
                ;; solution, so exposing ways to peek into the system
                ;; seems undesirable, since it makes it harder to get

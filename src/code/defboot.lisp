@@ -448,7 +448,7 @@ evaluated as a PROGN."
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if
 ;;; appropriate. Gross, but it's what the book seems to say...
 (defun munge-restart-case-expression (expression env)
-  (let ((exp (sb!xc:macroexpand expression env)))
+  (let ((exp (%macroexpand expression env)))
     (if (consp exp)
         (let* ((name (car exp))
                (args (if (eq name 'cerror) (cddr exp) (cdr exp))))

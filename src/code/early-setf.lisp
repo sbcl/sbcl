@@ -38,7 +38,7 @@
   (let (temp)
     (cond ((symbolp form)
            (multiple-value-bind (expansion expanded)
-               (sb!xc:macroexpand-1 form environment)
+               (%macroexpand-1 form environment)
              (if expanded
                  (sb!xc:get-setf-expansion expansion environment)
                  (let ((new-var (sb!xc:gensym "NEW")))
@@ -95,7 +95,7 @@ GET-SETF-EXPANSION directly."
                 expand-or-get-setf-inverse))
 (defun expand-or-get-setf-inverse (form environment)
   (multiple-value-bind (expansion expanded)
-      (sb!xc:macroexpand-1 form environment)
+      (%macroexpand-1 form environment)
     (if expanded
         (sb!xc:get-setf-expansion expansion environment)
         (get-setf-method-inverse form
@@ -599,12 +599,18 @@ GET-SETF-EXPANSION directly."
                  ,gnuval)
               `(mask-field ,btemp ,getter)))))
 
-(sb!xc:define-setf-expander the (type place &environment env)
+(defun setf-expand-the (the type place env)
   (declare (type sb!c::lexenv env))
   (multiple-value-bind (temps subforms store-vars setter getter)
       (sb!xc:get-setf-expansion place env)
     (values temps subforms store-vars
             `(multiple-value-bind ,store-vars
-                 (the ,type (values ,@store-vars))
+                 (,the ,type (values ,@store-vars))
                ,setter)
-            `(the ,type ,getter))))
+            `(,the ,type ,getter))))
+
+(sb!xc:define-setf-expander the (type place &environment env)
+  (setf-expand-the 'the type place env))
+
+(sb!xc:define-setf-expander truly-the (type place &environment env)
+  (setf-expand-the 'truly-the type place env))

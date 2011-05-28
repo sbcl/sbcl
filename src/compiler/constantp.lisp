@@ -29,7 +29,7 @@
 
 (defun %constantp (form environment envp)
   (let ((form (if envp
-                  (sb!xc:macroexpand form environment)
+                  (%macroexpand form environment)
                   form)))
     (typecase form
       ;; This INFO test catches KEYWORDs as well as explicitly
@@ -45,7 +45,7 @@
 
 (defun %constant-form-value (form environment envp)
   (let ((form (if envp
-                  (sb!xc:macroexpand form environment)
+                  (%macroexpand form environment)
                   form)))
     (typecase form
       (symbol

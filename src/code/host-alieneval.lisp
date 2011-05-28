@@ -160,7 +160,7 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun auxiliary-type-definitions (env)
     (multiple-value-bind (result expanded-p)
-        (sb!xc:macroexpand '&auxiliary-type-definitions& env)
+        (%macroexpand '&auxiliary-type-definitions& env)
       (if expanded-p
           result
           ;; This is like having the global symbol-macro definition be
@@ -1202,7 +1202,7 @@
   #!+sb-doc
   "Return an Alien pointer to the data addressed by Expr, which must be a call
    to SLOT or DEREF, or a reference to an Alien variable."
-  (let ((form (sb!xc:macroexpand expr env)))
+  (let ((form (%macroexpand expr env)))
     (or (typecase form
           (cons
            (case (car form)

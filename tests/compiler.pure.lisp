@@ -3882,3 +3882,13 @@
                       '(lambda ()
                         (eql (make-array 6)
                          (list unbound-variable-1 unbound-variable-2))))))))
+
+(with-test (:name :bug-771673)
+  (assert (equal `(the foo bar) (macroexpand `(truly-the foo bar))))
+  ;; Make sure the compiler doesn't use THE, and check that setf-expansions
+  ;; work.
+  (let ((f (compile nil `(lambda (x y)
+                           (setf (truly-the fixnum (car x)) y)))))
+    (let* ((cell (cons t t)))
+      (funcall f cell :ok)
+      (assert (equal '(:ok . t) cell)))))

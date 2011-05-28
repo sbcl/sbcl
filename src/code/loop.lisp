@@ -98,7 +98,7 @@
 
 (sb!int:defmacro-mundanely loop-collect-rplacd
     (&environment env (head-var tail-var &optional user-head-var) form)
-  (setq form (sb!xc:macroexpand form env))
+  (setq form (sb!int:%macroexpand form env))
   (flet ((cdr-wrap (form n)
            (declare (fixnum n))
            (do () ((<= n 4) (setq form `(,(case n
@@ -349,7 +349,7 @@ code to be loaded.
                                  (and (consp x)
                                       (or (not (eq (car x) 'car))
                                           (not (symbolp (cadr x)))
-                                          (not (symbolp (setq x (sb!xc:macroexpand x env)))))
+                                          (not (symbolp (setq x (sb!int:%macroexpand x env)))))
                                       (cons x nil)))
                                (cdr val))
                        `(,val))))
@@ -657,7 +657,7 @@ code to be loaded.
     ;;@@@@ ???? (declare (function list-size (list) fixnum))
     (cond ((constantp x) 1)
           ((symbolp x) (multiple-value-bind (new-form expanded-p)
-                           (sb!xc:macroexpand-1 x env)
+                           (sb!int:%macroexpand-1 x env)
                          (if expanded-p
                              (estimate-code-size-1 new-form env)
                              1)))
@@ -703,7 +703,7 @@ code to be loaded.
                           (member fn *estimate-code-size-punt*))
                       (throw 'estimate-code-size nil))
                      (t (multiple-value-bind (new-form expanded-p)
-                            (sb!xc:macroexpand-1 x env)
+                            (sb!int:%macroexpand-1 x env)
                           (if expanded-p
                               (estimate-code-size-1 new-form env)
                               (f 3))))))))

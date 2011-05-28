@@ -74,7 +74,7 @@
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
   (aver (constantp slot-name env))
-  (setq object (macroexpand object env))
+  (setq object (%macroexpand object env))
   (let* ((slot-name (constant-form-value slot-name env))
          (bind-object (unless (or (constantp new-value env) (atom new-value))
                         (let* ((object-var (gensym))
