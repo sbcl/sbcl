@@ -126,9 +126,7 @@ sufficiently motivated to do lengthy fixes."
              (handling-end-of-the-world
                (reinit)
                #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
-               (progn
-                 (funcall toplevel)
-                 (sb!ext:quit))))
+               (funcall toplevel)))
            (foreign-bool (value)
              (if value 1 0))
            (save-core (gc)
@@ -162,7 +160,11 @@ sufficiently motivated to do lengthy fixes."
            ;; Compact the environment even though we're skipping the
            ;; other purification stages.
            (sb!kernel::compact-environment-aux "Auxiliary" 200)
-           (save-core t)))))
+           (save-core t)))
+    ;; Something went very wrong -- reinitialize to have a prayer
+    ;; of being able to report the error.
+    (reinit)
+    (error "Could not save core.")))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)

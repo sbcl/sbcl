@@ -24,12 +24,23 @@ run_sbcl --script $tmpscript
 check_status_maybe_lose "--script exit status from QUIT" $? 7 "(quit status good)"
 
 echo '(error "oops")' > $tmpscript
-run_sbcl --script $tmpscript
+run_sbcl --script $tmpscript 2> /dev/null
 check_status_maybe_lose "--script exit status from ERROR" $? 1 "(error implies 1)"
 
 echo 'nil'> $tmpscript
 run_sbcl --script $tmpscript
 check_status_maybe_lose "--script exit status from normal exit" $? 0 "(everything ok)"
+
+cat > $tmpscript <<EOF
+(setf *standard-output* (open "/dev/stdout"))
+(close *standard-output*)
+(sb-ext:quit :unix-status 3)
+EOF
+cat $tmpscript
+run_sbcl --script $tmpscript
+check_status_maybe_lose "--script exit status from QUIT when stdout closed" $? 3 "(as given)"
+run_sbcl --load $tmpscript
+check_status_maybe_lose "--load exit status from QUIT when stdout closed" $? 3 "(as given)"
 
 rm -f $tmpscript
 

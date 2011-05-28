@@ -72,4 +72,10 @@
   (assert (equal (funcall fn 1) '(1)))
   (assert (equal (funcall fn 1 2 3) '(1 2 3))))
 
+;;; Failure to save a core is an error
+(with-test (:name :save-lisp-and-die-error)
+  (assert (eq :oops
+              (handler-case (save-lisp-and-die "/")
+                (error () :oops)))))
+
 ;;; success

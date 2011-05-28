@@ -121,11 +121,10 @@
                         ;; any way.  (Depends on running in the main
                         ;; thread.) FIXME: On Windows we get two
                         ;; extra foreign frames below regular frames.
-                        (let ((end (last backtrace #-win32 2 #+win32 4)))
-                          (unless (equal (caar end)
-                                         'sb-impl::toplevel-init)
-                            (print (list :backtrace-stunted (caar end)))
-                            (setf result nil)))
+                        (unless (find '(sb-impl::toplevel-init) backtrace
+                                      :test #'equal)
+                          (print (list :backtrace-stunted backtrace))
+                          (setf result nil))
                         (return-from outer-handler)))))
           (funcall test-function)))
       result)))

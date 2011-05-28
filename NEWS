@@ -36,6 +36,7 @@ changes relative to sbcl-1.0.48:
     1.0.43.57)
   * bug fix: TRULY-THE forms are now macroexpandable and setf-expandable.
     (lp#771673)
+  * bug fix: spurious errors during QUIT when standard streams were closed.
 
 changes in sbcl-1.0.48 relative to sbcl-1.0.47:
   * incompatible change: SB!KERNEL:INSTANCE-LAMBDA, deprecated for over five

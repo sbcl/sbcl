@@ -75,16 +75,28 @@ command-line.")
 ;;; handled appropriately.
 (defmacro handling-end-of-the-world (&body body)
   (with-unique-names (caught)
-    `(let ((,caught (catch '%end-of-the-world
-                      (/show0 "inside CATCH '%END-OF-THE-WORLD")
-                      (unwind-protect
-                           (progn ,@body)
-                        (call-hooks "exit" *exit-hooks*)))))
-      (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
-      (flush-standard-output-streams)
-      (sb!thread::terminate-session)
-      (/show0 "calling UNIX-EXIT")
-      (sb!unix:unix-exit ,caught))))
+    `(without-interrupts
+       (let ((,caught
+               (catch '%end-of-the-world
+                 (unwind-protect
+                      (with-local-interrupts ,@body (quit))
+                   (handler-case
+                       (with-local-interrupts
+                         (call-hooks "exit" *exit-hooks* :on-error :warn))
+                     (serious-condition ()
+                       1))))))
+         ;; If user called QUIT and exit hooks were OK, the status is what it
+         ;; is -- even eg. streams cannot be flushed anymore. Even if
+         ;; something goes wrong now, we still report what was asked. We still
+         ;; want to have %END-OF-THE-WORLD visible, though.
+         (catch '%end-of-the-world
+           (handler-case
+               (unwind-protect
+                    (progn
+                      (flush-standard-output-streams)
+                      (sb!thread::terminate-session))
+                 (sb!unix:unix-exit ,caught))
+             (serious-condition ())))))))
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 
@@ -289,8 +301,7 @@ any non-negative real number."
         ;; Scripts don't need to be stylish or fast, but silence is usually a
         ;; desirable quality...
         (handler-bind (((or style-warning compiler-note) #'muffle-warning))
-          (load f :verbose nil :print nil))
-        (quit)))))
+          (load f :verbose nil :print nil))))))
 
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
