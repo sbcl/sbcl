@@ -40,7 +40,10 @@
     (or (random-documentation x 'function)
         ;; Nothing under the name, check the function object.
         (when (fboundp x)
-          (fun-doc (or (macro-function x) (fdefinition x)))))))
+          (fun-doc (if (special-operator-p x)
+                       (fdefinition x)
+                       (or (macro-function x)
+                           (fdefinition x))))))))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
