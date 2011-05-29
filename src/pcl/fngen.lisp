@@ -89,7 +89,7 @@
 (defvar *fgens* (make-hash-table :test #'equal :synchronized t))
 
 (defun ensure-fgen (test gensyms generator generator-lambda system)
-  (with-locked-hash-table (*fgens*)
+  (with-locked-system-table (*fgens*)
     (let ((old (lookup-fgen test)))
       (cond (old
              (setf (fgen-generator old) generator)
@@ -164,7 +164,7 @@
 
 (defmacro precompile-function-generators (&optional system)
   (let (collect)
-    (with-locked-hash-table (*fgens*)
+    (with-locked-system-table (*fgens*)
       (maphash (lambda (test fgen)
                  (when (or (null (fgen-system fgen))
                            (eq (fgen-system fgen) system))

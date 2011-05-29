@@ -39,6 +39,10 @@
   (declare (ignore table))
   `(progn ,@body))
 
+(defmacro with-locked-system-table ((table) &body body)
+  (declare (ignore table))
+  `(progn ,@body))
+
 (defmacro defglobal (name value &rest doc)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (defparameter ,name

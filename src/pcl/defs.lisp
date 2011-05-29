@@ -595,7 +595,7 @@
 (defun intern-eql-specializer (object)
   ;; Need to lock, so that two threads don't get non-EQ specializers
   ;; for an EQL object.
-  (with-locked-hash-table (*eql-specializer-table*)
+  (with-locked-system-table (*eql-specializer-table*)
     (or (gethash object *eql-specializer-table*)
         (setf (gethash object *eql-specializer-table*)
               (make-instance 'eql-specializer :object object)))))

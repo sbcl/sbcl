@@ -66,7 +66,7 @@
   (let ((type (slot-definition-type slotd)))
     (values
      (when (and (neq t type) (safe-p (slot-definition-class slotd)))
-       (with-locked-hash-table (**typecheck-cache**)
+       (with-locked-system-table (**typecheck-cache**)
          (or (gethash type **typecheck-cache**)
              (setf (gethash type **typecheck-cache**)
                    (handler-bind (((or style-warning compiler-note)

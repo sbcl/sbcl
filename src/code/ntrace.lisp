@@ -660,7 +660,7 @@ are evaluated in the null environment."
       ((not fun)
        ;; Someone has FMAKUNBOUND it.
        (let ((table *traced-funs*))
-         (with-locked-hash-table (table)
+         (with-locked-system-table (table)
            (maphash (lambda (fun info)
                       (when (equal function-or-name (trace-info-what info))
                         (remhash fun table)))

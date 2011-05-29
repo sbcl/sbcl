@@ -75,7 +75,7 @@
 
 (defmacro with-package-names ((names &key) &body body)
   `(let ((,names *package-names*))
-     (with-locked-hash-table (,names)
+     (with-locked-system-table (,names)
        ,@body)))
 
 ;;;; PACKAGE-HASHTABLE stuff

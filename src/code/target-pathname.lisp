@@ -1361,7 +1361,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 ;;; a new one if necessary.
 (defun intern-logical-host (thing)
   (declare (values logical-host))
-  (with-locked-hash-table (*logical-hosts*)
+  (with-locked-system-table (*logical-hosts*)
     (or (find-logical-host thing nil)
         (let* ((name (logical-word-or-lose thing))
                (new (make-logical-host :name name)))

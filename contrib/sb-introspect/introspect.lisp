@@ -902,7 +902,7 @@ Experimental: interface subject to change."
                (funcall fun part))))
       (when ext
         (let ((table sb-pcl::*eql-specializer-table*))
-          (call (sb-ext:with-locked-hash-table (table)
+          (call (sb-int:with-locked-system-table (table)
                   (gethash object table)))))
       (etypecase object
         ((or bignum float sb-sys:system-area-pointer fixnum))

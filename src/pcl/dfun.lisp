@@ -1579,7 +1579,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     nil))
 
 ;;; Not synchronized, as all the uses we have for it are multiple ones
-;;; and need WITH-LOCKED-HASH-TABLE in any case.
+;;; and need WITH-LOCKED-SYSTEM-TABLE in any case.
 ;;;
 ;;; FIXME: Is it really more efficient to store this stuff in a global
 ;;; table instead of having a slot in each method?
@@ -1590,7 +1590,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun flush-effective-method-cache (generic-function)
   (let ((cache *effective-method-cache*))
-    (with-locked-hash-table (cache)
+    (with-locked-system-table (cache)
       (dolist (method (generic-function-methods generic-function))
         (remhash method cache)))))
 
@@ -1615,7 +1615,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (call-no-applicable-method gf args)))
       (let* ((key (car methods))
              (ht *effective-method-cache*)
-             (ht-value (with-locked-hash-table (ht)
+             (ht-value (with-locked-system-table (ht)
                          (or (gethash key ht)
                              (setf (gethash key ht) (cons nil nil))))))
         (if (and (null (cdr methods)) all-applicable-p ; the most common case

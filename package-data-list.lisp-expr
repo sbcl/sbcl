@@ -852,6 +852,9 @@ possibly temporariliy, because it might be used internally."
                ;; Stack allocation without any questions asked
                "TRULY-DYNAMIC-EXTENT"
 
+               ;; Like WITH-LOCKED-HASH-TABLE, but disabled interrupts
+               "WITH-LOCKED-SYSTEM-TABLE"
+
                ;; generic set implementation
                "ADD-TO-XSET"
                "ALLOC-XSET"

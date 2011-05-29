@@ -60,7 +60,7 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (/show0 "ensure-foreign-symbol-linkage")
-  (with-locked-hash-table (*linkage-info*)
+  (with-locked-system-table (*linkage-info*)
     (let ((info (or (gethash (cons name datap) *linkage-info*)
                     (link-foreign-symbol name datap))))
       (linkage-info-address info))))

@@ -705,7 +705,7 @@
 (defun find-classoid-cell (name &key create errorp)
   (let ((table *classoid-cells*)
         (real-name (uncross name)))
-    (or (with-locked-hash-table (table)
+    (or (with-locked-system-table (table)
           (or (gethash real-name table)
               (when create
                 (setf (gethash real-name table) (make-classoid-cell real-name)))))
@@ -827,7 +827,7 @@
 (defun insured-find-classoid (name predicate constructor)
   (declare (type function predicate constructor))
   (let ((table *forward-referenced-layouts*))
-    (with-locked-hash-table (table)
+    (with-locked-system-table (table)
       (let* ((old (find-classoid name nil))
              (res (if (and old (funcall predicate old))
                       old

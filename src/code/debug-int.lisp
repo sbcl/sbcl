@@ -309,7 +309,7 @@
 ;;; and retains roots to functions that might otherwise be collected.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
   (let ((table *compiled-debug-funs*))
-    (with-locked-hash-table (table)
+    (with-locked-system-table (table)
       (or (gethash compiler-debug-fun table)
           (setf (gethash compiler-debug-fun table)
                 (%make-compiled-debug-fun compiler-debug-fun component))))))

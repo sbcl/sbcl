@@ -461,7 +461,7 @@
                              ,@forms)))))
         `(let ((,n-table ,table))
            ,(if locked
-                `(with-locked-hash-table (,n-table)
+                `(with-locked-system-table (,n-table)
                    ,iter-form)
                 iter-form))))))
 
