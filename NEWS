@@ -1,29 +1,34 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.48:
-  * enhancement: source locations are now available for files loaded as source,
-    compile-time-too evaluation, and initialization files.
+  * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables
+    interrupts for its body.
+  * enhancement: source locations are now available for files loaded as
+    source, compile-time-too evaluation, and initialization files.
   * enhancement: WITH-COMPILATION-UNIT :SOURCE-NAMESTRING allows providing
     virtual source-file information, eg. overriding input-file of COMPILE-FILE
     when a temporary file is used for compilation.
   * enhancement: ASDF has been updated to version 2.015.3.
-  * enhancement: backtraces involving frames from the default evaluator
-    are more readable.
+  * enhancement: backtraces involving frames from the default evaluator are
+    more readable.
   * enhancement: RUN-PROGRAM works with user-defined binary input and output
     streams.
-  * enhancement: more informative compile-time warnings and runtime
-    errors for type-errors detected at compile-time.
+  * enhancement: more informative compile-time warnings and runtime errors for
+    type-errors detected at compile-time.
   * enhancement: deadlock detection for mutexes and spinlocks.
   * enhancement: dynamic-extent for &rest lists stack allocate only their
     spines, not their argumets. While portable code should not rely on this,
     particularly in combination with inlining, it should make dynamic-extent
-    easier and safer to use.
+    easier to use safely.
   * enhancement: SB-POSIX improvements:
     ** WNOHANG and WUNTRACED are exported.
     ** SYSCALL-ERROR now also provides the name of the failing system call.
   * optimization: using a &REST argument only in APPLY or VALUES-LIST calls
-    allows the compiler to automatically elide rest-list allocation so long
-    as the call sites are in functions that the compiler knows cannot escape.
+    allows the compiler to automatically elide rest-list allocation so long as
+    the call sites are in functions that the compiler knows cannot escape.
     (lp#504575)
+  * optimization: CALL-NEXT-METHOD using explicit arguments is faster,
+    especially in safe code when none of the required arguments have changed
+    their identities.
   * bug fix: blocking reads from FIFOs created by RUN-PROGRAM were
     uninterruptible, as well as blocking reads from socket streams created
     with for which :SERVE-EVENTS NIL. (regression from 1.0.42.43)
