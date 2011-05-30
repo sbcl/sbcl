@@ -32,6 +32,8 @@ changes relative to sbcl-1.0.48:
        standard input.
   * enhancement: MAKE-ALIEN-STRING provides an easy way to transport lisp
     strings to foreign memory.
+  * enhancement: (SETF GC-LOGFILE) allows logging garbage collections to
+    a file, making it easier to understand heap dynamics.
   * optimization: using a &REST argument only in APPLY or VALUES-LIST calls
     allows the compiler to automatically elide rest-list allocation so long as
     the call sites are in functions that the compiler knows cannot escape.

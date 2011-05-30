@@ -57,6 +57,8 @@ Extensions}.
 
 @include var-sb-ext-star-gc-run-time-star.texinfo
 @include fun-sb-ext-bytes-consed-between-gcs.texinfo
+@include fun-sb-ext-setf-gc-logfile.texinfo
+@include fun-sb-ext-gc-logfile.texinfo
 @include fun-sb-ext-generation-average-age.texinfo
 @include fun-sb-ext-generation-bytes-allocated.texinfo
 @include fun-sb-ext-generation-bytes-consed-between-gcs.texinfo

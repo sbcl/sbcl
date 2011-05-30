@@ -156,6 +156,30 @@ run in any thread.")
   (defun gc-stop-the-world ())
   (defun gc-start-the-world ()))
 
+#!+gencgc
+(progn
+  (sb!alien:define-alien-variable ("gc_logfile" %gc-logfile) (* char))
+  (defun (setf gc-logfile) (pathname)
+    "Use PATHNAME to log garbage collections. If non-null, the
+designated file is opened before and after each collection, and
+generation statistics are appended to it. To stop writing the log, use
+NIL as the pathname."
+    (let ((new (when pathname
+                 (sb!alien:make-alien-string
+                  (native-namestring (translate-logical-pathname pathname)
+                                     :as-file t))))
+          (old %gc-logfile))
+      (setf %gc-logfile new)
+      (when old
+        (sb!alien:free-alien old))))
+  (defun gc-logfile ()
+    "Return the name of the current GC logfile."
+    (let ((val %gc-logfile))
+      (when val
+        (native-pathname (cast val c-string)))))
+  (declaim (inline dynamic-space-size))
+  (defun dynamic-space-size ()
+    (sb!alien:extern-alien "dynamic_space_size" sb!alien:unsigned-long)))
 
 ;;;; SUB-GC
 

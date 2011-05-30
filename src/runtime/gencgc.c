@@ -433,10 +433,8 @@ generation_average_age(generation_index_t gen)
         / ((double)generations[gen].bytes_allocated);
 }
 
-/* The verbose argument controls how much to print: 0 for normal
- * level of detail; 1 for debugging. */
 extern void
-print_generation_stats() /* FIXME: should take FILE argument, or construct a string */
+write_generation_stats(FILE *file)
 {
     generation_index_t i;
 
@@ -453,7 +451,7 @@ print_generation_stats() /* FIXME: should take FILE argument, or construct a str
     fpu_save(fpu_state);
 
     /* Print the heap stats. */
-    fprintf(stderr,
+    fprintf(file,
             " Gen StaPg UbSta LaSta LUbSt Boxed Unboxed LB   LUB  !move  Alloc  Waste   Trig    WP  GCs Mem-age\n");
 
     for (i = 0; i < SCRATCH_GENERATION; i++) {
@@ -488,7 +486,7 @@ print_generation_stats() /* FIXME: should take FILE argument, or construct a str
 
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
-        fprintf(stderr,
+        fprintf(file,
                 "   %1d: %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
                 i,
                 generations[i].alloc_start_page,
@@ -508,10 +506,35 @@ print_generation_stats() /* FIXME: should take FILE argument, or construct a str
                 generations[i].num_gc,
                 generation_average_age(i));
     }
-    fprintf(stderr,"   Total bytes allocated    = %lu\n", bytes_allocated);
-    fprintf(stderr,"   Dynamic-space-size bytes = %u\n", dynamic_space_size);
+    fprintf(file,"   Total bytes allocated    = %lu\n", bytes_allocated);
+    fprintf(file,"   Dynamic-space-size bytes = %lu\n", (unsigned long)dynamic_space_size);
 
     fpu_restore(fpu_state);
+}
+
+extern void
+print_generation_stats()
+{
+    write_generation_stats(stderr);
+}
+
+extern char* gc_logfile;
+char * gc_logfile = NULL;
+
+extern void
+log_generation_stats(char *logfile, char *header)
+{
+    if (logfile) {
+        FILE * log = fopen(logfile, "a");
+        if (log) {
+            fprintf(log, "%s\n", header);
+            write_generation_stats(log);
+            fclose(log);
+        } else {
+            fprintf(stderr, "Could not open gc logile: %s\n", gc_logfile);
+            fflush(stderr);
+        }
+    }
 }
 
 
@@ -1165,15 +1188,15 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
             gc_active_p ? "garbage collection" : "allocation",
             available, requested);
     print_generation_stats();
-        fprintf(stderr, "GC control variables:\n");
-        fprintf(stderr, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
-                SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
-                (SymbolValue(GC_PENDING, thread) == T) ?
-                "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
-                  "false" : "in progress"));
+    fprintf(stderr, "GC control variables:\n");
+    fprintf(stderr, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
+            SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
+            (SymbolValue(GC_PENDING, thread) == T) ?
+            "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+                      "false" : "in progress"));
 #ifdef LISP_FEATURE_SB_THREAD
-        fprintf(stderr, "   *STOP-FOR-GC-PENDING* = %s\n",
-                SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
+    fprintf(stderr, "   *STOP-FOR-GC-PENDING* = %s\n",
+            SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
 #endif
     if (gc_active_p || (available == 0)) {
         /* If we are in GC, or totally out of memory there is no way
@@ -4259,6 +4282,7 @@ collect_garbage(generation_index_t last_gen)
     static page_index_t high_water_mark = 0;
 
     FSHOW((stderr, "/entering collect_garbage(%d)\n", last_gen));
+    log_generation_stats(gc_logfile, "=== GC Start ===");
 
     gc_active_p = 1;
 
@@ -4383,6 +4407,7 @@ collect_garbage(generation_index_t last_gen)
 
     gc_active_p = 0;
 
+    log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");
 }
 

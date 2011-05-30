@@ -609,6 +609,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "GENERATION-MINIMUM-AGE-BEFORE-GC"
                "GENERATION-NUMBER-OF-GCS"
                "GENERATION-NUMBER-OF-GCS-BEFORE-PROMOTION"
+               "GC-LOGFILE"
 
                ;; Stack allocation control
                "*STACK-ALLOCATE-DYNAMIC-EXTENT*"
