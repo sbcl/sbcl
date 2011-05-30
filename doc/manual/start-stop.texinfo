@@ -234,7 +234,9 @@ error SBCL will invoke ldb (if present and enabled) or else exit.
 As a runtime option this is equivalent to @code{--noinform}
 @code{--disable-ldb} @code{--lose-on-corruption}
 @code{--end-runtime-options} @code{--script} @var{filename}. See the
-description of @code{--script} as a toplevel option below.
+description of @code{--script} as a toplevel option below. If there
+are no other commandline arguments following @code{--script}, the
+filename argument can be omitted.
 
 @item --help
 Print some basic information about SBCL, then exit.
@@ -307,6 +309,16 @@ Implies @code{--no-userinit} @code{--no-sysinit}
 Causes the system to load the specified file instead of entering the
 read-eval-print-loop, and exit afterwards. If the file begins with a
 shebang line, it is ignored.
+
+If there are no other command line arguments following, the filename
+can be omitted: this causes the script to be loaded from standard
+input instead. Shebang lines in standard input script are currently
+@emph{not} ignored.
+
+In either case, if there is an unhandled error (eg. end of file, or a
+broken pipe) on either standard input, standard output, or standard
+error, the script silently exits with code 0. This allows eg. safely
+piping output from SBCL to @code{head -n1} or similar.
 
 @end table
 

@@ -22,6 +22,14 @@ changes relative to sbcl-1.0.48:
   * enhancement: SB-POSIX improvements:
     ** WNOHANG and WUNTRACED are exported.
     ** SYSCALL-ERROR now also provides the name of the failing system call.
+  * enhancement: --script improvements:
+    ** errors on standard input, output, and error streams are handled and
+       cause scripts to exit silently, making them easier to use in shell
+       pipelines.
+    ** backtraces from scripts now go to standard error instead of the
+       terminal even if one is available.
+    ** --script can be an argument, causing the script to be loaded from
+       standard input.
   * optimization: using a &REST argument only in APPLY or VALUES-LIST calls
     allows the compiler to automatically elide rest-list allocation so long as
     the call sites are in functions that the compiler knows cannot escape.

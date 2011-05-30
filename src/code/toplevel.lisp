@@ -294,14 +294,30 @@ any non-negative real number."
         (process-1 option)))))
 
 (defun process-script (script)
-  (let ((pathname (native-pathname script)))
+  (flet ((load-script (stream)
+           ;; Scripts don't need to be stylish or fast, but silence is usually a
+           ;; desirable quality...
+           (handler-bind (((or style-warning compiler-note) #'muffle-warning)
+                          (stream-error (lambda (e)
+                                          ;; Shell-style.
+                                          (when (member (stream-error-stream e)
+                                                        (list *stdout* *stdin* *stderr*))
+                                            (quit)))))
+             ;; Let's not use the *TTY* for scripts, ok? Also, normally we use
+             ;; synonym streams, but in order to have the broken pipe/eof error
+             ;; handling right we want to bind them for scripts.
+             (let ((*terminal-io* (make-two-way-stream *stdin* *stdout*))
+                   (*debug-io* (make-two-way-stream *stdin* *stderr*))
+                   (*standard-input* *stdin*)
+                   (*standard-output* *stdout*)
+                   (*error-output* *stderr*))
+               (load stream :verbose nil :print nil)))))
     (handling-end-of-the-world
-      (with-open-file (f pathname :element-type :default)
-        (sb!fasl::maybe-skip-shebang-line f)
-        ;; Scripts don't need to be stylish or fast, but silence is usually a
-        ;; desirable quality...
-        (handler-bind (((or style-warning compiler-note) #'muffle-warning))
-          (load f :verbose nil :print nil))))))
+      (if (eq t script)
+          (load-script *stdin*)
+          (with-open-file (f (native-pathname script) :element-type :default)
+            (sb!fasl::maybe-skip-shebang-line f)
+            (load-script f))))))
 
 ;; Errors while processing the command line cause the system to QUIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
@@ -365,7 +381,7 @@ any non-negative real number."
                     (setf disable-debugger t
                           no-userinit t
                           no-sysinit t
-                          script (pop-option))
+                          script (if options (pop-option) t))
                     (return))
                    ((string= option "--sysinit")
                     (pop-option)

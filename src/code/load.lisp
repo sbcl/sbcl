@@ -285,31 +285,33 @@
 
 ;;; Returns T if the stream is a binary input stream with a FASL header.
 (defun fasl-header-p (stream &key errorp)
-  (let ((p (file-position stream)))
-    (unwind-protect
-         (let* ((header *fasl-header-string-start-string*)
-                (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
-                (n 0))
-           (flet ((scan ()
-                    (maybe-skip-shebang-line stream)
-                    (setf n (read-sequence buffer stream))))
-             (if errorp
-                 (scan)
-                 (or (ignore-errors (scan))
-                     ;; no a binary input stream
-                     (return-from fasl-header-p nil))))
-           (if (mismatch buffer header
-                         :test #'(lambda (code char) (= code (char-code char))))
-               ;; Immediate EOF is valid -- we want to match what
-               ;; CHECK-FASL-HEADER does...
-               (or (zerop n)
-                   (when errorp
-                     (error 'fasl-header-missing
-                            :stream stream
-                            :fhsss buffer
-                            :expected header)))
-               t))
-      (file-position stream p))))
+  (unless (member (stream-element-type stream) '(character base-char))
+    (let ((p (file-position stream)))
+      (unwind-protect
+           (let* ((header *fasl-header-string-start-string*)
+                  (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
+                  (n 0))
+             (flet ((scan ()
+                      (maybe-skip-shebang-line stream)
+                      (setf n (read-sequence buffer stream))))
+               (if errorp
+                   (scan)
+                   (or (ignore-errors (scan))
+                       ;; no a binary input stream
+                       (return-from fasl-header-p nil))))
+             (if (mismatch buffer header
+                           :test #'(lambda (code char) (= code (char-code char))))
+                 ;; Immediate EOF is valid -- we want to match what
+                 ;; CHECK-FASL-HEADER does...
+                 (or (zerop n)
+                     (when errorp
+                       (error 'fasl-header-missing
+                              :stream stream
+                              :fhsss buffer
+                              :expected header)))
+                 t))
+        (file-position stream p)))))
+
 
 ;;;; LOAD-AS-FASL
 ;;;;

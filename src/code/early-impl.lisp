@@ -17,6 +17,10 @@
 ;;; slightly differently) elsewhere.
 (declaim (special *posix-argv*
                   *core-string*
+                  *stdin*
+                  *stdout*
+                  *stderr*
+                  *tty*
                   *read-only-space-free-pointer*
                   sb!vm:*static-space-free-pointer*
                   sb!vm::*current-catch-block*
