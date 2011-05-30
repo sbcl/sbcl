@@ -229,12 +229,38 @@
 
 (defmacro make-alien (type &optional size &environment env)
   #!+sb-doc
-  "Allocate an alien of type TYPE and return an alien pointer to it. If SIZE
-is supplied, how it is interpreted depends on TYPE. If TYPE is an array type,
-SIZE is used as the first dimension for the allocated array. If TYPE is not an
-array, then SIZE is the number of elements to allocate. The memory is
-allocated using ``malloc'', so it can be passed to foreign functions which use
-``free''."
+  "Allocate an alien of type TYPE in foreign heap, and return an alien
+pointer to it. The allocated memory is not initialized, and may
+contain garbage. The memory is allocated using malloc(3), so it can be
+passed to foreign functions which use free(3), or released using
+FREE-ALIEN.
+
+For alien stack allocation, see macro WITH-ALIEN.
+
+The TYPE argument is not evaluated. If SIZE is supplied, how it is
+interpreted depends on TYPE:
+
+  * When TYPE is a foreign array type, an array of that type is
+    allocated, and a pointer to it is returned. Note that you
+    must use DEREF to first access the arrey through the pointer.
+
+    If supplied, SIZE is used as the first dimension for the array.
+
+  * When TYPE is any other foreign type, then an object for that
+    type is allocated, and a pointer to it is returned. So
+    (make-alien int) returns a (* int).
+
+    If SIZE is specified, then a block of that many objects is
+    allocated, with the result pointing to the first one.
+
+Examples:
+
+  (defvar *foo* (make-alien (array char 10)))
+  (type-of *foo*)                 ; => (alien (* (array (signed 8) 10)))
+  (setf (deref (deref foo) 0) 10) ; => 10
+
+  (make-alien char 12)            ; => (alien (* (signed 8)))
+"
   (let ((alien-type (if (alien-type-p type)
                         type
                         (parse-alien-type type env))))
@@ -285,11 +311,51 @@ allocated using ``malloc'', so it can be passed to foreign functions which use
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
   #!+sb-doc
-  "Dispose of the storage pointed to by ALIEN. ALIEN must have been allocated
-   by MAKE-ALIEN or malloc(3)."
+  "Dispose of the storage pointed to by ALIEN. The ALIEN must have been
+allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
   (alien-funcall (extern-alien "free" (function (values) system-area-pointer))
                  (alien-sap alien))
   nil)
+
+(declaim (type (sfunction * system-area-pointer) %make-alien-string))
+(defun %make-alien-string (string &key (start 0) end
+                                       (external-format :default)
+                                       (null-terminate t))
+  ;; FIXME: This is slow. We want a function to get the length of the
+  ;; encoded string so we can allocate the foreign memory first and
+  ;; encode directly there.
+  (let* ((octets (string-to-octets string
+                                   :start start :end end
+                                   :external-format external-format
+                                   :null-terminate null-terminate))
+         (count (length octets))
+         (buf (%make-alien (* 8 count))))
+    (sb!kernel:copy-ub8-to-system-area octets 0 buf 0 count)
+    buf))
+
+(defun make-alien-string (string &rest rest
+                                 &key (start 0) end
+                                      (external-format :default)
+                                      (null-terminate t))
+  "Copy part of STRING delimited by START and END into freshly
+allocated foreign memory, freeable using free(3) or FREE-ALIEN.
+Returns the allocated string as a (* CHAR) alien, and the number of
+bytes allocated as secondary value.
+
+The string is encoded using EXTERNAL-FORMAT. If NULL-TERMINATE is
+true (the default), the alien string is terminated by an additional
+null byte.
+"
+  (declare (ignore start end external-format null-terminate))
+  (multiple-value-bind (sap bytes)
+      (apply #'%make-alien-string string rest)
+    (values (%sap-alien sap (parse-alien-type '(* char) nil))
+            bytes)))
+
+(define-compiler-macro make-alien-string (&rest args)
+  `(multiple-value-bind (sap bytes) (%make-alien-string ,@args)
+     (values (%sap-alien sap ',(parse-alien-type '(* char) nil))
+             bytes)))
 
 ;;;; the SLOT operator
 

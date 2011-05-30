@@ -319,4 +319,10 @@
                                     '(alien (c-string :not-null t))))
                     :ok))))))
 
+(with-test (:name :make-alien-string)
+  (let ((alien (sb-alien::make-alien-string "This comes from lisp!")))
+    (gc :full t)
+    (assert (equal "This comes from lisp!" (cast alien c-string)))
+    (free-alien alien)))
+
 ;;; success

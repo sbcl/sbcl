@@ -477,60 +477,15 @@ record type.
 @subsection Foreign Dynamic Allocation
 
 Lisp code can call the C standard library functions @code{malloc} and
-@code{free} to dynamically allocate and deallocate foreign
-variables. The Lisp code shares the same allocator with foreign C
-code, so it's OK for foreign code to call @code{free} on the result of
-Lisp @code{sb-alien:make-alien}, or for Lisp code to call
-@code{sb-alien:free-alien} on foreign objects allocated by C
-code.
+@code{free} to dynamically allocate and deallocate foreign variables.
+The Lisp code shares the same allocator with foreign C code, so it's
+OK for foreign code to call @code{free} on the result of Lisp
+@code{sb-alien:make-alien}, or for Lisp code to call
+@code{sb-alien:free-alien} on foreign objects allocated by C code.
 
-@defmac @sbalien{make-alien} @var{type} @var{size}
-
-The @code{sb-alien:make-alien} macro
-returns a dynamically allocated foreign value of the specified
-@var{type} (which is not evaluated.)  The allocated memory is not
-initialized, and may contain arbitrary junk.  If supplied,
-@var{size} is an expression to evaluate to compute the size of the
-allocated object.  There are two major cases:
-
-@itemize
-@item
-When @var{type} is a foreign array type, an array of that type is
-allocated and a pointer to it is returned.  Note that you must use
-@code{deref} to change the result to an array before you can use
-@code{deref} to read or write elements:
-
-@lisp
-(cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
-(defvar *foo* (make-alien (array char 10)))
-(type-of *foo*) @result{} (alien (* (array (signed 8) 10)))
-(setf (deref (deref foo) 0) 10) @result{} 10
-@end lisp
-
-If supplied, @var{size} is used as the first dimension for the
-    array.
-
-@item
-When @var{type} is any other foreign type, then an object for that
-type is allocated, and a pointer to it is returned.  So
-@code{(make-alien int)} returns a @code{(* int)}.  If @var{size} is
-specified, then a block of that many objects is allocated, with the
-result pointing to the first one.
-
-@end itemize
-
-@end defmac
-
-@defun @sbalien{free-alien} @var{foreign-value}
-
-The @code{sb-alien:free-alien} macro
-frees the storage for @var{foreign-value}, 
-which must have been allocated with Lisp @code{make-alien}
-or C @code{malloc}.
-
-See also the @code{sb-alien:with-alien} macro, which allocates foreign
-values on the stack.
-@end defun
+@include macro-sb-alien-make-alien.texinfo
+@include fun-sb-alien-make-alien-string.texinfo
+@include fun-sb-alien-free-alien.texinfo
 
 @node  Foreign Variables
 @comment  node-name,  next,  previous,  up

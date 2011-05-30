@@ -30,6 +30,8 @@ changes relative to sbcl-1.0.48:
        terminal even if one is available.
     ** --script can be an argument, causing the script to be loaded from
        standard input.
+  * enhancement: MAKE-ALIEN-STRING provides an easy way to transport lisp
+    strings to foreign memory.
   * optimization: using a &REST argument only in APPLY or VALUES-LIST calls
     allows the compiler to automatically elide rest-list allocation so long as
     the call sites are in functions that the compiler knows cannot escape.
