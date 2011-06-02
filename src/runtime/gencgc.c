@@ -513,7 +513,29 @@ write_generation_stats(FILE *file)
 }
 
 extern void
-print_generation_stats()
+write_heap_exhaustion_report(FILE *file, long available, long requested,
+                             struct thread *thread)
+{
+    fprintf(file,
+            "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
+            gc_active_p ? "garbage collection" : "allocation",
+            available,
+            requested);
+    write_generation_stats(file);
+    fprintf(file, "GC control variables:\n");
+    fprintf(file, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
+            SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
+            (SymbolValue(GC_PENDING, thread) == T) ?
+            "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+                      "false" : "in progress"));
+#ifdef LISP_FEATURE_SB_THREAD
+    fprintf(file, "   *STOP-FOR-GC-PENDING* = %s\n",
+            SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
+#endif
+}
+
+extern void
+print_generation_stats(void)
 {
     write_generation_stats(stderr);
 }
@@ -531,10 +553,27 @@ log_generation_stats(char *logfile, char *header)
             write_generation_stats(log);
             fclose(log);
         } else {
-            fprintf(stderr, "Could not open gc logile: %s\n", gc_logfile);
+            fprintf(stderr, "Could not open gc logfile: %s\n", logfile);
             fflush(stderr);
         }
     }
+}
+
+extern void
+report_heap_exhaustion(long available, long requested, struct thread *th)
+{
+    if (gc_logfile) {
+        FILE * log = fopen(gc_logfile, "a");
+        if (log) {
+            write_heap_exhaustion_report(log, available, requested, th);
+            fclose(log);
+        } else {
+            fprintf(stderr, "Could not open gc logfile: %s\n", gc_logfile);
+            fflush(stderr);
+        }
+    }
+    /* Always to stderr as well. */
+    write_heap_exhaustion_report(stderr, available, requested, th);
 }
 
 
@@ -1184,20 +1223,7 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
      * the danger that we bounce back here before the error has been
      * handled, or indeed even printed.
      */
-    fprintf(stderr, "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
-            gc_active_p ? "garbage collection" : "allocation",
-            available, requested);
-    print_generation_stats();
-    fprintf(stderr, "GC control variables:\n");
-    fprintf(stderr, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
-            SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
-            (SymbolValue(GC_PENDING, thread) == T) ?
-            "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
-                      "false" : "in progress"));
-#ifdef LISP_FEATURE_SB_THREAD
-    fprintf(stderr, "   *STOP-FOR-GC-PENDING* = %s\n",
-            SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
-#endif
+    report_heap_exhaustion(available, requested, thread);
     if (gc_active_p || (available == 0)) {
         /* If we are in GC, or totally out of memory there is no way
          * to sanely transfer control to the lisp-side of things.
