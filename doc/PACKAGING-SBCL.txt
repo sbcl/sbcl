@@ -1,19 +1,24 @@
 Packaging SBCL
 ==============
 
-If you package SBCL for a distribution, please edit version.lisp-expr,
-and append ".packaging-target-or-patch[.version]".
+If you package SBCL for distribution, we ask that you to take steps to
+make the version number reflect this. Our users often report bugs that
+are intimately tied up with configuration issues, and much confusion
+can result from mistaking a packaged SBCL for the upstream one.
+
+If you are working from a Git branch, all you need to do is make sure
+the branch name reflects the situation -- the build system will
+incorporate the it in the version string.
+
+If you are working from a release tarball, please edit
+version.lisp-expr, and append ".packaging-target-or-patch[.version]".
 
 Examples:
 
- "1.0.7.gentoo"
- "1.0.7.mikes-rpms.2"
+ "1.0.50.gentoo"
+ "1.0.50.mikes-rpms.2"
 
 This will make the startup banner, --version, and
 (lisp-implementation-version) all identify the packaged version
 correctly.
 
-We ask you to do this because users report bugs that are intimately
-tied up with configuration issues at regular intervals, and much
-confusion can result from mistaking a packaged SBCL for the upstream
-one.

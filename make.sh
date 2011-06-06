@@ -192,6 +192,9 @@ export DEVNULL
 . ./find-gnumake.sh
 find_gnumake
 
+. ./generate-version.sh
+generate_version
+
 # If you're cross-compiling, you should probably just walk through the
 # make-config.sh script by hand doing the right thing on both the host
 # and target machines.
