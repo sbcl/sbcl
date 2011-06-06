@@ -264,8 +264,7 @@
   (assert (verify-backtrace (lambda () (bug-354 354)) '((bug-354 354)))))
 
 ;;; FIXME: This test really should be broken into smaller pieces
-(with-test (:name (:backtrace :tl-xep)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :tl-xep))
   (with-details t
     (assert (verify-backtrace #'namestring
                               '(((sb-c::tl-xep namestring) 0 ?)))))
@@ -273,8 +272,7 @@
     (assert (verify-backtrace #'namestring
                               '((namestring))))))
 
-(with-test (:name (:backtrace :more-processor)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :more-processor))
   (with-details t
     (assert (verify-backtrace (lambda () (bt.1.1 :key))
                               '(((sb-c::&more-processor bt.1.1) &rest))))
@@ -290,8 +288,7 @@
     (assert (verify-backtrace (lambda () (bt.1.3 :key))
                               '((bt.1.3 &rest))))))
 
-(with-test (:name (:backtrace :xep)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :xep))
   (with-details t
     (assert (verify-backtrace #'bt.2.1
                               '(((sb-c::xep bt.2.1) 0 ?))))
@@ -307,8 +304,7 @@
     (assert (verify-backtrace #'bt.2.3
                               '((bt.2.3 &rest))))))
 
-(with-test (:name (:backtrace :varargs-entry)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :varargs-entry))
   (with-details t
     (assert (verify-backtrace #'bt.3.1
                               '(((sb-c::varargs-entry bt.3.1) :key nil))))
@@ -324,8 +320,7 @@
     (assert (verify-backtrace #'bt.3.3
                               '((bt.3.3 &rest))))))
 
-(with-test (:name (:backtrace :hairy-args-processor)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :hairy-args-processor))
   (with-details t
     (assert (verify-backtrace #'bt.4.1
                               '(((sb-c::hairy-arg-processor bt.4.1) ?))))
@@ -342,8 +337,7 @@
                               '((bt.4.3 &rest))))))
 
 
-(with-test (:name (:backtrace :optional-processor)
-                  :fails-on '(and :x86 (or :sunos)))
+(with-test (:name (:backtrace :optional-processor))
   (with-details t
     (assert (verify-backtrace #'bt.5.1
                               '(((sb-c::&optional-processor bt.5.1)))))
@@ -434,9 +428,9 @@
 ;;; This is not a WITH-TEST :FAILS-ON PPC DARWIN since there are
 ;;; suspicions that the breakpoint trace might corrupt the whole image
 ;;; on that platform.
-#-(and (or ppc x86 x86-64) (or darwin sunos))
 (with-test (:name (trace :encapsulate nil)
-            :fails-on '(or (and :ppc (not :linux)) :sparc :mips))
+            :fails-on '(or (and :ppc (not :linux)) :sparc :mips)
+	    :broken-on '(or :darwin :sunos))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-this :encapsulate nil)
                (assert (eq 'ok (trace-this)))
@@ -444,9 +438,9 @@
     (assert (search "TRACE-THIS" out))
     (assert (search "returned OK" out))))
 
-#-(and (or ppc x86 x86-64) darwin)
 (with-test (:name (trace-recursive :encapsulate nil)
-            :fails-on '(or (and :ppc (not :linux)) :sparc :mips :sunos))
+            :fails-on '(or (and :ppc (not :linux)) :sparc :mips :sunos)
+	    :broken-on '(or :darwin (and :x86 :sunos)))
   (let ((out (with-output-to-string (*trace-output*)
                (trace trace-fact :encapsulate nil)
                (assert (= 120 (trace-fact 5)))

@@ -249,8 +249,7 @@
               (simple-type-error () 'error)))
       t)))
 
-#+sb-eval
-(with-test (:name :bug-524707)
+(with-test (:name :bug-524707 :skipped-on '(not :sb-eval))
   (let ((*evaluator-mode* :interpret)
         (lambda-form '(lambda (x) (declare (fixnum x)) (1+ x))))
     (let ((fun (eval lambda-form)))

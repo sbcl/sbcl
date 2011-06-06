@@ -264,8 +264,7 @@
     ((foo (unsigned 32)))
   foo)
 
-#+(or x86-64 x86)
-(with-test (:name bug-316325)
+(with-test (:name bug-316325 :skipped-on '(not (or :x86-64 :x86)))
   ;; This test works by defining a callback function that provides an
   ;; identity transform over a full-width machine word, then calling
   ;; it as if it returned a narrower type and checking to see if any

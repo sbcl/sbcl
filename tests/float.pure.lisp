@@ -245,9 +245,10 @@
                                        (the (eql #c(1.0 2.0))
                                          x))))))))
 
-;; The x86 port used not to reduce the arguments of transcendentals
-;; correctly. On other platforms, we trust libm to DTRT.
-#+x86
+;; This was previously x86-only, with note:
+;;   The x86 port used not to reduce the arguments of transcendentals
+;;   correctly. On other platforms, we trust libm to DTRT.
+;; but it doesn't cost any real amount to just test them all
 (with-test (:name :range-reduction)
   (flet ((almost= (x y)
            (< (abs (- x y)) 1d-5)))
@@ -288,7 +289,8 @@
 ;; The tests are extremely brittle and could be broken by any number of
 ;; back- or front-end optimisations. We should just keep the issue above
 ;; in mind at all times when working with SSE or similar instruction sets.
-#+(or x86 x86-64) ;; No other platforms have SB-VM::TOUCH-OBJECT.
+;;
+;; Run only on x86/x86-64m as no other platforms have SB-VM::TOUCH-OBJECT.
 (macrolet ((with-pinned-floats ((count type &rest names) &body body)
              "Force COUNT float values to be kept live (and hopefully in registers),
               fill a temporary register with noise, and execute BODY."
@@ -313,7 +315,7 @@
                         (locally ,@body))
                     ,@(loop for var in dummy
                             collect `(sb-vm::touch-object ,var)))))))
-  (with-test (:name :clear-sqrtsd)
+  (with-test (:name :clear-sqrtsd :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-sqrtsd (float)
              (declare (optimize speed (safety 1))
                       (type (double-float (0d0)) float))
@@ -323,7 +325,7 @@
       (declare (notinline test-sqrtsd))
       (assert (zerop (imagpart (test-sqrtsd 4d0))))))
 
-  (with-test (:name :clear-sqrtsd-single)
+  (with-test (:name :clear-sqrtsd-single :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-sqrtsd-float (float)
              (declare (optimize speed (safety 1))
                       (type (single-float (0f0)) float))
@@ -333,7 +335,7 @@
       (declare (notinline test-sqrtsd-float))
       (assert (zerop (imagpart (test-sqrtsd-float 4f0))))))
 
-  (with-test (:name :clear-cvtss2sd)
+  (with-test (:name :clear-cvtss2sd :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-cvtss2sd (float)
              (declare (optimize speed (safety 1))
                       (type single-float float))
@@ -343,7 +345,7 @@
       (declare (notinline test-cvtss2sd))
       (assert (zerop (imagpart (test-cvtss2sd 1f0))))))
 
-  (with-test (:name :clear-cvtsd2ss)
+  (with-test (:name :clear-cvtsd2ss :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-cvtsd2ss (float)
              (declare (optimize speed (safety 1))
                       (type double-float float))
@@ -353,7 +355,7 @@
       (declare (notinline test-cvtsd2ss))
       (assert (zerop (imagpart (test-cvtsd2ss 4d0))))))
 
-  (with-test (:name :clear-cvtsi2sd)
+  (with-test (:name :clear-cvtsi2sd :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-cvtsi2sd (int)
              (declare (optimize speed (safety 0))
                       (type (unsigned-byte 10) int))
@@ -362,7 +364,7 @@
       (declare (notinline test-cvtsi2sd))
       (assert (zerop (imagpart (test-cvtsi2sd 4))))))
 
-  (with-test (:name :clear-cvtsi2ss)
+  (with-test (:name :clear-cvtsi2ss :skipped-on '(not (or :x86 :x86-64)))
     (flet ((test-cvtsi2ss (int)
              (declare (optimize speed (safety 0))
                       (type (unsigned-byte 10) int))

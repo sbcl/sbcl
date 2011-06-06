@@ -41,27 +41,35 @@
 (defun report ()
   (terpri)
   (format t "Finished running tests.~%")
-  (cond (*all-failures*
-         (format t "Status:~%")
-         (dolist (fail (reverse *all-failures*))
-           (cond ((eq (car fail) :unhandled-error)
-                  (format t " ~20a ~a~%"
-                          "Unhandled error"
-                          (enough-namestring (second fail))))
-                 ((eq (car fail) :invalid-exit-status)
-                  (format t " ~20a ~a~%"
-                          "Invalid exit status:"
-                          (enough-namestring (second fail))))
-                 (t
-                  (format t " ~20a ~a / ~a~%"
-                          (ecase (first fail)
-                            (:expected-failure "Expected failure:")
-                            (:unexpected-failure "Failure:")
-                            (:unexpected-success "Unexpected success:"))
-                          (enough-namestring (second fail))
-                          (third fail))))))
-        (t
-         (format t "All tests succeeded~%"))))
+  (let ((skipcount 0))
+    (cond (*all-failures*
+	   (format t "Status:~%")
+	   (dolist (fail (reverse *all-failures*))
+	     (cond ((eq (car fail) :unhandled-error)
+		    (format t " ~20a ~a~%"
+			    "Unhandled error"
+			    (enough-namestring (second fail))))
+		   ((eq (car fail) :invalid-exit-status)
+		    (format t " ~20a ~a~%"
+			    "Invalid exit status:"
+			    (enough-namestring (second fail))))
+		   ((eq (car fail) :skipped-disabled)
+		    (incf skipcount))
+		   (t
+		    (format t " ~20a ~a / ~a~%"
+			    (ecase (first fail)
+			      (:expected-failure "Expected failure:")
+			      (:unexpected-failure "Failure:")
+			      (:unexpected-success "Unexpected success:")
+			      (:skipped-broken "Skipped (broken):")
+			      (:skipped-disabled "Skipped (irrelevant):"))
+			    (enough-namestring (second fail))
+			    (third fail)))))
+	   (when (> skipcount 0)
+	     (format t " (~a tests skipped for this combination of platform and features)~%"
+		     skipcount)))
+	  (t
+	   (format t "All tests succeeded~%")))))
 
 (defun pure-runner (files test-fun)
   (format t "// Running pure tests (~a)~%" test-fun)
@@ -165,7 +173,9 @@
 (defun unexpected-failures ()
   (remove-if (lambda (x)
                (or (eq (car x) :expected-failure)
-                   (eq (car x) :unexpected-success)))
+                   (eq (car x) :unexpected-success)
+		   (eq (car x) :skipped-broken)
+		   (eq (car x) :skipped-disabled)))
              *all-failures*))
 
 (defun setup-cl-user ()

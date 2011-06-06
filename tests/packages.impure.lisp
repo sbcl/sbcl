@@ -290,8 +290,7 @@ if a restart was invoked."
                   :good)))))
 
 ;;; MAKE-PACKAGE error in another thread blocking FIND-PACKAGE & FIND-SYMBOL
-#+sb-thread
-(with-test (:name :bug-511072)
+(with-test (:name :bug-511072 :skipped-on '(not :sb-thread))
   (let* ((p (make-package :bug-511072))
          (sem (sb-thread:make-semaphore))
          (t2 (sb-thread:make-thread (lambda ()

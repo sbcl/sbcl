@@ -84,8 +84,7 @@
           (setq ok t)))
       (assert ok))))
 
-#+c-stack-is-control-stack
-(with-test (:name (:exhaust :alien-stack))
+(with-test (:name (:exhaust :alien-stack) :skipped-on '(not :c-stack-is-control-stack))
   (let ((ok nil))
     (labels ((exhaust-alien-stack (i)
                (with-alien ((integer-array (array int 500)))

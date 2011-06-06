@@ -531,8 +531,7 @@
 ;;; Reported by Willem Broekema: Reading #p"\\\\" caused an error due
 ;;; to insufficient sanity in input testing in EXTRACT-DEVICE (in
 ;;; src;code;win32-pathname).
-#+win32
-(with-test (:name :bug-489698)
+(with-test (:name :bug-489698 :skipped-on '(not :win32))
   (assert (equal (make-pathname :directory '(:absolute))
                  (read-from-string "#p\"\\\\\\\\\""))))
 

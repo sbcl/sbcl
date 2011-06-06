@@ -53,8 +53,7 @@
     (assert gc-happend)))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
-#+gencgc
-(with-test (:name :bug-529014)
+(with-test (:name :bug-529014 :skipped-on '(not :gencgc))
   ;; FIXME: These parameters are a) tunable in the source and b)
   ;; duplicated multiple times there and now here.  It would be good to
   ;; OAOO-ify them (probably to src/compiler/generic/params.lisp).

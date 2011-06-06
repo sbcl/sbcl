@@ -499,12 +499,10 @@
 
 (defvar *a-cons* (cons nil nil))
 
-#+stack-allocatable-closures
-(with-test (:name (:no-consing :dx-closures))
+(with-test (:name (:no-consing :dx-closures) :skipped-on '(not :stack-allocatable-closures))
   (assert-no-consing (dxclosure 42)))
 
-#+stack-allocatable-lists
-(with-test (:name (:no-consing :dx-lists))
+(with-test (:name (:no-consing :dx-lists) :skipped-on '(not :stack-allocatable-lists))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
   (assert-no-consing (dxlength))
@@ -520,8 +518,7 @@
 (with-test (:name (:no-consing :dx-value-cell))
   (assert-no-consing (dx-value-cell 13)))
 
-#+stack-allocatable-fixed-objects
-(with-test (:name (:no-consing :dx-fixed-objects))
+(with-test (:name (:no-consing :dx-fixed-objects) :skipped-on '(not :stack-allocatable-fixed-objects))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-foo1-on-stack 123))
   (assert-no-consing (nested-good 42))
@@ -529,8 +526,7 @@
   (assert-no-consing (dx-handler-bind 2))
   (assert-no-consing (dx-handler-case 2)))
 
-#+stack-allocatable-vectors
-(with-test (:name (:no-consing :dx-vectors))
+(with-test (:name (:no-consing :dx-vectors) :skipped-on '(not :stack-allocatable-vectors))
   (assert-no-consing (force-make-array-on-stack 128))
   (assert-no-consing (make-array-on-stack-1))
   (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
@@ -539,8 +535,7 @@
   (assert-no-consing (make-array-on-stack-5))
   (assert-no-consing (vector-on-stack :x :y)))
 
-#+raw-instance-init-vops
-(with-test (:name (:no-consing :dx-raw-instances) :fails-on :ppc)
+(with-test (:name (:no-consing :dx-raw-instances) :fails-on :ppc :skipped-on '(not :raw-instance-init-vops))
   (let (a b)
     (setf a 1.24 b 1.23d0)
     (assert-no-consing (make-foo2-on-stack a b)))
@@ -574,12 +569,10 @@
   (sb-thread:with-mutex (*mutex*)
     (true *mutex*)))
 
-#+sb-thread
-(with-test (:name (:no-consing :mutex) :fails-on :ppc)
+(with-test (:name (:no-consing :mutex) :fails-on :ppc :skipped-on '(not :sb-thread))
   (assert-no-consing (test-mutex)))
 
-#+sb-thread
-(with-test (:name (:no-consing :spinlock) :fails-on :ppc)
+(with-test (:name (:no-consing :spinlock) :fails-on :ppc :skipped-on '(not :sb-thread))
   (assert-no-consing (test-spinlock)))
 
 

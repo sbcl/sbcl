@@ -402,12 +402,10 @@
       (ignore-errors
         (delete-file file)))))
 
-#+sb-unicode
-(with-test (:name (:print-readable :character :utf-8))
+(with-test (:name (:print-readable :character :utf-8) :skipped-on '(not :sb-unicode))
   (test-readable-character (code-char #xfffe) :utf-8))
 
-#+sb-unicode
-(with-test (:name (:print-readable :character :iso-8859-1))
+(with-test (:name (:print-readable :character :iso-8859-1) :skipped-on '(not :sb-unicode))
   (test-readable-character (code-char #xfffe) :iso-8859-1))
 
 (assert (string= (eval '(format nil "~:C" #\a)) "a"))

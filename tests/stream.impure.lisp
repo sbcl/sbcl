@@ -610,8 +610,7 @@
 #-win32
 (require :sb-posix)
 
-#-win32
-(with-test (:name :interrupt-open)
+(with-test (:name :interrupt-open :skipped-on :win32)
   (let ((fifo nil)
         (to 0))
     (unwind-protect
@@ -641,8 +640,7 @@
 
 #-win32
 (require :sb-posix)
-#-win32
-(with-test (:name :overeager-character-buffering)
+(with-test (:name :overeager-character-buffering :skipped-on :win32)
   (let ((fifo nil)
         (proc nil))
     (maphash

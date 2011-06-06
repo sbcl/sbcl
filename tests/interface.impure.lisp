@@ -239,12 +239,10 @@
   (assert (not (setf (documentation 'docfoo 'function) nil)))
   (assert (string= (documentation 'docfoo 'function) "zot")))
 
-#+sb-doc
-(with-test (:name (documentation built-in-macro))
+(with-test (:name (documentation built-in-macro) :skipped-on '(not :sb-doc))
   (assert (documentation 'trace 'function)))
 
-#+sb-doc
-(with-test (:name (documentation built-in-function))
+(with-test (:name (documentation built-in-function) :skipped-on '(not :sb-doc))
   (assert (documentation 'cons 'function)))
 
 (with-test (:name :describe-generic-function-with-assumed-type)

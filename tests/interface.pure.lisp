@@ -65,8 +65,7 @@
 
 ;;; SLEEP should work with large integers as well -- no timers
 ;;; on win32, so don't test there.
-#-win32
-(with-test (:name (sleep pretty-much-forever))
+(with-test (:name (sleep pretty-much-forever) :skipped-on :win32)
   (assert (eq :timeout
               (handler-case
                   (sb-ext:with-timeout 1

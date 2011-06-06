@@ -31,8 +31,7 @@
               (assert (= (read-byte in) i)))
       (process-close process))))
 
-#+sb-thread
-(with-test (:name :run-program-cat-2)
+(with-test (:name :run-program-cat-2 :skipped-on '(not :sb-thread))
   ;; Tests that reading from a FIFO is interruptible.
   (let* ((process (sb-ext:run-program "/bin/cat" '()
                                       :wait nil
