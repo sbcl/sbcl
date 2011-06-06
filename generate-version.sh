@@ -34,14 +34,14 @@ generate_version() {
         exit 1
     fi
     # Build it.
-    version_head=$(git rev-parse HEAD)
+    version_head=`git rev-parse HEAD`
     if [ -z "$SBCL_BUILDING_RELEASE_FROM" ]
     then
         version_root="origin/master"
     else
         version_root="$SBCL_BUILDING_RELEASE_FROM"
     fi
-    version_base=$(git rev-parse "$version_root")
+    version_base=`git rev-parse "$version_root"`
     version_tag=`git describe --tags --match="sbcl*" --abbrev=0 $version_base`
     version_release=`echo $version_tag | sed -e 's/sbcl[_-]//' | sed -e 's/_/\./g'`
     version_n_root=`git rev-list $version_base --not $version_tag --count`
