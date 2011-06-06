@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# (Modified for SBCL.)
+#
 # Copyright (c) 2007 Andy Parkins
 #
 # An example hook script to mail out commit update information.  This hook
@@ -172,6 +174,11 @@ generate_email()
 	if [ -z "$describe" ]; then
 		describe=$rev
 	fi
+	# SBCL: Also grab the commit title.
+	title=$(git log -n1 --pretty=format:%s $rev)
+	if [ -z "$title" ]; then
+	        title=$rev
+	fi
 
 	generate_email_header
 
@@ -194,19 +201,24 @@ generate_email_header()
 {
 	# --- Email (all stdout will be the email)
 	# Generate header
+
+        # SBCL: branch updates get the commit title in the subject
+        if [ "branch" = "$refname_type" ] && [ "update" = "$change_type" ]
+	then
+	    subject="${emailprefix} $short_refname: $title"
+        else
+	    subject="${emailprefix} $refname_type $short_refname: ${change_type}d. $describe"
+	fi
+
 	cat <<-EOF
 	To: $recipients
-	Subject: ${emailprefix}$projectdesc $refname_type, $short_refname, ${change_type}d. $describe
+	Subject: $subject
 	X-Git-Refname: $refname
 	X-Git-Reftype: $refname_type
 	X-Git-Oldrev: $oldrev
 	X-Git-Newrev: $newrev
 
-	This is an automated email from the git hooks/post-receive script. It was
-	generated because a ref change was pushed to the repository containing
-	the project "$projectdesc".
-
-	The $refname_type, $short_refname has been ${change_type}d
+The $refname_type "$short_refname" has been ${change_type}d in $projectdesc:
 	EOF
 }
 
@@ -334,11 +346,17 @@ generate_update_branch_email()
 	# have already had notification emails and is present to show the
 	# full detail of the change from rolling back the old revision to
 	# the base revision and then forward to the new revision
-	for rev in $(git rev-list $oldrev..$newrev)
-	do
+	#
+	# For SBCL we skip this for branch updates, since we're getting
+	# one email per commit.
+	if [ "branch" != "$refname_type" ] || [ "update" != "$change_type" ]
+	then
+	    for rev in $(git rev-list $oldrev..$newrev)
+	    do
 		revtype=$(git cat-file -t "$rev")
 		echo "       via  $rev ($revtype)"
-	done
+	    done
+	fi
 
 	if [ "$fast_forward" ]; then
 		echo "      from  $oldrev ($oldrev_type)"
@@ -388,9 +406,11 @@ generate_update_branch_email()
 
 	echo ""
 	if [ -z "$rewind_only" ]; then
-		echo "Those revisions listed above that are new to this repository have"
-		echo "not appeared on any other notification email; so we list those"
-		echo "revisions in full, below."
+	        # Silenced for SBCL.
+	        #
+		# echo "Those revisions listed above that are new to this repository have"
+		# echo "not appeared on any other notification email; so we list those"
+		# echo "revisions in full, below."
 
 		echo ""
 		echo $LOGBEGIN
@@ -412,9 +432,14 @@ generate_update_branch_email()
 	# point - the user will be interested in what this revision changed
 	# - including the undoing of previous revisions in the case of
 	# non-fast-forward updates.
-	echo ""
-	echo "Summary of changes:"
-	git diff-tree --stat --summary --find-copies-harder $oldrev..$newrev
+        #
+        # Silenced for SBCL: we use "git show -p --stat -C %s" to generate
+        # revision information, getting the diffstat between the commit message
+        # and the diff. This would just duplicate that.
+        #
+	# echo ""
+	# echo "Summary of changes:"
+	# git diff-tree --stat --summary --find-copies-harder $oldrev..$newrev
 }
 
 #
@@ -621,12 +646,13 @@ show_new_revisions()
 
 	other_branches=$(git for-each-ref --format='%(refname)' refs/heads/ |
 	    grep -F -v $refname)
+	# SBCL: show oldest first via --reverse
 	git rev-parse --not $other_branches |
 	if [ -z "$custom_showrev" ]
 	then
-		git rev-list --pretty --stdin $revspec
+		git rev-list --reverse --pretty --stdin $revspec
 	else
-		git rev-list --stdin $revspec |
+		git rev-list --reverse --stdin $revspec |
 		while read onerev
 		do
 			eval $(printf "$custom_showrev" $onerev)
@@ -684,6 +710,25 @@ if [ -n "$1" -a -n "$2" -a -n "$3" ]; then
 else
 	while read oldrev newrev refname
 	do
-		generate_email $oldrev $newrev $refname | send_mail
+	  echo "Sending email for $refname: $oldrev -> $newrev"
+	  # SBCL KLUDGE: the default script sends one email per
+	  # push. We want one per commit. As long as we're
+	  # in fast-forward-only world, this should do the
+	  # right thing.
+	  if (expr "$oldrev" : '0*$' >/dev/null ||
+	      expr "$newrev" : '0*$' >/dev/null ||
+              ! expr "$refname" : "refs/heads/" > /dev/null)
+	  then
+	      # Just one email.
+	      generate_email $oldrev $newrev $refname | send_mail
+	  else
+	      # Branch update, one mail per commit.
+	      lastrev=$oldrev
+	      for step in $(git rev-list --reverse $oldrev..$newrev)
+	      do
+		generate_email $lastrev $step $refname | send_mail
+		lastrev=$step
+	      done
+	  fi
 	done
 fi
