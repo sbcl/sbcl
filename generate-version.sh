@@ -2,7 +2,22 @@
 # Not a shell script, but something intended to be sourced from shell scripts
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
-    (which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null)
+    if (which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null)
+    then
+        # Check that some of the newer git versions we use are supported.
+        if [ "0" != "$(git rev-list HEAD --not HEAD --count 2> /dev/null)" ]
+        then
+            echo "Too old a git installation."
+            echo
+            echo "Your git doesn't support --count option with git rev-list,"
+            echo "which SBCL build requires. Git 1.7.2 or later should work."
+            exit 1
+        else
+            true
+        fi
+    else
+        false
+    fi
 }
 
 generate_version() {
