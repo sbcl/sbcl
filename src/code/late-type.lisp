@@ -2403,14 +2403,8 @@ used for a COMPLEX component.~:@>"
          (values nil t))
         ((or (unknown-type-p (array-type-element-type type1))
              (unknown-type-p (array-type-element-type type2)))
-         (multiple-value-bind (equalp certainp)
-             (type= (array-type-element-type type1)
-                    (array-type-element-type type2))
-           ;; By its nature, the call to TYPE= should never return
-           ;; NIL, T, as we don't know what the UNKNOWN-TYPE will grow
-           ;; up to be.  -- CSR, 2002-08-19
-           (aver (not (and (not equalp) certainp)))
-           (values equalp certainp)))
+         (type= (array-type-element-type type1)
+                (array-type-element-type type2)))
         (t
          (values (type= (array-type-specialized-element-type type1)
                         (array-type-specialized-element-type type2))
