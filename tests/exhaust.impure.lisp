@@ -38,27 +38,27 @@
 ;;; Base-case: detecting exhaustion
 (with-test (:name (:exhaust :basic) :broken-on '(and :sunos :x86-64))
   (assert (eq :exhausted
-	      (handler-case
-		  (recurse)
-		(storage-condition (c)
-		  (declare (ignore c))
-		  :exhausted)))))
+              (handler-case
+                  (recurse)
+                (storage-condition (c)
+                  (declare (ignore c))
+                  :exhausted)))))
 
 ;;; Check that non-local control transfers restore the stack
 ;;; exhaustion checking after unwinding -- and that previous test
 ;;; didn't break it.
 (with-test (:name (:exhaust :non-local-control) :broken-on '(and :sunos :x86-64))
   (let ((exhaust-count 0)
-	(recurse-count 0))
+        (recurse-count 0))
     (tagbody
      :retry
        (handler-bind ((storage-condition (lambda (c)
-					   (declare (ignore c))
-					   (if (= *count* (incf exhaust-count))
-					       (go :stop)
-					       (go :retry)))))
-	 (incf recurse-count)
-	 (recurse))
+                                           (declare (ignore c))
+                                           (if (= *count* (incf exhaust-count))
+                                               (go :stop)
+                                               (go :retry)))))
+         (incf recurse-count)
+         (recurse))
      :stop)
     (assert (= exhaust-count recurse-count *count*))))
 
@@ -66,17 +66,17 @@
 ;;; unwind.
 (with-test (:name (:exhaust :restarts) :broken-on '(and :sunos :x86-64))
   (let ((exhaust-count 0)
-	(recurse-count 0))
+        (recurse-count 0))
     (block nil
       (handler-bind ((storage-condition (lambda (c)
-					  (declare (ignore c))
-					  (if (= *count* (incf exhaust-count))
-					      (return)
-					      (invoke-restart (find-restart 'ok))))))
-	(loop
-	   (with-simple-restart (ok "ok")
-	     (incf recurse-count)
-	     (recurse)))))
+                                          (declare (ignore c))
+                                          (if (= *count* (incf exhaust-count))
+                                              (return)
+                                              (invoke-restart (find-restart 'ok))))))
+        (loop
+           (with-simple-restart (ok "ok")
+             (incf recurse-count)
+             (recurse)))))
     (assert (= exhaust-count recurse-count *count*))))
 
 (with-test (:name (:exhaust :binding-stack))
