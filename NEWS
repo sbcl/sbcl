@@ -26,6 +26,9 @@ changes relative to sbcl-1.0.49:
     are of the order of ARRAY-TOTAL-SIZE-LIMIT. (lp#787237)
   * bug fix: the compiler no longer constant-folds NaNs in
     MAKE-{SINGLE,DOUBLE}-FLOAT. (lp#486812)
+  * bug fix: FORMAT now handles floating point rounding correct, eg.
+    (format nil "~,1F" 0.01) => "0.0" instead of "0.01" as previously.
+    (lp#308961)
 
 changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables
