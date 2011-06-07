@@ -12,6 +12,12 @@
 ;;;; more information.
 
 (cl:in-package :cl-user)
+
+(load "test-util.lisp")
+(load "assertoid.lisp")
+(use-package "TEST-UTIL")
+(use-package "ASSERTOID")
+
 
 ;;; Prior to sbcl-0.7.1.38, doing something like (RECURSE), even in
 ;;; safe code, would crash the entire Lisp process. Then the soft
@@ -30,45 +36,48 @@
 (defvar *count* 100)
 
 ;;; Base-case: detecting exhaustion
-(assert (eq :exhausted
-            (handler-case
-                (recurse)
-              (storage-condition (c)
-                (declare (ignore c))
-                :exhausted))))
+(with-test (:name (:exhaust :basic) :broken-on '(and :sunos :x86-64))
+  (assert (eq :exhausted
+	      (handler-case
+		  (recurse)
+		(storage-condition (c)
+		  (declare (ignore c))
+		  :exhausted)))))
 
 ;;; Check that non-local control transfers restore the stack
 ;;; exhaustion checking after unwinding -- and that previous test
 ;;; didn't break it.
-(let ((exhaust-count 0)
-      (recurse-count 0))
-  (tagbody
+(with-test (:name (:exhaust :non-local-control) :broken-on '(and :sunos :x86-64))
+  (let ((exhaust-count 0)
+	(recurse-count 0))
+    (tagbody
      :retry
-     (handler-bind ((storage-condition (lambda (c)
-                                         (declare (ignore c))
-                                         (if (= *count* (incf exhaust-count))
-                                             (go :stop)
-                                             (go :retry)))))
-       (incf recurse-count)
-       (recurse))
+       (handler-bind ((storage-condition (lambda (c)
+					   (declare (ignore c))
+					   (if (= *count* (incf exhaust-count))
+					       (go :stop)
+					       (go :retry)))))
+	 (incf recurse-count)
+	 (recurse))
      :stop)
-  (assert (= exhaust-count recurse-count *count*)))
+    (assert (= exhaust-count recurse-count *count*))))
 
 ;;; Check that we can safely use user-provided restarts to
 ;;; unwind.
-(let ((exhaust-count 0)
-      (recurse-count 0))
-  (block nil
-   (handler-bind ((storage-condition (lambda (c)
-                                       (declare (ignore c))
-                                       (if (= *count* (incf exhaust-count))
-                                           (return)
-                                           (invoke-restart (find-restart 'ok))))))
-      (loop
-       (with-simple-restart (ok "ok")
-         (incf recurse-count)
-         (recurse)))))
-  (assert (= exhaust-count recurse-count *count*)))
+(with-test (:name (:exhaust :restarts) :broken-on '(and :sunos :x86-64))
+  (let ((exhaust-count 0)
+	(recurse-count 0))
+    (block nil
+      (handler-bind ((storage-condition (lambda (c)
+					  (declare (ignore c))
+					  (if (= *count* (incf exhaust-count))
+					      (return)
+					      (invoke-restart (find-restart 'ok))))))
+	(loop
+	   (with-simple-restart (ok "ok")
+	     (incf recurse-count)
+	     (recurse)))))
+    (assert (= exhaust-count recurse-count *count*))))
 
 (with-test (:name (:exhaust :binding-stack))
   (let ((ok nil)
