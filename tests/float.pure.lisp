@@ -249,7 +249,8 @@
 ;;   The x86 port used not to reduce the arguments of transcendentals
 ;;   correctly. On other platforms, we trust libm to DTRT.
 ;; but it doesn't cost any real amount to just test them all
-(with-test (:name :range-reduction)
+(with-test (:name :range-reduction
+            :fails-on '(and :x86-64 (or :linux :darwin)))
   (flet ((almost= (x y)
            (< (abs (- x y)) 1d-5)))
     (macrolet ((foo (op value)
