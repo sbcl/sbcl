@@ -243,7 +243,7 @@ NIL as the pathname."
                (let ((*gc-inhibit* t))
                  (let ((old-usage (dynamic-usage))
                        (new-usage 0))
-                   (unsafe-clear-roots)
+                   (unsafe-clear-roots gen)
                    (gc-stop-the-world)
                    (let ((start-time (get-internal-run-time)))
                      (collect-garbage gen)
@@ -316,7 +316,7 @@ NIL as the pathname."
 
 (define-alien-routine scrub-control-stack sb!alien:void)
 
-(defun unsafe-clear-roots ()
+(defun unsafe-clear-roots (gen)
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
   ;; as having these cons more then we have space left leads to huge
   ;; badness.
@@ -324,10 +324,15 @@ NIL as the pathname."
   ;; Power cache of the bignum printer: drops overly large bignums and
   ;; removes duplicate entries.
   (scrub-power-cache)
-  ;; FIXME: CTYPE-OF-CACHE-CLEAR isn't thread-safe.
-  #!-sb-thread
-  (ctype-of-cache-clear))
-
+  ;; Clear caches depending on the generation being collected.
+  #!+gencgc
+  (cond ((eql 0 gen))
+        ((eql 1 gen)
+         (ctype-of-cache-clear))
+        (t
+         (drop-all-hash-caches)))
+  #!-gencgc
+  (drop-all-hash-caches))
 
 ;;;; auxiliary functions
 

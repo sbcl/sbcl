@@ -698,8 +698,7 @@ Experimental."
 (defun %note-type-defined (name)
   (declare (symbol name))
   (note-name-defined name :type)
-  (when (boundp 'sb!kernel::*values-specifier-type-cache-vector*)
-    (values-specifier-type-cache-clear))
+  (values-specifier-type-cache-clear)
   (values))
 
 

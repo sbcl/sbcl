@@ -520,14 +520,20 @@
 ;;;   the specified name. (:INIT-WRAPPER is set to COLD-INIT-FORMS
 ;;;   in type system definitions so that caches will be created
 ;;;   before top level forms run.)
+(defvar *cache-vector-symbols* nil)
+
+(defun drop-all-hash-caches ()
+  (dolist (name *cache-vector-symbols*)
+    (set name nil)))
+
 (defmacro define-hash-cache (name args &key hash-function hash-bits default
                                   (init-wrapper 'progn)
                                   (values 1))
-  (let* ((var-name (symbolicate "*" name "-CACHE-VECTOR*"))
+  (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
          (probes-name (when *profile-hash-cache*
-                       (symbolicate "*" name "-CACHE-PROBES*")))
+                       (symbolicate "**" name "-CACHE-PROBES**")))
          (misses-name (when *profile-hash-cache*
-                      (symbolicate "*" name "-CACHE-MISSES*")))
+                      (symbolicate "**" name "-CACHE-MISSES**")))
          (nargs (length args))
          (size (ash 1 hash-bits))
          (default-values (if (and (consp default) (eq (car default) 'values))
@@ -577,23 +583,26 @@
          `(defun ,fun-name ,(arg-vars)
             ,@(when *profile-hash-cache*
                 `((incf ,probes-name)))
-            (let* ((,n-index (,hash-function ,@(arg-vars)))
-                   (,n-cache ,var-name)
-                   (,args-and-values (svref ,n-cache ,n-index)))
-              (cond ((and ,args-and-values
-                          ,@(tests))
-                     (values ,@(values-refs)))
-                    (t
+            (flet ((miss ()
                      ,@(when *profile-hash-cache*
                          `((incf ,misses-name)))
-                     ,default))))))
+                     (return-from ,fun-name ,default)))
+              (let* ((,n-index (,hash-function ,@(arg-vars)))
+                     (,n-cache (or ,var-name (miss)))
+                     (,args-and-values (svref ,n-cache ,n-index)))
+                (cond ((and (not (eql 0 ,args-and-values))
+                            ,@(tests))
+                       (values ,@(values-refs)))
+                      (t
+                       (miss))))))))
 
       (let ((fun-name (symbolicate name "-CACHE-ENTER")))
         (inlines fun-name)
         (forms
          `(defun ,fun-name (,@(arg-vars) ,@(values-names))
             (let ((,n-index (,hash-function ,@(arg-vars)))
-                  (,n-cache ,var-name)
+                  (,n-cache (or ,var-name
+                                (setq ,var-name (make-array ,size :initial-element 0))))
                   (,args-and-values (make-array ,args-and-values-size)))
               ,@(sets)
               (setf (svref ,n-cache ,n-index) ,args-and-values))
@@ -602,19 +611,19 @@
       (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
         (forms
          `(defun ,fun-name ()
-            (fill ,var-name nil)))
-        (forms `(,fun-name)))
+            (setq ,var-name nil))))
 
-      (inits `(unless (boundp ',var-name)
-                (setq ,var-name (make-array ,size :initial-element nil))))
+      ;; Needed for cold init!
+      (inits `(setq ,var-name nil))
       #!+sb-show (inits `(setq *hash-caches-initialized-p* t))
 
       `(progn
-         (defvar ,var-name)
+         (pushnew ',var-name *cache-vector-symbols*)
+         (defglobal ,var-name nil)
          ,@(when *profile-hash-cache*
-             `((defvar ,probes-name)
-               (defvar ,misses-name)))
-         (declaim (type (simple-vector ,size) ,var-name))
+             `((defglobal ,probes-name 0)
+               (defglobal ,misses-name 0)))
+         (declaim (type (or null (simple-vector ,size)) ,var-name))
          #!-sb-fluid (declaim (inline ,@(inlines)))
          (,init-wrapper ,@(inits))
          ,@(forms)

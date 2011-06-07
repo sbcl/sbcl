@@ -1082,6 +1082,7 @@ possibly temporariliy, because it might be used internally."
                "DEFINE-HASH-CACHE"
                "DEFUN-CACHED"
                "DEFINE-CACHED-SYNONYM"
+               "DROP-ALL-HASH-CACHES"
 
                ;; time
                "FORMAT-DECODED-TIME"
