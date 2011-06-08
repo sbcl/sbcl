@@ -11,7 +11,7 @@
 
 .PHONY: all clean TAGS tags targets
 
-all: targets
+all: targets tags
 TARGET=sbcl
 
 # Defaults which might be overridden or modified by values in the
