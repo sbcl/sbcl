@@ -209,6 +209,11 @@
             (replace name x :start1 index)
             (incf index len)))))))
 
+(defun gensymify (x)
+  (if (symbolp x)
+      (sb!xc:gensym (symbol-name x))
+      (sb!xc:gensym)))
+
 ;;; like SYMBOLICATE, but producing keywords
 (defun keywordicate (&rest things)
   (let ((*package* *keyword-package*))

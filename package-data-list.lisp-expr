@@ -597,8 +597,14 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*USERINIT-PATHNAME-FUNCTION*"
                "*SYSINIT-PATHNAME-FUNCTION*"
 
-               ;; Atomic operations and types related to them
+               ;; Compare and Swap support
+               "CAS"
                "COMPARE-AND-SWAP"
+               "DEFCAS"
+               "DEFINE-CAS-EXPANDER"
+               "GET-CAS-EXPANSION"
+
+               ;; Other atomic operations and types related to them
                "ATOMIC-INCF"
                "ATOMIC-DECF"
                "WORD"
@@ -1091,7 +1097,7 @@ possibly temporariliy, because it might be used internally."
                "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
 
                ;; symbol-hacking idioms
-               "KEYWORDICATE" "SYMBOLICATE"
+               "GENSYMIFY" "KEYWORDICATE" "SYMBOLICATE"
 
                ;; certainly doesn't belong in public extensions
                ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?

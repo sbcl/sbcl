@@ -93,7 +93,7 @@
       (cond ((sb!xc:constantp x environment)
              (push x args))
             (t
-             (let ((temp (gensym "TMP")))
+             (let ((temp (gensymify x)))
                (push temp args)
                (push temp vars)
                (push x vals)))))

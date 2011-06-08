@@ -749,6 +749,8 @@
  ("src/code/macros")
  ("src/code/loop")
  ("src/code/late-setf")
+ ("src/code/cas")
+ ("src/code/late-cas")
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; other target-code-building stuff which can't be processed until

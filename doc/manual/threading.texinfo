@@ -107,6 +107,16 @@ useful for implementing lockless algorithms.
 @include macro-sb-ext-atomic-incf.texinfo
 @include macro-sb-ext-compare-and-swap.texinfo
 
+@subsection CAS Protocol
+
+Our @code{compare-and-swap} is user-extensible using a protocol similar
+to @code{setf}:
+
+@include macro-sb-ext-cas.texinfo
+@include macro-sb-ext-define-cas-expander.texinfo
+@include macro-sb-ext-defcas.texinfo
+@include fun-sb-ext-get-cas-expansion.texinfo
+
 @node Mutex Support
 @comment  node-name,  next,  previous,  up
 @section Mutex Support

@@ -35,7 +35,8 @@
 
 ;;;; the primitive objects themselves
 
-(define-primitive-object (cons :lowtag list-pointer-lowtag
+(define-primitive-object (cons :type cons
+                               :lowtag list-pointer-lowtag
                                :alloc-trans cons)
   (car :ref-trans car :set-trans sb!c::%rplaca :init :arg
        :cas-trans %compare-and-swap-car)
@@ -309,7 +310,8 @@
 
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-header-widetag
-                                 :alloc-trans %make-symbol)
+                                 :alloc-trans %make-symbol
+                                 :type symbol)
 
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons

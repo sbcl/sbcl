@@ -35,32 +35,24 @@ WITH-CAS-LOCK can be entered recursively."
      (%with-cas-lock (,place) ,@body)))
 
 (defmacro %with-cas-lock ((place) &body body &environment env)
-  (with-unique-names (self owner)
-    ;; Take care not to multiply-evaluate anything.
-    ;;
-    ;; FIXME: Once we get DEFCAS this can use GET-CAS-EXPANSION.
-    (let* ((placex (sb!xc:macroexpand place env))
-           (place-op (if (consp placex)
-                         (car placex)
-                         (error "~S: ~S is not a valid place for ~S"
-                                'with-cas-lock
-                                place 'sb!ext:compare-and-swap)))
-           (place-args (cdr placex))
-           (temps (make-gensym-list (length place-args) t))
-           (place `(,place-op ,@temps)))
-      `(let* (,@(mapcar #'list temps place-args)
+  (with-unique-names (owner self)
+    (multiple-value-bind (vars vals old new cas-form read-form)
+        (sb!ext:get-cas-expansion place env)
+      `(let* (,@(mapcar #'list vars vals)
+              (,owner ,read-form)
               (,self *current-thread*)
-              (,owner ,place))
+              (,old nil)
+              (,new ,self))
          (unwind-protect
               (progn
                 (unless (eq ,owner ,self)
-                  (loop while (setf ,owner
-                                    (or ,place
-                                        (sb!ext:compare-and-swap ,place nil ,self)))
+                  (loop while (setf ,owner (or ,read-form ,cas-form))
                         do (thread-yield)))
                 ,@body)
            (unless (eq ,owner ,self)
-             (sb!ext:compare-and-swap ,place ,self nil)))))))
+             (let ((,old ,self)
+                   (,new nil))
+               ,cas-form)))))))
 
 ;;; Conditions
 

@@ -68,9 +68,12 @@
 
 ;;;; STANDARD-INSTANCE-ACCESS
 
-(declaim (inline standard-instance-access (setf standard-instance-access)
+(declaim (inline standard-instance-access
+                 (setf standard-instance-access)
+                 (cas stadard-instance-access)
                  funcallable-standard-instance-access
-                 (setf funcallable-standard-instance-access)))
+                 (setf funcallable-standard-instance-access)
+                 (cas funcallable-standard-instance-access)))
 
 (defun standard-instance-access (instance location)
   (clos-slots-ref (std-instance-slots instance) location))
@@ -78,11 +81,19 @@
 (defun (setf standard-instance-access) (new-value instance location)
   (setf (clos-slots-ref (std-instance-slots instance) location) new-value))
 
+(defun (cas standard-instance-access) (old-value new-value instance location)
+  ;; FIXME: Maybe get rid of CLOS-SLOTS-REF entirely?
+  (cas (svref (std-instance-slots instance) location) old-value new-value))
+
 (defun funcallable-standard-instance-access (instance location)
   (clos-slots-ref (fsc-instance-slots instance) location))
 
 (defun (setf funcallable-standard-instance-access) (new-value instance location)
   (setf (clos-slots-ref (fsc-instance-slots instance) location) new-value))
+
+(defun (cas funcallable-standard-instance-access) (old-value new-value instance location)
+  ;; FIXME: Maybe get rid of CLOS-SLOTS-REF entirely?
+  (cas (svref (fsc-instance-slots instance) location) old-value new-value))
 
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
@@ -164,6 +175,34 @@
            (not (safe-code-p env)))
       `(accessor-set-slot-value ,object ,slot-name ,new-value)
       form))
+
+(defun (cas slot-value) (old-value new-value object slot-name)
+  (let* ((wrapper (valid-wrapper-of object))
+         (cell (or (find-slot-cell wrapper slot-name)
+                   (return-from slot-value
+                     (values (slot-missing (wrapper-class* wrapper) object slot-name
+                                           'cas (list old-value new-value))))))
+         (location (car cell))
+         (info (cdr cell))
+         (typecheck (slot-info-typecheck info)))
+    (when typecheck
+      (funcall typecheck new-value))
+    (let ((old (cond ((fixnump location)
+                      (if (std-instance-p object)
+                          (cas (standard-instance-access object location) old-value new-value)
+                          (cas (funcallable-standard-instance-access object location)
+                               old-value new-value)))
+                     ((consp location)
+                      (cas (cdr location) old-value new-value))
+                     ((not location)
+                      ;; FIXME: (CAS SLOT-VALUE-USING-CLASS)...
+                      (error "Cannot compare-and-swap slot ~S on: ~S" slot-name object))
+                     (t
+                      (bug "Bogus slot-cell in (CAS SLOT-VALUE): ~S" cell)))))
+      (if (and (eq +slot-unbound+ old)
+               (neq old old-value))
+          (slot-unbound (wrapper-class* wrapper) object slot-name)
+          old))))
 
 (defun slot-boundp (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))

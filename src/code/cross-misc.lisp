@@ -201,3 +201,9 @@
   name)
 
 (declaim (declaration enable-package-locks disable-package-locks))
+
+;;; printing structures
+
+(defun sb!kernel::default-structure-print (structure stream depth)
+  (declare (ignore depth))
+  (write structure :stream stream :circle t))
