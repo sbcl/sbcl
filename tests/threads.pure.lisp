@@ -53,7 +53,7 @@
 
 (with-test (:name without-interrupts+condition-wait
             :fails-on :sb-lutex
-	    :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread))
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
          (thread (make-thread (lambda ()

@@ -419,11 +419,38 @@
      (t (,op ,x ,y))))
 
 (defmacro bound-binop (op x y)
-  `(and ,x ,y
-       (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
-         (set-bound (safely-binop ,op (type-bound-number ,x)
-                                  (type-bound-number ,y))
-                    (or (consp ,x) (consp ,y))))))
+  (with-unique-names (xb yb res)
+    `(and ,x ,y
+          (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
+            (let* ((,xb (type-bound-number ,x))
+                   (,yb (type-bound-number ,y))
+                   (,res (safely-binop ,op ,xb ,yb)))
+              (set-bound ,res
+                         (and (or (consp ,x) (consp ,y))
+                              ;; Open bounds can very easily be messed up
+                              ;; by FP rounding, so take care here.
+                              ,(case op
+                                 (*
+                                  ;; Multiplying a greater-than-zero with
+                                  ;; less than one can round to zero.
+                                  `(or (not (fp-zero-p ,res))
+                                       (cond ((and (consp ,x) (fp-zero-p ,xb))
+                                              (>= (abs ,yb) 1))
+                                             ((and (consp ,y) (fp-zero-p ,yb))
+                                              (>= (abs ,xb) 1)))))
+                                 (/
+                                  ;; Dividing a greater-than-zero with
+                                  ;; greater than one can round to zero.
+                                  `(or (not (fp-zero-p ,res))
+                                       (cond ((and (consp ,x) (fp-zero-p ,xb))
+                                              (<= (abs ,yb) 1))
+                                             ((and (consp ,y) (fp-zero-p ,yb))
+                                              (<= (abs ,xb) 1)))))
+                                 ((+ -)
+                                  ;; Adding or subtracting greater-than-zero
+                                  ;; can end up with identity.
+                                  `(and (not (fp-zero-p ,xb))
+                                        (not (fp-zero-p ,yb))))))))))))
 
 (defun coerce-for-bound (val type)
   (if (consp val)

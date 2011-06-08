@@ -723,4 +723,13 @@
     (multiple-value-bind (ok sure) (sb-kernel:csubtypep t1 t2)
       (assert (and ok sure)))))
 
+(with-test (:name :unknown-type-not=-for-sure)
+  (let* ((type (gensym "FOO"))
+         (spec1 (sb-kernel:specifier-type `(vector ,type)))
+         (spec2 (sb-kernel:specifier-type `(vector single-float))))
+    (eval `(deftype ,type () 'double-float))
+    (multiple-value-bind (ok sure) (sb-kernel:type= spec1 spec2)
+      (assert (not ok))
+      (assert sure))))
+
 ;;; success

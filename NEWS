@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.49:
+  * enhancement: errors from FD handlers now provide a restart to remove
+    the offending handler.
+  * bug fix: bound derivation for floating point operations is now more
+    careful about rounding possibly closing open bounds. (lp#793771)
+
 changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables
     interrupts for its body.

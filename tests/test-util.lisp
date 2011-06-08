@@ -23,23 +23,23 @@
     `(progn
        (start-test)
        (cond
-	 ((broken-p ,broken-on)
-	  (fail-test :skipped-broken ',name "Test broken on this platform"))
-	 ((skipped-p ,skipped-on)
-	  (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features"))
-	 (t
-	  (block ,block-name
-	    (handler-bind ((error (lambda (error)
-				    (if (expected-failure-p ,fails-on)
-					(fail-test :expected-failure ',name error)
-					(fail-test :unexpected-failure ',name error))
-				    (return-from ,block-name))))
-	      (progn
-		(log-msg "Running ~S" ',name)
-		,@body
-		(if (expected-failure-p ,fails-on)
-		    (fail-test :unexpected-success ',name nil)
-		    (log-msg "Success ~S" ',name))))))))))
+         ((broken-p ,broken-on)
+          (fail-test :skipped-broken ',name "Test broken on this platform"))
+         ((skipped-p ,skipped-on)
+          (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features"))
+         (t
+          (block ,block-name
+            (handler-bind ((error (lambda (error)
+                                    (if (expected-failure-p ,fails-on)
+                                        (fail-test :expected-failure ',name error)
+                                        (fail-test :unexpected-failure ',name error))
+                                    (return-from ,block-name))))
+              (progn
+                (log-msg "Running ~S" ',name)
+                ,@body
+                (if (expected-failure-p ,fails-on)
+                    (fail-test :unexpected-success ',name nil)
+                    (log-msg "Success ~S" ',name))))))))))
 
 (defun report-test-status ()
   (with-standard-io-syntax

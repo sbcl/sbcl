@@ -89,7 +89,7 @@
 
 (with-test (:name (:timer :relative)
             :fails-on '(and :sparc :linux)
-	    :skipped-on :win32)
+            :skipped-on :win32)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -102,7 +102,7 @@
 
 (with-test (:name (:timer :absolute)
             :fails-on '(and :sparc :linux)
-	    :skipped-on :win32)
+            :skipped-on :win32)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
                             :name "simple timer")))
@@ -131,7 +131,7 @@
 
 (with-test (:name (:timer :repeat-and-unschedule)
             :fails-on '(and :sparc :linux)
-	    :skipped-on :win32)
+            :skipped-on :win32)
   (let* ((run-count 0)
          timer)
     (setq timer
