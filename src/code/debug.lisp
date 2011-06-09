@@ -295,11 +295,11 @@ thread, NIL otherwise."
                :deleted ((push (frame-call-arg element location frame) reversed-result))
                :rest ((lambda-var-dispatch (second element) location
                         nil
-                        (progn
-                          (setf reversed-result
-                                (append (reverse (sb!di:debug-var-value
-                                                  (second element) frame))
-                                        reversed-result))
+                        (let ((rest (sb!di:debug-var-value (second element) frame)))
+                          (if (listp rest)
+                              (setf reversed-result (append (reverse rest) reversed-result))
+                              (push (make-unprintable-object "unavailable &REST argument")
+                                    reversed-result))
                           (return-from enumerating))
                         (push (make-unprintable-object
                                "unavailable &REST argument")

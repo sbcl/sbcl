@@ -477,6 +477,21 @@
                                 (notany #'sb-debug::stack-allocated-p (cdr frame))))
                          (dx-arg-backtrace dx-arg))))))
 
+(with-test (:name :bug-795245)
+  (assert
+   (eq :ok
+       (catch 'done
+         (handler-bind
+             ((error (lambda (e)
+                       (declare (ignore e))
+                       (handler-case
+                           (sb-debug:backtrace 100 (make-broadcast-stream))
+                         (error ()
+                           (throw 'done :error))
+                         (:no-error ()
+                           (throw 'done :ok))))))
+           (apply '/= nil 1 2 nil))))))
+
 ;;;; test infinite error protection
 
 (defmacro nest-errors (n-levels error-form)
