@@ -346,17 +346,11 @@ generate_update_branch_email()
 	# have already had notification emails and is present to show the
 	# full detail of the change from rolling back the old revision to
 	# the base revision and then forward to the new revision
-	#
-	# For SBCL we skip this for branch updates, since we're getting
-	# one email per commit.
-	if [ "branch" != "$refname_type" ] || [ "update" != "$change_type" ]
-	then
-	    for rev in $(git rev-list $oldrev..$newrev)
-	    do
-		revtype=$(git cat-file -t "$rev")
-		echo "       via  $rev ($revtype)"
-	    done
-	fi
+	for rev in $(git rev-list $oldrev..$newrev)
+	do
+	    revtype=$(git cat-file -t "$rev")
+	    echo "       via  $rev ($revtype)"
+	done
 
 	if [ "$fast_forward" ]; then
 		echo "      from  $oldrev ($oldrev_type)"
@@ -715,14 +709,15 @@ else
 	  # push. We want one per commit. As long as we're
 	  # in fast-forward-only world, this should do the
 	  # right thing.
-	  if (expr "$oldrev" : '0*$' >/dev/null ||
-	      expr "$newrev" : '0*$' >/dev/null ||
-              ! expr "$refname" : "refs/heads/" > /dev/null)
+	  if (expr "$oldrev" : '0*$' >/dev/null ||                    # create
+	      expr "$newrev" : '0*$' >/dev/null ||                    # delete
+              (! expr "$refname" : "refs/heads/" > /dev/null) ||      # not a branch
+              git rev-parse --verify --quiet "$newrev"^2 > /dev/null) # merge commit
 	  then
 	      # Just one email.
 	      generate_email $oldrev $newrev $refname | send_mail
 	  else
-	      # Branch update, one mail per commit.
+	      # Simple branch update, one mail per commit.
 	      lastrev=$oldrev
 	      for step in $(git rev-list --reverse $oldrev..$newrev)
 	      do
