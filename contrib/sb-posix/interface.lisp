@@ -64,14 +64,19 @@
   ((errno :initarg :errno :reader sb-posix:syscall-errno)
    (name :initarg :name :initform nil :reader sb-posix:syscall-name))
   (:report (lambda (c s)
-             (let ((errno (sb-posix:syscall-errno c)))
-               (format s "Error in ~S: ~A (~A)"
-                       (sb-posix:syscall-name c)
-                       (sb-int:strerror errno)
-                       errno)))))
+             (let ((errno (sb-posix:syscall-errno c))
+                   (name (sb-posix:syscall-name c)))
+               (if name
+                   (format s "Error in ~S: ~A (~A)"
+                           name
+                           (sb-int:strerror errno)
+                           errno)
+                   (format s "Error in syscall: ~A (~A)"
+                           (sb-int:strerror errno)
+                           errno))))))
 
-(declaim (ftype (function (symbol) nil) syscall-error))
-(defun syscall-error (name)
+(declaim (ftype (function (&optional symbol) nil) syscall-error))
+(defun syscall-error (&optional name)
   (error 'sb-posix:syscall-error
          :name name
          :errno (get-errno)))
