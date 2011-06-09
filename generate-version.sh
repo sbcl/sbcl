@@ -2,7 +2,7 @@
 # Not a shell script, but something intended to be sourced from shell scripts
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
-    if `which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null`
+    if ( which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null )
     then
         # Check that some of the newer git versions we use are supported.
         if [ "0" != `git rev-list HEAD --not HEAD --count 2> /dev/null` ]
