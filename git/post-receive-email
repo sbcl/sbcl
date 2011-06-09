@@ -709,21 +709,37 @@ else
 	  # push. We want one per commit. As long as we're
 	  # in fast-forward-only world, this should do the
 	  # right thing.
-	  if (expr "$oldrev" : '0*$' >/dev/null ||                    # create
-	      expr "$newrev" : '0*$' >/dev/null ||                    # delete
-              (! expr "$refname" : "refs/heads/" > /dev/null) ||      # not a branch
-              git rev-parse --verify --quiet "$newrev"^2 > /dev/null) # merge commit
+	  if (expr "$oldrev" : '0*$' >/dev/null ||                  # create
+	      expr "$newrev" : '0*$' >/dev/null ||                  # delete
+              ! expr "$refname" : "refs/heads/" > /dev/null)        # not a branch
 	  then
 	      # Just one email.
 	      generate_email $oldrev $newrev $refname | send_mail
 	  else
-	      # Simple branch update, one mail per commit.
-	      lastrev=$oldrev
-	      for step in $(git rev-list --reverse $oldrev..$newrev)
-	      do
-		generate_email $lastrev $step $refname | send_mail
-		lastrev=$step
-	      done
+              # Get all revisions from old to new.
+              revlist=$(git rev-list --reverse $oldrev..$newrev)
+              no_merges=true
+              # Check for merges.
+              for rev in $revlist
+              do
+                  if ($no_merges && ! git rev-parse --verify --quiet "$rev"^2 > /dev/null)
+                  then
+                      no_merges=false
+                  fi
+              done
+              if $no_merges
+              then
+                  # Simple branch update, one mail per commit.
+	          lastrev=$oldrev
+	          for step in $revlist
+	          do
+		      generate_email $lastrev $step $refname | send_mail
+		      lastrev=$step
+	          done
+              else
+                  # There's a merge -- just one email.
+	          generate_email $oldrev $newrev $refname | send_mail
+              fi
 	  fi
 	done
 fi
