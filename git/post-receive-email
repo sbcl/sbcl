@@ -722,7 +722,7 @@ else
               # Check for merges.
               for rev in $revlist
               do
-                  if ($no_merges && ! git rev-parse --verify --quiet "$rev"^2 > /dev/null)
+                  if ($no_merges && git rev-parse --verify --quiet "$rev"^2 > /dev/null)
                   then
                       no_merges=false
                   fi
