@@ -1083,3 +1083,29 @@ redefinition."
   ;; So's empty.
   (eval '(defstruct (typed-struct2 (:type list) (:predicate))
           (a 42 :type fixnum))))
+
+(with-test (:name (:boa-supplied-p &optional))
+  (handler-bind ((warning #'error))
+    (eval `(defstruct (boa-supplied-p.1 (:constructor make-boa-supplied-p.1
+                                            (&optional (bar t barp))))
+             bar
+             barp)))
+  (let ((b1 (make-boa-supplied-p.1))
+        (b2 (make-boa-supplied-p.1 t)))
+    (assert (eq t (boa-supplied-p.1-bar b1)))
+    (assert (eq t (boa-supplied-p.1-bar b2)))
+    (assert (eq nil (boa-supplied-p.1-barp b1)))
+    (assert (eq t (boa-supplied-p.1-barp b2)))))
+
+(with-test (:name (:boa-supplied-p &key))
+  (handler-bind ((warning #'error))
+    (eval `(defstruct (boa-supplied-p.2 (:constructor make-boa-supplied-p.2
+                                            (&key (bar t barp))))
+             bar
+             barp)))
+  (let ((b1 (make-boa-supplied-p.2))
+        (b2 (make-boa-supplied-p.2 :bar t)))
+    (assert (eq t (boa-supplied-p.2-bar b1)))
+    (assert (eq t (boa-supplied-p.2-bar b2)))
+    (assert (eq nil (boa-supplied-p.2-barp b1)))
+    (assert (eq t (boa-supplied-p.2-barp b2)))))

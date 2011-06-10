@@ -13,6 +13,8 @@ changes relative to sbcl-1.0.49:
     backwards incompatible change in 1.0.48.27)
   * bug fix: occasional debugger errors in when a type-error occured in a
     function with dynamic-extent &rest list.
+  * bug fix: &optional and &key supplied-p arguments in DEFSTRUCT
+    boa-construtors can be used to initialized structure slots.
 
 changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables

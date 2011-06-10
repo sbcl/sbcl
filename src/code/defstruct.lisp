@@ -1542,7 +1542,9 @@
                          arg
                        (arglist `(,name ,def ,@(if supplied-test-p `(,supplied-test) nil)))
                        (vars name)
-                       (arg-type (get-slot name))))
+                       (arg-type (get-slot name))
+                       (when supplied-test-p
+                         (vars supplied-test))))
                     (t
                      (do-default arg)))))
 
@@ -1573,7 +1575,9 @@
                         (arglist `(,wot ,(if def-p def slot-def)
                                         ,@(if supplied-test-p `(,supplied-test) nil)))
                         (vars name)
-                        (arg-type type key name))))
+                        (arg-type type key name)
+                        (when supplied-test-p
+                          (vars supplied-test)))))
                   (do-default key t))))
 
           (when allowp
