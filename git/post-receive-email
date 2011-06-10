@@ -736,7 +736,7 @@ else
 	          lastrev=$oldrev
 	          for step in $revlist
 	          do
-                      echo "Sending: $(git log -n1 --oneline $rev)"
+                      echo "Sending: $(git log -n1 --oneline $step)"
 		      generate_email $lastrev $step $refname | send_mail
 		      lastrev=$step
 	          done
