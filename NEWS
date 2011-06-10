@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove
     the offending handler.
+  * enhancement: SB-INTROSPECT:FIND-DEFINITION-SOURCE now works on structure
+    copiers as well.
   * enhancement: location of user or system initialization file can now easily
     be customized for saved cores. See: SB-EXT:*USERINIT-PATHNAME-FUNCTION*
     and SB-EXT:*SYSINIT-PATHNAME-FUNCTION*.
