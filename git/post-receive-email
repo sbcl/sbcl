@@ -704,7 +704,7 @@ if [ -n "$1" -a -n "$2" -a -n "$3" ]; then
 else
 	while read oldrev newrev refname
 	do
-	  echo "Sending email for $refname: $oldrev -> $newrev"
+          echo "Sending mail for $refname: $oldrev -> $newrev"
 	  # SBCL KLUDGE: the default script sends one email per
 	  # push. We want one per commit. As long as we're
 	  # in fast-forward-only world, this should do the
@@ -714,6 +714,7 @@ else
               ! expr "$refname" : "refs/heads/" > /dev/null)        # not a branch
 	  then
 	      # Just one email.
+              echo "Not a branch update: all changes in one email."
 	      generate_email $oldrev $newrev $refname | send_mail
 	  else
               # Get all revisions from old to new.
@@ -724,15 +725,18 @@ else
               do
                   if ($no_merges && git rev-parse --verify --quiet "$rev"^2 > /dev/null)
                   then
+                      echo "Merge detected: $rev. Sending all commits in a single email."
                       no_merges=false
                   fi
               done
               if $no_merges
               then
                   # Simple branch update, one mail per commit.
+                  echo "Sending one email per commit."
 	          lastrev=$oldrev
 	          for step in $revlist
 	          do
+                      echo "Sending: $(git log -n1 --oneline $rev)"
 		      generate_email $lastrev $step $refname | send_mail
 		      lastrev=$step
 	          done
