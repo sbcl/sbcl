@@ -106,6 +106,7 @@
       (frob :where-from :assumed)
       (frob :inlinep)
       (frob :kind)
+      (frob :macro-function)
       (frob :inline-expansion-designator)
       (frob :source-transform)
       (frob :structure-accessor)

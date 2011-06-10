@@ -1227,6 +1227,14 @@
     (assert (search "INLINED-FUNCTION-IN-SOURCE-PATH" output))
     ;; ...not the leaf.
     (assert (not (search "DEFINED-FUN" output)))))
+
+(defmacro bug-795705 ()
+  t)
+
+(with-test (:name :bug-795705)
+  (assert (macro-function 'bug-795705))
+  (fmakunbound 'bug-795705)
+  (assert (not (macro-function 'bug-795705))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
