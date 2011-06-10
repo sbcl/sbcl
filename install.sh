@@ -112,11 +112,11 @@ cp doc/sbcl.1 "$BUILD_ROOT$MAN_DIR"/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1
 for info in doc/manual/*.info
 do
   cp $info "$BUILD_ROOT$INFO_DIR"/ \
-      && echo -n " info $BUILD_ROOT$INFO_DIR/`basename $info` $BUILD_ROOT$INFO_DIR/dir" \
-      && ( install-info --info-dir="$BUILD_ROOT$INFO_DIR" \
-        "$BUILD_ROOT$INFO_DIR"/`basename $info` > /dev/null 2>&1 \
-           || echo -n " (could not add to system catalog)" ) \
-      && echo
+      && BN=`basename $info` \
+      && DIRFAIL=`install-info --info-dir="$BUILD_ROOT$INFO_DIR" \
+        "$BUILD_ROOT$INFO_DIR"/$BN > /dev/null 2>&1 \
+           || echo "(could not add to system catalog)"` \
+      && echo " info $BUILD_ROOT$INFO_DIR/`basename $info` [$BUILD_ROOT$INFO_DIR/dir] $DIRFAIL"
 done
 
 for info in doc/manual/*.info-*
