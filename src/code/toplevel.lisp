@@ -56,16 +56,17 @@
 
 (defvar *sysinit-pathname-function* #'sysinit-pathname
   #!+sb-doc
-  "Designator for a function of zero arguments called to obtain a pathname
-designator for the default sysinit file, or NIL. If the function returns NIL,
-no sysinit file is used unless one has been specified on the command-line.")
+  "Designator for a function of zero arguments called to obtain a
+pathname designator for the default sysinit file, or NIL. If the
+function returns NIL, no sysinit file is used unless one has been
+specified on the command-line.")
 
 (defvar *userinit-pathname-function* #'userinit-pathname
   #!+sb-doc
-  "Designator for a function of zero arguments called to obtain a pathname
-designator or a stream for the default userinit file, or NIL. If the function
-returns NIL, no userinit file is used unless one has been specified on the
-command-line.")
+  "Designator for a function of zero arguments called to obtain a
+pathname designator or a stream for the default userinit file, or NIL.
+If the function returns NIL, no userinit file is used unless one has
+been specified on the command-line.")
 
 
 ;;;; miscellaneous utilities for working with with TOPLEVEL

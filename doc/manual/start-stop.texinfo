@@ -132,6 +132,13 @@ process, and is also provided as an extension to the user.
 @include fun-sb-ext-save-lisp-and-die.texinfo
 @include var-sb-ext-star-save-hooks-star.texinfo
 
+In cases where the standard initialization files have already been loaded
+into the saved core, and alternative ones should be used (or none at all),
+SBCL allows customizing the initfile pathname computation.
+
+@include var-sb-ext-star-sysinit-pathname-function-star.texinfo
+@include var-sb-ext-star-userinit-pathname-function-star.texinfo
+
 To facilitate distribution of SBCL applications using external
 resources, the filesystem location of the SBCL core file being used is
 available from Lisp.
