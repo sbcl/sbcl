@@ -532,3 +532,33 @@
       (type-equal (function-type #'nullary)
                   '(function () (values null &optional))))
   t)
+
+;;; Defstruct accessor, copier, and predicate
+
+(deftest defstruct-fun-sources
+    (let ((copier (find-definition-source #'cl-user::copy-three))
+          (accessor (find-definition-source #'cl-user::three-four))
+          (predicate (find-definition-source #'cl-user::three-p)))
+      (values (and (equalp copier accessor)
+                   (equalp copier predicate))
+              (equal "test.lisp"
+                     (file-namestring (definition-source-pathname copier)))
+              (equal '(5)
+                     (definition-source-form-path copier))))
+ t
+ t
+ t)
+
+(deftest defstruct-fun-sources-by-name
+    (let ((copier (car (find-definition-sources-by-name 'cl-user::copy-three :function)))
+          (accessor (car (find-definition-sources-by-name 'cl-user::three-four :function)))
+          (predicate (car (find-definition-sources-by-name 'cl-user::three-p :function))))
+      (values (and (equalp copier accessor)
+                   (equalp copier predicate))
+              (equal "test.lisp"
+                     (file-namestring (definition-source-pathname copier)))
+              (equal '(5)
+                     (definition-source-form-path copier))))
+ t
+ t
+ t)
