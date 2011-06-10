@@ -21,7 +21,7 @@
 
 ;;; TODO
 ;;; 1) structs don't have within-file location info.  problem for the
-;;;   structure itself, accessors and the predicate
+;;;   structure itself, accessors, the copier and the predicate
 ;;; 3) error handling.  Signal random errors, or handle and resignal 'our'
 ;;;   error, or return NIL?
 ;;; 4) FIXMEs
@@ -357,6 +357,9 @@ If an unsupported TYPE is requested, the function will return NIL.
            ((struct-predicate-p object)
             (find-definition-source
              (struct-predicate-structure-class object)))
+           ((struct-copier-p object)
+            (find-definition-source
+             (struct-copier-structure-class object)))
            (t
             (find-function-definition-source object))))
     ((or condition standard-object structure-object)
@@ -413,12 +416,19 @@ If an unsupported TYPE is requested, the function will return NIL.
   (sb-vm::%simple-fun-self #'(setf definition-source-pathname)))
 (defvar *struct-predicate*
   (sb-vm::%simple-fun-self #'definition-source-p))
+(defvar *struct-copier*
+  (sb-vm::%simple-fun-self #'copy-definition-source))
 
 (defun struct-accessor-p (function)
   (let ((self (sb-vm::%simple-fun-self function)))
     ;; FIXME there are other kinds of struct accessor.  Fill out this list
     (member self (list *struct-slotplace-reader*
                        *struct-slotplace-writer*))))
+
+(defun struct-copier-p (function)
+  (let ((self (sb-vm::%simple-fun-self function)))
+    ;; FIXME there may be other structure copier functions
+    (member self (list *struct-copier*))))
 
 (defun struct-predicate-p (function)
   (let ((self (sb-vm::%simple-fun-self function)))
@@ -491,6 +501,9 @@ value."
              type
              (sb-impl::%fun-type function-designator)))))))
 
+;;; FIXME: These three are pretty terrible. Can we place have some proper metadata
+;;; instead.
+
 (defun struct-accessor-structure-class (function)
   (let ((self (sb-vm::%simple-fun-self function)))
     (cond
@@ -499,6 +512,16 @@ value."
         (sb-kernel::classoid-name
          (sb-kernel::layout-classoid
           (sb-kernel:%closure-index-ref function 1)))))
+      )))
+
+(defun struct-copier-structure-class (function)
+  (let ((self (sb-vm::%simple-fun-self function)))
+    (cond
+      ((member self (list *struct-copier*))
+       (find-class
+        (sb-kernel::classoid-name
+         (sb-kernel::layout-classoid
+          (sb-kernel:%closure-index-ref function 0)))))
       )))
 
 (defun struct-predicate-structure-class (function)
