@@ -991,7 +991,7 @@ Experimental: interface subject to change."
            ((or (null one) (eq one :unspecific)) two)
            ((or (null two) (eq two :unspecific)) one)
            ((string= one two) one)
-           (t nil)))
+           (t (return-from pathname-intersections nil))))
        (intersect-directory (one two)
          (aver (typep one '(or null (member :wild :unspecific) list)))
          (aver (typep two '(or null (member :wild :unspecific) list)))

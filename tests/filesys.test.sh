@@ -219,12 +219,15 @@ touch qar/ac.tmp
 mkdir foo.moose
 touch foo.bar
 run_sbcl <<EOF
+(setf (logical-pathname-translations "foo")
+      (list (list "**;*.txt.*" (merge-pathnames "foo/**/*.txt"))
+            (list "**;*.*.*" (merge-pathnames "**/*.*"))))
+
 (defun test (pattern &rest expected)
   (let ((wanted (sort (mapcar #'truename expected) #'string< :key #'namestring))
         (got (sort (directory pattern) #'string< :key #'namestring)))
     (unless (equal wanted got)
-      (format t "wanted:~%  ~Sgot:~%  ~S" wanted got)
-      (error "wanted:~%  ~Sgot:~%  ~S" wanted got))))                 
+      (error "wanted:~%  ~S~%got:~%  ~S" wanted got))))
 (test "*/a*.txt" "foo/aa.txt" "far/ab.txt" "qar/ac.txt")
 (test "fo*/a*.t*" "foo/aa.txt" "foo/aa.tmp")
 (test "*/*b.*" "far/ab.txt" "far/ab.tmp")
@@ -240,6 +243,11 @@ run_sbcl <<EOF
 (test "*/x" "foo/x/" "far/x/")
 (test "far/*/x" "far/y/x/" "far/x/x/")
 (test "**/x/" "foo/x/" "far/x/" "far/x/x" "far/y/x/")
+(test "foo:*.txt" "foo/aa.txt")
+(test "foo:far;*.txt" "far/ab.txt")
+(test "foo:foo;*.txt" "foo/aa.txt")
+(test "foo:**;*.tmp" "foo/aa.tmp" "far/ab.tmp" "qar/ac.tmp")
+(test "foo:foo;*.tmp" "foo/aa.tmp")
 (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?

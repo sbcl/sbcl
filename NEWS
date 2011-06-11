@@ -19,6 +19,7 @@ changes relative to sbcl-1.0.49:
     boa-construtors can be used to initialized structure slots.
   * bug fix: FMAKUNBOUND removes the MACRO-FUNCTION, should one exist.
     (lp#795705, regression)
+  * bug fix: DIRECTORY works better on logical pathnames.
 
 changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables
