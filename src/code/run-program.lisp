@@ -458,10 +458,15 @@ status slot."
                                      :element-type :default
                                      :dual-channel-p t)))))
 
-(defmacro round-bytes-to-words (n)
+;; Null terminate strings only C-side: otherwise we can run into
+;; A-T-S-L even for simple encodings like ASCII.  Multibyte encodings
+;; may need more than a single byte of zeros; assume 4 byte is enough
+;; for everyone.
+(defmacro round-null-terminated-bytes-to-words (n)
   (let ((bytes-per-word (/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits)))
-    `(logandc2 (the fixnum (+ (the fixnum ,n)
-                              (1- ,bytes-per-word))) (1- ,bytes-per-word))))
+    `(logandc2 (the sb-vm:signed-word (+ (the fixnum ,n)
+                                         4 (1- ,bytes-per-word)))
+               (1- ,bytes-per-word))))
 
 (defun string-list-to-c-strvec (string-list)
   (let* ((bytes-per-word (/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits))
@@ -469,28 +474,33 @@ status slot."
          ;; clobbers argv[-1].
          (vec-bytes (* bytes-per-word (+ (length string-list) 2)))
          (octet-vector-list (mapcar (lambda (s)
-                                      (string-to-octets s :null-terminate t))
+                                      (string-to-octets s))
                                     string-list))
          (string-bytes (reduce #'+ octet-vector-list
                                :key (lambda (s)
-                                      (round-bytes-to-words (length s)))))
+                                      (round-null-terminated-bytes-to-words
+                                       (length s)))))
          (total-bytes (+ string-bytes vec-bytes))
          ;; Memory to hold the vector of pointers and all the strings.
          (vec-sap (sb-sys:allocate-system-memory total-bytes))
          (string-sap (sap+ vec-sap vec-bytes))
          ;; Index starts from [1]!
          (vec-index-offset bytes-per-word))
-    (declare (index string-bytes vec-bytes total-bytes)
+    (declare (sb-vm:signed-word vec-bytes)
+             (sb-vm:word string-bytes total-bytes)
              (sb-sys:system-area-pointer vec-sap string-sap))
     (dolist (octets octet-vector-list)
       (declare (type (simple-array (unsigned-byte 8) (*)) octets))
       (let ((size (length octets)))
         ;; Copy string.
         (sb-kernel:copy-ub8-to-system-area octets 0 string-sap 0 size)
+        ;; NULL-terminate it
+        (setf (sap-ref-32 string-sap size) 0)
         ;; Put the pointer in the vector.
         (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
         ;; Advance string-sap for the next string.
-        (setf string-sap (sap+ string-sap (round-bytes-to-words size)))
+        (setf string-sap (sap+ string-sap
+                               (round-null-terminated-bytes-to-words size)))
         (incf vec-index-offset bytes-per-word)))
     ;; Final null pointer.
     (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
