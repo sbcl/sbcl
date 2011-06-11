@@ -3028,6 +3028,9 @@
       ((:single-float)
          (aver (typep value 'single-float))
          (cons :dword (ldb (byte 32 0) (single-float-bits value))))
+      ((:double-float-bits)
+         (aver (integerp value))
+         (cons :double-float (ldb (byte 64 0) value)))
       ((:double-float)
          (aver (typep value 'double-float))
          (cons :double-float
