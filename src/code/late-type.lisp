@@ -1731,7 +1731,7 @@
              (eql low high)
              (eql (numeric-type-complexp type) :real)
              (member (numeric-type-class type) '(integer rational
-                                                 #!-sb-xc-host float)))
+                                                 #-sb-xc-host float)))
         (values t (numeric-type-low type))
         (values nil nil))))
 
