@@ -3926,3 +3926,11 @@
     (assert (equal `(function ((single-float (0.0)))
                               (values (or (member 0.0) (single-float (0.0))) &optional))
                    (sb-kernel:%simple-fun-type f)))))
+
+(with-test (:name (:bug-486812 single-float))
+  (compile nil `(lambda ()
+                  (sb-kernel:make-single-float -1))))
+
+(with-test (:name (:bug-486812 double-float))
+  (compile nil `(lambda ()
+                  (sb-kernel:make-double-float -1 0))))

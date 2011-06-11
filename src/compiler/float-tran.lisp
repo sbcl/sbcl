@@ -102,10 +102,36 @@
 ;;;; float accessors
 
 (defknown make-single-float ((signed-byte 32)) single-float
-  (movable foldable flushable))
+  (movable flushable))
 
 (defknown make-double-float ((signed-byte 32) (unsigned-byte 32)) double-float
-  (movable foldable flushable))
+  (movable flushable))
+
+#-sb-xc-host
+(deftransform make-single-float ((bits)
+                                 ((signed-byte 32)))
+  "Conditional constant folding"
+  (unless (constant-lvar-p bits)
+    (give-up-ir1-transform))
+  (let* ((bits  (lvar-value bits))
+         (float (make-single-float bits)))
+    (when (float-nan-p float)
+      (give-up-ir1-transform))
+    float))
+
+#-sb-xc-host
+(deftransform make-double-float ((hi lo)
+                                 ((signed-byte 32) (unsigned-byte 32)))
+  "Conditional constant folding"
+  (unless (and (constant-lvar-p hi)
+               (constant-lvar-p lo))
+    (give-up-ir1-transform))
+  (let* ((hi    (lvar-value hi))
+         (lo    (lvar-value lo))
+         (float (make-double-float hi lo)))
+    (when (float-nan-p float)
+      (give-up-ir1-transform))
+    float))
 
 (defknown single-float-bits (single-float) (signed-byte 32)
   (movable foldable flushable))
