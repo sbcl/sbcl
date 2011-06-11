@@ -1184,31 +1184,22 @@
   (:args (float :scs (single-reg descriptor-reg)
                 :load-if (not (sc-is float single-stack))))
   (:results (bits :scs (signed-reg)))
-  (:temporary (:sc signed-stack :from :argument :to :result) stack-temp)
   (:arg-types single-float)
   (:result-types signed-num)
   (:translate single-float-bits)
   (:policy :fast-safe)
-  (:vop-var vop)
   (:generator 4
-    (sc-case bits
-      (signed-reg
-       (sc-case float
-         (single-reg
-          (inst movss stack-temp float)
-          (move bits stack-temp))
-         (single-stack
-          (move bits float))
-         (descriptor-reg
-          (move bits float)
-          (inst shr bits 32))))
-      (signed-stack
-       (sc-case float
-         (single-reg
-          (inst movss bits float)))))
-    ;; Sign-extend
-    (inst shl bits 32)
-    (inst sar bits 32)))
+     (sc-case float
+       (single-reg
+        (inst movd bits float)
+        (inst movsxd bits (reg-in-size bits :dword)))
+       (single-stack
+        (inst movsxd bits (make-ea :dword ; c.f. ea-for-sf-stack
+                                   :base rbp-tn
+                                   :disp (frame-byte-offset (tn-offset float)))))
+       (descriptor-reg
+        (move bits float)
+        (inst sar bits 32)))))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
