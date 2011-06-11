@@ -481,3 +481,28 @@
                   (sb-thread:thread-deadlock ()
                     :deadlock))))
     (assert (eq :ok (join-thread t1)))))
+
+#+sb-thread
+(with-test (:name :pass-arguments-to-thread)
+  (assert (= 3 (join-thread (make-thread #'+ :arguments '(1 2))))))
+
+#+sb-thread
+(with-test (:name :pass-atom-to-thread)
+  (assert (= 1/2 (join-thread (make-thread #'/ :arguments 2)))))
+
+#+sb-thread
+(with-test (:name :pass-nil-to-thread)
+  (assert (= 1 (join-thread (make-thread #'* :arguments '())))))
+
+#+sb-thread
+(with-test (:name :pass-nothing-to-thread)
+  (assert (= 1 (join-thread (make-thread #'*)))))
+
+#+sb-thread
+(with-test (:name :pass-improper-list-to-thread)
+  (multiple-value-bind (value error)
+      (ignore-errors (make-thread #'+ :arguments '(1 . 1)))
+    (when value
+      (join-thread value))
+    (assert (and (null value)
+                 error))))
