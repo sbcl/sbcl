@@ -321,31 +321,53 @@
     (defconsetop conset-intersection bit-and)
     (defconsetop conset-difference bit-andc2)))
 
+;;; Constraints are hash-consed. Unfortunately, types aren't, so we have
+;;; to over-approximate and then linear search through the potential hits.
+;;; LVARs can only be found in EQL (not-p = NIL) constraints, while constant
+;;; and lambda-vars can only be found in EQL constraints.
+
 (defun find-constraint (kind x y not-p)
   (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
   (etypecase y
     (ctype
-     (do-conset-elements (con (lambda-var-constraints x) nil)
-       (when (and (eq (constraint-kind con) kind)
-                  (eq (constraint-not-p con) not-p)
-                  (type= (constraint-y con) y))
-         (return con))))
-    ((or lvar constant)
-     (do-conset-elements (con (lambda-var-constraints x) nil)
-       (when (and (eq (constraint-kind con) kind)
-                  (eq (constraint-not-p con) not-p)
-                  (eq (constraint-y con) y))
-         (return con))))
-    (lambda-var
-     (do-conset-elements (con (lambda-var-constraints x) nil)
-       (when (and (eq (constraint-kind con) kind)
-                  (eq (constraint-not-p con) not-p)
-                  (let ((cx (constraint-x con)))
-                    (eq (if (eq cx x)
-                            (constraint-y con)
-                            cx)
-                        y)))
-         (return con))))))
+       (awhen (lambda-var-ctype-constraints x)
+         (dolist (con (gethash (sb!kernel::type-class-info y) it) nil)
+           (when (and (eq (constraint-kind con) kind)
+                      (eq (constraint-not-p con) not-p)
+                      (type= (constraint-y con) y))
+             (return-from find-constraint con)))
+         nil))
+    (lvar
+       (awhen (lambda-var-eq-constraints x)
+         (gethash y it)))
+    ((or constant lambda-var)
+       (awhen (lambda-var-eq-constraints x)
+         (let ((cache (gethash y it)))
+           (declare (type list cache))
+           (if not-p (cdr cache) (car cache)))))))
+
+(defun register-constraint (x con y)
+  (declare (type lambda-var x) (type constraint con) (type constraint-y y))
+  (conset-adjoin con (lambda-var-constraints x))
+  (macrolet ((ensuref (place default)
+               `(or ,place (setf ,place ,default))))
+    (etypecase y
+      (ctype
+         (let ((index (ensuref (lambda-var-ctype-constraints x)
+                               (make-hash-table))))
+           (push con (gethash (sb!kernel::type-class-info y) index))))
+      (lvar
+         (let ((index (ensuref (lambda-var-eq-constraints x)
+                               (make-hash-table))))
+           (setf (gethash y index) con)))
+      ((or constant lambda-var)
+         (let* ((index (ensuref (lambda-var-eq-constraints x)
+                                (make-hash-table)))
+                (cons  (ensuref (gethash y index) (list nil))))
+           (if (constraint-not-p con)
+               (setf (cdr cons) con)
+               (setf (car cons) con))))))
+  nil)
 
 ;;; Return a constraint for the specified arguments. We only create a
 ;;; new constraint if there isn't already an equivalent old one,
@@ -358,9 +380,9 @@
                                   kind x y not-p)))
         (vector-push-extend new *constraint-universe*
                             (1+ (length *constraint-universe*)))
-        (conset-adjoin new (lambda-var-constraints x))
+        (register-constraint x new y)
         (when (lambda-var-p y)
-          (conset-adjoin new (lambda-var-constraints y)))
+          (register-constraint y new x))
         new)))
 
 ;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
