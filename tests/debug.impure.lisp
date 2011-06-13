@@ -61,16 +61,18 @@
 ;;; argument of PRINT might be SB-IMPL::OBJECT or SB-KERNEL::OBJ or
 ;;; whatever. But we do know the general structure that a correct
 ;;; answer should have, so we can safely do a lot of checks.)
-(destructuring-bind (object-sym &optional-sym stream-sym) (get-arglist #'print)
-  (assert (symbolp object-sym))
-  (assert (eql &optional-sym '&optional))
-  (assert (symbolp stream-sym)))
-(destructuring-bind (dest-sym control-sym &rest-sym format-args-sym)
-    (get-arglist #'format)
-  (assert (symbolp dest-sym))
-  (assert (symbolp control-sym))
-  (assert (eql &rest-sym '&rest))
-  (assert (symbolp format-args-sym)))
+(with-test (:name :predefined-functions-1)
+  (destructuring-bind (object-sym &optional-sym stream-sym) (get-arglist #'print)
+    (assert (symbolp object-sym))
+    (assert (eql &optional-sym '&optional))
+    (assert (symbolp stream-sym))))
+(with-test (:name :predefined-functions-2)
+  (destructuring-bind (dest-sym control-sym &rest-sym format-args-sym)
+      (get-arglist #'format)
+    (assert (symbolp dest-sym))
+    (assert (symbolp control-sym))
+    (assert (eql &rest-sym '&rest))
+    (assert (symbolp format-args-sym))))
 
 ;;; Check for backtraces generally being correct.  Ensure that the
 ;;; actual backtrace finishes (doesn't signal any errors on its own),
@@ -356,9 +358,10 @@
 (write-line "//compile nil")
 (defvar *compile-nil-error* (compile nil '(lambda (x) (cons (when x (error "oops")) nil))))
 (defvar *compile-nil-non-tc* (compile nil '(lambda (y) (cons (funcall *compile-nil-error* y) nil))))
-(assert (verify-backtrace (lambda () (funcall *compile-nil-non-tc* 13))
-                          '(((lambda (x)) 13)
-                            ((lambda (y)) 13))))
+(with-test (:name (:compile nil))
+  (assert (verify-backtrace (lambda () (funcall *compile-nil-non-tc* 13))
+			    '(((lambda (x)) 13)
+			      ((lambda (y)) 13)))))
 
 (with-test (:name :clos-slot-typecheckfun-named)
   (assert
@@ -417,12 +420,13 @@
       1
       (* n (trace-fact (1- n)))))
 
-(let ((out (with-output-to-string (*trace-output*)
-             (trace trace-this)
-             (assert (eq 'ok (trace-this)))
-             (untrace))))
-  (assert (search "TRACE-THIS" out))
-  (assert (search "returned OK" out)))
+(with-test (:name (trace :simple))
+  (let ((out (with-output-to-string (*trace-output*)
+	       (trace trace-this)
+	       (assert (eq 'ok (trace-this)))
+	       (untrace))))
+    (assert (search "TRACE-THIS" out))
+    (assert (search "returned OK" out))))
 
 ;;; bug 379
 ;;; This is not a WITH-TEST :FAILS-ON PPC DARWIN since there are
@@ -525,14 +529,17 @@
                      :normal-exit)))))))
   (write-line "--END OF H-B-A-B--"))
 
-(enable-debugger)
+(with-test (:name infinite-error-protection)
+  (enable-debugger)
+  (test-inifinite-error-protection))
 
-(test-inifinite-error-protection)
+(with-test (:name (infinite-error-protection :thread)
+		  :skipped-on '(not :sb-thread))
+  (enable-debugger)
+  (let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
+    (loop while (sb-thread:thread-alive-p thread))))
 
-#+sb-thread
-(let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
-  (loop while (sb-thread:thread-alive-p thread)))
-
+;; unconditional, in case either previous left it enabled
 (disable-debugger)
 
 (write-line "/debug.impure.lisp done")
