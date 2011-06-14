@@ -360,8 +360,8 @@
 (defvar *compile-nil-non-tc* (compile nil '(lambda (y) (cons (funcall *compile-nil-error* y) nil))))
 (with-test (:name (:compile nil))
   (assert (verify-backtrace (lambda () (funcall *compile-nil-non-tc* 13))
-			    '(((lambda (x)) 13)
-			      ((lambda (y)) 13)))))
+                            '(((lambda (x)) 13)
+                              ((lambda (y)) 13)))))
 
 (with-test (:name :clos-slot-typecheckfun-named)
   (assert
@@ -422,9 +422,9 @@
 
 (with-test (:name (trace :simple))
   (let ((out (with-output-to-string (*trace-output*)
-	       (trace trace-this)
-	       (assert (eq 'ok (trace-this)))
-	       (untrace))))
+               (trace trace-this)
+               (assert (eq 'ok (trace-this)))
+               (untrace))))
     (assert (search "TRACE-THIS" out))
     (assert (search "returned OK" out))))
 
@@ -534,7 +534,7 @@
   (test-inifinite-error-protection))
 
 (with-test (:name (infinite-error-protection :thread)
-		  :skipped-on '(not :sb-thread))
+                  :skipped-on '(not :sb-thread))
   (enable-debugger)
   (let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
     (loop while (sb-thread:thread-alive-p thread))))
