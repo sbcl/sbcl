@@ -1,4 +1,4 @@
-SBCL Style Guide
+SBCL Hacking Guide
 
   (This is not a most actively maintained file, but recommended
   reading anyways.)
@@ -7,27 +7,35 @@ Patch Submissions
 =================
 
 Preferred patch format is output from "git format-patch", including
-the commit message. The commit message should explain the why and how
-of the change.
+the commit message.
 
-Please include test-cases in your patch if at all possible.
+The commit message should explain the why and how of the change. See
+existing commit messages for examples -- for a truly trivial changes
+little is needed, but in most cases more is better.
+
+Please include test-cases in your patch if at all possible: if you're
+not sure which file in tests/ to put your test case in, just pick one
+that seems vaguely appropriate.
 
 Please format your submission for ease of reading: unless the change
 is whitespace only, avoid re-indenting code you are not touching, etc.
-Unless your patch is large and best understood as a series of
-sequential changes, please send it in as single patch file.
+
+Unless your change is large and best understood as a series of
+sequential changes, please send it in as single patch.
 
 If your patch includes algorithmic changes, explain them. If your
 patch uses a published algorithm, please include a link to the paper.
 We aren't always as well-educated as we'd like to...
 
 Ready-to-apply patches should be submitted via Launchpad: please add
-the tag "review" to the associated bug.
+the tag "review" to the associated bug (create new bug with name if
+there isn't one about the issue yet.)
 
 Patches requiring more widespread discussion and feedback should be
 sent to the sbcl-devel mailing list.
 
-If you have any questions, feel free to ask them on sbcl-devel.
+If you have any questions, feel free to ask them on sbcl-devel,
+or the IRC channel #sbcl@freenode.net.
 
 Coding Style
 ============
@@ -38,12 +46,10 @@ Most of the style hints in the Lisp FAQ apply.
 
 When porting code we prefer code which factors dependencies into a set
 of interface functions and constants and includes implementations of
-the interface for the different systems. Patches which require
-conditional compilation (like all the old
-#T+HPUX or #T-X86 tests in the sources inherited from CMUCL) might be
-accepted if they're simple, in hopes of factoring out the differences
-more cleanly later, but even if accepted, such code may not be
-maintained for very long.
+the interface for the different systems.
+
+Reader conditionals are frowed upon. Sometimes they're the least
+of all evils, but think thrice.
 
 grammatical fussiness:
   Phrases are not capitalized.
@@ -56,6 +62,7 @@ grammatical fussiness:
     ;;; solving a system.
     (defvar *max-n-transformations* 10)
   Lisp in comments is capitalized.
+  Symbol names are capitalized.
 
 usage fussiness:
   Function documentation can be a description of what the function
@@ -87,6 +94,8 @@ usage fussiness:
 	;;; When you call this function on X, you get back the first
 	;;; prime number greater than or equal to X.
 	(defun primify (x) ..)
+  Documentation for public functions belongs in a docstring.
+  Documentation for internal functions belongs mostly in a comment.
 
 In general, if you can express it in the code instead of the comments,
 do so. E.g. the old CMUCL code has many comments above functions foo
@@ -107,20 +116,18 @@ which are not good examples to follow:
     instead of factoring the dependencies into interfaces and providing
     implementations of the interface for different architectures;
   * in conditional compilation, using a common subexpression over and
-    over again, e.g. #+(OR GENGC GENCGC), when the important thing is
-    that GENGC and GENCGC are (currently) the GCs which support scavenger
-    hooks. If you have to do that, define a SCAVHOOK feature,
-    write #+SCAVHOOK in many places, and arrange for the SCAVHOOK feature
-    to be set once and only once in terms of GENGC and GENCGC. (That way
-    future maintainers won't curse you.)
+    over again, e.g. #+(OR X86 X86-64), when the important thing is
+    that the platform supports single-instruction CAS. If you have to
+    do something like that, define a new FOO feature, write #+FOO in
+    many places, and arrange for the FOO feature to be set once and
+    only once -- probably in make-config.sh. (That way future
+    maintainers won't curse you.)
   * putting the defined symbol, and information about whether it's 
     exported or not, into the comments around the definition of the symbol;
   * naming anything DO-FOO if it isn't an iteration macro
-  * exposing a lot of high-level functionality not in the ANSI standard
-    to the user (as discussed above)
   * not using a consistent abbreviation style in global names (e.g. 
     naming some things DEFINE-FOO and other things DEF-BAR, with 
-    no rule to determine whether the abbreviation is used)
+    no rule to determine whether the abbreviation is used).
   * using lots of single-colon package prefixes (distracting and hard
     to read, and obstacles to reaching package nirvana where 
     package dependencies are a directed acyclic graph) or even
@@ -130,6 +137,6 @@ which are not good examples to follow:
     (DEFUN CL:CADDDR (..) ..) as reminders that they're required by
     ANSI and can't be deleted no matter how obscure and useless some
     of them might look.:-)
-Most of these are common in the code inherited from CMUCL. We've
+Many of these are common in the code inherited from CMUCL. We've
 eliminated them in some places, but there's a *lot* of code inherited
 from CMUCL..
