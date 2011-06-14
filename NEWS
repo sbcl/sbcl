@@ -29,6 +29,8 @@ changes relative to sbcl-1.0.49:
   * bug fix: FORMAT now handles floating point rounding correct, eg.
     (format nil "~,1F" 0.01) => "0.0" instead of "0.01" as previously.
     (lp#308961)
+  * bug fix: style warning during lambda-list introspection of generic
+    functions with both optional and key argments.
 
 changes in sbcl-1.0.49 relative to sbcl-1.0.48:
   * minor incompatible change: WITH-LOCKED-HASH-TABLE no longer disables

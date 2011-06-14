@@ -1886,6 +1886,15 @@
               (check-type req integer))))
     (assert (= warnings 1))))
 
+(defgeneric generic-function-pretty-arglist-optional-and-key (req &optional opt &key key)
+  (:method (req &optional opt &key key)
+    (list req opt key)))
 
+(with-test (:name :generic-function-pretty-arglist-optional-and-key)
+  (handler-bind ((warning #'error))
+    ;; Used to signal a style-warning
+    (assert (equal '(req &optional opt &key key)
+                   (sb-pcl::generic-function-pretty-arglist
+                    #'generic-function-pretty-arglist-optional-and-key)))))
 
 ;;;; success

@@ -1717,7 +1717,7 @@
   ;; PARSE-LAMBDA-LIST to something handier.
   (multiple-value-bind (required optional restp rest keyp keys allowp
                         auxp aux morep more-context more-count)
-      (parse-lambda-list lambda-list)
+      (parse-lambda-list lambda-list :silent t)
     (declare (ignore restp keyp auxp aux morep))
     (declare (ignore more-context more-count))
     (values required optional rest keys allowp)))

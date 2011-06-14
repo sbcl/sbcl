@@ -38,7 +38,7 @@
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t boolean))
                 parse-lambda-list-like-thing))
-(declaim (ftype (sfunction (list)
+(declaim (ftype (sfunction (list &key (:silent boolean))
                            (values list list boolean t boolean list boolean
                                    boolean list boolean t t))
                 parse-lambda-list))
@@ -162,11 +162,11 @@
 ;;; can barf on things which're illegal as arguments in lambda lists
 ;;; even if they could conceivably be legal in not-quite-a-lambda-list
 ;;; weirdosities
-(defun parse-lambda-list (lambda-list)
+(defun parse-lambda-list (lambda-list &key silent)
   ;; Classify parameters without checking their validity individually.
   (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
                         morep more-context more-count)
-      (parse-lambda-list-like-thing lambda-list)
+      (parse-lambda-list-like-thing lambda-list :silent silent)
 
     ;; Check validity of parameters.
     (flet ((need-symbol (x why)
