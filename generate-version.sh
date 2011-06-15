@@ -4,17 +4,7 @@ git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
     if ( which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null )
     then
-        # Check that some of the newer git versions we use are supported.
-        if [ "0" != `git rev-list HEAD --not HEAD --count 2> /dev/null` ]
-        then
-            echo "Too old a git installation."
-            echo
-            echo "Your git doesn't support --count option with git rev-list,"
-            echo "which SBCL build requires. Git 1.7.2 or later should work."
-            exit 1
-        else
-            true
-        fi
+        true
     else
         false
     fi
@@ -44,8 +34,10 @@ generate_version() {
     version_base=`git rev-parse "$version_root"`
     version_tag=`git describe --tags --match="sbcl*" --abbrev=0 $version_base`
     version_release=`echo $version_tag | sed -e 's/sbcl[_-]//' | sed -e 's/_/\./g'`
-    version_n_root=`git rev-list $version_base --not $version_tag --count`
-    version_n_branch=`git rev-list HEAD --not $version_base --count`
+    # Using wc -l instead of --count argument to rev-list because
+    # pre-1.7.2 Gits are still common out in the wilderness.
+    version_n_root=`git rev-list $version_base --not $version_tag | wc -l`
+    version_n_branch=`git rev-list HEAD --not $version_base | wc -l`
     if [ -z "$NO_GIT_HASH_IN_VERSION" ]
     then
         version_hash="-`git rev-parse --short $version_head`"
