@@ -48,7 +48,8 @@
     sb!di::handle-breakpoint
     sb!di::handle-single-step-trap
     fdefinition-object
-    #!+win32 sb!kernel::handle-win32-exception))
+    #!+win32 sb!kernel::handle-win32-exception
+    #!+sb-thruption sb!thread::run-interruption))
 
 (defparameter *common-static-symbols*
   '(t
@@ -80,6 +81,8 @@
     sb!unix::*allow-with-interrupts*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
+    #!+sb-thruption sb!unix::*thruption-pending*
+    #!+sb-thruption sb!impl::*restart-clusters*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*

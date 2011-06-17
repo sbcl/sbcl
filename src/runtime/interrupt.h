@@ -177,6 +177,9 @@ extern void lower_thread_control_stack_guard_page(struct thread *th);
 extern void reset_thread_control_stack_guard_page(struct thread *th);
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_WIN32)
+# ifdef LISP_FEATURE_SB_THRUPTION
+void thruption_handler(int signal, siginfo_t *info, os_context_t *context);
+# endif
 void rtmin0_handler(int signal, siginfo_t *info, os_context_t *context);
 void rtmin1_handler(int signal, siginfo_t *info, os_context_t *context);
 #endif

@@ -30,6 +30,7 @@
                   *allow-with-interrupts*
                   *interrupts-enabled*
                   *interrupt-pending*
+                  #!+sb-thruption *thruption-pending*
                   *type-system-initialized*))
 
 (defvar *cold-init-complete-p*)

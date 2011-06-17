@@ -200,6 +200,7 @@
   (declare (ignore signal code context))
   (sb!ext:exit))
 
+#!-sb-thruption
 ;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
@@ -227,6 +228,7 @@
   #!-linux
   (enable-interrupt sigsys #'sigsys-handler)
   (enable-interrupt sigalrm #'sigalrm-handler)
+  #!-sb-thruption
   (enable-interrupt sigpipe #'sigpipe-handler)
   (enable-interrupt sigchld #'sigchld-handler)
   #!+hpux (ignore-interrupt sigxcpu)

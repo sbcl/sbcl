@@ -842,9 +842,14 @@ interrupt_handle_pending(os_context_t *context)
      * thus we end up here again. Third, when calling GC-ON or at the
      * end of a WITHOUT-GCING, MAYBE-HANDLE-PENDING-GC will trap to
      * here if there is a pending GC. Fourth, ahem, at the end of
-     * WITHOUT-INTERRUPTS (bar complications with nesting). */
-
-    /* Win32 only needs to handle the GC cases (for now?) */
+     * WITHOUT-INTERRUPTS (bar complications with nesting).
+     *
+     * A fourth way happens with safepoints: In addition to a stop for
+     * GC that is pending, there are thruptions.  Both mechanisms are
+     * mostly signal-free, yet also of an asynchronous nature, so it makes
+     * sense to let interrupt_handle_pending take care of running them:
+     * It gets run precisely at those places where it is safe to process
+     * pending asynchronous tasks. */
 
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
@@ -890,8 +895,42 @@ interrupt_handle_pending(os_context_t *context)
         void *original_pending_handler = data->pending_handler;
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-        /* handles the STOP_FOR_GC_PENDING case */
-        thread_pitstop(context);
+        /* handles the STOP_FOR_GC_PENDING case, plus THRUPTIONS */
+        if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL
+# ifdef LISP_FEATURE_SB_THRUPTION
+            || SymbolValue(THRUPTION_PENDING,thread) != NIL
+# endif
+            )
+        {
+            /* We ought to take this chance to do a pitstop now. */
+
+            /* Now, it goes without saying that the context sigmask
+             * tweaking around this call is not pretty.  However, it
+             * currently seems to be "needed" for the following
+             * situation.  (So let's find a better solution and remove
+             * this comment afterwards.)
+             *
+             * Suppose we are in a signal handler (let's say SIGALRM).
+             * At the end of a WITHOUT-INTERRUPTS, the lisp code notices
+             * that a thruption is pending, and says to itself "let's
+             * receive pending interrupts then".  We trust that the
+             * caller is happy to run those sorts of things now,
+             * including thruptions, otherwise it wouldn't have called
+             * us.  But that's the problem: Even though we can guess the
+             * caller's intention, may_thrupt() would see that signals
+             * are blocked in the signal context (because that context
+             * itself points to a signal handler).  So we cheat and
+             * pretend that signals weren't blocked.
+             * --DFL */
+#ifndef LISP_FEATURE_WIN32
+            sigset_t old, *ctxset = os_context_sigmask_addr(context);
+            unblock_signals(&deferrable_sigset, ctxset, &old);
+#endif
+            thread_pitstop(context);
+#ifndef LISP_FEATURE_WIN32
+            sigcopyset(&old, ctxset);
+#endif
+        }
 #elif defined(LISP_FEATURE_SB_THREAD)
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
@@ -978,6 +1017,17 @@ interrupt_handle_pending(os_context_t *context)
         sigcopyset(os_context_sigmask_addr(context), &data->pending_mask);
         run_deferred_handler(data, context);
     }
+#ifdef LISP_FEATURE_SB_THRUPTION
+    if (SymbolValue(THRUPTION_PENDING,thread)==T)
+        /* Special case for the following situation: There is a
+         * thruption pending, but a signal had been deferred.  The
+         * pitstop at the top of this function could only take care
+         * of GC, and skipped the thruption, so we need to try again
+         * now that INTERRUPT_PENDING and the sigmask have been
+         * reset. */
+        while (check_pending_thruptions(context))
+            ;
+#endif
 #endif
 #ifdef LISP_FEATURE_GENCGC
     if (get_pseudo_atomic_interrupted(thread))
@@ -1791,6 +1841,15 @@ undoably_install_low_level_interrupt_handler (int signal,
         sa.sa_sigaction = low_level_unblock_me_trampoline;
     else
         sa.sa_sigaction = low_level_handle_now_handler;
+
+#ifdef LISP_FEATURE_SB_THRUPTION
+    /* It's in `deferrable_sigset' so that we block&unblock it properly,
+     * but we don't actually want to defer it.  And if we put it only
+     * into blockable_sigset, we'd have to special-case it around thread
+     * creation at least. */
+    if (signal == SIGPIPE)
+        sa.sa_sigaction = low_level_handle_now_handler;
+#endif
 
     sigcopyset(&sa.sa_mask, &blockable_sigset);
     sa.sa_flags = SA_SIGINFO | SA_RESTART

@@ -598,6 +598,10 @@ create_thread_struct(lispobj initial_function) {
     bind_variable(GC_SAFE,NIL,th);
     bind_variable(IN_SAFEPOINT,NIL,th);
 #endif
+#ifdef LISP_FEATURE_SB_THRUPTION
+    bind_variable(THRUPTION_PENDING,NIL,th);
+    bind_variable(RESTART_CLUSTERS,NIL,th);
+#endif
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     access_control_stack_pointer(th)=th->control_stack_start;
 #endif
@@ -816,6 +820,19 @@ thread_yield()
 #endif
 }
 
+int
+wake_thread(os_thread_t os_thread)
+{
+#ifdef LISP_FEATURE_WIN32
+# define SIGPIPE 1
+#endif
+#if !defined(LISP_FEATURE_SB_THRUPTION) || defined(LISP_FEATURE_WIN32)
+    return kill_safely(os_thread, SIGPIPE);
+#else
+    return wake_thread_posix(os_thread);
+#endif
+}
+
 /* If the thread id given does not belong to a running thread (it has
  * exited or never even existed) pthread_kill _may_ fail with ESRCH,
  * but it is also allowed to just segfault, see
@@ -825,13 +842,13 @@ thread_yield()
  * (NPTL recycles them extremely fast) so a signal can be sent to
  * another process if the one it was sent to exited.
  *
- * We send signals in two places: signal_interrupt_thread sends a
- * signal that's harmless if delivered to another thread, but
- * SIG_STOP_FOR_GC is fatal.
- *
  * For these reasons, we must make sure that the thread is still alive
  * when the pthread_kill is called and return if the thread is
- * exiting. */
+ * exiting.
+ *
+ * Note (DFL, 2011-06-22): At the time of writing, this function is only
+ * used for INTERRUPT-THREAD, hence the wake_thread special-case for
+ * Windows is OK. */
 int
 kill_safely(os_thread_t os_thread, int signal)
 {

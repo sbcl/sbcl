@@ -350,8 +350,14 @@ extern kern_return_t mach_lisp_thread_destroy(struct thread *thread);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 void thread_in_safety_transition(os_context_t *ctx);
 void thread_in_lisp_raised(os_context_t *ctx);
+void thread_interrupted(os_context_t *ctx);
 void thread_pitstop(os_context_t *ctxptr);
 extern void thread_register_gc_trigger();
+
+# ifdef LISP_FEATURE_SB_THRUPTION
+int wake_thread(os_thread_t os_thread);
+int wake_thread_posix(os_thread_t os_thread);
+# endif
 
 #define thread_qrl(th) (&(th)->nonpointer_data->qrl_lock)
 
@@ -405,6 +411,8 @@ void pop_gcing_safety(struct gcing_safety *from)
 
 #define WITH_STATE_SEM(thread)                                     \
     WITH_STATE_SEM_hygenic(sbcl__state_sem, thread)
+
+int check_pending_thruptions(os_context_t *ctx);
 
 #endif
 

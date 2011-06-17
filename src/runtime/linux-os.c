@@ -453,8 +453,15 @@ os_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
                                                  sigsegv_handler);
+
+    /* OAOOM c.f. sunos-os.c.
+     * Should we have a reusable function gc_install_interrupt_handlers? */
 #ifdef LISP_FEATURE_SB_THREAD
-# ifndef LISP_FEATURE_SB_SAFEPOINT
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+#  ifdef LISP_FEATURE_SB_THRUPTION
+    undoably_install_low_level_interrupt_handler(SIGPIPE, thruption_handler);
+#  endif
+# else
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
                                                  sig_stop_for_gc_handler);
 # endif
