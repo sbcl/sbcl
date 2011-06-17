@@ -455,6 +455,7 @@ status slot."
           (copy-descriptor-to-stream new-fd pty cookie external-format)))
       (values name
               (sb-sys:make-fd-stream master :input t :output t
+                                     :external-format external-format
                                      :element-type :default
                                      :dual-channel-p t)))))
 
@@ -734,7 +735,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                         #+win32 `(declare (ignore ,pty ,cookie))
                         #+win32 `(let (,pty-name ,pty-stream) ,@body)
                         #-win32 `(multiple-value-bind (,pty-name ,pty-stream)
-                                     (open-pty ,pty ,cookie)
+                                     (open-pty ,pty ,cookie :external-format external-format)
                                    ,@body))
                       (with-args-vec ((vec args) &body body)
                         `(with-c-strvec (,vec ,args)
