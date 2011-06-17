@@ -64,7 +64,7 @@ extern sigset_t blockable_sigset;
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-#define QSHOW_PREFIX fprintf(stderr, "%lu ", pthread_self());
+#define QSHOW_PREFIX fprintf(stderr, "%p ", pthread_self());
 #else
 #define QSHOW_PREFIX
 #endif
