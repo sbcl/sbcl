@@ -346,27 +346,53 @@
            (declare (type list cache))
            (if not-p (cdr cache) (car cache)))))))
 
+;;; The most common operations on consets are iterating through the constraints
+;;; that are related to a certain variable in a given conset.  Storing the
+;;; constraints related to each variable in vectors allows us to easily iterate
+;;; through the intersection of such constraints and the constraints in a conset.
+;;;
+;;; EQL-var constraints assert that two lambda-vars are EQL.
+;;; Private constraints assert that a lambda-var is EQL or not EQL to a constant.
+;;; Inheritable constraints are constraints that may be propagated to EQL
+;;; lambda-vars (along with EQL-var constraints).
+;;;
+;;; Lambda-var -- lvar EQL constraints only serve one purpose: remember whether
+;;; an lvar is (only) written to by a ref to that lambda-var, and aren't ever
+;;; propagated.
+
 (defun register-constraint (x con y)
   (declare (type lambda-var x) (type constraint con) (type constraint-y y))
   (conset-adjoin con (lambda-var-constraints x))
   (macrolet ((ensuref (place default)
-               `(or ,place (setf ,place ,default))))
+               `(or ,place (setf ,place ,default)))
+             (ensure-hash (place)
+               `(ensuref ,place (make-hash-table)))
+             (ensure-vec (place)
+               `(ensuref ,place (make-array 8 :adjustable t :fill-pointer 0))))
     (etypecase y
       (ctype
-         (let ((index (ensuref (lambda-var-ctype-constraints x)
-                               (make-hash-table))))
-           (push con (gethash (sb!kernel::type-class-info y) index))))
+       (let ((index (ensure-hash (lambda-var-ctype-constraints x)))
+             (vec   (ensure-vec  (lambda-var-inheritable-constraints x))))
+         (push con (gethash (sb!kernel::type-class-info y) index))
+         (vector-push-extend con vec)))
       (lvar
-         (let ((index (ensuref (lambda-var-eq-constraints x)
-                               (make-hash-table))))
-           (setf (gethash y index) con)))
+       (let ((index (ensure-hash (lambda-var-eq-constraints x))))
+         (setf (gethash y index) con)))
       ((or constant lambda-var)
-         (let* ((index (ensuref (lambda-var-eq-constraints x)
-                                (make-hash-table)))
-                (cons  (ensuref (gethash y index) (list nil))))
-           (if (constraint-not-p con)
-               (setf (cdr cons) con)
-               (setf (car cons) con))))))
+       (let* ((index (ensure-hash (lambda-var-eq-constraints x)))
+              (cons  (ensuref (gethash y index) (list nil))))
+         (if (constraint-not-p con)
+             (setf (cdr cons) con)
+             (setf (car cons) con)))
+       (typecase y
+         (constant
+          (let ((vec (ensure-vec (lambda-var-private-constraints x))))
+            (vector-push-extend con vec)))
+         (lambda-var
+          (let ((vec (if (constraint-not-p con)
+                         (ensure-vec (lambda-var-inheritable-constraints x))
+                         (ensure-vec (lambda-var-eql-var-constraints x)))))
+            (vector-push-extend con vec)))))))
   nil)
 
 ;;; Return a constraint for the specified arguments. We only create a
@@ -409,26 +435,70 @@
           ((cast-p use)
            (ok-lvar-lambda-var (cast-value use) constraints)))))
 
-(defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
-  (once-only ((var var))
-    `(let ((,symbol ,var))
-       (flet ((body-fun ()
+(defmacro do-conset-constraints-intersection ((symbol (conset constraints) &optional result)
+                                             &body body)
+  (let ((min (gensym "MIN"))
+        (max (gensym "MAX")))
+    (once-only ((conset conset)
+                (constraints constraints))
+      `(flet ((body (,symbol)
+                (declare (type constraint ,symbol))
                 ,@body))
-         (body-fun)
-         (do-conset-elements (con ,constraints ,result)
-           (let ((other (and (eq (constraint-kind con) 'eql)
-                             (eq (constraint-not-p con) nil)
-                             (cond ((eq ,var (constraint-x con))
-                                    (constraint-y con))
-                                   ((eq ,var (constraint-y con))
-                                    (constraint-x con))
-                                   (t
-                                    nil)))))
-             (when other
-               (setq ,symbol other)
-               (when (lambda-var-p ,symbol)
-                 (body-fun)))))))))
+         (when ,constraints
+           (let ((,min (conset-min ,conset))
+                 (,max (conset-max ,conset)))
+             (map nil (lambda (constraint)
+                        (declare (type constraint constraint))
+                        (let ((number (constraint-number constraint)))
+                          (when (and (<= ,min number)
+                                     (< number ,max)
+                                     (conset-member constraint ,conset))
+                            (body constraint))))
+                  ,constraints)))
+         ,result))))
 
+(defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
+  (once-only ((var         var)
+              (constraints constraints))
+    `(flet ((body-fun (,symbol)
+              ,@body))
+       (body-fun ,var)
+       (do-conset-constraints-intersection
+           (con (,constraints (lambda-var-eql-var-constraints ,var)) ,result)
+         (let ((x (constraint-x con))
+               (y (constraint-y con)))
+           (body-fun (if (eq ,var x) y x)))))))
+
+(defmacro do-inheritable-constraints ((symbol (conset variable) &optional result)
+                                      &body body)
+  (once-only ((conset   conset)
+              (variable variable))
+    `(block nil
+       (flet ((body-fun (,symbol)
+                ,@body))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-inheritable-constraints ,variable)))
+           (body-fun con))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-eql-var-constraints ,variable)) ,result)
+           (body-fun con))))))
+
+(defmacro do-propagatable-constraints ((symbol (conset variable) &optional result)
+                                       &body body)
+  (once-only ((conset conset)
+              (variable variable))
+    `(block nil
+       (flet ((body-fun (,symbol)
+                ,@body))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-private-constraints ,variable)))
+           (body-fun con))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-eql-var-constraints ,variable)))
+           (body-fun con))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-inheritable-constraints ,variable)) ,result)
+           (body-fun con))))))
 ;;;; Searching constraints
 
 ;;; Add the indicated test constraint to BLOCK. We don't add the
@@ -647,8 +717,8 @@
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
-(defun constrain-ref-type (ref constraints in)
-  (declare (type ref ref) (type conset constraints in))
+(defun constrain-ref-type (ref in)
+  (declare (type ref ref) (type conset in))
   ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
   ;; cons up endless union types when propagating large number of EQL
   ;; constraints -- eg. from large CASE forms -- instead we just
@@ -665,15 +735,13 @@
         (not-fpz nil)
         (not-res *empty-type*)
         (leaf (ref-leaf ref)))
+    (declare (type lambda-var leaf))
     (flet ((note-not (x)
              (if (fp-zero-p x)
                  (push x not-fpz)
                  (when (or constrain-symbols (null x) (not (symbolp x)))
                    (add-to-xset x not-set)))))
-      ;; KLUDGE: the implementations of DO-CONSET-INTERSECTION will
-      ;; probably run faster when the smaller set comes first, so
-      ;; don't change the order here.
-      (do-conset-intersection (con constraints in)
+      (do-propagatable-constraints (con (in leaf))
         (let* ((x (constraint-x con))
                (y (constraint-y con))
                (not-p (constraint-not-p con))
@@ -687,26 +755,25 @@
                      (setq not-res (type-union not-res other)))
                  (setq res (type-approx-intersection2 res other))))
             (eql
-             (unless (lvar-p other)
-               (let ((other-type (leaf-type other)))
-                 (if not-p
-                     (when (and (constant-p other)
-                                (member-type-p other-type))
-                       (note-not (constant-value other)))
-                     (let ((leaf-type (leaf-type leaf)))
-                       (cond
-                         ((or (constant-p other)
-                              (and (leaf-refs other) ; protect from
+             (let ((other-type (leaf-type other)))
+               (if not-p
+                   (when (and (constant-p other)
+                              (member-type-p other-type))
+                     (note-not (constant-value other)))
+                   (let ((leaf-type (leaf-type leaf)))
+                     (cond
+                       ((or (constant-p other)
+                            (and (leaf-refs other) ; protect from
                                         ; deleted vars
-                                   (csubtypep other-type leaf-type)
-                                   (not (type= other-type leaf-type))
-                                   ;; Don't change to a LEAF not visible here.
-                                   (leaf-visible-from-node-p other ref)))
-                          (change-ref-leaf ref other)
-                          (when (constant-p other) (return)))
-                         (t
-                          (setq res (type-approx-intersection2
-                                     res other-type)))))))))
+                                 (csubtypep other-type leaf-type)
+                                 (not (type= other-type leaf-type))
+                                 ;; Don't change to a LEAF not visible here.
+                                 (leaf-visible-from-node-p other ref)))
+                        (change-ref-leaf ref other)
+                        (when (constant-p other) (return)))
+                       (t
+                        (setq res (type-approx-intersection2
+                                   res other-type))))))))
             ((< >)
              (cond
                ((and (integer-type-p res) (integer-type-p y))
@@ -746,20 +813,16 @@
 ;;; Copy all CONSTRAINTS involving FROM-VAR - except the (EQL VAR
 ;;; LVAR) ones - to all of the variables in the VARS list.
 (defun inherit-constraints (vars from-var constraints target)
-  (do-conset-elements (con constraints)
-    ;; Constant substitution is controversial.
-    (unless (constant-p (constraint-y con))
+  (do-inheritable-constraints (con (constraints from-var))
+    (let ((eq-x (eq from-var (constraint-x con)))
+          (eq-y (eq from-var (constraint-y con))))
       (dolist (var vars)
-        (let ((eq-x (eq from-var (constraint-x con)))
-              (eq-y (eq from-var (constraint-y con))))
-          (when (or (and eq-x (not (lvar-p (constraint-y con))))
-                    eq-y)
-            (conset-adjoin (find-or-create-constraint
-                            (constraint-kind con)
-                            (if eq-x var (constraint-x con))
-                            (if eq-y var (constraint-y con))
-                            (constraint-not-p con))
-                           target)))))))
+        (conset-adjoin (find-or-create-constraint
+                        (constraint-kind con)
+                        (if eq-x var (constraint-x con))
+                        (if eq-y var (constraint-y con))
+                        (constraint-not-p con))
+                       target)))))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
@@ -812,9 +875,7 @@
        (when (ok-ref-lambda-var node)
          (maybe-add-eql-var-lvar-constraint node gen)
          (when preprocess-refs-p
-           (let* ((var (ref-leaf node))
-                  (con (lambda-var-constraints var)))
-             (constrain-ref-type node con gen)))))
+           (constrain-ref-type node gen))))
       (cast
        (let ((lvar (cast-value node)))
          (let ((var (ok-lvar-lambda-var lvar gen)))
