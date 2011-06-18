@@ -153,37 +153,6 @@
     (min 0 :type fixnum)
     (max 0 :type fixnum))
 
-  (defmacro do-conset-elements ((constraint conset &optional result) &body body)
-    (with-unique-names (vector index start end
-                               #-sb-xc-host ignore
-                               #-sb-xc-host constraint-universe-end)
-      (let* ((constraint-universe #+sb-xc-host '*constraint-universe*
-                                  #-sb-xc-host (sb!xc:gensym "UNIVERSE"))
-             (with-array-data
-                #+sb-xc-host '(progn)
-                #-sb-xc-host `(with-array-data
-                                  ((,constraint-universe *constraint-universe*)
-                                   (,ignore 0) (,constraint-universe-end nil)
-                                   :check-fill-pointer t)
-                                (declare (ignore ,ignore))
-                                (aver (<= ,end ,constraint-universe-end)))))
-        `(let* ((,vector (conset-vector ,conset))
-               (,start (conset-min ,conset))
-               (,end (min (conset-max ,conset) (length ,vector))))
-          (,@with-array-data
-            (do ((,index ,start (1+ ,index))) ((>= ,index ,end) ,result)
-              (when (plusp (sbit ,vector ,index))
-                (let ((,constraint (elt ,constraint-universe ,index)))
-                  ,@body))))))))
-
-  ;; Oddly, iterating just between the maximum of the two sets' minima
-  ;; and the minimum of the sets' maxima slowed down CP.
-  (defmacro do-conset-intersection
-      ((constraint conset1 conset2 &optional result) &body body)
-    `(do-conset-elements (,constraint ,conset1 ,result)
-       (when (conset-member ,constraint ,conset2)
-         ,@body)))
-
   (defun conset-empty (conset)
     (or (= (conset-min conset) (conset-max conset))
         ;; TODO: I bet FIND on bit-vectors can be optimized, if it
@@ -227,14 +196,13 @@
         (plusp (sbit vector number)))))
 
   (defun conset-adjoin (constraint conset)
-    (prog1
-      (not (conset-member constraint conset))
-      (let ((number (%constraint-number constraint)))
-        (conset-grow conset (1+ number))
-        (setf (sbit (conset-vector conset) number) 1)
-        (setf (conset-min conset) (min number (conset-min conset)))
-        (when (>= number (conset-max conset))
-          (setf (conset-max conset) (1+ number))))))
+    (let ((number (%constraint-number constraint)))
+      (conset-grow conset (1+ number))
+      (setf (sbit (conset-vector conset) number) 1)
+      (setf (conset-min conset) (min number (conset-min conset)))
+      (when (>= number (conset-max conset))
+        (setf (conset-max conset) (1+ number))))
+    conset)
 
   (defun conset= (conset1 conset2)
     (let* ((vector1 (conset-vector conset1))
@@ -325,7 +293,6 @@
 ;;; to over-approximate and then linear search through the potential hits.
 ;;; LVARs can only be found in EQL (not-p = NIL) constraints, while constant
 ;;; and lambda-vars can only be found in EQL constraints.
-
 (defun find-constraint (kind x y not-p)
   (declare (type lambda-var x) (type constraint-y y) (type boolean not-p))
   (etypecase y
@@ -359,7 +326,10 @@
 ;;; Lambda-var -- lvar EQL constraints only serve one purpose: remember whether
 ;;; an lvar is (only) written to by a ref to that lambda-var, and aren't ever
 ;;; propagated.
-
+;;;
+;;; Finally, the lambda-var conset is only used to track the whole set of
+;;; constraints associated with a given lambda-var, and thus easily delete
+;;; such constraints from a conset.
 (defun register-constraint (x con y)
   (declare (type lambda-var x) (type constraint con) (type constraint-y y))
   (conset-adjoin con (lambda-var-constraints x))
@@ -410,33 +380,43 @@
         (when (lambda-var-p y)
           (register-constraint y new x))
         new)))
-
-;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
-;;; analysis on it), then return the LAMBDA-VAR, otherwise NIL.
-#!-sb-fluid (declaim (inline ok-ref-lambda-var))
-(defun ok-ref-lambda-var (ref)
-  (declare (type ref ref))
-  (let ((leaf (ref-leaf ref)))
-    (when (and (lambda-var-p leaf)
-               (lambda-var-constraints leaf))
-      leaf)))
-
-;;; See if LVAR's single USE is a REF to a LAMBDA-VAR and they are EQL
-;;; according to CONSTRAINTS. Return LAMBDA-VAR if so.
-(defun ok-lvar-lambda-var (lvar constraints)
-  (declare (type lvar lvar))
-  (let ((use (lvar-uses lvar)))
-    (cond ((ref-p use)
-           (let ((lambda-var (ok-ref-lambda-var use)))
-             (when lambda-var
-               (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
-                 (when (and constraint (conset-member constraint constraints))
-                   lambda-var)))))
-          ((cast-p use)
-           (ok-lvar-lambda-var (cast-value use) constraints)))))
-
+
+;;; Actual conset interface
+;;;
+;;; Constraint propagation needs to iterate over the set of lambda-vars known to
+;;; be EQL to a given variable (including itself), via DO-EQL-VARS.
+;;;
+;;; It also has to iterate through constraints that are inherited by EQL variables
+;;; (DO-INHERITABLE-CONSTRAINTS), and through constraints used by
+;;; CONSTRAIN-REF-TYPE (to derive the type of a REF to a lambda-var).
+;;;
+;;; Consets must keep track of which lvars are EQL to a given lambda-var (result
+;;; from a REF to the lambda-var): CONSET-LVAR-LAMBDA-VAR-EQL-P and
+;;; CONSET-ADD-LVAR-LAMBDA-VAR-EQL.  This, as all other constraints, must of
+;;; course be cleared when a lambda-var's constraints are dropped because of
+;;; assignment.
+;;;
+;;; Consets must be able to add constraints to a given lambda-var
+;;; (CONSET-ADD-CONSTRAINT), and to the set of variables EQL to a given
+;;; lambda-var (CONSET-ADD-CONSTRAINT-TO-EQL).
+;;;
+;;; When a lambda-var is assigned to, all the constraints involving that variable
+;;; must be dropped: constraint propagation is flow-sensitive, so the constraints
+;;; relate to the variable at a given range of program point.  In such cases,
+;;; constraint propagation calls CONSET-CLEAR-LAMBDA-VAR.
+;;;
+;;; Finally, one of the main strengths of constraint propagation in SBCL is the
+;;; tracking of EQL variables to help constraint propagation.  When two variables
+;;; are known to be EQL (e.g. after a branch), ADD-EQL-VAR-VAR-CONSTRAINT is
+;;; called to add the EQL constraint, but also have each equality class inherit
+;;; the other's (inheritable) constraints.
+;;;
+;;; On top of that, we have the usual bulk set operations: intersection, copy,
+;;; equality or emptiness testing.  There's also union, but that's only an
+;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
+;;; FIND-BLOCK-TYPE-CONSTRAINTS.
 (defmacro do-conset-constraints-intersection ((symbol (conset constraints) &optional result)
-                                             &body body)
+                                              &body body)
   (let ((min (gensym "MIN"))
         (max (gensym "MAX")))
     (once-only ((conset conset)
@@ -499,6 +479,85 @@
          (do-conset-constraints-intersection
              (con (,conset (lambda-var-inheritable-constraints ,variable)) ,result)
            (body-fun con))))))
+
+(declaim (inline conset-lvar-lambda-var-eql-p conset-add-lvar-lambda-var-eql))
+(defun conset-lvar-lambda-var-eql-p (conset lvar lambda-var)
+  (let ((constraint (find-constraint 'eql lambda-var lvar nil)))
+    (and constraint
+         (conset-member constraint conset))))
+
+(defun conset-add-lvar-lambda-var-eql (conset lvar lambda-var)
+  (let ((constraint (find-or-create-constraint 'eql lambda-var lvar nil)))
+    (conset-adjoin constraint conset)))
+
+(declaim (inline conset-add-constraint conset-add-constraint-to-eql))
+(defun conset-add-constraint (conset kind x y not-p)
+  (declare (type conset conset)
+           (type lambda-var x))
+  (conset-adjoin (find-or-create-constraint kind x y not-p)
+                 conset))
+
+(defun conset-add-constraint-to-eql (conset kind x y not-p &optional (target conset))
+  (declare (type conset target conset)
+           (type lambda-var x))
+  (do-eql-vars (x (x conset))
+    (conset-add-constraint target kind x y not-p)))
+
+(declaim (inline conset-clear-lambda-var))
+(defun conset-clear-lambda-var (conset var)
+  (conset-difference conset (lambda-var-constraints var)))
+
+;;; Copy all CONSTRAINTS involving FROM-VAR - except the (EQL VAR
+;;; LVAR) ones - to all of the variables in the VARS list.
+(defun inherit-constraints (vars from-var constraints target)
+  (do-inheritable-constraints (con (constraints from-var))
+    (let ((eq-x (eq from-var (constraint-x con)))
+          (eq-y (eq from-var (constraint-y con))))
+      (dolist (var vars)
+        (conset-add-constraint target
+                               (constraint-kind con)
+                               (if eq-x var (constraint-x con))
+                               (if eq-y var (constraint-y con))
+                               (constraint-not-p con))))))
+
+;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
+;; inherit each other's constraints.
+(defun add-eql-var-var-constraint (var1 var2 constraints
+                                   &optional (target constraints))
+  (let ((constraint (find-or-create-constraint 'eql var1 var2 nil)))
+    (unless (conset-member constraint target)
+      (conset-adjoin constraint target)
+      (collect ((eql1) (eql2))
+        (do-eql-vars (var1 (var1 constraints))
+          (eql1 var1))
+        (do-eql-vars (var2 (var2 constraints))
+          (eql2 var2))
+        (inherit-constraints (eql1) var2 constraints target)
+        (inherit-constraints (eql2) var1 constraints target))
+      t)))
+
+;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
+;;; analysis on it), then return the LAMBDA-VAR, otherwise NIL.
+#!-sb-fluid (declaim (inline ok-ref-lambda-var))
+(defun ok-ref-lambda-var (ref)
+  (declare (type ref ref))
+  (let ((leaf (ref-leaf ref)))
+    (when (and (lambda-var-p leaf)
+               (lambda-var-constraints leaf))
+      leaf)))
+
+;;; See if LVAR's single USE is a REF to a LAMBDA-VAR and they are EQL
+;;; according to CONSTRAINTS. Return LAMBDA-VAR if so.
+(defun ok-lvar-lambda-var (lvar constraints)
+  (declare (type lvar lvar))
+  (let ((use (lvar-uses lvar)))
+    (cond ((ref-p use)
+           (let ((lambda-var (ok-ref-lambda-var use)))
+             (and lambda-var
+                  (conset-lvar-lambda-var-eql-p constraints lvar lambda-var)
+                  lambda-var)))
+          ((cast-p use)
+           (ok-lvar-lambda-var (cast-value use) constraints)))))
 ;;;; Searching constraints
 
 ;;; Add the indicated test constraint to BLOCK. We don't add the
@@ -508,9 +567,7 @@
   (cond ((and (eq 'eql fun) (lambda-var-p y) (not not-p))
          (add-eql-var-var-constraint x y constraints target))
         (t
-         (do-eql-vars (x (x constraints))
-           (let ((con (find-or-create-constraint fun x y not-p)))
-             (conset-adjoin con target)))))
+         (conset-add-constraint-to-eql constraints fun x y not-p target)))
   (values))
 
 ;;; Add complementary constraints to the consequent and alternative
@@ -807,37 +864,7 @@
   (let ((lvar (ref-lvar ref))
         (leaf (ref-leaf ref)))
     (when (and (lambda-var-p leaf) lvar)
-      (conset-adjoin (find-or-create-constraint 'eql leaf lvar nil)
-                     gen))))
-
-;;; Copy all CONSTRAINTS involving FROM-VAR - except the (EQL VAR
-;;; LVAR) ones - to all of the variables in the VARS list.
-(defun inherit-constraints (vars from-var constraints target)
-  (do-inheritable-constraints (con (constraints from-var))
-    (let ((eq-x (eq from-var (constraint-x con)))
-          (eq-y (eq from-var (constraint-y con))))
-      (dolist (var vars)
-        (conset-adjoin (find-or-create-constraint
-                        (constraint-kind con)
-                        (if eq-x var (constraint-x con))
-                        (if eq-y var (constraint-y con))
-                        (constraint-not-p con))
-                       target)))))
-
-;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
-;; inherit each other's constraints.
-(defun add-eql-var-var-constraint (var1 var2 constraints
-                                   &optional (target constraints))
-  (let ((con (find-or-create-constraint 'eql var1 var2 nil)))
-    (when (conset-adjoin con target)
-      (collect ((eql1) (eql2))
-        (do-eql-vars (var1 (var1 constraints))
-          (eql1 var1))
-        (do-eql-vars (var2 (var2 constraints))
-          (eql2 var2))
-        (inherit-constraints (eql1) var2 constraints target)
-        (inherit-constraints (eql2) var1 constraints target))
-      t)))
+      (conset-add-lvar-lambda-var-eql gen lvar leaf))))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR and LVAR's
 ;; LAMBDA-VAR if possible.
@@ -868,8 +895,7 @@
                  when (and val (lambda-var-constraints var))
                  do (let ((type (lvar-type val)))
                       (unless (eq type *universal-type*)
-                        (let ((con (find-or-create-constraint 'typep var type nil)))
-                          (conset-adjoin con gen))))
+                        (conset-add-constraint gen 'typep var type nil)))
                     (maybe-add-eql-var-var-constraint var val gen)))))
       (ref
        (when (ok-ref-lambda-var node)
@@ -882,18 +908,15 @@
            (when var
              (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
                (unless (eq atype *universal-type*)
-                 (do-eql-vars (var (var gen))
-                   (let ((con (find-or-create-constraint 'typep var atype nil)))
-                     (conset-adjoin con gen)))))))))
+                 (conset-add-constraint-to-eql gen 'typep var atype nil)))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
-                  (cons (lambda-var-constraints var) :exit-if-null))
-         (conset-difference gen cons)
+                  (nil (lambda-var-constraints var) :exit-if-null))
+         (conset-clear-lambda-var gen var)
          (let ((type (single-value-type (node-derived-type node))))
            (unless (eq type *universal-type*)
-             (let ((con (find-or-create-constraint 'typep var type nil)))
-               (conset-adjoin con gen))))
+             (conset-add-constraint gen 'typep var type nil)))
          (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
   gen)
 

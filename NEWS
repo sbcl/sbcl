@@ -11,6 +11,8 @@ changes relative to sbcl-1.0.49:
     the thunk, as a keyword argument, :arguments.
   * optimization: extracting bits of a single-float on x86-64 has been
     optimized. (lp#555201)
+  * meta-optimization: improved compilation speed, especially for large
+    functions. (lp#792363 and lp#394206)
   * bug fix: bound derivation for floating point operations is now more
     careful about rounding possibly closing open bounds. (lp#793771)
   * bug fix: SB-POSIX:SYSCALL-ERROR's argument is now optional. (accidental
