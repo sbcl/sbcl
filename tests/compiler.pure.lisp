@@ -2231,15 +2231,16 @@
                (logand most-positive-fixnum (* x most-positive-fixnum))))
 
 ;;; bug 256.b
-(assert (let (warned-p)
+(with-test (:name :propagate-type-through-error-and-binding)
+  (assert (let (warned-p)
             (handler-bind ((warning (lambda (w) (setf warned-p t))))
               (compile nil
-                         '(lambda (x)
-                           (list (let ((y (the real x)))
-                                   (unless (floatp y) (error ""))
-                                   y)
-                                 (integer-length x)))))
-            warned-p))
+                       '(lambda (x)
+                         (list (let ((y (the real x)))
+                                 (unless (floatp y) (error ""))
+                                 y)
+                          (integer-length x)))))
+            warned-p)))
 
 ;; Dead / in safe code
 (with-test (:name :safe-dead-/)

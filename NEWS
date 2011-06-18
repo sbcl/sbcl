@@ -9,6 +9,8 @@ changes relative to sbcl-1.0.49:
     and SB-EXT:*SYSINIT-PATHNAME-FUNCTION*.
   * enhancement: SB-EXT:MAKE-THREAD accepts an argument list designator for
     the thunk, as a keyword argument, :arguments.
+  * enhancement: constraint propagation is simplified (and sped up) when
+    COMPILATION-SPEED > SPEED.
   * optimization: extracting bits of a single-float on x86-64 has been
     optimized. (lp#555201)
   * meta-optimization: improved compilation speed, especially for large

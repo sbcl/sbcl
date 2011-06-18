@@ -563,24 +563,48 @@
 ;;; Add the indicated test constraint to BLOCK. We don't add the
 ;;; constraint if the block has multiple predecessors, since it only
 ;;; holds on this particular path.
-(defun add-test-constraint (fun x y not-p constraints target)
-  (cond ((and (eq 'eql fun) (lambda-var-p y) (not not-p))
-         (add-eql-var-var-constraint x y constraints target))
-        (t
-         (conset-add-constraint-to-eql constraints fun x y not-p target)))
+(defun precise-add-test-constraint (fun x y not-p constraints target)
+  (if (and (eq 'eql fun) (lambda-var-p y) (not not-p))
+      (add-eql-var-var-constraint x y constraints target)
+      (conset-add-constraint-to-eql constraints fun x y not-p target))
   (values))
 
+(defun add-test-constraint (quick-p fun x y not-p constraints target)
+  (cond (quick-p
+         (conset-add-constraint target fun x y not-p))
+        (t
+         (precise-add-test-constraint fun x y not-p constraints target))))
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
-(defun add-complement-constraints (fun x y not-p constraints
-                                   consequent-constraints
-                                   alternative-constraints)
+(declaim (inline precise-add-test-constraint quick-add-complement-constraints))
+(defun precise-add-complement-constraints (fun x y not-p constraints
+                                           consequent-constraints
+                                           alternative-constraints)
   (when x
-    (add-test-constraint fun x y not-p constraints
-                         consequent-constraints)
-    (add-test-constraint fun x y (not not-p) constraints
+    (precise-add-test-constraint fun x y not-p constraints
+                                consequent-constraints)
+    (precise-add-test-constraint fun x y (not not-p) constraints
                          alternative-constraints))
   (values))
+
+(defun quick-add-complement-constraints (fun x y not-p
+                                         consequent-constraints
+                                         alternative-constraints)
+  (when x
+    (conset-add-constraint consequent-constraints fun x y not-p)
+    (conset-add-constraint alternative-constraints fun x y (not not-p)))
+  (values))
+
+(defun add-complement-constraints (quick-p fun x y not-p constraints
+                                   consequent-constraints
+                                   alternative-constraints)
+  (if quick-p
+      (quick-add-complement-constraints fun x y not-p
+                                        consequent-constraints
+                                        alternative-constraints)
+      (precise-add-complement-constraints fun x y not-p constraints
+                                          consequent-constraints
+                                          alternative-constraints)))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
@@ -592,9 +616,11 @@
   ;; need to avoid barfing on this case.
   (unless (eq (if-consequent if) (if-alternative if))
     (let ((consequent-constraints (make-conset))
-          (alternative-constraints (make-conset)))
+          (alternative-constraints (make-conset))
+          (quick-p (policy if (> compilation-speed speed))))
       (macrolet ((add (fun x y not-p)
-                   `(add-complement-constraints ,fun ,x ,y ,not-p
+                   `(add-complement-constraints quick-p
+                                                ,fun ,x ,y ,not-p
                                                 constraints
                                                 consequent-constraints
                                                 alternative-constraints)))
@@ -634,7 +660,8 @@
                     ;; unnatural asymmetry of the tests.
                     (cond ((not var1)
                            (when var2
-                             (add-test-constraint 'typep var2 (lvar-type arg1)
+                             (add-test-constraint quick-p
+                                                  'typep var2 (lvar-type arg1)
                                                   nil constraints
                                                   consequent-constraints)))
                           (var2
@@ -647,7 +674,8 @@
                                       (find-constant (lvar-value arg2))))
                                 nil))
                           (t
-                           (add-test-constraint 'typep var1 (lvar-type arg2)
+                           (add-test-constraint quick-p
+                                                'typep var1 (lvar-type arg2)
                                                 nil constraints
                                                 consequent-constraints)))))
                  ((< >)
@@ -917,7 +945,8 @@
          (let ((type (single-value-type (node-derived-type node))))
            (unless (eq type *universal-type*)
              (conset-add-constraint gen 'typep var type nil)))
-         (maybe-add-eql-var-var-constraint var (set-value node) gen)))))
+         (unless (policy node (> compilation-speed speed))
+           (maybe-add-eql-var-var-constraint var (set-value node) gen))))))
   gen)
 
 (defun constraint-propagate-if (block gen)
