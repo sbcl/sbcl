@@ -730,12 +730,6 @@
                       (volatile-info-env-threshold new)))))))))
     new-value))
 
-;;; FIXME: It should be possible to eliminate the hairy compiler macros below
-;;; by declaring INFO and (SETF INFO) inline and making a simple compiler macro
-;;; for TYPE-INFO-OR-LOSE. (If we didn't worry about efficiency of the
-;;; cross-compiler, we could even do it by just making TYPE-INFO-OR-LOSE
-;;; foldable.)
-
 ;;; INFO is the standard way to access the database. It's settable.
 ;;;
 ;;; Return the information of the specified TYPE and CLASS for NAME.
@@ -743,36 +737,18 @@
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
 (defun info (class type name &optional (env-list nil env-list-p))
-  ;; FIXME: At some point check systematically to make sure that the
-  ;; system doesn't do any full calls to INFO or (SETF INFO), or at
-  ;; least none in any inner loops.
   (let ((info (type-info-or-lose class type)))
     (if env-list-p
         (get-info-value name (type-info-number info) env-list)
         (get-info-value name (type-info-number info)))))
-#!-sb-fluid
-(define-compiler-macro info
-  (&whole whole class type name &optional (env-list nil env-list-p))
-  ;; Constant CLASS and TYPE is an overwhelmingly common special case,
-  ;; and we can implement it much more efficiently than the general case.
-  (if (and (keywordp class) (keywordp type))
-      (let (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
-            (info (type-info-or-lose class type)))
-        (with-unique-names (value foundp)
-          `(multiple-value-bind (,value ,foundp)
-               (get-info-value ,name
-                               ,(type-info-number info)
-                               ,@(when env-list-p `(,env-list)))
-             (declare (type ,(type-info-type info) ,value))
-             (values ,value ,foundp))))
-      whole))
 
 (defun (setf info)
     (new-value class type name &optional (env-list nil env-list-p))
   (let* ((info (type-info-or-lose class type))
-         (tin (type-info-number info)))
-    (when (type-info-validate-function info)
-      (funcall (type-info-validate-function info) name new-value))
+         (tin (type-info-number info))
+         (validate (type-info-validate-function info)))
+    (when validate
+      (funcall validate name new-value))
     (if env-list-p
         (set-info-value name
                         tin
@@ -782,29 +758,23 @@
                         tin
                         new-value)))
   new-value)
-#!-sb-fluid
-(progn
-  ;; Not all xc hosts are happy about SETF compiler macros: CMUCL 19
-  ;; does not accept them at all, and older SBCLs give a full warning.
-  ;; So the easy thing is to hide this optimization from all xc hosts.
-  #-sb-xc-host
-  (define-compiler-macro (setf info)
-      (&whole whole new-value class type name &optional (env-list nil env-list-p))
-    ;; Constant CLASS and TYPE is an overwhelmingly common special case,
-    ;; and we can resolve it much more efficiently than the general
-    ;; case.
-    (if (and (keywordp class) (keywordp type))
-        (let* ((info (type-info-or-lose class type))
-               (tin (type-info-number info)))
-          (if env-list-p
-              `(set-info-value ,name
-                               ,tin
-                               ,new-value
-                               (get-write-info-env ,env-list))
-              `(set-info-value ,name
-                               ,tin
-                               ,new-value))))
-    whole))
+
+;;; Clear the information of the specified TYPE and CLASS for NAME in
+;;; the current environment, allowing any inherited info to become
+;;; visible. We return true if there was any info.
+(defun clear-info (class type name)
+  (let ((info (type-info-or-lose class type)))
+    (clear-info-value name (type-info-number info))))
+
+(defun clear-info-value (name type)
+  (declare (type type-number type) (inline assoc))
+  (with-info-bucket (table index name (get-write-info-env))
+    (let ((types (assoc name (svref table index) :test #'equal)))
+      (when (and types
+                 (assoc type (cdr types)))
+        (setf (cdr types)
+              (delete type (cdr types) :key #'car))
+        t))))
 
 ;;; the maximum density of the hashtable in a volatile env (in
 ;;; names/bucket)
@@ -821,30 +791,6 @@
     (make-volatile-info-env :name name
                             :table (make-array table-size :initial-element nil)
                             :threshold size)))
-
-;;; Clear the information of the specified TYPE and CLASS for NAME in
-;;; the current environment, allowing any inherited info to become
-;;; visible. We return true if there was any info.
-(defun clear-info (class type name)
-  (let ((info (type-info-or-lose class type)))
-    (clear-info-value name (type-info-number info))))
-#!-sb-fluid
-(define-compiler-macro clear-info (&whole whole class type name)
-  ;; Constant CLASS and TYPE is an overwhelmingly common special case, and
-  ;; we can resolve it much more efficiently than the general case.
-  (if (and (keywordp class) (keywordp type))
-    (let ((info (type-info-or-lose class type)))
-      `(clear-info-value ,name ,(type-info-number info)))
-    whole))
-(defun clear-info-value (name type)
-  (declare (type type-number type) (inline assoc))
-  (with-info-bucket (table index name (get-write-info-env))
-    (let ((types (assoc name (svref table index) :test #'equal)))
-      (when (and types
-                 (assoc type (cdr types)))
-        (setf (cdr types)
-              (delete type (cdr types) :key #'car))
-        t))))
 
 ;;;; *INFO-ENVIRONMENT*
 
@@ -1351,6 +1297,62 @@
              `(!cold-init-forms
                 ,@(reverse *!reversed-type-info-init-forms*))))
   (frob))
+
+;;; Source transforms / compiler macros for INFO functions.
+;;;
+;;; When building the XC, we give it a source transform, so that it can
+;;; compile INFO calls in the target efficiently; we also give it a compiler
+;;; macro, so that at least those INFO calls compiled after this file can be
+;;; efficient. (Host compiler-macros do not fire when compiling the target,
+;;; and source transforms don't fire when building the XC, so we need both.)
+;;;
+;;; Target needs just one, since there compiler macros and source-transforms
+;;; are equivalent.
+(macrolet ((def (name lambda-list form)
+             (aver (member 'class lambda-list))
+             (aver (member 'type lambda-list))
+             `(progn
+                #+sb-xc-host
+                (define-source-transform ,name ,lambda-list
+                  (if (and (keywordp class) (keywordp type))
+                      ,form
+                      (values nil t)))
+                (define-compiler-macro ,name ,(append '(&whole .whole.) lambda-list)
+                  (if (and (keywordp class) (keywordp type))
+                      ,form
+                      .whole.)))))
+
+  (def info (class type name &optional (env-list nil env-list-p))
+    (let (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
+          (info (type-info-or-lose class type)))
+      (with-unique-names (value foundp)
+        `(multiple-value-bind (,value ,foundp)
+             (get-info-value ,name
+                             ,(type-info-number info)
+                             ,@(when env-list-p (list env-list)))
+           (declare (type ,(type-info-type info) ,value))
+           (values ,value ,foundp)))))
+
+  (def (setf info) (new-value class type name &optional (env-list nil env-list-p))
+    (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
+           (info (type-info-or-lose class type))
+           (tin (type-info-number info))
+           (validate (type-info-validate-function info)))
+      (with-unique-names (new check)
+        `(let ((,new ,new-value)
+               ,@(when validate
+                   `((,check (type-info-validate-function (svref *info-types* ,tin))))))
+           ,@(when validate
+               `((funcall ,check ',name ,new)))
+           (set-info-value ,name
+                           ,tin
+                           ,new
+                           ,@(when env-list-p
+                               (list `(get-write-info-env ,env-list))))))))
+
+  (def clear-info (class type name)
+    (let ((info (type-info-or-lose class type)))
+      `(clear-info-value ,name ,(type-info-number info)))))
 
 ;;;; a hack for detecting
 ;;;;   (DEFUN FOO (X Y)
