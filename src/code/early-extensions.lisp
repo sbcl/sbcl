@@ -777,57 +777,6 @@
               (char= #\* (aref name 0))
               (char= #\* (aref name (1- (length name))))))))
 
-;;; This function is to be called just before a change which would affect the
-;;; symbol value. We don't absolutely have to call this function before such
-;;; changes, since such changes to constants are given as undefined behavior,
-;;; it's nice to do so. To circumvent this you need code like this:
-;;;
-;;;   (defvar foo)
-;;;   (defun set-foo (x) (setq foo x))
-;;;   (defconstant foo 42)
-;;;   (set-foo 13)
-;;;   foo => 13, (constantp 'foo) => t
-;;;
-;;; ...in which case you frankly deserve to lose.
-(defun about-to-modify-symbol-value (symbol action &optional (new-value nil valuep) bind)
-  (declare (symbol symbol))
-  (flet ((describe-action ()
-           (ecase action
-             (set "set SYMBOL-VALUE of ~S")
-             (progv "bind ~S")
-             (compare-and-swap "compare-and-swap SYMBOL-VALUE of ~S")
-             (defconstant "define ~S as a constant")
-             (makunbound "make ~S unbound"))))
-    (let ((kind (info :variable :kind symbol)))
-      (multiple-value-bind (what continue)
-          (cond ((eq :constant kind)
-                 (cond ((eq symbol t)
-                        (values "Veritas aeterna. (can't ~@?)" nil))
-                       ((eq symbol nil)
-                        (values "Nihil ex nihil. (can't ~@?)" nil))
-                       ((keywordp symbol)
-                        (values "Can't ~@?." nil))
-                       (t
-                        (values "Constant modification: attempt to ~@?." t))))
-                ((and bind (eq :global kind))
-                 (values "Can't ~@? (global variable)." nil)))
-        (when what
-          (if continue
-              (cerror "Modify the constant." what (describe-action) symbol)
-              (error what (describe-action) symbol)))
-        (when valuep
-          ;; :VARIABLE :TYPE is in the db only if it is declared, so no need to
-          ;; check.
-          (let ((type (info :variable :type symbol)))
-            (unless (sb!kernel::%%typep new-value type nil)
-              (let ((spec (type-specifier type)))
-                (error 'simple-type-error
-                       :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
-                       :format-arguments (list (describe-action) symbol new-value spec)
-                       :datum new-value
-                       :expected-type spec))))))))
-  (values))
-
 ;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
 ;;; assignment instead of doing cold static linking. That way things like
 ;;;   (FLET ((FROB (X) ..))
