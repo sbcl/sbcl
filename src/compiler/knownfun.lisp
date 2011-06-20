@@ -215,8 +215,7 @@
                              :derive-type derive-type
                              :optimizer optimizer
                              :destroyed-constant-args destroyed-constant-args
-                             :result-arg result-arg))
-        (target-env *info-environment*))
+                             :result-arg result-arg)))
     (dolist (name names)
       (let ((old-fun-info (info :function :info name)))
         (when old-fun-info
@@ -232,10 +231,10 @@
           (cerror "Go ahead, overwrite it."
                   "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
                   old-fun-info name)))
-      (setf (info :function :type name target-env) ctype)
-      (setf (info :function :where-from name target-env) :declared)
-      (setf (info :function :kind name target-env) :function)
-      (setf (info :function :info name target-env) info)))
+      (setf (info :function :type name) ctype)
+      (setf (info :function :where-from name) :declared)
+      (setf (info :function :kind name) :function)
+      (setf (info :function :info name) info)))
   names)
 
 ;;; Return the FUN-INFO for NAME or die trying. Since this is

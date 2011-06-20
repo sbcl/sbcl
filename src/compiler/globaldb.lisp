@@ -696,38 +696,39 @@
 ;;;
 ;;; We return the new value so that this can be conveniently used in a
 ;;; SETF function.
-(defun set-info-value (name0 type new-value
-                             &optional (env (get-write-info-env)))
-  (declare (type type-number type) (type volatile-info-env env)
-           (inline assoc))
+(defun set-info-value (name0 type new-value)
   (let ((name (uncross name0)))
     (when (eql name 0)
       (error "0 is not a legal INFO name."))
-    (with-info-bucket (table index name env)
-      (let ((types (if (symbolp name)
-                       (assoc name (svref table index) :test #'eq)
-                       (assoc name (svref table index) :test #'equal))))
-        (cond
-         (types
-          (let ((value (assoc type (cdr types))))
-            (if value
-                (setf (cdr value) new-value)
-                (push (cons type new-value) (cdr types)))))
-         (t
-          (push (cons name (list (cons type new-value)))
-                (svref table index))
+    (labels ((set-it (name type new-value env)
+               (declare (type type-number type)
+                         (type volatile-info-env env))
+               (with-info-bucket (table index name env)
+                 (let ((types (if (symbolp name)
+                                  (assoc name (svref table index) :test #'eq)
+                                  (assoc name (svref table index) :test #'equal))))
+                   (cond
+                     (types
+                      (let ((value (assoc type (cdr types))))
+                        (if value
+                            (setf (cdr value) new-value)
+                            (push (cons type new-value) (cdr types)))))
+                     (t
+                      (push (cons name (list (cons type new-value)))
+                            (svref table index))
 
-          (let ((count (incf (volatile-info-env-count env))))
-            (when (>= count (volatile-info-env-threshold env))
-              (let ((new (make-info-environment :size (* count 2))))
-                (do-info (env :name entry-name :type-number entry-num
-                              :value entry-val :known-volatile t)
-                         (set-info-value entry-name entry-num entry-val new))
-                (fill (volatile-info-env-table env) nil)
-                (setf (volatile-info-env-table env)
-                      (volatile-info-env-table new))
-                (setf (volatile-info-env-threshold env)
-                      (volatile-info-env-threshold new)))))))))
+                      (let ((count (incf (volatile-info-env-count env))))
+                        (when (>= count (volatile-info-env-threshold env))
+                          (let ((new (make-info-environment :size (* count 2))))
+                            (do-info (env :name entry-name :type-number entry-num
+                                          :value entry-val :known-volatile t)
+                              (set-it entry-name entry-num entry-val new))
+                            (fill (volatile-info-env-table env) nil)
+                            (setf (volatile-info-env-table env)
+                                  (volatile-info-env-table new))
+                            (setf (volatile-info-env-threshold env)
+                                  (volatile-info-env-threshold new)))))))))))
+      (set-it name type new-value (get-write-info-env)))
     new-value))
 
 ;;; INFO is the standard way to access the database. It's settable.
@@ -736,27 +737,20 @@
 ;;; The second value returned is true if there is any such information
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
-(defun info (class type name &optional (env-list nil env-list-p))
+(defun info (class type name)
   (let ((info (type-info-or-lose class type)))
-    (if env-list-p
-        (get-info-value name (type-info-number info) env-list)
-        (get-info-value name (type-info-number info)))))
+    (get-info-value name (type-info-number info))))
 
 (defun (setf info)
-    (new-value class type name &optional (env-list nil env-list-p))
+    (new-value class type name)
   (let* ((info (type-info-or-lose class type))
          (tin (type-info-number info))
          (validate (type-info-validate-function info)))
     (when validate
       (funcall validate name new-value))
-    (if env-list-p
-        (set-info-value name
-                        tin
-                        new-value
-                        (get-write-info-env env-list))
-        (set-info-value name
-                        tin
-                        new-value)))
+    (set-info-value name
+                    tin
+                    new-value))
   new-value)
 
 ;;; Clear the information of the specified TYPE and CLASS for NAME in
@@ -811,7 +805,7 @@
 ;;; has it defined, or return the default if none does. We used to
 ;;; do a lot of complicated caching here, but that was removed for
 ;;; thread-safety reasons.
-(defun get-info-value (name0 type &optional (env-list nil env-list-p))
+(defun get-info-value (name0 type)
   (declare (type type-number type))
   ;; sanity check: If we have screwed up initialization somehow, then
   ;; *INFO-TYPES* could still be uninitialized at the time we try to
@@ -821,25 +815,21 @@
   (aver (aref *info-types* type))
   (let ((name (uncross name0)))
     (flet ((lookup (env-list)
-             (let ((hash nil))
-               (dolist (env env-list
-                        (multiple-value-bind (val winp)
-                            (funcall (type-info-default
-                                      (svref *info-types* type))
-                                     name)
-                          (values val winp)))
-                 (macrolet ((frob (lookup)
-                              `(progn
-                                 (setq hash (globaldb-sxhashoid name))
-                                 (multiple-value-bind (value winp)
-                                     (,lookup env name hash type)
-                                   (when winp (return (values value t)))))))
-                   (etypecase env
-                     (volatile-info-env (frob volatile-info-lookup))
-                     (compact-info-env (frob compact-info-lookup))))))))
-      (if env-list-p
-          (lookup env-list)
-          (lookup *info-environment*)))))
+             (dolist (env env-list
+                          (multiple-value-bind (val winp)
+                              (funcall (type-info-default
+                                        (svref *info-types* type))
+                                       name)
+                            (values val winp)))
+               (macrolet ((frob (lookup)
+                            `(let ((hash (globaldb-sxhashoid name)))
+                               (multiple-value-bind (value winp)
+                                   (,lookup env name hash type)
+                                 (when winp (return (values value t)))))))
+                 (etypecase env
+                   (volatile-info-env (frob volatile-info-lookup))
+                   (compact-info-env (frob compact-info-lookup)))))))
+      (lookup *info-environment*))))
 
 ;;;; definitions for function information
 
@@ -1322,18 +1312,16 @@
                       ,form
                       .whole.)))))
 
-  (def info (class type name &optional (env-list nil env-list-p))
+  (def info (class type name)
     (let (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
           (info (type-info-or-lose class type)))
       (with-unique-names (value foundp)
         `(multiple-value-bind (,value ,foundp)
-             (get-info-value ,name
-                             ,(type-info-number info)
-                             ,@(when env-list-p (list env-list)))
+             (get-info-value ,name ,(type-info-number info))
            (declare (type ,(type-info-type info) ,value))
            (values ,value ,foundp)))))
 
-  (def (setf info) (new-value class type name &optional (env-list nil env-list-p))
+  (def (setf info) (new-value class type name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
            (info (type-info-or-lose class type))
            (tin (type-info-number info))
@@ -1346,9 +1334,7 @@
                `((funcall ,check ',name ,new)))
            (set-info-value ,name
                            ,tin
-                           ,new
-                           ,@(when env-list-p
-                               (list `(get-write-info-env ,env-list))))))))
+                           ,new)))))
 
   (def clear-info (class type name)
     (let ((info (type-info-or-lose class type)))
