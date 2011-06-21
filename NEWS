@@ -17,6 +17,8 @@ changes relative to sbcl-1.0.49:
     when (> SPEED SPACE).
   * optimization: local call trampolines (x86 and x86-64) are emitted
     inline.
+  * optimization: implicit value cells for dynamic-extent closed-over bindings
+    on x86 and x86-64 can hold unboxed values as well.
   * meta-optimization: improved compilation speed, especially for large
     functions. (lp#792363 and lp#394206)
   * bug fix: bound derivation for floating point operations is now more

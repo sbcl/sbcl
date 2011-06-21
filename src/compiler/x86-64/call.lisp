@@ -139,6 +139,79 @@
     (storew value frame-pointer
             (frame-word-offset (tn-offset variable-home-tn)))))
 
+(macrolet ((define-frame-op
+               (suffix sc stack-sc instruction
+                &optional (ea
+                           `(make-ea :qword
+                                     :base frame-pointer
+                                     :disp (frame-byte-offset
+                                            (tn-offset variable-home-tn)))))
+               (let ((reffer (symbolicate 'ancestor-frame-ref '/ suffix))
+                     (setter (symbolicate 'ancestor-frame-set '/ suffix)))
+                 `(progn
+                    (define-vop (,reffer ancestor-frame-ref)
+                      (:results (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        (inst ,instruction value
+                              ,ea)))
+                    (define-vop (,setter ancestor-frame-set)
+                      (:args (frame-pointer :scs (descriptor-reg))
+                             (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        (inst ,instruction ,ea value)))))))
+  (define-frame-op double-float double-reg double-stack movsd)
+  (define-frame-op single-float single-reg single-stack movss)
+  (define-frame-op complex-double-float complex-double-reg complex-double-stack
+    movupd (ea-for-cdf-data-stack variable-home-tn frame-pointer))
+  (define-frame-op complex-single-float complex-single-reg complex-single-stack
+    movq   (ea-for-csf-data-stack variable-home-tn frame-pointer))
+  (define-frame-op signed-byte-64 signed-reg signed-stack mov)
+  (define-frame-op unsigned-byte-64 unsigned-reg unsigned-stack mov)
+  (define-frame-op system-area-pointer sap-reg sap-stack mov))
+
+(defun primitive-type-indirect-cell-type (ptype)
+  (declare (type primitive-type ptype))
+  (macrolet ((foo (&body data)
+                 `(case (primitive-type-name ptype)
+                    ,@(loop for (name stack-sc ref set) in data
+                            collect
+                            `(,name
+                               (load-time-value
+                                (list (primitive-type-or-lose ',name)
+                                      (sc-or-lose ',stack-sc)
+                                      (lambda (node block fp value res)
+                                        (sb!c::vop ,ref node block
+                                                   fp value res))
+                                      (lambda (node block fp new-val value)
+                                        (sb!c::vop ,set node block
+                                                   fp new-val value)))))))))
+    (foo (double-float double-stack
+                       ancestor-frame-ref/double-float
+                       ancestor-frame-set/double-float)
+         (single-float single-stack
+                       ancestor-frame-ref/single-float
+                       ancestor-frame-set/single-float)
+         (complex-double-float complex-double-stack
+                               ancestor-frame-ref/complex-double-float
+                               ancestor-frame-set/complex-double-float)
+         (complex-single-float complex-single-stack
+                               ancestor-frame-ref/complex-single-float
+                               ancestor-frame-set/complex-single-float)
+         (signed-byte-64 signed-stack
+                         ancestor-frame-ref/signed-byte-64
+                         ancestor-frame-set/signed-byte-64)
+         (unsigned-byte-64 unsigned-stack
+                           ancestor-frame-ref/unsigned-byte-64
+                           ancestor-frame-set/unsigned-byte-64)
+         (unsigned-byte-63 unsigned-stack
+                           ancestor-frame-ref/unsigned-byte-64
+                           ancestor-frame-set/unsigned-byte-64)
+         (system-area-pointer sap-stack
+                              ancestor-frame-ref/system-area-pointer
+                              ancestor-frame-set/system-area-pointer))))
+
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)

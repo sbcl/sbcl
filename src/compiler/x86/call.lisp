@@ -139,6 +139,137 @@
     (storew value frame-pointer
             (frame-word-offset (tn-offset variable-home-tn)))))
 
+(macrolet ((define-frame-op
+               (suffix sc stack-sc instruction
+                &optional (ea
+                           `(make-ea :dword
+                                     :base frame-pointer
+                                     :disp (frame-byte-offset
+                                            (tn-offset variable-home-tn)))))
+               (let ((reffer (symbolicate 'ancestor-frame-ref '/ suffix))
+                     (setter (symbolicate 'ancestor-frame-set '/ suffix)))
+                 `(progn
+                    (define-vop (,reffer ancestor-frame-ref)
+                      (:results (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        (inst ,instruction value
+                              ,ea)))
+                    (define-vop (,setter ancestor-frame-set)
+                      (:args (frame-pointer :scs (descriptor-reg))
+                             (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        (inst ,instruction ,ea value))))))
+           (define-x87-frame-op
+               (suffix sc stack-sc (load set)
+                &optional (ea
+                           `(make-ea :dword
+                                     :base frame-pointer
+                                     :disp (frame-byte-offset
+                                            (tn-offset variable-home-tn)))))
+               (let ((reffer (symbolicate 'ancestor-frame-ref '/ suffix))
+                     (setter (symbolicate 'ancestor-frame-set '/ suffix)))
+                 `(progn
+                    (define-vop (,reffer ancestor-frame-ref)
+                      (:results (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        ,(if (symbolp load)
+                             `(with-empty-tn@fp-top (value)
+                                (inst ,load ,ea))
+                             load)))
+                    (define-vop (,setter ancestor-frame-set)
+                      (:args (frame-pointer :scs (descriptor-reg))
+                             (value :scs (,sc)))
+                      (:generator 4
+                        (aver (sc-is variable-home-tn ,stack-sc))
+                        ,(if (symbolp set)
+                             `(with-tn@fp-top (value)
+                                (inst ,set ,ea))
+                             set)))))))
+  (define-frame-op signed-byte-32 signed-reg signed-stack mov)
+  (define-frame-op unsigned-byte-32 unsigned-reg unsigned-stack mov)
+  (define-frame-op system-area-pointer sap-reg sap-stack mov)
+
+  (define-x87-frame-op double-float double-reg double-stack
+    (fldd fstd) (make-ea :dword
+                         :base frame-pointer
+                         :disp (frame-byte-offset
+                                (1+ (tn-offset variable-home-tn)))))
+  (define-x87-frame-op single-float single-reg single-stack
+    (fld fst))
+
+  (define-x87-frame-op complex-double-float complex-double-reg
+    complex-double-stack
+    ((let ((real (complex-double-reg-real-tn value))
+           (imag (complex-double-reg-imag-tn value)))
+       (with-empty-tn@fp-top (real)
+         (inst fldd (ea-for-cdf-real-stack variable-home-tn frame-pointer)))
+       (with-empty-tn@fp-top (imag)
+         (inst fldd (ea-for-cdf-imag-stack variable-home-tn frame-pointer))))
+     (let ((real (complex-double-reg-real-tn value))
+           (imag (complex-double-reg-imag-tn value)))
+       (with-tn@fp-top (real)
+         (inst fstd (ea-for-cdf-real-stack variable-home-tn frame-pointer)))
+       (with-tn@fp-top (imag)
+         (inst fstd (ea-for-cdf-imag-stack variable-home-tn frame-pointer))))))
+  (define-x87-frame-op complex-single-float complex-single-reg
+    complex-single-stack
+    ((let ((real (complex-single-reg-real-tn value))
+           (imag (complex-single-reg-imag-tn value)))
+       (with-empty-tn@fp-top (real)
+         (inst fld (ea-for-csf-real-stack variable-home-tn frame-pointer)))
+       (with-empty-tn@fp-top (imag)
+         (inst fld (ea-for-csf-imag-stack variable-home-tn frame-pointer))))
+     (let ((real (complex-single-reg-real-tn value))
+           (imag (complex-single-reg-imag-tn value)))
+       (with-tn@fp-top (real)
+         (inst fst (ea-for-csf-real-stack variable-home-tn frame-pointer)))
+       (with-tn@fp-top (imag)
+         (inst fst (ea-for-csf-imag-stack variable-home-tn frame-pointer)))))))
+
+(defun primitive-type-indirect-cell-type (ptype)
+  (declare (type primitive-type ptype))
+  (macrolet ((foo (&body data)
+                 `(case (primitive-type-name ptype)
+                    ,@(loop for (name stack-sc ref set) in data
+                            collect
+                            `(,name
+                               (load-time-value
+                                (list (primitive-type-or-lose ',name)
+                                      (sc-or-lose ',stack-sc)
+                                      (lambda (node block fp value res)
+                                        (sb!c::vop ,ref node block
+                                                   fp value res))
+                                      (lambda (node block fp new-val value)
+                                        (sb!c::vop ,set node block
+                                                   fp new-val value)))))))))
+    (foo (double-float double-stack
+                       ancestor-frame-ref/double-float
+                       ancestor-frame-set/double-float)
+         (single-float single-stack
+                       ancestor-frame-ref/single-float
+                       ancestor-frame-set/single-float)
+         (complex-double-float complex-double-stack
+                               ancestor-frame-ref/complex-double-float
+                               ancestor-frame-set/complex-double-float)
+         (complex-single-float complex-single-stack
+                               ancestor-frame-ref/complex-single-float
+                               ancestor-frame-set/complex-single-float)
+         (signed-byte-32 signed-stack
+                         ancestor-frame-ref/signed-byte-32
+                         ancestor-frame-set/signed-byte-32)
+         (unsigned-byte-32 unsigned-stack
+                           ancestor-frame-ref/unsigned-byte-32
+                           ancestor-frame-set/unsigned-byte-32)
+         (unsigned-byte-31 unsigned-stack
+                           ancestor-frame-ref/unsigned-byte-32
+                           ancestor-frame-set/unsigned-byte-32)
+         (system-area-pointer sap-stack
+                              ancestor-frame-ref/system-area-pointer
+                              ancestor-frame-set/system-area-pointer))))
+
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)

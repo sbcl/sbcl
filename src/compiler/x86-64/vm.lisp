@@ -552,7 +552,3 @@
 (!def-vm-support-routine combination-implementation-style (node)
   (declare (type sb!c::combination node) (ignore node))
   (values :default nil))
-
-(defun primitive-type-indirect-cell-type (ptype)
-  (declare (ignore ptype))
-  nil)
