@@ -427,6 +427,7 @@
          (when ,constraints
            (let ((,min (conset-min ,conset))
                  (,max (conset-max ,conset)))
+             (declare (optimize speed))
              (map nil (lambda (constraint)
                         (declare (type constraint constraint))
                         (let ((number (constraint-number constraint)))

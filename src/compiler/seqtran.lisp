@@ -126,14 +126,15 @@
 ;;; MAP-INTO. RESULT and BODY are forms, which can use variables
 ;;; FUNCALL-RESULT, containing the result of application of FUN, and
 ;;; INDEX, containing the current position in sequences.
-(defun build-sequence-iterator (seqs seq-names &key result into body)
+(defun build-sequence-iterator (seqs seq-names &key result into body fast)
   (declare (type list seqs seq-names)
            (type symbol into))
   (collect ((bindings)
             (declarations)
             (vector-lengths)
             (tests)
-            (places))
+            (places)
+            (around))
     (let ((found-vector-p nil))
       (flet ((process-vector (length)
                (unless found-vector-p
@@ -150,10 +151,22 @@
                        (declarations `(type list ,index))
                        (places `(car ,index))
                        (tests `(endp ,index))))
-                    ((csubtypep type (specifier-type 'vector))
+                    ((or (csubtypep type (specifier-type '(simple-array * 1)))
+                         (and (not fast)
+                              (csubtypep type (specifier-type 'vector))))
                      (process-vector `(length ,seq-name))
                      (places `(locally (declare (optimize (insert-array-bounds-checks 0)))
                                 (aref ,seq-name index))))
+                    ((csubtypep type (specifier-type 'vector))
+                     (let ((data  (gensym "DATA"))
+                           (start (gensym "START"))
+                           (end   (gensym "END")))
+                       (around `(with-array-data ((,data ,seq-name)
+                                                  (,start)
+                                                  (,end (length ,seq-name)))))
+                       (process-vector `(- ,end ,start))
+                       (places `(locally (declare (optimize (insert-array-bounds-checks 0)))
+                                  (aref ,data (truly-the index (+ index ,start)))))))
                     (t
                      (give-up-ir1-transform
                       "can't determine sequence argument type"))))
@@ -162,12 +175,18 @@
       (when found-vector-p
         (bindings `(length (min ,@(vector-lengths))))
         (tests `(>= index length)))
-      `(do (,@(bindings))
-           ((or ,@(tests)) ,result)
-         (declare ,@(declarations))
-         (let ((funcall-result (funcall fun ,@(places))))
-           (declare (ignorable funcall-result))
-           ,body)))))
+      (let ((body `(do (,@(bindings))
+                       ((or ,@(tests)) ,result)
+                     (declare ,@(declarations))
+                     (let ((funcall-result (funcall fun ,@(places))))
+                       (declare (ignorable funcall-result))
+                       ,body))))
+        (if (around)
+            (reduce (lambda (wrap body) (append wrap (list body)))
+                    (around)
+                    :from-end t
+                    :initial-value body)
+            body)))))
 
 ;;; Try to compile %MAP efficiently when we can determine sequence
 ;;; argument types at compile time.
@@ -182,7 +201,7 @@
 ;;; the reader, because the code is complicated enough already and I
 ;;; don't happen to need that functionality right now. -- WHN 20000410
 (deftransform %map ((result-type fun seq &rest seqs) * *
-                    :policy (>= speed space))
+                    :node node :policy (>= speed space))
   "open code"
   (unless (constant-lvar-p result-type)
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
@@ -244,25 +263,45 @@
                       ,(build-sequence-iterator
                         seqs seq-args
                         :result result
-                        :body push-dacc))))))))))
+                        :body push-dacc
+                        :fast (policy node (> speed space))))))))))))
 
 ;;; MAP-INTO
 (deftransform map-into ((result fun &rest seqs)
                         (vector * &rest *)
-                        *)
+                        * :node node)
   "open code"
   (let ((seqs-names (mapcar (lambda (x)
                               (declare (ignore x))
                               (gensym))
                             seqs)))
     `(lambda (result fun ,@seqs-names)
-       ,(build-sequence-iterator
-         seqs seqs-names
-         :result '(when (array-has-fill-pointer-p result)
-                   (setf (fill-pointer result) index))
-         :into 'result
-         :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
-                 (setf (aref result index) funcall-result)))
+       ,(if (and (policy node (> speed space))
+                 (not (csubtypep (lvar-type result)
+                                 (specifier-type '(simple-array * 1)))))
+            (let ((data  (gensym "DATA"))
+                  (start (gensym "START"))
+                  (end   (gensym "END")))
+              `(with-array-data ((,data result)
+                                 (,start)
+                                 (,end))
+                 (declare (ignore ,end))
+                 ,(build-sequence-iterator
+                   seqs seqs-names
+                   :result '(when (array-has-fill-pointer-p result)
+                             (setf (fill-pointer result) index))
+                   :into 'result
+                   :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
+                           (setf (aref ,data (truly-the index (+ index ,start)))
+                                 funcall-result))
+                   :fast t)))
+            (build-sequence-iterator
+             seqs seqs-names
+             :result '(when (array-has-fill-pointer-p result)
+                       (setf (fill-pointer result) index))
+             :into 'result
+             :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
+                     (setf (aref result index) funcall-result))))
        result)))
 
 
