@@ -490,16 +490,17 @@
                (= (tn-offset return-pc) return-pc-save-offset))
     (error "return-pc not on stack in standard save location?")))
 
-;;; Instead of JMPing to TARGET, CALL a trampoline that saves the
-;;; return pc and jumps. Although this is an incredibly stupid trick
-;;; the paired CALL/RET instructions are a big win.
-(defun make-local-call (target)
-  (let ((tramp (gen-label)))
-    (inst call tramp)
-    (assemble (*elsewhere*)
-      (emit-label tramp)
-      (popw ebp-tn (frame-word-offset return-pc-save-offset))
-      (inst jmp target))))
+;;; The local call convention doesn't fit that well with x86-style
+;;; calls. Emit a header for local calls to pop the return address
+;;; in the right place.
+(defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
+  (declare (ignore alignp))
+  (when trampoline-label
+    (when fall-thru-p
+      (inst jmp start-label))
+    (emit-label trampoline-label)
+    (popw rbp-tn (frame-word-offset return-pc-save-offset)))
+  (emit-label start-label))
 
 ;;; Non-TR local call for a fixed number of values passed according to
 ;;; the unknown values convention.
@@ -535,7 +536,7 @@
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
     (note-this-location vop :call-site)
-    (make-local-call target)
+    (inst call target)
     (default-unknown-values vop values nvals node)
     (trace-table-entry trace-table-normal)))
 
@@ -556,7 +557,7 @@
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
     (note-this-location vop :call-site)
-    (make-local-call target)
+    (inst call target)
     (note-this-location vop :unknown-return)
     (receive-unknown-values values-start nvals start count node)
     (trace-table-entry trace-table-normal)))
@@ -583,7 +584,7 @@
     (trace-table-entry trace-table-call-site)
     (move ebp-tn fp)
     (note-this-location vop :call-site)
-    (make-local-call target)
+    (inst call target)
     (note-this-location vop :known-return)
     (trace-table-entry trace-table-normal)))
 

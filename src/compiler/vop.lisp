@@ -167,6 +167,11 @@
   ;; the assembler label that points to the beginning of the code for
   ;; this block, or NIL when we haven't assigned a label yet
   (%label nil)
+  ;; the assembler label that points to the trampoline for this block,
+  ;; or NIL if unassigned yet. Only meaningful for local call targets.
+  (%trampoline-label nil)
+  ;; T if the preceding block assumes it can drop thru to %label
+  (dropped-thru-to nil)
   ;; list of LOCATION-INFO structures describing all the interesting
   ;; (to the debugger) locations in this block
   (locations nil :type list))

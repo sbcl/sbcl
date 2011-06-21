@@ -631,13 +631,15 @@
            (emit-template node block template args nil
                           (list* (block-label consequent) not-p
                                  info-args))
-           (unless (drop-thru-p if alternative)
-             (vop branch node block (block-label alternative))))
+           (if (drop-thru-p if alternative)
+               (register-drop-thru alternative)
+               (vop branch node block (block-label alternative))))
           (t
            (emit-template node block template args nil info-args)
            (vop branch-if node block (block-label consequent) flags not-p)
-           (unless (drop-thru-p if alternative)
-             (vop branch node block (block-label alternative)))))))
+           (if (drop-thru-p if alternative)
+               (register-drop-thru alternative)
+               (vop branch node block (block-label alternative)))))))
 
 ;;; Convert an IF that isn't the DEST of a conditional template.
 (defun ir2-convert-if (node block)
@@ -947,7 +949,7 @@
           ((node-tail-p node)
            (ir2-convert-tail-local-call node block fun))
           (t
-           (let ((start (block-label (lambda-block fun)))
+           (let ((start (block-trampoline (lambda-block fun)))
                  (returns (tail-set-info (lambda-tail-set fun)))
                  (lvar (node-lvar node)))
              (ecase (if returns
@@ -1809,7 +1811,9 @@
                                 (aver (not named))
                                 tn)))))))
               ((not (eq (ir2-block-next 2block) (block-info target)))
-               (vop branch last 2block (block-label target)))))))
+               (vop branch last 2block (block-label target)))
+              (t
+               (register-drop-thru target))))))
 
   (values))
 

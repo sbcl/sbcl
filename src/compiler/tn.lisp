@@ -376,6 +376,11 @@
   (let ((2block (block-info block)))
     (or (ir2-block-%label 2block)
         (setf (ir2-block-%label 2block) (gen-label)))))
+(defun block-trampoline (block)
+  (declare (type cblock block))
+  (let ((2block (block-info block)))
+    (or (ir2-block-%trampoline-label 2block)
+        (setf (ir2-block-%trampoline-label 2block) (gen-label)))))
 
 ;;; Return true if Block is emitted immediately after the block ended by Node.
 (defun drop-thru-p (node block)
@@ -383,6 +388,11 @@
   (let ((next-block (ir2-block-next (block-info (node-block node)))))
     (aver (eq node (block-last (node-block node))))
     (eq next-block (block-info block))))
+(defun register-drop-thru (block)
+  (declare (type cblock block))
+  (let ((2block (block-info block)))
+    (setf (ir2-block-dropped-thru-to 2block) t))
+  nil)
 
 ;;; Link a list of VOPs from First to Last into Block, Before the specified
 ;;; VOP. If Before is NIL, insert at the end.

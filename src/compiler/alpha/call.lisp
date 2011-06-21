@@ -410,6 +410,16 @@ default-value-8
               nvals)
   (:temporary (:scs (non-descriptor-reg)) temp))
 
+;;; This hook by the codegen lets us insert code before fall-thru entry points,
+;;; local-call entry points, and tail-call entry points.  The default does
+;;; nothing.
+(defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
+  (declare (ignore fall-thru-p alignp))
+  (when trampoline-label
+    (emit-label trampoline-label))
+  (emit-label start-label))
+
+
 ;;;; local call with unknown values convention return
 
 ;;; Non-TR local call for a fixed number of values passed according to the
