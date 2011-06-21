@@ -134,7 +134,11 @@
           ((and indirect
                 (not (eq (node-physenv node)
                          (lambda-physenv (lambda-var-home leaf)))))
-           (vop ancestor-frame-ref node block tn (leaf-info leaf) res))
+           (let ((reffer (third (primitive-type-indirect-cell-type
+                                 (primitive-type (leaf-type leaf))))))
+             (if reffer
+                 (funcall reffer node block tn (leaf-info leaf) res)
+                 (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
           (t (emit-move node block tn res)))))
       (constant
        (emit-move node block (constant-tn leaf) res))
@@ -335,7 +339,11 @@
             ((and indirect
                   (not (eq (node-physenv node)
                            (lambda-physenv (lambda-var-home leaf)))))
-             (vop ancestor-frame-set node block tn val (leaf-info leaf)))
+             (let ((setter (fourth (primitive-type-indirect-cell-type
+                                    (primitive-type (leaf-type leaf))))))
+             (if setter
+                 (funcall setter node block tn val (leaf-info leaf))
+                 (vop ancestor-frame-set node block tn val (leaf-info leaf)))))
             (t (emit-move node block val tn))))))
       (global-var
        (aver (symbolp (leaf-source-name leaf)))

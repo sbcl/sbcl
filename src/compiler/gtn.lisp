@@ -40,8 +40,15 @@
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
     (when (leaf-refs var)
-      (let* ((type (if (lambda-var-indirect var)
-                       *backend-t-primitive-type*
+      (let* (ptype-info
+             (type (if (lambda-var-indirect var)
+                       (if (lambda-var-explicit-value-cell var)
+                           *backend-t-primitive-type*
+                           (or (first
+                                (setf ptype-info
+                                      (primitive-type-indirect-cell-type
+                                       (primitive-type (leaf-type var)))))
+                               *backend-t-primitive-type*))
                        (primitive-type (leaf-type var))))
              (res (make-normal-tn type))
              (node (lambda-bind fun))
@@ -54,8 +61,9 @@
           ;; Force closed-over indirect LAMBDA-VARs without explicit
           ;; VALUE-CELLs to the stack, and make sure that they are
           ;; live over the dynamic contour of the physenv.
-          (setf (tn-sc res) (svref *backend-sc-numbers*
-                                   sb!vm:control-stack-sc-number))
+          (setf (tn-sc res) (if ptype-info
+                                (second ptype-info)
+                                (sc-or-lose 'sb!vm::control-stack)))
           (physenv-live-tn res (lambda-physenv fun)))
 
          (debug-variable-p

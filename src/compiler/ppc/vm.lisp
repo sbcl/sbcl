@@ -394,3 +394,7 @@
                     (%%ldb integer size posn))))
          (t (values :default nil))))
       (t (values :default nil)))))
+
+(defun primitive-type-indirect-cell-type (ptype)
+  (declare (ignore ptype))
+  nil)
