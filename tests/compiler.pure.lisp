@@ -3935,3 +3935,10 @@
 (with-test (:name (:bug-486812 double-float))
   (compile nil `(lambda ()
                   (sb-kernel:make-double-float -1 0))))
+
+(with-test (:name :bug-729765)
+  (compile nil `(lambda (a b)
+                  (declare ((integer 1 1) a)
+                           ((integer 0 1) b)
+                           (optimize debug))
+                  (lambda () (< b a)))))

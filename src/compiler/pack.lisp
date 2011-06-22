@@ -826,11 +826,22 @@
     (let* ((sc (tn-sc tn))
            (sb (sc-sb sc)))
       (when (eq (sb-kind sb) :finite)
-        (do ((offset (tn-offset tn) (1+ offset))
-             (end (+ (tn-offset tn) (sc-element-size sc))))
-            ((= offset end))
-          (declare (type index offset end))
-          (setf (svref (finite-sb-live-tns sb) offset) tn)))))
+        ;; KLUDGE: we can have "live" TNs that are neither read
+        ;; to nor written from, due to more aggressive (type-
+        ;; directed) constant propagation.  Such TNs will never
+        ;; be assigned an offset nor be in conflict with anything.
+        ;;
+        ;; Ideally, it seems to me we could make sure these TNs
+        ;; are never allocated in the first place in
+        ;; ASSIGN-LAMBDA-VAR-TNS.
+        (if (tn-offset tn)
+            (do ((offset (tn-offset tn) (1+ offset))
+                 (end (+ (tn-offset tn) (sc-element-size sc))))
+                ((= offset end))
+              (declare (type index offset end))
+              (setf (svref (finite-sb-live-tns sb) offset) tn))
+            (assert (and (null (tn-reads tn))
+                         (null (tn-writes tn))))))))
 
   (setq *live-block* block)
   (setq *live-vop* (ir2-block-last-vop block))
