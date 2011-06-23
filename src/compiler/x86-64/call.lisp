@@ -561,7 +561,7 @@
 ;;; calls. Emit a header for local calls to pop the return address
 ;;; in the right place.
 (defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
-  (when (and fall-thru-p (or trampoline-label alignp))
+  (when (and fall-thru-p trampoline-label)
     (inst jmp start-label))
   (when alignp
     (emit-alignment n-lowtag-bits #x90))
