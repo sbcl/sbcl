@@ -563,11 +563,11 @@
 (defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
   (when (and fall-thru-p trampoline-label)
     (inst jmp start-label))
-  (when alignp
-    (emit-alignment n-lowtag-bits #x90))
   (when trampoline-label
     (emit-label trampoline-label)
     (popw rbp-tn (frame-word-offset return-pc-save-offset)))
+  (when alignp
+    (emit-alignment n-lowtag-bits #x90))
   (emit-label start-label))
 
 ;;; Non-TR local call for a fixed number of values passed according to
