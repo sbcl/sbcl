@@ -399,7 +399,7 @@
                                                       (apply fast call-args)
                                                     (division-by-zero () :div0)))
                                      (slow-result (handler-case
-                                                      (apply fast call-args)
+                                                      (apply slow call-args)
                                                     (division-by-zero () :div0))))
                                 (if (eql fast-result slow-result)
                                     (print (list :ok `(,op ,@args) :=> fast-result))
