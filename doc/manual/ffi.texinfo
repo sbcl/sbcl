@@ -342,13 +342,17 @@ the variable.
 
 @item
 @code{sb-alien} also exports translations of these C type
-specifiers as foreign type specifiers: @code{sb-alien:char},
-@code{sb-alien:short}, @code{sb-alien:int},
-@code{sb-alien:long}, @code{sb-alien:unsigned-char},
-@code{sb-alien:unsigned-short},
-@code{sb-alien:unsigned-int},
-@code{sb-alien:unsigned-long}, @code{sb-alien:float}, and
-@code{sb-alien:double}.
+specifiers as foreign type specifiers:
+@code{char},
+@code{short},
+@code{int},
+@code{long},
+@code{unsigned-char},
+@code{unsigned-short},
+@code{unsigned-int},
+@code{unsigned-long},
+@code{float}, @code{double},
+@code{size-t}, and @code{off-t}.
 
 @end itemize
 
