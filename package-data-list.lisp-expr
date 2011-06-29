@@ -688,6 +688,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
                "RESOLVE-CONFLICT"
 
+               "PRINT-UNREADABLY"
+
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
 
@@ -961,6 +963,8 @@ possibly temporariliy, because it might be used internally."
                "C-STRING-ENCODING-ERROR" "C-STRING-ENCODING-ERROR-EXTERNAL-FORMAT"
                "C-STRING-DECODING-ERROR" "C-STRING-DECODING-ERROR-EXTERNAL-FORMAT"
                "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
+               "READ-UNREADABLE-REPLACEMENT"
+
 
                ;; bootstrapping magic, to make things happen both in
                ;; the cross-compilation host compiler's environment and

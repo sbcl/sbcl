@@ -308,11 +308,24 @@
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
+(defun read-unreadable-replacement ()
+  (format *query-io* "~@<Enter an object (evaluated): ~@:>")
+  (finish-output *query-io*)
+  (list (eval (read *query-io*))))
+
 ;;; guts of PRINT-UNREADABLE-OBJECT
 (defun %print-unreadable-object (object stream type identity body)
   (declare (type (or null function) body))
   (when *print-readably*
-    (error 'print-not-readable :object object))
+    (restart-case
+        (error 'print-not-readable :object object)
+      (print-unreadably ()
+        :report "Print unreadably.")
+      (use-value (o)
+        :report "Supply an object to be printed instead."
+        :interactive read-unreadable-replacement
+        (write o :stream stream)
+        (return-from %print-unreadable-object nil))))
   (flet ((print-description ()
            (when type
              (write (type-of object) :stream stream :circle nil
@@ -941,7 +954,16 @@
                               (load-time-value
                                (array-element-type
                                 (make-array 0 :element-type 'character))))))
-                (error 'print-not-readable :object vector))
+                (restart-case
+                    (error 'print-not-readable :object vector)
+                  (print-unreadably ()
+                    :report "Print unreadably."
+                    (let ((*print-readably* nil))
+                      (output-vector vector stream)))
+                  (use-value (o)
+                    :report "Supply an object to be printed instead."
+                    :interactive read-unreadable-replacement
+                    (write o :stream stream))))
                ((or *print-escape* *print-readably*)
                 (write-char #\" stream)
                 (quote-string vector stream)
@@ -959,7 +981,14 @@
         (t
          (when (and *print-readably*
                     (not (array-readably-printable-p vector)))
-           (error 'print-not-readable :object vector))
+           (restart-case
+               (error 'print-not-readable :object vector)
+             (print-unreadably ()
+               :report "Print unreadably.")
+             (use-value (o)
+               :report "Supply an object to be printed instead."
+               :interactive read-unreadable-replacement
+               (return-from output-vector (write o :stream stream)))))
          (descend-into (stream)
                        (write-string "#(" stream)
                        (dotimes (i (length vector))
@@ -1011,7 +1040,14 @@
 (defun output-array-guts (array stream)
   (when (and *print-readably*
              (not (array-readably-printable-p array)))
-    (error 'print-not-readable :object array))
+    (restart-case
+        (error 'print-not-readable :object array)
+      (print-unreadably ()
+        :report "Print unreadably.")
+      (use-value (o)
+        :report "Supply an object to be printed instead."
+        :interactive read-unreadable-replacement
+        (return-from output-array-guts (write o :stream stream)))))
   (write-char #\# stream)
   (let ((*print-base* 10)
         (*print-radix* nil))
@@ -1555,7 +1591,16 @@
   (cond (*read-eval*
          (write-string "#." stream))
         (*print-readably*
-         (error 'print-not-readable :object x))
+         (restart-case
+             (error 'print-not-readable :object x)
+           (print-unreadably ()
+             :report "Print unreadably."
+             (let ((*print-readably* nil))
+               (output-float-infinity x stream)))
+           (use-value (o)
+             :report "Supply an object to be printed instead."
+             :interactive read-unreadable-replacement
+             (write o :stream stream))))
         (t
          (write-string "#<" stream)))
   (write-string "SB-EXT:" stream)
