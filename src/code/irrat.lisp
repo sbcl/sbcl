@@ -24,8 +24,8 @@
 
 (sb!xc:defmacro def-math-rtn (name num-args)
   (let ((function (symbolicate "%" (string-upcase name)))
-        (args (let ((sb!impl::*gentemp-counter* 0))
-                (loop repeat num-args collect (gentemp "ARG")))))
+        (args (loop for i below num-args
+                    collect (intern (format nil "ARG~D" i)))))
     `(progn
        (declaim (inline ,function))
        (defun ,function ,args
