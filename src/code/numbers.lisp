@@ -62,10 +62,51 @@
 
 ;;; Return an ETYPECASE form that does the type dispatch, ordering the
 ;;; cases for efficiency.
+;;; Check for some simple to detect problematic cases where the caller
+;;; used types that are not disjoint and where this may lead to
+;;; unexpected behaviour of the generated form, for example making
+;;; a clause unreachable, and throw an error if such a case is found.
+;;; An example:
+;;;   (number-dispatch ((var1 integer) (var2 float))
+;;;     ((fixnum single-float) a)
+;;;     ((integer float) b))
+;;; Even though the types are not reordered here, the generated form,
+;;; basically
+;;;   (etypecase var1
+;;;     (fixnum (etypecase var2
+;;;               (single-float a)))
+;;;     (integer (etypecase var2
+;;;                (float b))))
+;;; would fail at runtime if given var1 fixnum and var2 double-float,
+;;; even though the second clause matches this signature. To catch
+;;; this earlier than runtime we throw an error already here.
 (defun generate-number-dispatch (vars error-tags cases)
   (if vars
       (let ((var (first vars))
             (cases (sort cases #'type-test-order :key #'car)))
+        (flet ((error-if-sub-or-supertype (type1 type2)
+                 (when (or (subtypep type1 type2)
+                           (subtypep type2 type1))
+                   (error "Types not disjoint: ~S ~S." type1 type2)))
+               (error-if-supertype (type1 type2)
+                 (when (subtypep type2 type1)
+                   (error "Type ~S ordered before subtype ~S."
+                          type1 type2)))
+               (test-type-pairs (fun)
+                 ;; Apply FUN to all (ordered) pairs of types from the
+                 ;; cases.
+                 (mapl (lambda (cases)
+                         (when (cdr cases)
+                           (let ((type1 (caar cases)))
+                             (dolist (case (cdr cases))
+                               (funcall fun type1 (car case))))))
+                       cases)))
+          ;; For the last variable throw an error if a type is followed
+          ;; by a subtype, for all other variables additionally if a
+          ;; type is followed by a supertype.
+          (test-type-pairs (if (cdr vars)
+                               #'error-if-sub-or-supertype
+                               #'error-if-supertype)))
         `((typecase ,var
             ,@(mapcar (lambda (case)
                         `(,(first case)
@@ -92,6 +133,13 @@
 ;;; symbol. In this case, we apply the CAR of the form to the CDR and
 ;;; treat the result of the call as a list of cases. This process is
 ;;; not applied recursively.
+;;;
+;;; Be careful when using non-disjoint types in different cases for the
+;;; same variable. Some uses will behave as intended, others not, as the
+;;; variables are dispatched off sequentially and clauses are reordered
+;;; for efficiency. Some, but not all, problematic cases are detected
+;;; and lead to a compile time error; see GENERATE-NUMBER-DISPATCH above
+;;; for an example.
 (defmacro number-dispatch (var-specs &body cases)
   (let ((res (list nil))
         (vars (mapcar #'car var-specs))
