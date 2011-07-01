@@ -475,3 +475,68 @@
 (with-test (:name :logbitp-wide-fixnum)
   (assert (not (logbitp (1- (integer-length most-positive-fixnum))
                         most-negative-fixnum))))
+
+;; EXPT dispatches in a complicated way on the types of its arguments.
+;; Check that all possible combinations are covered.
+(with-test (:name (:expt :argument-type-combinations))
+  (let ((numbers '(2                 ; fixnum
+                   3/5               ; ratio
+                   1.2f0             ; single-float
+                   2.0d0             ; double-float
+                   #c(3/5 1/7)       ; complex rational
+                   #c(1.2f0 1.3f0)   ; complex single-float
+                   #c(2.0d0 3.0d0))) ; complex double-float
+        (bignum (expt 2 64))
+        results)
+    (dolist (base (cons bignum numbers))
+      (dolist (power numbers)
+        (format t "(expt ~s ~s) => " base power)
+        (let ((result (expt base power)))
+          (format t "~s~%" result)
+          (push result results))))
+    (assert (every #'numberp results))))
+
+(with-test (:name :bug-741564)
+  ;; The bug was that in (expt <fixnum> <(complex double-float)>) the
+  ;; calculation was partially done only to single-float precision,
+  ;; making the complex double-float result too unprecise. Some other
+  ;; combinations of argument types were affected, too; test that all
+  ;; of them are good to double-float precision.
+  (labels ((nearly-equal-p (x y)
+             "Are the arguments equal to nearly double-float precision?"
+             (declare (type double-float x y))
+             (< (/ (abs (- x y)) (abs y))
+                (* double-float-epsilon 4))) ; Differences in the two least
+                                             ; significant mantissa bits
+                                             ; are OK.
+           (test-complex (x y)
+             (and (nearly-equal-p (realpart x) (realpart y))
+                  (nearly-equal-p (imagpart x) (imagpart y))))
+           (print-result (msg base power got expected)
+             (format t "~a (expt ~s ~s)~%got      ~s~%expected ~s~%"
+                     msg base power got expected)))
+    (let ((n-broken 0))
+      (flet ((test (base power coerce-to-type)
+               (let* ((got (expt base power))
+                      (expected (expt (coerce base coerce-to-type) power))
+                      (result (test-complex got expected)))
+                 (print-result (if result "Good:" "Bad:")
+                               base power got expected)
+                 (unless result
+                   (incf n-broken)))))
+        (dolist (base (list 2                    ; fixnum
+                            (expt 2 64)          ; bignum
+                            3/5                  ; ratio
+                            2.0f0))              ; single-float
+          (let ((power #c(-2.5d0 -4.5d0)))       ; complex double-float
+            (test base power 'double-float)))
+        (dolist (base (list #c(2.0f0 3.0f0)      ; complex single-float
+                            #c(2 3)              ; complex fixnum
+                            (complex (expt 2 64) (expt 2 65))
+                                                 ; complex bignum
+                            #c(3/5 1/7)))        ; complex ratio
+          (dolist (power (list #c(-2.5d0 -4.5d0) ; complex double-float
+                               -2.5d0))          ; double-float
+            (test base power '(complex double-float)))))
+      (when (> n-broken 0)
+        (error "Number of broken combinations: ~a" n-broken)))))
