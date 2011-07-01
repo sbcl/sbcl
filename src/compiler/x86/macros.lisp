@@ -110,17 +110,19 @@
 
 #!+sb-thread
 (defmacro load-tl-symbol-value (reg symbol)
-  `(progn
-    (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
-    (inst mov ,reg (make-ea :dword :base ,reg) :fs)))
+  `(with-tls-ea (EA :base ,reg
+                    :disp-type :index
+                    :disp (make-ea-for-symbol-tls-index ,symbol))
+     (inst mov ,reg (make-ea :dword :base ,reg) :maybe-fs)))
 #!-sb-thread
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
 #!+sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
-  `(progn
-    (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
-    (inst mov (make-ea :dword :base ,temp) ,reg :fs)))
+  `(with-tls-ea (EA :base ,temp
+                    :disp-type :index
+                    :disp (make-ea-for-symbol-tls-index ,symbol))
+     (inst mov EA ,reg :maybe-fs)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
   (declare (ignore temp))
@@ -128,19 +130,29 @@
 
 (defmacro load-binding-stack-pointer (reg)
   #!+sb-thread
-  `(progn
-     (inst mov ,reg (make-ea :dword
-                             :disp (* 4 thread-binding-stack-pointer-slot))
-           :fs))
+  `(with-tls-ea (EA :base ,reg
+                    :disp-type :constant
+                    :disp (* 4 thread-binding-stack-pointer-slot))
+     (inst mov ,reg EA :maybe-fs))
   #!-sb-thread
   `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
   #!+sb-thread
   `(progn
-     (inst mov (make-ea :dword
+     #!+win32
+     (progn
+       (inst push eax-tn)
+       (inst push ,reg)
+       (with-tls-ea (EA :base eax-tn
+                        :disp-type :constant
                         :disp (* 4 thread-binding-stack-pointer-slot))
-           ,reg :fs))
+         (inst pop EA))
+       (inst pop eax-tn))
+     #!-win32
+     (with-tls-ea (EA :disp-type :constant
+                      :disp (* 4 thread-binding-stack-pointer-slot))
+       (inst mov EA ,reg :maybe-fs)))
   #!-sb-thread
   `(store-symbol-value ,reg *binding-stack-pointer*))
 
@@ -577,3 +589,56 @@ collection."
                            `(touch-object ,pin))
                          pins)))))
       `(progn ,@body)))
+
+;;; Helper to hide the fact that thread access on Windows needs one more
+;;; instruction, needs the FS prefix in that instruction _instead_ of
+;;; the actual load/store, and partially hide the resulting need for a
+;;; temporary TN when the non-windows might have have dereferenced an EA
+;;; without a TN as a base.
+
+(defmacro with-tls-ea ((ea-var &key base
+                                    base-already-live-p
+                                    (disp-type :constant)
+                                    (disp 0))
+                       &body body)
+  "Execute BODY with various magic.  BODY is expected to emit instructions.
+
+   In the body, EA-VAR will be an alias for an EA which BODY can use to
+   perform a thread-local load or store.
+
+   Within the body, :MAYBE-FS will be replaced with :FS or NIL,
+   depending on the target, and needs to be included in any instruction
+   performing an access through the EA.
+
+   DISP-TYPE must be :INDEX, or :CONSTANT, and DISP must be an EA/TN,
+   or an expression returning an integer, respectively.
+
+   BASE must be a temporary TN, except in the following situation: BASE
+   will be unused when DISP-TYPE is constant, BASE-ALREADY-LIVE-P is
+   true, _and_ we're on POSIX.  This is an intentional optimization, and
+   the caller needs to take care to ignore the TN in this case, or can
+   omit this parameter.
+
+   BASE-ALREADY-LIVE-P means that at run-time, the BASE register already
+   holds an offset that we should add to instead of overwriting it.
+   The value of the BASE register is undefined following the macro invocation."
+  (check-type base-already-live-p boolean)
+  (check-type disp-type (member :index :constant))
+  (let ((body (subst :fs :maybe-fs body)))
+    (ecase disp-type
+      (:constant
+       `(progn
+          ,@(subst (if base-already-live-p
+                       ;; use BASE and DISP
+                       `(make-ea :dword :base ,base :disp ,disp)
+                       ;; BASE not live and not needed, just use DISP
+                       `(make-ea :dword :disp ,disp))
+                   ea-var
+                   body)))
+      (:index
+       ;; need to use BASE in any case; and DISP is an EA
+       `(progn
+          (inst ,(if base-already-live-p 'add 'mov) ,base ,disp)
+          ,@(subst `(make-ea :dword :base ,base)
+                   ea-var
+                   body))))))

@@ -73,7 +73,8 @@
       (progn
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
         ;; Thread-local area, no LOCK needed.
-        (inst cmpxchg (make-ea :dword :base tls) new :fs)
+        (with-tls-ea (EA :base tls :base-already-live-p t)
+          (inst cmpxchg EA new :maybe-fs))
         (inst cmp eax no-tls-value-marker-widetag)
         (inst jmp :ne check)
         (move eax old))
@@ -117,9 +118,10 @@
       (let ((global-val (gen-label))
             (done (gen-label)))
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
-        (inst cmp (make-ea :dword :base tls) no-tls-value-marker-widetag :fs)
-        (inst jmp :z global-val)
-        (inst mov (make-ea :dword :base tls) value :fs)
+        (with-tls-ea (EA :base tls :base-already-live-p t)
+          (inst cmp EA no-tls-value-marker-widetag :maybe-fs)
+          (inst jmp :z global-val)
+          (inst mov EA value :maybe-fs))
         (inst jmp done)
         (emit-label global-val)
         (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -139,7 +141,8 @@
              (err-lab (generate-error-code vop 'unbound-symbol-error object))
              (ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-        (inst mov value (make-ea :dword :base value) :fs)
+        (with-tls-ea (EA :base value :base-already-live-p t)
+          (inst mov value EA :maybe-fs))
         (inst cmp value no-tls-value-marker-widetag)
         (inst jmp :ne check-unbound-label)
         (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -159,7 +162,8 @@
     (:generator 8
       (let ((ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-        (inst mov value (make-ea :dword :base value) :fs)
+        (with-tls-ea (EA :base value :base-already-live-p t)
+          (inst mov value EA :maybe-fs))
         (inst cmp value no-tls-value-marker-widetag)
         (inst jmp :ne ret-lab)
         (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -183,7 +187,8 @@
   (:generator 9
     (let ((check-unbound-label (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
-      (inst mov value (make-ea :dword :base value) :fs)
+      (with-tls-ea (EA :base value :base-already-live-p t)
+        (inst mov value EA :maybe-fs))
       (inst cmp value no-tls-value-marker-widetag)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -299,10 +304,11 @@
                     (#.esi-offset 'alloc-tls-index-in-esi))
                   :assembly-routine))
       (emit-label tls-index-valid)
-      (inst push (make-ea :dword :base tls-index) :fs)
-      (popw bsp (- binding-value-slot binding-size))
-      (storew symbol bsp (- binding-symbol-slot binding-size))
-      (inst mov (make-ea :dword :base tls-index) val :fs))))
+      (with-tls-ea (EA :base tls-index :base-already-live-p t)
+        (inst push EA :maybe-fs)
+        (popw bsp (- binding-value-slot binding-size))
+        (storew symbol bsp (- binding-symbol-slot binding-size))
+        (inst mov EA val :maybe-fs)))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -328,7 +334,8 @@
     (loadw tls-index temp symbol-tls-index-slot other-pointer-lowtag)
     ;; Load VALUE from stack, then restore it to the TLS area.
     (loadw temp bsp (- binding-value-slot binding-size))
-    (inst mov (make-ea :dword :base tls-index) temp :fs)
+    (with-tls-ea (EA :base tls-index :base-already-live-p t)
+      (inst mov EA temp :maybe-fs))
     ;; Zero out the stack.
     (storew 0 bsp (- binding-symbol-slot binding-size))
     (storew 0 bsp (- binding-value-slot binding-size))
@@ -369,7 +376,8 @@
 
     #!+sb-thread (loadw
                   tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-    #!+sb-thread (inst mov (make-ea :dword :base tls-index) value :fs)
+    #!+sb-thread (with-tls-ea (EA :base tls-index :base-already-live-p t)
+                   (inst mov EA value :maybe-fs))
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
