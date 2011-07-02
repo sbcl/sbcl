@@ -286,8 +286,8 @@
                                  ;; pointer is still below the allocation offset
                                  ;; of the page
                                  (when (and (not (zerop alloc-flag))
-                                            (<= (logand page-mask addr)
-                                                bytes-used))
+                                            (< (logand page-mask addr)
+                                               bytes-used))
                                    ;; Don't bother testing again until we
                                    ;; get past that allocation offset
                                    (setf skip-tests-until-addr
