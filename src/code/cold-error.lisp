@@ -152,7 +152,8 @@
 (defun break (&optional (datum "break") &rest arguments)
   #!+sb-doc
   "Print a message and invoke the debugger without allowing any possibility
-   of condition handling occurring."
+of condition handling occurring."
+  (declare (optimize (sb!c::rest-conversion 0)))
   (let ((*debugger-hook* nil)) ; as specifically required by ANSI
     (apply #'%break 'break datum arguments)))
 

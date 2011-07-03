@@ -3935,7 +3935,8 @@
                    (consp (arg-info-default info))
                    (not (lambda-var-specvar var))
                    (not (lambda-var-sets var))
-                   (every #'ref-good-for-more-context-p (lambda-var-refs var)))))
+                   (every #'ref-good-for-more-context-p (lambda-var-refs var))
+                   (policy node (= 3 rest-conversion)))))
         (cond (context-ok
                (destructuring-bind (context count &optional used) (arg-info-default info)
                  (declare (ignore used))

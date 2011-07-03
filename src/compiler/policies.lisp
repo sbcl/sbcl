@@ -45,6 +45,12 @@ Enabling this option can increase heap consing of closures.")
   ("off" "maybe" "on" "on")
   "Control inline-substitution of used-once local functions.")
 
+(define-optimization-quality rest-conversion
+    (if (= debug 3) 0 3)
+  ("off" "maybe" "on" "on")
+  "Control conversion of &REST argments to &MORE arguments when
+only used as the final argument to APPLY.")
+
 (define-optimization-quality verify-arg-count
     (if (zerop safety) 0 3)
   ("no" "maybe" "yes" "yes"))
