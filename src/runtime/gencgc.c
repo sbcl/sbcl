@@ -358,6 +358,9 @@ static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 extern unsigned long gencgc_release_granularity;
 unsigned long gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
 
+extern unsigned long gencgc_alloc_granularity;
+unsigned long gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
+
 
 /*
  * miscellaneous heap functions
@@ -1263,9 +1266,15 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
 {
     page_index_t first_page, last_page;
     page_index_t restart_page = *restart_page_ptr;
+    long nbytes_goal = nbytes;
     long bytes_found = 0;
     long most_bytes_found = 0;
+    page_index_t most_bytes_found_from, most_bytes_found_to;
+    int small_object = nbytes < GENCGC_CARD_BYTES;
     /* FIXME: assert(free_pages_lock is held); */
+
+    if (nbytes_goal < gencgc_alloc_granularity)
+            nbytes_goal = gencgc_alloc_granularity;
 
     /* Toggled by gc_and_save for heap compaction, normally -1. */
     if (gencgc_alloc_start_page != -1) {
@@ -1273,63 +1282,62 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
     }
 
     gc_assert(nbytes>=0);
-    if (((unsigned long)nbytes)>=GENCGC_CARD_BYTES) {
-        /* Search for a contiguous free space of at least nbytes,
-         * aligned on a page boundary. The page-alignment is strictly
-         * speaking needed only for objects at least large_object_size
-         * bytes in size. */
-        do {
-            first_page = restart_page;
-            while ((first_page < page_table_pages) &&
-                   page_allocated_p(first_page))
+    /* Search for a page with at least nbytes of space. We prefer
+     * not to split small objects on multiple pages, to reduce the
+     * number of contiguous allocation regions spaning multiple
+     * pages: this helps avoid excessive conservativism.
+     *
+     * For other objects, we guarantee that they start on their own
+     * page boundary.
+     */
+    first_page = restart_page;
+    while (first_page < page_table_pages) {
+        bytes_found = 0;
+        if (page_free_p(first_page)) {
+                gc_assert(0 == page_table[first_page].bytes_used);
+                bytes_found = GENCGC_CARD_BYTES;
+        } else if (small_object &&
+                   (page_table[first_page].allocated == page_type_flag) &&
+                   (page_table[first_page].large_object == 0) &&
+                   (page_table[first_page].gen == gc_alloc_generation) &&
+                   (page_table[first_page].write_protected == 0) &&
+                   (page_table[first_page].dont_move == 0)) {
+            bytes_found = GENCGC_CARD_BYTES - page_table[first_page].bytes_used;
+            if (bytes_found < nbytes) {
+                if (bytes_found > most_bytes_found)
+                    most_bytes_found = bytes_found;
                 first_page++;
-
-            last_page = first_page;
-            bytes_found = GENCGC_CARD_BYTES;
-            while ((bytes_found < nbytes) &&
-                   (last_page < (page_table_pages-1)) &&
-                   page_free_p(last_page+1)) {
-                last_page++;
-                bytes_found += GENCGC_CARD_BYTES;
-                gc_assert(0 == page_table[last_page].bytes_used);
-                gc_assert(0 == page_table[last_page].write_protected);
+                continue;
             }
-            if (bytes_found > most_bytes_found)
-                most_bytes_found = bytes_found;
-            restart_page = last_page + 1;
-        } while ((restart_page < page_table_pages) && (bytes_found < nbytes));
-
-    } else {
-        /* Search for a page with at least nbytes of space. We prefer
-         * not to split small objects on multiple pages, to reduce the
-         * number of contiguous allocation regions spaning multiple
-         * pages: this helps avoid excessive conservativism. */
-        first_page = restart_page;
-        while (first_page < page_table_pages) {
-            if (page_free_p(first_page))
-                {
-                    gc_assert(0 == page_table[first_page].bytes_used);
-                    bytes_found = GENCGC_CARD_BYTES;
-                    break;
-                }
-            else if ((page_table[first_page].allocated == page_type_flag) &&
-                     (page_table[first_page].large_object == 0) &&
-                     (page_table[first_page].gen == gc_alloc_generation) &&
-                     (page_table[first_page].write_protected == 0) &&
-                     (page_table[first_page].dont_move == 0))
-                {
-                    bytes_found = GENCGC_CARD_BYTES
-                        - page_table[first_page].bytes_used;
-                    if (bytes_found > most_bytes_found)
-                        most_bytes_found = bytes_found;
-                    if (bytes_found >= nbytes)
-                        break;
-                }
+        } else {
             first_page++;
+            continue;
         }
-        last_page = first_page;
-        restart_page = first_page + 1;
+
+        gc_assert(page_table[first_page].write_protected == 0);
+        for (last_page = first_page+1;
+             ((last_page < page_table_pages) &&
+              page_free_p(last_page) &&
+              (bytes_found < nbytes_goal));
+             last_page++) {
+            bytes_found += GENCGC_CARD_BYTES;
+            gc_assert(0 == page_table[last_page].bytes_used);
+            gc_assert(0 == page_table[last_page].write_protected);
+        }
+
+        if (bytes_found > most_bytes_found) {
+            most_bytes_found = bytes_found;
+            most_bytes_found_from = first_page;
+            most_bytes_found_to = last_page;
+        }
+        if (bytes_found >= nbytes_goal)
+            break;
+
+        first_page = last_page;
     }
+
+    bytes_found = most_bytes_found;
+    restart_page = first_page + 1;
 
     /* Check for a failure */
     if (bytes_found < nbytes) {
@@ -1337,10 +1345,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
         gc_heap_exhausted_error_or_lose(most_bytes_found, nbytes);
     }
 
-    gc_assert(page_table[first_page].write_protected == 0);
-
-    *restart_page_ptr = first_page;
-    return last_page;
+    *restart_page_ptr = most_bytes_found_from;
+    return most_bytes_found_to-1;
 }
 
 /* Allocate bytes.  All the rest of the special-purpose allocation
