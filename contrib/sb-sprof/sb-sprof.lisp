@@ -360,10 +360,8 @@ profiling")
 (defvar *alloc-region-size*
   #-gencgc
   (get-page-size)
-  ;; This hardcoded 2 matches the one in gc_find_freeish_pages. It's not
-  ;; really worth genesifying.
   #+gencgc
-  (* 2 sb-vm:gencgc-page-bytes))
+  sb-vm:gencgc-alloc-granularity)
 (declaim (type number *alloc-region-size*))
 
 (defvar *samples* nil)

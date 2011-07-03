@@ -49,7 +49,7 @@ struct page {
      * allocation regions. It should be 0 for all unallocated pages (not
      * hard to achieve).
      */
-#if PAGE_BYTES > USHRT_MAX
+#if GENCGC_CARD_BYTES > USHRT_MAX
     unsigned int bytes_used;
 #else
     unsigned short bytes_used;
@@ -119,7 +119,7 @@ space_matches_p(lispobj obj, generation_index_t space)
 {
     if (obj >= DYNAMIC_SPACE_START) {
         page_index_t page_index=((pointer_sized_uint_t)obj
-                                 - DYNAMIC_SPACE_START) / PAGE_BYTES;
+                                 - DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
         return ((page_index < page_table_pages) &&
                 (page_table[page_index].gen == space));
     } else {

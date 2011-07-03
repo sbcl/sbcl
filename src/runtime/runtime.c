@@ -482,6 +482,9 @@ main(int argc, char *argv[], char *envp[])
     /* Align down to multiple of page_table page size, and to the appropriate
      * stack alignment. */
     dynamic_space_size &= ~(PAGE_BYTES-1);
+#ifdef LISP_FEATURE_GENCGC
+    dynamic_space_size &= ~(GENCGC_CARD_BYTES-1);
+#endif
     thread_control_stack_size &= ~(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
     /* Preserve the runtime options for possible future core saving */

@@ -81,7 +81,7 @@ enum {
 boolean enable_page_protection = 1;
 
 /* the minimum size (in bytes) for a large object*/
-long large_object_size = 4 * PAGE_BYTES;
+long large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
 
 
 /*
@@ -217,7 +217,7 @@ static void *heap_base = NULL;
 inline void *
 page_address(page_index_t page_num)
 {
-    return (heap_base + (page_num * PAGE_BYTES));
+    return (heap_base + (page_num * GENCGC_CARD_BYTES));
 }
 
 /* Calculate the address where the allocation region associated with
@@ -235,7 +235,7 @@ find_page_index(void *addr)
 {
     if (addr >= heap_base) {
         page_index_t index = ((pointer_sized_uint_t)addr -
-                              (pointer_sized_uint_t)heap_base) / PAGE_BYTES;
+                              (pointer_sized_uint_t)heap_base) / GENCGC_CARD_BYTES;
         if (index < page_table_pages)
             return (index);
     }
@@ -246,7 +246,7 @@ static size_t
 npage_bytes(long npages)
 {
     gc_assert(npages>=0);
-    return ((unsigned long)npages)*PAGE_BYTES;
+    return ((unsigned long)npages)*GENCGC_CARD_BYTES;
 }
 
 /* Check that X is a higher address than Y and return offset from Y to
@@ -791,7 +791,7 @@ gc_alloc_new_region(long nbytes, int page_type_flag, struct alloc_region *alloc_
     gc_assert(ret == 0);
     first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
     last_page=gc_find_freeish_pages(&first_page, nbytes, page_type_flag);
-    bytes_found=(PAGE_BYTES - page_table[first_page].bytes_used)
+    bytes_found=(GENCGC_CARD_BYTES - page_table[first_page].bytes_used)
             + npage_bytes(last_page-first_page);
 
     /* Set up the alloc_region. */
@@ -1021,8 +1021,8 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         more = 0;
         if ((bytes_used = void_diff(alloc_region->free_pointer,
                                     page_address(first_page)))
-            >PAGE_BYTES) {
-            bytes_used = PAGE_BYTES;
+            >GENCGC_CARD_BYTES) {
+            bytes_used = GENCGC_CARD_BYTES;
             more = 1;
         }
         page_table[first_page].bytes_used = bytes_used;
@@ -1046,8 +1046,8 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
             /* Calculate the number of bytes used in this page. */
             more = 0;
             if ((bytes_used = void_diff(alloc_region->free_pointer,
-                                        page_address(next_page)))>PAGE_BYTES) {
-                bytes_used = PAGE_BYTES;
+                                        page_address(next_page)))>GENCGC_CARD_BYTES) {
+                bytes_used = GENCGC_CARD_BYTES;
                 more = 1;
             }
             page_table[next_page].bytes_used = bytes_used;
@@ -1148,8 +1148,8 @@ gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_regio
     /* Calc. the number of bytes used in this page. This is not
      * always the number of new bytes, unless it was free. */
     more = 0;
-    if ((bytes_used = nbytes+orig_first_page_bytes_used) > PAGE_BYTES) {
-        bytes_used = PAGE_BYTES;
+    if ((bytes_used = nbytes+orig_first_page_bytes_used) > GENCGC_CARD_BYTES) {
+        bytes_used = GENCGC_CARD_BYTES;
         more = 1;
     }
     page_table[first_page].bytes_used = bytes_used;
@@ -1173,8 +1173,8 @@ gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_regio
         /* Calculate the number of bytes used in this page. */
         more = 0;
         bytes_used=(nbytes+orig_first_page_bytes_used)-byte_cnt;
-        if (bytes_used > PAGE_BYTES) {
-            bytes_used = PAGE_BYTES;
+        if (bytes_used > GENCGC_CARD_BYTES) {
+            bytes_used = GENCGC_CARD_BYTES;
             more = 1;
         }
         page_table[next_page].bytes_used = bytes_used;
@@ -1267,7 +1267,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
     }
 
     gc_assert(nbytes>=0);
-    if (((unsigned long)nbytes)>=PAGE_BYTES) {
+    if (((unsigned long)nbytes)>=GENCGC_CARD_BYTES) {
         /* Search for a contiguous free space of at least nbytes,
          * aligned on a page boundary. The page-alignment is strictly
          * speaking needed only for objects at least large_object_size
@@ -1279,12 +1279,12 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
                 first_page++;
 
             last_page = first_page;
-            bytes_found = PAGE_BYTES;
+            bytes_found = GENCGC_CARD_BYTES;
             while ((bytes_found < nbytes) &&
                    (last_page < (page_table_pages-1)) &&
                    page_free_p(last_page+1)) {
                 last_page++;
-                bytes_found += PAGE_BYTES;
+                bytes_found += GENCGC_CARD_BYTES;
                 gc_assert(0 == page_table[last_page].bytes_used);
                 gc_assert(0 == page_table[last_page].write_protected);
             }
@@ -1303,7 +1303,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
             if (page_free_p(first_page))
                 {
                     gc_assert(0 == page_table[first_page].bytes_used);
-                    bytes_found = PAGE_BYTES;
+                    bytes_found = GENCGC_CARD_BYTES;
                     break;
                 }
             else if ((page_table[first_page].allocated == page_type_flag) &&
@@ -1312,7 +1312,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
                      (page_table[first_page].write_protected == 0) &&
                      (page_table[first_page].dont_move == 0))
                 {
-                    bytes_found = PAGE_BYTES
+                    bytes_found = GENCGC_CARD_BYTES
                         - page_table[first_page].bytes_used;
                     if (bytes_found > most_bytes_found)
                         most_bytes_found = bytes_found;
@@ -1457,19 +1457,19 @@ copy_large_object(lispobj object, long nwords)
 
         next_page = first_page;
         remaining_bytes = nwords*N_WORD_BYTES;
-        while (remaining_bytes > PAGE_BYTES) {
+        while (remaining_bytes > GENCGC_CARD_BYTES) {
             gc_assert(page_table[next_page].gen == from_space);
             gc_assert(page_boxed_p(next_page));
             gc_assert(page_table[next_page].large_object);
             gc_assert(page_table[next_page].region_start_offset ==
                       npage_bytes(next_page-first_page));
-            gc_assert(page_table[next_page].bytes_used == PAGE_BYTES);
+            gc_assert(page_table[next_page].bytes_used == GENCGC_CARD_BYTES);
             /* Should have been unprotected by unprotect_oldspace(). */
             gc_assert(page_table[next_page].write_protected == 0);
 
             page_table[next_page].gen = new_space;
 
-            remaining_bytes -= PAGE_BYTES;
+            remaining_bytes -= GENCGC_CARD_BYTES;
             next_page++;
         }
 
@@ -1490,7 +1490,7 @@ copy_large_object(lispobj object, long nwords)
 
         /* Free any remaining pages; needs care. */
         next_page++;
-        while ((old_bytes_used == PAGE_BYTES) &&
+        while ((old_bytes_used == GENCGC_CARD_BYTES) &&
                (page_table[next_page].gen == from_space) &&
                page_boxed_p(next_page) &&
                page_table[next_page].large_object &&
@@ -1599,17 +1599,17 @@ copy_large_unboxed_object(lispobj object, long nwords)
 
         next_page = first_page;
         remaining_bytes = nwords*N_WORD_BYTES;
-        while (remaining_bytes > PAGE_BYTES) {
+        while (remaining_bytes > GENCGC_CARD_BYTES) {
             gc_assert(page_table[next_page].gen == from_space);
             gc_assert(page_allocated_no_region_p(next_page));
             gc_assert(page_table[next_page].large_object);
             gc_assert(page_table[next_page].region_start_offset ==
                       npage_bytes(next_page-first_page));
-            gc_assert(page_table[next_page].bytes_used == PAGE_BYTES);
+            gc_assert(page_table[next_page].bytes_used == GENCGC_CARD_BYTES);
 
             page_table[next_page].gen = new_space;
             page_table[next_page].allocated = UNBOXED_PAGE_FLAG;
-            remaining_bytes -= PAGE_BYTES;
+            remaining_bytes -= GENCGC_CARD_BYTES;
             next_page++;
         }
 
@@ -1630,7 +1630,7 @@ copy_large_unboxed_object(lispobj object, long nwords)
 
         /* Free any remaining pages; needs care. */
         next_page++;
-        while ((old_bytes_used == PAGE_BYTES) &&
+        while ((old_bytes_used == GENCGC_CARD_BYTES) &&
                (page_table[next_page].gen == from_space) &&
                page_allocated_no_region_p(next_page) &&
                page_table[next_page].large_object &&
@@ -2697,20 +2697,20 @@ maybe_adjust_large_object(lispobj *where)
 
     next_page = first_page;
     remaining_bytes = nwords*N_WORD_BYTES;
-    while (remaining_bytes > PAGE_BYTES) {
+    while (remaining_bytes > GENCGC_CARD_BYTES) {
         gc_assert(page_table[next_page].gen == from_space);
         gc_assert(page_allocated_no_region_p(next_page));
         gc_assert(page_table[next_page].large_object);
         gc_assert(page_table[next_page].region_start_offset ==
                   npage_bytes(next_page-first_page));
-        gc_assert(page_table[next_page].bytes_used == PAGE_BYTES);
+        gc_assert(page_table[next_page].bytes_used == GENCGC_CARD_BYTES);
 
         page_table[next_page].allocated = boxed;
 
         /* Shouldn't be write-protected at this stage. Essential that the
          * pages aren't. */
         gc_assert(!page_table[next_page].write_protected);
-        remaining_bytes -= PAGE_BYTES;
+        remaining_bytes -= GENCGC_CARD_BYTES;
         next_page++;
     }
 
@@ -2732,7 +2732,7 @@ maybe_adjust_large_object(lispobj *where)
 
     /* Free any remaining pages; needs care. */
     next_page++;
-    while ((old_bytes_used == PAGE_BYTES) &&
+    while ((old_bytes_used == GENCGC_CARD_BYTES) &&
            (page_table[next_page].gen == from_space) &&
            page_allocated_no_region_p(next_page) &&
            page_table[next_page].large_object &&
@@ -2800,7 +2800,7 @@ preserve_pointer(void *addr)
     /* quick check 2: Check the offset within the page.
      *
      */
-    if (((unsigned long)addr & (PAGE_BYTES - 1)) >
+    if (((unsigned long)addr & (GENCGC_CARD_BYTES - 1)) >
         page_table[addr_page_index].bytes_used)
         return;
 
@@ -2835,7 +2835,7 @@ preserve_pointer(void *addr)
     while (page_table[first_page].region_start_offset != 0) {
         --first_page;
         /* Do some checks. */
-        gc_assert(page_table[first_page].bytes_used == PAGE_BYTES);
+        gc_assert(page_table[first_page].bytes_used == GENCGC_CARD_BYTES);
         gc_assert(page_table[first_page].gen == from_space);
         gc_assert(page_table[first_page].allocated == region_allocation);
     }
@@ -2852,7 +2852,7 @@ preserve_pointer(void *addr)
         if (page_free_p(addr_page_index)
             || (page_table[addr_page_index].bytes_used == 0)
             /* Check the offset within the page. */
-            || (((unsigned long)addr & (PAGE_BYTES - 1))
+            || (((unsigned long)addr & (GENCGC_CARD_BYTES - 1))
                 > page_table[addr_page_index].bytes_used)) {
             FSHOW((stderr,
                    "weird? ignore ptr 0x%x to freed area of large object\n",
@@ -2886,8 +2886,8 @@ preserve_pointer(void *addr)
         gc_assert(!page_table[i].write_protected);
 
         /* Check whether this is the last page in this contiguous block.. */
-        if ((page_table[i].bytes_used < PAGE_BYTES)
-            /* ..or it is PAGE_BYTES and is the last in the block */
+        if ((page_table[i].bytes_used < GENCGC_CARD_BYTES)
+            /* ..or it is CARD_BYTES and is the last in the block */
             || page_free_p(i+1)
             || (page_table[i+1].bytes_used == 0) /* next page free */
             || (page_table[i+1].gen != from_space) /* diff. gen */
@@ -2962,7 +2962,7 @@ update_page_write_prot(page_index_t page)
         /*FSHOW((stderr, "/write-protecting page %d gen %d\n", page, gen));*/
 
         os_protect((void *)page_addr,
-                   PAGE_BYTES,
+                   GENCGC_CARD_BYTES,
                    OS_VM_PROT_READ|OS_VM_PROT_EXECUTE);
 
         /* Note the page as protected in the page tables. */
@@ -3031,8 +3031,8 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             for (last_page = i; ; last_page++) {
                 write_protected =
                     write_protected && page_table[last_page].write_protected;
-                if ((page_table[last_page].bytes_used < PAGE_BYTES)
-                    /* Or it is PAGE_BYTES and is the last in the block */
+                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
+                    /* Or it is CARD_BYTES and is the last in the block */
                     || (!page_boxed_p(last_page+1))
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
@@ -3147,8 +3147,8 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
                 /* Check whether this is the last page in this
                  * contiguous block */
-                if ((page_table[last_page].bytes_used < PAGE_BYTES)
-                    /* Or it is PAGE_BYTES and is the last in the block */
+                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
+                    /* Or it is CARD_BYTES and is the last in the block */
                     || (!page_boxed_p(last_page+1))
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
@@ -3336,16 +3336,16 @@ unprotect_oldspace(void)
                 if (!region_addr) {
                     /* First region. */
                     region_addr = page_addr;
-                    region_bytes = PAGE_BYTES;
+                    region_bytes = GENCGC_CARD_BYTES;
                 } else if (region_addr + region_bytes == page_addr) {
                     /* Region continue. */
-                    region_bytes += PAGE_BYTES;
+                    region_bytes += GENCGC_CARD_BYTES;
                 } else {
                     /* Unprotect previous region. */
                     os_protect(region_addr, region_bytes, OS_VM_PROT_ALL);
                     /* First page in new region. */
                     region_addr = page_addr;
-                    region_bytes = PAGE_BYTES;
+                    region_bytes = GENCGC_CARD_BYTES;
                 }
             }
         }
@@ -3767,8 +3767,8 @@ verify_generation(generation_index_t generation)
             for (last_page = i; ;last_page++)
                 /* Check whether this is the last page in this contiguous
                  * block. */
-                if ((page_table[last_page].bytes_used < PAGE_BYTES)
-                    /* Or it is PAGE_BYTES and is the last in the block */
+                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
+                    /* Or it is CARD_BYTES and is the last in the block */
                     || (page_table[last_page+1].allocated != region_allocation)
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
@@ -3803,7 +3803,7 @@ verify_zero_fill(void)
                 }
             }
         } else {
-            long free_bytes = PAGE_BYTES - page_table[page].bytes_used;
+            long free_bytes = GENCGC_CARD_BYTES - page_table[page].bytes_used;
             if (free_bytes > 0) {
                 long *start_addr = (long *)((unsigned long)page_address(page)
                                           + page_table[page].bytes_used);
@@ -4470,11 +4470,11 @@ gc_free_heap(void)
             page_start = (void *)page_address(page);
 
             /* First, remove any write-protection. */
-            os_protect(page_start, PAGE_BYTES, OS_VM_PROT_ALL);
+            os_protect(page_start, GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
             page_table[page].write_protected = 0;
 
-            os_invalidate(page_start,PAGE_BYTES);
-            addr = os_validate(page_start,PAGE_BYTES);
+            os_invalidate(page_start,GENCGC_CARD_BYTES);
+            addr = os_validate(page_start,GENCGC_CARD_BYTES);
             if (addr == NULL || addr != page_start) {
                 lose("gc_free_heap: page moved, 0x%08x ==> 0x%08x\n",
                      page_start,
@@ -4539,7 +4539,7 @@ gc_init(void)
 
     /* Compute the number of pages needed for the dynamic space.
      * Dynamic space size should be aligned on page size. */
-    page_table_pages = dynamic_space_size/PAGE_BYTES;
+    page_table_pages = dynamic_space_size/GENCGC_CARD_BYTES;
     gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
 
     /* The page_table must be allocated using "calloc" to initialize
@@ -4643,7 +4643,7 @@ gencgc_pickup_dynamic(void)
           /* It is possible, though rare, for the saved page table
            * to contain free pages below alloc_ptr. */
           page_table[page].gen = gen;
-          page_table[page].bytes_used = PAGE_BYTES;
+          page_table[page].bytes_used = GENCGC_CARD_BYTES;
           page_table[page].large_object = 0;
           page_table[page].write_protected = 0;
           page_table[page].write_protected_cleared = 0;
@@ -4845,7 +4845,7 @@ gencgc_handle_wp_violation(void* fault_addr)
         gc_assert(ret == 0);
         if (page_table[page_index].write_protected) {
             /* Unprotect the page. */
-            os_protect(page_address(page_index), PAGE_BYTES, OS_VM_PROT_ALL);
+            os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
             page_table[page_index].write_protected_cleared = 1;
             page_table[page_index].write_protected = 0;
         } else {
@@ -4903,7 +4903,7 @@ zero_all_free_pages()
         if (page_free_p(i)) {
 #ifdef READ_PROTECT_FREE_PAGES
             os_protect(page_address(i),
-                       PAGE_BYTES,
+                       GENCGC_CARD_BYTES,
                        OS_VM_PROT_ALL);
 #endif
             zero_pages(i, i);
