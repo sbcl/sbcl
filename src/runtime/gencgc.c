@@ -4281,9 +4281,7 @@ remap_page_range (page_index_t from, page_index_t to, int forcibly)
     if (forcibly)
         zero_pages(from, to);
 #else
-    page_index_t aligned_from, aligned_end, end = to+1;
-
-    const page_index_t 
+    const page_index_t
             release_granularity = gencgc_release_granularity/GENCGC_CARD_BYTES,
                    release_mask = release_granularity-1,
                             end = to+1,
