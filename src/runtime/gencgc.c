@@ -355,6 +355,9 @@ static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
+extern unsigned long gencgc_release_granularity;
+unsigned long gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
+
 
 /*
  * miscellaneous heap functions
@@ -592,6 +595,9 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
 
     if (start > end)
       return;
+
+    gc_assert(length >= gencgc_release_granularity);
+    gc_assert((length % gencgc_release_granularity) == 0);
 
     os_invalidate(addr, length);
     new_addr = os_validate(addr, length);
@@ -4256,35 +4262,69 @@ update_dynamic_space_free_pointer(void)
 }
 
 static void
-remap_free_pages (page_index_t from, page_index_t to)
+remap_page_range (page_index_t from, page_index_t to, int forcibly)
 {
-    page_index_t first_page, last_page;
+    /* There's a mysterious Solaris/x86 problem with using mmap
+     * tricks for memory zeroing. See sbcl-devel thread
+     * "Re: patch: standalone executable redux".
+     *
+     * Since pages don't have to be zeroed ahead of time, only do
+     * so when called from purify.
+     */
+#if defined(LISP_FEATURE_SUNOS)
+    if (forcibly)
+        zero_pages(from, to);
+#else
+    page_index_t aligned_from, aligned_end, end = to+1;
 
+    const page_index_t 
+            release_granularity = gencgc_release_granularity/GENCGC_CARD_BYTES,
+                   release_mask = release_granularity-1,
+                            end = to+1,
+                   aligned_from = (from+release_mask)&~release_mask,
+                    aligned_end = (end&~release_mask);
+
+    if (aligned_from < aligned_end) {
+        zero_pages_with_mmap(aligned_from, aligned_end-1);
+        if (forcibly) {
+            if (aligned_from != from)
+                zero_pages(from, aligned_from-1);
+            if (aligned_end != end)
+                zero_pages(aligned_end, end-1);
+        }
+    } else if (forcibly)
+        zero_pages(from, to);
+#endif
+}
+
+static void
+remap_free_pages (page_index_t from, page_index_t to, int forcibly)
+{
+    page_index_t first_page, last_page,
+                 first_aligned_page, last_aligned_page;
+
+    if (forcibly)
+        return remap_page_range(from, to, 1);
+
+    /* See comment above about mysterious failures on Solaris/x86.
+     */
+#if !defined(LISP_FEATURE_SUNOS)
     for (first_page = from; first_page <= to; first_page++) {
         if (page_allocated_p(first_page) ||
-            (page_table[first_page].need_to_zero == 0)) {
+            (page_table[first_page].need_to_zero == 0))
             continue;
-        }
 
         last_page = first_page + 1;
         while (page_free_p(last_page) &&
-               (last_page < to) &&
-               (page_table[last_page].need_to_zero == 1)) {
+               (last_page <= to) &&
+               (page_table[last_page].need_to_zero == 1))
             last_page++;
-        }
 
-        /* There's a mysterious Solaris/x86 problem with using mmap
-         * tricks for memory zeroing. See sbcl-devel thread
-         * "Re: patch: standalone executable redux".
-         */
-#if defined(LISP_FEATURE_SUNOS)
-        zero_pages(first_page, last_page-1);
-#else
-        zero_pages_with_mmap(first_page, last_page-1);
-#endif
+        remap_page_range(first_page, last_page-1, 0);
 
         first_page = last_page;
     }
+#endif
 }
 
 generation_index_t small_generation_limit = 1;
@@ -4427,7 +4467,7 @@ collect_garbage(generation_index_t last_gen)
     if (gen > small_generation_limit) {
         if (last_free_page > high_water_mark)
             high_water_mark = last_free_page;
-        remap_free_pages(0, high_water_mark);
+        remap_free_pages(0, high_water_mark, 0);
         high_water_mark = 0;
     }
 
@@ -4445,7 +4485,7 @@ collect_garbage(generation_index_t last_gen)
 void
 gc_free_heap(void)
 {
-    page_index_t page;
+    page_index_t page, last_page;
 
     if (gencgc_verbose > 1) {
         SHOW("entering gc_free_heap");
@@ -4455,33 +4495,25 @@ gc_free_heap(void)
         /* Skip free pages which should already be zero filled. */
         if (page_allocated_p(page)) {
             void *page_start, *addr;
-
-            /* Mark the page free. The other slots are assumed invalid
-             * when it is a FREE_PAGE_FLAG and bytes_used is 0 and it
-             * should not be write-protected -- except that the
-             * generation is used for the current region but it sets
-             * that up. */
-            page_table[page].allocated = FREE_PAGE_FLAG;
-            page_table[page].bytes_used = 0;
+            for (last_page = page;
+                 (last_page < page_table_pages) && page_allocated_p(last_page);
+                 last_page++) {
+                /* Mark the page free. The other slots are assumed invalid
+                 * when it is a FREE_PAGE_FLAG and bytes_used is 0 and it
+                 * should not be write-protected -- except that the
+                 * generation is used for the current region but it sets
+                 * that up. */
+                page_table[page].allocated = FREE_PAGE_FLAG;
+                page_table[page].bytes_used = 0;
+                page_table[page].write_protected = 0;
+            }
 
 #ifndef LISP_FEATURE_WIN32 /* Pages already zeroed on win32? Not sure
                             * about this change. */
-            /* Zero the page. */
             page_start = (void *)page_address(page);
-
-            /* First, remove any write-protection. */
-            os_protect(page_start, GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
-            page_table[page].write_protected = 0;
-
-            os_invalidate(page_start,GENCGC_CARD_BYTES);
-            addr = os_validate(page_start,GENCGC_CARD_BYTES);
-            if (addr == NULL || addr != page_start) {
-                lose("gc_free_heap: page moved, 0x%08x ==> 0x%08x\n",
-                     page_start,
-                     addr);
-            }
-#else
-            page_table[page].write_protected = 0;
+            os_protect(page_start, npage_bytes(last_page-page), OS_VM_PROT_ALL);
+            remap_free_pages(page, last_page-1, 1);
+            page = last_page-1;
 #endif
         } else if (gencgc_zero_check_during_free_heap) {
             /* Double-check that the page is zero filled. */
@@ -4490,7 +4522,7 @@ gc_free_heap(void)
             gc_assert(page_free_p(page));
             gc_assert(page_table[page].bytes_used == 0);
             page_start = (long *)page_address(page);
-            for (i=0; i<1024; i++) {
+            for (i=0; i<GENCGC_CARD_BYTES/sizeof(long); i++) {
                 if (page_start[i] != 0) {
                     lose("free region not zero at %x\n", page_start + i);
                 }
