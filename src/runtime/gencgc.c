@@ -627,13 +627,13 @@ zero_pages(page_index_t start, page_index_t end) {
  */
 static void
 zero_dirty_pages(page_index_t start, page_index_t end) {
-    page_index_t i;
+    page_index_t i, j;
 
     for (i = start; i <= end; i++) {
-        if (page_table[i].need_to_zero == 1) {
-            zero_pages(start, end);
-            break;
-        }
+        if (!page_table[i].need_to_zero) continue;
+        for (j = i+1; (j <= end) && (page_table[j].need_to_zero); j++);
+        zero_pages(i, j-1);
+        i = j;
     }
 
     for (i = start; i <= end; i++) {

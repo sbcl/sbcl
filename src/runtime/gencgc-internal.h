@@ -82,7 +82,7 @@ struct page {
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
         large_object :1,
-        /* True if the page is known to contain only zeroes. */
+        /* Cleared if the page is known to contain only zeroes. */
         need_to_zero :1;
 
     /* the generation that this page belongs to. This should be valid
