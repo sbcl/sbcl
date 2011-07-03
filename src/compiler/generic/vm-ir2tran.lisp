@@ -69,7 +69,7 @@
              (macrolet ((make-case ()
                           `(ecase raw-type
                              ((t)
-                              (vop set-slot node block object arg-tn
+                              (vop init-slot node block object arg-tn
                                    name (+ sb!vm:instance-slots-offset slot) lowtag))
                              ,@(mapcar (lambda (rsd)
                                          `(,(sb!kernel::raw-slot-data-raw-type rsd)
@@ -82,11 +82,11 @@
                                        nil))))
                (make-case))))
           (:dd
-           (vop set-slot node block object
+           (vop init-slot node block object
                 (emit-constant (sb!kernel::dd-layout-or-lose slot))
                 name sb!vm:instance-slots-offset lowtag))
           (otherwise
-           (vop set-slot node block object
+           (vop init-slot node block object
                 (ecase kind
                   (:arg
                    (aver args)

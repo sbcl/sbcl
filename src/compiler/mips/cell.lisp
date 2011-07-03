@@ -31,6 +31,7 @@
   (:generator 1
     (storew value object offset lowtag)))
 
+(define-vop (init-slot set-slot))
 
 ;;;; Symbol hacking VOPs:
 

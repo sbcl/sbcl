@@ -31,6 +31,8 @@
   (:generator 1
     (storew value object offset lowtag)))
 
+(define-vop (init-slot set-slot))
+
 #!+compare-and-swap-vops
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg))

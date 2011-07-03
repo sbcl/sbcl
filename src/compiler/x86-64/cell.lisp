@@ -47,6 +47,8 @@
         ;; Else, value not immediate.
         (storew value object offset lowtag))))
 
+(define-vop (init-slot set-slot))
+
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
          (old :scs (descriptor-reg any-reg) :target rax)

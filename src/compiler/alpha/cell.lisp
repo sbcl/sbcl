@@ -35,6 +35,8 @@
         (storew value object offset lowtag))
     #!-gengc
     (storew value object offset lowtag)))
+
+(define-vop (init-slot set-slot))
 
 ;;;; symbol hacking VOPs
 
