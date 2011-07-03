@@ -32,9 +32,8 @@
 ;;;    SC-Offset of primary location (as var-length integer)
 ;;;    [If has save SC, SC-OFFSET of save location (as var-length integer)]
 
-;;; FIXME: The first two are no longer used in SBCL.
-;;;(defconstant compiled-debug-var-uninterned           #b00000001)
-;;;(defconstant compiled-debug-var-packaged             #b00000010)
+(def!constant compiled-debug-var-more-context-p         #b00000001)
+(def!constant compiled-debug-var-more-count-p           #b00000010)
 (def!constant compiled-debug-var-environment-live       #b00000100)
 (def!constant compiled-debug-var-save-loc-p             #b00001000)
 (def!constant compiled-debug-var-id-p                   #b00010000)

@@ -205,12 +205,13 @@
 (defstruct (compiled-debug-var
             (:include debug-var)
             (:constructor make-compiled-debug-var
-                          (symbol id alive-p sc-offset save-sc-offset))
+                (symbol id alive-p sc-offset save-sc-offset info))
             (:copier nil))
   ;; storage class and offset (unexported)
   (sc-offset nil :type sb!c:sc-offset)
   ;; storage class and offset when saved somewhere
-  (save-sc-offset nil :type (or sb!c:sc-offset null)))
+  (save-sc-offset nil :type (or sb!c:sc-offset null))
+  (info nil))
 
 ;;;; frames
 
@@ -1636,6 +1637,8 @@ register."
           (let* ((flags (geti))
                  (minimal (logtest sb!c::compiled-debug-var-minimal-p flags))
                  (deleted (logtest sb!c::compiled-debug-var-deleted-p flags))
+                 (more-context-p (logtest sb!c::compiled-debug-var-more-context-p flags))
+                 (more-count-p (logtest sb!c::compiled-debug-var-more-count-p flags))
                  (live (logtest sb!c::compiled-debug-var-environment-live
                                 flags))
                  (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
@@ -1650,7 +1653,9 @@ register."
                                                          id
                                                          live
                                                          sc-offset
-                                                         save-sc-offset)
+                                                         save-sc-offset
+                                                         (cond (more-context-p :more-context)
+                                                               (more-count-p :more-count)))
                                 buffer)))))))
 
 ;;;; CODE-LOCATIONs
@@ -2374,12 +2379,10 @@ register."
 ;;; :unknown. Once we've called CODE-LOCATION-UNKNOWN-P, we know the
 ;;; live-set information has been cached in the code-location.
 (defun debug-var-validity (debug-var basic-code-location)
-  (etypecase debug-var
-    (compiled-debug-var
-     (compiled-debug-var-validity debug-var basic-code-location))
-    ;; (There used to be more cases back before sbcl-0.7.0, when
-    ;; we did special tricks to debug the IR1 interpreter.)
-    ))
+  (compiled-debug-var-validity debug-var basic-code-location))
+
+(defun debug-var-info (debug-var)
+  (compiled-debug-var-info debug-var))
 
 ;;; This is the method for DEBUG-VAR-VALIDITY for COMPILED-DEBUG-VARs.
 ;;; For safety, make sure basic-code-location is what we think.
@@ -2514,7 +2517,9 @@ register."
 (defun preprocess-for-eval (form loc)
   (declare (type code-location loc))
   (let ((n-frame (gensym))
-        (fun (code-location-debug-fun loc)))
+        (fun (code-location-debug-fun loc))
+        (more-context nil)
+        (more-count nil))
     (unless (debug-var-info-available fun)
       (debug-signal 'no-debug-vars :debug-fun fun))
     (sb!int:collect ((binds)
@@ -2522,17 +2527,33 @@ register."
       (do-debug-fun-vars (var fun)
         (let ((validity (debug-var-validity var loc)))
           (unless (eq validity :invalid)
+            (case (debug-var-info var)
+              (:more-context
+               (setf more-context var))
+              (:more-count
+               (setf more-count var)))
             (let* ((sym (debug-var-symbol var))
                    (found (assoc sym (binds))))
               (if found
                   (setf (second found) :ambiguous)
                   (binds (list sym validity var)))))))
+      (when (and more-context more-count)
+        (let ((more (assoc 'sb!debug::more (binds))))
+          (if more
+              (setf (second more) :ambiguous)
+              (binds (list 'sb!debug::more :more more-context more-count)))))
       (dolist (bind (binds))
         (let ((name (first bind))
               (var (third bind)))
           (ecase (second bind)
             (:valid
              (specs `(,name (debug-var-value ',var ,n-frame))))
+            (:more
+             (let ((count-var (fourth bind)))
+               (specs `(,name (multiple-value-list
+                               (sb!c:%more-arg-values (debug-var-value ',var ,n-frame)
+                                                      0
+                                                      (debug-var-value ',count-var ,n-frame)))))))
             (:unknown
              (specs `(,name (debug-signal 'invalid-value
                                           :debug-var ',var

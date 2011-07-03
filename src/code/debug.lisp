@@ -1267,19 +1267,29 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
               (location (sb!di:frame-code-location *current-frame*))
               (prefix (read-if-available nil))
               (any-p nil)
-              (any-valid-p nil))
+              (any-valid-p nil)
+              (more-context nil)
+              (more-count nil))
           (dolist (v (sb!di:ambiguous-debug-vars
-                        d-fun
-                        (if prefix (string prefix) "")))
+                      d-fun
+                      (if prefix (string prefix) "")))
             (setf any-p t)
             (when (eq (sb!di:debug-var-validity v location) :valid)
               (setf any-valid-p t)
+              (case (sb!di::debug-var-info v)
+                (:more-context
+                 (setf more-context (sb!di:debug-var-value v *current-frame*)))
+                (:more-count
+                 (setf more-count (sb!di:debug-var-value v *current-frame*))))
               (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
                       (sb!di:debug-var-symbol v)
                       (zerop (sb!di:debug-var-id v))
                       (sb!di:debug-var-id v)
                       (sb!di:debug-var-value v *current-frame*))))
-
+          (when (and more-context more-count)
+            (format *debug-io* "~S  =  ~S~%"
+                    'more
+                    (multiple-value-list (sb!c:%more-arg-values more-context 0 more-count))))
           (cond
            ((not any-p)
             (format *debug-io*

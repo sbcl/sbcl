@@ -352,7 +352,8 @@
   (let* ((name (leaf-debug-name var))
          (save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
-         (flags 0))
+         (flags 0)
+         (info (lambda-var-arg-info var)))
     (declare (type index flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
@@ -369,6 +370,12 @@
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (unless (or (zerop id) minimal)
       (setq flags (logior flags compiled-debug-var-id-p)))
+    (when info
+      (case (arg-info-kind info)
+        (:more-context
+         (setq flags (logior flags compiled-debug-var-more-context-p)))
+        (:more-count
+         (setq flags (logior flags compiled-debug-var-more-count-p)))))
     (vector-push-extend flags buffer)
     (unless minimal
       (vector-push-extend name buffer)
