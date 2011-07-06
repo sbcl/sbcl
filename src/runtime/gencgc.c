@@ -81,7 +81,13 @@ enum {
 boolean enable_page_protection = 1;
 
 /* the minimum size (in bytes) for a large object*/
+#if (GENCGC_ALLOC_GRANULARITY >= PAGE_BYTES) && (GENCGC_ALLOC_GRANULARITY >= GENCGC_CARD_BYTES)
 long large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
+#elif (GENCGC_CARD_BYTES >= PAGE_BYTES) && (GENCGC_CARD_BYTES >= GENCGC_ALLOC_GRANULARITY)
+long large_object_size = 4 * GENCGC_CARD_BYTES;
+#else
+long large_object_size = 4 * PAGE_BYTES;
+#endif
 
 
 /*
@@ -628,6 +634,15 @@ zero_pages(page_index_t start, page_index_t end) {
     bzero(page_address(start), npage_bytes(1+end-start));
 #endif
 
+}
+
+static void
+zero_and_mark_pages(page_index_t start, page_index_t end) {
+    page_index_t i;
+
+    zero_pages(start, end);
+    for (i = start; i <= end; i++)
+        page_table[i].need_to_zero = 0;
 }
 
 /* Zero the pages from START to END (inclusive), except for those
@@ -4268,18 +4283,14 @@ update_dynamic_space_free_pointer(void)
 }
 
 static void
-remap_page_range (page_index_t from, page_index_t to, int forcibly)
+remap_page_range (page_index_t from, page_index_t to)
 {
     /* There's a mysterious Solaris/x86 problem with using mmap
      * tricks for memory zeroing. See sbcl-devel thread
      * "Re: patch: standalone executable redux".
-     *
-     * Since pages don't have to be zeroed ahead of time, only do
-     * so when called from purify.
      */
 #if defined(LISP_FEATURE_SUNOS)
-    if (forcibly)
-        zero_pages(from, to);
+    zero_and_mark_pages(from, to);
 #else
     const page_index_t
             release_granularity = gencgc_release_granularity/GENCGC_CARD_BYTES,
@@ -4290,14 +4301,13 @@ remap_page_range (page_index_t from, page_index_t to, int forcibly)
 
     if (aligned_from < aligned_end) {
         zero_pages_with_mmap(aligned_from, aligned_end-1);
-        if (forcibly) {
-            if (aligned_from != from)
-                zero_pages(from, aligned_from-1);
-            if (aligned_end != end)
-                zero_pages(aligned_end, end-1);
-        }
-    } else if (forcibly)
-        zero_pages(from, to);
+        if (aligned_from != from)
+            zero_and_mark_pages(from, aligned_from-1);
+        if (aligned_end != end)
+            zero_and_mark_pages(aligned_end, end-1);
+    } else {
+        zero_and_mark_pages(from, to);
+    }
 #endif
 }
 
@@ -4308,11 +4318,8 @@ remap_free_pages (page_index_t from, page_index_t to, int forcibly)
                  first_aligned_page, last_aligned_page;
 
     if (forcibly)
-        return remap_page_range(from, to, 1);
+        return remap_page_range(from, to);
 
-    /* See comment above about mysterious failures on Solaris/x86.
-     */
-#if !defined(LISP_FEATURE_SUNOS)
     for (first_page = from; first_page <= to; first_page++) {
         if (page_allocated_p(first_page) ||
             (page_table[first_page].need_to_zero == 0))
@@ -4324,11 +4331,10 @@ remap_free_pages (page_index_t from, page_index_t to, int forcibly)
                (page_table[last_page].need_to_zero == 1))
             last_page++;
 
-        remap_page_range(first_page, last_page-1, 0);
+        remap_page_range(first_page, last_page-1);
 
         first_page = last_page;
     }
-#endif
 }
 
 generation_index_t small_generation_limit = 1;

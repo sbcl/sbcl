@@ -20,7 +20,7 @@
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
 ;;; the start of objects.
-(def!constant gencgc-alloc-granularity *backend-page-bytes*)
+(def!constant gencgc-alloc-granularity 0)
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (def!constant gencgc-release-granularity *backend-page-bytes*)
