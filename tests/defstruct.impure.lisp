@@ -461,11 +461,13 @@
             *manyraw*)))
   (room)
   (sb-ext:gc))
-(check-manyraws *manyraw*)
+(with-test (:name defstruct-raw-slot-gc)
+  (check-manyraws *manyraw*))
 
 ;;; try a full GC, too
 (sb-ext:gc :full t)
-(check-manyraws *manyraw*)
+(with-test (:name (defstruct-raw-slot-gc :full))
+  (check-manyraws *manyraw*))
 
 ;;; fasl dumper and loader also have special handling of raw slots, so
 ;;; dump all of them into a fasl
@@ -485,7 +487,8 @@
 
 ;;; re-read the dumped structures and check them
 (load "tmp-defstruct.manyraw.fasl")
-(check-manyraws (dumped-manyraws))
+(with-test (:name (defstruct-raw-slot load))
+  (check-manyraws (dumped-manyraws)))
 
 
 ;;;; miscellaneous old bugs

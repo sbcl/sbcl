@@ -361,7 +361,7 @@ profiling")
   #-gencgc
   (get-page-size)
   #+gencgc
-  sb-vm:gencgc-alloc-granularity)
+  (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-card-bytes))
 (declaim (type number *alloc-region-size*))
 
 (defvar *samples* nil)

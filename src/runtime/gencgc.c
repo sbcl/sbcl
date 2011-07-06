@@ -4314,8 +4314,7 @@ remap_page_range (page_index_t from, page_index_t to)
 static void
 remap_free_pages (page_index_t from, page_index_t to, int forcibly)
 {
-    page_index_t first_page, last_page,
-                 first_aligned_page, last_aligned_page;
+    page_index_t first_page, last_page;
 
     if (forcibly)
         return remap_page_range(from, to);
