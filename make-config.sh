@@ -293,7 +293,16 @@ esac
 
 link_or_copy() {
    if [ "$sbcl_os" = "win32" ] ; then
-       cp -r "$1" "$2"
+      # Use preprocessor or makefile includes instead of copying if
+      # possible, to avoid unexpected use of the original, unchanged
+      # files when re-running only make-target-1 during development.
+      if echo "$1" | egrep '[.][ch]$'; then
+         echo "#include \"$1\"" >"$2"
+      elif echo "$1" | egrep '^Config[.]'; then
+         echo "include $1" >"$2"
+      else
+         cp -r "$1" "$2"
+      fi
    else
        ln -s "$1" "$2"
    fi
