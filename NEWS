@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.50:
+  * enhancement: added support for socket keepalive timeout intervals
+    and probe counts on Linux.
   * enhancement: building 32-bit SBCL on Linux/x86-64 now works without a
     chroot. (Use "SBCL_ARCH=x86 sh make.sh" to build.)
   * bug fix: correct RIP offset calculation in SSE comparison and shuffle

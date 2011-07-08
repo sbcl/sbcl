@@ -102,6 +102,13 @@ Code for options that not every system has should be conditionalised:
   sockopt-priority sockint::sol-socket sockint::so-priority :linux
   "Available only on Linux.")
 
+(define-socket-option-int
+  sockopt-tcp-keepcnt :tcp sockint::tcp-keepcnt :linux "Available only on Linux.")
+(define-socket-option-int
+  sockopt-tcp-keepidle :tcp sockint::tcp-keepidle :linux "Available only on Linux.")
+(define-socket-option-int
+  sockopt-tcp-keepintvl :tcp sockint::tcp-keepintvl :linux "Available only on Linux.")
+
 ;;; boolean options are integers really
 
 (defun foreign-int-to-bool (x size)

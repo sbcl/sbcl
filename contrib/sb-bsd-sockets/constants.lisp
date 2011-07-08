@@ -44,7 +44,12 @@
  #+linux (:integer so-passcred "SO_PASSCRED")
  (:integer so-rcvbuf "SO_RCVBUF")
  (:integer so-keepalive "SO_KEEPALIVE"
-           "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
+           "Send periodic keepalives.  If peer does not respond, we get SIGPIPE.")
+ #+linux (:integer tcp-keepcnt "TCP_KEEPCNT"
+                   "Number of unacknowledged probes before the connection is considered dead.")
+ #+linux (:integer tcp-keepidle "TCP_KEEPIDLE"
+                   "Seconds between the last data packet sent and the first keepalive probe.")
+ #+linux (:integer tcp-keepintvl "TCP_KEEPINTVL" "Seconds between keepalive probes.")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
  #+linux
