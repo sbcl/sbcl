@@ -317,6 +317,7 @@ NIL as the pathname."
 (define-alien-routine scrub-control-stack sb!alien:void)
 
 (defun unsafe-clear-roots (gen)
+  #!-gencgc (declare (ignore gen))
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe
   ;; as having these cons more then we have space left leads to huge
   ;; badness.
