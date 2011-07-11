@@ -4,18 +4,19 @@ git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
     if ( which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null )
     then
-        true
+        echo "ok"
     else
-        false
+        echo ""
     fi
 }
 
 generate_version() {
-    if [ -f version.lisp-expr -a ! git_available_p ]
+    AVAILABLE=$(git_available_p)
+    if [ -f version.lisp-expr -a -z "$AVAILABLE" ]
     then
         # Relase tarball, leave version.lisp-expr alone.
         return
-    elif [ ! git_available_p ]
+    elif [ -z "$AVAILABLE" ]
     then
         echo "Can't run 'git describe' and version.lisp-expr is missing." >&2
         echo "To fix this, either install git or create a fake version.lisp-expr file." >&2
