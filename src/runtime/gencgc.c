@@ -1255,10 +1255,12 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
     else {
         /* FIXME: assert free_pages_lock held */
         (void)thread_mutex_unlock(&free_pages_lock);
+#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
         gc_assert(get_pseudo_atomic_atomic(thread));
         clear_pseudo_atomic_atomic(thread);
         if (get_pseudo_atomic_interrupted(thread))
             do_pending_interrupt();
+#endif
         /* Another issue is that signalling HEAP-EXHAUSTED error leads
          * to running user code at arbitrary places, even in a
          * WITHOUT-INTERRUPTS which may lead to a deadlock without
@@ -4181,8 +4183,10 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     gc_assert((((unsigned long)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
 
+#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
     /* Must be inside a PA section. */
     gc_assert(get_pseudo_atomic_atomic(thread));
+#endif
 
     if (nbytes > large_allocation)
         large_allocation = nbytes;
@@ -4284,7 +4288,9 @@ general_alloc(long nbytes, int page_type_flag)
 lispobj *
 alloc(long nbytes)
 {
+#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
     gc_assert(get_pseudo_atomic_atomic(arch_os_get_current_thread()));
+#endif
     return general_alloc(nbytes, BOXED_PAGE_FLAG);
 }
 

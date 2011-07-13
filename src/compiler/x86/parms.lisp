@@ -383,3 +383,6 @@
 ;;; FIXME: Is this used? Delete it or document it.
 ;;; cf the sparc PARMS.LISP
 (defparameter *assembly-unit-length* 8)
+
+#!+win32
+(defconstant +win32-tib-arbitrary-field-offset+ #.(+ #xE10 (* 4 63)))

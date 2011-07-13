@@ -270,10 +270,19 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
-  (:args (n :scs (unsigned-reg) :target sap))
+  (:args (n :scs (unsigned-reg)
+            #!+win32 #!+win32 :to :save
+            #!-win32 #!-win32 :target sap))
   (:arg-types unsigned-num)
   (:policy :fast-safe)
   (:generator 2
+    #!+win32
+    (progn
+      ;; Note that SAP conflicts with N in this case, hence the reader
+      ;; conditionals above.
+      (inst mov sap (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
+      (inst mov sap (make-ea :dword :base sap :disp 0 :index n :scale 4)))
+    #!-win32
     (inst mov sap (make-ea :dword :disp 0 :index n :scale 4) :fs)))
 
 (define-vop (halt)
