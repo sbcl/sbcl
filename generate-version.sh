@@ -11,7 +11,7 @@ git_available_p() {
 }
 
 generate_version() {
-    AVAILABLE=$(git_available_p)
+    AVAILABLE=`git_available_p`
     if [ -f version.lisp-expr -a -z "$AVAILABLE" ]
     then
         # Relase tarball, leave version.lisp-expr alone.
