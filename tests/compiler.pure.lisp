@@ -3942,3 +3942,19 @@
                            ((integer 0 1) b)
                            (optimize debug))
                   (lambda () (< b a)))))
+
+;; Actually tests the assembly of RIP-relative operands to comparison
+;; functions (one of the few x86 instructions that have extra bytes
+;; *after* the mem operand's effective address, resulting in a wrong
+;; offset).
+(with-test (:name :cmpps)
+  (let ((foo (compile nil `(lambda (x)
+                             (= #C(2.0 3.0) (the (complex single-float) x))))))
+    (assert (funcall foo #C(2.0 3.0)))
+    (assert (not (funcall foo #C(1.0 2.0))))))
+
+(with-test (:name :cmppd)
+  (let ((foo (compile nil `(lambda (x)
+                             (= #C(2d0 3d0) (the (complex double-float) x))))))
+    (assert (funcall foo #C(2d0 3d0)))
+    (assert (not (funcall foo #C(1d0 2d0))))))

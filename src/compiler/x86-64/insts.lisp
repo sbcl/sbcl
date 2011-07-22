@@ -1382,7 +1382,7 @@
             (format stream "+~A" (ea-disp ea))))
          (write-char #\] stream))))
 
-(defun emit-constant-tn-rip (segment constant-tn reg)
+(defun emit-constant-tn-rip (segment constant-tn reg remaining-bytes)
   ;; AMD64 doesn't currently have a code object register to use as a
   ;; base register for constant access. Instead we use RIP-relative
   ;; addressing. The offset from the SIMPLE-FUN-HEADER to the instruction
@@ -1411,21 +1411,23 @@
                        ;; The addressing is relative to end of instruction,
                        ;; i.e. the end of this dword. Hence the + 4.
                        (emit-signed-dword segment
-                                          (+ 4 (- (+ offset posn)))))))
+                                          (+ 4 remaining-bytes
+                                             (- (+ offset posn)))))))
   (values))
 
-(defun emit-label-rip (segment fixup reg)
+(defun emit-label-rip (segment fixup reg remaining-bytes)
   (let ((label (fixup-offset fixup)))
     ;; RIP-relative addressing
     (emit-mod-reg-r/m-byte segment #b00 reg #b101)
     (emit-back-patch segment
                      4
                      (lambda (segment posn)
-                       (emit-signed-dword segment (- (label-position label)
-                                                     (+ posn 4))))))
+                       (emit-signed-dword segment
+                                          (- (label-position label)
+                                             (+ posn 4 remaining-bytes))))))
   (values))
 
-(defun emit-ea (segment thing reg &optional allow-constants)
+(defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
   (etypecase thing
     (tn
      ;; this would be eleganter if we had a function that would create
@@ -1447,7 +1449,7 @@
           ;; Why?
           (error
            "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
-        (emit-constant-tn-rip segment thing reg))))
+        (emit-constant-tn-rip segment thing reg remaining-bytes))))
     (ea
      (let* ((base (ea-base thing))
             (index (ea-index thing))
@@ -1468,7 +1470,9 @@
                   (label-p (fixup-offset disp)))
          (aver (null base))
          (aver (null index))
-         (return-from emit-ea (emit-ea segment disp reg allow-constants)))
+         (return-from emit-ea (emit-ea segment disp reg
+                                       :allow-constants allow-constants
+                                       :remaining-bytes remaining-bytes)))
        (when (and (= mod 0) (= r/m #b101))
          ;; this is rip-relative in amd64, so we'll use a sib instead
          (setf r/m #b100 scale 1))
@@ -1494,7 +1498,7 @@
     (fixup
      (typecase (fixup-offset thing)
        (label
-        (emit-label-rip segment thing reg))
+        (emit-label-rip segment thing reg remaining-bytes))
        (t
         (emit-mod-reg-r/m-byte segment #b00 reg #b100)
         (emit-sib-byte segment 0 #b100 #b101)
@@ -1819,7 +1823,7 @@
                               (if (eq size :byte)
                                   #b10001010
                                   #b10001011))
-                   (emit-ea segment src (reg-tn-encoding dst) t))))
+                   (emit-ea segment src (reg-tn-encoding dst) :allow-constants t))))
            ((integerp src)
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
@@ -1962,7 +1966,7 @@
                    (emit-byte-with-reg segment #b01010 (reg-tn-encoding src)))
                   (t
                    (emit-byte segment #b11111111)
-                   (emit-ea segment src #b110 t))))))))
+                   (emit-ea segment src #b110 :allow-constants t))))))))
 
 (define-instruction pop (segment dst)
   (:printer reg-no-width-default-qword ((op #b01011)))
@@ -2115,7 +2119,7 @@
       (cond ((and (not (eq size :byte)) (<= -128 src 127))
              (maybe-emit-rex-for-ea segment dst nil)
              (emit-byte segment #b10000011)
-             (emit-ea segment dst opcode allow-constants)
+             (emit-ea segment dst opcode :allow-constants allow-constants)
              (emit-byte segment src))
             ((accumulator-p dst)
              (maybe-emit-rex-for-ea segment dst nil)
@@ -2129,7 +2133,7 @@
             (t
              (maybe-emit-rex-for-ea segment dst nil)
              (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
-             (emit-ea segment dst opcode allow-constants)
+             (emit-ea segment dst opcode :allow-constants allow-constants)
              (emit-sized-immediate segment size src))))
      ((register-p src)
       (maybe-emit-rex-for-ea segment dst src)
@@ -2137,14 +2141,14 @@
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000000 #b00000001)))
-      (emit-ea segment dst (reg-tn-encoding src) allow-constants))
+      (emit-ea segment dst (reg-tn-encoding src) :allow-constants allow-constants))
      ((register-p dst)
       (maybe-emit-rex-for-ea segment src dst)
       (emit-byte segment
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000010 #b00000011)))
-      (emit-ea segment src (reg-tn-encoding dst) allow-constants))
+      (emit-ea segment src (reg-tn-encoding dst) :allow-constants allow-constants))
      (t
       (error "bogus operands to ~A" name)))))
 
@@ -3028,7 +3032,8 @@
 
 ;;;; Instructions required to do floating point operations using SSE
 
-(defun emit-sse-inst (segment dst src prefix opcode &key operand-size)
+(defun emit-sse-inst (segment dst src prefix opcode
+                      &key operand-size (remaining-bytes 0))
   (when prefix
     (emit-byte segment prefix))
   (if operand-size
@@ -3036,7 +3041,7 @@
       (maybe-emit-rex-for-ea segment src dst))
   (emit-byte segment #x0f)
   (emit-byte segment opcode)
-  (emit-ea segment src (reg-tn-encoding dst)))
+  (emit-ea segment src (reg-tn-encoding dst) :remaining-bytes remaining-bytes))
 
 ;; 0110 0110:0000 1111:0111 00gg: 11 010 xmmreg:imm8
 
@@ -3078,10 +3083,12 @@
 ;;; Emit an SSE instruction that has an XMM register as the destination
 ;;; operand and for which the size of the operands is implicitly given
 ;;; by the instruction.
-(defun emit-regular-sse-inst (segment dst src prefix opcode)
+(defun emit-regular-sse-inst (segment dst src prefix opcode
+                              &key (remaining-bytes 0))
   (aver (xmm-register-p dst))
   (emit-sse-inst segment dst src prefix opcode
-                 :operand-size :do-not-set))
+                 :operand-size :do-not-set
+                 :remaining-bytes remaining-bytes))
 
 ;;; Instructions having an XMM register as the destination operand
 ;;; and an XMM register or a memory location as the source operand.
@@ -3228,7 +3235,8 @@
                           (:printer rex-xmm-xmm/mem-imm ((op ,opcode)))))
                   (:emitter
                    (aver (typep pattern '(unsigned-byte 8)))
-                   (emit-regular-sse-inst segment dst src ,prefix ,opcode)
+                   (emit-regular-sse-inst segment dst src ,prefix ,opcode
+                                          :remaining-bytes 1)
                    (emit-byte segment pattern)))))
   (define-xmm-shuffle-sse-inst pshufd  #x66 #x70)
   (define-xmm-shuffle-sse-inst pshufhw #xf3 #x70)
@@ -3265,7 +3273,8 @@
                     (:emitter
                      (let ((code (position op *sse-conditions*)))
                        (aver code)
-                       (emit-regular-sse-inst segment x y ,prefix ,opcode)
+                       (emit-regular-sse-inst segment x y ,prefix ,opcode
+                                              :remaining-bytes 1)
                        (emit-byte segment code)))))))
   (define-xmm-comparison-sse-inst cmppd #x66 #xc2 "CMP" "PD")
   (define-xmm-comparison-sse-inst cmpps nil  #xc2 "CMP" "PS")
