@@ -241,6 +241,8 @@
         ((and (csubtypep type (specifier-type 'sequence))
               (find-class output-type-spec nil))
          (let ((class (find-class output-type-spec)))
+           (unless (sb!mop:class-finalized-p class)
+             (sb!mop:finalize-inheritance class))
            (sb!sequence:make-sequence-like
             (sb!mop:class-prototype class)
             (length object) :initial-contents object)))
