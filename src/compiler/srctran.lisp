@@ -3264,6 +3264,112 @@
       `(if (minusp x)
            (- (logand (- x) ,mask))
            (logand x ,mask)))))
+
+;;; Return an expression to calculate the integer quotient of X and
+;;; constant Y, using multiplication, shift and add/sub instead of
+;;; division. Both arguments must be unsigned, fit in a machine word and
+;;; Y must neither be zero nor a power of two. The quotient is rounded
+;;; towards zero.
+;;; The algorithm is taken from the paper "Division by Invariant
+;;; Integers using Multiplication", 1994 by Torbjörn Granlund and Peter
+;;; L. Montgomery, Figures 4.2 and 6.2, modified to exclude the case of
+;;; division by powers of two.
+;;; The following two examples show an average case and the worst case
+;;; with respect to the complexity of the generated expression, under
+;;; a word size of 64 bits:
+;;;
+;;; (UNSIGNED-DIV-TRANSFORMER 10) ->
+;;; (ASH (%MULTIPLY (ASH X 0) 14757395258967641293) -3)
+;;;
+;;; (UNSIGNED-DIV-TRANSFORMER 7) ->
+;;; (LET* ((NUM X)
+;;;        (T1 (%MULTIPLY NUM 2635249153387078803)))
+;;;   (ASH (LDB (BYTE 64 0)
+;;;             (+ T1 (ASH (LDB (BYTE 64 0)
+;;;                             (- NUM T1))
+;;;                        -1)))
+;;;        -2))
+;;;
+(defun gen-unsigned-div-by-constant-expr (y)
+  (declare (type (integer 3 #.most-positive-word) y))
+  (aver (not (zerop (logand y (1- y)))))
+  (labels ((ld (x)
+             ;; the floor of the binary logarithm of (positive) X
+             (integer-length (1- x)))
+           (choose-multiplier (y precision)
+             (do* ((l (ld y))
+                   (shift l (1- shift))
+                   (expt-2-n+l (expt 2 (+ sb!vm:n-word-bits l)))
+                   (m-low (truncate expt-2-n+l y) (ash m-low -1))
+                   (m-high (truncate (+ expt-2-n+l
+                                        (ash expt-2-n+l (- precision)))
+                                     y)
+                           (ash m-high -1)))
+                  ((not (and (< (ash m-low -1) (ash m-high -1))
+                             (> shift 0)))
+                   (values m-high shift)))))
+    (let ((n (expt 2 sb!vm:n-word-bits))
+          (shift1 0))
+      (multiple-value-bind (m shift2)
+          (choose-multiplier y sb!vm:n-word-bits)
+        (when (and (>= m n) (evenp y))
+          (setq shift1 (ld (logand y (- y))))
+          (multiple-value-setq (m shift2)
+            (choose-multiplier (/ y (ash 1 shift1))
+                               (- sb!vm:n-word-bits shift1))))
+        (if (>= m n)
+            (flet ((word-mod (x)
+                     `(ldb (byte #.sb!vm:n-word-bits 0) ,x)))
+              `(let* ((num x)
+                      (t1 (%multiply num ,(- m n))))
+                 (ash ,(word-mod `(+ t1 (ash ,(word-mod `(- num t1))
+                                             -1)))
+                      ,(- 1 shift2))))
+            `(ash (%multiply (ash x ,(- shift1)) ,m)
+                  ,(- shift2)))))))
+
+;;; If the divisor is constant and both args are positive and fit in a
+;;; machine word, replace the division by a multiplication and possibly
+;;; some shifts and an addition. Calculate the remainder by a second
+;;; multiplication and a subtraction. Dead code elimination will
+;;; suppress the latter part if only the quotient is needed. If the type
+;;; of the dividend allows to derive that the quotient will always have
+;;; the same value, emit much simpler code to handle that. (This case
+;;; may be rare but it's easy to detect and the compiler doesn't find
+;;; this optimization on its own.)
+(deftransform truncate ((x y) ((unsigned-byte #.sb!vm:n-word-bits)
+                               (constant-arg
+                                (unsigned-byte #.sb!vm:n-word-bits)))
+                        *
+                        :policy (and (> speed compilation-speed)
+                                     (> speed space)))
+  "convert integer division to multiplication"
+  (let ((y (lvar-value y)))
+    ;; Division by zero, one or powers of two is handled elsewhere.
+    (when (zerop (logand y (1- y)))
+      (give-up-ir1-transform))
+    ;; The compiler can't derive the result types to maximal tightness
+    ;; from the transformed expression, so we calculate them here and
+    ;; add the corresponding specifiers explicitly through TRULY-THE.
+    ;; This duplicates parts of the TRUNCATE DERIVE-TYPE optimizer but
+    ;; using that here would be too cumbersome.
+    (let* ((x-type (lvar-type x))
+           (x-low (or (and (numeric-type-p x-type)
+                           (numeric-type-low x-type))
+                      0))
+           (x-high (or (and (numeric-type-p x-type)
+                            (numeric-type-high x-type))
+                       (1- (expt 2 #.sb!vm:n-word-bits))))
+           (quot-low (truncate x-low y))
+           (quot-high (truncate x-high y)))
+      (if (= quot-low quot-high)
+          `(values ,quot-low
+                   (- x ,(* quot-low y)))
+          `(let* ((quot ,(gen-unsigned-div-by-constant-expr y))
+                  (rem (ldb (byte #.sb!vm:n-word-bits 0)
+                            (- x (* quot ,y)))))
+             (values (truly-the (integer ,quot-low ,quot-high) quot)
+                     (truly-the (integer 0 ,(1- y)) rem)))))))
 
 ;;;; arithmetic and logical identity operation elimination
 

@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.50:
     and probe counts on Linux.
   * enhancement: building 32-bit SBCL on Linux/x86-64 now works without a
     chroot. (Use "SBCL_ARCH=x86 sh make.sh" to build.)
+  * optimization: unsigned integer divisions by a constant are implemented
+    using multiplication (affects CEILING, FLOOR, TRUNCATE, MOD, and REM.)
   * bug fix: correct RIP offset calculation in SSE comparison and shuffle
     instructions. (lp#814688)
   * bug fix: COERCE to unfinalized extended sequence classes now works.

@@ -404,3 +404,67 @@
                                 (if (eql fast-result slow-result)
                                     (print (list :ok `(,op ,@args) :=> fast-result))
                                     (error "oops: ~S, ~S" args call-args)))))))))))
+
+;;; (TRUNCATE <unsigned-word> <constant unsigned-word>) is optimized
+;;; to use multiplication instead of division. This propagates to FLOOR,
+;;; MOD and REM. Test that the transform is indeed triggered and test
+;;; several cases for correct results.
+(with-test (:name (:integer-division-using-multiplication :used)
+                  :skipped-on '(not (or :x86-64 :x86)))
+  (dolist (fun '(truncate floor ceiling mod rem))
+    (let* ((foo (compile nil `(lambda (x)
+                                (declare (optimize (speed 3)
+                                                   (space 0)
+                                                   (compilation-speed 0))
+                                         (type (unsigned-byte
+                                                ,sb-vm:n-word-bits) x))
+                                (,fun x 9))))
+           (disassembly (with-output-to-string (s)
+                          (disassemble foo :stream s))))
+      ;; KLUDGE copied from test :float-division-using-exact-reciprocal
+      ;; in compiler.pure.lisp.
+      (assert (and (not (search "DIV" disassembly))
+                   (search "MUL" disassembly))))))
+
+(with-test (:name (:integer-division-using-multiplication :correctness))
+  (let ((*random-state* (make-random-state t)))
+    (dolist (dividend-type `((unsigned-byte ,sb-vm:n-word-bits)
+                             (and fixnum unsigned-byte)
+                             (integer 10000 10100)))
+      (dolist (divisor `(;; Some special cases from the paper
+                         7 10 14 641 274177
+                         ;; Range extremes
+                         3
+                         ,most-positive-fixnum
+                         ,(1- (expt 2 sb-vm:n-word-bits))
+                         ;; Some random values
+                         ,@(loop for i from 8 to sb-vm:n-word-bits
+                                 for r = (random (expt 2 i))
+                                 ;; We don't want 0, 1 and powers of 2.
+                                 when (not (zerop (logand r (1- r))))
+                                 collect r)))
+        (dolist (fun '(truncate ceiling floor mod rem))
+          (let ((foo (compile nil `(lambda (x)
+                                     (declare (optimize (speed 3)
+                                                        (space 0)
+                                                        (compilation-speed 0))
+                                              (type ,dividend-type x))
+                                     (,fun x ,divisor)))))
+            (dolist (dividend `(0 1 ,most-positive-fixnum
+                                ,(1- divisor) ,divisor
+                                ,(1- (* divisor 2)) ,(* divisor 2)
+                                ,@(loop repeat 4
+                                        collect (+ 10000 (random 101)))
+                                ,@(loop for i from 4 to sb-vm:n-word-bits
+                                        for r = (random (expt 2 i))
+                                        collect r)))
+              (when (typep dividend dividend-type)
+                (multiple-value-bind (q1 r1)
+                    (funcall foo dividend)
+                  (multiple-value-bind (q2 r2)
+                      (funcall fun dividend divisor)
+                    (unless (and (= q1 q2)
+                                 (eql r1 r2))
+                      (error "bad results for ~s with dividend type ~s"
+                             (list fun dividend divisor)
+                             dividend-type))))))))))))
