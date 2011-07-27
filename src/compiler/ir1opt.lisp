@@ -222,7 +222,7 @@
                                 it (coerce-to-values type)))
                               (t (coerce-to-values type)))))
                dest)))))
-  (lvar-%externally-checkable-type lvar))
+  (or (lvar-%externally-checkable-type lvar) *wild-type*))
 #!-sb-fluid(declaim (inline flush-lvar-externally-checkable-type))
 (defun flush-lvar-externally-checkable-type (lvar)
   (declare (type lvar lvar))

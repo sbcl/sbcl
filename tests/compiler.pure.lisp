@@ -3958,3 +3958,13 @@
                              (= #C(2d0 3d0) (the (complex double-float) x))))))
     (assert (funcall foo #C(2d0 3d0)))
     (assert (not (funcall foo #C(1d0 2d0))))))
+
+(with-test (:name :lvar-externally-checkable-type-nil)
+  ;; Used to signal a BUG during compilation.
+  (let ((fun (compile nil `(lambda (a) (parse-integer "12321321" (the (member :start) a) 1)))))
+    (multiple-value-bind (i p) (funcall fun :start)
+      (assert (= 2321321 i))
+      (assert (= 8 p)))
+    (multiple-value-bind (i e) (ignore-errors (funcall fun :end))
+      (assert (not i))
+      (assert (typep e 'type-error)))))

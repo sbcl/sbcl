@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.50:
     instructions. (lp#814688)
   * bug fix: COERCE to unfinalized extended sequence classes now works.
     (reported by Jan Moringen; lp#815155)
+  * bug fix: a compiler error during typecheck generation, reported by Eric
+    Marsden.
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove
