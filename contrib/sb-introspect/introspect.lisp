@@ -647,7 +647,7 @@ constant pool."
             (loop for i from 0 below (length array) by 2
                   for xref-name = (aref array i)
                   for xref-path = (aref array (1+ i))
-                  do (when (eql xref-name wanted-name)
+                  do (when (equal xref-name wanted-name)
                        (let ((source-location
                               (find-function-definition-source simple-fun)))
                          ;; Use the more accurate source path from
