@@ -21,6 +21,7 @@ src/compiler/target
 src/runtime/Config
 src/runtime/genesis
 src/runtime/ldso-stubs.S
+src/runtime/openbsd-sigcontext.h
 src/runtime/sbcl
 src/runtime/sbcl.exe
 src/runtime/sbcl.h
