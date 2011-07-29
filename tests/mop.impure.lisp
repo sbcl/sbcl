@@ -645,5 +645,37 @@
            ((foo :initarg :foo :reader foofoo :function car))
            (:metaclass func-slot-class)))
     (assert (eq x (foofoo o)))))
+
+(defclass class-slot-removal-test ()
+  ((instance :initform 1)
+   (class :allocation :class :initform :ok)))
+
+(defmethod update-instance-for-redefined-class ((x class-slot-removal-test) added removed plist &rest inits)
+  (throw 'update-instance
+    (list added removed plist inits)))
+
+(with-test (:name :class-redefinition-removes-class-slot)
+  (let ((o (make-instance 'class-slot-removal-test)))
+    (assert (equal '(nil nil nil nil)
+                   (catch 'update-instance
+                     (eval `(defclass class-slot-removal-test ()
+                              ((instance :initform 2))))
+                     (slot-value o 'instance))))))
+
+(defclass class-slot-add-test ()
+  ((instance :initform 1)))
+
+(defmethod update-instance-for-redefined-class ((x class-slot-add-test) added removed plist &rest inits)
+  (throw 'update-instance
+    (list added removed plist inits)))
+
+(with-test (:name :class-redefinition-adds-class-slot)
+  (let ((o (make-instance 'class-slot-add-test)))
+    (assert (equal '(nil nil nil nil)
+                   (catch 'update-instance
+                     (eval `(defclass class-slot-add-test ()
+                              ((instance :initform 2)
+                               (class :allocation :class :initform :ok))))
+                     (slot-value o 'instance))))))
 
 ;;;; success

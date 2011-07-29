@@ -968,9 +968,8 @@
             (cond ((null owrapper)
                    (make-wrapper nslots class))
                   ((and (equal nlayout olayout)
-                        (loop for o in owrapper-class-slots
-                              for n in nwrapper-class-slots
-                              always (eq (car o) (car n)))
+                        (equal (mapcar #'car owrapper-class-slots)
+                               (mapcar #'car nwrapper-class-slots))
                         (slotd-classes-eq (slot-value class 'slots) eslotds))
                    owrapper)
                   (t
