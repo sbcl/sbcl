@@ -8,6 +8,8 @@ changes relative to sbcl-1.0.50:
     Marsden. (lp#816564)
   * bug fix: obsolete instance protocol fires when shared slots are added
     or removed.
+  * bug fix: fixed-format floating point printing with scaling factors.
+    (lp#811386)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove

@@ -1333,7 +1333,9 @@
                    (values-list w))
                   (t (values-list f))))
               (flonum-to-digits x)))
-    (let ((e (+ e (or scale 0)))
+    (let ((e (if (zerop x)
+                 e
+                 (+ e (or scale 0))))
           (stream (make-string-output-stream)))
       (if (plusp e)
           (progn
@@ -1351,7 +1353,10 @@
             (write-string "." stream)
             (dotimes (i (- e))
               (write-char #\0 stream))
-            (write-string string stream)
+            (write-string string stream :end (when fdigits
+                                               (min (length string)
+                                                    (max (or fmin 0)
+                                                         (+ fdigits e)))))
             (when fdigits
               (dotimes (i (+ fdigits e (- (length string))))
                 (write-char #\0 stream)))))

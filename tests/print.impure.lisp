@@ -562,4 +562,13 @@
                        (list f (read-from-string (prin1-to-string f))))
                      oops)))))
 
+(with-test (:name :bug-811386)
+  (assert (equal "   0.00" (format nil "~7,2,-2f" 0)))
+  (assert (equal "   0.00" (format nil "~7,2,2f" 0)))
+  (assert (equal "   0.01" (format nil "~7,2,-2f" 1)))
+  (assert (equal " 100.00" (format nil "~7,2,2f" 1)))
+  (assert (equal "   0.00" (format nil "~7,2,-2f" 0.1)))
+  (assert (equal "  10.00" (format nil "~7,2,2f" 0.1)))
+  (assert (equal "   0.01" (format nil "~7,2,-2f" 0.5))))
+
 ;;; success
