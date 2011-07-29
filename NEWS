@@ -5,7 +5,7 @@ changes relative to sbcl-1.0.50:
   * bug fix: COERCE to unfinalized extended sequence classes now works.
     (reported by Jan Moringen; lp#815155)
   * bug fix: a compiler error during typecheck generation, reported by Eric
-    Marsden.
+    Marsden. (lp#816564)
   * bug fix: obsolete instance protocol fires when shared slots are added
     or removed.
 
