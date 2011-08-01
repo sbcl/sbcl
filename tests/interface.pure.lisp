@@ -116,3 +116,14 @@
 (loop repeat 2
       do (compile nil '(lambda (x) x))
       do (sb-ext:gc :full t))
+
+;;; On x86-64, the instruction definitions for CMP*[PS][SD] were broken
+;;; so that the disassembler threw an error when they were used with
+;;; one operand in memory.
+(with-test (:name :bug-814702)
+  (disassemble (lambda (x)
+                 (= #C(2.0f0 3.0f0)
+                    (the (complex single-float) x))))
+  (disassemble (lambda (x y)
+                 (= (the (complex single-float) x)
+                    (the (complex single-float) y)))))

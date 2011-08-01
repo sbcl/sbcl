@@ -1072,53 +1072,9 @@
   (defparameter *sse-conditions* #(:eq :lt :le :unord :neq :nlt :nle :ord)))
 
 (sb!disassem:define-arg-type sse-condition-code
+  ;; Inherit the prefilter from IMM-BYTE to READ-SUFFIX the byte.
+  :type 'imm-byte
   :printer *sse-conditions*)
-
-(sb!disassem:define-instruction-format (xmm-xmm/mem-cmp 32
-                                        :default-printer
-                                        '(:name " " cc :tab reg ", " reg/mem))
-  (x0f     :field (byte 8 0)    :value #x0f)
-  (op      :field (byte 8 8))
-  (reg/mem :fields (list (byte 2 22) (byte 3 16))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 19)   :type 'xmmreg)
-  (cc      :field (byte 8 24)   :type 'sse-condition-code))
-
-(sb!disassem:define-instruction-format (rex-xmm-xmm/mem-cmp 40
-                                        :default-printer
-                                        '(:name " " cc :tab reg ", " reg/mem))
-  (rex     :field (byte 4 4)   :value #b0100)
-  (wrxb    :field (byte 4 0)    :type 'wrxb)
-  (x0f     :field (byte 8 8)    :value #x0f)
-  (op      :field (byte 8 16))
-  (reg/mem :fields (list (byte 2 30) (byte 3 24))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 27)   :type 'xmmreg)
-  (cc      :field (byte 8 32)   :type 'sse-condition-code))
-
-(sb!disassem:define-instruction-format (ext-xmm-xmm/mem-cmp 40
-                                        :default-printer
-                                        '(:name " " cc :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (x0f     :field (byte 8 8)    :value #x0f)
-  (op      :field (byte 8 16))
-  (reg/mem :fields (list (byte 2 30) (byte 3 24))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 27)   :type 'xmmreg)
-  (cc      :field (byte 8 32)   :type 'sse-condition-code))
-
-(sb!disassem:define-instruction-format (ext-rex-xmm-xmm/mem-cmp 48
-                                        :default-printer
-                                        '(:name " " cc :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0))
-  (rex     :field (byte 4 12)   :value #b0100)
-  (wrxb    :field (byte 4 8)    :type 'wrxb)
-  (x0f     :field (byte 8 16)   :value #x0f)
-  (op      :field (byte 8 24))
-  (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'xmmreg/mem)
-  (reg     :field (byte 3 35)   :type 'xmmreg)
-  (cc      :field (byte 8 40)   :type 'sse-condition-code))
 
 ;;; XMM instructions with 8 bit immediate data
 
@@ -3032,6 +2988,26 @@
 
 ;;;; Instructions required to do floating point operations using SSE
 
+;; Return a two-element list of printers for SSE instructions. One
+;; printer is for the format without a REX prefix, the other one for the
+;; one with.
+(eval-when (:compile-toplevel :execute)
+  (defun sse-inst-printer-list (inst-format-stem prefix opcode
+                                &key more-fields printer)
+    (let ((fields `(,@(when prefix
+                        `((prefix ,prefix)))
+                    (op ,opcode)
+                    ,@more-fields))
+          (inst-formats (if prefix
+                            (list (symbolicate "EXT-" inst-format-stem)
+                                  (symbolicate "EXT-REX-" inst-format-stem))
+                            (list inst-format-stem
+                                  (symbolicate "REX-" inst-format-stem)))))
+      (mapcar (lambda (inst-format)
+                `(,inst-format ,fields ,@(when printer
+                                           (list printer))))
+              inst-formats))))
+
 (defun emit-sse-inst (segment dst src prefix opcode
                       &key operand-size (remaining-bytes 0))
   (when prefix
@@ -3255,31 +3231,25 @@
    (aver (xmm-register-p mask))
    (emit-regular-sse-inst segment src mask #x66 #xf7)))
 
-(macrolet ((define-xmm-comparison-sse-inst (name prefix opcode &optional name-prefix name-suffix)
-               (let ((printer (when name-prefix
-                                `'(,name-prefix cc ,name-suffix :tab reg ", " reg/mem))))
-                 `(define-instruction ,name (segment op x y)
-                    ,@(if prefix
-                          `((:printer ext-xmm-xmm/mem-cmp
-                                      ((prefix ,prefix) (op ,opcode))
-                                      ,@(and printer `(,printer)))
-                            (:printer ext-rex-xmm-xmm/mem-cmp
-                                      ((prefix ,prefix) (op ,opcode))
-                                      ,@(and printer `(,printer))))
-                          `((:printer xmm-xmm/mem-cmp ((op ,opcode))
-                                      ,@(and printer `(,printer)))
-                            (:printer rex-xmm-xmm/mem-cmp ((op ,opcode))
-                                      ,@(and printer `(,printer)))))
-                    (:emitter
-                     (let ((code (position op *sse-conditions*)))
-                       (aver code)
-                       (emit-regular-sse-inst segment x y ,prefix ,opcode
-                                              :remaining-bytes 1)
-                       (emit-byte segment code)))))))
-  (define-xmm-comparison-sse-inst cmppd #x66 #xc2 "CMP" "PD")
-  (define-xmm-comparison-sse-inst cmpps nil  #xc2 "CMP" "PS")
-  (define-xmm-comparison-sse-inst cmpsd #xf2 #xc2 "CMP" "SD")
-  (define-xmm-comparison-sse-inst cmpss #xf3 #xc2 "CMP" "SS"))
+(macrolet ((define-comparison-sse-inst (name prefix opcode
+                                        name-prefix name-suffix)
+               `(define-instruction ,name (segment op x y)
+                  (:printer-list
+                   ',(sse-inst-printer-list
+                      'xmm-xmm/mem-imm prefix opcode
+                      :more-fields '((imm nil :type sse-condition-code))
+                      :printer `(,name-prefix imm ,name-suffix
+                                 :tab reg ", " reg/mem)))
+                  (:emitter
+                   (let ((code (position op *sse-conditions*)))
+                     (aver code)
+                     (emit-regular-sse-inst segment x y ,prefix ,opcode
+                                            :remaining-bytes 1)
+                     (emit-byte segment code))))))
+  (define-comparison-sse-inst cmppd #x66 #xc2 "CMP" "PD")
+  (define-comparison-sse-inst cmpps nil  #xc2 "CMP" "PS")
+  (define-comparison-sse-inst cmpsd #xf2 #xc2 "CMP" "SD")
+  (define-comparison-sse-inst cmpss #xf3 #xc2 "CMP" "SS"))
 
 ;;; MOVSD, MOVSS
 (macrolet ((define-movsd/ss-sse-inst (name prefix)
