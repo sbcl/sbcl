@@ -15,4 +15,4 @@ ASSEM_SRC += ldso-stubs.S
 OS_SRC += undefineds.c
 LINKFLAGS += -dynamic -export-dynamic
 
-CFLAGS =  -g -Wall -O2
+CFLAGS = -g -Wall -O2 -fno-omit-frame-pointer

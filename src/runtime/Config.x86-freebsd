@@ -24,3 +24,5 @@ ifdef LISP_FEATURE_SB_THREAD
   #OS_LIBS += -lpthread
   OS_LIBS += -lthr
 endif
+
+CFLAGS += -fno-omit-frame-pointer

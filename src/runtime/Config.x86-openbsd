@@ -25,4 +25,4 @@ OS_LIBS += -lutil
 LINKFLAGS += -export-dynamic
 LDFLAGS += -export-dynamic
 
-CFLAGS =  -g -Wall -O2
+CFLAGS = -g -Wall -O2 -fno-omit-frame-pointer

@@ -12,6 +12,8 @@ changes relative to sbcl-1.0.50:
     or removed.
   * bug fix: fixed-format floating point printing with scaling factors.
     (lp#811386)
+  * bug fix: using GCC >= 4.6 to build SBCL on x86 no longer breaks
+    backtraces. (lp#818460)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove

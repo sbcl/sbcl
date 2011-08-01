@@ -1,5 +1,16 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
 CC=gcc
-CFLAGS = -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT
+CFLAGS = -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 ASFLAGS = -Wall
 LD = ld
 NM = nm -xgp
