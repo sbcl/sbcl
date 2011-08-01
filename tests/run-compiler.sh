@@ -10,11 +10,9 @@ fi
 args=
 case "$platform" in
     Darwin-X86-64) args="-arch x86_64" ;;
+    Darwin-X86)    args="-arch i386" ;;
     SunOS-X86-64)  args=-m64 ;;
-esac
-
-case "$platform" in
-    Darwin-X86) args="-arch i386" ;;
+    Linux-X86)     args="-m32" ;;
 esac
 
 while [ $# -gt 0 ]; do
