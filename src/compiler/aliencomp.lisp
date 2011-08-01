@@ -702,7 +702,7 @@
             ;; to it later regardless of how the foreign stack looks
             ;; like.
             #!+:c-stack-is-control-stack
-            (when (policy node (<= speed debug))
+            (when (policy node (= 3 alien-funcall-saves-fp-and-pc))
               (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body))))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
             `(lambda (function ,@(params))

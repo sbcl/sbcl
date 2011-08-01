@@ -173,6 +173,18 @@
                    (list '(flet not-optimized))
                    (list '(flet test) #'not-optimized))))))
 
+(with-test (:name :interrupted-syscall)
+  (let ((m (sb-thread:make-mutex))
+        (q (sb-thread:make-waitqueue)))
+    (assert (verify-backtrace
+            (lambda ()
+              (sb-thread:with-mutex (m)
+                (handler-bind ((timeout (lambda (c)
+                                          (error "foo"))))
+                  (with-timeout 0.1
+                    (sb-thread:condition-wait q m)))))
+            `((sb-thread:condition-wait ,q ,m))))))
+
 ;;; Division by zero was a common error on PPC. It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
 ;;; or more than MOST-POSITIVE-FIXNUM bytes ahead. It also depends on

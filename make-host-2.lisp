@@ -27,7 +27,9 @@
        ;; sbcl-internal optimization declarations:
        ;;
        ;; never insert stepper conditions
-       (sb!c:insert-step-conditions 0)))))
+       (sb!c:insert-step-conditions 0)
+       ;; save FP and PC for alien calls -- or not
+       (sb!c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
 (compile 'proclaim-target-optimization)
 
 (defun in-target-cross-compilation-mode (fun)

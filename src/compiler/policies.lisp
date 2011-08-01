@@ -51,6 +51,12 @@ Enabling this option can increase heap consing of closures.")
   "Control conversion of &REST argments to &MORE arguments when
 only used as the final argument to APPLY.")
 
+(define-optimization-quality alien-funcall-saves-fp-and-pc
+    (if (<= speed debug) 3 0)
+  ("no" "maybe" "yes" "yes")
+  "Control ALIEN-FUNCALL saving frame-pointer and program counter for
+more reliable bactracing across foreign calls.")
+
 (define-optimization-quality verify-arg-count
     (if (zerop safety) 0 3)
   ("no" "maybe" "yes" "yes"))
