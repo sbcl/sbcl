@@ -198,12 +198,18 @@ os_init(char *argv[], char *envp[])
     int patch_version;
     char *p;
     uname(&name);
+
     p=name.release;
     major_version = atoi(p);
-    p=strchr(p,'.')+1;
-    minor_version = atoi(p);
-    p=strchr(p,'.')+1;
-    patch_version = atoi(p);
+    minor_version = patch_version = 0;
+    p=strchr(p,'.');
+    if (p != NULL) {
+            minor_version = atoi(++p);
+            p=strchr(p,'.');
+            if (p != NULL)
+                    patch_version = atoi(++p);
+    }
+
     if (major_version<2) {
         lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
              major_version);
