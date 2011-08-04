@@ -291,9 +291,9 @@
                                (return (reset-buffer obuf)))
                               (count
                                ;; Partial write -- update buffer status and
-                               ;; queue or wait. Do not use INCF! Another
-                               ;; thread might have moved head...
-                               (setf (buffer-head obuf) (+ count head))
+                               ;; queue or wait.
+                               (incf head count)
+                               (setf (buffer-head obuf) head)
                                (queue-or-wait))
                               #!-win32
                               ((eql errno sb!unix:ewouldblock)

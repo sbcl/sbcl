@@ -18,6 +18,7 @@ changes relative to sbcl-1.0.50:
     (lp#549673)
   * bug fix: SSE comparison instructions can be disassembled even when one
     operand is in memory. (lp#814702)
+  * bug fix: incomplete writes when not using SERVE-EVENTS. (lp#820599)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove
