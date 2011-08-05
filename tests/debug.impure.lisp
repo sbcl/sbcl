@@ -173,7 +173,8 @@
                    (list '(flet not-optimized))
                    (list '(flet test) #'not-optimized))))))
 
-(with-test (:name :interrupted-syscall)
+(with-test (:name :backtrace-interrupted-condition-wait
+            :skipped-on '(not :sb-thread))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
