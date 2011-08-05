@@ -15,8 +15,6 @@
 ;;;; Thread safe, and reasonably fast: in common case increment is just an
 ;;;; ATOMIC-INCF, in overflow case grab a lock and increment overflow counter.
 
-(defconstant +most-positive-word+ (1- (expt 2 sb-vm:n-word-bits)))
-
 (declaim (inline make-counter))
 (defstruct (counter (:constructor make-counter) (:copier nil))
   (word 0 :type sb-vm:word)
@@ -36,11 +34,11 @@
                ;; Increment the word-sized counter. If it overflows, record the
                ;; overflow.
                (let ((prev (atomic-incf (counter-word counter) d)))
-                 (when (< (logand +most-positive-word+ (+ prev d)) prev)
+                 (when (< (logand most-positive-word (+ prev d)) prev)
                    (%incf-overflow)))))
       ;; DELTA can potentially be a bignum -- cut it down to word-size.
       (unless (typep delta 'sb-vm:word)
-        (multiple-value-bind (n r) (truncate delta (1+ +most-positive-word+))
+        (multiple-value-bind (n r) (truncate delta (1+ most-positive-word))
           (%incf-overflow n)
           (setf delta r)))
       ;; ATOMIC-INCF can at most handle SIGNED-WORD: if DELTA doesn't fit that,
@@ -57,7 +55,7 @@
 
 (defun counter-count (counter)
   (+ (counter-word counter)
-     (* (counter-overflow counter) (1+ +most-positive-word+))))
+     (* (counter-overflow counter) (1+ most-positive-word))))
 
 ;;;; High resolution timer
 

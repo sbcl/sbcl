@@ -601,6 +601,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "ATOMIC-INCF"
                "ATOMIC-DECF"
                "WORD"
+               "MOST-POSITIVE-WORD"
 
                ;; Time related things
                "CALL-WITH-TIMING"

@@ -46,6 +46,9 @@
   #!+sb-doc
   "the fixnum closest in value to negative infinity")
 
+(def!constant most-positive-word (1- (expt 2 n-word-bits))
+  "The most positive integer that is of type SB-EXT:WORD.")
+
 (def!constant most-positive-exactly-single-float-fixnum
   (min #xffffff sb!xc:most-positive-fixnum))
 (def!constant most-negative-exactly-single-float-fixnum
