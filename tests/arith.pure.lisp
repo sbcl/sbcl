@@ -414,7 +414,7 @@
   (dolist (fun '(truncate floor ceiling mod rem))
     (let* ((foo (compile nil `(lambda (x)
                                 (declare (optimize (speed 3)
-                                                   (space 0)
+                                                   (space 1)
                                                    (compilation-speed 0))
                                          (type (unsigned-byte
                                                 ,sb-vm:n-word-bits) x))
@@ -446,7 +446,7 @@
         (dolist (fun '(truncate ceiling floor mod rem))
           (let ((foo (compile nil `(lambda (x)
                                      (declare (optimize (speed 3)
-                                                        (space 0)
+                                                        (space 1)
                                                         (compilation-speed 0))
                                               (type ,dividend-type x))
                                      (,fun x ,divisor)))))

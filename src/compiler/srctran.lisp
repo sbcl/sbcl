@@ -3186,6 +3186,15 @@
         `(- (ash x ,len))
         `(ash x ,len))))
 
+;;; These must come before the ones below, so that they are tried
+;;; first. Since %FLOOR and %CEILING are inlined, this allows
+;;; the general case to be handled by TRUNCATE transforms.
+(deftransform floor ((x y))
+  `(%floor x y))
+
+(deftransform ceiling ((x y))
+  `(%ceiling x y))
+
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
 ;;; remainder.

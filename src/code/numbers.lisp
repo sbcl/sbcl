@@ -593,16 +593,14 @@
 ;;; Declare these guys inline to let them get optimized a little.
 ;;; ROUND and FROUND are not declared inline since they seem too
 ;;; obscure and too big to inline-expand by default. Also, this gives
-;;; the compiler a chance to pick off the unary float case. Similarly,
-;;; CEILING and FLOOR are only maybe-inline for now, so that the
-;;; power-of-2 CEILING and FLOOR transforms get a chance.
-#!-sb-fluid (declaim (inline rem mod fceiling ffloor ftruncate))
-(declaim (maybe-inline ceiling floor))
-
-(defun floor (number &optional (divisor 1))
-  #!+sb-doc
-  "Return the greatest integer not greater than number, or number/divisor.
-  The second returned value is (mod number divisor)."
+;;; the compiler a chance to pick off the unary float case.
+;;;
+;;; CEILING and FLOOR are implemented in terms of %CEILING and %FLOOR
+;;; if no better transform can be found: they aren't inline directly,
+;;; since we want to try a transform specific to them before letting
+;;; the transform for TRUNCATE pick up the slack.
+#!-sb-fluid (declaim (inline rem mod fceiling ffloor ftruncate %floor %ceiling))
+(defun %floor (number divisor)
   ;; If the numbers do not divide exactly and the result of
   ;; (/ NUMBER DIVISOR) would be negative then decrement the quotient
   ;; and augment the remainder by the divisor.
@@ -614,10 +612,13 @@
         (values (1- tru) (+ rem divisor))
         (values tru rem))))
 
-(defun ceiling (number &optional (divisor 1))
+(defun floor (number &optional (divisor 1))
   #!+sb-doc
-  "Return the smallest integer not less than number, or number/divisor.
-  The second returned value is the remainder."
+  "Return the greatest integer not greater than number, or number/divisor.
+  The second returned value is (mod number divisor)."
+  (%floor number divisor))
+
+(defun %ceiling (number divisor)
   ;; If the numbers do not divide exactly and the result of
   ;; (/ NUMBER DIVISOR) would be positive then increment the quotient
   ;; and decrement the remainder by the divisor.
@@ -628,6 +629,12 @@
                  (plusp number)))
         (values (+ tru 1) (- rem divisor))
         (values tru rem))))
+
+(defun ceiling (number &optional (divisor 1))
+  #!+sb-doc
+  "Return the smallest integer not less than number, or number/divisor.
+  The second returned value is the remainder."
+  (%ceiling number divisor))
 
 (defun round (number &optional (divisor 1))
   #!+sb-doc

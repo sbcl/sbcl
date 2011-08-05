@@ -319,6 +319,10 @@
   (real &optional real) (values integer real)
   (movable foldable flushable explicit-check))
 
+(defknown (%floor %ceiling)
+  (real real) (values integer real)
+  (movable foldable flushable explicit-check))
+
 (defknown (mod rem) (real real) real
   (movable foldable flushable explicit-check))
 
