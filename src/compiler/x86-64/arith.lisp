@@ -1628,7 +1628,7 @@ constant shift greater than word length")))
     (inst sar digit 3)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target edx)
          (div-low :scs (unsigned-reg) :target eax)

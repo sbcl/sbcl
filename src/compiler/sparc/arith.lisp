@@ -1040,7 +1040,7 @@
     (inst sra digit fixnum n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target rem)
          (div-low :scs (unsigned-reg) :target quo)
@@ -1064,7 +1064,7 @@
     (inst not quo)))
 
 (define-vop (bignum-floor-v8)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target rem)
          (div-low :scs (unsigned-reg) :target quo)
@@ -1093,7 +1093,7 @@
       (move quo q))))
 
 (define-vop (bignum-floor-v9)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg))
          (div-low :scs (unsigned-reg))

@@ -28,7 +28,7 @@
 ;;;       %bignum-length %bignum-set-length %bignum-ref %bignum-set
 ;;;       %digit-0-or-plusp %add-with-carry %subtract-with-borrow
 ;;;       %multiply-and-add %multiply %lognot %logand %logior %logxor
-;;;       %fixnum-to-digit %floor %fixnum-digit-with-correct-sign %ashl
+;;;       %fixnum-to-digit %bigfloor %fixnum-digit-with-correct-sign %ashl
 ;;;       %ashr %digit-logical-shift-right))
 
 ;;; The following interfaces will either be assembler routines or code
@@ -67,7 +67,7 @@
 ;;;    LDB
 ;;;       %FIXNUM-TO-DIGIT
 ;;;    TRUNCATE
-;;;       %FLOOR
+;;;       %BIGFLOOR
 ;;;
 ;;; Note: The floating routines know about the float representation.
 ;;;
@@ -216,13 +216,13 @@
 ;;; dividing the first two as a 2*digit-size integer by the third.
 ;;;
 ;;; Do weird LET and SETQ stuff to bamboozle the compiler into allowing
-;;; the %FLOOR transform to expand into pseudo-assembler for which the
+;;; the %BIGFLOOR transform to expand into pseudo-assembler for which the
 ;;; compiler can later correctly allocate registers.
-(defun %floor (a b c)
+(defun %bigfloor (a b c)
   (let ((a a) (b b) (c c))
     (declare (type bignum-element-type a b c))
     (setq a a b b c c)
-    (%floor a b c)))
+    (%bigfloor a b c)))
 
 ;;; Convert the digit to a regular integer assuming that the digit is signed.
 (defun %fixnum-digit-with-correct-sign (digit)
@@ -1557,10 +1557,10 @@
         ;;; normalization.
         ;;;
         ;;; We don't have to worry about shifting Y to make its most
-        ;;; significant digit sufficiently large for %FLOOR to return
+        ;;; significant digit sufficiently large for %BIGFLOOR to return
         ;;; digit-size quantities for the q-digit and r-digit. If Y is
         ;;; a single digit bignum, it is already large enough for
-        ;;; %FLOOR. That is, it has some bits on pretty high in the
+        ;;; %BIGFLOOR. That is, it has some bits on pretty high in the
         ;;; digit.
         ((bignum-truncate-single-digit (x len-x y)
            (declare (type bignum-index len-x))
@@ -1598,7 +1598,7 @@
                         (values q rem)))
                    (declare (type bignum-element-type r))
                    (multiple-value-bind (q-digit r-digit)
-                       (%floor r (%bignum-ref x i) y)
+                       (%bigfloor r (%bignum-ref x i) y)
                      (declare (type bignum-element-type q-digit r-digit))
                      (setf (%bignum-ref q i) q-digit)
                      (setf r r-digit))))))
@@ -1626,7 +1626,7 @@
            (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
            (let ((guess (if (%digit-compare x-i y1)
                             all-ones-digit
-                            (%floor x-i x-i-1 y1))))
+                            (%bigfloor x-i x-i-1 y1))))
              (declare (type bignum-element-type guess))
              (loop
                  (multiple-value-bind (high-guess*y1 low-guess*y1)
@@ -1773,7 +1773,7 @@
         ;;; digit-size.
         ;;;
         ;;; We shift y to make it sufficiently large that doing the
-        ;;; 2*digit-size by digit-size %FLOOR calls ensures the quotient and
+        ;;; 2*digit-size by digit-size %BIGFLOOR calls ensures the quotient and
         ;;; remainder fit in digit-size.
          (shift-y-for-truncate (y)
            (let* ((len (%bignum-length y))
@@ -1862,7 +1862,7 @@
 ;;;; There used to be a pile of code for implementing division for bignum digits
 ;;;; for machines that don't have a 2*digit-size by digit-size divide instruction.
 ;;;; This happens to be most machines, but all the SBCL ports seem to be content
-;;;; to implement SB-BIGNUM:%FLOOR as a VOP rather than using the code here.
+;;;; to implement SB-BIGNUM:%BIGFLOOR as a VOP rather than using the code here.
 ;;;; So it's been deleted.  --njf, 2007-02-04
 
 ;;;; general utilities

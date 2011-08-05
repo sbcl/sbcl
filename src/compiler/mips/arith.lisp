@@ -859,7 +859,7 @@
     (inst sra digit fixnum n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (num-high :scs (unsigned-reg) :target rem)
          (num-low :scs (unsigned-reg) :target rem-low)

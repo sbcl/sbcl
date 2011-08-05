@@ -290,7 +290,7 @@
 (defknown %fixnum-to-digit (fixnum) bignum-element-type
   (foldable flushable movable))
 
-(defknown %floor (bignum-element-type bignum-element-type bignum-element-type)
+(defknown %bigfloor (bignum-element-type bignum-element-type bignum-element-type)
   (values bignum-element-type bignum-element-type)
   (foldable flushable movable))
 

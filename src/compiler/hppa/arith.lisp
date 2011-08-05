@@ -863,7 +863,7 @@
     (inst sra fixnum n-fixnum-tag-bits digit)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum:%floor)
+  (:translate sb!bignum:%bigfloor)
   (:policy :fast-safe)
   (:args (hi :scs (unsigned-reg) :to (:argument 1))
          (lo :scs (unsigned-reg) :to (:argument 0))
