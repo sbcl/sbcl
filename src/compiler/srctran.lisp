@@ -3280,9 +3280,9 @@
 ;;; Y must neither be zero nor a power of two. The quotient is rounded
 ;;; towards zero.
 ;;; The algorithm is taken from the paper "Division by Invariant
-;;; Integers using Multiplication", 1994 by Torbjörn Granlund and Peter
-;;; L. Montgomery, Figures 4.2 and 6.2, modified to exclude the case of
-;;; division by powers of two.
+;;; Integers using Multiplication", 1994 by Torbj\"{o}rn Granlund and
+;;; Peter L. Montgomery, Figures 4.2 and 6.2, modified to exclude the
+;;; case of division by powers of two.
 ;;; The following two examples show an average case and the worst case
 ;;; with respect to the complexity of the generated expression, under
 ;;; a word size of 64 bits:
