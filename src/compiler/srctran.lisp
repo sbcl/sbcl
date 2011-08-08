@@ -3357,28 +3357,10 @@
     ;; Division by zero, one or powers of two is handled elsewhere.
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
-    ;; The compiler can't derive the result types to maximal tightness
-    ;; from the transformed expression, so we calculate them here and
-    ;; add the corresponding specifiers explicitly through TRULY-THE.
-    ;; This duplicates parts of the TRUNCATE DERIVE-TYPE optimizer but
-    ;; using that here would be too cumbersome.
-    (let* ((x-type (lvar-type x))
-           (x-low (or (and (numeric-type-p x-type)
-                           (numeric-type-low x-type))
-                      0))
-           (x-high (or (and (numeric-type-p x-type)
-                            (numeric-type-high x-type))
-                       (1- (expt 2 #.sb!vm:n-word-bits))))
-           (quot-low (truncate x-low y))
-           (quot-high (truncate x-high y)))
-      (if (= quot-low quot-high)
-          `(values ,quot-low
-                   (- x ,(* quot-low y)))
-          `(let* ((quot ,(gen-unsigned-div-by-constant-expr y))
-                  (rem (ldb (byte #.sb!vm:n-word-bits 0)
-                            (- x (* quot ,y)))))
-             (values (truly-the (integer ,quot-low ,quot-high) quot)
-                     (truly-the (integer 0 ,(1- y)) rem)))))))
+    `(let* ((quot ,(gen-unsigned-div-by-constant-expr y))
+            (rem (ldb (byte #.sb!vm:n-word-bits 0)
+                      (- x (* quot ,y)))))
+       (values quot rem))))
 
 ;;;; arithmetic and logical identity operation elimination
 

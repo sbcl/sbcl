@@ -1988,6 +1988,15 @@
         (unlink-node call)
         (when vals
           (reoptimize-lvar (first vals)))
+        ;; Propagate derived types from the VALUES call to its args:
+        ;; transforms can leave the VALUES call with a better type
+        ;; than its args have, so make sure not to throw that away.
+        (let ((types (values-type-types (node-derived-type use))))
+          (dolist (val vals)
+            (when types
+              (let ((type (pop types)))
+                (assert-lvar-type val type '((type-check . 0)))))))
+        ;; Propagate declared types of MV-BIND variables.
         (propagate-to-args use fun)
         (reoptimize-call use))
       t)))
