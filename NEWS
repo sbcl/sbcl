@@ -7,6 +7,8 @@ changes relative to sbcl-1.0.50:
     and probe counts on Linux.
   * enhancement: building 32-bit SBCL on Linux/x86-64 now works without a
     chroot. (Use "SBCL_ARCH=x86 sh make.sh" to build.)
+  * enhancement: added new toplevel options --quit and --non-interactive
+    (lp#822712).
   * optimization: unsigned integer divisions by a constant are implemented
     using multiplication (affects CEILING, FLOOR, TRUNCATE, MOD, and REM.)
   * optimization: improved type-derivation for LOAD-TIME-VALUE.

@@ -288,7 +288,9 @@ any non-negative real number."
                (:load
                 (with-simple-restart (continue "Ignore runtime option --load ~S."
                                                value)
-                  (load (native-pathname value))))))
+                  (load (native-pathname value))))
+               (:quit
+                (quit))))
            (flush-standard-output-streams)))
     (with-simple-restart (abort "Skip rest of --eval and --load options.")
       (dolist (option options)
@@ -356,6 +358,8 @@ any non-negative real number."
         (noprint nil)
         ;; Has a --script option been seen?
         (script nil)
+        ;; Quit after processing other options?
+        (finally-quit nil)
         ;; everything in *POSIX-ARGV* except for argv[0]=programname
         (options (rest *posix-argv*)))
 
@@ -412,6 +416,16 @@ any non-negative real number."
                    ((string= option "--disable-debugger")
                     (pop-option)
                     (setf disable-debugger t))
+                   ((string= option "--quit")
+                    (pop-option)
+                    (setf finally-quit t))
+                   ((string= option "--non-interactive")
+                    ;; This option is short for --quit and --disable-debugger,
+                    ;; which are needed in combination for reliable non-
+                    ;; interactive startup.
+                    (pop-option)
+                    (setf finally-quit t)
+                    (setf disable-debugger t))
                    ((string= option "--end-toplevel-options")
                     (pop-option)
                     (return))
@@ -464,6 +478,8 @@ any non-negative real number."
               (process-init-file sysinit :system))
             (unless no-userinit
               (process-init-file userinit :user))
+            (when finally-quit
+              (push (list :quit) reversed-options))
             (process-eval/load-options (nreverse reversed-options))
             (when script
               (process-script script)

@@ -182,6 +182,8 @@ Common toplevel options:\n\
   --disable-debugger         Invoke sb-ext:disable-debugger.\n\
   --noprint                  Run a Read-Eval Loop without printing results.\n\
   --script [<filename>]      Skip #! line, disable debugger, avoid verbosity.\n\
+  --quit                     Exit with code 0 after option processing.\n\
+  --non-interactive          Sets both --quit and --disable-debugger.\n\
 Common toplevel options that are processed in order:\n\
   --eval <form>              Form to eval when processing this option.\n\
   --load <filename>          File to load when processing this option.\n\

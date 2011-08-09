@@ -179,6 +179,17 @@ This option disables the debugger, causing errors to print a backtrace
 and exit with status 1 instead -- which is a mode of operation better suited
 for batch processing. See the User Manual on \f(CRSB\-EXT:DISABLE\-DEBUGGER\fR for details.
 .TP 3
+.B \-\-quit
+At the end of toplevel option processing, exit SBCL with a successful
+code of zero.  Note that the effect of this option is delayed until after
+toplevel options following this one.
+.TP 3
+.B \-\-non-interactive
+This option disables the read-eval-print loop for both exceptional and
+non-exceptional reasons.  It is short for --disable-debugger and --quit in
+combination and is useful for batch uses where the special option processing
+implied by --script is not desired.
+.TP 3
 .B \-\-script <filename>
 Implies \-\-no-sysinit \-\-no-userinit \-\-disable-debugger
 \-\-end\-toplevel\-options.
