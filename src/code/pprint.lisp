@@ -1145,7 +1145,9 @@ line break."
   (declare (ignore noise))
   (if (and (consp list)
            (consp (cdr list))
-           (cddr list))
+           (cddr list)
+           ;; Filter out (FLET FOO :IN BAR) names.
+           (not (eq :in (third list))))
       (funcall (formatter
                 "~:<~^~W~^ ~@_~:<~@{~:<~^~W~^~3I ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~:@_~@{~W~^ ~_~}~:>~^ ~_~}~:>~1I~@:_~@{~W~^ ~_~}~:>")
                stream

@@ -230,7 +230,7 @@ the stack without triggering overflow protection.")
 (setf *debug-name-sharp* (make-debug-name-marker)
       *debug-name-ellipsis* (make-debug-name-marker))
 
-(defun debug-name (type thing)
+(defun debug-name (type thing &optional context)
   (let ((*debug-name-punt* nil))
     (labels ((walk (x)
                (typecase x
@@ -257,7 +257,7 @@ the stack without triggering overflow protection.")
                   x)
                  (t
                   (type-of x)))))
-      (let ((name (list type (walk thing))))
+      (let ((name (list* type (walk thing) (when context (name-context)))))
         (when (legal-fun-name-p name)
           (bug "~S is a legal function name, and cannot be used as a ~
                 debug name." name))

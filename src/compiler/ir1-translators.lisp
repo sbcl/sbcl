@@ -476,15 +476,27 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
 Return VALUE without evaluating it."
   (reference-constant start next result thing))
 
+(defun name-context ()
+  ;; Name of the outermost non-NIL BLOCK, or the source namestring
+  ;; of the source file.
+  (let ((context
+          (or (car (find-if #'car (lexenv-blocks *lexenv*) :from-end t))
+              *source-namestring*
+              (let ((p (or *compile-file-truename* *load-truename*)))
+                (when p (namestring p))))))
+    (when context
+      (list :in context))))
+
 ;;;; FUNCTION and NAMED-LAMBDA
 (defun name-lambdalike (thing)
   (case (car thing)
     ((named-lambda)
      (or (second thing)
-         `(lambda ,(third thing))))
+         `(lambda ,(third thing) ,(name-context))))
     ((lambda)
-     `(lambda ,(second thing)))
+     `(lambda ,(second thing) ,@(name-context)))
     ((lambda-with-lexenv)
+     ;; FIXME: Get the original DEFUN name here.
      `(lambda ,(fifth thing)))
     (otherwise
      (compiler-error "Not a valid lambda expression:~%  ~S"
@@ -814,10 +826,11 @@ lexically apparent function definition in the enclosing environment."
     (multiple-value-bind (names defs)
         (extract-flet-vars definitions 'flet)
       (let ((fvars (mapcar (lambda (n d)
-                             (ir1-convert-lambda d
-                                                 :source-name n
-                                                 :maybe-add-debug-catch t
-                                                 :debug-name (debug-name 'flet n)))
+                             (ir1-convert-lambda
+                              d :source-name n
+                                :maybe-add-debug-catch t
+                                :debug-name
+                                (debug-name 'flet n t)))
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
@@ -852,7 +865,7 @@ other."
                           (ir1-convert-lambda def
                                               :source-name name
                                               :maybe-add-debug-catch t
-                                              :debug-name (debug-name 'labels name)))
+                                              :debug-name (debug-name 'labels name t)))
                         names defs))))
 
         ;; Modify all the references to the dummy function leaves so

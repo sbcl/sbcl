@@ -20,8 +20,8 @@
 
 (defun return-from-frame (frame-name &rest values)
   (let ((frame (sb-di::top-frame)))
-    (loop until (equal (sb-debug::frame-call frame)
-                       frame-name)
+    (loop until (equal frame-name
+                       (sb-debug::frame-call frame))
           do (setf frame (sb-di::frame-down frame)))
     (assert frame)
     (assert (sb-debug::frame-has-debug-tag-p frame))
@@ -194,10 +194,10 @@
 (defun test-locals (name)
   (handler-bind ((in-a (lambda (c)
                          (declare (ignore c))
-                         (return-from-frame '(flet a) 'x 'y)))
+                         (return-from-frame `(flet a :in ,name) 'x 'y)))
                  (in-b (lambda (c)
                          (declare (ignore c))
-                         (return-from-frame '(flet b) 'z))))
+                         (return-from-frame `(flet b :in ,name) 'z))))
     (funcall name))
   ;; We're intentionally not testing for returning a different amount
   ;; of values than the local functions are normally returning. It's
@@ -249,11 +249,12 @@
 (defparameter *anon-3* (make-anon-3))
 (defparameter *anon-4* (make-anon-4))
 
-(defun test-anon (fun var-name)
+(defun test-anon (fun var-name &optional in)
   (handler-bind ((anon-condition (lambda (c)
                                    (declare (ignore c))
-                                   (return-from-frame `(lambda (,var-name))
-                                                      'x 'y))))
+                                   (return-from-frame
+                                    `(lambda (,var-name) ,@(when in `(:in ,in)))
+                                    'x 'y))))
     (let ((*foo* 'x))
       (let ((*foo* 'y))
         (assert (equal (multiple-value-list (funcall fun 1))
@@ -262,16 +263,16 @@
       (assert (eql *foo* 'x)))))
 
 (with-test (:name (:return-from-frame :anonymous :toplevel))
-  (test-anon *anon-1* 'foo))
+  (test-anon *anon-1* 'foo (namestring *load-truename*)))
 
 (with-test (:name (:return-from-frame :anonymous :toplevel-special))
-  (test-anon *anon-2* '*foo*))
+  (test-anon *anon-2* '*foo* (namestring *load-truename*)))
 
 (with-test (:name (:return-from-frame :anonymous))
-  (test-anon *anon-3* 'foo))
+  (test-anon *anon-3* 'foo 'make-anon-3))
 
 (with-test (:name (:return-from-frame :anonymous :special))
-  (test-anon *anon-4* '*foo*))
+  (test-anon *anon-4* '*foo* 'make-anon-4))
 
 
 ;;;; Test that unwind cleanups are executed

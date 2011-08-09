@@ -22,6 +22,8 @@
 
 ;;;; Check that we get debug arglists right.
 
+(defvar *p* (namestring *load-truename*))
+
 ;;; FIXME: This should use some get-argslist like functionality that
 ;;; we actually export.
 ;;;
@@ -155,7 +157,7 @@
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
-                   (list '(flet test) #'optimized)))))
+                   (list `(flet test :in ,*p*) #'optimized)))))
 
   ;; bug 353: This test fails at least most of the time for x86/linux
   ;; ca. 0.8.20.16. -- WHN
@@ -169,8 +171,8 @@
     (assert (verify-backtrace
              (lambda () (test #'not-optimized))
              (list *undefined-function-frame*
-                   (list '(flet not-optimized))
-                   (list '(flet test) #'not-optimized))))))
+                   (list `(flet not-optimized :in ,*p*))
+                   (list `(flet test :in ,*p*) #'not-optimized))))))
 
 (with-test (:name :backtrace-interrupted-condition-wait
             :skipped-on '(not :sb-thread)
@@ -216,13 +218,13 @@
               :fails-on :alpha)  ; bug 346
     (assert (verify-backtrace (lambda () (test #'optimized))
                               (list '(/ 42 &rest)
-                                    (list '(flet test) #'optimized)))))
+                                    (list `(flet test :in ,*p*) #'optimized)))))
   (with-test (:name (:divide-by-zero :bug-356)
               :fails-on :alpha)  ; bug 356
     (assert (verify-backtrace (lambda () (test #'not-optimized))
                               (list '(/ 42 &rest)
-                                    '((flet not-optimized))
-                                    (list '(flet test) #'not-optimized))))))
+                                    `((flet not-optimized :in ,*p*))
+                                    (list `(flet test :in ,*p*) #'not-optimized))))))
 
 (with-test (:name (:throw :no-such-tag)
             :fails-on '(or
@@ -378,8 +380,8 @@
 (defvar *compile-nil-non-tc* (compile nil '(lambda (y) (cons (funcall *compile-nil-error* y) nil))))
 (with-test (:name (:compile nil))
   (assert (verify-backtrace (lambda () (funcall *compile-nil-non-tc* 13))
-                            '(((lambda (x)) 13)
-                              ((lambda (y)) 13)))))
+                            `(((lambda (x) :in ,*p*) 13)
+                              ((lambda (y) :in ,*p*) 13)))))
 
 (with-test (:name :clos-slot-typecheckfun-named)
   (assert
@@ -412,21 +414,21 @@
     (assert
      (verify-backtrace (lambda ()
                          (funcall (make-fun 0) 10 11 0))
-                       '((sb-kernel:two-arg-/ 10/11 0)
+                       `((sb-kernel:two-arg-/ 10/11 0)
                          (/ 10 11 0)
-                         ((lambda (&rest rest)) 10 11 0))))
+                         ((lambda (&rest rest) :in ,*p*) 10 11 0))))
     (assert
      (verify-backtrace (lambda ()
                          (funcall (make-fun 1) 10 11 0))
-                       '((sb-kernel:two-arg-/ 10/11 0)
+                       `((sb-kernel:two-arg-/ 10/11 0)
                          (/ 10 11 0)
-                         ((lambda (a &rest rest)) 10 11 0))))
+                         ((lambda (a &rest rest) :in ,*p*) 10 11 0))))
     (assert
      (verify-backtrace (lambda ()
                          (funcall (make-fun 2) 10 11 0))
-                       '((sb-kernel:two-arg-/ 10/11 0)
+                       `((sb-kernel:two-arg-/ 10/11 0)
                          (/ 10 11 0)
-                         ((lambda (a b &rest rest)) 10 11 0))))))
+                         ((lambda (a b &rest rest) :in ,*p*) 10 11 0))))))
 
 ;;;; test TRACE
 
@@ -499,7 +501,8 @@
       (declare (notinline dx-arg-backtrace))
       (assert (member-if (lambda (frame)
                            (and (consp frame)
-                                (equal '(flet dx-arg-backtrace) (car frame))
+                                (consp (car frame))
+                                (equal '(flet dx-arg-backtrace :in) (butlast (car frame)))
                                 (notany #'sb-debug::stack-allocated-p (cdr frame))))
                          (dx-arg-backtrace dx-arg))))))
 

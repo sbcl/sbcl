@@ -24,6 +24,8 @@ changes relative to sbcl-1.0.53:
        STANDARD-INSTANCE-ACCESS, and FUNCALLABLE-STANDARD-INSTANCE-ACCESS.
     ** Users can now defined new places usable with SB-EXT:COMPARE-AND-SWAP
        using an API anologous to defining new SETFable places.
+  * enhancement: debug-names of anonymous and local function are more
+    descriptive. Affects backtraces and SB-SPROF results. (lp#805100)
   * enhancement: on GENCGC systems nursery and generation sizes now default to
     5% of dynamic-space size.
   * enhancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does

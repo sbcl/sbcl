@@ -1734,15 +1734,15 @@
   nil)
 
 (defun output-fun (object stream)
-    (let* ((*print-length* 3)  ; in case we have to..
-           (*print-level* 3)  ; ..print an interpreted function definition
-           (name (%fun-name object))
-           (proper-name-p (and (legal-fun-name-p name) (fboundp name)
-                               (eq (fdefinition name) object))))
-      (print-unreadable-object (object stream :identity (not proper-name-p))
-        (format stream "~:[FUNCTION~;CLOSURE~]~@[ ~S~]"
-                (closurep object)
-                name))))
+  (let* ((*print-length* 4)  ; in case we have to..
+         (*print-level* 3)  ; ..print an interpreted function definition
+         (name (%fun-name object))
+         (proper-name-p (and (legal-fun-name-p name) (fboundp name)
+                             (eq (fdefinition name) object))))
+    (print-unreadable-object (object stream :identity (not proper-name-p))
+      (format stream "~:[FUNCTION~;CLOSURE~]~@[ ~S~]"
+              (closurep object)
+              name))))
 
 ;;;; catch-all for unknown things
 

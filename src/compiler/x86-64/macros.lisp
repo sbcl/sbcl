@@ -529,7 +529,7 @@ Useful for e.g. foreign calls where another thread may trigger
 collection."
   (if objects
       (let ((pins (make-gensym-list (length objects)))
-            (wpo (block-gensym "WPO")))
+            (wpo (gensym "WITH-PINNED-OBJECTS-THUNK")))
         ;; BODY is stuffed in a function to preserve the lexical
         ;; environment.
         `(flet ((,wpo () (progn ,@body)))

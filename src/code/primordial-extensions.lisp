@@ -124,16 +124,6 @@
 
 ;;;; GENSYM tricks
 
-;;; GENSYM variant for easier debugging and better backtraces: append
-;;; the closest enclosing non-nil block name to the provided stem.
-(defun block-gensym (&optional (name "G") (env (when (boundp 'sb!c::*lexenv*)
-                                             (symbol-value 'sb!c::*lexenv*))))
-  (let ((block-name (when env
-                      (car (find-if #'car (sb!c::lexenv-blocks env))))))
-    (if block-name
-        (sb!xc:gensym (format nil "~A[~A]" name block-name))
-        (sb!xc:gensym name))))
-
 ;;; Compile a version of BODY for all TYPES, and dispatch to the
 ;;; correct one based on the value of VAR. This was originally used
 ;;; only for strings, hence the name. Renaming it to something more
@@ -164,7 +154,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (concatenate 'string symbol-name "-"))))
-                     `(,symbol (block-gensym ,stem))))
+                     `(,symbol (gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -173,13 +163,11 @@
 (declaim (ftype (function (index &optional t) (values list &optional))
                 make-gensym-list))
 (defun make-gensym-list (n &optional name)
-  (case name
-    ((t)
-     (loop repeat n collect (gensym)))
-    ((nil)
-     (loop repeat n collect (block-gensym)))
-    (otherwise
-     (loop repeat n collect (gensym name)))))
+  (when (eq t name)
+    (break))
+  (if name
+      (loop repeat n collect (gensym (string name)))
+      (loop repeat n collect (gensym))))
 
 ;;;; miscellany
 
