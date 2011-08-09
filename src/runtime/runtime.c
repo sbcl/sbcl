@@ -179,6 +179,12 @@ Common toplevel options:\n\
   --userinit <filename>      Per-user init-file to use instead of default.\n\
   --no-sysinit               Inhibit processing of any system-wide init-file.\n\
   --no-userinit              Inhibit processing of any per-user init-file.\n\
+  --disable-debugger         Invoke sb-ext:disable-debugger.\n\
+  --noprint                  Run a Read-Eval Loop without printing results.\n\
+  --script [<filename>]      Skip #! line, disable debugger, avoid verbosity.\n\
+Common toplevel options that are processed in order:\n\
+  --eval <form>              Form to eval when processing this option.\n\
+  --load <filename>          File to load when processing this option.\n\
 \n\
 User options are not processed by SBCL. All runtime options must\n\
 appear before toplevel options, and all toplevel options must\n\
