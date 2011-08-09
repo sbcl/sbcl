@@ -384,21 +384,32 @@ for the stream."))
                                (external-format :default)
                                timeout
                                auto-close
-                               (serve-events t))
+                               serve-events)
   "Default method for SOCKET objects.
 
-An ELEMENT-TYPE of :DEFAULT will construct a bivalent stream, capable of both
-binary and character IO. Acceptable values for BUFFERING are :FULL, :LINE
-and :NONE. Streams will have no TIMEOUT by default. If AUTO-CLOSE is true, the
-underlying OS socket is automatically closed after the stream and the socket
-have been garbage collected. If SERVE-EVENTS is true, blocking IO on the
-socket will dispatch to the recursive event loop -- the default is currently
-true, but this liable to change.
+ELEMENT-TYPE defaults to CHARACTER, to construct a bivalent stream,
+capable of both binary and character IO use :DEFAULT.
 
-The stream for SOCKET will be cached, and a second invocation of this method
-will return the same stream. This may lead to oddities if this function is
-invoked with inconsistent arguments \(e.g., one might request an input stream
-and get an output stream in response\)."
+Acceptable values for BUFFERING are :FULL, :LINE and :NONE, default
+is :FULL, ie. output is buffered till it is explicitly flushed using
+CLOSE or FINISH-OUTPUT. (FORCE-OUTPUT forces some output to be
+flushed: to ensure all buffered output is flused use FINISH-OUTPUT.)
+
+Streams have no TIMEOUT by default. If one is provided, it is the
+number of seconds the system will at most wait for input to appear on
+the socket stream when trying to read from it.
+
+If AUTO-CLOSE is true, the underlying OS socket is automatically
+closed after the stream and the socket have been garbage collected.
+Default is false.
+
+If SERVE-EVENTS is true, blocking IO on the socket will dispatch to
+the recursive event loop. Default is false.
+
+The stream for SOCKET will be cached, and a second invocation of this
+method will return the same stream. This may lead to oddities if this
+function is invoked with inconsistent arguments \(e.g., one might
+request an input stream and get an output stream in response\)."
   (let ((stream
          (and (slot-boundp socket 'stream) (slot-value socket 'stream))))
     (unless stream

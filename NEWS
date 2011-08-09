@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.50:
+  * minor incompatible change: SB-BSD-SOCKET socket streams no longer
+    participate in SERVE-EVENT by default: pass :SERVE-EVENTS T to
+    MAKE-SOCKET-STREAM if using SERVE-EVENT.
   * enhancement: added support for socket keepalive timeout intervals
     and probe counts on Linux.
   * enhancement: building 32-bit SBCL on Linux/x86-64 now works without a
