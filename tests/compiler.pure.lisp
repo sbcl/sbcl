@@ -3071,20 +3071,6 @@
             (assert (eql x (funcall fun i)))
             (assert (eql (- x) (funcall fun i))))))))
 
-(with-test (:name (load-time-value :type-derivation))
-  (flet ((test (type form value-cell-p)
-           (let ((derived (funcall (compile
-                                    nil
-                                    `(lambda ()
-                                       (ctu:compiler-derived-type
-                                        (load-time-value ,form)))))))
-             (unless (equal type derived)
-              (error "wanted ~S, got ~S" type derived)))))
-    (let ((* 10))
-      (test '(integer 11 11) '(+ * 1) nil))
-    (let ((* "fooo"))
-      (test '(integer 4 4) '(length *) t))))
-
 (with-test (:name :float-division-using-exact-reciprocal)
   (flet ((test (lambda-form arg res &key (check-insts t))
            (let* ((fun (compile nil lambda-form))

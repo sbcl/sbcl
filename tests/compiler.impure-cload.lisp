@@ -531,7 +531,7 @@
   (load-time-value (cons t t)))
 (test-util:with-test (:name (load-time-value :type-smartness/cload))
   (assert (eq 'cons (load-time-value-type-derivation-test-1)))
-  (assert (eq 'number (load-time-value-type-derivation-test-2)))
+  (assert (equal '(integer 10) (load-time-value-type-derivation-test-2)))
   (assert (not (ctu:find-value-cell-values #'load-time-value-auto-read-only-p)))
   (assert (ctu:find-value-cell-values #'load-time-value-boring)))
 

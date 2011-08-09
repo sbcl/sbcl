@@ -43,6 +43,11 @@
   (when (source-form-has-path-p form)
     (gethash form *source-paths*)))
 
+(defun ensure-source-path (form)
+  (or (get-source-path form)
+      (cons (simplify-source-path-form form)
+            *current-path*)))
+
 (defun simplify-source-path-form (form)
   (if (consp form)
       (let ((op (car form)))
@@ -531,7 +536,8 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
-(declaim (ftype (sfunction (ctran ctran (or lvar null) t) (values))
+(declaim (ftype (sfunction (ctran ctran (or lvar null) t &optional t)
+                           (values))
                 ir1-convert))
 (macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
            ;; out of the body and converts a condition signalling form
@@ -560,11 +566,9 @@
   ;; the creation using backquote of forms that contain leaf
   ;; references, without having to introduce dummy names into the
   ;; namespace.
-  (defun ir1-convert (start next result form)
+  (defun ir1-convert (start next result form &optional alias)
     (ir1-error-bailout (start next result form)
-      (let* ((*current-path* (or (get-source-path form)
-                                 (cons (simplify-source-path-form form)
-                                       *current-path*)))
+      (let* ((*current-path* (ensure-source-path (or alias form)))
              (start (instrument-coverage start nil form)))
         (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))

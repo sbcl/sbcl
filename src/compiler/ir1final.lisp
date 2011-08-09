@@ -147,7 +147,7 @@
     (case (functional-kind fun)
       (:external
        (finalize-xep-definition fun))
-      ((nil)
+      ((nil :toplevel)
        (setf (leaf-type fun) (definition-type fun)))))
 
   (maphash #'note-failed-optimization

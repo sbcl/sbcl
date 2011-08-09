@@ -1235,6 +1235,69 @@
   (assert (macro-function 'bug-795705))
   (fmakunbound 'bug-795705)
   (assert (not (macro-function 'bug-795705))))
+
+(with-test (:name (load-time-value :type-derivation))
+  (let ((name 'load-time-value-type-derivation-test))
+    (labels ((funtype (fun)
+               (sb-kernel:type-specifier
+                (sb-kernel:single-value-type
+                 (sb-kernel:fun-type-returns
+                  (sb-kernel:specifier-type
+                   (sb-kernel:%simple-fun-type fun))))))
+             (test (type1 type2 form value-cell-p)
+             (let* ((lambda-form `(lambda ()
+                                    (load-time-value ,form)))
+                    (core-fun (compile nil lambda-form))
+                    (core-type (funtype core-fun))
+                    (core-cell (ctu:find-value-cell-values core-fun))
+                    (defun-form `(defun ,name ()
+                                   (load-time-value ,form)))
+                    (file-fun (progn
+                                (ctu:file-compile (list defun-form) :load t)
+                                (symbol-function name)))
+                    (file-type (funtype file-fun))
+                    (file-cell (ctu:find-value-cell-values file-fun)))
+               (if value-cell-p
+                   (assert (and core-cell file-cell))
+                   (assert (not (or core-cell file-cell))))
+               (unless (subtypep core-type type1)
+                 (error "core: wanted ~S, got ~S" type1 core-type))
+               (unless (subtypep file-type type2)
+                 (error "file: wanted ~S, got ~S" type2 file-type)))))
+      (let ((* 10))
+        (test '(integer 11 11) 'number
+              '(+ * 1) nil))
+      (let ((* "fooo"))
+        (test '(integer 4 4) 'unsigned-byte
+              '(length *) nil))
+      (test '(integer 10 10) '(integer 10 10) 10 nil)
+      (test 'cons 'cons '(cons t t) t))))
+
+(with-test (:name (load-time-value :errors))
+  (multiple-value-bind (warn fail)
+      (ctu:file-compile
+       `((defvar *load-time-value-error-value* 10)
+         (declaim (fixnum *load-time-value-error-value*))
+         (defun load-time-value-error-test-1 ()
+           (the list (load-time-value *load-time-value-error-value*))))
+       :load t)
+    (assert warn)
+    (assert fail))
+  (handler-case (load-time-value-error-test-1)
+    (type-error (e)
+      (and (eql 10 (type-error-datum e))
+           (eql 'list (type-error-expected-type e)))))
+  (multiple-value-bind (warn2 fail2)
+      (ctu:file-compile
+       `((defun load-time-value-error-test-2 ()
+           (the list (load-time-value 10))))
+       :load t)
+    (assert warn2)
+    (assert fail2))
+  (handler-case (load-time-value-error-test-2)
+    (type-error (e)
+      (and (eql 10 (type-error-datum e))
+           (eql 'list (type-error-expected-type e))))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

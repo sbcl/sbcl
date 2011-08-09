@@ -6,6 +6,7 @@ changes relative to sbcl-1.0.50:
     chroot. (Use "SBCL_ARCH=x86 sh make.sh" to build.)
   * optimization: unsigned integer divisions by a constant are implemented
     using multiplication (affects CEILING, FLOOR, TRUNCATE, MOD, and REM.)
+  * optimization: improved type-derivation for LOAD-TIME-VALUE.
   * bug fix: correct RIP offset calculation in SSE comparison and shuffle
     instructions. (lp#814688)
   * bug fix: COERCE to unfinalized extended sequence classes now works.
@@ -23,6 +24,10 @@ changes relative to sbcl-1.0.50:
   * bug fix: SSE comparison instructions can be disassembled even when one
     operand is in memory. (lp#814702)
   * bug fix: incomplete writes when not using SERVE-EVENTS. (lp#820599)
+  * bug fix: MULTIPLE-VALUE-BIND + VALUES -> LET conversion could lose derived
+    type information associated with the VALUES form.
+  * bug fix: broken warnings/errors for type-errors involving LOAD-TIME-VALUE
+    forms. (lp#823014)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove

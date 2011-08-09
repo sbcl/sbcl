@@ -44,6 +44,8 @@ guaranteed to never be modified, so it can be put in read-only storage."
                             ((and (symbolp form)
                                   (eq :declared (info :variable :where-from form)))
                              (info :variable :type form))
+                            ((constantp form)
+                             (ctype-of (eval form)))
                             (t
                              *universal-type*)))))
     ;; Implictly READ-ONLY-P for immutable objects.
@@ -52,32 +54,33 @@ guaranteed to never be modified, so it can be put in read-only storage."
       (setf read-only-p t))
     (if (producing-fasl-file)
         (multiple-value-bind (handle type)
-            ;; Value cells are allocated for non-READ-ONLY-P stop the compiler
-            ;; from complaining about constant modification -- it seems that
-            ;; we should be able to elide them all the time if we had a way
-            ;; of telling the compiler that "this object isn't really a constant
-            ;; the way you think". --NS 2009-06-28
+            ;; Value cells are allocated for non-READ-ONLY-P stop the
+            ;; compiler from complaining about constant modification
+            ;; -- it seems that we should be able to elide them all
+            ;; the time if we had a way of telling the compiler that
+            ;; "this object isn't really a constant the way you
+            ;; think". --NS 2009-06-28
             (compile-load-time-value (if read-only-p
                                          form
                                          `(make-value-cell ,form)))
-          (when (eq *wild-type* type)
+          (unless (csubtypep type source-type)
             (setf type source-type))
           (let ((value-form
-                 (if read-only-p
-                     `(%load-time-value ',handle)
-                     `(value-cell-ref (%load-time-value ',handle)))))
-            (ir1-convert start next result `(truly-the ,type ,value-form))))
-        (let ((value
-               (handler-case (eval form)
-                 (error (condition)
-                   (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
-                                   condition)))))
-          (ir1-convert start next result
-                       (if read-only-p
-                           `',value
-                           `(truly-the ,(ctype-of value)
-                                       (value-cell-ref
-                                        ',(make-value-cell value)))))))))
+                  (if read-only-p
+                      `(%load-time-value ',handle)
+                      `(value-cell-ref (%load-time-value ',handle)))))
+            (the-in-policy type value-form '((type-check . 0))
+                           start next result)))
+        (let* ((value
+                 (handler-case (eval form)
+                   (error (condition)
+                     (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
+                                     condition)))))
+          (if read-only-p
+              (ir1-convert start next result `',value nil)
+              (the-in-policy (ctype-of value) `(value-cell-ref ,(make-value-cell value))
+                             '((type-check . 0))
+                             start next result))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
   (aver (constant-lvar-p handle))
