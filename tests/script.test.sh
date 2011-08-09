@@ -76,6 +76,17 @@ then
     exit $EXIT_LOSE
 fi
 
+# --script
+cat > $tmpscript <<EOF
+(print :script-ok)
+EOF
+run_sbcl --script $tmpscript --eval foo \
+  < /dev/null > $tmpout
+if [ "`grep -c :SCRIPT-OK $tmpout`" != 1 ] ; then
+   echo "failed --script test using PRINT"
+   exit $EXIT_LOSE
+fi
+
 rm -f $tmpscript $tmpout $tmperr
 
 exit $EXIT_TEST_WIN

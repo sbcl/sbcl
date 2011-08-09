@@ -28,11 +28,4 @@ if [ "`grep -c FOO::BAR $TEST_FILESTEM`" != 1 ] ; then
     exit $EXIT_LOSE
 fi
 
-# --script
-run_sbcl --script script-test.lisp --eval foo \
-  < /dev/null > $TEST_FILESTEM
-if [ "`grep -c :SCRIPT-OK $TEST_FILESTEM`" != 1 ] ; then
-   echo "failed --script test"
-   exit $EXIT_LOSE
-fi
 exit $EXIT_TEST_WIN
