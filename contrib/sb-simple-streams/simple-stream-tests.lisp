@@ -941,7 +941,9 @@ Nothing to see here, move along.")
                  (sb-simple-streams::read-vector b stream
                                                  :endian-swap :network-order)
                  (aref b 0))))
-      (with-open-file (stream "lp491087.txt" :class 'file-simple-stream)
+      (with-open-file (stream
+                       (merge-pathnames #P"lp491087.txt" *test-path*)
+                       :class 'file-simple-stream)
         (let* ((start (file-position stream))
                (integer (read-big-int stream))
                (end (file-position stream)))
