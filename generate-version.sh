@@ -26,9 +26,23 @@ generate_version() {
     fi
     # Build it.
     version_head=`git rev-parse HEAD`
+    if expr "`cat .git/HEAD`" : "ref: refs/heads/.*" > /dev/null 2>&1
+    then
+        version_branchname=`cut -d / -f 3- < .git/HEAD`
+    else
+        # Detached head.
+        version_branchname="HEAD"
+    fi
     if [ -z "$SBCL_BUILDING_RELEASE_FROM" ]
     then
-        version_root="origin/master"
+        if [ "`git rev-list HEAD --not origin/master`" = '' ]
+        then
+            # If origin/master contains all the commits on current
+            # branch, use current head as the root instead.
+            version_root="$version_branchname"
+        else
+            version_root="origin/master"
+        fi
     else
         version_root="$SBCL_BUILDING_RELEASE_FROM"
     fi
@@ -71,7 +85,6 @@ EOF
     else
         echo "base=$version_base"
         echo "head=$version_head"
-        version_branchname=`git describe --contains --all HEAD`
         printf "\"%s.%s.%s.%s%s%s\"\n" \
             $version_release $version_n_root \
             $version_branchname $version_n_branch \
