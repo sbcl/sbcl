@@ -152,15 +152,18 @@
 
 (defmethod device-close ((stream file-simple-stream) abort)
   (with-stream-class (file-simple-stream stream)
-    (let ((fd (or (sm input-handle stream) (sm output-handle stream))))
+    (let ((fd (or (sm input-handle stream) (sm output-handle stream)))
+          (closed nil))
       (when (sb-int:fixnump fd)
         (cond (abort
                (when (any-stream-instance-flags stream :output)
+                 #+win32 (progn (sb-unix:unix-close fd) (setf closed t))
                  (revert-file (sm filename stream) (sm original stream))))
               (t
                (when (sm delete-original stream)
                  (delete-original (sm filename stream) (sm original stream)))))
-        (sb-unix:unix-close fd))
+        (unless closed
+          (sb-unix:unix-close fd)))
       (when (sm buffer stream)
         (free-buffer (sm buffer stream))
         (setf (sm buffer stream) nil))))
