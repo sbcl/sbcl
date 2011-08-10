@@ -169,7 +169,7 @@
 
 (deftest rmdir.error.3
   (handler-case
-      (sb-posix:rmdir #-win32 "/" #+win32 "C:/")
+      (sb-posix:rmdir #-win32 "/" #+win32 (sb-ext:posix-getenv "windir"))
     (sb-posix:syscall-error (c)
       (typep
        (sb-posix:syscall-errno c)
@@ -280,14 +280,15 @@
 
 #+win32
 (deftest stat.5
-    (let* ((stat-1 (sb-posix:stat "/"))
-           (mode-1 (sb-posix:stat-mode stat-1))
-           (stat-2 (sb-posix:stat "C:\\pagefile.sys"
-                                   stat-1))
-           (mode-2 (sb-posix:stat-mode stat-2)))
-      (values
-       (eq stat-1 stat-2)
-       (/= mode-1 mode-2)))
+    (let ((f (namestring (merge-pathnames "some.file" *test-directory*))))
+      (close (open f :if-exists :append :if-does-not-exist :create))
+      (let* ((stat-1 (sb-posix:stat "/"))
+             (mode-1 (sb-posix:stat-mode stat-1))
+             (stat-2 (sb-posix:stat f stat-1))
+             (mode-2 (sb-posix:stat-mode stat-2)))
+        (values
+         (eq stat-1 stat-2)
+         (/= mode-1 mode-2))))
   t
   t)
 
