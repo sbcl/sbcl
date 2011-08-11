@@ -537,6 +537,7 @@
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
+#!+gencgc (declaim (inline valid-lisp-pointer-p))
 #!+gencgc
 (sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
   (pointer system-area-pointer))
