@@ -579,9 +579,11 @@ void scratch(void)
     #ifndef LISP_FEATURE_SB_UNICODE
       CreateDirectoryA(0,0);
       CreateFileMappingA(0,0,0,0,0,0);
+      CreateFileA(0,0,0,0,0,0,0);
       GetComputerNameA(0, 0);
       GetCurrentDirectoryA(0,0);
       GetEnvironmentVariableA(0, 0, 0);
+      GetFileAttributesA(0);
       GetVersionExA(0);
       MoveFileA(0,0);
       SHGetFolderPathA(0, 0, 0, 0, 0);
@@ -590,10 +592,12 @@ void scratch(void)
     #else
       CreateDirectoryW(0,0);
       CreateFileMappingW(0,0,0,0,0,0);
+      CreateFileW(0,0,0,0,0,0,0);
       FormatMessageW(0, 0, 0, 0, 0, 0, 0);
       GetComputerNameW(0, 0);
       GetCurrentDirectoryW(0,0);
       GetEnvironmentVariableW(0, 0, 0);
+      GetFileAttributesW(0);
       GetVersionExW(0);
       MoveFileW(0,0);
       SHGetFolderPathW(0, 0, 0, 0, 0);

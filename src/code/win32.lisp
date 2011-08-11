@@ -665,5 +665,62 @@ UNIX epoch: January 1st 1970."
   (address (* t))
   (length dword))
 
+;; Constants for CreateFile `disposition'.
+(defconstant file-create-new 1)
+(defconstant file-create-always 2)
+(defconstant file-open-existing 3)
+(defconstant file-open-always 4)
+(defconstant file-truncate-existing 5)
+
+;; access rights
+(defconstant access-generic-read #x80000000)
+(defconstant access-generic-write #x40000000)
+(defconstant access-generic-execute #x20000000)
+(defconstant access-generic-all #x10000000)
+(defconstant access-file-append-data #x4)
+
+;; share modes
+(defconstant file-share-delete #x04)
+(defconstant file-share-read #x01)
+(defconstant file-share-write #x02)
+
+;; CreateFile (the real file-opening workhorse)
+(define-alien-routine (#!+sb-unicode "CreateFileW"
+                       #!-sb-unicode "CreateFileA"
+                       create-file)
+    handle
+  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2))
+  (desired-access dword)
+  (share-mode dword)
+  (security-attributes (* t))
+  (creation-disposition dword)
+  (flags-and-attributes dword)
+  (template-file handle))
+
+(defconstant file-attribute-readonly #x1)
+(defconstant file-attribute-hidden #x2)
+(defconstant file-attribute-system #x4)
+(defconstant file-attribute-directory #x10)
+(defconstant file-attribute-archive #x20)
+(defconstant file-attribute-device #x40)
+(defconstant file-attribute-normal #x80)
+(defconstant file-attribute-temporary #x100)
+(defconstant file-attribute-sparse #x200)
+(defconstant file-attribute-reparse-point #x400)
+(defconstant file-attribute-reparse-compressed #x800)
+(defconstant file-attribute-reparse-offline #x1000)
+(defconstant file-attribute-not-content-indexed #x2000)
+(defconstant file-attribute-encrypted #x4000)
+
+(defconstant file-flag-overlapped #x40000000)
+
+;; GetFileAttribute is like a tiny subset of fstat(),
+;; enough to distinguish directories from anything else.
+(define-alien-routine (#!+sb-unicode "GetFileAttributesW"
+                       #!-sb-unicode "GetFileAttributesA"
+                       get-file-attributes)
+    dword
+  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2)))
+
 (define-alien-routine ("CloseHandle" close-handle) bool
   (handle handle))
