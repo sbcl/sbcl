@@ -547,6 +547,10 @@
           (cond
            ((and (not (eq spec u))
                  (info :type :builtin spec)))
+           ((and (consp spec) (symbolp (car spec))
+                 (info :type :builtin (car spec))
+                 (let ((expander (info :type :expander (car spec))))
+                   (and expander (values-specifier-type (funcall expander spec))))))
            ((eq (info :type :kind spec) :instance)
             (find-classoid spec))
            ((typep spec 'classoid)
@@ -615,6 +619,9 @@ expansion happened."
                (values nil nil))
               ((symbolp spec)
                (values (info :type :expander spec) (list spec)))
+              ((and (consp spec) (symbolp (car spec)) (info :type :builtin (car spec)))
+               ;; see above
+               (values nil nil))
               ((and (consp spec) (symbolp (car spec)))
                (values (info :type :expander (car spec)) spec))
               (t nil)))

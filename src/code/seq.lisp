@@ -296,17 +296,18 @@
   "Return a sequence of the given TYPE and LENGTH, with elements initialized
   to INITIAL-ELEMENT."
   (declare (fixnum length))
-  (let* ((adjusted-type
-          (typecase type
+  (let* ((expanded-type (typexpand type))
+         (adjusted-type
+          (typecase expanded-type
             (atom (cond
-                    ((eq type 'string) '(vector character))
-                    ((eq type 'simple-string) '(simple-array character (*)))
+                    ((eq expanded-type 'string) '(vector character))
+                    ((eq expanded-type 'simple-string) '(simple-array character (*)))
                     (t type)))
             (cons (cond
-                    ((eq (car type) 'string) `(vector character ,@(cdr type)))
-                    ((eq (car type) 'simple-string)
-                     `(simple-array character ,(if (cdr type)
-                                                   (cdr type)
+                    ((eq (car expanded-type) 'string) `(vector character ,@(cdr expanded-type)))
+                    ((eq (car expanded-type) 'simple-string)
+                     `(simple-array character ,(if (cdr expanded-type)
+                                                   (cdr expanded-type)
                                                    '(*))))
                     (t type)))
             (t type)))

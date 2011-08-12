@@ -1118,4 +1118,25 @@
                   (error ()
                     :error))))))
 
+;;; tests of deftype types equivalent to STRING or SIMPLE-STRING
+(deftype %string () 'string)
+(deftype %simple-string () 'simple-string)
+(deftype string-3 () '(string 3))
+(deftype simple-string-3 () '(simple-string 3))
+
+(with-test (:name :user-defined-string-types-map-etc)
+  (dolist (type '(%string %simple-string string-3 simple-string-3))
+    (assert (string= "foo" (coerce '(#\f #\o #\o) type)))
+    (assert (string= "foo" (map type 'identity #(#\f #\o #\o))))
+    (assert (string= "foo" (merge type '(#\o) '(#\f #\o) 'char<)))
+    (assert (string= "foo" (concatenate type '(#\f) "oo")))
+    (assert (string= "ooo" (make-sequence type 3 :initial-element #\o)))))
+(with-test (:name :user-defined-string-types-map-etc-error)
+  (dolist (type '(string-3 simple-string-3))
+    (assert (raises-error? (coerce '(#\q #\u #\u #\x) type)))
+    (assert (raises-error? (map type 'identity #(#\q #\u #\u #\x))))
+    (assert (raises-error? (merge type '(#\q #\x) "uu" 'char<)))
+    (assert (raises-error? (concatenate type "qu" '(#\u #\x))))
+    (assert (raises-error? (make-sequence type 4 :initial-element #\u)))))
+
 ;;; success
