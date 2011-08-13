@@ -512,9 +512,7 @@
                        (format stream "~@:_Source file: ~A" namestring))
                       ((sb-di:debug-source-form source)
                        (format stream "~@:_Source form:~@:_  ~S"
-                               (sb-di:debug-source-form source)))
-                      (t (bug "Don't know how to use a DEBUG-SOURCE without ~
-                               a namestring or a form."))))))))
+                               (sb-di:debug-source-form source)))))))))
       #+sb-eval
       (let ((source (sb-eval:interpreted-function-source-location function)))
         (when source

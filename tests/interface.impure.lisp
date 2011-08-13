@@ -83,15 +83,20 @@
 ;;; support for DESCRIBE tests
 (defstruct to-be-described a b)
 (defclass forward-describe-class (forward-describe-ref) (a))
+(let ((sb-ext:*evaluator-mode* :compile))
+  (eval `(let (x) (defun closure-to-describe () (incf x)))))
 
 ;;; DESCRIBE should run without signalling an error.
-(describe (make-to-be-described))
-(describe 12)
-(describe "a string")
-(describe 'symbolism)
-(describe (find-package :cl))
-(describe '(a list))
-(describe #(a vector))
+(with-test (:name (describe :no-error))
+  (describe (make-to-be-described))
+  (describe 12)
+  (describe "a string")
+  (describe 'symbolism)
+  (describe (find-package :cl))
+  (describe '(a list))
+  (describe #(a vector))
+;; bug 824974
+  (describe 'closure-to-describe))
 
 ;;; The DESCRIBE-OBJECT methods for built-in CL stuff should do
 ;;; FRESH-LINE and TERPRI neatly.
