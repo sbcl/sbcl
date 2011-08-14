@@ -11,6 +11,8 @@ changes relative to sbcl-1.0.50:
     (lp#822712).
   * enhancement: the Windows port of SBCL now builds and runs on Wine
     (thanks to Anton Kovalenko).
+  * enhancement: more, and more correct, SSE instruction definitions on
+    x86-64 (thanks to Alexander Gavrilov).
   * optimization: unsigned integer divisions by a constant are implemented
     using multiplication (affects CEILING, FLOOR, TRUNCATE, MOD, and REM.)
   * optimization: improved type-derivation for LOAD-TIME-VALUE.
@@ -39,7 +41,8 @@ changes relative to sbcl-1.0.50:
     first write (lp#561642).
   * bug fix: compiled closures from EVAL could not be DESCRIBEd. (lp#824974)
   * bug fix: bound propagation involving conversion of large bignums to
-    floats no longer signals a SIMPLE-TYPE-ERROR (lp#819269).
+    floats no longer signals a SIMPLE-TYPE-ERROR, reported by Lutz Euler.
+    (lp#819269)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove
