@@ -948,11 +948,9 @@
                    (int-hi (if hi
                                (ceiling (type-bound-number hi))
                                '*))
-                   (f-lo (if lo
-                             (bound-func #'float lo)
+                   (f-lo (or (bound-func #'float lo)
                              '*))
-                   (f-hi (if hi
-                             (bound-func #'float hi)
+                   (f-hi (or (bound-func #'float hi)
                              '*)))
               (specifier-type `(or (rational ,int-lo ,int-hi)
                                 (single-float ,f-lo, f-hi)))))
@@ -982,11 +980,9 @@
                    (int-hi (if hi
                                (ceiling (type-bound-number hi))
                                '*))
-                   (f-lo (if lo
-                             (bound-func #'float lo)
+                   (f-lo (or (bound-func #'float lo)
                              '*))
-                   (f-hi (if hi
-                             (bound-func #'float hi)
+                   (f-hi (or (bound-func #'float hi)
                              '*)))
               (specifier-type `(or (rational ,int-lo ,int-hi)
                                 (single-float ,f-lo, f-hi)))))

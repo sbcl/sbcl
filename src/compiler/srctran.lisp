@@ -350,15 +350,20 @@
 (defun bound-func (f x)
   (declare (type function f))
   (and x
-       (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
-         ;; With these traps masked, we might get things like infinity
-         ;; or negative infinity returned. Check for this and return
-         ;; NIL to indicate unbounded.
-         (let ((y (funcall f (type-bound-number x))))
-           (if (and (floatp y)
-                    (float-infinity-p y))
-               nil
-               (set-bound y (consp x)))))))
+       (handler-case
+         (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
+           ;; With these traps masked, we might get things like infinity
+           ;; or negative infinity returned. Check for this and return
+           ;; NIL to indicate unbounded.
+           (let ((y (funcall f (type-bound-number x))))
+             (if (and (floatp y)
+                      (float-infinity-p y))
+                 nil
+                 (set-bound y (consp x)))))
+         ;; Some numerical operations will signal SIMPLE-TYPE-ERROR, e.g.
+         ;; in the course of converting a bignum to a float.  Default to
+         ;; NIL in that case.
+         (simple-type-error ()))))
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)

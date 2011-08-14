@@ -3954,3 +3954,16 @@
     (multiple-value-bind (i e) (ignore-errors (funcall fun :end))
       (assert (not i))
       (assert (typep e 'type-error)))))
+
+(with-test (:name :simple-type-error-in-bound-propagation-a)
+  (compile nil `(lambda (i)
+                  (declare (unsigned-byte i))
+                  (expt 10 (expt 7 (- 2 i))))))
+
+(with-test (:name :simple-type-error-in-bound-propagation-b)
+  (assert (equal `(FUNCTION (UNSIGNED-BYTE)
+                            (VALUES (SINGLE-FLOAT -1F0 1F0) &OPTIONAL))
+                 (sb-kernel:%simple-fun-type
+                  (compile nil `(lambda (i)
+                                  (declare (unsigned-byte i))
+                                  (cos (expt 10 (+ 4096 i)))))))))
