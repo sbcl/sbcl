@@ -3967,3 +3967,9 @@
                   (compile nil `(lambda (i)
                                   (declare (unsigned-byte i))
                                   (cos (expt 10 (+ 4096 i)))))))))
+
+(with-test (:name :fixed-%more-arg-values)
+  (let ((fun (compile nil `(lambda (&rest rest)
+                             (declare (optimize (safety 0)))
+                             (apply #'cons rest)))))
+    (assert (equal '(car . cdr) (funcall fun 'car 'cdr)))))

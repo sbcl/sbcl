@@ -1482,7 +1482,17 @@
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
-      (:fixed (ir2-convert-full-call node block))
+      (:fixed
+       ;; KLUDGE: this is very much unsafe, and can leak random stack values.
+       ;; OTOH, I think the :FIXED case can only happen with (safety 0) in the
+       ;; first place.
+       ;;  -PK
+       (loop for loc in (ir2-lvar-locs 2lvar)
+             for idx upfrom 0
+             do (vop sb!vm::more-arg node block
+                     (lvar-tn node block context)
+                     (make-constant-tn (find-constant idx))
+                     loc)))
       (:unknown
        (let ((locs (ir2-lvar-locs 2lvar)))
          (vop* %more-arg-values node block
