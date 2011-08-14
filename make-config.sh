@@ -303,7 +303,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :inline-constants ' >> $ltf
-    printf ' :memory-barrier-vops' >> $ltf
+    printf ' :memory-barrier-vops :multiply-high-vops' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | netbsd | openbsd | sunos | darwin | win32)
         printf ' :linkage-table' >> $ltf
@@ -324,6 +324,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
     printf ' :float-eql-vops :inline-constants :memory-barrier-vops' >> $ltf
+    printf ' :multiply-high-vops' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
@@ -338,7 +339,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
-    printf ' :compare-and-swap-vops' >> $ltf
+    printf ' :compare-and-swap-vops :multiply-high-vops' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between

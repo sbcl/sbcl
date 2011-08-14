@@ -309,6 +309,12 @@
  ;; foreign code that uses a 32-bit off_t.
  ; :largefile
 
+ ;; Enabled automatically on platforms that have VOPs to compute the
+ ;; high half of a full word-by-word multiplication.  When disabled,
+ ;; SB-KERNEL:%MULTIPLY-HIGH is implemented in terms of
+ ;; SB-BIGNUM:%MULTIPLY.
+ ; :multiply-high-vops
+
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

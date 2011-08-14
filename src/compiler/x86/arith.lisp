@@ -1574,6 +1574,42 @@ constant shift greater than word length")))
     (move hi edx)
     (move lo eax)))
 
+#!+multiply-high-vops
+(define-vop (mulhi)
+  (:translate sb!kernel:%multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :target eax)
+         (y :scs (unsigned-reg unsigned-stack)))
+  (:arg-types unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0))
+              eax)
+  (:temporary (:sc unsigned-reg :offset edx-offset :from (:argument 1)
+                   :to (:result 0) :target hi) edx)
+  (:results (hi :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 20
+    (move eax x)
+    (inst mul eax y)
+    (move hi edx)))
+
+#!+multiply-high-vops
+(define-vop (mulhi/fx)
+  (:translate sb!kernel:%multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg) :target eax)
+         (y :scs (unsigned-reg unsigned-stack)))
+  (:arg-types positive-fixnum unsigned-num)
+  (:temporary (:sc any-reg :offset eax-offset :from (:argument 0)) eax)
+  (:temporary (:sc any-reg :offset edx-offset :from (:argument 1)
+                   :to (:result 0) :target hi) edx)
+  (:results (hi :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 15
+    (move eax x)
+    (inst mul eax y)
+    (move hi edx)
+    (inst and hi (lognot fixnum-tag-mask))))
+
 (define-vop (bignum-lognot lognot-mod32/word=>unsigned)
   (:translate sb!bignum:%lognot))
 

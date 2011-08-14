@@ -1154,6 +1154,34 @@
     (inst mullw lo x y)
     (inst mulhwu hi x y)))
 
+#!+multiply-high-vops
+(define-vop (mulhi)
+  (:translate sb!kernel:%multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (hi :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 20
+    (inst mulhwu hi x y)))
+
+#!+multiply-high-vops
+(define-vop (mulhi/fx)
+  (:translate sb!kernel:%multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types positive-fixnum unsigned-num)
+  (:temporary (:sc non-descriptor-reg :from :eval :to :result) temp)
+  (:temporary (:sc non-descriptor-reg :from :eval :to :result) mask)
+  (:results (hi :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 15
+    (inst mulhwu temp x y)
+    (inst lr mask fixnum-tag-mask)
+    (inst andc hi temp mask)))
+
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
   (:translate sb!bignum:%lognot))
 

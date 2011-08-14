@@ -3336,16 +3336,23 @@
           (multiple-value-setq (m shift2)
             (choose-multiplier (/ y (ash 1 shift1))
                                (- precision shift1))))
-        (if (>= m n)
-            (flet ((word (x)
-                     `(truly-the word ,x)))
-              `(let* ((num x)
-                      (t1 (%multiply num ,(- m n))))
-                 (ash ,(word `(+ t1 (ash ,(word `(- num t1))
-                                         -1)))
-                      ,(- 1 shift2))))
-            `(ash (%multiply (logandc2 x ,(1- (ash 1 shift1))) ,m)
-                  ,(- (+ shift1 shift2))))))))
+        (cond ((>= m n)
+               (flet ((word (x)
+                        `(truly-the word ,x)))
+                 `(let* ((num x)
+                         (t1 (%multiply-high num ,(- m n))))
+                    (ash ,(word `(+ t1 (ash ,(word `(- num t1))
+                                            -1)))
+                         ,(- 1 shift2)))))
+              ((and (zerop shift1) (zerop shift2))
+               (let ((max (truncate max-x y)))
+                 ;; Explicit TRULY-THE needed to get the FIXNUM=>FIXNUM
+                 ;; VOP.
+                 `(truly-the (integer 0 ,max)
+                             (%multiply-high x ,m))))
+              (t
+               `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
+                     ,(- (+ shift1 shift2)))))))))
 
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
