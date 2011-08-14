@@ -456,7 +456,8 @@
                                 ,@(loop repeat 4
                                         collect (+ 10000 (random 101)))
                                 ,@(loop for i from 4 to sb-vm:n-word-bits
-                                        for r = (random (expt 2 i))
+                                        for pow = (expt 2 (1- i))
+                                        for r = (+ pow (random pow))
                                         collect r)))
               (when (typep dividend dividend-type)
                 (multiple-value-bind (q1 r1)
