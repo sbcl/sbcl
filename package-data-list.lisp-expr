@@ -603,6 +603,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "WORD"
                "MOST-POSITIVE-WORD"
 
+               ;; Not an atomic operation, but should be used with them
+               "SPIN-LOOP-HINT"
+
                ;; Time related things
                "CALL-WITH-TIMING"
                "GET-TIME-OF-DAY"

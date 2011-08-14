@@ -246,3 +246,9 @@
       (inst ld count count-vector offset)
       (inst add count 1)
       (inst st count count-vector offset))))
+
+;;;; Dummy definition for a spin-loop hint VOP
+(define-vop (spin-loop-hint)
+  (:translate spin-loop-hint)
+  (:policy :fast-safe)
+  (:generator 0))

@@ -13,6 +13,9 @@ changes relative to sbcl-1.0.50:
     (thanks to Anton Kovalenko).
   * enhancement: more, and more correct, SSE instruction definitions on
     x86-64 (thanks to Alexander Gavrilov).
+  * enhancement: SB-EXT:SPIN-LOOP-HINT assembles to an instruction designed
+    to help the processor execute spin loops, when applicable.  Currently
+    implemented for x86 and x86-64.
   * optimization: unsigned integer divisions by a constant are implemented
     using multiplication (affects CEILING, FLOOR, TRUNCATE, MOD, and REM.)
   * optimization: improved type-derivation for LOAD-TIME-VALUE.

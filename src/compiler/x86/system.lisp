@@ -385,3 +385,9 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
+
+(define-vop (pause)
+  (:translate spin-loop-hint)
+  (:policy :fast-safe)
+  (:generator 0
+    (inst pause)))

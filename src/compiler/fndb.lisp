@@ -1604,3 +1604,5 @@
     (unsafe))
 (defknown %compare-and-swap-symbol-value (symbol t t) t
     (unsafe unwind))
+(defknown spin-loop-hint () (values)
+    (always-translatable))

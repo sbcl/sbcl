@@ -296,6 +296,11 @@ EXPERIMENTAL: Interface subject to change."
            (type sb!vm:signed-word diff))
   (%array-atomic-incf/word array index diff))
 
+(defun spin-loop-hint ()
+  #!+sb-doc
+  "Hints the processor that the current thread is spin-looping."
+  (spin-loop-hint))
+
 (defun call-hooks (kind hooks &key (on-error :error))
   (dolist (hook hooks)
     (handler-case

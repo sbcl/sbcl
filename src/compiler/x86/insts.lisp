@@ -1285,6 +1285,11 @@
      (emit-byte segment (if (eq size :byte) #b10110000 #b10110001))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
+(define-instruction pause (segment)
+  (:printer two-bytes ((op '(#xf3 #x90))))
+  (:emitter
+   (emit-byte segment #xf3)
+   (emit-byte segment #x90)))
 
 (defun emit-prefix (segment name)
   (ecase name

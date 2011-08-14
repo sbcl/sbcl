@@ -245,3 +245,9 @@
       (inst ldl count offset count-vector)
       (inst addq count 1 count)
       (inst stl count offset count-vector))))
+
+;;;; Dummy definition for a spin-loop hint VOP
+(define-vop (spin-loop-hint)
+  (:translate spin-loop-hint)
+  (:policy :fast-safe)
+  (:generator 0))

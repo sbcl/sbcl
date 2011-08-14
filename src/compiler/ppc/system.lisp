@@ -285,3 +285,9 @@
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)
   (:generator 3))
+
+;;;; Dummy definition for a spin-loop hint VOP
+(define-vop (spin-loop-hint)
+  (:translate spin-loop-hint)
+  (:policy :fast-safe)
+  (:generator 0))
