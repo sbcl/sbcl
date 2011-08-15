@@ -3037,8 +3037,9 @@
 (macrolet
     ((define-imm-sse-instruction (name opcode /i)
          `(define-instruction ,name (segment dst/src imm)
-            (:printer ext-rex-xmm-imm ((prefix #x66) (op ,opcode) (/i ,/i)))
-            (:printer ext-xmm-imm ((prefix #x66) (op ,opcode) (/i ,/i)))
+            (:printer-list
+             ',(sse-inst-printer-list 'xmm-imm #x66 opcode
+                                      :more-fields `((/i ,/i))))
             (:emitter
              (emit-sse-inst-with-imm segment dst/src imm
                                      #x66 ,opcode ,/i
@@ -3072,13 +3073,8 @@
 
 (macrolet ((define-regular-sse-inst (name prefix opcode)
              `(define-instruction ,name (segment dst src)
-                ,@(if prefix
-                      `((:printer ext-xmm-xmm/mem
-                                  ((prefix ,prefix) (op ,opcode)))
-                        (:printer ext-rex-xmm-xmm/mem
-                                  ((prefix ,prefix) (op ,opcode))))
-                      `((:printer xmm-xmm/mem ((op ,opcode)))
-                        (:printer rex-xmm-xmm/mem ((op ,opcode)))))
+                (:printer-list
+                 ',(sse-inst-printer-list 'xmm-xmm/mem prefix opcode))
                 (:emitter
                  (emit-regular-sse-inst segment dst src ,prefix ,opcode)))))
   ;; logical
@@ -3208,13 +3204,9 @@
 
 (macrolet ((define-xmm-shuffle-sse-inst (name prefix opcode)
                `(define-instruction ,name (segment dst src pattern)
-                  ,@(if prefix
-                        `((:printer ext-xmm-xmm/mem-imm ; suboptimal
-                                    ((prefix ,prefix) (op ,opcode)))
-                          (:printer ext-rex-xmm-xmm/mem-imm
-                                    ((prefix ,prefix) (op ,opcode))))
-                        `((:printer xmm-xmm/mem-imm ((op ,opcode)))
-                          (:printer rex-xmm-xmm/mem-imm ((op ,opcode)))))
+                  (:printer-list
+                   ',(sse-inst-printer-list 'xmm-xmm/mem-imm
+                                            prefix opcode)) ; suboptimal
                   (:emitter
                    (aver (typep pattern '(unsigned-byte 8)))
                    (emit-regular-sse-inst segment dst src ,prefix ,opcode
@@ -3228,10 +3220,8 @@
 
 ;; MASKMOVDQU (dst is DS:RDI)
 (define-instruction maskmovdqu (segment src mask)
-  (:printer ext-xmm-xmm/mem
-            ((prefix #x66) (op #xf7)))
-  (:printer ext-rex-xmm-xmm/mem
-            ((prefix #x66) (op #xf7)))
+  (:printer-list
+   (sse-inst-printer-list 'xmm-xmm/mem #x66 #xf7))
   (:emitter
    (aver (xmm-register-p src))
    (aver (xmm-register-p mask))
@@ -3260,10 +3250,9 @@
 ;;; MOVSD, MOVSS
 (macrolet ((define-movsd/ss-sse-inst (name prefix)
              `(define-instruction ,name (segment dst src)
-                (:printer ext-xmm-xmm/mem-dir ((prefix ,prefix)
-                                               (op #b0001000)))
-                (:printer ext-rex-xmm-xmm/mem-dir ((prefix ,prefix)
-                                                   (op #b0001000)))
+                (:printer-list
+                 ',(sse-inst-printer-list 'xmm-xmm/mem-dir
+                                          prefix #b0001000))
                 (:emitter
                  (cond ((xmm-register-p dst)
                         (emit-sse-inst segment dst src ,prefix #x10
@@ -3284,44 +3273,31 @@
                         (:emitter
                          (aver (xmm-register-p dst))
                          (aver (xmm-register-p src))
-                         (emit-regular-sse-inst segment dst src ,prefix ,opcode-from))))
+                         (emit-regular-sse-inst segment dst src
+                                                ,prefix ,opcode-from))))
                   (define-instruction ,name (segment dst src)
-                    ,@(let ((printers
-                             (if prefix
-                                 `((:printer ext-xmm-xmm/mem
-                                             ((prefix ,prefix) (op ,opcode-from)))
-                                   (:printer ext-rex-xmm-xmm/mem
-                                             ((prefix ,prefix) (op ,opcode-from)))
-                                   (:printer ext-xmm-xmm/mem
-                                             ((prefix ,prefix) (op ,opcode-to))
-                                             '(:name :tab reg/mem ", " reg))
-                                   (:printer ext-rex-xmm-xmm/mem
-                                             ((prefix ,prefix) (op ,opcode-to))
-                                             '(:name :tab reg/mem ", " reg)))
-                                 `((:printer xmm-xmm/mem
-                                             ((op ,opcode-from)))
-                                   (:printer rex-xmm-xmm/mem
-                                             ((op ,opcode-from)))
-                                   (:printer xmm-xmm/mem
-                                             ((op ,opcode-to))
-                                             '(:name :tab reg/mem ", " reg))
-                                   (:printer rex-xmm-xmm/mem
-                                             ((op ,opcode-to))
-                                             '(:name :tab reg/mem ", " reg))))))
-                        (if opcode-from printers (cddr printers)))
+                    (:printer-list
+                     '(,@(when opcode-from
+                           (sse-inst-printer-list
+                            'xmm-xmm/mem prefix opcode-from))
+                       ,@(sse-inst-printer-list
+                          'xmm-xmm/mem prefix opcode-to
+                          :printer '(:name :tab reg/mem ", " reg))))
                     (:emitter
                      (cond ,@(when opcode-from
                                `(((xmm-register-p dst)
                                   ,(when force-to-mem
                                      `(aver (not (or (register-p src)
                                                      (xmm-register-p src)))))
-                                  (emit-regular-sse-inst segment dst src ,prefix ,opcode-from))))
+                                  (emit-regular-sse-inst
+                                   segment dst src ,prefix ,opcode-from))))
                            (t
                             (aver (xmm-register-p src))
                             ,(when force-to-mem
                                `(aver (not (or (register-p dst)
                                                (xmm-register-p dst)))))
-                            (emit-regular-sse-inst segment src dst ,prefix ,opcode-to))))))))
+                            (emit-regular-sse-inst segment src dst
+                                                   ,prefix ,opcode-to))))))))
   ;; direction bit?
   (define-mov-sse-inst movapd #x66 #x28 #x29)
   (define-mov-sse-inst movaps nil  #x28 #x29)
@@ -3343,12 +3319,11 @@
 
 ;;; MOVQ
 (define-instruction movq (segment dst src)
-  (:printer ext-xmm-xmm/mem ((prefix #xf3) (op #x7e)))
-  (:printer ext-rex-xmm-xmm/mem ((prefix #xf3) (op #x7e)))
-  (:printer ext-xmm-xmm/mem ((prefix #x66) (op #xd6))
-            '(:name :tab reg/mem ", " reg))
-  (:printer ext-rex-xmm-xmm/mem ((prefix #x66) (op #xd6))
-            '(:name :tab reg/mem ", " reg))
+  (:printer-list
+   (append
+    (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
+    (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
+                           :printer '(:name :tab reg/mem ", " reg))))
   (:emitter
    (cond ((xmm-register-p dst)
           (emit-sse-inst segment dst src #xf3 #x7e
@@ -3367,12 +3342,11 @@
 ;;; with zero extension or vice versa.
 ;;; We do not support the MMX version of this instruction.
 (define-instruction movd (segment dst src)
-  (:printer ext-xmm-reg/mem ((prefix #x66) (op #x6e)))
-  (:printer ext-rex-xmm-reg/mem ((prefix #x66) (op #x6e)))
-  (:printer ext-xmm-reg/mem ((prefix #x66) (op #x7e))
-            '(:name :tab reg/mem ", " reg))
-  (:printer ext-rex-xmm-reg/mem ((prefix #x66) (op #x7e))
-            '(:name :tab reg/mem ", " reg))
+  (:printer-list
+   (append
+    (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e)
+    (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
+                           :printer '(:name :tab reg/mem ", " reg))))
   (:emitter
    (cond ((xmm-register-p dst)
           (emit-sse-inst segment dst src #x66 #x6e))
@@ -3414,12 +3388,8 @@
 
 (macrolet ((define-integer-source-sse-inst (name prefix opcode &key mem-only)
              `(define-instruction ,name (segment dst src)
-                ,@(if prefix
-                      `((:printer ext-xmm-reg/mem ((prefix ,prefix) (op ,opcode)))
-                        (:printer ext-rex-xmm-reg/mem ((prefix ,prefix) (op ,opcode))))
-                      `((:printer xmm-reg/mem ((op ,opcode)))
-                        (:printer rex-xmm-reg/mem ((op ,opcode)))))
-
+                (:printer-list
+                 ',(sse-inst-printer-list 'xmm-reg/mem prefix opcode))
                 (:emitter
                  (aver (xmm-register-p dst))
                  ,(when mem-only
@@ -3441,11 +3411,8 @@
 
 (macrolet ((define-gpr-destination-sse-inst (name prefix opcode &key reg-only)
              `(define-instruction ,name (segment dst src)
-                ,@(if prefix
-                      `((:printer ext-reg-xmm/mem ((prefix ,prefix) (op ,opcode)))
-                        (:printer ext-rex-reg-xmm/mem ((prefix ,prefix) (op ,opcode))))
-                      `((:printer reg-xmm/mem ((op ,opcode)))
-                        (:printer rex-reg-xmm/mem ((op ,opcode)))))
+                (:printer-list
+                 ',(sse-inst-printer-list 'reg-xmm/mem prefix opcode))
                 (:emitter
                  (aver (register-p dst))
                  ,(when reg-only
