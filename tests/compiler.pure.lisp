@@ -3973,3 +3973,9 @@
                              (declare (optimize (safety 0)))
                              (apply #'cons rest)))))
     (assert (equal '(car . cdr) (funcall fun 'car 'cdr)))))
+
+(with-test (:name :bug-826970)
+  (let ((fun (compile nil `(lambda (a b c)
+                             (declare (type (member -2 1) b))
+                             (array-in-bounds-p a 4 b c)))))
+    (assert (funcall fun (make-array '(5 2 2)) 1 1))))

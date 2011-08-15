@@ -174,9 +174,12 @@
         ;; we can already decide on the result of the optimization without
         ;; even taking a look at the dimensions.
         (flet ((subscript-bounds (subscript)
-                 (let* ((type (lvar-type subscript))
-                        (low (numeric-type-low type))
-                        (high (numeric-type-high type)))
+                 (let* ((type1 (lvar-type subscript))
+                        (type2 (if (csubtypep type1 (specifier-type 'integer))
+                                   (weaken-integer-type type1)
+                                   (give-up)))
+                        (low (numeric-type-low type2))
+                        (high (numeric-type-high type2)))
                    (cond
                      ((and (or (not (bound-known-p low)) (minusp low))
                            (or (not (bound-known-p high)) (not (minusp high))))
