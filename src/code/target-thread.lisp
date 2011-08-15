@@ -301,7 +301,7 @@ created and old ones may exit at any time."
 
 (defmacro with-deadlocks ((thread lock &optional timeout) &body forms)
   (declare (ignorable timeout))
-  (with-unique-names (prev n-thread n-lock n-timeout new)
+  (with-unique-names (n-thread n-lock n-timeout new)
     `(let* ((,n-thread ,thread)
             (,n-lock ,lock)
             (,n-timeout #!-sb-lutex
@@ -309,8 +309,6 @@ created and old ones may exit at any time."
                            `(or ,timeout
                                 (when sb!impl::*deadline*
                                   sb!impl::*deadline-seconds*))))
-            ;; If we get interrupted while waiting for a lock, etc.
-            (,prev (thread-waiting-for ,n-thread))
             (,new (if ,n-timeout
                       (cons ,n-timeout ,n-lock)
                       ,n-lock)))
@@ -321,7 +319,9 @@ created and old ones may exit at any time."
             (progn
               (setf (thread-waiting-for ,n-thread) ,new)
               ,@forms)
-         (setf (thread-waiting-for ,n-thread) ,prev)))))
+         ;; Interrupt handlers and GC save and restore any
+         ;; previous wait marks using WITHOUT-DEADLOCKS below.
+         (setf (thread-waiting-for ,n-thread) nil)))))
 
 (declaim (inline get-spinlock release-spinlock))
 

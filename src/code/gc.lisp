@@ -236,39 +236,40 @@ NIL as the pathname."
            ;; Now, if GET-MUTEX did not cons, that would be enough.
            ;; Because it does, we need the :IN-PROGRESS bit above to
            ;; tell the runtime not to trigger gcs.
-           (let ((sb!impl::*in-without-gcing* t)
-                 (sb!impl::*deadline* nil)
-                 (sb!impl::*deadline-seconds* nil))
-             (sb!thread:with-mutex (*already-in-gc*)
-               (let ((*gc-inhibit* t))
-                 (let ((old-usage (dynamic-usage))
-                       (new-usage 0))
-                   (unsafe-clear-roots gen)
-                   (gc-stop-the-world)
-                   (let ((start-time (get-internal-run-time)))
-                     (collect-garbage gen)
-                     (setf *gc-epoch* (cons nil nil))
-                     (let ((run-time (- (get-internal-run-time) start-time)))
-                       ;; KLUDGE: Sometimes we see the second getrusage() call
-                       ;; return a smaller value than the first, which can
-                       ;; lead to *GC-RUN-TIME* to going negative, which in
-                       ;; turn is a type-error.
-                       (when (plusp run-time)
-                         (incf *gc-run-time* run-time))))
-                   (setf *gc-pending* nil
-                         new-usage (dynamic-usage))
-                   #!+sb-thread
-                   (assert (not *stop-for-gc-pending*))
-                   (gc-start-the-world)
-                   ;; In a multithreaded environment the other threads
-                   ;; will see *n-b-f-o-p* change a little late, but
-                   ;; that's OK.
-                   (let ((freed (- old-usage new-usage)))
-                     ;; GENCGC occasionally reports negative here, but
-                     ;; the current belief is that it is part of the
-                     ;; normal order of things and not a bug.
-                     (when (plusp freed)
-                       (incf *n-bytes-freed-or-purified* freed)))))))
+           (sb!thread::without-thread-waiting-for (:already-without-interrupts t)
+             (let* ((sb!impl::*in-without-gcing* t)
+                    (sb!impl::*deadline* nil)
+                    (sb!impl::*deadline-seconds* nil))
+               (sb!thread:with-mutex (*already-in-gc*)
+                 (let ((*gc-inhibit* t))
+                   (let ((old-usage (dynamic-usage))
+                         (new-usage 0))
+                     (unsafe-clear-roots gen)
+                     (gc-stop-the-world)
+                     (let ((start-time (get-internal-run-time)))
+                       (collect-garbage gen)
+                       (setf *gc-epoch* (cons nil nil))
+                       (let ((run-time (- (get-internal-run-time) start-time)))
+                         ;; KLUDGE: Sometimes we see the second getrusage() call
+                         ;; return a smaller value than the first, which can
+                         ;; lead to *GC-RUN-TIME* to going negative, which in
+                         ;; turn is a type-error.
+                         (when (plusp run-time)
+                           (incf *gc-run-time* run-time))))
+                     (setf *gc-pending* nil
+                           new-usage (dynamic-usage))
+                     #!+sb-thread
+                     (assert (not *stop-for-gc-pending*))
+                     (gc-start-the-world)
+                     ;; In a multithreaded environment the other threads
+                     ;; will see *n-b-f-o-p* change a little late, but
+                     ;; that's OK.
+                     (let ((freed (- old-usage new-usage)))
+                       ;; GENCGC occasionally reports negative here, but
+                       ;; the current belief is that it is part of the
+                       ;; normal order of things and not a bug.
+                       (when (plusp freed)
+                         (incf *n-bytes-freed-or-purified* freed))))))))
            ;; While holding the mutex we were protected from
            ;; SIG_STOP_FOR_GC and recursive GCs. Now, in order to
            ;; preserve the invariant (*GC-PENDING* ->
@@ -299,9 +300,10 @@ NIL as the pathname."
   ;; finalizers and after-gc hooks.
   (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
     (when *allow-with-interrupts*
-      (with-interrupts
-        (run-pending-finalizers)
-        (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
+      (sb!thread::without-thread-waiting-for ()
+        (with-interrupts
+          (run-pending-finalizers)
+          (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)

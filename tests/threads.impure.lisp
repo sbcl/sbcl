@@ -1385,3 +1385,55 @@
             (format t "~%joined ~S~%" (sb-thread:thread-name th)))
           (list d1 d2 d3 i))))
 (format t "parallel defclass test done~%")
+
+(with-test (:name (:deadlock-detection :interrupts))
+  (let* ((m1 (sb-thread:make-mutex :name "M1"))
+         (m2 (sb-thread:make-mutex :name "M2"))
+         (t1 (sb-thread:make-thread
+              (lambda ()
+                (sb-thread:with-mutex (m1)
+                  (sleep 0.3)
+                  :ok))
+              :name "T1"))
+         (t2 (sb-thread:make-thread
+              (lambda ()
+                (sleep 0.1)
+                (sb-thread:with-mutex (m1 :wait-p t)
+                  (sleep 0.2)
+                  :ok))
+              :name "T2")))
+    (sleep 0.2)
+    (sb-thread:interrupt-thread t2 (lambda ()
+                                     (sb-thread:with-mutex (m2 :wait-p t)
+                                       (sleep 0.3))))
+    (sleep 0.05)
+    (sb-thread:interrupt-thread t1 (lambda ()
+                                     (sb-thread:with-mutex (m2 :wait-p t)
+                                       (sleep 0.3))))
+    ;; both threads should finish without a deadlock or deadlock
+    ;; detection error
+    (let ((res (list (sb-thread:join-thread t1)
+                     (sb-thread:join-thread t2))))
+      (assert (equal '(:ok :ok) res)))))
+
+(with-test (:name (:deadlock-detection :gc))
+  ;; To semi-reliably trigger the error (in SBCL's where)
+  ;; it was present you had to run this for > 30 seconds,
+  ;; but that's a bit long for a single test.
+  (let* ((stop (+ 5 (get-universal-time)))
+         (m1 (sb-thread:make-mutex :name "m1"))
+         (t1 (sb-thread:make-thread
+              (lambda ()
+                (loop until (> (get-universal-time) stop)
+                      do (sb-thread:with-mutex (m1)
+                           (eval `(make-array 24))))
+                :ok)))
+         (t2 (sb-thread:make-thread
+              (lambda ()
+                (loop until (> (get-universal-time) stop)
+                      do (sb-thread:with-mutex (m1)
+                           (eval `(make-array 24))))
+                :ok))))
+    (let ((res (list (sb-thread:join-thread t1)
+                     (sb-thread:join-thread t2))))
+      (assert (equal '(:ok :ok) res)))))

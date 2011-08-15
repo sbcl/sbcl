@@ -71,6 +71,26 @@ stale value, use MUTEX-OWNER instead."
   (name  nil :type (or null thread-name))
   (value nil))
 
+(sb!xc:defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
+  (with-unique-names (thread prev)
+    (let ((without (if already-without-interrupts
+                       'progn
+                       'without-interrupts))
+          (with (if already-without-interrupts
+                    'progn
+                    'with-local-interrupts)))
+      `(let* ((,thread *current-thread*)
+              (,prev (thread-waiting-for ,thread)))
+         (flet ((exec () ,@body))
+           (if ,prev
+               (,without
+                (unwind-protect
+                     (progn
+                       (setf (thread-waiting-for ,thread) nil)
+                       (,with (exec)))
+                  (setf (thread-waiting-for ,thread) ,prev)))
+               (exec)))))))
+
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
                             &body body)
   #!+sb-doc

@@ -48,6 +48,8 @@ changes relative to sbcl-1.0.50:
     (lp#819269)
   * bug fix: &REST to &MORE conversion still works in unsafe call to known
     functions; reported by Lutz Euler (lp#826459).
+  * bug fix: bogus deadlocks from interrupts and GCs. (lp#807475, regression
+    since 1.0.48)
 
 changes in sbcl-1.0.50 relative to sbcl-1.0.49:
   * enhancement: errors from FD handlers now provide a restart to remove
