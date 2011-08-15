@@ -521,6 +521,20 @@
     vec))
 ) ; EVAL-WHEN
 
+;;; SSE shuffle patterns. The names end in the number of bits of the
+;;; immediate byte that are used to encode the pattern and the radix
+;;; in which to print the value.
+(macrolet ((define-sse-shuffle-arg-type (name format-string)
+               `(sb!disassem:define-arg-type ,name
+                  :type 'imm-byte
+                  :printer (lambda (value stream dstate)
+                             (declare (type (unsigned-byte 8) value)
+                                      (type stream stream)
+                                      (ignore dstate))
+                             (format stream ,format-string value)))))
+  (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
+  (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
+
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -3202,21 +3216,25 @@
   (define-regular-sse-inst punpckldq #x66 #x62)
   (define-regular-sse-inst punpcklqdq #x66 #x6c))
 
-(macrolet ((define-xmm-shuffle-sse-inst (name prefix opcode)
-               `(define-instruction ,name (segment dst src pattern)
-                  (:printer-list
-                   ',(sse-inst-printer-list 'xmm-xmm/mem-imm
-                                            prefix opcode)) ; suboptimal
-                  (:emitter
-                   (aver (typep pattern '(unsigned-byte 8)))
-                   (emit-regular-sse-inst segment dst src ,prefix ,opcode
-                                          :remaining-bytes 1)
-                   (emit-byte segment pattern)))))
-  (define-xmm-shuffle-sse-inst pshufd  #x66 #x70)
-  (define-xmm-shuffle-sse-inst pshufhw #xf3 #x70)
-  (define-xmm-shuffle-sse-inst pshuflw #xf2 #x70)
-  (define-xmm-shuffle-sse-inst shufpd  #x66 #xc6)
-  (define-xmm-shuffle-sse-inst shufps  nil  #xc6))
+(macrolet ((define-xmm-shuffle-sse-inst (name prefix opcode n-bits radix)
+               (let ((shuffle-pattern
+                      (intern (format nil "SSE-SHUFFLE-PATTERN-~D-~D"
+                                      n-bits radix))))
+                 `(define-instruction ,name (segment dst src pattern)
+                    (:printer-list
+                     ',(sse-inst-printer-list
+                        'xmm-xmm/mem-imm prefix opcode
+                        :more-fields `((imm nil :type ,shuffle-pattern))))
+                    (:emitter
+                     (aver (typep pattern '(unsigned-byte ,n-bits)))
+                     (emit-regular-sse-inst segment dst src ,prefix ,opcode
+                                            :remaining-bytes 1)
+                     (emit-byte segment pattern))))))
+  (define-xmm-shuffle-sse-inst pshufd  #x66 #x70 8 4)
+  (define-xmm-shuffle-sse-inst pshufhw #xf3 #x70 8 4)
+  (define-xmm-shuffle-sse-inst pshuflw #xf2 #x70 8 4)
+  (define-xmm-shuffle-sse-inst shufpd  #x66 #xc6 2 2)
+  (define-xmm-shuffle-sse-inst shufps  nil  #xc6 8 4))
 
 ;; MASKMOVDQU (dst is DS:RDI)
 (define-instruction maskmovdqu (segment src mask)
