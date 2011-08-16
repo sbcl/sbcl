@@ -98,6 +98,10 @@
        (values element-type
                (when (eq *wild-type* element-type)
                  (apply #'type-union element-supertypes)))))
+    (member-type
+     ;; Convert member-type to an union-type.
+     (array-type-upgraded-element-type
+      (apply #'type-union (mapcar #'ctype-of (member-type-members type)))))
     (t
      ;; KLUDGE: there is no good answer here, but at least
      ;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be

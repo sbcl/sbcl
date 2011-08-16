@@ -3979,3 +3979,9 @@
                              (declare (type (member -2 1) b))
                              (array-in-bounds-p a 4 b c)))))
     (assert (funcall fun (make-array '(5 2 2)) 1 1))))
+
+(with-test (:name :bug-826971)
+  (let* ((foo "foo")
+         (fun (compile nil `(lambda (p1 p2)
+                              (schar (the (eql ,foo) p1) p2)))))
+    (assert (eql #\f (funcall fun foo 0)))))
