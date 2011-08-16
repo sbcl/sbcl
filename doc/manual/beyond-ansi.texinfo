@@ -426,6 +426,7 @@ arguments to @code{make-hash-table}.
 @include fun-sb-ext-delete-directory.texinfo
 @include fun-sb-ext-get-time-of-day.texinfo
 @include fun-sb-ext-seed-random-state.texinfo
+@include macro-sb-ext-wait-for.texinfo
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up

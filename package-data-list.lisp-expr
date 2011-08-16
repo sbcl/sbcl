@@ -608,6 +608,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Not an atomic operation, but should be used with them
                "SPIN-LOOP-HINT"
 
+               ;; Waiting for arbitrary events.
+               "WAIT-FOR"
+
                ;; Time related things
                "CALL-WITH-TIMING"
                "GET-TIME-OF-DAY"

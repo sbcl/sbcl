@@ -3,6 +3,7 @@ changes relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,
     the parameter n-fixnum-tag-bits may now vary from 1 (fixnum =
     (signed-byte 63)) to 3 (fixnum = (signed-byte 61)) at build-time.
+  * enhancement: SB-EXT:WAIT-FOR allows waiting for arbitrary events.
   * minor(?) incompatible(?) change: The default fixnum width on 64-bit
     targets is now 63 bits (up from 61).
   * enhancement: DESCRIBE now reports a lambda-list and source location
