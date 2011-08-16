@@ -1029,8 +1029,6 @@ Experimental: interface subject to change."
          (case (sb-kernel:widetag-of object)
            (#.sb-vm::value-cell-header-widetag
             (call (sb-kernel::value-cell-ref object)))
-           #+(and sb-lutex sb-thread)
-           (#.sb-vm::lutex-widetag)
            (t
             (warn "~&MAP-ROOT: Unknown widetag ~S: ~S~%"
                   (sb-kernel:widetag-of object) object)))))))

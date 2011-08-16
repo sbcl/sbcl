@@ -36,10 +36,8 @@ in future versions."
   "Mutex type."
   (name   nil :type (or null thread-name))
   (%owner nil :type (or null thread))
-  #!+(and (not sb-lutex) sb-thread)
-  (state    0 :type fixnum)
-  #!+(and sb-lutex sb-thread)
-  (lutex (make-lutex)))
+  #!+(and sb-thread sb-futex)
+  (state    0 :type fixnum))
 
 (defun mutex-value (mutex)
   "Current owner of the mutex, NIL if the mutex is free. May return a

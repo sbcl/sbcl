@@ -221,15 +221,12 @@
  ;; x86oid Darwin, FreeBSD, and Solaris.
  ; :sb-thread
 
- ;; lutex support
+ ;; futex support
  ;;
  ;; While on linux we are able to use futexes for our locking
- ;; primitive, on other platforms we don't have this luxury. NJF's
- ;; lutexes present a locking API similar to the futex-based API that
- ;; allows for sb-thread support on x86 OS X, Solaris and
- ;; FreeBSD.
+ ;; primitive, on other platforms we don't have this luxury.
  ;;
- ; :sb-lutex
+ ; :sb-futex
 
  ;; On some operating systems the FS segment register (used for SBCL's
  ;; thread local storage) is not reliably preserved in signal

@@ -106,7 +106,6 @@
                                   (caar frame-specs)
                                   full-backtrace)
                           (setf result nil))
-
                         ;; check that we have all the frames we wanted
                         (mapcar
                          (lambda (spec frame)
@@ -174,7 +173,13 @@
                    (list '(flet test) #'not-optimized))))))
 
 (with-test (:name :backtrace-interrupted-condition-wait
-            :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread)
+                  ;; For some unfathomable reason the backtrace becomes
+                  ;; stunted on Darwin, ending at _sigtramp, when we add
+                  ;; :TIMEOUT NIL to the frame we expect. If we leave it out,
+                  ;; the backtrace is fine -- but the test fails. I can only
+                  ;; boggle right now.
+            :fails-on :darwin)
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
@@ -184,7 +189,7 @@
                                           (error "foo"))))
                   (with-timeout 0.1
                     (sb-thread:condition-wait q m)))))
-            `((sb-thread:condition-wait ,q ,m))))))
+            `((sb-thread:condition-wait ,q ,m :timeout nil))))))
 
 ;;; Division by zero was a common error on PPC. It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,

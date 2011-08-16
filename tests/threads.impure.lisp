@@ -342,8 +342,6 @@
                                       (grab-mutex m :waitp nil)))))))))
 
 (with-test (:name (:grab-mutex :timeout :acquisition-fail))
-  #+sb-lutex
-  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex))
         (w (make-semaphore)))
     (with-mutex (m)
@@ -358,8 +356,6 @@
         (assert (null (join-thread th)))))))
 
 (with-test (:name (:grab-mutex :timeout :acquisition-success))
-  #+sb-lutex
-  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex))
         (child))
     (with-mutex (m)
@@ -368,8 +364,6 @@
     (assert (eq (join-thread child) 't))))
 
 (with-test (:name (:grab-mutex :timeout+deadline))
-  #+sb-lutex
-  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex))
         (w (make-semaphore)))
     (with-mutex (m)
@@ -384,8 +378,6 @@
         (assert (eq (join-thread th) :deadline))))))
 
 (with-test (:name (:grab-mutex :waitp+deadline))
-  #+sb-lutex
-  (error "Mutex timeout not supported here.")
   (let ((m (make-mutex)))
     (with-mutex (m)
       (assert (eq (join-thread
@@ -567,7 +559,8 @@
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
-(with-test (:name (:interrupt-thread :interrupt-consing-child))
+(with-test (:name (:interrupt-thread :interrupt-consing-child)
+            :broken-on :darwin)
   (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
@@ -1080,37 +1073,35 @@
 ;;; Make sure that a deadline handler is not invoked twice in a row in
 ;;; CONDITION-WAIT. See LP #512914 for a detailed explanation.
 ;;;
-#-sb-lutex    ; See KLUDGE above: no deadlines for condition-wait+lutexes.
-(with-test (:name (:condition-wait :deadlines :LP-512914))
-  (let ((n 2) ; was empirically enough to trigger the bug
+(with-test (:name (:condition-wait :deadlines :LP-512914)
+            :skipped-on '(not :sb-futex))
+  (let ((n 2)                      ; was empirically enough to trigger the bug
         (mutex (sb-thread:make-mutex))
         (waitq (sb-thread:make-waitqueue))
         (threads nil)
         (deadline-handler-run-twice? nil))
     (dotimes (i n)
       (let ((child
-             (sb-thread:make-thread
-              #'(lambda ()
-                  (handler-bind
-                      ((sb-sys:deadline-timeout
-                        (let ((already? nil))
-                          #'(lambda (c)
-                              (when already?
-                                (setq deadline-handler-run-twice? t))
-                              (setq already? t)
-                              (sleep 0.2)
-                              (sb-thread:condition-broadcast waitq)
-                              (sb-sys:defer-deadline 10.0 c)))))
-                    (sb-sys:with-deadline (:seconds 0.1)
-                      (sb-thread:with-mutex (mutex)
-                        (sb-thread:condition-wait waitq mutex))))))))
+              (sb-thread:make-thread
+               #'(lambda ()
+                   (handler-bind
+                       ((sb-sys:deadline-timeout
+                          (let ((already? nil))
+                            #'(lambda (c)
+                                (when already?
+                                  (setq deadline-handler-run-twice? t))
+                                (setq already? t)
+                                (sleep 0.2)
+                                (sb-thread:condition-broadcast waitq)
+                                (sb-sys:defer-deadline 10.0 c)))))
+                     (sb-sys:with-deadline (:seconds 0.1)
+                       (sb-thread:with-mutex (mutex)
+                         (sb-thread:condition-wait waitq mutex))))))))
         (push child threads)))
     (mapc #'sb-thread:join-thread threads)
     (assert (not deadline-handler-run-twice?))))
 
 (with-test (:name (:condition-wait :signal-deadline-with-interrupts-enabled))
-  #+darwin
-  (error "Bad Darwin")
   (let ((mutex (sb-thread:make-mutex))
         (waitq (sb-thread:make-waitqueue))
         (A-holds? :unknown)
@@ -1136,7 +1127,8 @@
                            (sb-sys:defer-deadline 10.0 c))))
                    (sb-sys:with-deadline (:seconds 0.1)
                      (sb-thread:with-mutex (mutex)
-                       (sb-thread:condition-wait waitq mutex)))))))
+                       (sb-thread:condition-wait waitq mutex)))))
+             :name "A"))
     (setq B (sb-thread:make-thread
              #'(lambda ()
                  (thread-yield)
@@ -1155,7 +1147,8 @@
                            (sb-sys:defer-deadline 10.0 c))))
                    (sb-sys:with-deadline (:seconds 0.1)
                      (sb-thread:with-mutex (mutex)
-                       (sb-thread:condition-wait waitq mutex)))))))
+                       (sb-thread:condition-wait waitq mutex)))))
+             :name "B"))
     (sb-thread:join-thread A)
     (sb-thread:join-thread B)
     (let ((A-result (list A-holds? A-interrupts-enabled?))
@@ -1167,7 +1160,10 @@
       ;; behaviour.
       (cond ((equal A-result '(t t)) (assert (equal B-result '(nil t))))
             ((equal B-result '(t t)) (assert (equal A-result '(nil t))))
-            (t (error "Failure: fall through."))))))
+            (t
+             (error "Failure: fell through wit A: ~S, B: ~S"
+                    A-result
+                    B-result))))))
 
 (with-test (:name (:mutex :finalization))
   (let ((a nil))
@@ -1209,9 +1205,7 @@
 
 (format t "infodb test done~%")
 
-(with-test (:name (:backtrace))
-  #+darwin
-  (error "Prone to crash on Darwin, cause unknown.")
+(with-test (:name :backtrace)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
@@ -1230,9 +1224,9 @@
 
 (format t "~&starting gc deadlock test: WARNING: THIS TEST WILL HANG ON FAILURE!~%")
 
-(with-test (:name (:gc-deadlock))
-  #+darwin
-  (error "Prone to hang on Darwin due to interrupt issues.")
+(with-test (:name :gc-deadlock
+                  ;; Prone to hang on Darwin due to interrupt issues.
+            :broken-on :darwin)
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier
   ;; versions and at least on one specific box this test is good enough

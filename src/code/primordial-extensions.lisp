@@ -170,9 +170,16 @@
 
 ;;; Return a list of N gensyms. (This is a common suboperation in
 ;;; macros and other code-manipulating code.)
-(declaim (ftype (function (index) list) make-gensym-list))
-(defun make-gensym-list (n)
-  (loop repeat n collect (block-gensym)))
+(declaim (ftype (function (index &optional t) (values list &optional))
+                make-gensym-list))
+(defun make-gensym-list (n &optional name)
+  (case name
+    ((t)
+     (loop repeat n collect (gensym)))
+    ((nil)
+     (loop repeat n collect (block-gensym)))
+    (otherwise
+     (loop repeat n collect (gensym name)))))
 
 ;;;; miscellany
 

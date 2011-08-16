@@ -174,10 +174,7 @@
   fdefn-widetag                             ; 01010110
 
   no-tls-value-marker-widetag               ; 01011010
-  #!-(and sb-lutex sb-thread)
-  unused01-widetag
-  #!+(and sb-lutex sb-thread)
-  lutex-widetag                             ; 01011110
+  unused01-widetag                          ; 01011110
   unused02-widetag                          ; 01100010
   unused03-widetag                          ; 01100110
   unused04-widetag                          ; 01101010

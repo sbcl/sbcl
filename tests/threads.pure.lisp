@@ -52,7 +52,6 @@
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
 
 (with-test (:name without-interrupts+condition-wait
-            :fails-on :sb-lutex
             :skipped-on '(not :sb-thread))
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
@@ -191,7 +190,9 @@
 ;;; wich _appear_ to be caused by malloc() and free() not being thread safe: an
 ;;; interrupted malloc in one thread can apparently block a free in another. There
 ;;; are also some indications that pthread_mutex_lock is not re-entrant.
-(with-test (:name symbol-value-in-thread.3 :skipped-on '(not :sb-thread) :broken-on :darwin)
+(with-test (:name symbol-value-in-thread.3
+            :skipped-on '(not :sb-thread)
+            :broken-on :darwin)
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (running t)
@@ -372,10 +373,8 @@
                     :ok)))
               :name "T1")))
     ;; Currently we don't consider it a deadlock
-    ;; if there is a timeout in the chain. No
-    ;; Timeouts on lutex builds, though.
-    (assert (eq #-sb-lutex :deadline
-                #+sb-lutex :deadlock
+    ;; if there is a timeout in the chain.
+    (assert (eq :deadline
                 (handler-case
                     (sb-thread:with-mutex (m2)
                       (sb-thread:signal-semaphore s2)

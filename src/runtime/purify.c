@@ -496,12 +496,6 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
       case SAP_WIDETAG:
           return ptrans_unboxed(thing, header);
-#ifdef LUTEX_WIDETAG
-      case LUTEX_WIDETAG:
-          gencgc_unregister_lutex((struct lutex *) native_pointer(thing));
-          return ptrans_unboxed(thing, header);
-#endif
-
       case RATIO_WIDETAG:
       case COMPLEX_WIDETAG:
       case SIMPLE_ARRAY_WIDETAG:

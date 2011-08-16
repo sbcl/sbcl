@@ -15,9 +15,6 @@
   (declare (ignore name value))
   nil)
 
-#!+(and sb-lutex sb-thread)
-(defun make-lutex () nil)
-
 (defmacro with-mutex ((mutex) &body body)
   (declare (ignore mutex))
   `(locally ,@body))

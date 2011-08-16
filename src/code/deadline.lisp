@@ -117,6 +117,21 @@ seconds.) Otherwise return NIL if the restart is not found."
 CONDITION, or return NIL if the restart is not found."
   (try-restart 'cancel-deadline condition))
 
+(declaim (inline relative-decoded-times))
+(defun relative-decoded-times (abs-sec abs-usec)
+  #!+sb-doc
+  "Returns relative decoded times: difference between SEC and USEC and
+current real time."
+  (multiple-value-bind (now-sec now-usec)
+      (decode-internal-time (get-internal-real-time))
+    (let ((rel-sec (- abs-sec now-sec)))
+      (cond ((> now-usec abs-usec)
+             (values (max 0 (1- rel-sec))
+                     (- (+ abs-usec 1000000) now-usec)))
+            (t
+             (values (max 0 rel-sec)
+                     (- abs-usec now-usec)))))))
+
 ;;; Returns TIMEOUT-SEC, TIMEOUT-USEC, DEADLINE-SEC, DEADLINE-USEC, SIGNALP
 ;;;
 ;;; Takes *DEADLINE* into account: if it occurs before given SECONDS,
@@ -172,7 +187,7 @@ it will signal a timeout condition."
                    (decode-internal-time final-timeout)
                  (multiple-value-bind (stop-sec stop-usec)
                      (decode-internal-time final-deadline)
-                   (values to-sec to-usec stop-sec stop-usec signalp)))
+                   (values (max 0 to-sec) (max 0 to-usec) stop-sec stop-usec signalp)))
                (values nil nil nil nil nil)))))))
 
 (!defun-from-collected-cold-init-forms !deadline-cold-init)

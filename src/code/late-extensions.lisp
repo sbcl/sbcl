@@ -352,12 +352,12 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
 
 ;;;; WAIT-FOR -- waiting on arbitrary conditions
 
-(defun %wait-for (test timeout)
+(defun %%wait-for (test stop-sec stop-usec)
   (declare (function test))
   (labels ((try ()
              (declare (optimize (safety 0)))
              (awhen (funcall test)
-               (return-from %wait-for it)))
+               (return-from %%wait-for it)))
            (tick (sec usec)
              (declare (fixnum sec usec))
              ;; TICK is microseconds
@@ -365,56 +365,62 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
            (get-tick ()
              (multiple-value-call #'tick
                (decode-internal-time (get-internal-real-time)))))
-    ;; Compute timeout: must come first so that deadlines already passed
-    ;; are noticed before the first try.
-    (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
-        (decode-timeout timeout)
-      (declare (ignore to-sec to-usec))
-      (let* ((timeout-tick (when stop-sec (tick stop-sec stop-usec)))
-             (start (get-tick))
-             ;; Rough estimate of how long a single attempt takes.
-             (try-ticks (progn
-                            (try) (try) (try)
-                            (max 1 (truncate (- (get-tick) start) 3)))))
-        ;; Scale sleeping between attempts:
-        ;;
-        ;; Start by sleeping for as many ticks as an average attempt
-        ;; takes, then doubling for each attempt.
-        ;;
-        ;; Max out at 0.1 seconds, or the 2 x time of a single try,
-        ;; whichever is longer -- with a hard cap of 10 seconds.
-        ;;
-        ;; FIXME: Maybe the API should have a :MAX-SLEEP argument?
-        (loop with max-ticks = (max 100000 (min (* 2 try-ticks)
-                                                (expt 10 7)))
-              for scale of-type fixnum = 1
-              then (let ((x (logand most-positive-fixnum (* 2 scale))))
-                     (if (> scale x)
-                         most-positive-fixnum
-                         x))
-              do (try)
-                 (let* ((now (get-tick))
-                        (sleep-ticks (min (* try-ticks scale) max-ticks))
-                        (sleep
-                          (if timeout-tick
-                              ;; If sleep would take us past the
-                              ;; timeout, shorten it so it's just
-                              ;; right.
-                              (if (>= (+ now sleep-ticks) timeout-tick)
-                                  (- timeout-tick now)
-                                  sleep-ticks)
-                              sleep-ticks)))
-                   (declare (fixnum sleep))
-                   (cond ((plusp sleep)
-                          ;; microseconds to seconds and nanoseconds
-                          (multiple-value-bind (sec nsec)
-                              (truncate (* 1000 sleep) (expt 10 9))
-                            (with-interrupts
-                              (sb!unix:nanosleep sec nsec))))
-                         (deadlinep
-                          (signal-deadline))
-                         (t
-                          (return-from %wait-for nil)))))))))
+    (let* ((timeout-tick (when stop-sec (tick stop-sec stop-usec)))
+           (start (get-tick))
+           ;; Rough estimate of how long a single attempt takes.
+           (try-ticks (progn
+                        (try) (try) (try)
+                        (max 1 (truncate (- (get-tick) start) 3)))))
+      ;; Scale sleeping between attempts:
+      ;;
+      ;; Start by sleeping for as many ticks as an average attempt
+      ;; takes, then doubling for each attempt.
+      ;;
+      ;; Max out at 0.1 seconds, or the 2 x time of a single try,
+      ;; whichever is longer -- with a hard cap of 10 seconds.
+      ;;
+      ;; FIXME: Maybe the API should have a :MAX-SLEEP argument?
+      (loop with max-ticks = (max 100000 (min (* 2 try-ticks)
+                                              (expt 10 7)))
+            for scale of-type fixnum = 1
+            then (let ((x (logand most-positive-fixnum (* 2 scale))))
+                   (if (> scale x)
+                       most-positive-fixnum
+                       x))
+            do (try)
+               (let* ((now (get-tick))
+                      (sleep-ticks (min (* try-ticks scale) max-ticks))
+                      (sleep
+                        (if timeout-tick
+                            ;; If sleep would take us past the
+                            ;; timeout, shorten it so it's just
+                            ;; right.
+                            (if (>= (+ now sleep-ticks) timeout-tick)
+                                (- timeout-tick now)
+                                sleep-ticks)
+                            sleep-ticks)))
+                 (declare (fixnum sleep))
+                 (cond ((plusp sleep)
+                        ;; microseconds to seconds and nanoseconds
+                        (multiple-value-bind (sec nsec)
+                            (truncate (* 1000 sleep) (expt 10 9))
+                          (with-interrupts
+                            (sb!unix:nanosleep sec nsec))))
+                       (t
+                        (return-from %%wait-for nil))))))))
+
+(defun %wait-for (test timeout)
+  (declare (function test))
+  (tagbody
+   :restart
+     (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
+         (decode-timeout timeout)
+       (declare (ignore to-sec to-usec))
+       (return-from %wait-for
+         (or (%%wait-for test stop-sec stop-usec)
+             (when deadlinep
+               (signal-deadline)
+               (go :restart)))))))
 
 (defmacro wait-for (test-form &key timeout)
   "Wait until TEST-FORM evaluates to true, then return its primary value.

@@ -355,7 +355,7 @@ case "$sbcl_os" in
 		printf ' :largefile' >> $ltf
 		;;
             x86 | x86-64)
-		printf ' :sb-thread :largefile' >> $ltf
+		printf ' :sb-thread :sb-futex :largefile' >> $ltf
 		;;
         esac
 
@@ -420,10 +420,10 @@ case "$sbcl_os" in
         printf ' :bsd' >> $ltf
         printf ' :darwin' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler :sb-lutex :restore-fs-segment-register-from-tls :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls :ud2-breakpoints' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :mach-exception-handler :sb-lutex :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler :ud2-breakpoints' >> $ltf
         fi
         link_or_copy $sbcl_arch-darwin-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
@@ -435,9 +435,6 @@ case "$sbcl_os" in
         printf ' :sunos' >> $ltf
         if [ $sbcl_arch = "x86-64" ]; then
             printf ' :largefile' >> $ltf
-        fi
-        if [ $sbcl_arch = "x86" ] || [ $sbcl_arch = "x86-64" ]; then
-            printf ' :sb-lutex' >> $ltf
         fi
         link_or_copy Config.$sbcl_arch-sunos Config
         link_or_copy $sbcl_arch-sunos-os.h target-arch-os.h

@@ -11,6 +11,57 @@
 
 (in-package "SB!THREAD")
 
+;;; CAS Lock
+;;;
+;;; Locks don't come any simpler -- or more lightweight than this. While
+;;; this is probably a premature optimization for most users, we still
+;;; need it internally for implementing condition variables outside Futex
+;;; builds.
+
+(defmacro with-cas-lock ((place) &body body)
+  #!+sb-doc
+  "Runs BODY with interrupts disabled and *CURRENT-THREAD* compare-and-swapped
+into PLACE instead of NIL. PLACE must be a place acceptable to
+COMPARE-AND-SWAP, and must initially hold NIL.
+
+WITH-CAS-LOCK is suitable mostly when the critical section needing protection
+is very small, and cost of allocating a separate lock object would be
+prohibitive. While it is the most lightweight locking constructed offered by
+SBCL, it is also the least scalable if the section is heavily contested or
+long.
+
+WITH-CAS-LOCK can be entered recursively."
+  `(without-interrupts
+     (%with-cas-lock (,place) ,@body)))
+
+(defmacro %with-cas-lock ((place) &body body &environment env)
+  (with-unique-names (self owner)
+    ;; Take care not to multiply-evaluate anything.
+    ;;
+    ;; FIXME: Once we get DEFCAS this can use GET-CAS-EXPANSION.
+    (let* ((placex (sb!xc:macroexpand place env))
+           (place-op (if (consp placex)
+                         (car placex)
+                         (error "~S: ~S is not a valid place for ~S"
+                                'with-cas-lock
+                                place 'sb!ext:compare-and-swap)))
+           (place-args (cdr placex))
+           (temps (make-gensym-list (length place-args) t))
+           (place `(,place-op ,@temps)))
+      `(let* (,@(mapcar #'list temps place-args)
+              (,self *current-thread*)
+              (,owner ,place))
+         (unwind-protect
+              (progn
+                (unless (eq ,owner ,self)
+                  (loop while (setf ,owner
+                                    (or ,place
+                                        (sb!ext:compare-and-swap ,place nil ,self)))
+                        do (thread-yield)))
+                ,@body)
+           (unless (eq ,owner ,self)
+             (sb!ext:compare-and-swap ,place ,self nil)))))))
+
 ;;; Conditions
 
 (define-condition thread-error (error)
@@ -110,15 +161,15 @@ arbitrary printable objects, and need not be unique.")
                      (multiple-value-list
                       (join-thread thread :default cookie))))
            (state (if (eq :running info)
-                      (let* ((lock (thread-waiting-for thread)))
-                        (typecase lock
+                      (let* ((thing (thread-waiting-for thread)))
+                        (typecase thing
                           (cons
-                           (list "waiting for:" (cdr lock)
-                                 "timeout: " (car lock)))
+                           (list "waiting on:" (cdr thing)
+                                 "timeout: " (car thing)))
                           (null
                            (list info))
                           (t
-                           (list "waiting for:" lock))))
+                           (list "waiting on:" thing))))
                       (if (eq cookie (car info))
                           (list :aborted)
                           :finished)))
@@ -220,55 +271,7 @@ created and old ones may exit at any time."
   (defun block-deferrable-signals ()
     (%block-deferrable-signals 0 0))
 
-  #!+sb-lutex
-  (progn
-    (declaim (inline %lutex-init %lutex-wait %lutex-wake
-                     %lutex-lock %lutex-unlock))
-
-    (define-alien-routine ("lutex_init" %lutex-init)
-        int (lutex unsigned-long))
-
-    (define-alien-routine ("lutex_wait" %lutex-wait)
-        int (queue-lutex unsigned-long) (mutex-lutex unsigned-long))
-
-    (define-alien-routine ("lutex_wake" %lutex-wake)
-        int (lutex unsigned-long) (n int))
-
-    (define-alien-routine ("lutex_lock" %lutex-lock)
-        int (lutex unsigned-long))
-
-    (define-alien-routine ("lutex_trylock" %lutex-trylock)
-        int (lutex unsigned-long))
-
-    (define-alien-routine ("lutex_unlock" %lutex-unlock)
-        int (lutex unsigned-long))
-
-    (define-alien-routine ("lutex_destroy" %lutex-destroy)
-        int (lutex unsigned-long))
-
-    ;; FIXME: Defining a whole bunch of alien-type machinery just for
-    ;; passing primitive lutex objects directly to foreign functions
-    ;; doesn't seem like fun right now. So instead we just manually
-    ;; pin the lutex, get its address, and let the callee untag it.
-    (defmacro with-lutex-address ((name lutex) &body body)
-      `(let ((,name ,lutex))
-         (with-pinned-objects (,name)
-           (let ((,name (get-lisp-obj-address ,name)))
-             ,@body))))
-
-    (defun make-lutex ()
-      (/show0 "Entering MAKE-LUTEX")
-      ;; Suppress GC until the lutex has been properly registered with
-      ;; the GC.
-      (without-gcing
-        (let ((lutex (sb!vm::%make-lutex)))
-          (/show0 "LUTEX=..")
-          (/hexstr lutex)
-          (with-lutex-address (lutex lutex)
-            (%lutex-init lutex))
-          lutex))))
-
-  #!-sb-lutex
+  #!+sb-futex
   (progn
     (declaim (inline futex-wait %futex-wait futex-wake))
 
@@ -299,17 +302,17 @@ created and old ones may exit at any time."
 
 ;;;; Spinlocks
 
-(defmacro with-deadlocks ((thread lock &optional timeout) &body forms)
-  (declare (ignorable timeout))
-  (with-unique-names (n-thread n-lock n-timeout new)
+(defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
+  (with-unique-names (n-thread n-lock new n-timeout)
     `(let* ((,n-thread ,thread)
             (,n-lock ,lock)
-            (,n-timeout #!-sb-lutex
-                        ,(when timeout
+            (,n-timeout ,(when timeoutp
                            `(or ,timeout
                                 (when sb!impl::*deadline*
                                   sb!impl::*deadline-seconds*))))
             (,new (if ,n-timeout
+                      ;; Using CONS tells the rest of the system there's a
+                      ;; timeout in place, so it isn't considered a deadlock.
                       (cons ,n-timeout ,n-lock)
                       ,n-lock)))
        (declare (dynamic-extent ,new))
@@ -386,7 +389,7 @@ created and old ones may exit at any time."
       (fdocumentation 'mutex-name 'function)
       "The name of the mutex. Setfable.")
 
-#!+(and sb-thread (not sb-lutex))
+#!+(and sb-thread sb-futex)
 (progn
   (define-structure-slot-addressor mutex-state-address
       :structure mutex
@@ -415,6 +418,8 @@ HOLDING-MUTEX-P."
                (etypecase lock
                  (mutex (mutex-%owner lock))
                  (spinlock (spinlock-value lock))))
+             (lock-p (thing)
+               (typep thing '(or mutex spinlock)))
              (detect-deadlock (lock)
                (let ((other-thread (lock-owner lock)))
                  (cond ((not other-thread))
@@ -439,7 +444,7 @@ HOLDING-MUTEX-P."
                           ;; If the thread is waiting with a timeout OTHER-LOCK
                           ;; is a cons, and we don't consider it a deadlock -- since
                           ;; it will time out on its own sooner or later.
-                          (when (and other-lock (not (consp other-lock)))
+                          (when (lock-p other-lock)
                             (detect-deadlock other-lock)))))))
              (deadlock-chain (thread lock)
                (let* ((other-thread (lock-owner lock))
@@ -452,6 +457,9 @@ HOLDING-MUTEX-P."
                        ((consp other-lock)
                         ;; There's a timeout -- no deadlock.
                         (return-from check-deadlock nil))
+                       ((waitqueue-p other-lock)
+                        ;; Not a lock.
+                        (return-from check-deadlock nil))
                        ((eq self other-thread)
                         ;; Done
                         (list (list thread lock)))
@@ -462,119 +470,124 @@ HOLDING-MUTEX-P."
                             ;; Again, the deadlock is gone?
                             (return-from check-deadlock nil)))))))
       ;; Timeout means there is no deadlock
-      (unless (consp origin)
+      (when (lock-p origin)
         (detect-deadlock origin)
         t))))
 
-(defun get-mutex (mutex &optional new-owner
-                                  (waitp t) (timeout nil))
-  #!+sb-doc
-  "Deprecated in favor of GRAB-MUTEX."
-  (declare (type mutex mutex) (optimize (speed 3))
-           #!-sb-thread (ignore waitp timeout))
-  (unless new-owner
-    (setq new-owner *current-thread*))
+(defun %try-mutex (mutex new-owner)
+  (declare (type mutex mutex) (optimize (speed 3)))
   (barrier (:read))
   (let ((old (mutex-%owner mutex)))
     (when (eq new-owner old)
       (error "Recursive lock attempt ~S." mutex))
     #!-sb-thread
     (when old
-      (error "Strange deadlock on ~S in an unithreaded build?" mutex)))
-  #!-sb-thread
-  (setf (mutex-%owner mutex) new-owner)
-  #!+sb-thread
-  (with-deadlocks (new-owner mutex timeout)
-    ;; FIXME: Lutexes do not currently support deadlines, as at least
-    ;; on Darwin pthread_foo_timedbar functions are not supported:
-    ;; this means that we probably need to use the Carbon multiprocessing
-    ;; functions on Darwin.
-    ;;
-    ;; FIXME: This is definitely not interrupt safe: what happens if
-    ;; we get hit (1) during the lutex calls (ok, they may be safe,
-    ;; but has that been checked?) (2) after the lutex call, but
-    ;; before setting the mutex owner.
-    #!+sb-lutex
-    (progn
-      (when timeout
-        (error "Mutex timeouts not supported on this platform."))
-      (when (zerop (with-lutex-address (lutex (mutex-lutex mutex))
-                     (if waitp
-                         (let ((once (%lutex-trylock lutex)))
-                           (cond ((zerop once)
-                                  ;; No need to wait.
-                                  once)
-                                 (t
-                                  (with-interrupts
-                                    ;; Check for deadlocks before waiting
-                                    (check-deadlock)
-                                    (%lutex-lock lutex)))))
-                         (%lutex-trylock lutex))))
-        ;; FIXME: If %LUTEX-LOCK unwinds due to a signal, we may actually
-        ;; be holding the lock already -- and but neglect to mark ourselves
-        ;; as the owner here. This is bad.
-        (setf (mutex-%owner mutex) new-owner)
-        (barrier (:write))
-        t))
-    #!-sb-lutex
-    ;; This is a direct translation of the Mutex 2 algorithm from
-    ;; "Futexes are Tricky" by Ulrich Drepper.
-    (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
-                                        +lock-free+
-                                        +lock-taken+)))
-      (unless (or (eql +lock-free+ old) (not waitp))
-        (tagbody
-         :retry
-           (when (or (eql +lock-contested+ old)
-                     (not (eql +lock-free+
-                               (sb!ext:compare-and-swap (mutex-state mutex)
-                                                        +lock-taken+
-                                                        +lock-contested+))))
-             ;; Wait on the contested lock.
-             (with-interrupts
-               (check-deadlock)
-               (loop
-                 (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
-                     (decode-timeout timeout)
-                   (declare (ignore stop-sec stop-usec))
-                   (case (with-pinned-objects (mutex)
-                           (futex-wait (mutex-state-address mutex)
-                                       (get-lisp-obj-address +lock-contested+)
-                                       (or to-sec -1)
-                                       (or to-usec 0)))
-                     ((1) (if deadlinep
-                              (signal-deadline)
-                              (return-from get-mutex nil)))
-                     ((2))
-                     (otherwise (return)))))))
-           (setf old (sb!ext:compare-and-swap (mutex-state mutex)
-                                              +lock-free+
-                                              +lock-contested+))
-           ;; Did we get it?
-           (unless (eql +lock-free+ old)
-             (go :retry))))
-      (cond ((eql +lock-free+ old)
+      (error "Strange deadlock on ~S in an unithreaded build?" mutex))
+    #!-sb-futex
+    (and (not (mutex-%owner mutex))
+         (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
+    #!+sb-futex
+    ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
+    (when (eql +lock-free+ (sb!ext:compare-and-swap (mutex-state mutex)
+                                                    +lock-free+
+                                                    +lock-taken+))
+      (let ((prev (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
+        (when prev
+          (bug "Old owner in free mutex: ~S" prev))
+        t))))
+
+#!+sb-thread
+(defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
+  (declare (type mutex mutex) (optimize (speed 3)))
+  #!-sb-futex
+  (declare (ignore to-sec to-usec))
+  #!-sb-futex
+  (flet ((cas ()
+           (loop repeat 24
+                 when (and (not (mutex-%owner mutex))
+                           (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil
+                                                         new-owner)))
+                 do (return-from cas t))
+           ;; Check for pending interrupts.
+           (with-interrupts nil)))
+    (declare (dynamic-extent #'cas))
+    (sb!impl::%%wait-for #'cas stop-sec stop-usec))
+  #!+sb-futex
+  ;; This is a fairly direct translation of the Mutex 2 algorithm from
+  ;; "Futexes are Tricky" by Ulrich Drepper.
+  (flet ((maybe (old)
+           (when (eql +lock-free+ old)
              (let ((prev (sb!ext:compare-and-swap (mutex-%owner mutex)
                                                   nil new-owner)))
                (when prev
                  (bug "Old owner in free mutex: ~S" prev))
-               t))
-            (waitp
-             (bug "Failed to acquire lock with WAITP."))))))
+               (return-from %%wait-for-mutex t)))))
+    (prog ((old (sb!ext:compare-and-swap (mutex-state mutex)
+                                         +lock-free+ +lock-taken+)))
+       ;; Got it right off the bat?
+       (maybe old)
+     :retry
+       ;; Mark it as contested, and sleep. (Exception: it was just released.)
+       (when (or (eql +lock-contested+ old)
+                 (not (eql +lock-free+
+                           (sb!ext:compare-and-swap
+                            (mutex-state mutex) +lock-taken+ +lock-contested+))))
+         (when (eql 1 (with-pinned-objects (mutex)
+                        (futex-wait (mutex-state-address mutex)
+                                    (get-lisp-obj-address +lock-contested+)
+                                    (or to-sec -1)
+                                    (or to-usec 0))))
+           ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+           ;;  0 = normal wakeup
+           ;;  1 = ETIMEDOUT ***DONE***
+           ;;  2 = EINTR, a spurious wakeup
+           (return-from %%wait-for-mutex nil)))
+       ;; Try to get it, still marking it as contested.
+       (maybe
+        (sb!ext:compare-and-swap (mutex-state mutex) +lock-free+ +lock-contested+))
+       ;; Update timeout if necessary.
+       (when stop-sec
+         (setf (values to-sec to-usec)
+               (sb!impl::relative-decoded-times stop-sec stop-usec)))
+       ;; Spin.
+       (go :retry))))
+
+(defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
+  (with-deadlocks (self mutex timeout)
+    (with-interrupts (check-deadlock))
+    (tagbody
+     :again
+       (return-from %wait-for-mutex
+         (or (%%wait-for-mutex mutex self to-sec to-usec stop-sec stop-usec)
+             (when deadlinep
+               (signal-deadline)
+               ;; FIXME: substract elapsed time from timeout...
+               (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
+                     (decode-timeout timeout))
+               (go :again)))))))
+
+(defun get-mutex (mutex &optional new-owner (waitp t) (timeout nil))
+  #!+sb-doc
+  "Deprecated in favor of GRAB-MUTEX."
+  (declare (ignorable waitp timeout))
+  (let ((new-owner (or new-owner *current-thread*)))
+    (or (%try-mutex mutex new-owner)
+        #!+sb-thread
+        (when waitp
+          (multiple-value-call #'%wait-for-mutex
+            mutex new-owner timeout (decode-timeout timeout))))))
 
 (defun grab-mutex (mutex &key (waitp t) (timeout nil))
   #!+sb-doc
   "Acquire MUTEX for the current thread. If WAITP is true (the default) and
 the mutex is not immediately available, sleep until it is available.
 
-If TIMEOUT is given, it specifies a relative timeout, in seconds, on
-how long GRAB-MUTEX should try to acquire the lock in the contested
-case. Unsupported on :SB-LUTEX platforms (eg. Darwin), where a non-NIL
-TIMEOUT signals an error.
+If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
+GRAB-MUTEX should try to acquire the lock in the contested case.
 
-If GRAB-MUTEX returns T, the lock acquisition was successful. In case
-of WAITP being NIL, or an expired TIMEOUT, GRAB-MUTEX may also return
-NIL which denotes that GRAB-MUTEX did -not- acquire the lock.
+If GRAB-MUTEX returns T, the lock acquisition was successful. In case of WAITP
+being NIL, or an expired TIMEOUT, GRAB-MUTEX may also return NIL which denotes
+that GRAB-MUTEX did -not- acquire the lock.
 
 Notes:
 
@@ -585,23 +598,28 @@ Notes:
         (ALLOW-WITH-INTERRUPTS (GRAB-MUTEX ...))
         ...)
 
-    WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding
-    the call while the mutex is in an inconsistent state while
-    ALLOW-WITH-INTERRUPTS allows the call to be interrupted from
-    sleep.
+    WITHOUT-INTERRUPTS is necessary to avoid an interrupt unwinding the call
+    while the mutex is in an inconsistent state while ALLOW-WITH-INTERRUPTS
+    allows the call to be interrupted from sleep.
 
   - (GRAB-MUTEX <mutex> :timeout 0.0) differs from
     (GRAB-MUTEX <mutex> :waitp nil) in that the former may signal a
-    DEADLINE-TIMEOUT if the global deadline was due already on
-    entering GRAB-MUTEX.
+    DEADLINE-TIMEOUT if the global deadline was due already on entering
+    GRAB-MUTEX.
 
-    The exact interplay of GRAB-MUTEX and deadlines are reserved to
-    change in future versions.
+    The exact interplay of GRAB-MUTEX and deadlines are reserved to change in
+    future versions.
 
-  - It is recommended that you use WITH-MUTEX instead of calling
-    GRAB-MUTEX directly.
+  - It is recommended that you use WITH-MUTEX instead of calling GRAB-MUTEX
+    directly.
 "
-  (get-mutex mutex nil waitp timeout))
+  (declare (ignorable waitp timeout))
+  (let ((self *current-thread*))
+    (or (%try-mutex mutex self)
+        #!+sb-thread
+        (when waitp
+          (multiple-value-call #'%wait-for-mutex
+            mutex self timeout (decode-timeout timeout))))))
 
 (defun release-mutex (mutex &key (if-not-owner :punt))
   #!+sb-doc
@@ -619,19 +637,18 @@ IF-NOT-OWNER is :FORCE)."
   ;; Order matters: set owner to NIL before releasing state.
   (let* ((self *current-thread*)
          (old-owner (sb!ext:compare-and-swap (mutex-%owner mutex) self nil)))
-    (unless (eql self old-owner)
+    (unless (eq self old-owner)
       (ecase if-not-owner
         ((:punt) (return-from release-mutex nil))
         ((:warn)
          (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner))
-        ((:force))))
-    #!+sb-thread
-    (when old-owner
+        ((:force)))
       (setf (mutex-%owner mutex) nil)
-      #!+sb-lutex
-      (with-lutex-address (lutex (mutex-lutex mutex))
-        (%lutex-unlock lutex))
-      #!-sb-lutex
+      ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
+      ;; barrier instead?
+      (barrier (:memory)))
+    #!+sb-futex
+    (when old-owner
       ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
       ;; unsigned-byte type this can be used:
       ;;
@@ -652,14 +669,71 @@ IF-NOT-OWNER is :FORCE)."
 
 ;;;; Waitqueues/condition variables
 
+#!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:constructor %make-waitqueue))
   #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null thread-name))
-  #!+(and sb-lutex sb-thread)
-  (lutex (make-lutex))
-  #!-sb-lutex
+  #!+sb-futex
   (token nil))
+
+#!+(and sb-thread (not sb-futex))
+(progn
+  (defstruct (waitqueue (:constructor %make-waitqueue))
+    #!+sb-doc
+    "Waitqueue type."
+    (name nil :type (or null thread-name))
+    ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
+    ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
+    ;; lock. In most cases this should be uncontested thanks to the mutex --
+    ;; the only case where that might not be true is when CONDITION-WAIT
+    ;; unwinds and %WAITQUEUE-DROP is called.
+    %owner
+    %head
+    %tail)
+
+  (defun %waitqueue-enqueue (thread queue)
+    (setf (thread-waiting-for thread) queue)
+    (let ((head (waitqueue-%head queue))
+          (tail (waitqueue-%tail queue))
+          (new (list thread)))
+      (unless head
+        (setf (waitqueue-%head queue) new))
+      (when tail
+        (setf (cdr tail) new))
+      (setf (waitqueue-%tail queue) new)
+      nil))
+  (defun %waitqueue-drop (thread queue)
+    (setf (thread-waiting-for thread) nil)
+    (let ((head (waitqueue-%head queue)))
+      (do ((list head (cdr list))
+           (prev nil))
+          ((eq (car list) thread)
+           (let ((rest (cdr list)))
+             (cond (prev
+                    (setf (cdr prev) rest))
+                   (t
+                    (setf (waitqueue-%head queue) rest
+                          prev rest)))
+             (unless rest
+               (setf (waitqueue-%tail queue) prev))))
+        (setf prev list)))
+    nil)
+  (defun %waitqueue-wakeup (queue n)
+    (declare (fixnum n))
+    (loop while (plusp n)
+          for next = (let ((head (waitqueue-%head queue))
+                           (tail (waitqueue-%tail queue)))
+                       (when head
+                         (if (eq head tail)
+                             (setf (waitqueue-%head queue) nil
+                                   (waitqueue-%tail queue) nil)
+                             (setf (waitqueue-%head queue) (cdr head)))
+                         (car head)))
+          while next
+          do (when (eq queue (sb!ext:compare-and-swap (thread-waiting-for next) queue nil))
+               (decf n)))
+    nil))
 
 (def!method print-object ((waitqueue waitqueue) stream)
   (print-unreadable-object (waitqueue stream :type t :identity t)
@@ -674,30 +748,41 @@ IF-NOT-OWNER is :FORCE)."
 (setf (fdocumentation 'waitqueue-name 'function)
       "The name of the waitqueue. Setfable.")
 
-#!+(and sb-thread (not sb-lutex))
+#!+(and sb-thread sb-futex)
 (define-structure-slot-addressor waitqueue-token-address
     :structure waitqueue
     :slot token)
 
-(defun condition-wait (queue mutex)
+(defun condition-wait (queue mutex &key timeout)
   #!+sb-doc
-  "Atomically release MUTEX and enqueue ourselves on QUEUE. Another thread may
-subsequently notify us using CONDITION-NOTIFY, at which time we reacquire
-MUTEX and return to the caller.
+  "Atomically release MUTEX and start waiting on QUEUE for till another thread
+wakes us up using either CONDITION-NOTIFY or CONDITION-BROADCAST on that
+queue, at which point we re-acquire MUTEX and return T.
 
-Important: CONDITION-WAIT may return without CONDITION-NOTIFY having occurred.
-The correct way to write code that uses CONDITION-WAIT is to loop around the
-call, checking the the associated data:
+Spurious wakeups are possible.
+
+If TIMEOUT is given, it is the maximum number of seconds to wait, including
+both waiting for the wakeup and the time to re-acquire MUTEX. Unless both
+wakeup and re-acquisition do not occur within the given time, returns NIL
+without re-acquiring the mutex.
+
+If CONDITION-WAIT unwinds, it may do so with or without the mutex being held.
+
+Important: Since CONDITION-WAIT may return without CONDITION-NOTIFY having
+occurred the correct way to write code that uses CONDITION-WAIT is to loop
+around the call, checking the the associated data:
 
   (defvar *data* nil)
   (defvar *queue* (make-waitqueue))
   (defvar *lock* (make-mutex))
 
   ;; Consumer
-  (defun pop-data ()
+  (defun pop-data (&optional timeout)
     (with-mutex (*lock*)
       (loop until *data*
-            do (condition-wait *queue* *lock*))
+            do (or (condition-wait *queue* *lock* :timeout timeout)
+                   ;; Lock not held, must unwind without touching *data*.
+                   (return-from pop-data nil)))
       (pop *data*)))
 
   ;; Producer
@@ -705,97 +790,115 @@ call, checking the the associated data:
     (with-mutex (*lock*)
       (push data *data*)
       (condition-notify *queue*)))
-
-Also note that if CONDITION-WAIT unwinds (due to eg. a timeout) instead of
-returning normally, it may do so without holding the mutex."
-  #!-sb-thread (declare (ignore queue))
+"
+  #!-sb-thread (declare (ignore queue timeout))
   (assert mutex)
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
     (assert (eq me (mutex-%owner mutex)))
-    (/show0 "CONDITION-WAITing")
-    #!+sb-lutex
-    ;; Need to disable interrupts so that we don't miss setting the
-    ;; owner on our way out. (pthread_cond_wait handles the actual
-    ;; re-acquisition.)
-    (without-interrupts
-      (unwind-protect
-           (progn
-             (setf (mutex-%owner mutex) nil)
-             (with-lutex-address (queue-lutex-address (waitqueue-lutex queue))
-               (with-lutex-address (mutex-lutex-address (mutex-lutex mutex))
-                 (with-local-interrupts
-                   (%lutex-wait queue-lutex-address mutex-lutex-address)))))
-        (barrier (:write)
-          (setf (mutex-%owner mutex) me))))
-    #!-sb-lutex
-    ;; Need to disable interrupts so that we don't miss grabbing the
-    ;; mutex on our way out.
-    (without-interrupts
-      ;; This setf becomes visible to other CPUS due to the usual
-      ;; memory barrier semantics of lock acquire/release. This must
-      ;; not be moved into the loop else wakeups may be lost upon
-      ;; continuing after a deadline or EINTR.
-      (setf (waitqueue-token queue) me)
-      (loop
-        (multiple-value-bind (to-sec to-usec)
-            (allow-with-interrupts (decode-timeout nil))
-          (case (unwind-protect
-                     (with-pinned-objects (queue me)
-                       ;; RELEASE-MUTEX is purposefully as close to
-                       ;; FUTEX-WAIT as possible to reduce the size of
-                       ;; the window where the token may be set by a
-                       ;; notifier.
-                       (release-mutex mutex)
-                       ;; Now we go to sleep using futex-wait. If
-                       ;; anyone else manages to grab MUTEX and call
-                       ;; CONDITION-NOTIFY during this comment, it
-                       ;; will change the token, and so futex-wait
-                       ;; returns immediately instead of sleeping.
-                       ;; Ergo, no lost wakeup. We may get spurious
-                       ;; wakeups, but that's ok.
-                       (allow-with-interrupts
-                         (futex-wait (waitqueue-token-address queue)
-                                     (get-lisp-obj-address me)
-                                     ;; our way of saying "no
-                                     ;; timeout":
-                                     (or to-sec -1)
-                                     (or to-usec 0))))
-                  ;; If we are interrupted while waiting, we should
-                  ;; do these things before returning. Ideally, in
-                  ;; the case of an unhandled signal, we should do
-                  ;; them before entering the debugger, but this is
-                  ;; better than nothing.
-                  (allow-with-interrupts (get-mutex mutex)))
-            ;; ETIMEDOUT; we know it was a timeout, yet we cannot
-            ;; signal a deadline unconditionally here because the
-            ;; call to GET-MUTEX may already have signaled it.
-            ((1))
-            ;; EINTR; we do not need to return to the caller because
-            ;; an interleaved wakeup would change the token causing an
-            ;; EWOULDBLOCK in the next iteration.
-            ((2))
-            ;; EWOULDBLOCK, -1 here, is the possible spurious wakeup
-            ;; case. 0 is the normal wakeup.
-            (otherwise (return))))))))
+    (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
+        (decode-timeout timeout)
+      (let ((status :interrupted))
+        ;; Need to disable interrupts so that we don't miss grabbing the
+        ;; mutex on our way out.
+        (without-interrupts
+          (unwind-protect
+               (progn
+                 #!-sb-futex
+                 (progn
+                   (%waitqueue-enqueue me queue)
+                   (release-mutex mutex)
+                   (setf status
+                         (or (flet ((wakeup ()
+                                      (when (neq queue (thread-waiting-for me))
+                                        :ok)))
+                               (declare (dynamic-extent #'wakeup))
+                               (allow-with-interrupts
+                                 (sb!impl::%%wait-for #'wakeup stop-sec stop-usec)))
+                             :timeout)))
+                 #!+sb-futex
+                 (with-pinned-objects (queue me)
+                   (setf (waitqueue-token queue) me)
+                   (release-mutex mutex)
+                   ;; Now we go to sleep using futex-wait. If anyone else
+                   ;; manages to grab MUTEX and call CONDITION-NOTIFY during
+                   ;; this comment, it will change the token, and so futex-wait
+                   ;; returns immediately instead of sleeping. Ergo, no lost
+                   ;; wakeup. We may get spurious wakeups, but that's ok.
+                   (setf status
+                         (case (allow-with-interrupts
+                                 (futex-wait (waitqueue-token-address queue)
+                                             (get-lisp-obj-address me)
+                                             ;; our way of saying "no
+                                             ;; timeout":
+                                             (or to-sec -1)
+                                             (or to-usec 0)))
+                           ((1)
+                            ;;  1 = ETIMEDOUT
+                            :timeout)
+                           (t
+                            ;; -1 = EWOULDBLOCK, possibly spurious wakeup
+                            ;;  0 = normal wakeup
+                            ;;  2 = EINTR, a spurious wakeup
+                            :ok)))))
+            #!-sb-futex
+            (%with-cas-lock ((waitqueue-%owner queue))
+              (if (eq queue (thread-waiting-for me))
+                  (%waitqueue-drop me queue)
+                  (unless (eq :ok status)
+                    ;; CONDITION-NOTIFY thinks we've been woken up, but really
+                    ;; we're unwinding. Wake someone else up.
+                    (%waitqueue-wakeup queue 1))))
+            ;; Update timeout for mutex re-aquisition.
+            (when (and (eq :ok status) to-sec)
+              (setf (values to-sec to-usec)
+                    (sb!impl::relative-decoded-times stop-sec stop-usec)))
+            ;; If we ran into deadline, try to get the mutex before
+            ;; signaling. If we don't unwind it will look like a normal
+            ;; return from user perspective.
+            (when (and (eq :timeout status) deadlinep)
+              (let ((got-it (%try-mutex mutex me)))
+                (allow-with-interrupts
+                  (signal-deadline))
+                (cond (got-it
+                       (return-from condition-wait t))
+                      (t
+                       (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
+                             (decode-timeout timeout))))))
+            ;; Re-acquire the mutex for normal return.
+            (unless (or (%try-mutex mutex me)
+                        (allow-with-interrupts
+                          (%wait-for-mutex mutex me timeout
+                                           to-sec to-usec
+                                           stop-sec stop-usec deadlinep)))
+              ;; The only case we return normally without re-acquiring the
+              ;; mutex is when there is a :TIMEOUT that runs out.
+              (aver (and timeout (not deadlinep)))
+              (return-from condition-wait nil)))))))
+  t)
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
-  "Notify N threads waiting on QUEUE. The same mutex that is used in
-the corresponding CONDITION-WAIT must be held by this thread during
-this call."
-  #!-sb-thread (declare (ignore queue n))
-  #!-sb-thread (error "Not supported in unithread builds.")
+  "Notify N threads waiting on QUEUE.
+
+IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
+must be held by this thread during this call."
+  #!-sb-thread
+  (declare (ignore queue n))
+  #!-sb-thread
+  (error "Not supported in unithread builds.")
   #!+sb-thread
   (declare (type (and fixnum (integer 1)) n))
   (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
   (progn
-    #!+sb-lutex
-    (with-lutex-address (lutex (waitqueue-lutex queue))
-      (%lutex-wake lutex n))
+    #!-sb-futex
+    (with-cas-lock ((waitqueue-%owner queue))
+      (%waitqueue-wakeup queue n))
+    #!+sb-futex
+    (progn
     ;; No problem if >1 thread notifies during the comment in condition-wait:
     ;; as long as the value in queue-data isn't the waiting thread's id, it
     ;; matters not what it is -- using the queue object itself is handy.
@@ -804,15 +907,16 @@ this call."
     ;; is visible to all CPUs.
     ;;
     ;; ^-- surely futex_wake() involves a memory barrier?
-    #!-sb-lutex
-    (progn
       (setf (waitqueue-token queue) queue)
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n)))))
 
 (defun condition-broadcast (queue)
   #!+sb-doc
-  "Notify all threads waiting on QUEUE."
+  "Notify all threads waiting on QUEUE.
+
+IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
+must be held by this thread during this call."
   (condition-notify queue
                     ;; On a 64-bit platform truncating M-P-F to an int
                     ;; results in -1, which wakes up only one thread.
@@ -839,6 +943,7 @@ future."
 (declaim (inline semaphore-count))
 (defun semaphore-count (instance)
   "Returns the current count of the semaphore INSTANCE."
+  (barrier (:read))
   (semaphore-%count instance))
 
 (defun make-semaphore (&key name (count 0))
@@ -882,7 +987,7 @@ negative. Else blocks until the semaphore can be decremented."
   "Try to decrement the count of SEMAPHORE by N. If the count were to
 become negative, punt and return NIL, otherwise return true."
   (declare (type (integer 1) n))
-  (with-mutex ((semaphore-mutex semaphore))
+  (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
     (let ((new-count (- (semaphore-%count semaphore) n)))
       (when (not (minusp new-count))
         (setf (semaphore-%count semaphore) new-count)))))
@@ -964,12 +1069,7 @@ on this semaphore, then N of them is woken up."
     (setf (thread-os-thread thread) nil)
     (setq *all-threads* (delete thread *all-threads*))
     (when *session*
-      (%delete-thread-from-session thread *session*)))
-  #!+sb-lutex
-  (without-gcing
-    (/show0 "FREEING MUTEX LUTEX")
-    (with-lutex-address (lutex (mutex-lutex (thread-interruptions-lock thread)))
-      (%lutex-destroy lutex))))
+      (%delete-thread-from-session thread *session*))))
 
 (defun terminate-session ()
   #!+sb-doc

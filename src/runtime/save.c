@@ -34,14 +34,9 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
-#include "genesis/lutex.h"
-#endif
-
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # include <zlib.h>
 #endif
-
 
 /* write_runtime_options uses a simple serialization scheme that
  * consists of one word of magic, one word indicating whether options
@@ -173,79 +168,6 @@ write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
                                     COMPRESSION_LEVEL_NONE);
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
-/* saving lutexes in the core */
-static void **lutex_addresses;
-static long n_lutexes = 0;
-static long max_lutexes = 0;
-
-static long
-default_scan_action(lispobj *obj)
-{
-    return (sizetab[widetag_of(*obj)])(obj);
-}
-
-static long
-lutex_scan_action(lispobj *obj)
-{
-    /* note the address of the lutex */
-    if(n_lutexes >= max_lutexes) {
-        max_lutexes *= 2;
-        lutex_addresses = realloc(lutex_addresses, max_lutexes * sizeof(void *));
-        gc_assert(lutex_addresses);
-    }
-
-    lutex_addresses[n_lutexes++] = obj;
-
-    return (*sizetab[widetag_of(*obj)])(obj);
-}
-
-typedef long (*scan_table[256])(lispobj *obj);
-
-static void
-scan_objects(lispobj *start, long n_words, scan_table table)
-{
-    lispobj *end = start + n_words;
-    lispobj *object_ptr;
-    long n_words_scanned;
-    for (object_ptr = start;
-         object_ptr < end;
-         object_ptr += n_words_scanned) {
-        lispobj obj = *object_ptr;
-
-        n_words_scanned = (table[widetag_of(obj)])(object_ptr);
-    }
-}
-
-static void
-scan_for_lutexes(lispobj *addr, long n_words)
-{
-    static int initialized = 0;
-    static scan_table lutex_scan_table;
-
-    if (!initialized) {
-        int i;
-
-        /* allocate a little space to get started */
-        lutex_addresses = malloc(16*sizeof(void *));
-        gc_assert(lutex_addresses);
-        max_lutexes = 16;
-
-        /* initialize the mapping table */
-        for(i = 0; i < ((sizeof lutex_scan_table)/(sizeof lutex_scan_table[0])); ++i) {
-            lutex_scan_table[i] = default_scan_action;
-        }
-
-        lutex_scan_table[LUTEX_WIDETAG] = lutex_scan_action;
-
-        initialized = 1;
-    }
-
-    /* do the scan */
-    scan_objects(addr, n_words, lutex_scan_table);
-}
-#endif
-
 static void
 output_space(FILE *file, int id, lispobj *addr, lispobj *end,
              os_vm_offset_t file_offset,
@@ -263,11 +185,6 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
     write_lispobj(words, file);
 
     bytes = words * sizeof(lispobj);
-
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
-    printf("scanning space for lutexes...\n");
-    scan_for_lutexes((void *)addr, words);
-#endif
 
     printf("writing %lu bytes from the %s space at 0x%08lx\n",
            (unsigned long)bytes, names[id], (unsigned long)addr);
@@ -410,24 +327,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
             offset = write_bytes(file, (char *)data, size, core_start_pos);
             write_lispobj(offset, file);
         }
-    }
-#endif
-
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_LUTEX)
-    if(n_lutexes > 0) {
-        long offset;
-        printf("writing %ld lutexes to the core...\n", n_lutexes);
-        write_lispobj(LUTEX_TABLE_CORE_ENTRY_TYPE_CODE, file);
-        /* word count of the entry */
-        write_lispobj(4, file);
-        /* indicate how many lutexes we saved */
-        write_lispobj(n_lutexes, file);
-        /* save the lutexes */
-        offset = write_bytes(file, (char *) lutex_addresses,
-                             n_lutexes * sizeof(*lutex_addresses),
-                             core_start_pos);
-
-        write_lispobj(offset, file);
     }
 #endif
 
