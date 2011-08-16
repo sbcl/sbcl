@@ -950,8 +950,8 @@ corresponds to NAME, or NIL if there is none."
 (defun nanosleep (secs nsecs)
   (with-alien ((req (struct timespec))
                (rem (struct timespec)))
-    (setf (slot req 'tv-sec) secs)
-    (setf (slot req 'tv-nsec) nsecs)
+    (setf (slot req 'tv-sec) secs
+          (slot req 'tv-nsec) nsecs)
     (loop while (and (eql sb!unix:eintr
                           (nth-value 1
                                      (int-syscall ("nanosleep" (* (struct timespec))
@@ -976,10 +976,9 @@ corresponds to NAME, or NIL if there is none."
                            (rem-nsec (slot rem 'tv-nsec)))
                        (when (or (> secs rem-sec)
                                  (and (= secs rem-sec) (>= nsecs rem-nsec)))
-                         (setf secs rem-sec
-                               nsecs rem-nsec)
                          t)))
-          do (rotatef req rem))))
+          do (setf (slot req 'tv-sec) (slot rem 'tv-sec)
+                   (slot req 'tv-nsec) (slot rem 'tv-nsec)))))
 
 (defun unix-get-seconds-west (secs)
   (multiple-value-bind (ignore seconds dst) (get-timezone secs)

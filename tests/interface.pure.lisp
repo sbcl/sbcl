@@ -12,6 +12,10 @@
 ;;;; more information.
 
 (in-package :cl-user)
+
+(load "test-util.lisp")
+(load "compiler-test-util.lisp")
+(use-package :test-util)
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 
@@ -62,6 +66,10 @@
     (sb-ext:with-timeout 3
       (sleep 2)
       (sleep 2))))
+
+;;; SLEEP should not cons
+(with-test (:name (sleep :non-consing))
+  (ctu:assert-no-consing (sleep 0.00001)))
 
 ;;; SLEEP should work with large integers as well -- no timers
 ;;; on win32, so don't test there.
