@@ -3985,3 +3985,12 @@
          (fun (compile nil `(lambda (p1 p2)
                               (schar (the (eql ,foo) p1) p2)))))
     (assert (eql #\f (funcall fun foo 0)))))
+
+(with-test (:name :bug-738464)
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda ()
+                      (flet ((foo () 42))
+                        (declare (ftype non-function-type foo))
+                        (foo))))
+    (assert (eql 42 (funcall fun)))
+    (assert (and warn (not fail)))))
