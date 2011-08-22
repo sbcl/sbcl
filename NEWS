@@ -1,4 +1,14 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.50:
+  * enhancement: ASDF has been updated to version 2.017.
+  * optimization: SLEEP no longer conses.
+  * bug fix: non-function FTYPE declarations no longer cause a compiler-error.
+    (lp#738464)
+  * bug fix: compiler-errors causes by MEMBER types in conjunction with with
+    AREF, CHAR, etc. (lp#826971)
+  * bug fix: compiler-errors causes by integer arguments with composed of multiple
+    ranges to ARRAY-IN-BOUNDS-P. (lp#826970)
+
 changes in sbcl-1.0.51 relative to sbcl-1.0.50:
   * minor incompatible change: SB-BSD-SOCKET socket streams no longer
     participate in SERVE-EVENT by default: pass :SERVE-EVENTS T to
