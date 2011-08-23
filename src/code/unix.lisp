@@ -977,8 +977,8 @@ corresponds to NAME, or NIL if there is none."
                        (when (or (> secs rem-sec)
                                  (and (= secs rem-sec) (>= nsecs rem-nsec)))
                          ;; Update for next round.
-                         (setf sec rem-sec
-                               nsec rem-nsec)
+                         (setf secs  rem-sec
+                               nsecs rem-nsec)
                          t)))
           do (setf (slot req 'tv-sec) (slot rem 'tv-sec)
                    (slot req 'tv-nsec) (slot rem 'tv-nsec)))))
