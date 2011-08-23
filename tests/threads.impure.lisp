@@ -883,7 +883,13 @@
   (sb-debug:backtrace)
   (catch 'done))
 
-(with-test (:name (:unsynchronized-hash-table))
+(with-test (:name (:unsynchronized-hash-table)
+                  ;; FIXME: This test occasionally eats out craploads
+                  ;; of heap instead of expected error early. Not 100%
+                  ;; sure if it would finish as expected, but since it
+                  ;; hits swap on my system I'm not likely to find out
+                  ;; soon. Disabling for now. -- nikodemus
+            :skipped-on :sbcl)
   ;; We expect a (probable) error here: parellel readers and writers
   ;; on a hash-table are not expected to work -- but we also don't
   ;; expect this to corrupt the image.
