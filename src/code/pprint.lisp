@@ -1003,9 +1003,7 @@ line break."
 ;;;; standard pretty-printing routines
 
 (defun pprint-array (stream array)
-  (cond ((or (and (null *print-array*) (null *print-readably*))
-             (stringp array)
-             (bit-vector-p array))
+  (cond ((and (null *print-array*) (null *print-readably*))
          (output-ugly-object array stream))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
@@ -1488,7 +1486,7 @@ line break."
   (let ((*print-pprint-dispatch* *initial-pprint-dispatch-table*)
         (*building-initial-table* t))
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
-    (set-pprint-dispatch 'array #'pprint-array)
+    (set-pprint-dispatch '(and array (not (or string bit-vector))) #'pprint-array)
     (set-pprint-dispatch '(cons (and symbol (satisfies mboundp)))
                          #'pprint-macro-call -1)
     (set-pprint-dispatch '(cons (and symbol (satisfies fboundp)))

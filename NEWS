@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.50:
   * enhancement: ASDF has been updated to version 2.017.
   * optimization: SLEEP no longer conses.
+  * optimization: *PRINT-PRETTY* no longer slows down printing of strings
+    or bit-vectors when using the standard pretty-print dispatch table.
   * bug fix: non-function FTYPE declarations no longer cause a compiler-error.
     (lp#738464)
   * bug fix: compiler-errors causes by MEMBER types in conjunction with with
