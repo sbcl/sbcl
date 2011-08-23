@@ -390,27 +390,31 @@
         complex-double-float))
 
 (macrolet ((generate (opinst commutative constant-sc load-inst)
-             `(flet ((get-constant (tn)
-                       (register-inline-constant
-                        ,@(and (eq constant-sc 'fp-single-immediate)
-                               '(:aligned))
-                        (tn-value tn))))
+             `(flet ((get-constant (tn &optional maybe-aligned)
+                       (declare (ignorable maybe-aligned))
+                       (let ((value (tn-value tn)))
+                         ,(if (eq constant-sc 'fp-complex-single-immediate)
+                              `(if maybe-aligned
+                                   (register-inline-constant
+                                    :aligned value)
+                                   (register-inline-constant value))
+                              `(register-inline-constant value)))))
                 (declare (ignorable #'get-constant))
                 (cond
                   ((location= x r)
                    (when (sc-is y ,constant-sc)
-                     (setf y (get-constant y)))
+                     (setf y (get-constant y t)))
                    (inst ,opinst x y))
                   ((and ,commutative (location= y r))
                    (when (sc-is x ,constant-sc)
-                     (setf x (get-constant x)))
+                     (setf x (get-constant x t)))
                    (inst ,opinst y x))
                   ((not (location= r y))
                    (if (sc-is x ,constant-sc)
                        (inst ,load-inst r (get-constant x))
                        (move r x))
                    (when (sc-is y ,constant-sc)
-                     (setf y (get-constant y)))
+                     (setf y (get-constant y t)))
                    (inst ,opinst r y))
                   (t
                    (if (sc-is x ,constant-sc)
@@ -809,12 +813,9 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1
-                            (note-this-location vop :internal-error)
-                            ;; we should be able to do this better.  what we
-                            ;; really would like to do is use the target as the
-                            ;; temp whenever it's not also the source
-                            (move y x)
-                            ,@body))))
+                  (note-this-location vop :internal-error)
+                  (move y x)
+                  ,@body))))
   (frob (%negate/double-float %negate double-reg double-float)
         (inst xorpd y (register-inline-constant :oword (ash 1 63))))
   (frob (%negate/complex-double-float %negate complex-double-reg complex-double-float)

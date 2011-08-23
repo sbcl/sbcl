@@ -3994,3 +3994,10 @@
                         (foo))))
     (assert (eql 42 (funcall fun)))
     (assert (and warn (not fail)))))
+
+(with-test (:name :bug-832005)
+  (let ((fun (compile nil `(lambda (x)
+                             (declare (type (complex single-float) x))
+                             (+ #C(0.0 1.0) x)))))
+    (assert (= (funcall fun #C(1.0 2.0))
+               #C(1.0 3.0)))))
