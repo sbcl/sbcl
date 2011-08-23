@@ -52,25 +52,16 @@
   #!+sb-doc
   "List of available buffers.")
 
-(defvar *available-buffers-spinlock* (sb!thread::make-spinlock
-                                      :name "lock for *AVAILABLE-BUFFERS*")
+(defvar *available-buffers-lock* (sb!thread:make-mutex
+                                  :name "lock for *AVAILABLE-BUFFERS*")
   #!+sb-doc
   "Mutex for access to *AVAILABLE-BUFFERS*.")
 
 (defmacro with-available-buffers-lock ((&optional) &body body)
-  ;; CALL-WITH-SYSTEM-SPINLOCK because
-  ;;
-  ;; 1. streams are low-level enough to be async signal safe, and in
-  ;;    particular a C-c that brings up the debugger while holding the
-  ;;    mutex would lose badly
-  ;;
-  ;; 2. this can potentially be a fairly busy (but also probably
-  ;;    uncontended) lock, so we don't want to pay the syscall per
-  ;;    release -- hence a spinlock.
-  ;;
-  ;; ...again, once we have smarted locks the spinlock here can become
-  ;; a mutex.
-  `(sb!thread::with-system-spinlock (*available-buffers-spinlock*)
+  ;; CALL-WITH-SYSTEM-MUTEX because streams are low-level enough to be
+  ;; async signal safe, and in particular a C-c that brings up the
+  ;; debugger while holding the mutex would lose badly.
+  `(sb!thread::with-system-mutex (*available-buffers-lock*)
      ,@body))
 
 (defconstant +bytes-per-buffer+ (* 4 1024)

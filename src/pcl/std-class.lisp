@@ -202,18 +202,18 @@
 ;;; This needs to be used recursively, in case a non-trivial user
 ;;; defined ADD/REMOVE-DIRECT-METHOD method ends up calling another
 ;;; function using the same lock.
-(defvar *specializer-lock* (sb-thread::make-spinlock :name "Specializer lock"))
+(defvar *specializer-lock* (sb-thread:make-mutex :name "Specializer lock"))
 
 (defmethod add-direct-method :around ((specializer specializer) method)
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
-  (sb-thread::with-recursive-system-spinlock (*specializer-lock*)
+  (sb-thread::with-recursive-system-lock (*specializer-lock*)
     (call-next-method)))
 
 (defmethod remove-direct-method :around ((specializer specializer) method)
   ;; All the actions done under this lock are done in an order
   ;; that is safe to unwind at any point.
-  (sb-thread::with-recursive-system-spinlock (*specializer-lock*)
+  (sb-thread::with-recursive-system-lock (*specializer-lock*)
     (call-next-method)))
 
 (defmethod add-direct-method ((specializer class) (method method))
@@ -244,7 +244,7 @@
     ;; we behave as if we got just first or just after -- it's just
     ;; for update that we need to lock.
     (or (cdr cell)
-        (sb-thread::with-spinlock (*specializer-lock*)
+        (sb-thread:with-mutex (*specializer-lock*)
           (setf (cdr cell)
                 (let (collect)
                   (dolist (m (car cell))
@@ -303,7 +303,7 @@
          (entry (gethash object (specializer-method-table specializer))))
     (when entry
       (or (cdr entry)
-          (sb-thread::with-spinlock (*specializer-lock*)
+          (sb-thread:with-mutex (*specializer-lock*)
             (setf (cdr entry)
                   (let (collect)
                     (dolist (m (car entry))

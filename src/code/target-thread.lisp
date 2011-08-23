@@ -200,9 +200,6 @@ arbitrary printable objects, and need not be unique.")
 (def!method print-object ((mutex mutex) stream)
   (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
 
-(def!method print-object ((spinlock spinlock) stream)
-  (print-lock spinlock (spinlock-name spinlock) (spinlock-value spinlock) stream))
-
 (defun thread-alive-p (thread)
   #!+sb-doc
   "Return T if THREAD is still alive. Note that the return value is
@@ -307,8 +304,6 @@ created and old ones may exit at any time."
   (sb!vm::current-thread-offset-sap n))
 
 
-;;;; Spinlocks
-
 (defmacro with-deadlocks ((thread lock &optional (timeout nil timeoutp)) &body forms)
   (with-unique-names (n-thread n-lock new n-timeout)
     `(let* ((,n-thread ,thread)
@@ -332,62 +327,7 @@ created and old ones may exit at any time."
          ;; Interrupt handlers and GC save and restore any
          ;; previous wait marks using WITHOUT-DEADLOCKS below.
          (setf (thread-waiting-for ,n-thread) nil)))))
-
-(declaim (inline get-spinlock release-spinlock))
-
-;;; Should always be called with interrupts disabled.
-(defun get-spinlock (spinlock)
-  (declare (optimize (speed 3) (safety 0)))
-  (let* ((new *current-thread*)
-         (old (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)))
-    (when old
-      (when (eq old new)
-        (error "Recursive lock attempt on ~S." spinlock))
-      #!+sb-thread
-      (with-deadlocks (new spinlock)
-        (flet ((cas ()
-                 (if (sb!ext:compare-and-swap (spinlock-value spinlock) nil new)
-                     (thread-yield)
-                     (return-from get-spinlock t))))
-          ;; Try once.
-          (cas)
-          ;; Check deadlocks
-          (with-interrupts (check-deadlock))
-          (if (and (not *interrupts-enabled*) *allow-with-interrupts*)
-              ;; If interrupts are disabled, but we are allowed to
-              ;; enabled them, check for pending interrupts every once
-              ;; in a while. %CHECK-INTERRUPTS is taking shortcuts, make
-              ;; sure that deferrables are unblocked by doing an empty
-              ;; WITH-INTERRUPTS once.
-              (progn
-                (with-interrupts)
-                (loop
-                  (loop repeat 128 do (cas)) ; 128 is arbitrary here
-                  (sb!unix::%check-interrupts)))
-              (loop (cas)))))))
-    t)
-
-(defun release-spinlock (spinlock)
-  (declare (optimize (speed 3) (safety 0)))
-  ;; On x86 and x86-64 we can get away with no memory barriers, (see
-  ;; Linux kernel mailing list "spin_unlock optimization(i386)"
-  ;; thread, summary at
-  ;; http://kt.iserv.nl/kernel-traffic/kt19991220_47.html#1.
-  ;;
-  ;; If the compiler may reorder this with other instructions, insert
-  ;; compiler barrier here.
-  ;;
-  ;; FIXME: this does not work on SMP Pentium Pro and OOSTORE systems,
-  ;; neither on most non-x86 architectures (but we don't have threads
-  ;; on those).
-  (setf (spinlock-value spinlock) nil)
-
-  ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
-  ;; barrier instead?
-  #!+(not (or x86 x86-64))
-  (barrier (:memory)))
 
-
 ;;;; Mutexes
 
 #!+sb-doc
@@ -421,14 +361,8 @@ HOLDING-MUTEX-P."
 (defun check-deadlock ()
   (let* ((self *current-thread*)
          (origin (thread-waiting-for self)))
-    (labels ((lock-owner (lock)
-               (etypecase lock
-                 (mutex (mutex-%owner lock))
-                 (spinlock (spinlock-value lock))))
-             (lock-p (thing)
-               (typep thing '(or mutex spinlock)))
-             (detect-deadlock (lock)
-               (let ((other-thread (lock-owner lock)))
+    (labels ((detect-deadlock (lock)
+               (let ((other-thread (mutex-%owner lock)))
                  (cond ((not other-thread))
                        ((eq self other-thread)
                         (let* ((chain (deadlock-chain self origin))
@@ -451,10 +385,10 @@ HOLDING-MUTEX-P."
                           ;; If the thread is waiting with a timeout OTHER-LOCK
                           ;; is a cons, and we don't consider it a deadlock -- since
                           ;; it will time out on its own sooner or later.
-                          (when (lock-p other-lock)
+                          (when (mutex-p other-lock)
                             (detect-deadlock other-lock)))))))
              (deadlock-chain (thread lock)
-               (let* ((other-thread (lock-owner lock))
+               (let* ((other-thread (mutex-owner lock))
                       (other-lock (when other-thread
                                     (thread-waiting-for other-thread))))
                  (cond ((not other-thread)
@@ -477,7 +411,7 @@ HOLDING-MUTEX-P."
                             ;; Again, the deadlock is gone?
                             (return-from check-deadlock nil)))))))
       ;; Timeout means there is no deadlock
-      (when (lock-p origin)
+      (when (mutex-p origin)
         (detect-deadlock origin)
         t))))
 

@@ -1700,10 +1700,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       ;; are part of this same code path (done while the lock is held),
       ;; which we AVER.
       ;;
-      ;; FIXME: When our mutexes are smart about the need to wake up
-      ;; sleepers we can put a mutex here instead -- but in the meantime
-      ;; we use a spinlock to avoid a syscall for every dfun update.
-      ;;
       ;; KLUDGE: No need to lock during bootstrap.
       (if early-p
           (update)
@@ -1712,7 +1708,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             ;; where we can end up in a metacircular loop here? In
             ;; case there are, better fetch it while interrupts are
             ;; still enabled...
-            (sb-thread::call-with-recursive-system-spinlock #'update lock))))))
+            (sb-thread::call-with-recursive-system-lock #'update lock))))))
 
 (defvar *dfun-count* nil)
 (defvar *dfun-list* nil)

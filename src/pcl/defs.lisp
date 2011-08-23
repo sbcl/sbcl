@@ -357,7 +357,7 @@
     :accessor gf-dfun-state)
    ;; Used to make DFUN-STATE & FIN-FUNCTION updates atomic.
    (%lock
-    :initform (sb-thread::make-spinlock :name "GF lock")
+    :initform (sb-thread:make-mutex :name "GF lock")
     :reader gf-lock)
    ;; Set to true by ADD-METHOD, REMOVE-METHOD; to false by
    ;; MAYBE-UPDATE-INFO-FOR-GF.

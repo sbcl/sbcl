@@ -63,11 +63,40 @@ stale value, use MUTEX-OWNER instead."
         '(setf mutex-value))
   form)
 
-(def!struct spinlock
-  #!+sb-doc
+;;; SPINLOCK no longer exists as a type -- provided for backwards compatibility.
+
+(deftype spinlock ()
   "Spinlock type."
-  (name  nil :type (or null thread-name))
-  (value nil))
+  (deprecation-warning :early "1.0.53.11" 'spinlock 'mutex)
+  'mutex)
+
+(define-deprecated-function :early "1.0.53.11" make-spinlock make-mutex (&key name)
+  (make-mutex :name name))
+
+(define-deprecated-function :early "1.0.5.x" spinlock-name mutex-name (lock)
+  (mutex-name lock))
+
+(define-deprecated-function :early "1.0.53.11" (setf spinlock-name) (setf mutex-name) (name lock)
+  (setf (mutex-name lock) name))
+
+(define-deprecated-function :early "1.0.53.11" spinlock-value mutex-owner (lock)
+  (mutex-owner lock))
+
+(define-deprecated-function :early "1.0.53.11" get-spinlock grab-mutex (lock)
+  (grab-mutex lock))
+
+(define-deprecated-function :early "1.0.53.11" release-spinlock release-mutex (lock)
+  (release-mutex lock))
+
+(sb!xc:defmacro with-recursive-spinlock ((lock) &body body)
+  (deprecation-warning :early "1.0.53.11" 'with-recursive-spinlock 'with-recursive-lock)
+  `(with-recursive-lock (,lock)
+     ,@body))
+
+(sb!xc:defmacro with-spinlock ((lock) &body body)
+  (deprecation-warning :early "1.0.53.11" 'with-recursive-spinlock 'with-mutex)
+  `(with-lock (,lock)
+     ,@body))
 
 (sb!xc:defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
   (with-unique-names (thread prev)
@@ -115,12 +144,6 @@ is in use, sleep until it is available"
        #'with-system-mutex-thunk
        ,mutex)))
 
-(sb!xc:defmacro with-system-spinlock ((spinlock &key) &body body)
-  `(dx-flet ((with-system-spinlock-thunk () ,@body))
-     (call-with-system-spinlock
-       #'with-system-spinlock-thunk
-       ,spinlock)))
-
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-doc
   "Acquires MUTEX for the dynamic scope of BODY. Within that scope
@@ -132,28 +155,16 @@ provided the default value is used for the mutex."
       #'with-recursive-lock-thunk
       ,mutex)))
 
-(sb!xc:defmacro with-recursive-spinlock ((spinlock) &body body)
-  `(dx-flet ((with-recursive-spinlock-thunk () ,@body))
-     (call-with-recursive-spinlock
-      #'with-recursive-spinlock-thunk
-      ,spinlock)))
-
-(sb!xc:defmacro with-recursive-system-spinlock ((spinlock
-                                                 &key without-gcing)
-                                                &body body)
-  `(dx-flet ((with-recursive-system-spinlock-thunk () ,@body))
+(sb!xc:defmacro with-recursive-system-lock ((lock
+                                             &key without-gcing)
+                                            &body body)
+  `(dx-flet ((with-recursive-system-lock-thunk () ,@body))
      (,(cond (without-gcing
-               'call-with-recursive-system-spinlock/without-gcing)
+              'call-with-recursive-system-lock/without-gcing)
              (t
-              'call-with-recursive-system-spinlock))
-       #'with-recursive-system-spinlock-thunk
-       ,spinlock)))
-
-(sb!xc:defmacro with-spinlock ((spinlock) &body body)
-  `(dx-flet ((with-spinlock-thunk () ,@body))
-     (call-with-spinlock
-      #'with-spinlock-thunk
-      ,spinlock)))
+              'call-with-recursive-system-lock))
+      #'with-recursive-system-lock-thunk
+       ,lock)))
 
 (macrolet ((def (name &optional variant)
              `(defun ,(if variant (symbolicate name "/" variant) name)
@@ -181,22 +192,6 @@ provided the default value is used for the mutex."
 
 #!-sb-thread
 (progn
-  (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name)
-                    (function lock)
-                  (declare (ignore lock) (function function))
-                  ,(ecase variant
-                    (:without-gcing
-                      `(without-gcing (funcall function)))
-                    (:allow-with-interrupts
-                      `(without-interrupts
-                         (allow-with-interrupts (funcall function))))
-                    ((nil)
-                      `(without-interrupts (funcall function)))))))
-    (def call-with-system-spinlock)
-    (def call-with-recursive-system-spinlock)
-    (def call-with-recursive-system-spinlock :without-gcing))
-
   (defun call-with-mutex (function mutex value waitp)
     (declare (ignore mutex value waitp)
              (function function))
@@ -206,65 +201,21 @@ provided the default value is used for the mutex."
     (declare (ignore mutex) (function function))
     (funcall function))
 
-  (defun call-with-spinlock (function spinlock)
-    (declare (ignore spinlock) (function function))
-    (funcall function))
+  (defun call-with-recursive-system-lock (function lock)
+    (declare (function function) (ignore lock))
+    (without-interrupts
+      (funcall function)))
 
-  (defun call-with-recursive-spinlock (function spinlock)
-    (declare (ignore spinlock) (function function))
-    (funcall function)))
+  (defun call-with-recursive-system-lock/without-gcing (function mutex)
+    (declare (function function) (ignore lock))
+    (without-gcing
+      (funcall function))))
 
 #!+sb-thread
 ;;; KLUDGE: These need to use DX-LET, because the cleanup form that
 ;;; closes over GOT-IT causes a value-cell to be allocated for it --
 ;;; and we prefer that to go on the stack since it can.
 (progn
-  (defun call-with-system-spinlock (function spinlock)
-    (declare (function function))
-    (without-interrupts
-      (dx-let (got-it)
-        (unwind-protect
-             (when (setf got-it (get-spinlock spinlock))
-               (funcall function))
-          (when got-it
-            (release-spinlock spinlock))))))
-
-  (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name)
-                    (function spinlock)
-                  (declare (function function))
-                  (flet ((%call-with-system-spinlock ()
-                           (dx-let ((inner-lock-p
-                                     (eq *current-thread*
-                                         (spinlock-value spinlock)))
-                                    (got-it nil))
-                             (unwind-protect
-                                  (when (or inner-lock-p
-                                            (setf got-it
-                                                  (get-spinlock spinlock)))
-                                    (funcall function))
-                               (when got-it
-                                 (release-spinlock spinlock))))))
-                    (declare (inline %call-with-system-spinlock))
-                    ,(ecase variant
-                      (:without-gcing
-                        `(without-gcing (%call-with-system-spinlock)))
-                      ((nil)
-                        `(without-interrupts (%call-with-system-spinlock))))))))
-    (def call-with-recursive-system-spinlock)
-    (def call-with-recursive-system-spinlock :without-gcing))
-
-  (defun call-with-spinlock (function spinlock)
-    (declare (function function))
-    (dx-let ((got-it nil))
-      (without-interrupts
-        (unwind-protect
-             (when (setf got-it (allow-with-interrupts
-                                 (get-spinlock spinlock)))
-               (with-local-interrupts (funcall function)))
-          (when got-it
-            (release-spinlock spinlock))))))
-
   (defun call-with-mutex (function mutex value waitp)
     (declare (function function))
     (dx-let ((got-it nil))
@@ -288,14 +239,25 @@ provided the default value is used for the mutex."
           (when got-it
             (release-mutex mutex))))))
 
-  (defun call-with-recursive-spinlock (function spinlock)
-    (declare (function function))
-    (dx-let ((inner-lock-p (eq (spinlock-value spinlock) *current-thread*))
-          (got-it nil))
-      (without-interrupts
-        (unwind-protect
-             (when (or inner-lock-p (setf got-it (allow-with-interrupts
-                                                  (get-spinlock spinlock))))
-               (with-local-interrupts (funcall function)))
-          (when got-it
-            (release-spinlock spinlock)))))))
+  (macrolet ((def (name &optional variant)
+               `(defun ,(if variant (symbolicate name "/" variant) name)
+                    (function lock)
+                  (declare (function function))
+                  (flet ((%call-with-recursive-system-lock ()
+                           (dx-let ((inner-lock-p
+                                     (eq *current-thread* (mutex-owner lock)))
+                                    (got-it nil))
+                             (unwind-protect
+                                  (when (or inner-lock-p
+                                            (setf got-it (grab-mutex lock)))
+                                    (funcall function))
+                               (when got-it
+                                 (release-mutex lock))))))
+                    (declare (inline %call-with-recursive-system-lock))
+                    ,(ecase variant
+                      (:without-gcing
+                        `(without-gcing (%call-with-recursive-system-lock)))
+                      ((nil)
+                        `(without-interrupts (%call-with-recursive-system-lock))))))))
+    (def call-with-recursive-system-lock)
+    (def call-with-recursive-system-lock :without-gcing)))

@@ -487,7 +487,7 @@
           ;; System lock because interrupts need to be disabled as
           ;; well: it would be bad to unwind and leave the gf in an
           ;; inconsistent state.
-          (sb-thread::with-recursive-system-spinlock (lock)
+          (sb-thread::with-recursive-system-lock (lock)
             (let ((existing (get-method generic-function
                                         qualifiers
                                         specializers
@@ -574,7 +574,7 @@
       ;; System lock because interrupts need to be disabled as well:
       ;; it would be bad to unwind and leave the gf in an inconsistent
       ;; state.
-      (sb-thread::with-recursive-system-spinlock (lock)
+      (sb-thread::with-recursive-system-lock (lock)
         (let* ((specializers (method-specializers method))
                (methods (generic-function-methods generic-function))
                (new-methods (remove method methods)))

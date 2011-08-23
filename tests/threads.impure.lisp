@@ -37,10 +37,6 @@
     (with-mutex (mutex)
       mutex)))
 
-(with-test (:name (:with-spinlock :basics))
-  (let ((spinlock (make-spinlock)))
-    (with-spinlock (spinlock))))
-
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
     void
   (where sb-alien:unsigned-long))
@@ -76,19 +72,19 @@
 
 ;;;; Now the real tests...
 
-(with-test (:name (:interrupt-thread :deferrables-unblocked-by-spinlock))
-  (let ((spinlock (sb-thread::make-spinlock))
+(with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock))
+  (let ((lock (sb-thread::make-mutex))
         (thread (sb-thread:make-thread (lambda ()
                                          (loop (sleep 1))))))
-    (sb-thread::get-spinlock spinlock)
+    (sb-thread::grab-mutex lock)
     (sb-thread:interrupt-thread thread
                                 (lambda ()
                                   (check-deferrables-blocked-or-lose 0)
-                                  (sb-thread::get-spinlock spinlock)
+                                  (sb-thread::grab-mutex lock)
                                   (check-deferrables-unblocked-or-lose 0)
                                   (sb-ext:quit)))
     (sleep 1)
-    (sb-thread::release-spinlock spinlock)))
+    (sb-thread::release-mutex lock)))
 
 ;;; compare-and-swap
 
@@ -229,37 +225,10 @@
         (assert (ours-p (mutex-value l)) nil "5"))
       (assert (eql (mutex-value l) nil) nil "6"))))
 
-(with-test (:name (:with-recursive-spinlock :basics))
-  (labels ((ours-p (value)
-             (eq *current-thread* value)))
-    (let ((l (make-spinlock :name "rec")))
-      (assert (eql (spinlock-value l) nil) nil "1")
-      (with-recursive-spinlock (l)
-        (assert (ours-p (spinlock-value l)) nil "3")
-        (with-recursive-spinlock (l)
-          (assert (ours-p (spinlock-value l)) nil "4"))
-        (assert (ours-p (spinlock-value l)) nil "5"))
-      (assert (eql (spinlock-value l) nil) nil "6"))))
-
 (with-test (:name (:mutex :nesting-mutex-and-recursive-lock))
   (let ((l (make-mutex :name "a mutex")))
     (with-mutex (l)
       (with-recursive-lock (l)))))
-
-(with-test (:name (:spinlock :nesting-spinlock-and-recursive-spinlock))
-  (let ((l (make-spinlock :name "a spinlock")))
-    (with-spinlock (l)
-      (with-recursive-spinlock (l)))))
-
-(with-test (:name (:spinlock :more-basics))
-  (let ((l (make-spinlock :name "spinlock")))
-    (assert (eql (spinlock-value l) nil) ((spinlock-value l))
-            "spinlock not free (1)")
-    (with-spinlock (l)
-      (assert (eql (spinlock-value l) *current-thread*) ((spinlock-value l))
-              "spinlock not taken"))
-    (assert (eql (spinlock-value l) nil) ((spinlock-value l))
-            "spinlock not free (2)")))
 
 ;; test that SLEEP actually sleeps for at least the given time, even
 ;; if interrupted by another thread exiting/a gc/anything

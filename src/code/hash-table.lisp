@@ -67,8 +67,8 @@
   ;; respective key.
   (hash-vector nil :type (or null (simple-array sb!vm:word (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
-  (spinlock (sb!thread::make-spinlock :name "hash-table lock")
-            :type sb!thread::spinlock :read-only t)
+  (lock (sb!thread:make-mutex :name "hash-table lock")
+        :type sb!thread:mutex :read-only t)
   ;; The GC will set this to T if it moves an EQ-based key. This used
   ;; to be signaled by a bit in the header of the kv vector, but that
   ;; implementation caused some concurrency issues when we stopped
@@ -144,10 +144,10 @@ unspecified."
   ;; Needless to say, this also excludes some internal bits, but
   ;; getting there is too much detail when "unspecified" says what
   ;; is important -- unpredictable, but harmless.
-  `(sb!thread::with-recursive-spinlock ((hash-table-spinlock ,hash-table))
+  `(sb!thread::with-recursive-lock ((hash-table-lock ,hash-table))
      ,@body))
 
 (defmacro-mundanely with-locked-system-table ((hash-table) &body body)
-  `(sb!thread::with-recursive-system-spinlock
-       ((hash-table-spinlock ,hash-table))
+  `(sb!thread::with-recursive-system-lock
+       ((hash-table-lock ,hash-table))
      ,@body))

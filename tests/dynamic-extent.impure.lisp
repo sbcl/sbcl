@@ -550,18 +550,12 @@
   (gethash 5 *table*))
 
 ;; This fails on threaded PPC because the hash-table implementation
-;; uses recursive system spinlocks, which cons (see below for test
-;; (:no-consing :spinlock), which also fails on threaded PPC).
+;; uses recursive system locks, which cons (see below for test
+;; (:no-consing :lock), which also fails on threaded PPC).
 (with-test (:name (:no-consing :hash-tables) :fails-on '(and :ppc :sb-thread))
   (assert-no-consing (test-hash-table)))
 
-;;; with-spinlock and with-mutex should use DX and not cons
-
-(defvar *slock* (sb-thread::make-spinlock :name "slocklock"))
-
-(defun test-spinlock ()
-  (sb-thread::with-spinlock (*slock*)
-    (true *slock*)))
+;;; with-mutex should use DX and not cons
 
 (defvar *mutex* (sb-thread::make-mutex :name "mutexlock"))
 
@@ -571,10 +565,6 @@
 
 (with-test (:name (:no-consing :mutex) :fails-on :ppc :skipped-on '(not :sb-thread))
   (assert-no-consing (test-mutex)))
-
-(with-test (:name (:no-consing :spinlock) :fails-on :ppc :skipped-on '(not :sb-thread))
-  (assert-no-consing (test-spinlock)))
-
 
 
 ;;; Bugs found by Paul F. Dietz

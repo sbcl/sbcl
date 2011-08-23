@@ -61,9 +61,6 @@
   (declare (function function))
   ;; FIXME: Since name conflicts can be signalled while holding the
   ;; mutex, user code can be run leading to lock ordering problems.
-  ;;
-  ;; This used to be a spinlock, but there it can be held for a long
-  ;; time while the debugger waits for user input.
   (sb!thread:with-recursive-lock (*package-graph-lock*)
     (funcall function)))
 

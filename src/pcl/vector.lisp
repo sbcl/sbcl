@@ -55,11 +55,11 @@
 ;;; used.
 (defvar *pv-tables* (make-hash-table :test 'equal))
 
-;;; ...and one lock to rule them. Spinlock because for certain (rare)
+;;; ...and one lock to rule them. Lock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
 ;;; -- and mostly this is already under the *world-lock*
 (defvar *pv-lock*
-  (sb-thread::make-spinlock :name "pv table index lock"))
+  (sb-thread:make-mutex :name "pv table index lock"))
 
 (defun intern-pv-table (&key slot-name-lists)
   (flet ((intern-slot-names (slot-names)
@@ -77,7 +77,7 @@
                                     :pv-size (* 2 (reduce #'+ snl
                                                           :key (lambda (slots)
                                                                  (length (cdr slots))))))))))
-    (sb-thread::with-spinlock (*pv-lock*)
+    (sb-thread:with-mutex (*pv-lock*)
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
 (defun use-standard-slot-access-p (class slot-name type)
