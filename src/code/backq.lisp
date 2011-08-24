@@ -97,6 +97,21 @@
          (or (eq flag *bq-at-flag*)
              (eq flag *bq-dot-flag*)))))
 
+(defun backquote-splice (method dflag a d what stream)
+  (cond (dflag
+         (values method
+                 (cond ((eq dflag method)
+                        (cons a d))
+                       (t (list a (backquotify-1 dflag d))))))
+        ((expandable-backq-expression-p a)
+         (values method (list a)))
+        ((not (and (atom a) (backq-constant-p a)))
+         ;; COMMA special cases a few constant atoms, which
+         ;; are illegal in splices.
+         (comma a))
+        (t
+         (simple-reader-error stream "Invalid splice in backquote: ~A~A" what a))))
+
 ;;; This does the expansion from table 2.
 (defun backquotify (stream code)
   (cond ((atom code)
@@ -123,23 +138,9 @@
                  (simple-reader-error stream ",. after dot in ~S" code))
                (cond
                 ((eq aflag *bq-at-flag*)
-                 (if (null dflag)
-                     (if (expandable-backq-expression-p a)
-                         (values 'append (list a))
-                         (comma a))
-                     (values 'append
-                             (cond ((eq dflag 'append)
-                                    (cons a d ))
-                                   (t (list a (backquotify-1 dflag d)))))))
+                 (backquote-splice 'append dflag a d ",@" stream))
                 ((eq aflag *bq-dot-flag*)
-                 (if (null dflag)
-                     (if (expandable-backq-expression-p a)
-                         (values 'nconc (list a))
-                         (comma a))
-                     (values 'nconc
-                             (cond ((eq dflag 'nconc)
-                                    (cons a d))
-                                   (t (list a (backquotify-1 dflag d)))))))
+                 (backquote-splice 'nconc dflag a d ",." stream))
                 ((null dflag)
                  (if (member aflag '(quote t nil))
                      (values 'quote (list a))
@@ -157,14 +158,18 @@
 
 (/show0 "backq.lisp 139")
 
+(defun backq-constant-p (x)
+  (or (numberp x) (eq x t)))
+
 ;;; This handles the <hair> cases.
 (defun comma (code)
   (cond ((atom code)
          (cond ((null code)
                 (values nil nil))
-               ((or (numberp code) (eq code t))
+               ((backq-constant-p code)
                 (values t code))
-               (t (values *bq-comma-flag* code))))
+               (t
+                (values *bq-comma-flag* code))))
         ((and (eq (car code) 'quote)
               (not (expandable-backq-expression-p (cadr code))))
          (values (car code) (cadr code)))
