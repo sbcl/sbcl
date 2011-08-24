@@ -766,6 +766,9 @@
 (defun %report-reader-error (condition stream &key simple)
   (let* ((error-stream (stream-error-stream condition))
          (pos (file-position-or-nil-for-error error-stream)))
+    (when (and pos (plusp pos))
+      ;; FILE-POSITION is the next character -- error is at the previous one.
+      (decf pos))
     (let (lineno colno)
       (when (and pos
                  (< pos sb!xc:array-dimension-limit)
@@ -786,22 +789,22 @@
                             :element-type (stream-element-type
                                            error-stream))))
           (when (= pos (read-sequence string error-stream))
+            ;; Lines count from 1, columns from 0. It's stupid and traditional.
             (setq lineno (1+ (count #\Newline string))
-                  colno (- pos
-                           (or (position #\Newline string :from-end t) -1)
-                           1))))
+                  colno (- pos (or (position #\Newline string :from-end t) 0)))))
         (file-position-or-nil-for-error error-stream pos))
       (pprint-logical-block (stream nil)
-        (format stream
-                "~S ~@[at ~W ~]~
-                    ~@[(line ~W~]~@[, column ~W) ~]~
-                    on ~S"
-                (class-name (class-of condition))
-                pos lineno colno error-stream)
-        (when simple
-          (format stream ":~2I~_~?"
-                  (simple-condition-format-control condition)
-                  (simple-condition-format-arguments condition)))))))
+        (if simple
+            (apply #'format stream
+                   (simple-condition-format-control condition)
+                   (simple-condition-format-arguments condition))
+            (prin1 (class-name (class-of condition)) stream))
+        (format stream "~2I~@[~_~_~:{~:(~A~): ~S~:^, ~:_~}~]~_~_Stream: ~S"
+                (remove-if-not #'second
+                               (list (list :line lineno)
+                                     (list :column colno)
+                                     (list :file-position pos)))
+                error-stream)))))
 
 ;;;; special SBCL extension conditions
 
