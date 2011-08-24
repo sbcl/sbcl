@@ -200,6 +200,8 @@
                                       (list (native-namestring ,file))
                                       :environment (test-util::test-env)
                                       :output *error-output*)))
+     (let ((*failures* nil))
+       (test-util:report-test-status))
      (sb-ext:quit :unix-status (process-exit-code process))))
 
 (defun accept-test-file (file)
