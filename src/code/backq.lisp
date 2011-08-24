@@ -72,12 +72,21 @@
     (simple-reader-error stream *bq-error*))
   (let ((c (read-char stream))
         (*backquote-count* (1- *backquote-count*)))
-    (cond ((char= c #\@)
-           (cons *bq-at-flag* (read stream t nil t)))
-          ((char= c #\.)
-           (cons *bq-dot-flag* (read stream t nil t)))
-          (t (unread-char c stream)
-             (cons *bq-comma-flag* (read stream t nil t))))))
+    (flet ((check (what)
+             (let ((x (peek-char t stream t nil t)))
+               (when (and (char= x #\)) (eq #'read-right-paren (get-macro-character #\))))
+                 ;; Easier to figure out than an "unmatched parenthesis".
+                 (simple-reader-error stream "Trailing ~A in backquoted expression." what)))))
+      (cond ((char= c #\@)
+             (check "comma-at")
+             (cons *bq-at-flag* (read stream t nil t)))
+            ((char= c #\.)
+             (check "comma-dot")
+             (cons *bq-dot-flag* (read stream t nil t)))
+            (t
+             (unread-char c stream)
+             (check "comma")
+             (cons *bq-comma-flag* (read stream t nil t)))))))
 
 (/show0 "backq.lisp 83")
 
