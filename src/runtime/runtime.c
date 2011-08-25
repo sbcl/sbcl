@@ -533,6 +533,19 @@ main(int argc, char *argv[], char *envp[])
         fflush(stdout);
     }
 
+    if (embedded_core_offset == 0) {
+        /* Here we make a last attempt at recognizing an embedded core,
+         * so that a file with an embedded core is a valid argument to
+         * --core.  We take care that any decisions on special behaviour
+         * (suppressed banner, embedded options) have already been made
+         * before we reach this block, so that there is no observable
+         * difference between "embedded" and "bare" images given to
+         * --core. */
+        os_vm_offset_t offset = search_for_embedded_core(core);
+        if (offset != -1)
+            embedded_core_offset = offset;
+    }
+
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
     tzset();
 #endif

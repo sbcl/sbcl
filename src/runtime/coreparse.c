@@ -115,6 +115,16 @@ search_for_embedded_core(char *filename)
 
     if ((fd = open_binary(filename, O_RDONLY)) < 0)
         goto lose;
+
+    if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
+        goto lose;
+    if (header == CORE_MAGIC) {
+        /* This file is a real core, not an embedded core.  Return 0 to
+         * indicate where the core starts, and do not look for runtime
+         * options in this case. */
+        return 0;
+    }
+
     if (lseek(fd, -lispobj_size, SEEK_END) < 0)
         goto lose;
     if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)

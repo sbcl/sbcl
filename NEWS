@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.50:
   * enhancement: ASDF has been updated to version 2.017.
+  * enhancement: the --core command line option now accepts binaries with
+    an embedded core.
   * optimization: SLEEP no longer conses.
   * optimization: *PRINT-PRETTY* no longer slows down printing of strings
     or bit-vectors when using the standard pretty-print dispatch table.
