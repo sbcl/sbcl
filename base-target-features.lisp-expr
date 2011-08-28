@@ -315,6 +315,11 @@
  ;; SB-BIGNUM:%MULTIPLY.
  ; :multiply-high-vops
 
+ ;; SBCL has optional support for zlib-based compressed core files.  Enable
+ ;; this feature to compile it in.  Obviously, doing so adds a dependency
+ ;; on zlib.
+ ; :sb-core-compression
+
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

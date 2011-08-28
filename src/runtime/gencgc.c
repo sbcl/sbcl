@@ -4982,7 +4982,8 @@ prepare_for_final_gc ()
  * SB!VM:RESTART-LISP-FUNCTION */
 void
 gc_and_save(char *filename, boolean prepend_runtime,
-            boolean save_runtime_options)
+            boolean save_runtime_options,
+            boolean compressed, int compression_level)
 {
     FILE *file;
     void *runtime_bytes = NULL;
@@ -5017,7 +5018,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
     save_to_filehandle(file, filename, SymbolValue(RESTART_LISP_FUNCTION,0),
-                       prepend_runtime, save_runtime_options);
+                       prepend_runtime, save_runtime_options,
+                       compressed ? compression_level : COMPRESSION_LEVEL_NONE);
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing RESTART_LISP_FUNCTION, but I suspect that's

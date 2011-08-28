@@ -231,6 +231,9 @@
 (defvar *read-only*)
 (defconstant read-only-core-space-id 3)
 
+(defconstant max-core-space-id 3)
+(defconstant deflated-core-space-id-flag 4)
+
 (defconstant descriptor-low-bits 16
   "the number of bits in the low half of the descriptor")
 (defconstant target-space-alignment (ash 1 descriptor-low-bits)
@@ -2803,6 +2806,7 @@ core and return a descriptor to it."
                                                  7 :large t)
               (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 8)
               (maybe-record-with-translated-name '("-CORE-SPACE-ID") 9)
+              (maybe-record-with-translated-name '("-CORE-SPACE-ID-FLAG") 9)
               (maybe-record-with-translated-name '("-GENERATION+") 10))))))
     ;; KLUDGE: these constants are sort of important, but there's no
     ;; pleasing way to inform the code above about them.  So we fake

@@ -104,4 +104,21 @@ if [ $status != 42 ]; then
     exit 1
 fi
 
+rm "$tmpcore"
+run_sbcl <<EOF
+  (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42)
+                      :compression (and (member :sb-core-compression *features*) t))
+EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit
+check_status_maybe_lose "SAVE-LISP-AND-DIE :COMPRESS" $? 0 "(compressed saved core ran)"
+
+rm "$tmpcore"
+run_sbcl <<EOF
+  (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42) :executable t
+                     :compression (and (member :sb-core-compression *features*) t))
+EOF
+chmod u+x "$tmpcore"
+./"$tmpcore" --no-userinit --no-sysinit
+check_status_maybe_lose "SAVE-LISP-AND-DIE :EXECUTABLE-COMPRESS" $? 0 "(executable compressed saved core ran)"
+
 exit $EXIT_TEST_WIN

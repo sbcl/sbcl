@@ -29,6 +29,9 @@ OS_SRC = win32-os.c x86-win32-os.c os-common.c
 # working on one and it would be a nice thing to have.)
 OS_LINK_FLAGS = -Wl,--export-dynamic
 OS_LIBS =
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
 
 GC_SRC = gencgc.c
 

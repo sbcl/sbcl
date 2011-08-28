@@ -22,6 +22,10 @@ ARCH_SRC = x86-arch.c
 OS_SRC = sunos-os.c x86-sunos-os.c os-common.c
 OS_LIBS= -ldl -lsocket -lnsl -lrt
 
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
+
 GC_SRC= gencgc.c
 
 # Nothing to do for after-grovel-headers.

@@ -41,6 +41,11 @@
 #include "pthread-lutex.h"
 #endif
 
+#include <errno.h>
+
+#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+# include <zlib.h>
+#endif
 
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"
@@ -194,16 +199,85 @@ os_vm_address_t copy_core_bytes(int fd, os_vm_offset_t offset,
 }
 #endif
 
+#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+# define ZLIB_BUFFER_SIZE (1u<<16)
+os_vm_address_t inflate_core_bytes(int fd, os_vm_offset_t offset,
+                                   os_vm_address_t addr, int len)
+{
+    z_stream stream;
+    unsigned char buf[ZLIB_BUFFER_SIZE];
+    int ret;
+
+    if (-1 == lseek(fd, offset, SEEK_SET)) {
+        lose("Unable to lseek() on corefile\n");
+    }
+
+    stream.zalloc = NULL;
+    stream.zfree = NULL;
+    stream.opaque = NULL;
+    stream.avail_in = 0;
+    stream.next_in = buf;
+
+    ret = inflateInit(&stream);
+    if (ret != Z_OK)
+        lose("zlib error %i\n", ret);
+
+    stream.next_out  = (void*)addr;
+    stream.avail_out = len;
+    do {
+        ssize_t count = read(fd, buf, sizeof(buf));
+        if (count < 0)
+            lose("unable to read core file (errno = %i)\n", errno);
+        stream.next_in = buf;
+        stream.avail_in = count;
+        if (count == 0) break;
+        ret = inflate(&stream, Z_NO_FLUSH);
+        switch (ret) {
+        case Z_STREAM_END:
+            break;
+        case Z_OK:
+            if (stream.avail_out == 0)
+                lose("Runaway gzipped core directory... aborting\n");
+            if (stream.avail_in > 0)
+                lose("zlib inflate returned without fully"
+                     "using up input buffer... aborting\n");
+            break;
+        default:
+            lose("zlib inflate error: %i\n", ret);
+            break;
+        }
+    } while (ret != Z_STREAM_END);
+
+    if (stream.avail_out > 0) {
+        if (stream.avail_out >= os_vm_page_size)
+            fprintf(stderr, "Warning: gzipped core directory significantly"
+                    "shorter than expected (%lu bytes)", (unsigned long)stream.avail_out);
+        /* Is this needed? */
+        memset(stream.next_out, 0, stream.avail_out);
+    }
+
+    inflateEnd(&stream);
+    return addr;
+}
+# undef ZLIB_BUFFER_SIZE
+#endif
+
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
     struct ndir_entry *entry;
+    int compressed;
 
     FSHOW((stderr, "/process_directory(..), count=%d\n", count));
 
     for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
-
+        compressed = 0;
         long id = entry->identifier;
+        if (id <= (MAX_CORE_SPACE_ID | DEFLATED_CORE_SPACE_ID_FLAG)) {
+            if (id & DEFLATED_CORE_SPACE_ID_FLAG)
+                compressed = 1;
+            id &= ~(DEFLATED_CORE_SPACE_ID_FLAG);
+        }
         long offset = os_vm_page_size * (1 + entry->data_page);
         os_vm_address_t addr =
             (os_vm_address_t) (os_vm_page_size * entry->address);
@@ -213,11 +287,19 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
             os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
                    (long)len, (long)len, (unsigned long)addr));
-#ifdef LISP_FEATURE_HPUX
-            real_addr = copy_core_bytes(fd, offset + file_offset, addr, len);
+            if (compressed) {
+#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+                real_addr = inflate_core_bytes(fd, offset + file_offset, addr, len);
 #else
-            real_addr = os_map(fd, offset + file_offset, addr, len);
+                lose("This runtime was not built with zlib-compressed core support... aborting\n");
 #endif
+            } else {
+#ifdef LISP_FEATURE_HPUX
+                real_addr = copy_core_bytes(fd, offset + file_offset, addr, len);
+#else
+                real_addr = os_map(fd, offset + file_offset, addr, len);
+#endif
+            }
             if (real_addr != addr) {
                 lose("file mapped in wrong place! "
                      "(0x%08x != 0x%08lx)\n",

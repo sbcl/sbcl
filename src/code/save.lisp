@@ -21,13 +21,17 @@
   (file c-string)
   (initial-fun (unsigned #.sb!vm:n-word-bits))
   (prepend-runtime int)
-  (save-runtime-options int))
+  (save-runtime-options int)
+  (compressed int)
+  (compression-level int))
 
 #!+gencgc
 (define-alien-routine "gc_and_save" void
   (file c-string)
   (prepend-runtime int)
-  (save-runtime-options int))
+  (save-runtime-options int)
+  (compressed int)
+  (compression-level int))
 
 #!+gencgc
 (defvar sb!vm::*restart-lisp-function*)
@@ -38,7 +42,8 @@
                                          (save-runtime-options nil)
                                          (purify t)
                                          (root-structures ())
-                                         (environment-name "auxiliary"))
+                                         (environment-name "auxiliary")
+                                         (compression nil))
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
@@ -85,6 +90,13 @@ The following &KEY arguments are defined:
      This is also passed to the PURIFY function when :PURIFY is T.
      (rarely used)
 
+  :COMPRESSION
+     This is only meaningful if the runtime was built with the :SB-CORE-COMPRESSION
+     feature enabled. If NIL (the default), saves to uncompressed core files. If
+     :SB-CORE-COMPRESSION was enabled at build-time, the argument may also be
+     an integer from -1 to 9, corresponding to zlib compression levels, or T
+     (which is equivalent to the default compression level, -1).
+
 The save/load process changes the values of some global variables:
 
   *STANDARD-OUTPUT*, *DEBUG-IO*, etc.
@@ -116,6 +128,13 @@ seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
   #!+gencgc
   (declare (ignore purify root-structures environment-name))
+  #!+sb-core-compression
+  (check-type compression (or boolean (integer -1 9)))
+  #!-sb-core-compression
+  (when compression
+    (error "Unable to save compressed core: this runtime was not built with zlib support"))
+  (when (eql t compression)
+    (setf compression -1))
   (tune-hashtable-sizes-of-all-packages)
   (deinit)
   ;; FIXME: Would it be possible to unmix the PURIFY logic from this
@@ -141,12 +160,16 @@ sufficiently motivated to do lengthy fixes."
                  ;; since the GC will invalidate the stack.
                  #!+gencgc (gc-and-save name
                                         (foreign-bool executable)
-                                        (foreign-bool save-runtime-options)))
+                                        (foreign-bool save-runtime-options)
+                                        (foreign-bool compression)
+                                        (or compression 0)))
                (without-gcing
                  (save name
                        (get-lisp-obj-address #'restart-lisp)
                        (foreign-bool executable)
-                       (foreign-bool save-runtime-options))))))
+                       (foreign-bool save-runtime-options)
+                       (foreign-bool compression)
+                       (or compression 0))))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
     #!+gencgc

@@ -15,6 +15,9 @@ LINKFLAGS += -mmacosx-version-min=10.4
 OS_SRC = bsd-os.c darwin-os.c ppc-darwin-os.c
 
 OS_LIBS = -lSystem -lc
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
 
 CC = gcc
 

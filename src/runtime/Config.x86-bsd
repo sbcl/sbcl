@@ -15,6 +15,9 @@ ARCH_SRC = x86-arch.c
 
 OS_SRC = bsd-os.c x86-bsd-os.c
 OS_LIBS = # -ldl
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
 
 GC_SRC = gencgc.c
 

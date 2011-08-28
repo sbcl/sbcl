@@ -3,6 +3,9 @@ changes relative to sbcl-1.0.50:
   * enhancement: ASDF has been updated to version 2.017.
   * enhancement: the --core command line option now accepts binaries with
     an embedded core.
+  * enhancement: when built with :sb-core-compression, core files (regular
+    or executable) can be compressed with zlib.  Use the :COMPRESSION
+    argument to SAVE-LISP-AND-DIE to specify a compression level.
   * optimization: SLEEP no longer conses.
   * optimization: *PRINT-PRETTY* no longer slows down printing of strings
     or bit-vectors when using the standard pretty-print dispatch table.
@@ -14,6 +17,8 @@ changes relative to sbcl-1.0.50:
     ranges to ARRAY-IN-BOUNDS-P. (lp#826970)
   * bug fix: ,@ and ,. now signal a read-time error for certain non-list
     expressions. (lp#770184)
+  * bug fix: complex single float literals are correctly aligned when used
+    as arguments of arithmetic operators.
 
 changes in sbcl-1.0.51 relative to sbcl-1.0.50:
   * minor incompatible change: SB-BSD-SOCKET socket streams no longer

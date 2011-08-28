@@ -38,6 +38,10 @@ ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
 
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
+
 CFLAGS += -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c
