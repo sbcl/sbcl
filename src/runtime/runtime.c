@@ -452,6 +452,15 @@ main(int argc, char *argv[], char *envp[])
                 end_runtime_options = 1;
                 ++argi;
                 break;
+            } else if (0 == strcmp(arg, "--merge-core-pages")) {
+                ++argi;
+                merge_core_pages = 1;
+            } else if (0 == strcmp(arg, "--no-merge-core-pages")) {
+                ++argi;
+                merge_core_pages = 0;
+            } else if (0 == strcmp(arg, "--default-merge-core-pages")) {
+                ++argi;
+                merge_core_pages = -1;
             } else {
                 /* This option was unrecognized as a runtime option,
                  * so it must be a toplevel option or a user option,

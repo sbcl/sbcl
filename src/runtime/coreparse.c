@@ -22,6 +22,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef LISP_FEATURE_LINUX
+/* For madvise */
+# define _BSD_SOURCE
+#endif
+#include <sys/mman.h>
 
 #include "sbcl.h"
 #include "os.h"
@@ -262,6 +267,8 @@ os_vm_address_t inflate_core_bytes(int fd, os_vm_offset_t offset,
 # undef ZLIB_BUFFER_SIZE
 #endif
 
+int merge_core_pages = -1;
+
 static void
 process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 {
@@ -307,6 +314,13 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                      addr);
             }
         }
+
+#ifdef MADV_MERGEABLE
+        if ((merge_core_pages == 1)
+            || ((merge_core_pages == -1) && compressed)) {
+                madvise(addr, len, MADV_MERGEABLE);
+        }
+#endif
 
         FSHOW((stderr, "/space id = %ld, free pointer = 0x%lx\n",
                id, (unsigned long)free_pointer));
