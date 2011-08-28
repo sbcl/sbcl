@@ -46,11 +46,11 @@ Includes both \"system\" and \"user\" time."
 ;;; number of seconds since 1970-01-01
 
 ;;; I'm obliged to Erik Naggum's "Long, Painful History of Time" paper
-;;; <http://heim.ifi.uio.no/~enag/lugm-time.html> for the choice of epoch
-;;; here.  By starting the year in March, we avoid having to test the month
-;;; whenever deciding whether to account for a leap day.  2000 is especially
-;;; special, because it's disvisible by 400, hence the start of a 400 year
-;;; leap year cycle
+;;; <http://naggum.no/lugm-time.html> for the choice of epoch here.
+;;; By starting the year in March, we avoid having to test the month
+;;; whenever deciding whether to account for a leap day.  2000 is
+;;; especially special, because it's disvisible by 400, hence the
+;;; start of a 400 year leap year cycle
 
 ;;; If a universal-time is after time_t runs out, we find its offset
 ;;; from 1st March of whichever year it falls in, then add that to
