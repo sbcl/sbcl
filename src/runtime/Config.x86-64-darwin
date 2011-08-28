@@ -31,6 +31,8 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
+CC = gcc
+
 ASSEM_SRC = x86-64-assem.S ldso-stubs.S
 ARCH_SRC = x86-64-arch.c
 
