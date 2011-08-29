@@ -827,6 +827,55 @@
   ;; optional fields
   (imm))
 
+(sb!disassem:define-instruction-format (x66-ext-reg-reg/mem 32
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
+  (x66     :field (byte 8 0)    :type 'x66 :value #x66)
+  (prefix  :field (byte 8 8)    :value #b00001111)
+  (op      :field (byte 7 17))
+  (width   :field (byte 1 16)   :type 'width)
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 27)   :type 'reg)
+  ;; optional fields
+  (imm))
+
+(sb!disassem:define-instruction-format (rex-ext-reg-reg/mem 32
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (prefix  :field (byte 8 8)    :value #b00001111)
+  (op      :field (byte 7 17))
+  (width   :field (byte 1 16)   :type 'width)
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 27)   :type 'reg)
+  ;; optional fields
+  (imm))
+
+(sb!disassem:define-instruction-format (x66-rex-ext-reg-reg/mem 40
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
+  (x66     :field (byte 8 0)    :type 'x66 :value #x66)
+  (rex     :field (byte 4 12)   :value #b0100)
+  (wrxb    :field (byte 4 8)    :type 'wrxb)
+  (prefix  :field (byte 8 16)   :value #b00001111)
+  (op      :field (byte 7 25))
+  (width   :field (byte 1 24)   :type 'width)
+  (reg/mem :fields (list (byte 2 38) (byte 3 32))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 35)   :type 'reg)
+  ;; optional fields
+  (imm))
+
+(eval-when (:compile-toplevel :execute)
+  (defun ext-reg-reg/mem-printer-list (op &optional printer)
+    `((ext-reg-reg/mem         ((op ,op)) ,@(when printer (list printer)))
+      (x66-ext-reg-reg/mem     ((op ,op)) ,@(when printer (list printer)))
+      (rex-ext-reg-reg/mem     ((op ,op)) ,@(when printer (list printer)))
+      (x66-rex-ext-reg-reg/mem ((op ,op)) ,@(when printer (list printer))))))
+
 (sb!disassem:define-instruction-format (ext-reg-reg/mem-no-width 24
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -1951,7 +2000,8 @@
 
 (define-instruction cmpxchg (segment dst src &optional prefix)
   ;; Register/Memory with Register.
-  (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
+  (:printer-list (ext-reg-reg/mem-printer-list #b1011000
+                                               '(:name :tab reg/mem ", " reg)))
   (:emitter
    (aver (register-p src))
    (emit-prefix segment prefix)
@@ -2276,7 +2326,8 @@
 
 (define-instruction xadd (segment dst src &optional prefix)
   ;; Register/Memory with Register.
-  (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
+  (:printer-list (ext-reg-reg/mem-printer-list #b1100000
+                                               '(:name :tab reg/mem ", " reg)))
   (:emitter
    (aver (register-p src))
    (emit-prefix segment prefix)
@@ -2381,7 +2432,7 @@
       (ext-reg-reg/mem-imm ((op ,(logior op #b100))
                             (imm nil :type signed-imm-byte)))
       (ext-reg-reg/mem ((op ,(logior op #b101)))
-         (:name :tab reg/mem ", " 'cl)))))
+         (:name :tab reg/mem ", " reg ", " 'cl)))))
 
 (define-instruction shld (segment dst src amt)
   (:declare (type (or (member :cl) (mod 32)) amt))
