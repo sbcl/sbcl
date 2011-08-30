@@ -429,7 +429,7 @@
                            (flet ((get-next-src ()
                                     (setf prev next)
                                     (setf next (funcall src-ref-fn src
-                                                        (setf src-word-offset (incf src-word-offset))))))
+                                                        (incf src-word-offset)))))
                              (declare (inline get-next-src))
                              ,@(unless (= bytes-per-word 1)
                                 `((unless (zerop dst-byte-offset)
