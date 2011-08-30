@@ -856,7 +856,7 @@
                             :load-if (not (sc-is y ,constant-sc))))
                   (:arg-types ,type ,type)
                   (:temporary (:sc ,sc :from :eval) mask)
-                  (:temporary (:sc any-reg) bits)
+                  (:temporary (:sc dword-reg) bits)
                   (:conditional :e)
                   (:generator ,cost
                     (when (or (location= y mask)
@@ -868,7 +868,8 @@
                       (setf y (register-inline-constant :aligned (tn-value y))))
                     (inst pcmpeqd mask y)
                     (inst movmskps bits mask)
-                    (inst cmp bits #b1111)))))
+                    (inst cmp (if (location= bits eax-tn) al-tn bits)
+                          #b1111)))))
   (define-float-eql eql/single-float 4
     single-reg fp-single-immediate single-float)
   (define-float-eql eql/double-float 4
@@ -980,7 +981,7 @@
                               :load-if (not (sc-is y ,complex-constant-sc))))
                     (:arg-types ,complex-type ,complex-type)
                     (:temporary (:sc ,complex-sc :from :eval) cmp)
-                    (:temporary (:sc unsigned-reg) bits)
+                    (:temporary (:sc dword-reg) bits)
                     (:info)
                     (:conditional :e)
                     (:generator 3
@@ -1000,7 +1001,8 @@
                       (note-this-location vop :internal-error)
                       (inst ,cmp-inst :eq cmp y)
                       (inst ,mask-inst bits cmp)
-                      (inst cmp bits ,mask)))
+                      (inst cmp (if (location= bits eax-tn) al-tn bits)
+                            ,mask)))
                   (define-vop (,complex-real-name ,complex-complex-name)
                     (:args (x :scs (,complex-sc ,complex-constant-sc)
                               :target cmp
