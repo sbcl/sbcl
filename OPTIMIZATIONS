@@ -157,11 +157,6 @@ sbcl-0.8.12.30, this affects at least DUMP-OBJECT through
 COMPOUND-OBJECT-P, and (LABELS MAYBE-EMIT-MAKE-LOAD-FORMS GROVEL)
 through TYPEP UNBOXED-ARRAY, within the compiler itself.
 --------------------------------------------------------------------------------
-#18
-(lambda (x) (declare (null x)) (sxhash x)) goes through SYMBOL-HASH
-rather than either constant-folding or manipulating NIL-VALUE or
-NULL-TN directly.
---------------------------------------------------------------------------------
 #20
 (defun-with-dx foo (x)
   (flet ((make (x)
@@ -179,8 +174,7 @@ Result of MAKE is not stack allocated.
 IR2 does not perform unused code flushing.
 --------------------------------------------------------------------------------
 #24
-a. Iterations on &REST lists, returning them as VALUES could be
-   rewritten with &MORE vectors.
+a. Iterations on &REST lists could be rewritten with &MORE vectors.
 b. Implement local unknown-values mv-call (useful for fast type checking).
 --------------------------------------------------------------------------------
 #26
@@ -246,21 +240,6 @@ etc., etc.
 vm-support-routine COMBINATION-IMPLEMENTATION-STYLE and its use in
 src/compiler/ir1opt.lisp, IR1-OPTIMIZE-COMBINATION.  The above
 optimizations are left as an exercise for the reader.)
---------------------------------------------------------------------------------
-#30
-(defun foo (x y)
-  (< x y))
-
-FOO's IR1 representation is roughly:
-
-(defun foo (x y)
-  (if (< x y)
-      T
-      NIL))
-
-However, if a full call is generated for < (and similarly for other
-predicate functions), then the IF is unnecessary, since the return value
-of (< x y) is already T or NIL.
 --------------------------------------------------------------------------------
 #31
 The typecheck generated for a declaration like (integer 0 45) on x86 looks
