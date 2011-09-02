@@ -42,9 +42,9 @@ cat > $tmpscript <<EOF
 (close *standard-output*)
 (sb-ext:quit :unix-status 3)
 EOF
-run_sbcl --script $tmpscript
+run_sbcl --script $tmpscript >/dev/null
 check_status_maybe_lose "--script exit status from QUIT when stdout closed" $? 3 "(as given)"
-run_sbcl --load $tmpscript
+run_sbcl --load $tmpscript >/dev/null
 check_status_maybe_lose "--load exit status from QUIT when stdout closed" $? 3 "(as given)"
 
 cat > $tmpscript <<EOF
