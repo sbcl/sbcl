@@ -799,13 +799,15 @@ Users Manual for details about the PROCESS structure."#-win32"
         (unless proc
           (dolist (fd *close-on-error*)
             (sb-unix:unix-close fd))
-          ;; FIXME: nothing seems to set this.
           #-win32
           (dolist (handler *handlers-installed*)
-            (sb-sys:remove-fd-handler handler))))
-      #-win32
-      (when (and wait proc)
-        (process-wait proc))
+            (sb-sys:remove-fd-handler handler)))
+        #-win32
+        (when (and wait proc)
+          (unwind-protect
+               (process-wait proc)
+            (dolist (handler *handlers-installed*)
+              (sb-sys:remove-fd-handler handler)))))
       proc)))
 
 ;;; Install a handler for any input that shows up on the file
@@ -896,7 +898,8 @@ Users Manual for details about the PROCESS structure."#-win32"
                       (strerror errno)))
                     (t
                      (incf read-end count)
-                     (funcall copy-fun))))))))))
+                     (funcall copy-fun))))))))
+    (push handler *handlers-installed*)))
 
 ;;; FIXME: something very like this is done in SB-POSIX to treat
 ;;; streams as file descriptor designators; maybe we can combine these

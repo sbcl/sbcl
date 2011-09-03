@@ -264,3 +264,32 @@
         (process-close proc)
         (assert (not stopped))))))
 
+
+;; Check that in when you do run-program with :wait t that causes
+;; encoding error, it does not affect the following run-program
+(with-test (:name (:run-program :clean-exit-after-encoding-error))
+  (let ((had-error-p nil))
+    (flet ((barf (&optional (format :default))
+             (with-output-to-string (stream)
+               (run-program "/usr/bin/perl"
+                            '("-e" "print \"\\x20\\xfe\\xff\\x0a\"")
+                            :output stream
+                            :external-format format)))
+           (no-barf ()
+             (with-output-to-string (stream)
+               (run-program "/bin/echo"
+                            '("This is a test")
+                            :output stream))))
+      (handler-case
+          (barf :utf-8)
+        (error ()
+          (setq had-error-p t)))
+      (assert had-error-p)
+      ;; now run the harmless program
+      (setq had-error-p nil)
+      (handler-case
+          (no-barf)
+        (error ()
+          (setq had-error-p t)))
+      (assert (not had-error-p)))))
+

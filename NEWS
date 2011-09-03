@@ -25,6 +25,9 @@ changes relative to sbcl-1.0.51:
     as arguments of arithmetic operators.
   * bug fix: on 32-bit platforms, rounding of double floats larger than a
     fixnum is correct.  (reported by Peter Keller)
+  * bug fix: stray FD-HANDLERs are no longer left lying around after unwinds
+    from RUN-PROGRAM.  (lp#840190, reported by Dominic Pearson; fix from Max
+    Mikhanosha)
 
 changes in sbcl-1.0.51 relative to sbcl-1.0.50:
   * minor incompatible change: SB-BSD-SOCKET socket streams no longer
