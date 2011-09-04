@@ -373,3 +373,11 @@
                (+ (float int 0e0) x0))))
       (declare (notinline test-cvtsi2ss))
       (assert (zerop (imagpart (test-cvtsi2ss 4)))))))
+
+(with-test (:name :round-to-bignum)
+  (assert (= (round 1073741822.3d0) 1073741822))
+  (assert (= (round 1073741822.5d0) 1073741822))
+  (assert (= (round 1073741822.7d0) 1073741823))
+  (assert (= (round 1073741823.3d0) 1073741823))
+  (assert (= (round 1073741823.5d0) 1073741824))
+  (assert (= (round 1073741823.7d0) 1073741824)))
