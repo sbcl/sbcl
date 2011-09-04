@@ -66,12 +66,6 @@ Website: @url{http://sb-studio.net/}
 
 Email: @email{info@@sb-studio.net}
 
-@item Christophe Rhodes
-is a researcher and long-time SBCL developer, available for custom
-development, particularly in the area of language extension.
-
-Email: @email{c.rhodes@@gold.ac.uk}
-
 @end table
 
 @node Reporting Bugs
