@@ -17,12 +17,14 @@ changes relative to sbcl-1.0.51:
     (lp#738464)
   * bug fix: compiler-errors causes by MEMBER types in conjunction with with
     AREF, CHAR, etc. (lp#826971)
-  * bug fix: compiler-errors causes by integer arguments with composed of multiple
-    ranges to ARRAY-IN-BOUNDS-P. (lp#826970)
+  * bug fix: compiler-errors causes by integer arguments with composed of
+    multiple ranges to ARRAY-IN-BOUNDS-P. (lp#826970)
   * bug fix: ,@ and ,. now signal a read-time error for certain non-list
     expressions. (lp#770184)
   * bug fix: complex single float literals are correctly aligned when used
     as arguments of arithmetic operators.
+  * bug fix: on 32-bit platforms, rounding of double floats larger than a
+    fixnum is correct.  (reported by Peter Keller)
 
 changes in sbcl-1.0.51 relative to sbcl-1.0.50:
   * minor incompatible change: SB-BSD-SOCKET socket streams no longer
