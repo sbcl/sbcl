@@ -249,7 +249,7 @@
                 (:alien "an alien variable"))))
     (when (or (not (eq :unknown kind)) (boundp symbol))
       (pprint-logical-block (stream nil)
-        (format stream "~%~A names ~A:" symbol wot)
+        (format stream "~@:_~A names ~A:" symbol wot)
         (pprint-indent :block 2 stream)
         (when (eq (info :variable :where-from symbol) :declared)
           (format stream "~@:_Declared type: ~S"
@@ -296,10 +296,10 @@
     (when fun
       (pprint-newline :mandatory stream)
       (pprint-logical-block (stream nil)
-        (pprint-indent :block 2 stream)
-        (format stream "~A names a ~@[primitive~* ~]type-specifier:"
+        (format stream "~@:_~A names a ~@[primitive~* ~]type-specifier:"
                 symbol
                 (eq kind :primitive))
+        (pprint-indent :block 2 stream)
         (describe-documentation symbol 'type stream (eq t fun))
         (unless (eq t fun)
           (describe-lambda-list (if (eq :primitive kind)
@@ -382,7 +382,7 @@
       (let ((metaclass-name (class-name (class-of class))))
         (pprint-logical-block (stream nil)
           (when by-name
-            (format stream "~%~A names the ~(~A~) ~S:"
+            (format stream "~@:_~A names the ~(~A~) ~S:"
                     name
                     metaclass-name
                     class)
@@ -441,6 +441,7 @@
                                             (quiet-doc slotd t)))
                                     slots))
                     (format stream "~@:_No direct slots."))))
+          (pprint-indent :block 0 stream)
           (pprint-newline :mandatory stream))))))
 
 (defun describe-instance (object stream)
