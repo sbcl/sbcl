@@ -425,7 +425,15 @@
     instance
     (etypecase position
       (fixnum
-       (car (nth position (wrapper-instance-slots-layout (wrapper-of instance)))))
+       ;; In the vast majority of cases location corresponds to the position
+       ;; in list. The only exceptions are when there are non-local slots
+       ;; before the one we want.
+       (let* ((slots (wrapper-slots (wrapper-of instance)))
+              (guess (nth position slots)))
+         (if (eql position (slot-definition-location guess))
+             (slot-definition-name guess)
+             (slot-definition-name
+              (car (member position (class-slots instance) :key #'slot-definition-location))))))
       (cons
        (car position))))))
 

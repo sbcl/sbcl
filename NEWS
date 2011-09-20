@@ -28,6 +28,8 @@ changes relative to sbcl-1.0.51:
   * bug fix: stray FD-HANDLERs are no longer left lying around after unwinds
     from RUN-PROGRAM.  (lp#840190, reported by Dominic Pearson; fix from Max
     Mikhanosha)
+  * bug fix: redefining classes such that slots with custom allocation are
+    added or removed works again.
 
 changes in sbcl-1.0.51 relative to sbcl-1.0.50:
   * minor incompatible change: SB-BSD-SOCKET socket streams no longer

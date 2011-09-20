@@ -55,6 +55,9 @@
              (setf (cdr entry) new-value))
          new-value))
 
+  (defun dynamic-slot-names (instance)
+    (mapcar #'car (gethash instance table)))
+
    (defun dynamic-slot-boundp (instance slot-name)
       (let* ((alist (gethash instance table))
              (entry (assoc slot-name alist)))
@@ -66,7 +69,6 @@
         (unless (null entry)
           (setf (gethash instance table) (delete entry alist))))
       instance)
-
 )
 
 (defmethod allocate-instance ((class dynamic-slot-class) &key)
@@ -157,3 +159,79 @@
 (assert (not (slot-boundp *three* 'slot1)))
 (assert (eq (slot-value *three* 'slot2) t))
 (assert (= (slot-value *three* 'slot3) 3))
+
+(defmethod slot-missing ((class dynamic-slot-class) instance slot-name operation &optional v)
+  (declare (ignore v))
+  (list :slot-missing slot-name))
+
+;;; Test redefinition adding a dynamic slot
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform t :allocation :dynamic)
+   (slot3 :initarg :slot3)
+   (slot4 :initarg :slot4 :initform 42 :allocation :dynamic))
+  (:metaclass dynamic-slot-subclass))
+(assert (= 42 (slot-value *three* 'slot4)))
+
+;;; Test redefinition removing a dynamic slot
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform t :allocation :dynamic)
+   (slot3 :initarg :slot3))
+  (:metaclass dynamic-slot-subclass))
+(assert (equal (list :slot-missing 'slot4) (slot-value *three* 'slot4)))
+
+;;; Test redefinition making a dynamic slot local
+;;;
+;;; NOTE: seriously underspecified. We muddle somehow.
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform 'ok :allocation :instance)
+   (slot3 :initarg :slot3))
+  (:metaclass dynamic-slot-subclass))
+(let* ((slots (class-slots (find-class 'test-class-3)))
+       (slot (find 'slot2 slots :key #'slot-definition-name)))
+  (assert (eq :instance (slot-definition-allocation slot)))
+  (assert (eq 'ok (slot-value *three* 'slot2))))
+
+;;; Test redefinition making a local slot dynamic again
+;;;
+;;; NOTE: seriously underspecified. We muddle somehow.
+;;; This picks up the old value from the table, not the
+;;; new initform.
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform 'ok? :allocation :dynamic)
+   (slot3 :initarg :slot3))
+  (:metaclass dynamic-slot-subclass))
+(let* ((slots (class-slots (find-class 'test-class-3)))
+       (slot (find 'slot2 slots :key #'slot-definition-name)))
+  (assert (eq :dynamic (slot-definition-allocation slot)))
+  (assert (eq t (slot-value *three* 'slot2))))
+
+;;; Test redefinition making a dynamic slot local, with
+;;; UPDATE-INSTANCE-FOR-REDEFINED-CLASS unbinding the dynamic slot.
+;;; Then we make it dynamic again.
+;;;
+;;; NOTE: seriously underspecified. We muddle somehow.
+(defmethod update-instance-for-redefined-class :after ((obj test-class-3) add drop plist
+                                                       &rest inits)
+  (declare (ignore inits))
+  (let* ((class (class-of obj))
+         (slots (class-slots class)))
+    (dolist (name (dynamic-slot-names obj))
+      (let ((slotd (find name slots :key #'slot-definition-name)))
+        (unless (and slotd (eq :dynamic (slot-definition-allocation slotd)))
+          (dynamic-slot-makunbound obj name))))))
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform 'ok :allocation :instance)
+   (slot3 :initarg :slot3))
+  (:metaclass dynamic-slot-subclass))
+(let* ((slots (class-slots (find-class 'test-class-3)))
+       (slot (find 'slot2 slots :key #'slot-definition-name)))
+  (assert (eq :instance (slot-definition-allocation slot)))
+  (assert (eq 'ok (slot-value *three* 'slot2))))
+(defclass test-class-3 (test-class-1)
+  ((slot2 :initarg :slot2 :initform 'ok! :allocation :dynamic)
+   (slot3 :initarg :slot3))
+  (:metaclass dynamic-slot-subclass))
+(let* ((slots (class-slots (find-class 'test-class-3)))
+       (slot (find 'slot2 slots :key #'slot-definition-name)))
+  (assert (eq :dynamic (slot-definition-allocation slot)))
+  (assert (eq 'ok! (slot-value *three* 'slot2))))

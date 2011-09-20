@@ -92,8 +92,7 @@
                       (for-std-class-p t))
             (:constructor make-wrapper-internal)
             (:copier nil))
-  (instance-slots-layout nil :type list)
-  (class-slots nil :type list))
+  (slots () :type list))
 #-sb-fluid (declaim (sb-ext:freeze-type wrapper))
 
 ;;;; PCL's view of funcallable instances

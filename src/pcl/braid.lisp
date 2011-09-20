@@ -85,6 +85,28 @@
           (allocate-standard-funcallable-instance-slots
            wrapper slots-init-p slots-init))
     fin))
+
+(defun classify-slotds (slotds)
+  (let (instance-slots class-slots custom-slots bootp)
+    (dolist (slotd slotds)
+      (let ((alloc (cond ((consp slotd) ; bootstrap
+                          (setf bootp t)
+                          :instance)
+                         (t
+                          (slot-definition-allocation slotd)))))
+        (case alloc
+          (:instance
+           (push slotd instance-slots))
+          (:class
+           (push slotd class-slots))
+          (t
+           (push slotd custom-slots)))))
+    (values (if bootp
+                (nreverse instance-slots)
+                (when slotds
+                  (sort instance-slots #'< :key #'slot-definition-location)))
+            class-slots
+            custom-slots)))
 
 ;;;; BOOTSTRAP-META-BRAID
 ;;;;
@@ -186,14 +208,8 @@
                   (error "Slot allocation ~S is not supported in bootstrap."
                          (getf slot :allocation))))
 
-              (when (typep wrapper 'wrapper)
-                (setf (wrapper-instance-slots-layout wrapper)
-                      (mapcar (lambda (slotd)
-                                ;; T is the slot-definition-type.
-                                (cons (canonical-slot-name slotd) t))
-                              slots))
-                (setf (wrapper-class-slots wrapper)
-                      ()))
+              (when (wrapper-p wrapper)
+                (setf (wrapper-slots wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
                               (allocate-standard-funcallable-instance wrapper)
@@ -209,6 +225,8 @@
                      standard-effective-slot-definition-wrapper t))
 
               (setf (layout-slot-table wrapper) (make-slot-table class slots t))
+              (when (wrapper-p wrapper)
+                (setf (wrapper-slots wrapper) slots))
 
               (case meta
                 ((standard-class funcallable-standard-class)
@@ -309,7 +327,9 @@
       (setf (layout-slot-table wrapper)
             (make-slot-table class slots
                              (member metaclass-name
-                                     '(standard-class funcallable-standard-class)))))
+                                     '(standard-class funcallable-standard-class))))
+      (when (wrapper-p wrapper)
+        (setf (wrapper-slots wrapper) slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't
