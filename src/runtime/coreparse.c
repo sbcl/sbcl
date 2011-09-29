@@ -22,11 +22,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#ifndef LISP_FEATURE_WIN32
 #ifdef LISP_FEATURE_LINUX
 /* For madvise */
 # define _BSD_SOURCE
 #endif
 #include <sys/mman.h>
+#endif
 
 #include "sbcl.h"
 #include "os.h"
