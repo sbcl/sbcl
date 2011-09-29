@@ -100,7 +100,7 @@ maybe_initialize_runtime_options(int fd)
 
     lseek(fd, -end_offset, SEEK_END);
 
-    if (new_runtime_options = read_runtime_options(fd)) {
+    if ((new_runtime_options = read_runtime_options(fd))) {
         runtime_options = new_runtime_options;
     }
 }
