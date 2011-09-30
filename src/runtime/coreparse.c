@@ -23,6 +23,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "sbcl.h"
+
 #ifndef LISP_FEATURE_WIN32
 #ifdef LISP_FEATURE_LINUX
 /* For madvise */
@@ -31,7 +33,6 @@
 #include <sys/mman.h>
 #endif
 
-#include "sbcl.h"
 #include "os.h"
 #include "runtime.h"
 #include "globals.h"

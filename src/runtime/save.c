@@ -149,6 +149,7 @@ write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file
     bytes = (bytes+os_vm_page_size-1)&~(os_vm_page_size-1);
 
 #ifdef LISP_FEATURE_WIN32
+    long count;
     /* touch every single page in the space to force it to be mapped. */
     for (count = 0; count < bytes; count += 0x1000) {
         volatile int temp = addr[count];
