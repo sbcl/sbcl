@@ -381,3 +381,7 @@
   (assert (= (round 1073741823.3d0) 1073741823))
   (assert (= (round 1073741823.5d0) 1073741824))
   (assert (= (round 1073741823.7d0) 1073741824)))
+
+(with-test (:name :round-single-to-bignum)
+  (assert (= (round 1e14) 100000000376832))
+  (assert (= (round 1e19) 9999999980506447872)))

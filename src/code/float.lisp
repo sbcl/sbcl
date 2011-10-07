@@ -816,8 +816,8 @@
                                  (cond
                                    ((> fractional-bits 0.5bits) (1+ shifted))
                                    ((< fractional-bits 0.5bits) shifted)
-                                   (t (if (oddp shifted) (1+ shifted) shifted)))))
-                    ))
+                                   (t (if (oddp shifted) (1+ shifted) shifted))))
+                               shifted)))
              (if (minusp number)
                  (- rounded)
                  rounded)))))))
