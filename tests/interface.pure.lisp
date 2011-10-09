@@ -68,7 +68,7 @@
       (sleep 2))))
 
 ;;; SLEEP should not cons
-(with-test (:name (sleep :non-consing))
+(with-test (:name (sleep :non-consing) :fails-on '(not :x86-64))
   (ctu:assert-no-consing (sleep 0.00001)))
 
 ;;; SLEEP should work with large integers as well -- no timers
