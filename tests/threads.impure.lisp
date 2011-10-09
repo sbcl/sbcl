@@ -852,11 +852,12 @@
    ;; now SOMETHING is gc'ed and the binding stack looks like this: 0,
    ;; 0, SOMETHING, 0 (because the symbol slots are zeroed on
    ;; unbinding but values are not).
-   (let ((*x* nil))
+   (let ((*x* nil)
+         (binding-pointer-delta (ash 2 (- sb-vm:word-shift sb-vm:n-fixnum-tag-bits))))
      ;; bump bsp as if a BIND had just started
-     (incf sb-vm::*binding-stack-pointer* 2)
+     (incf sb-vm::*binding-stack-pointer* binding-pointer-delta)
      (wait-for-gc)
-     (decf sb-vm::*binding-stack-pointer* 2))))
+     (decf sb-vm::*binding-stack-pointer* binding-pointer-delta))))
 
 (with-test (:name (:binding-stack-gc-safety))
   (let (threads)
