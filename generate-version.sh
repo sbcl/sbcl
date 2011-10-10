@@ -26,7 +26,7 @@ generate_version() {
     fi
     # Build it.
     version_head=`git rev-parse HEAD`
-    if expr "`cat .git/HEAD`" : "ref: refs/heads/.*" > /dev/null 2>&1
+    if `cat .git/HEAD` | grep -q "ref: refs/heads/.*" > /dev/null 2>&1
     then
         version_branchname=`cut -d / -f 3- < .git/HEAD`
     else
