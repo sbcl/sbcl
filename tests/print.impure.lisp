@@ -571,4 +571,7 @@
   (assert (equal "  10.00" (format nil "~7,2,2f" 0.1)))
   (assert (equal "   0.01" (format nil "~7,2,-2f" 0.5))))
 
+(with-test (:name :bug-867684)
+  (assert (equal "ab" (format nil "a~0&b"))))
+
 ;;; success

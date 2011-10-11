@@ -752,9 +752,10 @@
            :complaint
            "cannot specify either colon or atsign for this directive"))
   (interpret-bind-defaults ((count 1)) params
-    (fresh-line stream)
-    (dotimes (i (1- count))
-      (terpri stream))))
+    (when (plusp count)
+      (fresh-line stream)
+      (dotimes (i (1- count))
+       (terpri stream)))))
 
 (def-format-interpreter #\| (colonp atsignp params)
   (when (or colonp atsignp)

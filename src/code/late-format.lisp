@@ -602,9 +602,10 @@
   (if params
       (expand-bind-defaults ((count 1)) params
         `(progn
-           (fresh-line stream)
-           (dotimes (i (1- ,count))
-             (terpri stream))))
+           (when (plusp ,count)
+             (fresh-line stream)
+             (dotimes (i (1- ,count))
+               (terpri stream)))))
       '(fresh-line stream)))
 
 (def-format-directive #\| (colonp atsignp params)
