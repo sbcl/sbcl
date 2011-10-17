@@ -174,7 +174,7 @@
       (typep
        (sb-posix:syscall-errno c)
        '(member
-         #+darwin
+         #+bsd
          #.sb-posix:eisdir
          #+win32
          #.sb-posix::eacces
@@ -182,7 +182,7 @@
          #.sb-posix::enotempty
          #+sunos
          #.sb-posix::einval
-         #-(or darwin win32 sunos)
+         #-(or bsd win32 sunos)
          #.sb-posix::ebusy)))) t)
 
 (deftest rmdir.error.4
