@@ -4001,3 +4001,13 @@
                              (+ #C(0.0 1.0) x)))))
     (assert (= (funcall fun #C(1.0 2.0))
                #C(1.0 3.0)))))
+
+;; A refactoring  1.0.12.18 caused lossy computation of primitive
+;; types for member types.
+(with-test (:name :member-type-primitive-type)
+  (let ((fun (compile nil `(lambda (p1 p2 p3)
+                             (if p1
+                                 (the (member #c(1.2d0 1d0)) p2)
+                                 (the (eql #c(1.0 1.0)) p3))))))
+    (assert (eql (funcall fun 1 #c(1.2d0 1d0) #c(1.0 1.0))
+                 #c(1.2d0 1.0d0)))))

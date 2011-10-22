@@ -356,8 +356,8 @@
                               (setq res new-ptype)
                               (return (any)))))
                       (setf res ptype))))
-              type))
-           res))
+              type)
+             res)))
         (named-type
          (ecase (named-type-name type)
            ((t *) (values *backend-t-primitive-type* t))
