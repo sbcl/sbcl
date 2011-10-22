@@ -20,6 +20,9 @@ LANG=C
 LC_ALL=C
 export LANG LC_ALL
 
+# Load our build configuration
+. output/build-config
+
 # Do warm init stuff, e.g. building and loading CLOS, and stuff which
 # can't be done until CLOS is running.
 #

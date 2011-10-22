@@ -20,8 +20,8 @@ LANG=C
 LC_ALL=C
 export LANG LC_ALL
 
-. ./find-gnumake.sh
-find_gnumake
+# Load our build configuration
+. output/build-config
 
 . ./sbcl-pwd.sh
 sbcl_pwd

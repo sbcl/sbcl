@@ -20,6 +20,9 @@ LANG=C
 LC_ALL=C
 export LANG LC_ALL
 
+# Load our build configuration
+. output/build-config
+
 # In some cases, a debugging build of the system will creates a core
 # file output/after-xc.core in the next step. In cases where it
 # doesn't, it's confusing and basically useless to have any old copies

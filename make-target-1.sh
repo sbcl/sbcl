@@ -20,6 +20,9 @@ LANG=C
 LC_ALL=C
 export LANG LC_ALL
 
+# Load our build configuration
+. output/build-config
+
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get

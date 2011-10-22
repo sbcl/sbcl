@@ -20,6 +20,9 @@ LANG=C
 LC_ALL=C
 export LANG LC_ALL
 
+# Load our build configuration
+. output/build-config
+
 # Compile and load the cross-compiler. (We load it here not because we're
 # about to use it, but because it's written under the assumption that each
 # file will be loaded before the following file is compiled.)
