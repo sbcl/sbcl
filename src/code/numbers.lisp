@@ -1085,9 +1085,9 @@ the first."
   #!+sb-doc
   "Predicate returns T if bit index of integer is a 1."
   (number-dispatch ((index integer) (integer integer))
-    ((fixnum fixnum) (if (> index #.(- sb!vm:n-word-bits sb!vm:n-lowtag-bits))
-                         (minusp integer)
-                         (not (zerop (logand integer (ash 1 index))))))
+    ((fixnum fixnum) (if (< index sb!vm:n-positive-fixnum-bits)
+                         (not (zerop (logand integer (ash 1 index))))
+                         (minusp integer)))
     ((fixnum bignum) (bignum-logbitp index integer))
     ((bignum (foreach fixnum bignum)) (minusp integer))))
 
