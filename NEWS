@@ -23,6 +23,9 @@ changes relative to sbcl-1.0.54:
     generally behave better when errors occur during printing.
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
+  * optimization: the compiler no longer refuses to coerce large fixnums to
+    single floats inline, except on x86 where this limitation is still
+    necessary.
   * bug fix: deadlock detection could report the same deadlock twice, for
     two different threads. Now a single deadlock is reported exactly once.
   * bug fix: interval-arithmetic division during type derivation did not

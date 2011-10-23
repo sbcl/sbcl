@@ -331,8 +331,11 @@
   ;; problem, but in the context of evaluated and compiled (+ <int> <single>)
   ;; giving different result if we fail to check for this.
   (or (not (csubtypep x (specifier-type 'integer)))
+      #!+x86
       (csubtypep x (specifier-type `(integer ,most-negative-exactly-single-float-fixnum
-                                             ,most-positive-exactly-single-float-fixnum)))))
+                                             ,most-positive-exactly-single-float-fixnum)))
+      #!-x86
+      (csubtypep x (specifier-type 'fixnum))))
 
 ;;; Do some stuff to recognize when the loser is doing mixed float and
 ;;; rational arithmetic, or different float types, and fix it up. If

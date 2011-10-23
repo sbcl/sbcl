@@ -371,30 +371,37 @@
 
 (defun safe-single-coercion-p (x)
   (or (typep x 'single-float)
-      ;; Fix for bug 420, and related issues: during type derivation we often
-      ;; end up deriving types for both
-      ;;
-      ;;   (some-op <int> <single>)
-      ;; and
-      ;;   (some-op (coerce <int> 'single-float) <single>)
-      ;;
-      ;; or other equivalent transformed forms. The problem with this is that
-      ;; on some platforms like x86 (+ <int> <single>) is on the machine level
-      ;; equivalent of
-      ;;
-      ;;   (coerce (+ (coerce <int> 'double-float)
-      ;;              (coerce <single> 'double-float))
-      ;;           'single-float)
-      ;;
-      ;; so if the result of (coerce <int> 'single-float) is not exact, the
-      ;; derived types for the transformed forms will have an empty
-      ;; intersection -- which in turn means that the compiler will conclude
-      ;; that the call never returns, and all hell breaks lose when it *does*
-      ;; return at runtime. (This affects not just +, but other operators are
-      ;; well.)
-      (and (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
-                              (integer (,most-positive-exactly-single-float-fixnum) *))))
-           (<= most-negative-single-float x most-positive-single-float))))
+      (and
+       ;; Fix for bug 420, and related issues: during type derivation we often
+       ;; end up deriving types for both
+       ;;
+       ;;   (some-op <int> <single>)
+       ;; and
+       ;;   (some-op (coerce <int> 'single-float) <single>)
+       ;;
+       ;; or other equivalent transformed forms. The problem with this
+       ;; is that on x86 (+ <int> <single>) is on the machine level
+       ;; equivalent of
+       ;;
+       ;;   (coerce (+ (coerce <int> 'double-float)
+       ;;              (coerce <single> 'double-float))
+       ;;           'single-float)
+       ;;
+       ;; so if the result of (coerce <int> 'single-float) is not exact, the
+       ;; derived types for the transformed forms will have an empty
+       ;; intersection -- which in turn means that the compiler will conclude
+       ;; that the call never returns, and all hell breaks lose when it *does*
+       ;; return at runtime. (This affects not just +, but other operators are
+       ;; well.)
+       ;;
+       ;; See also: SAFE-CTYPE-FOR-SINGLE-COERCION-P
+       ;;
+       ;; FIXME: If we ever add SSE-support for x86, this conditional needs to
+       ;; change.
+       #!+x86
+       (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
+                          (integer (,most-positive-exactly-single-float-fixnum) *))))
+       (<= most-negative-single-float x most-positive-single-float))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
 ;;; NIL if either is NIL. Otherwise bound is computed and the result

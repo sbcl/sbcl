@@ -4120,3 +4120,15 @@
                          (declare (double-float x))
                          (unknown-fun 1.0d0 (+ 1.0d0 x))))))
     (assert (equal '(1.0d0) (ctu:find-code-constants fun :type 'double-float)))))
+
+(with-test (:name :fixnum+float-coerces-fixnum
+            :skipped-on :x86)
+  (let ((fun (compile nil
+                      `(lambda (x y)
+                         (declare (fixnum x)
+                                  (single-float y))
+                         (+ x y)))))
+    (assert (not (ctu:find-named-callees fun)))
+    (assert (not (search "GENERIC"
+                         (with-output-to-string (s)
+                           (disassemble fun :stream s)))))))
