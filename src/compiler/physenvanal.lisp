@@ -496,26 +496,24 @@
   (declare (type component component))
   (dolist (fun (component-lambdas component))
     (let ((ret (lambda-return fun)))
-      ;; Nodes whose type is NIL (i.e. don't return) such as calls to
-      ;; ERROR are never annotated as TAIL-P, in order to preserve
-      ;; debugging information.
-      ;;
-      ;; FIXME: It might be better to add another DEFKNOWN property
-      ;; (e.g. NO-TAIL-RECURSION) and use it for error-handling
-      ;; functions like ERROR, instead of spreading this special case
-      ;; net so widely. --WHN?
-      ;;
-      ;; Why is that bad? Because this non-elimination of
-      ;; non-returning tail calls causes the XEP for FOO appear in
-      ;; backtrace for (defun foo (x) (error "foo ~S" x)) wich seems
-      ;; less then optimal. --NS 2005-02-28
       (when ret
         (let ((result (return-result ret)))
           (do-uses (use result)
-            (when (and (policy use merge-tail-calls)
-                       (basic-combination-p use)
+            (when (and (basic-combination-p use)
                        (immediately-used-p result use)
-                       (or (not (eq (node-derived-type use) *empty-type*))
-                           (eq (basic-combination-kind use) :local)))
+                       (or (eq (basic-combination-kind use) :local)
+                           ;; Nodes whose type is NIL (i.e. don't return) such
+                           ;; as calls to ERROR are never annotated as TAIL-P,
+                           ;; in order to preserve debugging information, so that
+                           ;;
+                           ;; We spread this net wide enough to catch
+                           ;; untrusted NIL return types as well, so that
+                           ;; frames calling functions such as FOO-ERROR are
+                           ;; kept in backtraces:
+                           ;;
+                           ;;  (defun foo-error (x) (error "oops: ~S" x))
+                           ;;
+                           (not (or (eq *empty-type* (node-derived-type use))
+                                    (eq *empty-type* (combination-defined-type use))))))
               (setf (node-tail-p use) t)))))))
   (values))

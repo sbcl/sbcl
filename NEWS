@@ -47,6 +47,9 @@ changes relative to sbcl-1.0.53:
        systems with getaddrinfo().
     ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
        safe outside systems with getaddrinfo().
+  * enhancement: special-case TCO prevention for functions which never return
+    extended to untrusted type, keeping one more frame's worth of debug
+    information around in many cases.
   * enhancement: debug-names of anonymous and local function are more
     descriptive. Affects backtraces and SB-SPROF results. (lp#805100)
   * enhancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does

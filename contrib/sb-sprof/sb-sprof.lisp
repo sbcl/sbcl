@@ -514,7 +514,7 @@ profiling")
   ;;; This in turn will distribute the notice to those threads we are
   ;;; interested using SIGPROF.
   (defun thread-distribution-handler ()
-    (declare (optimize sb-c::merge-tail-calls))
+    (declare (optimize speed (space 0)))
     (when *sampling*
       #+sb-thread
       (let ((lock *distribution-lock*))

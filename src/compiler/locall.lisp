@@ -163,9 +163,7 @@
           ,(if (policy *lexenv* (zerop verify-arg-count))
                `(declare (ignore ,n-supplied))
                `(%verify-arg-count ,n-supplied ,nargs))
-          (locally
-            (declare (optimize (merge-tail-calls 3)))
-            (%funcall ,fun ,@temps)))))
+          (%funcall ,fun ,@temps))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
             (max (optional-dispatch-max-args fun))
@@ -190,9 +188,7 @@
                     ,(with-unique-names (n-context n-count)
                        `(multiple-value-bind (,n-context ,n-count)
                             (%more-arg-context ,n-supplied ,max)
-                          (locally
-                            (declare (optimize (merge-tail-calls 3)))
-                            (%funcall ,more ,@temps ,n-context ,n-count)))))))
+                          (%funcall ,more ,@temps ,n-context ,n-count))))))
              (t
               (%arg-count-error ,n-supplied)))))))))
 
