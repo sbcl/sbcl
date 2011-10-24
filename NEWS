@@ -12,6 +12,8 @@ changes relative to sbcl-1.0.52:
     of multiple-valued places to be set to NIL, instead of signalling an
     error (per a careful reading of CLHS 5.1.2.3).
   * bug fix: floating-point traps now work on darwin/x86-64.
+  * bug fix: repair crash in x86oid darwin signal handling emulation
+    when built with certain compilers.
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.

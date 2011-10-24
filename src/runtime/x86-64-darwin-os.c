@@ -249,8 +249,8 @@ void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
     os_invalidate((os_vm_address_t)regs, sizeof(darwin_mcontext));
 
     /* Trap to restore the signal context. */
-    asm volatile ("mov %0, %%rax; mov %1, %%rbx; .quad 0xffffffffffff0b0f"
-                  : : "r" (thread_state), "r" (float_state));
+    asm volatile (".quad 0xffffffffffff0b0f"
+                  : : "a" (thread_state), "b" (float_state));
 }
 
 #if defined DUMP_CONTEXT

@@ -273,8 +273,8 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
     os_invalidate((os_vm_address_t)regs, sizeof(mcontext_t));
 
     /* Trap to restore the signal context. */
-    asm volatile ("movl %0, %%eax; movl %1, %%ebx; .long 0xffff0b0f"
-                  : : "r" (thread_state), "r" (float_state));
+    asm volatile (".long 0xffff0b0f"
+                  : : "a" (thread_state), "b" (float_state));
 }
 
 /* Convenience wrapper for the above */
