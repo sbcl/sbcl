@@ -191,10 +191,10 @@ generate_version
 # dependencies, write them out to a file to be sourced by other
 # scripts.
 
-echo "export DEVNULL=\"$DEVNULL\"" > output/build-config
-echo "export GNUMAKE=\"$GNUMAKE\"" >> output/build-config
-echo "export SBCL_XC_HOST=\"$SBCL_XC_HOST\"" >> output/build-config
-echo "export legacy_xc_spec=\"$legacy_xc_spec\"" >> output/build-config
+echo "DEVNULL=\"$DEVNULL\"; export DEVNULL" > output/build-config
+echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
+echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
+echo "legacy_xc_spec=\"$legacy_xc_spec\"; export legacy_xc_spec" >> output/build-config
 
 # And now, sorting out the per-target dependencies...
 
