@@ -509,4 +509,16 @@ catch_exception_raise(mach_port_t exception_port,
     return ret;
 }
 
+void
+os_restore_fp_control(os_context_t *context)
+{
+    /* KLUDGE: The x87 FPU control word is some nasty bitfield struct
+     * thing.  Rather than deal with that, just grab it as a 16-bit
+     * integer. */
+    unsigned short fpu_control_word =
+        *((unsigned short *)&context->uc_mcontext->FS.FPU_FCW);
+    /* reset exception flags and restore control flags on x87 FPU */
+    asm ("fldcw %0" : : "m" (fpu_control_word));
+}
+
 #endif

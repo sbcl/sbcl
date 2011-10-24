@@ -118,7 +118,7 @@ in effect."
             (or (cdr (assoc precision *precision-mode-alist*))
                 (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
-    #!-(and darwin (or ppc x86))
+    #!-(and darwin ppc)
     (setf (floating-point-modes) modes))
   (values))
 

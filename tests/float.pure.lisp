@@ -93,7 +93,7 @@
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on '(and :darwin (or :ppc :x86))) ;; bug 372
+            :fails-on '(and :darwin :ppc)) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -126,7 +126,7 @@
 
 (with-test (:name (:addition-overflow :bug-372)
             :fails-on '(or (and :ppc :openbsd)
-                           (and (or :ppc :x86) :darwin)
+                           (and :ppc :darwin)
                            (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1
@@ -143,9 +143,12 @@
 ;; control word, which can happen if the kernel clears the FPU control
 ;; (a reasonable thing for it to do) and the runtime fails to
 ;; compensate for this (see RESTORE_FP_CONTROL_WORD in interrupt.c).
+;; Note that this only works when running float.pure.lisp alone, as
+;; the preceeding "pure" test files aren't as free of side effects as
+;; we might like.
 (with-test (:name (:addition-overflow :bug-372 :take-2)
             :fails-on '(or (and :ppc :openbsd)
-                           (and (or :ppc :x86) :darwin)
+                           (and :ppc :darwin)
                            (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1

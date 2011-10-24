@@ -11,7 +11,7 @@ changes relative to sbcl-1.0.52:
     GETF, LOGBITP, LDB, and MASK-FIELD now arrange for non-primary values
     of multiple-valued places to be set to NIL, instead of signalling an
     error (per a careful reading of CLHS 5.1.2.3).
-  * bug fix: floating-point traps now work on darwin/x86-64.
+  * bug fix: floating-point traps now work on darwin/x86 and /x86-64.
   * bug fix: repair crash in x86oid darwin signal handling emulation
     when built with certain compilers.
 

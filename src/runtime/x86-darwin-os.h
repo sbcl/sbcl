@@ -40,6 +40,8 @@ void set_data_desc_addr(data_desc_t* desc, void* addr);
 #define SS __ss
 #define GS __gs
 
+#define FPU_FCW __fpu_fcw
+
 #else
 
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
@@ -60,8 +62,11 @@ void set_data_desc_addr(data_desc_t* desc, void* addr);
 #define SS ss
 #define GS gs
 
+#define FPU_FCW fpu_fcw
+
 #endif /* __DARWIN_UNIX03 */
 
-
+#define RESTORE_FP_CONTROL_FROM_CONTEXT
+void os_restore_fp_control(os_context_t *context);
 
 #endif /* _X86_DARWIN_OS_H */
