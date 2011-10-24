@@ -93,7 +93,7 @@
 (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on :darwin) ;; bug 372
+            :fails-on '(and :darwin (or :ppc :x86))) ;; bug 372
   (progn
     (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
                            floating-point-overflow))
@@ -125,7 +125,28 @@
 (funcall (compile nil '(lambda () (tan (tan (round 0))))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or (and :ppc :openbsd) :darwin (and :x86 :netbsd)))
+            :fails-on '(or (and :ppc :openbsd)
+                           (and (or :ppc :x86) :darwin)
+                           (and :x86 :netbsd)))
+  (assert (typep (nth-value
+                  1
+                  (ignore-errors
+                    (sb-sys:without-interrupts
+                     (sb-int:set-floating-point-modes :current-exceptions nil
+                                                      :accrued-exceptions nil)
+                     (loop repeat 2 summing most-positive-double-float)
+                     (sleep 2))))
+                 'floating-point-overflow)))
+
+;; This is the same test as above.  Even if the above copy passes,
+;; this copy will fail if SIGFPE handling ends up clearing the FPU
+;; control word, which can happen if the kernel clears the FPU control
+;; (a reasonable thing for it to do) and the runtime fails to
+;; compensate for this (see RESTORE_FP_CONTROL_WORD in interrupt.c).
+(with-test (:name (:addition-overflow :bug-372 :take-2)
+            :fails-on '(or (and :ppc :openbsd)
+                           (and (or :ppc :x86) :darwin)
+                           (and :x86 :netbsd)))
   (assert (typep (nth-value
                   1
                   (ignore-errors

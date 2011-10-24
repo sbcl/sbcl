@@ -118,7 +118,8 @@ in effect."
             (or (cdr (assoc precision *precision-mode-alist*))
                 (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
-    #!-darwin (setf (floating-point-modes) modes))
+    #!-(and darwin (or ppc x86))
+    (setf (floating-point-modes) modes))
   (values))
 
 (defun get-floating-point-modes ()

@@ -49,6 +49,9 @@ typedef struct __darwin_mcontext64 darwin_mcontext;
 #define es __es
 #define fs __fs
 
+#define fpu_fcw __fpu_fcw
+#define fpu_mxcsr __fpu_mxcsr
+
 #else
 
 typedef struct ucontext darwin_ucontext;
@@ -585,6 +588,21 @@ catch_exception_raise(mach_port_t exception_port,
     }
 
     return ret;
+}
+
+void
+os_restore_fp_control(os_context_t *context)
+{
+    /* KLUDGE: The x87 FPU control word is some nasty bitfield struct
+     * thing.  Rather than deal with that, just grab it as a 16-bit
+     * integer. */
+    unsigned short fpu_control_word =
+        *((unsigned short *)&context->uc_mcontext->fs.fpu_fcw);
+    /* reset exception flags and restore control flags on SSE2 FPU */
+    unsigned int temp = (context->uc_mcontext->fs.fpu_mxcsr) & ~0x3F;
+    asm ("ldmxcsr %0" : : "m" (temp));
+    /* same for x87 FPU. */
+    asm ("fldcw %0" : : "m" (fpu_control_word));
 }
 
 #endif
