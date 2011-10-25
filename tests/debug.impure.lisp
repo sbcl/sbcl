@@ -480,8 +480,12 @@
     (load (compile-file "bug-414.lisp"))
     (disassemble 'bug-414)))
 
-(with-test (:name :bug-310175)
-  (let ((dx-arg (cons t t)))
+(with-test (:name :bug-310175 :fails-on '(not :stack-allocatable-lists))
+  ;; KLUDGE: Not all DX-enabled platforms DX CONS, and the compiler
+  ;; transforms two-arg-LIST* (and one-arg-LIST) to CONS.  Therefore,
+  ;; use two-arg-LIST, which should get through to VOP LIST, and thus
+  ;; stack-allocate on a predictable set of machines.
+  (let ((dx-arg (list t t)))
     (declare (dynamic-extent dx-arg))
     (flet ((dx-arg-backtrace (x)
              (declare (optimize (debug 2)))
