@@ -2947,14 +2947,14 @@ core and return a descriptor to it."
   (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
   (format t " * so they work directly on tagged addresses. */~2%")
   (let ((name (sb!vm:primitive-object-name obj))
-        (lowtag (eval (sb!vm:primitive-object-lowtag obj))))
-    (when lowtag
-      (dolist (slot (sb!vm:primitive-object-slots obj))
-        (format t "#define ~A_~A_OFFSET ~D~%"
-                (c-symbol-name name)
-                (c-symbol-name (sb!vm:slot-name slot))
-                (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
-      (terpri)))
+        (lowtag (or (symbol-value (sb!vm:primitive-object-lowtag obj))
+                    0)))
+    (dolist (slot (sb!vm:primitive-object-slots obj))
+      (format t "#define ~A_~A_OFFSET ~D~%"
+              (c-symbol-name name)
+              (c-symbol-name (sb!vm:slot-name slot))
+              (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
+    (terpri))
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
 (defun write-structure-object (dd)
