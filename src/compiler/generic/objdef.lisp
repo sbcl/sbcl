@@ -376,9 +376,7 @@
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
-;;; Hence the even-fixnum lowtag just so we don't get odd(sic) numbers
-;;; added to the slot offsets
-(define-primitive-object (thread :lowtag even-fixnum-lowtag)
+(define-primitive-object (thread)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of initial-function into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
