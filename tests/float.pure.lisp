@@ -319,6 +319,12 @@
 (macrolet ((with-pinned-floats ((count type &rest names) &body body)
              "Force COUNT float values to be kept live (and hopefully in registers),
               fill a temporary register with noise, and execute BODY."
+             ;; KLUDGE: SB-VM is locked, and non-x86oids don't have
+             ;; SB-VM::TOUCH-OBJECT.  Don't even READ this body on
+             ;; other platforms.
+             #-(or x86 x86-64)
+             (declare (ignore count type names body))
+             #+(or x86 x86-64)
              (let ((dummy (loop repeat count
                                 collect (or (pop names)
                                             (gensym "TEMP")))))
