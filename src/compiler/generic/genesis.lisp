@@ -282,6 +282,13 @@
 (defun is-fixnum-lowtag (lowtag)
   (zerop (logand lowtag sb!vm:fixnum-tag-mask)))
 
+(defun is-other-immediate-lowtag (lowtag)
+  ;; The other-immediate lowtags are similar to the fixnum lowtags, in
+  ;; that they have an "effective length" that is shorter than is used
+  ;; for the pointer lowtags.  Unlike the fixnum lowtags, however, the
+  ;; other-immediate lowtags are always effectively two bits wide.
+  (= (logand lowtag 3) sb!vm:other-immediate-0-lowtag))
+
 (defstruct (descriptor
             (:constructor make-descriptor
                           (high low &optional gspace word-offset))
@@ -314,12 +321,7 @@
                        (if (> unsigned #x1FFFFFFF)
                            (- unsigned #x40000000)
                            unsigned))))
-            ((or (= lowtag sb!vm:other-immediate-0-lowtag)
-                 (= lowtag sb!vm:other-immediate-1-lowtag)
-                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                 (= lowtag sb!vm:other-immediate-2-lowtag)
-                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                 (= lowtag sb!vm:other-immediate-3-lowtag))
+            ((is-other-immediate-lowtag lowtag)
              (format stream
                      "for other immediate: #X~X, type #b~8,'0B"
                      (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
