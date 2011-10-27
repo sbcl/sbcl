@@ -14,7 +14,18 @@
            nil)
 
 #!+stack-allocatable-fixed-objects
-(defoptimizer (%make-structure-instance stack-allocate-result) ((&rest args) node dx)
+(defoptimizer (%make-structure-instance stack-allocate-result) ((defstruct-description &rest args) node dx)
+  (aver (constant-lvar-p defstruct-description))
+  ;; A structure instance can be stack-allocated if it has no raw
+  ;; slots, or if we're on a target with a conservatively-scavenged
+  ;; stack.  We have no reader conditional for stack conservation, but
+  ;; it turns out that the only time stack conservation is in play is
+  ;; when we're on GENCGC (since CHENEYGC doesn't have conservation)
+  ;; and C-STACK-IS-CONTROL-STACK (otherwise, the C stack is the
+  ;; number stack, and we precisely-scavenge the control stack).
+  #!-(and :gencgc :c-stack-is-control-stack)
+  (zerop (sb!kernel::dd-raw-length (lvar-value defstruct-description)))
+  #!+(and :gencgc :c-stack-is-control-stack)
   t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
