@@ -586,7 +586,8 @@
   (assert-no-consing (make-array-on-stack-9))
   (assert-no-consing (make-array-on-stack-10)))
 
-(with-test (:name (:no-consing :dx-raw-instances) :fails-on :ppc :skipped-on '(not :raw-instance-init-vops))
+(with-test (:name (:no-consing :dx-raw-instances) :skipped-on '(or (not :raw-instance-init-vops)
+                                                                   (not (and :gencgc :c-stack-is-control-stack))))
   (let (a b)
     (setf a 1.24 b 1.23d0)
     (assert-no-consing (make-foo2-on-stack a b)))
