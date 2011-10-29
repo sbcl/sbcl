@@ -177,11 +177,25 @@
              ;;    previous call to REGISTER-LAYOUT for a superclass of
              ;;    INSTANCE's class.  See also the comment above
              ;;    FORCE-CACHE-FLUSHES.  Paul Dietz has test cases for this.
-             (%force-cache-flushes (class-of instance))
-             ;; KLUDGE avoid an infinite recursion, it's still better to
-             ;; bail out with an AVER for server softwares. see FIXME above.
-             ;; details: http://thread.gmane.org/gmane.lisp.steel-bank.devel/10175
-             (aver (not (eq (layout-invalid (wrapper-of instance)) t)))
+             (let ((class (wrapper-class* owrapper)))
+               (%force-cache-flushes class)
+               ;; KLUDGE: avoid an infinite recursion, it's still better to
+               ;; bail out with an error for server softwares. see FIXME above.
+               ;; details: http://thread.gmane.org/gmane.lisp.steel-bank.devel/10175
+               ;;
+               ;; Error message here is trying to figure out a bit more about the
+               ;; situation, since we don't have anything approaching a test-case
+               ;; for the bug.
+               (let ((new-state (layout-invalid (wrapper-of instance))))
+                 (unless (neq t new-state)
+                   (cerror "Nevermind and recurse." 'bug
+                           :format-control "~@<Problem forcing cache flushes. Please report ~
+                                               to sbcl-devel. Info:~% ~S~:@>"
+                           :format-arguments (mapcar (lambda (x)
+                                                       (cons x (layout-invalid x)))
+                                                     (list owrapper
+                                                           (wrapper-of instance)
+                                                           (class-wrapper class)))))))
              (check-wrapper-validity instance))
             ((consp state)
              (ecase (car state)
