@@ -73,10 +73,14 @@
   (declare (type (unsigned-byte 64) integer))
   (rotate-byte 6 (byte 64 0) integer))
 
-(assert (= (ub64/c 5) 320))
-(assert (= (ub64/c 1) 64))
-(assert (= (ub64/c (ash 1 57)) (ash 1 63)))
-(assert (= (ub64/c (ash 1 58)) 1))
+(defun ub64/-c (integer)
+  (declare (type (unsigned-byte 64) integer))
+  (rotate-byte -6 (byte 64 0) integer))
+
+(assert (= (ub64/-c 320) 5))
+(assert (= (ub64/-c 64) 1))
+(assert (= (ub64/-c (ash 1 63)) (ash 1 57)))
+(assert (= (ub64/-c 1) (ash 1 58)))
 
 (defun ub64 (count integer)
   (declare (type (unsigned-byte 64) integer)

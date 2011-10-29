@@ -59,7 +59,7 @@
     (move result integer)
     (if (> count 0)
         (inst rol result count)
-        (inst ror result count))))
+        (inst ror result (- count)))))
 
 (define-vop (%64bit-rotate-byte)
   (:policy :fast-safe)
