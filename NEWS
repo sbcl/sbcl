@@ -23,6 +23,8 @@ changes relative to sbcl-1.0.52:
   * bug fix: on SPARC/:sb-unicode, avoid crashing the assembler by trying
     to emit literal characters > (code-char 4095), for comparisons with
     constant characters.
+  * bug fix: ROOM reported only the low 32 bits of dynamic space usage
+    on 64 bit platforms. (lp#881445)
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.
