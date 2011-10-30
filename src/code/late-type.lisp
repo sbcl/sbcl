@@ -2903,11 +2903,12 @@ used for a COMPLEX component.~:@>"
                           :high (if (null (numeric-type-high type1))
                                     nil
                                     (list (1+ (numeric-type-high type1)))))))
-         (type-union type1
-                     (apply #'type-intersection
-                            (remove (specifier-type '(not integer))
-                                    (intersection-type-types type2)
-                                    :test #'type=))))
+         (let* ((intersected (intersection-type-types type2))
+                (remaining   (remove (specifier-type '(not integer))
+                                     intersected
+                                     :test #'type=)))
+           (and (not (equal intersected remaining))
+                (type-union type1 (apply #'type-intersection remaining)))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))

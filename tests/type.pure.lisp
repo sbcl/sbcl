@@ -424,3 +424,19 @@ ACTUAL ~D DERIVED ~D~%"
 (with-test (:name :bug-485972)
   (assert (equal (multiple-value-list (subtypep 'symbol 'keyword)) '(nil t)))
   (assert (equal (multiple-value-list (subtypep 'keyword 'symbol)) '(t t))))
+
+;; WARNING: this test case would fail by recursing into the stack's guard page.
+(with-test (:name :bug-883498)
+  (sb-kernel:specifier-type
+   `(or (INTEGER -2 -2)
+        (AND (SATISFIES FOO) (RATIONAL -3/2 -3/2)))))
+
+;; The infinite recursion mentioned in the previous test was caused by an
+;; attempt to get the following right.
+(with-test (:name :quirky-integer-rational-union)
+  (assert (subtypep `(or (integer * -1)
+                         (and (rational * -1/2) (not integer)))
+                    `(rational * -1/2)))
+  (assert (subtypep `(rational * -1/2)
+                    `(or (integer * -1)
+                         (and (rational * -1/2) (not integer))))))
