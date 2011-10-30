@@ -20,6 +20,9 @@ changes relative to sbcl-1.0.52:
   * bug fix: low-level control flow optimisations could result in bogus
     code in functions with tail and non-tail calls to local functions on
     x86oids. (lp#883500)
+  * bug fix: on SPARC/:sb-unicode, avoid crashing the assembler by trying
+    to emit literal characters > (code-char 4095), for comparisons with
+    constant characters.
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.

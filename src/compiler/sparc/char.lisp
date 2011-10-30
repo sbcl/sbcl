@@ -132,7 +132,7 @@
 
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))
-  (:arg-types character (:constant character))
+  (:arg-types character (:constant (character-set ((0 . 4095)))))
   (:conditional)
   (:info target not-p y)
   (:policy :fast-safe)

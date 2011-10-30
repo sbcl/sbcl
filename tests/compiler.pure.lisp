@@ -4021,3 +4021,10 @@
                            (declare (optimize (speed 0)))
                            (mod (mod a (min -5 a)) 5)))
            1))
+
+;; Test for literals too large for the ISA (e.g. (SIGNED-BYTE 13) on SPARC).
+#+sb-unicode
+(with-test (:name :bug-883519)
+  (compile nil `(lambda (x)
+                  (declare (type character x))
+                  (eql x #\U0010FFFF))))
