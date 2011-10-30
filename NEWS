@@ -17,6 +17,9 @@ changes relative to sbcl-1.0.52:
     when built with certain compilers.
   * bug fix: SB-ROTATE-BYTE misrotated to the right when using constant
     rotation arguments on x86-64. (lp#882151)
+  * bug fix: low-level control flow optimisations could result in bogus
+    code in functions with tail and non-tail calls to local functions on
+    x86oids. (lp#883500)
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.

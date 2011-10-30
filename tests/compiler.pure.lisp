@@ -4011,3 +4011,13 @@
                                  (the (eql #c(1.0 1.0)) p3))))))
     (assert (eql (funcall fun 1 #c(1.2d0 1d0) #c(1.0 1.0))
                  #c(1.2d0 1.0d0)))))
+
+;; Fall-through jump elimination made control flow fall through to trampolines.
+;; Reported by Eric Marsden on sbcl-devel@ 2011.10.26, with a test case
+;; reproduced below (triggered a corruption warning and a memory fault).
+(with-test (:name :bug-883500)
+  (funcall (compile nil `(lambda (a)
+                           (declare (type (integer -50 50) a))
+                           (declare (optimize (speed 0)))
+                           (mod (mod a (min -5 a)) 5)))
+           1))
