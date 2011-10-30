@@ -493,9 +493,9 @@ If FILE is a stream, on Windows the stream is closed immediately. On Unix
 plaforms the stream remains open, allowing IO to continue: the OS resources
 associated with the deleted file remain available till the stream is closed as
 per standard Unix unlink() behaviour."
-  (let* ((pathname (translate-logical-pathname file))
+  (let* ((pathname (translate-logical-pathname
+                    (merge-pathnames file (sane-default-pathname-defaults))))
          (namestring (native-namestring pathname :as-file t)))
-    (truename file) ; for error-checking side-effect
     #!+win32
     (when (streamp file)
       (close file))
@@ -518,9 +518,7 @@ the directory could not be deleted for any reason.
 
 \(DELETE-DIRECTORY \"/tmp/foo\") and \(DELETE-DIRECTORY \"/tmp/foo/\") both
 delete the \"foo\" subdirectory of \"/tmp\", or signal an error if it does not
-exist or is a file.
-
-Experimental: interface subject to change."
+exist or is a file."
   (declare (type pathname-designator pathspec))
   (with-pathname (pathname pathspec)
     (let ((truename (truename (translate-logical-pathname pathname))))

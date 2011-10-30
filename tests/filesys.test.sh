@@ -265,6 +265,18 @@ test -d foo?bar
 check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 2" $? \
     0 "(directory exists)"
 
+# DELETE-FILE
+use_test_subdirectory
+mkdir    sub
+touch    deltest
+touch    sub/deltest
+run_sbcl --eval '(let ((*default-pathname-defaults* (truename "sub")))
+                   (delete-file "deltest")
+                   (sb-ext:quit))'
+test -f deltest && test ! -f sub/deltest
+check_status_maybe_lose "delete-file via d-p-d" $? \
+  0 "ok"
+
 # DELETE-DIRECTORY
 use_test_subdirectory
 mkdir    dont_delete_me
@@ -280,10 +292,15 @@ touch    deep/1/2/e
 touch    deep/1/2/f
 ln -s    `pwd`/dont_delete_me deep/linky
 ln -s    `pwd`/me_neither deep/1/another_linky
+mkdir -p one/one
+touch    one/one/two
+touch    one/two
 
 run_sbcl --eval '(sb-ext:delete-directory "simple_test_subdir1")' \
          --eval '(sb-ext:delete-directory "simple_test_subdir2/")' \
          --eval '(sb-ext:delete-directory "deep" :recursive t)' \
+         --eval '(let ((*default-pathname-defaults* (truename "one")))
+                   (delete-directory "one" :recursive t))' \
          --eval '(sb-ext:quit)'
 
 test -d simple_test_subdir1
@@ -305,6 +322,10 @@ check_status_maybe_lose "delete-directory 4" $? \
 test -f me_neither
 check_status_maybe_lose "delete-directory 5" $? \
   0 "didn't follow link"
+
+test -f one/two && test -d one && test ! -d one/one
+check_status_maybe_lose "delete-directory via d-p-d" $? \
+  0 "ok"
 
 # success convention for script
 exit $EXIT_TEST_WIN

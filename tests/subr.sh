@@ -119,6 +119,10 @@ check_status_maybe_lose () {
 # them consistently do so in subdirectories.  Note that such tests
 # should not change their exit action, or do so only very carefully.
 use_test_subdirectory () {
+    if test -d "$TEST_DIRECTORY"
+    then
+        cleanup_test_subdirectory
+    fi
     mkdir "$TEST_DIRECTORY"
     cd "$TEST_DIRECTORY"
     trap "cleanup_test_subdirectory" EXIT
