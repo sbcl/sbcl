@@ -13,22 +13,19 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro def-c-var-fun (lisp-fun c-var-name)
-    `(defun ,lisp-fun ()
-       (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32)))))
-
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 #!+gencgc
 (defun current-dynamic-space-start () sb!vm:dynamic-space-start)
 #!-gencgc
-(def-c-var-fun current-dynamic-space-start "current_dynamic_space")
+(defun current-dynamic-space-start ()
+  (sb!alien:extern-alien "current_dynamic_space" sb!alien:unsigned-long))
 
 #!-sb-fluid
 (declaim (inline dynamic-usage))
 #!+gencgc
-(def-c-var-fun dynamic-usage "bytes_allocated")
+(defun dynamic-usage ()
+  (sb!alien:extern-alien "bytes_allocated" sb!alien:unsigned-long))
 #!-gencgc
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
