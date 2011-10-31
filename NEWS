@@ -27,6 +27,8 @@ changes relative to sbcl-1.0.52:
     on 64 bit platforms. (lp#881445)
   * bug fix: DELETE-FILE did not MERGE-PATHNAMES, making it possible to
     delete the wrong file when using relative pathnames. (lp#882877)
+  * bug fix: optimized SEARCH of vectors-on-vectors mishandled zero-length
+    sequences and :KEY NIL.
 
 changes in sbcl-1.0.52 relative to sbcl-1.0.51:
   * enhancement: ASDF has been updated to version 2.017.

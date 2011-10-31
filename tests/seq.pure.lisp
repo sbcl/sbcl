@@ -250,3 +250,44 @@
   ;; element is found before that's an issue.
   (assert (eq :foo (find :foo '(1 2 3 :foo) :start 1 :end 5)))
   (assert (= 3 (position :foo '(1 2 3 :foo) :start 1 :end 5))))
+
+(with-test (:name (:search :empty-seq))
+  (assert (eql 0
+               (funcall (compile nil
+                                 `(lambda (x)
+                                    (declare (optimize (speed 3)) (simple-vector x))
+                                    (search x #())))
+                        #())))
+  (assert (eql 0
+               (funcall (compile nil
+                                 `(lambda (x)
+                                    (declare (optimize (speed 3)) (simple-vector x))
+                                    (search x #(t t t))))
+                        #())))
+  (assert (eql 0
+               (funcall (compile nil
+                                 `(lambda (x)
+                                    (declare (optimize (speed 3)) (simple-vector x))
+                                    (search x #(t t t) :end1 0)))
+                        #(t t t))))
+  (assert (eql 0
+               (funcall (compile nil
+                                 `(lambda (x)
+                                    (declare (optimize (speed 3)) (simple-vector x))
+                                    (search x #(t t t) :key nil)))
+                        #())))
+  (assert (eql 0
+               (funcall (compile nil
+                                 `(lambda (x k)
+                                    (declare (optimize (speed 3)) (simple-vector x))
+                                    (search x #(t t t) :key k)))
+                        #() nil)))
+  (assert (eq :ok
+              (handler-case
+                  (funcall (compile nil
+                                    `(lambda (x)
+                                       (declare (optimize (speed 3)) (simple-vector x))
+                                       (search x #(t t t) :start2 1 :end2 0 :end1 0)))
+                           #(t t t))
+                (sb-kernel:bounding-indices-bad-error ()
+                  :ok)))))
