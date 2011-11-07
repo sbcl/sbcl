@@ -4028,3 +4028,19 @@
   (compile nil `(lambda (x)
                   (declare (type character x))
                   (eql x #\U0010FFFF))))
+
+;; Wide fixnum platforms had buggy address computation in atomic-incf/aref
+(with-test (:name :bug-887220)
+  (let ((incfer (compile
+                 nil
+                 `(lambda (vector index)
+                    (declare (type (simple-array sb-ext:word (4))
+                                   vector)
+                             (type (mod 4) index))
+                    (sb-ext:atomic-incf (aref vector index) 1)
+                    vector))))
+    (assert (equalp (funcall incfer
+                             (make-array 4 :element-type 'sb-ext:word
+                                           :initial-element 0)
+                             1)
+                    #(0 1 0 0)))))

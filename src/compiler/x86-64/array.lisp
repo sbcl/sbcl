@@ -764,7 +764,8 @@
   (:result-types unsigned-num)
   (:generator 4
     (inst xadd (make-ea :qword :base array
-                        :scale 1 :index index
+                        :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                        :index index
                         :disp (- (* vector-data-offset n-word-bytes)
                                  other-pointer-lowtag))
           diff :lock)
