@@ -3152,20 +3152,10 @@ register."
      #!-(or x86 x86-64)
      (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
                                       sb!vm:other-pointer-lowtag))))
-       #!-(or gencgc ppc)
-       (progn
-         ;; Set the offset from the LRA to the enclosing component.
-         ;; This does not need to be done on GENCGC targets, as the
-         ;; pointer validation done in MAKE-LISP-OBJ requires that it
-         ;; already have been set before we get here.  It does not
-         ;; need to be done on CHENEYGC PPC as it's easier to use the
-         ;; same fun_end_breakpoint_guts on both, including the LRA
-         ;; header.
-         (set-header-data
-          new-lra
-          (logandc2 (+ sb!vm:code-constants-offset bogus-lra-constants 1)
-                    1))
-         (sb!vm:sanctify-for-execution code-object))
+       ;; We used to set the header value of the LRA here to the
+       ;; offset from the enclosing component to the LRA header, but
+       ;; MAKE-LISP-OBJ actually checks the value before we get a
+       ;; chance to set it, so it's now done in arch-assem.S.
        (values new-lra code-object (sap- trap-loc src-start))))))
 
 ;;;; miscellaneous

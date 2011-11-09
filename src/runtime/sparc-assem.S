@@ -265,11 +265,16 @@ funcallable_instance_tramp = . + 1
  * Function-end breakpoint magic.
  */
 
+/*
+ * For an explanation of the magic involved in function-end
+ * breakpoints, see the implementation in ppc-assem.S.
+ */
+
 	.text
 	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_HEADER_WIDETAG
+	.word	RETURN_PC_HEADER_WIDETAG + 0x800
 	b	1f
 	nop
 	mov	reg_CSP, reg_OCFP

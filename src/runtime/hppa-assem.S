@@ -436,10 +436,15 @@ SingleStepTraps:
 	there's a break 0,0 in the new version here!!!
 */
 
+/*
+ * For an explanation of the magic involved in function-end
+ * breakpoints, see the implementation in ppc-assem.S.
+ */
+
 	.align	8
 	.export fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_HEADER_WIDETAG
+	.word	RETURN_PC_HEADER_WIDETAG + 0x800
 	/* multiple value return point -- just jump to trap. */
 	b,n	fun_end_breakpoint_trap
 	/* single value return point -- convert to multiple w/ n=1 */

@@ -380,6 +380,12 @@ GNAME(funcallable_instance_tramp):
 /*
  * fun-end breakpoint magic
  */
+
+/*
+ * For an explanation of the magic involved in function-end
+ * breakpoints, see the implementation in ppc-assem.S.
+ */
+
 	.text
 	.globl	GNAME(fun_end_breakpoint_guts)
 	.align	align_16byte

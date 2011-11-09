@@ -663,13 +663,13 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 	.globl CSYMBOL(fun_end_breakpoint_trap)
 	.globl CSYMBOL(fun_end_breakpoint_end)
 
-	/* Due to pointer verification in MAKE-LISP-OBJ on GENCGC
-	targets, which includes PPC, this must include its header data
-	(the offset from the start of the code-object to the LRA).
-	The code-object header is five words, there are two words of
-	constants, and the instruction space is doubleword-aligned,
-	making an offset of eight.  This is header data for a widetag,
-	so shift left eight bits and add. */
+	/* Due to pointer verification in MAKE-LISP-OBJ, this must
+	include its header data (the offset from the start of the
+	code-object to the LRA).  The code-object header is five
+	words, there are two words of constants, and the instruction
+	space is doubleword-aligned, making an offset of eight.
+	This is header data for a widetag, so shift left eight bits
+	and add. */
 	.long RETURN_PC_HEADER_WIDETAG + 0x800
 
 	/* We are receiving unknown multiple values, thus must deal

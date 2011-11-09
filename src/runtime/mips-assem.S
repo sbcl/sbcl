@@ -447,10 +447,16 @@ funcallable_instance_tramp = . + 1
  * copied and has to be relocatable. It also needs a properly aligned
  * header tag after the fun_end_breakpoint_guts symbol.
  */
+
+/*
+ * For an explanation of the magic involved in function-end
+ * breakpoints, see the implementation in ppc-assem.S.
+ */
+
 	.align  3 /* minimum alignment for a lisp object */
 	LEAF(fun_end_breakpoint_guts)
 	.set    noreorder
-	.word   RETURN_PC_HEADER_WIDETAG
+	.word   RETURN_PC_HEADER_WIDETAG + 0x800
 	b       multiple_value_return
 	 nop
 	.set    reorder
