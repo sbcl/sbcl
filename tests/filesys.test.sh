@@ -206,6 +206,7 @@ mkdir foo
 touch foo/aa.txt
 touch foo/aa.tmp
 mkdir foo/x
+
 mkdir far
 touch far/ab.txt
 touch far/ab.tmp
@@ -213,11 +214,19 @@ mkdir far/x
 mkdir far/y
 mkdir far/y/x
 mkdir far/x/x
+
 mkdir qar
 touch qar/ac.txt
 touch qar/ac.tmp
+
 mkdir foo.moose
 touch foo.bar
+
+mkdir -p a/z c
+touch a/z/foo.bar
+touch a/z/foo.dummy
+ln -s ../a/z c/z
+
 run_sbcl <<EOF
 (setf (logical-pathname-translations "foo")
       (list (list "**;*.txt.*" (merge-pathnames "foo/**/*.txt"))
@@ -248,6 +257,7 @@ run_sbcl <<EOF
 (test "foo:foo;*.txt" "foo/aa.txt")
 (test "foo:**;*.tmp" "foo/aa.tmp" "far/ab.tmp" "qar/ac.tmp")
 (test "foo:foo;*.tmp" "foo/aa.tmp")
+(test "c/*/*.bar" "a/z/foo.bar")
 (quit :unix-status $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?

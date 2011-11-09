@@ -737,7 +737,7 @@ matching filenames."
 ;;; This is our core directory access interface that we use to implement
 ;;; DIRECTORY.
 (defun map-directory (function directory &key (files t) (directories t)
-                      (classify-symlinks) (errorp t))
+                      (classify-symlinks t) (errorp t))
   #!+sb-doc
   "Map over entries in DIRECTORY. Keyword arguments specify which entries to
 map over, and how:
@@ -753,12 +753,12 @@ map over, and how:
    pathname. Defaults to T.
 
  :CLASSIFY-SYMLINKS
-   If T, the decision to call FUNCTION with the pathname of a symbolic link
+   If true, the decision to call FUNCTION with the pathname of a symbolic link
    depends on the resolution of the link: if it points to a directory, it is
    considered a directory entry, otherwise a file entry. If false, all
-   symbolic links are considered file entries. Defaults to T. In both cases
-   the pathname used for the symbolic link is not fully resolved, but names it
-   as an immediate child of DIRECTORY.
+   symbolic links are considered file entries. In both cases the pathname used
+   for the symbolic link is not fully resolved, but names it as an immediate
+   child of DIRECTORY. Defaults to T.
 
  :ERRORP
    If true, signal an error if DIRECTORY does not exist, cannot be read, etc.

@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.53:
   * bug fix: on 64-bit targets, atomic-incf/aref does index computation
     correctly, even on wide-fixnum builds. (lp#887220)
+  * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that
+    resolved to directories.
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,
