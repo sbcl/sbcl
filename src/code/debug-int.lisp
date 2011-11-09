@@ -539,8 +539,7 @@
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
-#!+gencgc (declaim (inline valid-lisp-pointer-p))
-#!+gencgc
+(declaim (inline valid-lisp-pointer-p))
 (sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
   (pointer system-area-pointer))
 
@@ -1987,21 +1986,7 @@ register."
        ;; unbound marker
        (= val sb!vm:unbound-marker-widetag)
        ;; pointer
-       #!+gencgc
-       (not (zerop (valid-lisp-pointer-p (int-sap val))))
-       ;; FIXME: There is no fundamental reason not to use the above
-       ;; function on other platforms as well, but I didn't have
-       ;; others available while doing this. --NS 2007-06-21
-       #!-gencgc
-       (and (logbitp 0 val)
-            (or (< sb!vm:read-only-space-start val
-                   (ash sb!vm:*read-only-space-free-pointer*
-                        sb!vm:n-fixnum-tag-bits))
-                (< sb!vm:static-space-start val
-                   (ash sb!vm:*static-space-free-pointer*
-                        sb!vm:n-fixnum-tag-bits))
-                (< (current-dynamic-space-start) val
-                   (sap-int (dynamic-space-free-pointer))))))
+       (not (zerop (valid-lisp-pointer-p (int-sap val)))))
       (values (%make-lisp-obj val) t)
       (if errorp
           (error "~S is not a valid argument to ~S"

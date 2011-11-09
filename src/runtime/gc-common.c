@@ -2409,6 +2409,236 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
     return (NULL);
 }
 
+/* Helper for valid_lisp_pointer_p (below) and
+ * possibly_valid_dynamic_space_pointer (gencgc).
+ *
+ * pointer is the pointer to validate, and start_addr is the address
+ * of the enclosing object.
+ */
+int
+looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
+{
+    if (!is_lisp_pointer((lispobj)pointer)) {
+        return 0;
+    }
+
+    /* Check that the object pointed to is consistent with the pointer
+     * low tag. */
+    switch (lowtag_of((lispobj)pointer)) {
+    case FUN_POINTER_LOWTAG:
+        /* Start_addr should be the enclosing code object, or a closure
+         * header. */
+        switch (widetag_of(*start_addr)) {
+        case CODE_HEADER_WIDETAG:
+          /* Make sure we actually point to a function in the code object,
+           * as opposed to a random point there. */
+          if (SIMPLE_FUN_HEADER_WIDETAG==widetag_of(*((lispobj *)(((unsigned long)pointer)-FUN_POINTER_LOWTAG))))
+            return 1;
+          else
+            return 0;
+        case CLOSURE_HEADER_WIDETAG:
+        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+            if ((unsigned long)pointer !=
+                ((unsigned long)start_addr+FUN_POINTER_LOWTAG)) {
+                return 0;
+            }
+            break;
+        default:
+            return 0;
+        }
+        break;
+    case LIST_POINTER_LOWTAG:
+        if ((unsigned long)pointer !=
+            ((unsigned long)start_addr+LIST_POINTER_LOWTAG)) {
+            return 0;
+        }
+        /* Is it plausible cons? */
+        if ((is_lisp_pointer(start_addr[0]) ||
+             is_lisp_immediate(start_addr[0])) &&
+            (is_lisp_pointer(start_addr[1]) ||
+             is_lisp_immediate(start_addr[1])))
+            break;
+        else {
+            return 0;
+        }
+    case INSTANCE_POINTER_LOWTAG:
+        if ((unsigned long)pointer !=
+            ((unsigned long)start_addr+INSTANCE_POINTER_LOWTAG)) {
+            return 0;
+        }
+        if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
+            return 0;
+        }
+        break;
+    case OTHER_POINTER_LOWTAG:
+
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
+        /* The all-architecture test below is good as far as it goes,
+         * but an LRA object is similar to a FUN-POINTER: It is
+         * embedded within a CODE-OBJECT pointed to by start_addr, and
+         * cannot be found by simply walking the heap, therefore we
+         * need to check for it. -- AB, 2010-Jun-04 */
+        if ((widetag_of(start_addr[0]) == CODE_HEADER_WIDETAG)) {
+            lispobj *potential_lra =
+                (lispobj *)(((unsigned long)pointer) - OTHER_POINTER_LOWTAG);
+            if ((widetag_of(potential_lra[0]) == RETURN_PC_HEADER_WIDETAG) &&
+                ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
+                return 1; /* It's as good as we can verify. */
+            }
+        }
+#endif
+
+        if ((unsigned long)pointer !=
+            ((unsigned long)start_addr+OTHER_POINTER_LOWTAG)) {
+            return 0;
+        }
+        /* Is it plausible?  Not a cons. XXX should check the headers. */
+        if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
+            return 0;
+        }
+        switch (widetag_of(start_addr[0])) {
+        case UNBOUND_MARKER_WIDETAG:
+        case NO_TLS_VALUE_MARKER_WIDETAG:
+        case CHARACTER_WIDETAG:
+#if N_WORD_BITS == 64
+        case SINGLE_FLOAT_WIDETAG:
+#endif
+            return 0;
+
+            /* only pointed to by function pointers? */
+        case CLOSURE_HEADER_WIDETAG:
+        case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+            return 0;
+
+        case INSTANCE_HEADER_WIDETAG:
+            return 0;
+
+            /* the valid other immediate pointer objects */
+        case SIMPLE_VECTOR_WIDETAG:
+        case RATIO_WIDETAG:
+        case COMPLEX_WIDETAG:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+        case COMPLEX_SINGLE_FLOAT_WIDETAG:
+#endif
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+        case COMPLEX_DOUBLE_FLOAT_WIDETAG:
+#endif
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+        case COMPLEX_LONG_FLOAT_WIDETAG:
+#endif
+        case SIMPLE_ARRAY_WIDETAG:
+        case COMPLEX_BASE_STRING_WIDETAG:
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+        case COMPLEX_CHARACTER_STRING_WIDETAG:
+#endif
+        case COMPLEX_VECTOR_NIL_WIDETAG:
+        case COMPLEX_BIT_VECTOR_WIDETAG:
+        case COMPLEX_VECTOR_WIDETAG:
+        case COMPLEX_ARRAY_WIDETAG:
+        case VALUE_CELL_HEADER_WIDETAG:
+        case SYMBOL_HEADER_WIDETAG:
+        case FDEFN_WIDETAG:
+        case CODE_HEADER_WIDETAG:
+        case BIGNUM_WIDETAG:
+#if N_WORD_BITS != 64
+        case SINGLE_FLOAT_WIDETAG:
+#endif
+        case DOUBLE_FLOAT_WIDETAG:
+#ifdef LONG_FLOAT_WIDETAG
+        case LONG_FLOAT_WIDETAG:
+#endif
+        case SIMPLE_BASE_STRING_WIDETAG:
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+        case SIMPLE_CHARACTER_STRING_WIDETAG:
+#endif
+        case SIMPLE_BIT_VECTOR_WIDETAG:
+        case SIMPLE_ARRAY_NIL_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+
+        case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
+
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+        case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+        case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+        case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
+#endif
+
+        case SIMPLE_ARRAY_FIXNUM_WIDETAG:
+
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+        case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+        case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
+#endif
+        case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+        case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+        case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+        case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+        case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+        case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
+#endif
+        case SAP_WIDETAG:
+        case WEAK_POINTER_WIDETAG:
+            break;
+
+        default:
+            return 0;
+        }
+        break;
+    default:
+        return 0;
+    }
+
+    /* looks good */
+    return 1;
+}
+
+/* Used by the debugger to validate possibly bogus pointers before
+ * calling MAKE-LISP-OBJ on them.
+ *
+ * FIXME: We would like to make this perfect, because if the debugger
+ * constructs a reference to a bugs lisp object, and it ends up in a
+ * location scavenged by the GC all hell breaks loose.
+ *
+ * Whereas possibly_valid_dynamic_space_pointer has to be conservative
+ * and return true for all valid pointers, this could actually be eager
+ * and lie about a few pointers without bad results... but that should
+ * be reflected in the name.
+ */
+int
+valid_lisp_pointer_p(lispobj *pointer)
+{
+    lispobj *start;
+    if (((start=search_dynamic_space(pointer))!=NULL) ||
+        ((start=search_static_space(pointer))!=NULL) ||
+        ((start=search_read_only_space(pointer))!=NULL))
+        return looks_like_valid_lisp_pointer_p(pointer, start);
+    else
+        return 0;
+}
+
 boolean
 maybe_gc(os_context_t *context)
 {

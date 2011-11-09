@@ -576,4 +576,26 @@
                  (sb-kernel:get-lisp-obj-address
                   #'identity))))))
 
+;;; Older CHENEYGC systems didn't perform any real pointer validity
+;;; checks beyond "is this pointer to somewhere in heap space".
+(with-test (:name (make-lisp-obj :pointer-validation))
+  ;; Fun and games: We need to test MAKE-LISP-OBJ with a known-bogus
+  ;; address, but we also need the GC to not pitch a fit if it sees an
+  ;; object with said bogus address.  Thus, construct our known-bogus
+  ;; object within an area of unboxed storage (a vector) in static
+  ;; space.  We'll make it a simple object, (CONS 0 0), which has an
+  ;; in-memory representation of two consecutive zero words.  We
+  ;; allocate a three-word vector so that we can guarantee a
+  ;; double-word aligned double-word of zeros no matter what happens
+  ;; with the vector-data-offset (currently double-word aligned).
+  (let* ((memory (sb-int:make-static-vector 3 :element-type `(unsigned-byte ,sb-vm:n-word-bits)
+                                            :initial-element 0))
+         (vector-data-address (sb-sys:sap-int (sb-kernel::vector-sap memory)))
+         (object-base-address (logandc2 (+ vector-data-address sb-vm:lowtag-mask) sb-vm:lowtag-mask))
+         (object-tagged-address (+ object-base-address sb-vm:list-pointer-lowtag)))
+    (multiple-value-bind
+          (object valid-p)
+        (sb-kernel:make-lisp-obj object-tagged-address nil)
+      (assert (not valid-p)))))
+
 (write-line "/debug.impure.lisp done")
