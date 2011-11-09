@@ -563,5 +563,17 @@
 
 ;; unconditional, in case either previous left it enabled
 (disable-debugger)
+
+;;;; test some limitations of MAKE-LISP-OBJ
+
+;;; Older GENCGC systems had a bug in the pointer validation used by
+;;; MAKE-LISP-OBJ that made SIMPLE-FUN objects always fail to
+;;; validate.
+(with-test (:name (make-lisp-obj :simple-funs))
+  (sb-sys:without-gcing
+    (assert (eq #'identity
+                (sb-kernel:make-lisp-obj
+                 (sb-kernel:get-lisp-obj-address
+                  #'identity))))))
 
 (write-line "/debug.impure.lisp done")
