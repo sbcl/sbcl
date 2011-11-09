@@ -478,7 +478,7 @@
   42)
 
 
-#-win32
+#-(or win32 netbsd)
 (deftest fcntl.flock.2
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
