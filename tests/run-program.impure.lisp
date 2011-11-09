@@ -271,7 +271,7 @@
   (let ((had-error-p nil))
     (flet ((barf (&optional (format :default))
              (with-output-to-string (stream)
-               (run-program "/usr/bin/perl"
+               (run-program #-netbsd "/usr/bin/perl" #+netbsd "/usr/pkg/bin/perl"
                             '("-e" "print \"\\x20\\xfe\\xff\\x0a\"")
                             :output stream
                             :external-format format)))
