@@ -207,7 +207,7 @@ provided the default value is used for the mutex."
       (funcall function)))
 
   (defun call-with-recursive-system-lock/without-gcing (function mutex)
-    (declare (function function) (ignore lock))
+    (declare (function function) (ignore mutex))
     (without-gcing
       (funcall function))))
 

@@ -38,6 +38,7 @@
   (3 nil (#\1 #\2 #\3) nil)
   (0 t nil t))
 
+#+sb-thread
 (deftest mailbox-timeouts
     (let* ((mbox (make-mailbox))
            (writers (loop for i from 1 upto 20
