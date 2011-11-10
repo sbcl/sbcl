@@ -61,10 +61,10 @@ find output -name 'building-contrib.*' -print | xargs rm -f
 CL_SOURCE_REGISTRY='(:source-registry :ignore-inherited-configuration)'
 export CL_SOURCE_REGISTRY
 
-if [ -z "$@" ]; then
+if [ -z "$*" ]; then
     contribs_to_build=contrib/*
 else
-    for name in $@; do
+    for name in $*; do
         contribs_to_build="contrib/$name $contribs_to_build"
     done
 fi
