@@ -73,7 +73,7 @@ stale value, use MUTEX-OWNER instead."
 (define-deprecated-function :early "1.0.53.11" make-spinlock make-mutex (&key name)
   (make-mutex :name name))
 
-(define-deprecated-function :early "1.0.5.x" spinlock-name mutex-name (lock)
+(define-deprecated-function :early "1.0.53.11" spinlock-name mutex-name (lock)
   (mutex-name lock))
 
 (define-deprecated-function :early "1.0.53.11" (setf spinlock-name) (setf mutex-name) (name lock)
