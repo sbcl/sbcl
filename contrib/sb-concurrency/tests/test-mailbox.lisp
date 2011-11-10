@@ -40,7 +40,7 @@
 
 ;;; FIXME: Several tests disabled on Darwin due to hangs. Something not right
 ;;; with mailboxes -- or possibly semaphores -- there.
-#+(and sb-thread (not darwin))
+#+(and sb-thread (not (or darwin sunos)))
 (progn
 
 ;; Dummy struct for ATOMIC-INCF to work.
