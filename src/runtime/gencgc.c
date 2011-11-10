@@ -3316,19 +3316,6 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-static void
-scavenge_control_stack(struct thread *th)
-{
-    lispobj *control_stack =
-        (lispobj *)(th->control_stack_start);
-    unsigned long control_stack_size =
-        access_control_stack_pointer(th) - control_stack;
-
-    scavenge(control_stack, control_stack_size);
-}
-#endif
-
 #if defined(LISP_FEATURE_SB_THREAD) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 static void
 preserve_context_registers (os_context_t *c)

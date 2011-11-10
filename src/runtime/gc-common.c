@@ -2780,6 +2780,17 @@ scrub_control_stack(void)
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 
+void
+scavenge_control_stack(struct thread *th)
+{
+    lispobj *control_stack =
+        (lispobj *)(th->control_stack_start);
+    unsigned long control_stack_size =
+        access_control_stack_pointer(th) - control_stack;
+
+    scavenge(control_stack, control_stack_size);
+}
+
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;

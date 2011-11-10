@@ -149,16 +149,10 @@ collect_garbage(generation_index_t ignore)
     scavenge((lispobj *) interrupt_handlers,
              sizeof(interrupt_handlers) / sizeof(lispobj));
 
-    /* _size quantities are in units of sizeof(lispobj) - i.e. 4 */
-    control_stack_size =
-        current_control_stack_pointer-
-        (lispobj *)th->control_stack_start;
 #ifdef PRINTNOISE
-    printf("Scavenging the control stack at %p (%ld words) ...\n",
-           ((lispobj *)th->control_stack_start),
-           control_stack_size);
+    printf("Scavenging the control stack ...\n");
 #endif
-    scavenge(((lispobj *)th->control_stack_start), control_stack_size);
+    scavenge_control_stack(th);
 
 
     binding_stack_size =
