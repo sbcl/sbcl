@@ -61,7 +61,15 @@ find output -name 'building-contrib.*' -print | xargs rm -f
 CL_SOURCE_REGISTRY='(:source-registry :ignore-inherited-configuration)'
 export CL_SOURCE_REGISTRY
 
-for i in contrib/*; do
+if [ -z "$@" ]; then
+    contribs_to_build=contrib/*
+else
+    for name in $@; do
+        contribs_to_build="contrib/$name $contribs_to_build"
+    done
+fi
+
+for i in $contribs_to_build; do
     test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
     test -f $i/test-passed && rm $i/test-passed
