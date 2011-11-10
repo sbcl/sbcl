@@ -175,15 +175,9 @@ waiting."
        (flet ((maybe-update-timeout ()
                 ;; If we return early, recompute the timeouts, possibly
                 ;; signaling the deadline or returning with NIL to caller.
-                (multiple-value-bind (sec usec)
-                    (decode-internal-time (get-internal-real-time))
-                  (setf to-sec (- stop-sec sec))
-                  (cond ((> usec stop-usec)
-                         (decf to-sec)
-                         (setf to-usec (- (+ stop-usec 1000000) usec)))
-                        (t
-                         (setf to-usec (- stop-usec usec)))))
-                (when (or (minusp to-sec) (and (zerop to-sec) (not (plusp to-usec))))
+                (setf (values to-sec to-usec)
+                      (relative-decoded-times stop-sec stop-usec))
+                (when (and (zerop to-sec) (not (plusp to-usec)))
                   (cond (signalp
                          (signal-deadline)
                          (go :restart))
