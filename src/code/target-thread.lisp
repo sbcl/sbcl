@@ -108,11 +108,18 @@ the symbol not having a thread-local value, or the target thread having
 exited. The offending symbol can be accessed using CELL-ERROR-NAME, and the
 offending thread using THREAD-ERROR-THREAD."))
 
-(define-condition join-thread-error (thread-error) ()
+(define-condition join-thread-error (thread-error)
+  ((problem :initarg :problem :reader join-thread-problem))
   (:report (lambda (c s)
-             (format s "Joining thread failed: thread ~A ~
-                        did not return normally."
-                     (thread-error-thread c))))
+             (ecase (join-thread-problem c)
+               (:abort
+                (format s "Joining thread failed: thread ~A ~
+                           did not return normally."
+                        (thread-error-thread c)))
+               (:timeout
+                (format s "Joining thread timed out: thread ~A ~
+                           did not exit in time."
+                        (thread-error-thread c))))))
   #!+sb-doc
   (:documentation
    "Signalled when joining a thread fails due to abnormal exit of the thread
@@ -1301,18 +1308,37 @@ around and can be retrieved by JOIN-THREAD."
           (wait-on-semaphore setup-sem)
           thread)))))
 
-(defun join-thread (thread &key (default nil defaultp))
+(defun join-thread (thread &key (default nil defaultp) timeout)
   #!+sb-doc
-  "Suspend current thread until THREAD exits. Returns the result
-values of the thread function. If the thread does not exit normally,
-return DEFAULT if given or else signal JOIN-THREAD-ERROR."
-  (with-system-mutex ((thread-result-lock thread) :allow-with-interrupts t)
-    (cond ((car (thread-result thread))
-           (return-from join-thread
-             (values-list (cdr (thread-result thread)))))
-          (defaultp
-           (return-from join-thread default))))
-  (error 'join-thread-error :thread thread))
+  "Suspend current thread until THREAD exits. Return the result values of the
+thread function.
+
+If the thread does not exit normally within TIMEOUT seconds return DEFAULT if
+given, or else signal JOIN-THREAD-ERROR.
+
+NOTE: Return convention in case of a timeout is exprimental and subject to
+change."
+  (let ((lock (thread-result-lock thread))
+        (got-it nil)
+        (problem :timeout))
+    (without-interrupts
+      (unwind-protect
+           (if (setf got-it
+                     (allow-with-interrupts
+                       ;; Don't use the timeout if the thread is not alive anymore.
+                       (grab-mutex lock :timeout (and (thread-alive-p thread) timeout))))
+               (cond ((car (thread-result thread))
+                      (return-from join-thread
+                        (values-list (cdr (thread-result thread)))))
+                     (defaultp
+                      (return-from join-thread default))
+                     (t
+                      (setf problem :abort)))
+               (when defaultp
+                 (return-from join-thread default)))
+        (when got-it
+          (release-mutex lock))))
+    (error 'join-thread-error :thread thread :problem problem)))
 
 (defun destroy-thread (thread)
   #!+sb-doc

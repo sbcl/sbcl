@@ -583,3 +583,16 @@
     (let ((ok (count-if #'join-thread threads)))
       (unless (eql 20 ok)
         (error "Wanted 20, got ~S" ok)))))
+
+(with-test (:name (:join-thread :timeout)
+            :skipped-on '(not :sb-thread))
+  (assert (eq :error
+              (handler-case
+                  (join-thread (make-thread (lambda () (sleep 10))) :timeout 0.01)
+                (join-thread-error ()
+                  :error))))
+  (let ((cookie (cons t t)))
+    (assert (eq cookie
+                (join-thread (make-thread (lambda () (sleep 10)))
+                             :timeout 0.01
+                             :default cookie)))))
