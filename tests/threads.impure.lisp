@@ -1042,8 +1042,7 @@
 ;;; Make sure that a deadline handler is not invoked twice in a row in
 ;;; CONDITION-WAIT. See LP #512914 for a detailed explanation.
 ;;;
-(with-test (:name (:condition-wait :deadlines :LP-512914)
-            :skipped-on '(not :sb-futex))
+(with-test (:name (:condition-wait :deadlines :LP-512914))
   (let ((n 2)                      ; was empirically enough to trigger the bug
         (mutex (sb-thread:make-mutex))
         (waitq (sb-thread:make-waitqueue))
@@ -1174,7 +1173,7 @@
 
 (format t "infodb test done~%")
 
-(with-test (:name :backtrace)
+(with-test (:name :backtrace :broken-on :darwin)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
