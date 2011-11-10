@@ -38,8 +38,29 @@
   (3 nil (#\1 #\2 #\3) nil)
   (0 t nil t))
 
-;;; FIXME: Several tests disabled on Darwin due to hangs. Something not right
-;;; with mailboxes -- or possibly semaphores -- there.
+(deftest mailbox-timeouts
+    (let* ((mbox (make-mailbox))
+           (writers (loop for i from 1 upto 20
+                          collect (make-thread
+                                   (lambda (x)
+                                     (loop repeat 50
+                                           do (send-message mbox x)
+                                              (sleep 0.001)))
+                                   :arguments i)))
+           (readers (loop repeat 10
+                          collect (make-thread
+                                   (lambda ()
+                                     (loop while (receive-message mbox :timeout 0.1)
+                                           count t))))))
+      (mapc #'join-thread writers)
+      (apply #'+ (mapcar #'join-thread readers)))
+  1000)
+
+;;; FIXME: Several tests disabled on Darwin and SunOS due to hangs.
+;;;
+;;; On Darwin at least the issues don't seem to have anything to do with
+;;; mailboxes per-se, but are rather related to our usage of signal-unsafe
+;;; pthread functions inside signal handlers.
 #+(and sb-thread (not (or darwin sunos)))
 (progn
 

@@ -66,19 +66,23 @@ mailbox. Does not remove messages from the mailbox."
     (enqueue message (mailbox-queue mailbox))
     (signal-semaphore (mailbox-semaphore mailbox))))
 
-;;; TODO: TIMEOUT argument.
-(defun receive-message (mailbox &key)
-  "Removes the oldest message from MAILBOX and returns it as the
-primary value. If MAILBOX is empty waits until a message arrives."
+(defun receive-message (mailbox &key timeout)
+  "Removes the oldest message from MAILBOX and returns it as the primary
+value, and a secondary value of T. If MAILBOX is empty waits until a message
+arrives.
+
+If TIMEOUT is provided, and no message arrives within the specified interval,
+returns primary and secondary value of NIL."
   (tagbody
      ;; Disable interrupts for keeping semaphore count in sync with
      ;; #msgs in the mailbox.
      (sb-sys:without-interrupts
        (sb-sys:allow-with-interrupts
-         (wait-on-semaphore (mailbox-semaphore mailbox)))
+         (or (wait-on-semaphore (mailbox-semaphore mailbox) :timeout timeout)
+             (return-from receive-message (values nil nil))))
        (multiple-value-bind (value ok) (dequeue (mailbox-queue mailbox))
          (if ok
-             (return-from receive-message value)
+             (return-from receive-message (values value t))
              (go :error))))
    :error
      (sb-int:bug "Mailbox ~S empty after WAIT-ON-SEMAPHORE."

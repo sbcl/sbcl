@@ -793,7 +793,8 @@ around the call, checking the the associated data:
 "
   #!-sb-thread (declare (ignore queue timeout))
   (assert mutex)
-  #!-sb-thread (error "Not supported in unithread builds.")
+  #!-sb-thread
+  (wait-for nil :timeout timeout) ; Yeah...
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
@@ -861,23 +862,27 @@ around the call, checking the the associated data:
             (when (and (eq :timeout status) deadlinep)
               (let ((got-it (%try-mutex mutex me)))
                 (allow-with-interrupts
-                  (signal-deadline))
-                (cond (got-it
-                       (return-from condition-wait t))
-                      (t
-                       (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
-                             (decode-timeout timeout))))))
+                  (signal-deadline)
+                  (cond (got-it
+                         (return-from condition-wait t))
+                        (t
+                         ;; The deadline may have changed.
+                         (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
+                               (decode-timeout timeout))
+                         (setf status :ok))))))
             ;; Re-acquire the mutex for normal return.
-            (unless (or (%try-mutex mutex me)
-                        (allow-with-interrupts
-                          (%wait-for-mutex mutex me timeout
-                                           to-sec to-usec
-                                           stop-sec stop-usec deadlinep)))
+            (when (eq :ok status)
+              (unless (or (%try-mutex mutex me)
+                          (allow-with-interrupts
+                            (%wait-for-mutex mutex me timeout
+                                             to-sec to-usec
+                                             stop-sec stop-usec deadlinep)))
+                (setf status :timeout)))))
+        (or (eq :ok status)
+            (unless (eq :timeout status)
               ;; The only case we return normally without re-acquiring the
               ;; mutex is when there is a :TIMEOUT that runs out.
-              (aver (and timeout (not deadlinep)))
-              (return-from condition-wait nil)))))))
-  t)
+              (bug "CONDITION-WAIT: invalid status on normal return: ~S" status)))))))
 
 (defun condition-notify (queue &optional (n 1))
   #!+sb-doc
@@ -951,16 +956,22 @@ future."
   "Create a semaphore with the supplied COUNT and NAME."
   (%make-semaphore name count))
 
-(defun wait-on-semaphore (semaphore)
+(defun wait-on-semaphore (semaphore &key timeout)
   #!+sb-doc
-  "Decrement the count of SEMAPHORE if the count would not be
-negative. Else blocks until the semaphore can be decremented."
+  "Decrement the count of SEMAPHORE if the count would not be negative. Else
+blocks until the semaphore can be decremented. Returns T on success.
+
+If TIMEOUT is given, it is the maximum number of seconds to wait. If the count
+cannot be decremented in that time, returns NIL without decrementing the
+count."
   ;; A more direct implementation based directly on futexes should be
   ;; possible.
   ;;
   ;; We need to disable interrupts so that we don't forget to
   ;; decrement the waitcount (which would happen if an asynch
   ;; interrupt should catch us on our way out from the loop.)
+  ;;
+  ;; FIXME: No timeout on initial mutex acquisition.
   (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
     ;; Quick check: is it positive? If not, enter the wait loop.
     (let ((count (semaphore-%count semaphore)))
@@ -975,12 +986,15 @@ negative. Else blocks until the semaphore can be decremented."
                  ;; at most one increment per thread waiting on the semaphore.
                  (sb!ext:atomic-incf (semaphore-waitcount semaphore))
                  (loop until (plusp (setf count (semaphore-%count semaphore)))
-                       do (condition-wait (semaphore-queue semaphore)
-                                          (semaphore-mutex semaphore)))
+                       do (or (condition-wait (semaphore-queue semaphore)
+                                              (semaphore-mutex semaphore)
+                                              :timeout timeout)
+                              (return-from wait-on-semaphore nil)))
                  (setf (semaphore-%count semaphore) (1- count)))
             ;; Need to use ATOMIC-DECF instead of DECF, as CONDITION-WAIT
             ;; may unwind without the lock being held due to timeouts.
-            (sb!ext:atomic-decf (semaphore-waitcount semaphore)))))))
+            (sb!ext:atomic-decf (semaphore-waitcount semaphore))))))
+  t)
 
 (defun try-semaphore (semaphore &optional (n 1))
   #!+sb-doc

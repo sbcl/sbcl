@@ -524,3 +524,62 @@
                     (sb-ext:wait-for nil :timeout 10)
                     (error "oops"))
                 (sb-sys:deadline-timeout () :deadline)))))
+
+(with-test (:name (:condition-wait :timeout :one-thread))
+  (let ((mutex (make-mutex))
+        (waitqueue (make-waitqueue)))
+    (assert (not (with-mutex (mutex)
+                   (condition-wait waitqueue mutex :timeout 0.01))))))
+
+(with-test (:name (:condition-wait :timeout :many-threads)
+            :skipped-on '(not :sb-thread))
+  (let* ((mutex (make-mutex))
+         (waitqueue (make-waitqueue))
+         (sem (make-semaphore))
+         (data nil)
+         (workers
+           (loop repeat 100
+                 collect (make-thread
+                          (lambda ()
+                            (wait-on-semaphore sem)
+                            (block thread
+                              (with-mutex (mutex)
+                                (loop until data
+                                      do (or (condition-wait waitqueue mutex :timeout 0.01)
+                                             (return-from thread nil)))
+                                (assert (eq t (pop data)))
+                                t)))))))
+    (loop repeat 50
+          do (with-mutex (mutex)
+               (push t data)
+               (condition-notify waitqueue)))
+    (signal-semaphore sem 100)
+    (let ((ok (count-if #'join-thread workers)))
+      (unless (eql 50 ok)
+        (error "Wanted 50, got ~S" ok)))))
+
+(with-test (:name (:wait-on-semaphore :timeout :one-thread))
+  (let ((sem (make-semaphore))
+        (n 0))
+    (signal-semaphore sem 10)
+    (loop repeat 100
+          do (when (wait-on-semaphore sem :timeout 0.001)
+               (incf n)))
+    (assert (= n 10))))
+
+(with-test (:name (:wait-on-semaphore :timeout :many-threads)
+            :skipped-on '(not :sb-thread))
+  (let* ((sem (make-semaphore))
+         (threads
+           (progn
+             (signal-semaphore sem 10)
+             (loop repeat 100
+                   collect (make-thread
+                            (lambda ()
+                              (sleep (random 0.02))
+                              (wait-on-semaphore sem :timeout 0.01)))))))
+    (loop repeat 5
+          do (signal-semaphore sem 2))
+    (let ((ok (count-if #'join-thread threads)))
+      (unless (eql 20 ok)
+        (error "Wanted 20, got ~S" ok)))))
