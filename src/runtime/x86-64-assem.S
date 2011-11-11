@@ -458,4 +458,78 @@ Lend:
 	ret
 	SIZE(GNAME(fast_bzero))
 
+
+/* When LISP_FEATURE_C_STACK_IS_CONTROL_STACK, we cannot safely scrub
+ * the control stack from C, largely due to not knowing where the
+ * active stack frame ends.  On such platforms, we reimplement the
+ * core scrubbing logic in assembly, in this case here:
+ */
+	.text
+	.align	align_16byte,0x90
+	.globl GNAME(arch_scrub_control_stack)
+	TYPE(GNAME(arch_scrub_control_stack))
+GNAME(arch_scrub_control_stack):
+	/* We are passed three parameters:
+	 * A (struct thread *) in RDI,
+	 * the address of the guard page in RSI, and
+	 * the address of the hard guard page in RDX.
+	 * We may trash RAX, RCX, and R8-R11 with impunity.
+	 * [RSP] is our return address, [RSP-8] is the first
+	 * stack slot to scrub. */
+
+	/* We start by setting up our scrub pointer in RAX, our
+	 * guard page upper bound in R8, and our hard guard
+	 * page upper bound in R9. */
+	lea	-8(%rsp), %rax
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(os_vm_page_size)),%r9
+#else
+	mov	os_vm_page_size,%r9
+#endif
+	lea	(%rsi,%r9), %r8
+	lea	(%rdx,%r9), %r9
+
+	/* Now we begin our main scrub loop. */
+ascs_outer_loop:
+
+	/* If we're about to scrub the hard guard page, exit. */
+	cmp	%r9, %rax
+	jae	ascs_check_guard_page
+	cmp	%rax, %rdx
+	jbe	ascs_finished
+
+ascs_check_guard_page:
+	/* If we're about to scrub the guard page, and the guard
+	 * page is protected, exit. */
+	cmp	%r8, %rax
+	jae	ascs_clear_loop
+	cmp	%rax, %rsi
+	ja	ascs_clear_loop
+	cmpq	$(NIL), THREAD_CONTROL_STACK_GUARD_PAGE_PROTECTED_OFFSET(%rdi)
+	jne	ascs_finished
+
+	/* Clear memory backwards to the start of the (4KiB) page */
+ascs_clear_loop:
+	movq	$0, (%rax)
+	test	$0xfff, %rax
+	lea	-8(%rax), %rax
+	jnz	ascs_clear_loop
+
+	/* If we're about to hit the hard guard page, exit. */
+	cmp	%r9, %rax
+	jae	ascs_finished
+
+	/* If the next (previous?) 4KiB page contains a non-zero
+	 * word, continue scrubbing. */
+ascs_check_loop:
+	testq	$-1, (%rax)
+	jnz	ascs_outer_loop
+	test	$0xfff, %rax
+	lea	-8(%rax), %rax
+	jnz	ascs_check_loop
+
+ascs_finished:
+	ret
+	SIZE(GNAME(arch_scrub_control_stack))
+
         END()

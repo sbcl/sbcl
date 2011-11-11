@@ -2740,12 +2740,13 @@ scrub_control_stack(void)
     struct thread *th = arch_os_get_current_thread();
     os_vm_address_t guard_page_address = CONTROL_STACK_GUARD_PAGE(th);
     os_vm_address_t hard_guard_page_address = CONTROL_STACK_HARD_GUARD_PAGE(th);
-    lispobj *sp;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    sp = (lispobj *)&sp - 1;
+    /* On these targets scrubbing from C is a bad idea, so we punt to
+     * a routine in $ARCH-assem.S. */
+    extern void arch_scrub_control_stack(struct thread *, os_vm_address_t, os_vm_address_t);
+    arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address);
 #else
-    sp = access_control_stack_pointer(th);
-#endif
+    lispobj *sp = access_control_stack_pointer(th);
  scrub:
     if ((((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size)) &&
          ((os_vm_address_t)sp >= hard_guard_page_address)) ||
@@ -2774,6 +2775,7 @@ scrub_control_stack(void)
             goto scrub;
     } while (((unsigned long)++sp) & (BYTES_ZERO_BEFORE_END - 1));
 #endif
+#endif /* LISP_FEATURE_C_STACK_IS_CONTROL_STACK */
 }
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)

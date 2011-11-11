@@ -881,6 +881,81 @@ Lend_base:
         pop %eax
 	ret
 	SIZE(GNAME(fast_bzero_base))
-        
-	
+
+
+/* When LISP_FEATURE_C_STACK_IS_CONTROL_STACK, we cannot safely scrub
+ * the control stack from C, largely due to not knowing where the
+ * active stack frame ends.  On such platforms, we reimplement the
+ * core scrubbing logic in assembly, in this case here:
+ */
+	.text
+	.align	align_16byte,0x90
+	.globl GNAME(arch_scrub_control_stack)
+	TYPE(GNAME(arch_scrub_control_stack))
+GNAME(arch_scrub_control_stack):
+	/* We are passed three parameters:
+	 * A (struct thread *) at [ESP+4],
+	 * the address of the guard page at [ESP+8], and
+	 * the address of the hard guard page at [ESP+12].
+	 * We may trash EAX, ECX, and EDX with impunity.
+	 * [ESP] is our return address, [ESP-4] is the first
+	 * stack slot to scrub. */
+
+	/* We start by setting up our scrub pointer in EAX, our
+	 * guard page upper bound in ECX, and our hard guard
+	 * page upper bound in EDX. */
+	lea	-4(%esp), %eax
+	mov	GNAME(os_vm_page_size),%edx
+	mov	%edx, %ecx
+	add	8(%esp), %ecx
+	add	12(%esp), %edx
+
+	/* We need to do a memory operation relative to the
+	 * thread pointer, so put it in %ecx and our guard
+	 * page upper bound in 4(%esp). */
+	xchg	4(%esp), %ecx
+
+	/* Now we begin our main scrub loop. */
+ascs_outer_loop:
+
+	/* If we're about to scrub the hard guard page, exit. */
+	cmp	%edx, %eax
+	jae	ascs_check_guard_page
+	cmp	12(%esp), %eax
+	ja	ascs_finished
+
+ascs_check_guard_page:
+	/* If we're about to scrub the guard page, and the guard
+	 * page is protected, exit. */
+	cmp	4(%esp), %eax
+	jae	ascs_clear_loop
+	cmp	8(%esp), %eax
+	jbe	ascs_clear_loop
+	cmpl	$(NIL), THREAD_CONTROL_STACK_GUARD_PAGE_PROTECTED_OFFSET(%ecx)
+	jne	ascs_finished
+
+	/* Clear memory backwards to the start of the (4KiB) page */
+ascs_clear_loop:
+	movl	$0, (%eax)
+	test	$0xfff, %eax
+	lea	-4(%eax), %eax
+	jnz	ascs_clear_loop
+
+	/* If we're about to hit the hard guard page, exit. */
+	cmp	%edx, %eax
+	jae	ascs_finished
+
+	/* If the next (previous?) 4KiB page contains a non-zero
+	 * word, continue scrubbing. */
+ascs_check_loop:
+	testl	$-1, (%eax)
+	jnz	ascs_outer_loop
+	test	$0xfff, %eax
+	lea	-4(%eax), %eax
+	jnz	ascs_check_loop
+
+ascs_finished:
+	ret
+	SIZE(GNAME(arch_scrub_control_stack))
+
         END()
