@@ -533,7 +533,7 @@
                ((layout-invalid obj-layout)
                 (/noshow0 "LAYOUT-INVALID case")
                 (error 'layout-invalid
-                       :expected-type (layout-classoid obj-layout)
+                       :expected-type (layout-classoid layout)
                        :datum obj))
                (t
                 (let ((depthoid (layout-depthoid layout)))
