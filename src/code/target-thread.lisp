@@ -737,7 +737,7 @@ around the call, checking the the associated data:
   (declare (ignore queue))
   (assert mutex)
   #!-sb-thread
-  (wait-for nil :timeout timeout) ; Yeah...
+  (sb!ext:wait-for nil :timeout timeout) ; Yeah...
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
