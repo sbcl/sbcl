@@ -521,28 +521,25 @@
   (/nohexstr obj)
   (/nohexstr layout)
   (when (layout-invalid layout)
-    (error "An obsolete structure accessor function was called."))
+    (error "An obsolete structure typecheck function was called."))
   (/noshow0 "back from testing LAYOUT-INVALID LAYOUT")
   (and (%instancep obj)
        (let ((obj-layout (%instance-layout obj)))
-         (cond ((eq obj-layout layout)
-                ;; (In this case OBJ-LAYOUT can't be invalid, because
-                ;; we determined LAYOUT is valid in the test above.)
-                (/noshow0 "EQ case")
-                t)
-               ((layout-invalid obj-layout)
-                (/noshow0 "LAYOUT-INVALID case")
-                (error 'layout-invalid
-                       :expected-type (layout-classoid layout)
-                       :datum obj))
-               (t
-                (let ((depthoid (layout-depthoid layout)))
-                  (/noshow0 "DEPTHOID case, DEPTHOID,LAYOUT-INHERITS=..")
-                  (/nohexstr depthoid)
-                  (/nohexstr layout-inherits)
-                  (and (> (layout-depthoid obj-layout) depthoid)
-                       (eq (svref (layout-inherits obj-layout) depthoid)
-                           layout))))))))
+         (when (eq obj-layout layout)
+           ;; (In this case OBJ-LAYOUT can't be invalid, because
+           ;; we determined LAYOUT is valid in the test above.)
+           (/noshow0 "EQ case")
+           (return-from typep-to-layout t))
+         (when (layout-invalid obj-layout)
+           (/noshow0 "LAYOUT-INVALID case")
+           (setf obj-layout (update-object-layout-or-invalid obj layout)))
+         (let ((depthoid (layout-depthoid layout)))
+           (/noshow0 "DEPTHOID case, DEPTHOID,LAYOUT-INHERITS=..")
+           (/nohexstr depthoid)
+           (/nohexstr layout-inherits)
+           (and (> (layout-depthoid obj-layout) depthoid)
+                (eq (svref (layout-inherits obj-layout) depthoid)
+                    layout))))))
 
 ;;;; checking structure types
 

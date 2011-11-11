@@ -153,7 +153,7 @@
     (remhash owrapper *previous-nwrappers*)
     (setf (gethash nwrapper *previous-nwrappers*) new-previous)))
 
-;;; FIXME: This is not a good name: part of the constract here is that
+;;; FIXME: This is not a good name: part of the contract here is that
 ;;; we return the valid wrapper, which is not obvious from the name
 ;;; (or the names of our callees.)
 (defun check-wrapper-validity (instance)

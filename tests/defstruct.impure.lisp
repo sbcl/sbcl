@@ -1112,3 +1112,12 @@ redefinition."
     (assert (eq t (boa-supplied-p.2-bar b2)))
     (assert (eq nil (boa-supplied-p.2-barp b1)))
     (assert (eq t (boa-supplied-p.2-barp b2)))))
+
+(defstruct structure-with-predicate)
+(defclass class-to-be-redefined () ())
+(let ((x (make-instance 'class-to-be-redefined)))
+  (defun function-trampoline (fun) (funcall fun x)))
+
+(with-test (:name (:struct-predicate :obsolete-instance))
+  (defclass class-to-be-redefined () ((a :initarg :a :initform 1)))
+  (function-trampoline #'structure-with-predicate-p))

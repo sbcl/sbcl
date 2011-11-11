@@ -880,7 +880,7 @@
     (%ensure-classoid-valid class2 layout2)))
 
 (defun update-object-layout-or-invalid (object layout)
-  (if (typep (classoid-of object) 'standard-classoid)
+  (if (layout-for-std-class-p (layout-of object))
       (sb!pcl::check-wrapper-validity object)
       (sb!c::%layout-invalid-error object layout)))
 
