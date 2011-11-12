@@ -383,8 +383,8 @@ static void freebsd_init()
 #endif /* LISP_FEATURE_X86 */
 }
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX) \
-    && !defined(LISP_FEATURE_SB_LUTEX)
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) \
+    && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
 int
 futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
 {

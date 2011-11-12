@@ -64,7 +64,7 @@ int personality (unsigned long);
 
 size_t os_vm_page_size;
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_LUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <errno.h>
@@ -221,7 +221,7 @@ os_init(char *argv[], char *envp[])
 #endif
     }
 #ifdef LISP_FEATURE_SB_THREAD
-#if !defined(LISP_FEATURE_SB_LUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+#if defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
     futex_init();
 #endif
     if(! isnptl()) {
