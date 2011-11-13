@@ -3,6 +3,8 @@ changes relative to sbcl-1.0.53:
   * enchancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does
     the same validation of pointer objects as GENCGC does, instead of a
     comparatively weak bounds-check against the heap spaces.
+  * enhancement: on win32, ABS of complex floats guards better against
+    overflows. (lp#888410)
   * bug fix: on 64-bit targets, atomic-incf/aref does index computation
     correctly, even on wide-fixnum builds. (lp#887220)
   * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that

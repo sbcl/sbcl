@@ -415,3 +415,7 @@
 (with-test (:name :round-single-to-bignum)
   (assert (= (round 1e14) 100000000376832))
   (assert (= (round 1e19) 9999999980506447872)))
+
+(with-test (:name :scaled-%hypot)
+  (assert (<= (abs (complex most-positive-double-float 1d0))
+              (1+ most-positive-double-float))))

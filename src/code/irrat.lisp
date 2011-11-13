@@ -127,11 +127,26 @@
 
 #!+win32
 (progn
-  ;; FIXME: libc hypot "computes the sqrt(x*x+y*y) without undue overflow or underflow"
-  ;; ...we just do the stupid simple thing.
+  ;; This is written in a peculiar way to avoid overflow. Note that in
+  ;; sqrt(x^2 + y^2), either square or the sum can overflow.
+  ;;
+  ;; Factoring x^2 out of sqrt(x^2 + y^2) gives us the expression
+  ;; |x|sqrt(1 + (y/x)^2), which, assuming |x| >= |y|, can only overflow
+  ;; if |x| is sufficiently large.
+  ;;
+  ;; The ZEROP test suffices (y is non-negative) to guard against
+  ;; divisions by zero: x >= y > 0.
   (declaim (inline %hypot))
   (defun %hypot (x y)
-    (sqrt (+ (* x x) (* y y)))))
+    (declare (type double-float x y))
+    (let ((x (abs x))
+          (y (abs y)))
+      (when (> y x)
+        (rotatef x y))
+      (if (zerop y)
+          x
+          (let ((y/x (/ y x)))
+            (* x (sqrt (1+ (* y/x y/x)))))))))
 
 ;;;; power functions
 
