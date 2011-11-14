@@ -1,5 +1,5 @@
 (defpackage :sb-concurrency
-  (:use :cl :sb-thread)
+  (:use :cl :sb-thread :sb-int)
   (:export
    ;; MAILBOX
    "LIST-MAILBOX-MESSAGES"
@@ -24,4 +24,14 @@
    "QUEUE-EMPTY-P"
    "QUEUE-NAME"
    "QUEUEP"
+
+   ;; GATE
+   "CLOSE-GATE"
+   "GATE"
+   "GATE-NAME"
+   "GATE-OPEN-P"
+   "GATEP"
+   "MAKE-GATE"
+   "OPEN-GATE"
+   "WAIT-ON-GATE"
    ))

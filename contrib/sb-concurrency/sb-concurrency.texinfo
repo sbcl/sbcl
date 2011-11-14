@@ -22,15 +22,6 @@ Before SBCL 1.0.38, this implementation resided in its own contrib
 (@pxref{sb-queue}) which is still provided for backwards-compatibility
 but which has since been deprecated.
 
-@sp 1
-@unnumberedsubsubsec Synopsis:
-
-@code{enqueue} can be used to add objects to a queue, and
-@code{dequeue} retrieves items from a queue in FIFO order.
-
-@sp 1
-@unnumberedsubsubsec Dictionary:
-
 @include struct-sb-concurrency-queue.texinfo
 
 @include fun-sb-concurrency-dequeue.texinfo
@@ -48,23 +39,10 @@ but which has since been deprecated.
 
 @code{sb-concurrency:mailbox} is a lock-free message queue where one
 or multiple ends can send messages to one or multiple receivers. The
-difference to @ref{Section sb-concurrency:queue} is that the receiving
+difference to @ref{Section sb-concurrency:queue, queues} is that the receiving
 end may block until a message arrives.
 @*@*
-The implementation is based on the Queue implementation above
-(@pxref{Structure sb-concurrency:queue}.)
-
-@sp 1
-@unnumberedsubsubsec Synopsis:
-@code{send-message} can be used to send a message to a mailbox, and
-@code{receive-message} retrieves a message from a mailbox, or blocks
-until a new message arrives. @code{receive-message-no-hang} is the
-non-blocking variant.
-@*@*
-Messages can be any object.
-
-@sp 1
-@unnumberedsubsubsec Dictionary:
+Built on top of the @ref{Structure sb-concurrency:queue, queue} implementation.
 
 @include struct-sb-concurrency-mailbox.texinfo
 
@@ -78,3 +56,21 @@ Messages can be any object.
 @include fun-sb-concurrency-receive-message-no-hang.texinfo
 @include fun-sb-concurrency-receive-pending-messages.texinfo
 @include fun-sb-concurrency-send-message.texinfo
+
+@page
+@anchor{Section sb-concurrency:gate}
+@subsection Gates
+@cindex Gate
+
+@code{sb-concurrency:gate} is a synchronization object suitable for when
+multiple threads must wait for a single event before proceeding.
+
+@include struct-sb-concurrency-gate.texinfo
+
+@include fun-sb-concurrency-close-gate.texinfo
+@include fun-sb-concurrency-gate-name.texinfo
+@include fun-sb-concurrency-gate-open-p.texinfo
+@include fun-sb-concurrency-gatep.texinfo
+@include fun-sb-concurrency-make-gate.texinfo
+@include fun-sb-concurrency-open-gate.texinfo
+@include fun-sb-concurrency-wait-on-gate.texinfo

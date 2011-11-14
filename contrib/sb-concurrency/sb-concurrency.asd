@@ -14,7 +14,8 @@
 (asdf:defsystem :sb-concurrency
   :components ((:file "package")
                (:file "queue"    :depends-on ("package"))
-               (:file "mailbox"  :depends-on ("package" "queue"))))
+               (:file "mailbox"  :depends-on ("package" "queue"))
+               (:file "gate"     :depends-on ("package"))))
 
 (asdf:defsystem :sb-concurrency-tests
   :depends-on (:sb-concurrency :sb-rt)
@@ -24,7 +25,8 @@
     ((:file "package")
      (:file "test-utils"   :depends-on ("package"))
      (:file "test-queue"   :depends-on ("package" "test-utils"))
-     (:file "test-mailbox" :depends-on ("package" "test-utils"))))))
+     (:file "test-mailbox" :depends-on ("package" "test-utils"))
+     (:file "test-gate"    :depends-on ("package" "test-utils"))))))
 
 (defmethod asdf:perform :after ((o asdf:load-op)
                                 (c (eql (asdf:find-system :sb-concurrency))))

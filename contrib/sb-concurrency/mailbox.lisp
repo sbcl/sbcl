@@ -18,7 +18,13 @@
 (defstruct (mailbox (:constructor %make-mailbox (queue semaphore name))
                     (:copier nil)
                     (:predicate mailboxp))
-  "Mailbox aka message queue."
+  "Mailbox aka message queue.
+
+SEND-MESSAGE adds a message to the mailbox, RECEIVE-MESSAGE waits till
+a message becomes available, whereas RECEIVE-MESSAGE-NO-HANG is a non-blocking
+variant, and RECEIVE-PENDING-MESSAGES empties the entire mailbox in one go.
+
+Messages can be arbitrary objects"
   (queue (missing-arg) :type queue)
   (semaphore (missing-arg) :type semaphore)
   (name nil))
