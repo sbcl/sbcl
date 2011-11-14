@@ -107,7 +107,7 @@ useful for implementing lockless algorithms.
 @include macro-sb-ext-atomic-incf.texinfo
 @include macro-sb-ext-compare-and-swap.texinfo
 
-@subsection CAS Protocol
+@unnumberedsubsec CAS Protocol
 
 Our @code{compare-and-swap} is user-extensible using a protocol similar
 to @code{setf}:
@@ -152,10 +152,11 @@ if you want a bounded wait.
 @include fun-sb-thread-make-mutex.texinfo
 @include fun-sb-thread-mutex-name.texinfo
 @include fun-sb-thread-mutex-value.texinfo
-@include fun-sb-thread-get-mutex.texinfo
+@include fun-sb-thread-grab-mutex.texinfo
 @include fun-sb-thread-release-mutex.texinfo
 @include macro-sb-thread-with-mutex.texinfo
 @include macro-sb-thread-with-recursive-lock.texinfo
+@include fun-sb-thread-get-mutex.texinfo
 
 @node Semaphores
 @comment  node-name,  next,  previous,  up
