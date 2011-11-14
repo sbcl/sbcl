@@ -58,9 +58,10 @@ if the gate was already open."
   (declare (gate gate))
   (let (closed)
     (with-mutex ((gate-mutex gate))
-      (setf closed (eq :closed (gate-state gate))
-            (gate-state gate) :open)
-      (condition-broadcast (gate-queue gate)))
+      (sb-sys:without-interrupts
+        (setf closed (eq :closed (gate-state gate))
+              (gate-state gate) :open)
+        (condition-broadcast (gate-queue gate))))
     closed))
 
 (defun close-gate (gate)
