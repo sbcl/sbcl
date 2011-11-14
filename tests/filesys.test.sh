@@ -287,6 +287,27 @@ test -f deltest && test ! -f sub/deltest
 check_status_maybe_lose "delete-file via d-p-d" $? \
   0 "ok"
 
+# RENAME-FILE
+use_test_subdirectory
+touch one
+mkdir sub
+touch sub/one
+touch foo
+ln -s foo link
+run_sbcl --eval '(let ((*default-pathname-defaults* (truename "sub")))
+                   (rename-file "one" "two"))' \
+         --eval '(rename-file "one" "three")' \
+         --eval '(rename-file "link" "bar")'
+test -f three
+check_status_maybe_lose "rename-file" $? \
+    0 "ok"
+test -f sub/two
+check_status_maybe_lose "rename-file via d-p-d" $? \
+    0 "ok"
+test -f foo && test -L bar
+check_status_maybe_lose "rename-file + symlink" $? \
+    0 "ok"
+
 # DELETE-DIRECTORY
 use_test_subdirectory
 mkdir    dont_delete_me
@@ -305,13 +326,22 @@ ln -s    `pwd`/me_neither deep/1/another_linky
 mkdir -p one/one
 touch    one/one/two
 touch    one/two
+ln -s dont_delete_me will_fail
 
 run_sbcl --eval '(sb-ext:delete-directory "simple_test_subdir1")' \
          --eval '(sb-ext:delete-directory "simple_test_subdir2/")' \
          --eval '(sb-ext:delete-directory "deep" :recursive t)' \
          --eval '(let ((*default-pathname-defaults* (truename "one")))
                    (delete-directory "one" :recursive t))' \
+         --eval '(handler-case (delete-directory "will_fail")
+                   (file-error ())
+                   (:no-error (x) (sb-ext:quit :unix-status 1)))' \
          --eval '(sb-ext:quit)'
+check_status_maybe_lose "delete-directory symlink" $? \
+  0 "ok"
+test -L will_fail && test -d dont_delete_me
+check_status_maybe_lose "delete-directory symlink 2" $? \
+  0 "ok"
 
 test -d simple_test_subdir1
 check_status_maybe_lose "delete-directory 1" $? \

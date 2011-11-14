@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.53:
+  * minor incompatible changes:
+    ** RENAME-FILE on a symbolic links used to rename the linked-to file instead
+       of the link.
+    ** DELETE-DIRECTORY on symbolic link to a directory used to delete the
+       directory, but now signal an error instead. Use TRUENAME to resolve
+       the pathname if you wish to delete the linked directory, and DELETE-FILE
+       if you wish to delete the
   * enchancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does
     the same validation of pointer objects as GENCGC does, instead of a
     comparatively weak bounds-check against the heap spaces.

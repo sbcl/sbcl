@@ -462,9 +462,11 @@ or if PATHSPEC is a wild pathname."
 (defun rename-file (file new-name)
   #!+sb-doc
   "Rename FILE to have the specified NEW-NAME. If FILE is a stream open to a
-  file, then the associated file is renamed."
-  (let* ((original (truename file))
-         (original-namestring (native-namestring original :as-file t))
+file, then the associated file is renamed."
+  (let* ((original (merge-pathnames file (sane-default-pathname-defaults)))
+         (old-truename (truename original))
+         (original-namestring (native-namestring (physicalize-pathname original)
+                                                 :as-file t))
          (new-name (merge-pathnames new-name original))
          (new-namestring (native-namestring (physicalize-pathname new-name)
                                             :as-file t)))
@@ -483,7 +485,7 @@ or if PATHSPEC is a wild pathname."
                :format-arguments (list original new-name (strerror error))))
       (when (streamp file)
         (file-name file new-name))
-      (values new-name original (truename new-name)))))
+      (values new-name old-truename (truename new-name)))))
 
 (defun delete-file (file)
   #!+sb-doc
@@ -501,8 +503,17 @@ per standard Unix unlink() behaviour."
       (close file))
     (multiple-value-bind (res err) (sb!unix:unix-unlink namestring)
       (unless res
-        (simple-file-perror "couldn't delete ~A" namestring err))))
+        (simple-file-perror "Couldn't delete file ~A" namestring err))))
   t)
+
+(defun directorize-pathname (pathname)
+  (if (or (pathname-name pathname)
+          (pathname-type pathname))
+      (make-pathname :directory (append (pathname-directory pathname)
+                                        (list (file-namestring pathname)))
+                     :host (pathname-host pathname)
+                     :device (pathname-device pathname))
+      pathname))
 
 (defun delete-directory (pathspec &key recursive)
   "Deletes the directory designated by PATHSPEC (a pathname designator).
@@ -513,38 +524,50 @@ empty. If RECURSIVE is true, first deletes all files and subdirectories. If
 RECURSIVE is true and the directory contains symbolic links, the links are
 deleted, not the files and directories they point to.
 
-Signals an error if PATHSPEC designates a file instead of a directory, or if
-the directory could not be deleted for any reason.
+Signals an error if PATHSPEC designates a file or a symbolic link instead of a
+directory, or if the directory could not be deleted for any reason.
 
-\(DELETE-DIRECTORY \"/tmp/foo\") and \(DELETE-DIRECTORY \"/tmp/foo/\") both
+Both
+
+   \(DELETE-DIRECTORY \"/tmp/foo\")
+   \(DELETE-DIRECTORY \"/tmp/foo/\")
+
 delete the \"foo\" subdirectory of \"/tmp\", or signal an error if it does not
-exist or is a file."
+exist or if is a file or a symbolic link."
   (declare (type pathname-designator pathspec))
-  (with-pathname (pathname pathspec)
-    (let ((truename (truename (translate-logical-pathname pathname))))
-      (labels ((recurse (dir)
-                 (map-directory #'recurse dir
-                                :files nil
-                                :directories t
-                                :classify-symlinks nil)
-                 (map-directory #'delete-file dir
-                                :files t
-                                :directories nil
-                                :classify-symlinks nil)
-                 (delete-dir dir))
-               (delete-dir (dir)
-                 (let* ((namestring (native-namestring dir :as-file t))
-                        (res (alien-funcall (extern-alien #!-win32 "rmdir"
-                                                          #!+win32 "_rmdir"
-                                                          (function int c-string))
-                                            namestring)))
-                   (if (minusp res)
-                       (simple-file-perror "Could not delete directory ~A:~%  ~A"
-                                           namestring (get-errno))
-                       dir))))
-        (if recursive
-            (recurse truename)
-            (delete-dir truename))))))
+  (let ((physical (directorize-pathname
+                   (physicalize-pathname
+                    (merge-pathnames
+                     pathspec (sane-default-pathname-defaults))))))
+    (labels ((recurse-merged (dir)
+               (lambda (sub)
+                 (recurse (merge-pathnames sub dir))))
+             (delete-merged (dir)
+               (lambda (file)
+                 (delete-file (merge-pathnames file dir))))
+             (recurse (dir)
+               (map-directory (recurse-merged dir) dir
+                              :files nil
+                              :directories t
+                              :classify-symlinks nil)
+               (map-directory (delete-merged dir) dir
+                              :files t
+                              :directories nil
+                              :classify-symlinks nil)
+               (delete-dir dir))
+             (delete-dir (dir)
+               (let* ((namestring (native-namestring dir :as-file t))
+                      (res (alien-funcall (extern-alien #!-win32 "rmdir"
+                                                        #!+win32 "_rmdir"
+                                                        (function int c-string))
+                                          namestring)))
+                 (if (minusp res)
+                     (simple-file-perror "Couldn't delete directory ~A"
+                                         namestring (get-errno))
+                     dir))))
+      (if recursive
+          (recurse physical)
+          (delete-dir physical)))))
 
 (defun sbcl-homedir-pathname ()
   (let ((sbcl-home (posix-getenv "SBCL_HOME")))
@@ -786,34 +809,34 @@ Experimental: interface subject to change."
                                         :as-directory (and dirp (not as-files)))
                                        physical))))
       (with-native-directory-iterator (next dirname :errorp errorp)
-       (loop for name = (next)
-             while name
-             do (let* ((full (concatenate 'string dirname name))
-                       (kind (native-file-kind full)))
-                  (when kind
-                    (case kind
-                      (:directory
-                       (when directories
-                         (map-it name t)))
-                      (:symlink
-                       (if classify-symlinks
-                           (let* ((tmpname (merge-pathnames
-                                            (parse-native-namestring
-                                             name nil physical :as-directory nil)
-                                            physical))
-                                  (truename (query-file-system tmpname :truename nil)))
-                             (if (or (not truename)
-                                     (or (pathname-name truename) (pathname-type truename)))
-                                 (when files
-                                   (funcall fun tmpname))
-                                 (when directories
-                                   (map-it name t))))
-                           (when files
-                             (map-it name nil))))
-                      (t
-                       ;; Anything else parses as a file.
-                       (when files
-                         (map-it name nil)))))))))))
+        (loop for name = (next)
+              while name
+              do (let* ((full (concatenate 'string dirname name))
+                        (kind (native-file-kind full)))
+                   (when kind
+                     (case kind
+                       (:directory
+                        (when directories
+                          (map-it name t)))
+                       (:symlink
+                        (if classify-symlinks
+                            (let* ((tmpname (merge-pathnames
+                                             (parse-native-namestring
+                                              name nil physical :as-directory nil)
+                                             physical))
+                                   (truename (query-file-system tmpname :truename nil)))
+                              (if (or (not truename)
+                                      (or (pathname-name truename) (pathname-type truename)))
+                                  (when files
+                                    (funcall fun tmpname))
+                                  (when directories
+                                    (map-it name t))))
+                            (when files
+                              (map-it name nil))))
+                       (t
+                        ;; Anything else parses as a file.
+                        (when files
+                          (map-it name nil)))))))))))
 
 ;;; Part of DIRECTORY: implements matching the directory spec. Calls FUNCTION
 ;;; with all DIRECTORIES that match the directory portion of PATHSPEC.
