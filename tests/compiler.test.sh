@@ -469,5 +469,17 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+(defun foo ()
+  (declare (muffle-conditions warning))
+  (let ((em 0d0))
+    (declare (type double-float em))
+    (dotimes (i 42)
+      (setf em (float (1+ i))))))
+EOF
+expect_clean_compile $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

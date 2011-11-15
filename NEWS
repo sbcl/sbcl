@@ -18,6 +18,8 @@ changes relative to sbcl-1.0.53:
     resolved to directories.
   * bug fix: SB-KERNEL:MAKE-LISP-OBJ on GENCGC no longer categorically
     refuses to create SIMPLE-FUN objects.
+  * bug fix: type mismatch when assigning to lexical variables no longer
+    result in fasl-dumping internal type objects. (lp#890750)
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,
