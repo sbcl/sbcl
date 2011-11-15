@@ -955,7 +955,7 @@
                             forms))
                  (forms (if (eq result-type *wild-type*)
                             forms
-                            `((the ,result-type (progn ,@forms)))))
+                            `((the ,(type-specifier result-type) (progn ,@forms)))))
                  (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
                  (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
                              (ir1-convert-hairy-lambda forms vars keyp

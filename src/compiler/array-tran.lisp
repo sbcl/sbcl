@@ -1098,7 +1098,8 @@
              `(deftransform ,name ((array index ,@extra))
                 (let* ((type (lvar-type array))
                        (element-type (array-type-upgraded-element-type type))
-                       (declared-type (array-type-declared-element-type type)))
+                       (declared-type (type-specifier
+                                       (array-type-declared-element-type type))))
                   ;; If an element type has been declared, we want to
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array

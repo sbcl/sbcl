@@ -481,5 +481,28 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+(defun foo ()
+  (declare (muffle-conditions warning))
+  (flet ((foo ()
+           (declare (values fixnum))
+           nil))
+    (foo)))
+EOF
+expect_clean_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+(defun foo (x)
+  (declare (muffle-conditions warning)
+           (type (vector (mod 7) 1) x))
+  (setf (aref x 0) 8)
+  x)
+EOF
+expect_clean_compile $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN
