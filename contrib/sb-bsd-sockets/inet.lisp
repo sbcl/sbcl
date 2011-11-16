@@ -82,46 +82,53 @@ a list of protocol aliases"
               (sockint::protoent-name protoent)
               (let ((index 0))
                 (loop
-                   for alias = (sb-alien:deref (sockint::protoent-aliases protoent) index)
-                   while (not (sb-alien:null-alien alias))
-                   do (incf index)
-                   collect (sb-alien::c-string-to-string (sb-alien:alien-sap alias)
-                                                         (sb-impl::default-external-format)
-                                                         'character))))))
+                  for alias = (sb-alien:deref
+                               (sockint::protoent-aliases protoent) index)
+                  while (not (sb-alien:null-alien alias))
+                  do (incf index)
+                  collect (sb-alien::c-string-to-string
+                           (sb-alien:alien-sap alias)
+                           (sb-impl::default-external-format)
+                           'character))))))
     #+(and sb-thread os-provides-getprotoby-r)
     (let ((buffer-length 1024)
-          (max-buffer 10000))
+          (max-buffer 10000)
+          (result-buf nil)
+          (buffer nil)
+          #-solaris
+          (result nil))
       (declare (type fixnum buffer-length)
                (type fixnum max-buffer))
       (loop
-         (sb-alien:with-alien ((result-buf (* sockint::protoent)
-                                           (sb-alien:make-alien sockint::protoent))
-                               (buffer (* char )
-                                       (sb-alien:make-alien sb-alien:char buffer-length))
-                               #-solaris
-                               (result (* (* sockint::protoent))
-                                       (sb-alien:make-alien (* sockint::protoent))))
-
-           (let ((res (sockint::getprotobyname-r name
-                                                 result-buf
-                                                 buffer
-                                                 buffer-length
-                                                 #-solaris
-                                                 result)))
-             (if (eql res 0)
-                 (progn
-                   #-solaris
-                   (when (sb-alien::null-alien (sb-alien:deref result 0))
-                     (error 'unknown-protocol :name name))
-                   (return-from get-protocol-by-name
-                     (protoent-to-values result-buf)))
-                 (let ((errno (sb-unix::get-errno)))
-                   (if (eql errno  sockint::erange)
-                       (progn
-                         (incf buffer-length 1024)
-                         (if (> buffer-length max-buffer)
-                             (error "Exceeded max-buffer of ~d" max-buffer)))
-                       (error "Unexpected errno ~d" errno))))))))
+        (unwind-protect
+             (progn
+               (setf result-buf (sb-alien:make-alien sockint::protoent)
+                     buffer (sb-alien:make-alien sb-alien:char buffer-length))
+               #-solaris
+               (setf result (sb-alien:make-alien (* sockint::protoent)))
+               (let ((res (sockint::getprotobyname-r
+                           name result-buf buffer buffer-length #-solaris result)))
+                 (cond ((eql res 0)
+                        #-solaris
+                        (when (sb-alien::null-alien (sb-alien:deref result 0))
+                          (error 'unknown-protocol :name name))
+                        (return-from get-protocol-by-name
+                          (protoent-to-values result-buf)))
+                       (t
+                        (let ((errno (sb-unix::get-errno)))
+                          (cond ((eql errno sockint::erange)
+                                 (incf buffer-length 1024)
+                                 (when (> buffer-length max-buffer)
+                                   (error "Exceeded max-buffer of ~d" max-buffer)))
+                                (t
+                                 (error "Unexpected errno ~d" errno))))))))
+          (when result-buf
+            (sb-alien:free-alien result-buf))
+          (when buffer
+            (sb-alien:free-alien buffer))
+          #-solaris
+          (when result
+            (sb-alien:free-alien result)))))
     #-(and sb-thread os-provides-getprotoby-r)
     (tagbody
        (flet ((get-it ()

@@ -22,6 +22,7 @@ changes relative to sbcl-1.0.53:
     result in fasl-dumping internal type objects. (lp#890750)
   * bug fix: type mismatch on (setf aref) and function return values no
     longer result in fasl-dumping internal type objects.
+  * bug fix: SB-BSD-SOCKETS:GET-PROTOCOL-BY-NAME leaked foreign memory.
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,
