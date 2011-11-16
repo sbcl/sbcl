@@ -39,20 +39,33 @@ WITH-CAS-LOCK can be entered recursively."
     (multiple-value-bind (vars vals old new cas-form read-form)
         (sb!ext:get-cas-expansion place env)
       `(let* (,@(mapcar #'list vars vals)
-              (,owner ,read-form)
+              (,owner (progn
+                        (barrier (:read))
+                        ,read-form))
               (,self *current-thread*)
               (,old nil)
               (,new ,self))
          (unwind-protect
               (progn
                 (unless (eq ,owner ,self)
-                  (loop while (setf ,owner (or ,read-form ,cas-form))
+                  (loop until (loop repeat 100
+                                    when (and (progn
+                                                (barrier (:read))
+                                                (not ,read-form))
+                                              (not (setf ,owner ,cas-form)))
+                                    return t
+                                    else
+                                    do (sb!ext:spin-loop-hint))
                         do (thread-yield)))
                 ,@body)
+           ;; FIXME: SETF + write barrier should to be enough here.
+           ;; ...but GET-CAS-EXPANSION doesn't return a WRITE-FORM.
+           ;; ...maybe it should?
            (unless (eq ,owner ,self)
              (let ((,old ,self)
                    (,new nil))
-               ,cas-form)))))))
+               (unless (eq ,old ,cas-form)
+                 (bug "Failed to release CAS lock!")))))))))
 
 ;;; Conditions
 
@@ -160,7 +173,9 @@ arbitrary printable objects, and need not be unique.")
                      (multiple-value-list
                       (join-thread thread :default cookie))))
            (state (if (eq :running info)
-                      (let* ((thing (thread-waiting-for thread)))
+                      (let* ((thing (progn
+                                      (barrier (:read))
+                                      (thread-waiting-for thread))))
                         (typecase thing
                           (cons
                            (list "waiting on:" (cdr thing)
@@ -315,10 +330,12 @@ created and old ones may exit at any time."
        (unwind-protect
             (progn
               (setf (thread-waiting-for ,n-thread) ,new)
+              (barrier (:write))
               ,@forms)
          ;; Interrupt handlers and GC save and restore any
          ;; previous wait marks using WITHOUT-DEADLOCKS below.
-         (setf (thread-waiting-for ,n-thread) nil)))))
+         (setf (thread-waiting-for ,n-thread) nil)
+         (barrier (:write))))))
 
 ;;;; Mutexes
 
@@ -352,7 +369,9 @@ HOLDING-MUTEX-P."
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
 (defun check-deadlock ()
   (let* ((self *current-thread*)
-         (origin (thread-waiting-for self)))
+         (origin (progn
+                   (barrier (:read))
+                   (thread-waiting-for self))))
     (labels ((detect-deadlock (lock)
                (let ((other-thread (mutex-%owner lock)))
                  (cond ((not other-thread))
@@ -373,7 +392,9 @@ HOLDING-MUTEX-P."
                                  :thread *current-thread*
                                  :cycle chain)))
                        (t
-                        (let ((other-lock (thread-waiting-for other-thread)))
+                        (let ((other-lock (progn
+                                            (barrier (:read))
+                                            (thread-waiting-for other-thread))))
                           ;; If the thread is waiting with a timeout OTHER-LOCK
                           ;; is a cons, and we don't consider it a deadlock -- since
                           ;; it will time out on its own sooner or later.
@@ -382,6 +403,7 @@ HOLDING-MUTEX-P."
              (deadlock-chain (thread lock)
                (let* ((other-thread (mutex-owner lock))
                       (other-lock (when other-thread
+                                    (barrier (:read))
                                     (thread-waiting-for other-thread))))
                  (cond ((not other-thread)
                         ;; The deadlock is gone -- maybe someone unwound
@@ -417,7 +439,8 @@ HOLDING-MUTEX-P."
     (when old
       (error "Strange deadlock on ~S in an unithreaded build?" mutex))
     #!-sb-futex
-    (and (not (mutex-%owner mutex))
+    (and (not old)
+         ;; Don't even bother to try to CAS if it looks bad.
          (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
     #!+sb-futex
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
@@ -436,11 +459,16 @@ HOLDING-MUTEX-P."
   (declare (ignore to-sec to-usec))
   #!-sb-futex
   (flet ((cas ()
-           (loop repeat 24
-                 when (and (not (mutex-%owner mutex))
+           (loop repeat 100
+                 when (and (progn
+                             (barrier (:read))
+                             (not (mutex-%owner mutex)))
                            (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil
                                                          new-owner)))
-                 do (return-from cas t))
+                 do (return-from cas t)
+                 else
+                 do
+                    (sb!ext:spin-loop-hint))
            ;; Check for pending interrupts.
            (with-interrupts nil)))
     (declare (dynamic-extent #'cas))
@@ -665,7 +693,8 @@ IF-NOT-OWNER is :FORCE)."
                              (setf (waitqueue-%head queue) (cdr head)))
                          (car head)))
           while next
-          do (when (eq queue (sb!ext:compare-and-swap (thread-waiting-for next) queue nil))
+          do (when (eq queue (sb!ext:compare-and-swap
+                              (thread-waiting-for next) queue nil))
                (decf n)))
     nil))
 
@@ -744,11 +773,14 @@ around the call, checking the the associated data:
                (progn
                  #!-sb-futex
                  (progn
-                   (%waitqueue-enqueue me queue)
+                   (%with-cas-lock ((waitqueue-%owner queue))
+                     (%waitqueue-enqueue me queue))
                    (release-mutex mutex)
                    (setf status
                          (or (flet ((wakeup ()
-                                      (when (neq queue (thread-waiting-for me))
+                                      (barrier (:read))
+                                      (when (neq queue
+                                                 (thread-waiting-for me))
                                         :ok)))
                                (declare (dynamic-extent #'wakeup))
                                (allow-with-interrupts

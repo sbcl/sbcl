@@ -23,3 +23,6 @@
   (declare (ignore mutex))
   `(locally ,@body))
 
+(defmacro barrier ((kind) &body body)
+  (declare (ignore kind))
+  `(progn ,@body))

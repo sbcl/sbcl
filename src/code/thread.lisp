@@ -107,15 +107,19 @@ stale value, use MUTEX-OWNER instead."
                     'progn
                     'with-local-interrupts)))
       `(let* ((,thread *current-thread*)
-              (,prev (thread-waiting-for ,thread)))
+              (,prev (progn
+                       (barrier (:read))
+                       (thread-waiting-for ,thread))))
          (flet ((exec () ,@body))
            (if ,prev
                (,without
                 (unwind-protect
                      (progn
                        (setf (thread-waiting-for ,thread) nil)
+                       (barrier (:write))
                        (,with (exec)))
-                  (setf (thread-waiting-for ,thread) ,prev)))
+                  (setf (thread-waiting-for ,thread) ,prev)
+                  (barrier (:write))))
                (exec)))))))
 
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
