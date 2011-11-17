@@ -1325,17 +1325,59 @@ change."
 
 (defun interrupt-thread (thread function)
   #!+sb-doc
-  "Interrupt the live THREAD and make it run FUNCTION. A moderate
-degree of care is expected for use of INTERRUPT-THREAD, due to its
-nature: if you interrupt a thread that was holding important locks
-then do something that turns out to need those locks, you probably
-won't like the effect. FUNCTION runs with interrupts disabled, but
-WITH-INTERRUPTS is allowed in it. Keep in mind that many things may
-enable interrupts (GET-MUTEX when contended, for instance) so the
-first thing to do is usually a WITH-INTERRUPTS or a
-WITHOUT-INTERRUPTS. Within a thread interrupts are queued, they are
-run in same the order they were sent."
-  #!+win32
+  "Interrupt THREAD and make it run FUNCTION.
+
+The interrupt is asynchronous, and can occur anywhere with the exception of
+sections protected using SB-SYS:WITHOUT-INTERRUPTS.
+
+FUNCTION is called with interrupts disabled, under
+SB-SYS:ALLOW-WITH-INTERRUPTS. Since functions such as GRAB-MUTEX may try to
+enable interrupts internally, in most cases FUNCTION should either enter
+SB-SYS:WITH-INTERRUPTS to allow nested interrupts, or
+SB-SYS:WITHOUT-INTERRUPTS to prevent them completely.
+
+When a thread receives multiple interrupts, they are executed in the order
+they were sent -- first in, first out.
+
+This means that a great degree of care is required to use INTERRUPT-THREAD
+safely and sanely in a production environment. The general recommendation is
+to limit uses of INTERRUPT-THREAD for interactive debugging, banning it
+entirely from production environments -- it is simply exceedingly hard to use
+correctly.
+
+With those caveats in mind, what you need to know when using it:
+
+ * If calling FUNCTION causes a non-local transfer of control (ie. an
+   unwind), all normal cleanup forms will be executed.
+
+   However, if the interrupt occurs during cleanup forms of an UNWIND-PROTECT,
+   it is just as if that had happened due to a regular GO, THROW, or
+   RETURN-FROM: the interrupted cleanup form and those following it in the
+   same UNWIND-PROTECT do not get executed.
+
+   SBCL tries to keep its own internals asynch-unwind-safe, but this is
+   frankly an unreasonable expectation for third party libraries, especially
+   given that asynch-unwind-safety does not compose: a function calling
+   only asynch-unwind-safe function isn't automatically asynch-unwind-safe.
+
+   This means that in order for an asych unwind to be safe, the entire
+   callstack at the point of interruption needs to be asynch-unwind-safe.
+
+ * In addition to asynch-unwind-safety you must consider the issue of
+   re-entrancy. INTERRUPT-THREAD can cause function that are never normally
+   called recursively to be re-entered during their dynamic contour,
+   which may cause them to misbehave. (Consider binding of special variables,
+   values of global variables, etc.)
+
+Take togather, these two restrict the \"safe\" things to do using
+INTERRUPT-THREAD to a fairly minimal set. One useful one -- exclusively for
+interactive development use is using it to force entry to debugger to inspect
+the state of a thread:
+
+  (interrupt-thread thread #'break)
+
+Short version: be careful out there."
+ #!+win32
   (declare (ignore thread))
   #!+win32
   (with-interrupt-bindings
@@ -1360,8 +1402,43 @@ run in same the order they were sent."
 
 (defun terminate-thread (thread)
   #!+sb-doc
-  "Terminate the thread identified by THREAD, by causing it to run
-SB-EXT:QUIT - the usual cleanup forms will be evaluated"
+  "Terminate the thread identified by THREAD, by interrupting it and causing
+it to call SB-EXT:QUIT.
+
+The unwind caused by TERMINATE-THREAD is asynchronous, meaning that eg. thread
+executing
+
+  (let (foo)
+     (unwind-protect
+         (progn
+            (setf foo (get-foo))
+            (work-on-foo foo))
+       (when foo
+         ;; An interrupt occurring inside the cleanup clause
+         ;; will cause cleanups from the current UNWIND-PROTECT
+         ;; to be dropped.
+         (release-foo foo))))
+
+might miss calling RELEASE-FOO despite GET-FOO having returned true if the
+interrupt occurs inside the cleanup clause, eg. during execution of
+RELEASE-FOO.
+
+Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need to use
+WITHOUT-INTERRUPTS:
+
+  (let (foo)
+    (sb-sys:without-interrupts
+      (unwind-protect
+          (progn
+            (setf foo (sb-sys:allow-with-interrupts
+                        (get-foo)))
+            (sb-sys:with-local-interrupts
+              (work-on-foo foo)))
+       (when foo
+         (release-foo foo)))))
+
+Since most libraries using UNWIND-PROTECT do not do this, you should never
+assume that unknown code can safely be terminated using TERMINATE-THREAD."
   (interrupt-thread thread 'sb!ext:quit))
 
 (define-alien-routine "thread_yield" int)
