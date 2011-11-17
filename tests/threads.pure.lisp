@@ -495,3 +495,49 @@
                 (join-thread (make-thread (lambda () (sleep 10)))
                              :timeout 0.01
                              :default cookie)))))
+
+(with-test (:name :semaphore-notification
+            :skipped-on '(not :sb-thread))
+  (let ((sem (make-semaphore))
+        (ok nil)
+        (n 0))
+    (flet ((critical ()
+             (let ((note (make-semaphore-notification)))
+               (sb-sys:without-interrupts
+                 (unwind-protect
+                      (progn
+                        (sb-sys:with-local-interrupts
+                          (wait-on-semaphore sem :notification note)
+                          (sleep (random 0.1)))
+                        (incf n))
+                   ;; Re-increment on exit if we decremented it.
+                   (when (semaphore-notification-status note)
+                     (signal-semaphore sem))
+                   ;; KLUDGE: Prevent interrupts after this point from
+                   ;; unwinding us, so that we can reason about the counts.
+                   (sb-thread::block-deferrable-signals))))))
+      (let* ((threads (loop for i from 1 upto 100
+                            collect (make-thread #'critical :name (format nil "T~A" i))))
+             (safe nil)
+             (unsafe nil)
+             (interruptor (make-thread (lambda ()
+                                         (loop until ok)
+                                         (let (x)
+                                           (dolist (thread threads)
+                                             (cond (x
+                                                    (push thread unsafe)
+                                                    (sleep (random 0.1))
+                                                    (ignore-errors
+                                                     (terminate-thread thread)))
+                                                   (t
+                                                    (push thread safe)))
+                                             (setf x (not x))))))))
+        (signal-semaphore sem)
+        (setf ok t)
+        (join-thread interruptor)
+        (mapc #'join-thread safe)
+        (let ((k (count-if (lambda (th)
+                             (join-thread th :default nil))
+                           unsafe)))
+          (assert (= n (+ k (length safe))))
+          (assert unsafe))))))

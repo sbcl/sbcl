@@ -2022,7 +2022,12 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SEMAPHORE-COUNT"
                "SIGNAL-SEMAPHORE"
                "TRY-SEMAPHORE"
-               "WAIT-ON-SEMAPHORE"))
+               "WAIT-ON-SEMAPHORE"
+               ;; Semaphore notification objects
+               "CLEAR-SEMAPHORE-NOTIFICATION"
+               "MAKE-SEMAPHORE-NOTIFICATION"
+               "SEMAPHORE-NOTIFICATION"
+               "SEMAPHORE-NOTIFICATION-STATUS"))
 
    #s(sb-cold:package-data
       :name "SB!LOOP"

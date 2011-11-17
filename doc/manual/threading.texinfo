@@ -162,16 +162,22 @@ if you want a bounded wait.
 @comment  node-name,  next,  previous,  up
 @section Semaphores
 
-described here should be considered
-experimental, subject to API changes without notice.
+Semaphores are among other things useful for keeping track of a
+countable resource, eg. messages in a queue, and sleep when the
+resource is exhausted.
 
 @include struct-sb-thread-semaphore.texinfo
 @include fun-sb-thread-make-semaphore.texinfo
+@include fun-sb-thread-signal-semaphore.texinfo
+@include fun-sb-thread-wait-on-semaphore.texinfo
+@include fun-sb-thread-try-semaphore.texinfo
 @include fun-sb-thread-semaphore-count.texinfo
 @include fun-sb-thread-semaphore-name.texinfo
-@include fun-sb-thread-signal-semaphore.texinfo
-@include fun-sb-thread-try-semaphore.texinfo
-@include fun-sb-thread-wait-on-semaphore.texinfo
+
+@include struct-sb-thread-semaphore-notification.texinfo
+@include fun-sb-thread-make-semaphore-notification.texinfo
+@include fun-sb-thread-semaphore-notification-status.texinfo
+@include fun-sb-thread-clear-semaphore-notification.texinfo
 
 @node Waitqueue/condition variables
 @comment  node-name,  next,  previous,  up
