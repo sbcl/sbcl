@@ -81,9 +81,9 @@ Unless explicitly altered by @code{defpackage},
 @findex @sbext{disable-package-locks}
 @findex @sbext{enable-package-locks}
 
-Lexical bindings or declarations that violate package locks cause
-result in a @code{program-error} being signalled at when the form that
-violates package locks would be executed.
+Lexical bindings or declarations that violate package locks cause a
+compile-time warning, and a runtime @code{program-error} when the form
+that violates package locks would be executed.
 
 A complete listing of operators affect by this is: @code{let},
 @code{let*}, @code{flet}, @code{labels}, @code{macrolet}, and
