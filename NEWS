@@ -7,6 +7,23 @@ changes relative to sbcl-1.0.53:
        directory, but now signal an error instead. Use TRUENAME to resolve
        the pathname if you wish to delete the linked directory, and DELETE-FILE
        if you wish to delete the
+    ** The internal SB-THREAD::SPINLOCK API has been deprecated, and using
+       symbols associated with it will trigger a compile-time warning.
+  * thread-related enhancements:
+    (This work has been funded by the SBCL Threading 2011 IndieGoGo campaign.
+     Many thanks to generous donors!)
+    ** Threading is now more reliable on non-Linux platforms. We still
+       don't consider threads on non-Linux platforms good enough to
+       enable them by default, but they're in a clearly better shape now.
+    ** Deadlines supported now on all platforms.
+    ** All blocking functions in the threading API now have a :TIMEOUT
+       argument.
+    ** Semaphore notification objects have been added to SB-THREAD.
+    ** SB-CONCURRENCY contrib now includes Allegro-style GATE objects.
+    ** SB-EXT:COMPARE-AND-SWAP has been extended to support SLOT-VALUE,
+       STANDARD-INSTANCE-ACCESS, and FUNCALLABLE-STANDARD-INSTANCE-ACCESS.
+    ** Users can now defined new places usable with SB-EXT:COMPARE-AND-SWAP
+       using an API anologous to defining new SETFable places.
   * enchancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does
     the same validation of pointer objects as GENCGC does, instead of a
     comparatively weak bounds-check against the heap spaces.
