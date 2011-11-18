@@ -28,6 +28,7 @@
 
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <errno.h>
 
 #ifdef LISP_FEATURE_OPENBSD
 /* FIXME: there has to be a better way to avoid ./util.h here */
@@ -101,12 +102,51 @@ extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name, int wait)
 {
-    int pid = fork();
+    pid_t pid;
     int fd;
+    int channel[2];
     sigset_t sset;
 
-    if (pid != 0)
+    channel[0] = -1;
+    channel[1] = -1;
+    if (!pipe(channel)) {
+        if (-1==fcntl(channel[1], F_SETFD,  FD_CLOEXEC)) {
+            close(channel[1]);
+            channel[1] = -1;
+        }
+    }
+
+    pid = fork();
+    if (pid) {
+        if ((-1 != pid) && (-1 != channel[1])) {
+            int child_errno = 0;
+            int bytes = sizeof(int);
+            int n;
+            char *p = (char*)&child_errno;
+            close(channel[1]);
+            /* Try to read child errno from channel. */
+            while ((bytes > 0) &&
+                   (n = read(channel[0], p, bytes))) {
+                if (-1 == n) {
+                    if (EINTR == errno) {
+                        continue;
+                    } else {
+                        break;
+                    }
+                } else {
+                    bytes -= n;
+                    p += n;
+                }
+            }
+            if (child_errno) {
+                waitpid(pid, NULL, 0);
+                pid = 0;
+                errno = child_errno;
+            }
+        }
         return pid;
+    }
+    close (channel[0]);
 
     /* Put us in our own process group, but only if we need not
      * share stdin with our parent. In the latter case we claim
@@ -144,10 +184,10 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     /* Close all other fds. */
 #ifdef SVR4
     for (fd = sysconf(_SC_OPEN_MAX)-1; fd >= 3; fd--)
-        close(fd);
+        if (fd != channel[1]) close(fd);
 #else
     for (fd = getdtablesize()-1; fd >= 3; fd--)
-        close(fd);
+        if (fd != channel[1]) close(fd);
 #endif
 
     environ = envp;
@@ -157,7 +197,28 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     else
       execv(program, argv);
 
-    exit (1);
+    /* When exec fails and channel is available, send the errno value. */
+    if (-1 != channel[1]) {
+        int our_errno = errno;
+        int bytes = sizeof(int);
+        int n;
+        char *p = (char*)&our_errno;
+        while ((bytes > 0) &&
+               (n = write(channel[1], p, bytes))) {
+            if (-1 == n) {
+                if (EINTR == errno) {
+                    continue;
+                } else {
+                    break;
+                }
+            } else {
+                bytes -= n;
+                p += n;
+            }
+        }
+        close(channel[1]);
+    }
+    _exit(1);
 }
 #else  /* !LISP_FEATURE_WIN32 */
 

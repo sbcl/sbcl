@@ -12,6 +12,8 @@ changes relative to sbcl-1.0.53:
     comparatively weak bounds-check against the heap spaces.
   * enhancement: on win32, ABS of complex floats guards better against
     overflows. (lp#888410)
+  * enhancement: RUN-PROGRAM now distinguishes exec() failing from child
+    process exiting with code 1. (lp#676987)
   * bug fix: on 64-bit targets, atomic-incf/aref does index computation
     correctly, even on wide-fixnum builds. (lp#887220)
   * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that

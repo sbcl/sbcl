@@ -293,3 +293,16 @@
           (setq had-error-p t)))
       (assert (not had-error-p)))))
 
+(with-test (:name (:run-program :no-such-thing))
+  (assert (search "Couldn't execute"
+                  (handler-case
+                      (progn (run-program "no-such-program-we-hope" '()) nil)
+                    (error (e)
+                      (princ-to-string e))))))
+
+(with-test (:name (:run-program :not-executable))
+  (assert (search "Couldn't execute"
+                  (handler-case
+                      (progn (run-program "run-program.impure.lisp" '()) nil)
+                    (error (e)
+                      (princ-to-string e))))))
