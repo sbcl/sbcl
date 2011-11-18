@@ -106,6 +106,10 @@ a list of protocol aliases"
                      buffer (sb-alien:make-alien sb-alien:char buffer-length))
                #-solaris
                (setf result (sb-alien:make-alien (* sockint::protoent)))
+               (when (or (sb-alien:null-alien result-buf)
+                         (sb-alien:null-alien buffer)
+                         (sb-alien:null-alien result))
+                 (error "Could not allocate foreign memory."))
                (let ((res (sockint::getprotobyname-r
                            name result-buf buffer buffer-length #-solaris result)))
                  (cond ((eql res 0)
