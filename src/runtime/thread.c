@@ -158,7 +158,7 @@ initial_thread_trampoline(struct thread *th)
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define THREAD_STATE_LOCK_SIZE \
-    (sizeof(pthread_mutex_t))+(sizeof(pthread_cond_t))
+    ((sizeof(os_sem_t))+(sizeof(os_sem_t))+(sizeof(os_sem_t)))
 #else
 #define THREAD_STATE_LOCK_SIZE 0
 #endif
@@ -310,8 +310,9 @@ new_thread_trampoline(struct thread *th)
     gc_assert(lock_ret == 0);
 
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
-    pthread_mutex_destroy(th->state_lock);
-    pthread_cond_destroy(th->state_cond);
+    os_sem_destroy(th->state_sem);
+    os_sem_destroy(th->state_not_running_sem);
+    os_sem_destroy(th->state_not_stopped_sem);
 
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
@@ -430,12 +431,16 @@ create_thread_struct(lispobj initial_function) {
     th->os_thread=0;
 #ifdef LISP_FEATURE_SB_THREAD
     th->os_attr=malloc(sizeof(pthread_attr_t));
-    th->state_lock=(pthread_mutex_t *)((void *)th->alien_stack_start +
-                                       ALIEN_STACK_SIZE);
-    pthread_mutex_init(th->state_lock, NULL);
-    th->state_cond=(pthread_cond_t *)((void *)th->state_lock +
-                                      (sizeof(pthread_mutex_t)));
-    pthread_cond_init(th->state_cond, NULL);
+    th->state_sem=(os_sem_t *)((void *)th->alien_stack_start + ALIEN_STACK_SIZE);
+    th->state_not_running_sem=(os_sem_t *)
+        ((void *)th->state_sem + (sizeof(os_sem_t)));
+    th->state_not_stopped_sem=(os_sem_t *)
+        ((void *)th->state_not_running_sem + (sizeof(os_sem_t)));
+    th->state_not_running_waitcount = 0;
+    th->state_not_stopped_waitcount = 0;
+    os_sem_init(th->state_sem, 1);
+    os_sem_init(th->state_not_running_sem, 0);
+    os_sem_init(th->state_not_stopped_sem, 0);
 #endif
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
@@ -523,9 +528,6 @@ void create_initial_thread(lispobj initial_function) {
     pthread_key_create(&lisp_thread, 0);
 #endif
     if(th) {
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-        setup_mach_exception_handling_thread();
-#endif
         initial_thread_trampoline(th); /* no return */
     } else lose("can't create initial thread\n");
 }
@@ -679,7 +681,7 @@ void gc_start_the_world()
         if (p!=th) {
             lispobj state = thread_state(p);
             if (state != STATE_DEAD) {
-                if(state != STATE_SUSPENDED) {
+                if(state != STATE_STOPPED) {
                     lose("gc_start_the_world: wrong thread state is %d\n",
                          fixnum_value(state));
                 }

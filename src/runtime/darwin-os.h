@@ -38,4 +38,6 @@ typedef ucontext_t os_context_t;
 extern mach_port_t current_mach_task;
 #endif
 
+void darwin_init(void);
+
 #endif /* _DARWIN_OS_H */

@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stddef.h>
+#include <errno.h>
+#include <stdio.h>
 #include "sbcl.h"
 #include "globals.h"
 #include "runtime.h"
@@ -15,15 +17,107 @@ struct alloc_region { };
 #endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
+
+#ifdef LISP_FEATURE_SB_THREAD
+# ifndef LISP_FEATURE_DARWIN
+#   include <semaphore.h>
+    typedef sem_t os_sem_t;
+# else
+#   include <mach/semaphore.h>
+    typedef semaphore_t os_sem_t;
+# endif
+#endif
+
 #include "genesis/thread.h"
 #include "genesis/fdefn.h"
 #include "interrupt.h"
 
-#define STATE_RUNNING (make_fixnum(1))
-#define STATE_SUSPENDED (make_fixnum(2))
-#define STATE_DEAD (make_fixnum(3))
+#define STATE_RUNNING MAKE_FIXNUM(1)
+#define STATE_STOPPED MAKE_FIXNUM(2)
+#define STATE_DEAD MAKE_FIXNUM(3)
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+# ifndef LISP_FEATURE_DARWIN
+
+static inline void
+os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    if (-1==sem_init(sem, 0, value))
+        lose("os_sem_init(%p, %u): %s", sem, value, strerror(errno));
+    FSHOW((stderr, "os_sem_init(%p, %u)\n", sem, value));
+}
+
+static inline void
+os_sem_wait(os_sem_t *sem, char *what)
+{
+    FSHOW((stderr, "%s: os_sem_wait(%p) ...\n", what, sem));
+    while (-1 == sem_wait(sem))
+        if (EINTR!=errno)
+            lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_wait(%p) => ok\n", what, sem));
+}
+
+static inline void
+os_sem_post(sem_t *sem, char *what)
+{
+    if (-1 == sem_post(sem))
+        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_post(%p)\n", what, sem));
+}
+
+static inline void
+os_sem_destroy(os_sem_t *sem)
+{
+    if (-1==sem_destroy(sem))
+        lose("os_sem_destroy(%p): %s", sem, strerror(errno));
+}
+
+# else
+
+static inline void
+os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    if (KERN_SUCCESS!=semaphore_create(current_mach_task, sem, SYNC_POLICY_FIFO, (int)value))
+        lose("os_sem_init(%p): %s", sem, strerror(errno));
+}
+
+static inline void
+os_sem_wait(os_sem_t *sem, char *what)
+{
+    kern_return_t ret;
+  restart:
+    FSHOW((stderr, "%s: os_sem_wait(%p)\n", what, sem));
+    ret = semaphore_wait(*sem);
+    FSHOW((stderr, "%s: os_sem_wait(%p) => %s\n", what, sem,
+           KERN_SUCCESS==ret ? "ok" : strerror(errno)));
+    switch (ret) {
+    case KERN_SUCCESS:
+        return;
+    case KERN_OPERATION_TIMED_OUT:
+        fprintf(stderr, "%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+        goto restart;
+    default:
+        lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+    }
+}
+
+static inline void
+os_sem_post(os_sem_t *sem, char *what)
+{
+    if (KERN_SUCCESS!=semaphore_signal(*sem))
+        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_post(%p) ok\n", what, sem));
+}
+
+static inline void
+os_sem_destroy(os_sem_t *sem)
+{
+    if (-1==semaphore_destroy(current_mach_task, *sem))
+        lose("os_sem_destroy(%p): %s", sem, strerror(errno));
+}
+
+# endif
 
 /* Only access thread state with blockables blocked. */
 static inline lispobj
@@ -31,36 +125,72 @@ thread_state(struct thread *thread)
 {
     lispobj state;
     sigset_t old;
-    block_blockable_signals(0, &old);
-    pthread_mutex_lock(thread->state_lock);
+    block_blockable_signals(NULL, &old);
+    os_sem_wait(thread->state_sem, "thread_state");
     state = thread->state;
-    pthread_mutex_unlock(thread->state_lock);
-    thread_sigmask(SIG_SETMASK,&old,0);
+    os_sem_post(thread->state_sem, "thread_state");
+    thread_sigmask(SIG_SETMASK, &old, NULL);
     return state;
 }
 
 static inline void
 set_thread_state(struct thread *thread, lispobj state)
 {
+    int i, waitcount = 0;
     sigset_t old;
-    block_blockable_signals(0, &old);
-    pthread_mutex_lock(thread->state_lock);
-    thread->state = state;
-    pthread_cond_broadcast(thread->state_cond);
-    pthread_mutex_unlock(thread->state_lock);
-    thread_sigmask(SIG_SETMASK,&old,0);
+    block_blockable_signals(NULL, &old);
+    os_sem_wait(thread->state_sem, "set_thread_state");
+    if (thread->state != state) {
+        if ((STATE_STOPPED==state) ||
+            (STATE_DEAD==state)) {
+            waitcount = thread->state_not_running_waitcount;
+            thread->state_not_running_waitcount = 0;
+            for (i=0; i<waitcount; i++)
+                os_sem_post(thread->state_not_running_sem, "set_thread_state (not running)");
+        }
+        if ((STATE_RUNNING==state) ||
+            (STATE_DEAD==state)) {
+            waitcount = thread->state_not_stopped_waitcount;
+            thread->state_not_stopped_waitcount = 0;
+            for (i=0; i<waitcount; i++)
+                os_sem_post(thread->state_not_stopped_sem, "set_thread_state (not stopped)");
+        }
+        thread->state = state;
+    }
+    os_sem_post(thread->state_sem, "set_thread_state");
+    thread_sigmask(SIG_SETMASK, &old, NULL);
 }
 
 static inline void
 wait_for_thread_state_change(struct thread *thread, lispobj state)
 {
     sigset_t old;
-    block_blockable_signals(0, &old);
-    pthread_mutex_lock(thread->state_lock);
-    while (thread->state == state)
-        pthread_cond_wait(thread->state_cond, thread->state_lock);
-    pthread_mutex_unlock(thread->state_lock);
-    thread_sigmask(SIG_SETMASK,&old,0);
+    os_sem_t *wait_sem;
+    block_blockable_signals(NULL, &old);
+  start:
+    os_sem_wait(thread->state_sem, "wait_for_thread_state_change");
+    if (thread->state == state) {
+        switch (state) {
+        case STATE_RUNNING:
+            wait_sem = thread->state_not_running_sem;
+            thread->state_not_running_waitcount++;
+            break;
+        case STATE_STOPPED:
+            wait_sem = thread->state_not_stopped_sem;
+            thread->state_not_stopped_waitcount++;
+            break;
+        default:
+            lose("Invalid state in wait_for_thread_state_change: "OBJ_FMTX"\n", state);
+        }
+    } else {
+        wait_sem = NULL;
+    }
+    os_sem_post(thread->state_sem, "wait_for_thread_state_change");
+    if (wait_sem) {
+        os_sem_wait(wait_sem, "wait_for_thread_state_change");
+        goto start;
+    }
+    thread_sigmask(SIG_SETMASK, &old, NULL);
 }
 
 extern pthread_key_t lisp_thread;

@@ -377,9 +377,15 @@
   #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
-  (state-lock :c-type "pthread_mutex_t *" :length #!+alpha 2 #!-alpha 1)
+  (state-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
-  (state-cond :c-type "pthread_cond_t *" :length #!+alpha 2 #!-alpha 1)
+  (state-not-running-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
+  #!+sb-thread
+  (state-not-running-waitcount :c-type "int" :length 1)
+  #!+sb-thread
+  (state-not-stopped-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
+  #!+sb-thread
+  (state-not-stopped-waitcount :c-type "int" :length 1)
   (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)

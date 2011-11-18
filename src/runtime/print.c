@@ -33,6 +33,7 @@
 #include "os.h"
 #include "gencgc-alloc-region.h" /* genesis/thread.h needs this */
 #include "genesis/static-symbols.h"
+#include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/tagnames.h"

@@ -24,7 +24,6 @@
 #include "pseudo-atomic.h"
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
-#include "genesis/thread.h"
 #include "genesis/static-symbols.h"
 
 void bind_variable(lispobj symbol, lispobj value, void *th)

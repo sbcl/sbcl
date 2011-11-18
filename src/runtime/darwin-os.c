@@ -164,5 +164,10 @@ mach_fork() {
     }
 }
 
+void darwin_init(void)
+{
+    setup_mach_exception_handling_thread();
+}
+
 #endif
 

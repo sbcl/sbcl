@@ -90,6 +90,8 @@ os_init(char *argv[], char *envp[])
     freebsd_init();
 #elif defined(__OpenBSD__)
     openbsd_init();
+#elif defined(LISP_FEATURE_DARWIN)
+    darwin_init();
 #endif
 }
 

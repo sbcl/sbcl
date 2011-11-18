@@ -120,8 +120,10 @@ typedef pid_t os_thread_t;
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS
 #define LOW_WORD(c) ((pointer_sized_uint_t)c)
+#define OBJ_FMTX "lx"
 typedef unsigned long lispobj;
 #else
+#define OBJ_FMTX "x"
 #define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
 /* fake it on alpha32 */
 typedef unsigned int lispobj;
@@ -206,10 +208,11 @@ make_lispobj(void *o, int low_tag)
     return LOW_WORD(o) | low_tag;
 }
 
+#define MAKE_FIXNUM(n) (n << N_FIXNUM_TAG_BITS)
 static inline lispobj
 make_fixnum(long n)
 {
-    return n << N_FIXNUM_TAG_BITS;
+    return MAKE_FIXNUM(n);
 }
 
 static inline long
