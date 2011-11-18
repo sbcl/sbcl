@@ -24,10 +24,12 @@ changes relative to sbcl-1.0.53:
     result in fasl-dumping internal type objects. (lp#890750)
   * bug fix: type mismatch on (setf aref) and function return values no
     longer result in fasl-dumping internal type objects.
-  * bug fix: SB-BSD-SOCKETS foreign memory leaks
-    ** GET-PROTOCOL-BY-NAME had a significant leak.
-    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS leaked 1 word per call on
-       systems providing getaddrinfo().
+  * bug fix: SB-BSD-SOCKETS issues
+    ** GET-PROTOCOL-BY-NAME had a significant memory leak.
+    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS small amounts of memory on
+       systems with getaddrinfo().
+    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
+       safe outside systems with getaddrinfo().
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,

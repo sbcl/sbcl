@@ -61,6 +61,9 @@
 
 ;;; Resolving
 
+#+(and sb-thread (not sb-bsd-sockets-addrinfo))
+(sb-ext:defglobal **gethostby-lock** (sb-thread:make-mutex :name "gethostby lock"))
+
 (defun get-host-by-name (host-name)
   "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 HOST-NAME may also be an IP address in dotted quad notation or some other
@@ -68,7 +71,8 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
   #+sb-bsd-sockets-addrinfo
   (get-address-info host-name)
   #-sb-bsd-sockets-addrinfo
-  (make-host-ent (sockint::gethostbyname host-name)))
+  (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (make-host-ent (sockint::gethostbyname host-name))))
 
 (defun get-host-by-address (address)
   "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
@@ -77,14 +81,15 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
   #+sb-bsd-sockets-addrinfo
   (get-name-info address)
   #-sb-bsd-sockets-addrinfo
-  (sockint::with-in-addr packed-addr ()
-    (let ((addr-vector (coerce address 'vector)))
-      (loop for i from 0 below (length addr-vector)
-            do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
-                     (elt addr-vector i)))
-      (make-host-ent (sockint::gethostbyaddr packed-addr
-                                             4
-                                             sockint::af-inet)))))
+  (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (sockint::with-in-addr packed-addr ()
+      (let ((addr-vector (coerce address 'vector)))
+        (loop for i from 0 below (length addr-vector)
+              do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
+                       (elt addr-vector i)))
+        (make-host-ent (sockint::gethostbyaddr packed-addr
+                                               4
+                                               sockint::af-inet))))))
 
 ;;; Emulate the above two functions with getaddrinfo / getnameinfo
 
