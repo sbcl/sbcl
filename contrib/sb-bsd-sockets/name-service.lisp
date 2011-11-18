@@ -90,9 +90,9 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
 
 #+sb-bsd-sockets-addrinfo
 (defun get-address-info (node)
-  (sb-alien:with-alien ((res (* (* sockint::addrinfo)) :local
-                             (sb-alien:make-alien (* sockint::addrinfo))))
-    (let ((err (sockint::getaddrinfo node nil nil res)))
+  (sb-alien:with-alien ((buf (sb-alien:array (* sockint::addrinfo) 1)))
+    (let* ((res (sb-alien:addr (sb-alien:deref buf 0)))
+           (err (sockint::getaddrinfo node nil nil res)))
       (if (zerop err)
           (let ((host-ent (make-instance 'host-ent
                                          :name node
@@ -114,7 +114,7 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
                                                                          4)
                                        (host-ent-addresses host-ent)
                                        :test 'equalp)))))
-            (sockint::free-addrinfo (sb-alien:deref res))
+            (sockint::freeaddrinfo (sb-alien:deref res))
             host-ent)
           (addrinfo-error "getaddrinfo" err)))))
 
