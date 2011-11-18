@@ -669,17 +669,18 @@ IF-NOT-OWNER is :FORCE)."
     (setf (thread-waiting-for thread) nil)
     (let ((head (waitqueue-%head queue)))
       (do ((list head (cdr list))
-           (prev nil))
-          ((eq (car list) thread)
-           (let ((rest (cdr list)))
-             (cond (prev
-                    (setf (cdr prev) rest))
-                   (t
-                    (setf (waitqueue-%head queue) rest
-                          prev rest)))
-             (unless rest
-               (setf (waitqueue-%tail queue) prev))))
-        (setf prev list)))
+           (prev nil list))
+          ((or (null list)
+               (eq (car list) thread))
+           (when list
+             (let ((rest (cdr list)))
+               (cond (prev
+                      (setf (cdr prev) rest))
+                     (t
+                      (setf (waitqueue-%head queue) rest
+                            prev rest)))
+               (unless rest
+                 (setf (waitqueue-%tail queue) prev)))))))
     nil)
   (defun %waitqueue-wakeup (queue n)
     (declare (fixnum n))
@@ -779,8 +780,7 @@ around the call, checking the the associated data:
                    (setf status
                          (or (flet ((wakeup ()
                                       (barrier (:read))
-                                      (when (neq queue
-                                                 (thread-waiting-for me))
+                                      (unless (eq queue (thread-waiting-for me))
                                         :ok)))
                                (declare (dynamic-extent #'wakeup))
                                (allow-with-interrupts

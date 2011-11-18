@@ -118,8 +118,11 @@ stale value, use MUTEX-OWNER instead."
                        (setf (thread-waiting-for ,thread) nil)
                        (barrier (:write))
                        (,with (exec)))
-                  (setf (thread-waiting-for ,thread) ,prev)
-                  (barrier (:write))))
+                  ;; If we were waiting on a waitqueue, this becomes a bogus
+                  ;; wakeup.
+                  (when (mutex-p ,prev)
+                    (setf (thread-waiting-for ,thread) ,prev)
+                    (barrier (:write)))))
                (exec)))))))
 
 (sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
