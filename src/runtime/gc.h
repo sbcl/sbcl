@@ -38,6 +38,6 @@ extern void clear_auto_gc_trigger(void);
 
 extern boolean maybe_gc(os_context_t *context);
 
-extern unsigned long bytes_consed_between_gcs;
+extern os_vm_size_t bytes_consed_between_gcs;
 
 #endif /* _GC_H_ */

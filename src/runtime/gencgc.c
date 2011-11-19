@@ -149,8 +149,8 @@ boolean gencgc_partial_pickup = 0;
  */
 
 /* the total bytes allocated. These are seen by Lisp DYNAMIC-USAGE. */
-unsigned long bytes_allocated = 0;
-unsigned long auto_gc_trigger = 0;
+os_vm_size_t bytes_allocated = 0;
+os_vm_size_t auto_gc_trigger = 0;
 
 /* the source and destination generations. These are set before a GC starts
  * scavenging. */
@@ -285,13 +285,13 @@ struct generation {
     page_index_t alloc_large_unboxed_start_page;
 
     /* the bytes allocated to this generation */
-    unsigned long bytes_allocated;
+    os_vm_size_t bytes_allocated;
 
     /* the number of bytes at which to trigger a GC */
-    unsigned long gc_trigger;
+    os_vm_size_t gc_trigger;
 
     /* to calculate a new level for gc_trigger */
-    unsigned long bytes_consed_between_gc;
+    os_vm_size_t bytes_consed_between_gc;
 
     /* the number of GCs since the last raise */
     int num_gc;
@@ -305,7 +305,7 @@ struct generation {
      * objects are added from a GC of a younger generation. Dividing by
      * the bytes_allocated will give the average age of the memory in
      * this generation since its last GC. */
-    unsigned long cum_sum_bytes_allocated;
+    os_vm_size_t cum_sum_bytes_allocated;
 
     /* a minimum average memory age before a GC will occur helps
      * prevent a GC when a large number of new live objects have been
@@ -507,7 +507,7 @@ write_generation_stats(FILE *file)
                 generations[i].num_gc,
                 generation_average_age(i));
     }
-    fprintf(file,"   Total bytes allocated    = %lu\n", bytes_allocated);
+    fprintf(file,"   Total bytes allocated    = %lu\n", (unsigned long)bytes_allocated);
     fprintf(file,"   Dynamic-space-size bytes = %lu\n", (unsigned long)dynamic_space_size);
 
     fpu_restore(fpu_state);
@@ -3686,8 +3686,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* As a check re-scavenge the newspace once; no new objects should
      * be found. */
     {
-        long old_bytes_allocated = bytes_allocated;
-        long bytes_allocated;
+        os_vm_size_t old_bytes_allocated = bytes_allocated;
+        os_vm_size_t bytes_allocated;
 
         /* Start with a full scavenge. */
         scavenge_newspace_generation_one_scan(new_space);

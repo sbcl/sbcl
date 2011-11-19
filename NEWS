@@ -47,6 +47,8 @@ changes relative to sbcl-1.0.53:
        systems with getaddrinfo().
     ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
        safe outside systems with getaddrinfo().
+  * bug fix: on 64-bit systems setting the nursery size above 4Gb now works.
+    (lp#870868)
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,

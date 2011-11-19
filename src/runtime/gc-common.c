@@ -90,8 +90,7 @@ lispobj (*transother[256])(lispobj object);
 long (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointers;
 
-unsigned long bytes_consed_between_gcs = 12*1024*1024;
-
+os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
 /*
  * copying objects

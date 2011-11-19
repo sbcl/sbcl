@@ -467,13 +467,16 @@ main(int argc, char *argv[])
     printf("\n");
 #endif
 
+    printf("(in-package \"SB!KERNEL\")\n\n");
 #ifdef LISP_FEATURE_GENCGC
     printf(";;; GENCGC related\n");
-    printf("(in-package \"SB!KERNEL\")\n");
     DEFTYPE("page-index-t", page_index_t);
     DEFTYPE("generation-index-t", generation_index_t);
     printf("\n");
 #endif
+
+    printf(";;; Our runtime types\n");
+    DEFTYPE("os-vm-size-t", os_vm_size_t);
 
     return 0;
 }

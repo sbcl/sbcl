@@ -25,7 +25,7 @@
 (declaim (inline dynamic-usage))
 #!+gencgc
 (defun dynamic-usage ()
-  (sb!alien:extern-alien "bytes_allocated" sb!alien:unsigned-long))
+  (sb!alien:extern-alien "bytes_allocated" os-vm-size-t))
 #!-gencgc
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
@@ -176,7 +176,7 @@ NIL as the pathname."
         (native-pathname (cast val c-string)))))
   (declaim (inline dynamic-space-size))
   (defun dynamic-space-size ()
-    (sb!alien:extern-alien "dynamic_space_size" sb!alien:unsigned-long)))
+    (sb!alien:extern-alien "dynamic_space_size" os-vm-size-t)))
 
 ;;;; SUB-GC
 
@@ -340,13 +340,11 @@ NIL as the pathname."
   #!+sb-doc
   "The amount of memory that will be allocated before the next garbage
 collection is initiated. This can be set with SETF."
-  (sb!alien:extern-alien "bytes_consed_between_gcs"
-                         (sb!alien:unsigned 32)))
+  (sb!alien:extern-alien "bytes_consed_between_gcs" os-vm-size-t))
 
 (defun (setf bytes-consed-between-gcs) (val)
   (declare (type index val))
-  (setf (sb!alien:extern-alien "bytes_consed_between_gcs"
-                               (sb!alien:unsigned 32))
+  (setf (sb!alien:extern-alien "bytes_consed_between_gcs" os-vm-size-t)
         val))
 
 (declaim (inline maybe-handle-pending-gc))
@@ -374,12 +372,12 @@ collection is initiated. This can be set with SETF."
             (alloc-unboxed-start-page page-index-t)
             (alloc-large-start-page page-index-t)
             (alloc-large-unboxed-start-page page-index-t)
-            (bytes-allocated unsigned-long)
-            (gc-trigger unsigned-long)
-            (bytes-consed-between-gcs unsigned-long)
+            (bytes-allocated os-vm-size-t)
+            (gc-trigger os-vm-size-t)
+            (bytes-consed-between-gcs os-vm-size-t)
             (number-of-gcs int)
             (number-of-gcs-before-promotion int)
-            (cum-sum-bytes-allocated unsigned-long)
+            (cum-sum-bytes-allocated os-vm-size-t)
             (minimum-age-before-gc double)))
 
 #!+gencgc
