@@ -42,12 +42,21 @@ EXPERIMENTAL: Interface subject to change."
 
 (defun get-cas-expansion (place &optional environment)
   #!+sb-doc
-  "Analogous to GET-SETF-EXPANSION. Return six values needed by the CAS
-machinary: a list of temporary variables, a list of values to which they must
-be bound, a temporary variable for the old value of PLACE, a temporary value
-for the new value of PLACE, a form using the aforementioned temporaries
-which performs the compare-and-swap operation, and a form using the aforementioned
-temporaries with which to perform a volatile read of the place.
+  "Analogous to GET-SETF-EXPANSION. Returns the following six values:
+
+ * list of temporary variables
+
+ * list of value-forms whose results those variable must be bound
+
+ * temporary variable for the old value of PLACE
+
+ * temporary variable for the new value of PLACE
+
+ * form using the aforementioned temporaries which performs the
+   compare-and-swap operation on PLACE
+
+ * form using the aforementioned temporaries with which to perform a volatile
+   read of PLACE
 
 Example:
 

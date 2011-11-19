@@ -58,9 +58,6 @@ WITH-CAS-LOCK can be entered recursively."
                                     do (sb!ext:spin-loop-hint))
                         do (thread-yield)))
                 ,@body)
-           ;; FIXME: SETF + write barrier should to be enough here.
-           ;; ...but GET-CAS-EXPANSION doesn't return a WRITE-FORM.
-           ;; ...maybe it should?
            (unless (eq ,owner ,self)
              (let ((,old ,self)
                    (,new nil))
