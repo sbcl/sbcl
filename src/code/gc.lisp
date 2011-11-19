@@ -176,6 +176,7 @@ NIL as the pathname."
         (native-pathname (cast val c-string)))))
   (declaim (inline dynamic-space-size))
   (defun dynamic-space-size ()
+    "Size of the dynamic space in bytes."
     (sb!alien:extern-alien "dynamic_space_size" os-vm-size-t)))
 
 ;;;; SUB-GC

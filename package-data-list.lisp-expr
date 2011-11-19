@@ -626,6 +626,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "GC" "GET-BYTES-CONSED"
                "*GC-RUN-TIME*"
                "PURIFY"
+               "DYNAMIC-SPACE-SIZE"
                ;; Gencgc only, but symbols exist for manual building
                ;; convenience on all platforms.
                "GENERATION-AVERAGE-AGE"
