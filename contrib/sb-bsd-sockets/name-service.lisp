@@ -61,7 +61,7 @@
 
 ;;; Resolving
 
-#+(and sb-thread (not sb-bsd-sockets-addrinfo))
+#-sb-bsd-sockets-addrinfo
 (sb-ext:defglobal **gethostby-lock** (sb-thread:make-mutex :name "gethostby lock"))
 
 (defun get-host-by-name (host-name)
