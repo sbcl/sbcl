@@ -1767,3 +1767,29 @@ experimental and subject to change."
           `(("SYS:SRC;**;*.*.*" ,src)
             ("SYS:CONTRIB;**;*.*.*" ,contrib)
             ("SYS:OUTPUT;**;*.*.*" ,output)))))
+
+(defun set-sbcl-source-location (pathname)
+  "Initialize the SYS logical host based on PATHNAME, which should be
+the top-level directory of the SBCL sources. This will replace any
+existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and
+\"SYS:OUTPUT;\". Other \"SYS:\" translations are preserved."
+  (let ((truename (truename pathname))
+        (current-translations
+         (remove-if (lambda (translation)
+                      (or (pathname-match-p "SYS:SRC;" translation)
+                          (pathname-match-p "SYS:CONTRIB;" translation)
+                          (pathname-match-p "SYS:OUTPUT;" translation)))
+                    (logical-pathname-translations "SYS")
+                    :key #'first)))
+    (flet ((physical-target (component)
+             (merge-pathnames
+              (make-pathname :directory (list :relative component
+                                              :wild-inferiors)
+                             :name :wild
+                             :type :wild)
+              truename)))
+      (setf (logical-pathname-translations "SYS")
+            `(("SYS:SRC;**;*.*.*" ,(physical-target "src"))
+              ("SYS:CONTRIB;**;*.*.*" ,(physical-target "contrib"))
+              ("SYS:OUTPUT;**;*.*.*" ,(physical-target "output"))
+              ,@current-translations)))))

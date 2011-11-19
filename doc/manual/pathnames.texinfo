@@ -105,6 +105,8 @@ particular, the core system's source files match the logical pathname
 @code{"SYS:SRC;**;*.*.*"}, and the contributed modules' source files
 match @code{"SYS:CONTRIB;**;*.*.*"}.
 
+@include fun-sb-ext-set-sbcl-source-location.texinfo
+
 @node Native Filenames
 @comment  node-name,  next,  previous,  up
 @section Native Filenames

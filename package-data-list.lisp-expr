@@ -799,6 +799,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
                "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
                "DELETE-DIRECTORY"
+               "SET-SBCL-SOURCE-LOCATION"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
