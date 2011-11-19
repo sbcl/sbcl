@@ -419,7 +419,8 @@ Note: currently changes to this value are lost when saving core."
       "Number of bytes that can be allocated to GENERATION before that
 generation is considered for garbage collection. This value is meaningless for
 generation 0 (the nursery): see BYTES-CONSED-BETWEEN-GCS instead. Default is
-20Mb. Can be assigned to using SETF. Available on GENCGC platforms only.
+5% of the dynamic space size. Can be assigned to using SETF. Available on
+GENCGC platforms only.
 
 Experimental: interface subject to change."
     t)

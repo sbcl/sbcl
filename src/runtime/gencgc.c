@@ -4136,7 +4136,7 @@ gc_init(void)
         generations[i].num_gc = 0;
         generations[i].cum_sum_bytes_allocated = 0;
         /* the tune-able parameters */
-        generations[i].bytes_consed_between_gc = 2000000;
+        generations[i].bytes_consed_between_gc = bytes_consed_between_gcs;
         generations[i].number_of_gcs_before_promotion = 1;
         generations[i].minimum_age_before_gc = 0.75;
     }

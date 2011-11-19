@@ -54,10 +54,11 @@
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
 (with-test (:name :bug-529014 :skipped-on '(not :gencgc))
-  ;; FIXME: These parameters are a) tunable in the source and b)
-  ;; duplicated multiple times there and now here.  It would be good to
-  ;; OAOO-ify them (probably to src/compiler/generic/params.lisp).
   (loop for i from 0 to sb-vm:+pseudo-static-generation+
-     do (assert (= (sb-ext:generation-bytes-consed-between-gcs i) 2000000))
-       (assert (= (sb-ext:generation-minimum-age-before-gc i) 0.75))
-       (assert (= (sb-ext:generation-number-of-gcs-before-promotion i) 1))))
+     do (assert (= (sb-ext:generation-bytes-consed-between-gcs i)
+                   (sb-ext:bytes-consed-between-gcs)))
+        ;; FIXME: These parameters are a) tunable in the source and b)
+        ;; duplicated multiple times there and now here.  It would be good to
+        ;; OAOO-ify them (probably to src/compiler/generic/params.lisp).
+        (assert (= (sb-ext:generation-minimum-age-before-gc i) 0.75))
+        (assert (= (sb-ext:generation-number-of-gcs-before-promotion i) 1))))
