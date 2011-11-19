@@ -1601,15 +1601,33 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 (!def-debug-command "RESTART-FRAME" ()
   (if (frame-has-debug-tag-p *current-frame*)
-      (let* ((call-list (frame-call-as-list *current-frame*))
-             (fun (fdefinition (car call-list))))
-        (unwind-to-frame-and-call *current-frame*
-                                  (lambda ()
-                                    (apply fun (cdr call-list)))))
+      (multiple-value-bind (fname args) (frame-call *current-frame*)
+        (multiple-value-bind (fun arglist ok)
+            (if (and (legal-fun-name-p fname) (fboundp fname))
+                (values (fdefinition fname) args t)
+                (values (sb!di:debug-fun-fun (sb!di:frame-debug-fun *current-frame*))
+                        (frame-args-as-list *current-frame*)
+                        nil))
+          (when (and fun
+                     (or ok
+                         (y-or-n-p "~@<No global function for the frame, but we ~
+                                    do have access to a function object that we ~
+                                    can try to call -- but if it is normally part ~
+                                    of a closure, then this is NOT going to end well.~_~_~
+                                    Try it anyways?~:@>")))
+            (unwind-to-frame-and-call *current-frame*
+                                      (lambda ()
+                                        ;; Ensure TCO.
+                                        (declare (optimize (debug 0)))
+                                        (apply fun arglist))))
+          (format *debug-io*
+              "Can't restart ~S: no function for frame."
+              *current-frame*)))
       (format *debug-io*
-              "~@<can't find a tag for this frame ~
-                 ~2I~_(hint: try increasing the DEBUG optimization quality ~
-                 and recompiling)~:@>")))
+              "~@<Can't restart ~S: tag not found. ~
+               ~2I~_(hint: try increasing the DEBUG optimization quality ~
+               and recompiling)~:@>"
+              *current-frame*)))
 
 (defun frame-has-debug-tag-p (frame)
   #!+unwind-to-frame-and-call-vop
