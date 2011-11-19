@@ -157,10 +157,6 @@ run in any thread.")
 (progn
   (sb!alien:define-alien-variable ("gc_logfile" %gc-logfile) (* char))
   (defun (setf gc-logfile) (pathname)
-    "Use PATHNAME to log garbage collections. If non-null, the
-designated file is opened before and after each collection, and
-generation statistics are appended to it. To stop writing the log, use
-NIL as the pathname."
     (let ((new (when pathname
                  (sb!alien:make-alien-string
                   (native-namestring (translate-logical-pathname pathname)
@@ -170,7 +166,11 @@ NIL as the pathname."
       (when old
         (sb!alien:free-alien old))))
   (defun gc-logfile ()
-    "Return the name of the current GC logfile."
+    #!+sb-doc
+    "Return the pathname used to log garbage collections. Can be SETF.
+Default is NIL, meaning collections are not logged. If non-null, the
+designated file is opened before and after each collection, and generation
+statistics are appended to it."
     (let ((val %gc-logfile))
       (when val
         (native-pathname (cast val c-string)))))
@@ -435,8 +435,8 @@ Experimental: interface subject to change."
     t)
   (def number-of-gcs-before-promotion
       "Number of times garbage collection is done on GENERATION before
-automatic promotion to the next generation is triggered. Can be assigned to
-using SETF. Available on GENCGC platforms only.
+automatic promotion to the next generation is triggered. Default is 1. Can be
+assigned to using SETF. Available on GENCGC platforms only.
 
 Experimental: interface subject to change."
     t)
