@@ -1008,8 +1008,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     clear_auto_gc_trigger(); /* restore mmap as it was given by os */
 #endif
 
-    os_zero((os_vm_address_t) current_dynamic_space,
-            (os_vm_size_t) dynamic_space_size);
+    os_zero((os_vm_address_t) current_dynamic_space, dynamic_space_size);
 
     /* Zero the stack. */
     os_zero((os_vm_address_t) access_control_stack_pointer(all_threads),

@@ -4068,6 +4068,12 @@ gc_init(void)
     page_table_pages = dynamic_space_size/GENCGC_CARD_BYTES;
     gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
 
+    /* Default nursery size to 5% of the total dynamic space size,
+     * min 1Mb. */
+    bytes_consed_between_gcs = dynamic_space_size/(os_vm_size_t)20;
+    if (bytes_consed_between_gcs < (1024*1024))
+        bytes_consed_between_gcs = 1024*1024;
+
     /* The page_table must be allocated using "calloc" to initialize
      * the page structures correctly. There used to be a separate
      * initialization loop (now commented out; see below) but that was

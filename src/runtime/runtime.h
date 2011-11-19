@@ -256,16 +256,4 @@ other_immediate_lowtag_p(lispobj header)
 extern void *successful_malloc (size_t size);
 extern char *copied_string (char *string);
 
-#define RUNTIME_OPTIONS_MAGIC 0x31EBF355
-/* 1 for magic, 1 for boolean, 2 for struct runtime_options fields */
-#define RUNTIME_OPTIONS_WORDS (1 + 1 + 2)
-
-struct runtime_options {
-    size_t dynamic_space_size;
-    size_t thread_control_stack_size;
-};
-
-/* saved runtime path computed from argv[0] */
-extern char *saved_runtime_path;
-
 #endif /* _SBCL_RUNTIME_H_ */

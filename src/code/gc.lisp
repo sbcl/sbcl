@@ -339,7 +339,12 @@ NIL as the pathname."
 (defun bytes-consed-between-gcs ()
   #!+sb-doc
   "The amount of memory that will be allocated before the next garbage
-collection is initiated. This can be set with SETF."
+collection is initiated. This can be set with SETF.
+
+On GENCGC platforms this is the nursery size, and defaults to 5% of dynamic
+space size.
+
+Note: currently changes to this value are lost when saving core."
   (sb!alien:extern-alien "bytes_consed_between_gcs" os-vm-size-t))
 
 (defun (setf bytes-consed-between-gcs) (val)
