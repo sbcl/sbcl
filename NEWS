@@ -56,7 +56,6 @@ changes relative to sbcl-1.0.53:
        safe outside systems with getaddrinfo().
   * bug fix: on 64-bit systems setting the nursery size above 4Gb now works.
     (lp#870868)
-  * bug fix: SB-POSIX tests failed on OpenBSD 5.0. (lp#892707)
   * bug fix: With several combinations of argument types, for example (EXPT
     <integer> <(complex double)>), EXPT now uses double-precision throughout
     instead of partially calculating only to single-precision.  (lp#741564;
