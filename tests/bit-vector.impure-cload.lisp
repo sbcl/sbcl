@@ -78,15 +78,8 @@
 
 (test-small-bit-vectors)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun dynamic-space-size ()
-    #+gencgc
-    (- sb-vm:dynamic-space-end sb-vm:dynamic-space-start)
-    #-gencgc
-    (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)))
-
 ;; except on machines where the arrays won't fit into the dynamic space.
-#+#.(cl:if (cl:> (cl-user::dynamic-space-size)
+#+#.(cl:if (cl:> (sb-ext:dynamic-space-size)
                  (cl:truncate (cl:1- cl:array-dimension-limit)
                               sb-vm:n-word-bits))
            '(and)
