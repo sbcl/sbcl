@@ -16,10 +16,10 @@
 # include <sys/types.h>
 # include <unistd.h>
 # include "runtime.h"
+# include "runtime-options.h"
 #endif
 
 #include "sbcl.h"
-#include "runtime-options.h"
 
 #ifndef LANGUAGE_ASSEMBLY
 
