@@ -140,7 +140,9 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
             }
             if (child_errno) {
                 waitpid(pid, NULL, 0);
-                pid = 0;
+                /* Our convention to tell Lisp that it was the exec that
+                 * failed, not the fork. */
+                pid = -2;
                 errno = child_errno;
             }
         }

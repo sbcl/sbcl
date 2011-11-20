@@ -773,7 +773,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                                                   (if search 1 0)
                                                   environment-vec pty-name
                                                   (if wait 1 0))))
-                             (when (plusp child)
+                             (unless (minusp child)
                                (setf proc
                                      (apply
                                       #'make-process
@@ -791,9 +791,13 @@ Users Manual for details about the PROCESS structure."#-win32"
                                                   (list :%status :running))))
                                (push proc *active-processes*)))))
                        ;; Report the error outside the lock.
+                       #+win32
+                       (when (minusp child)
+                         (error "Couldn't execute ~S: ~A" progname (strerror)))
+                       #-win32
                        (case child
-                         (0
-                          (error "Couldn't execute ~A: ~A" progname (strerror)))
+                         (-2
+                          (error "Couldn't execute ~S: ~A" progname (strerror)))
                          (-1
                           (error "Couldn't fork child process: ~A" (strerror))))))))))
         (dolist (fd *close-in-parent*)
